@@ -16,11 +16,31 @@ from pathlib import Path
 
 # ``streamlit run app/streamlit_app.py`` puts ``app/`` (the script's own
 # directory) on ``sys.path[0]``, not the project root. The top-level ``verify``
-# and ``app`` packages then fail to import. Ensure the project root is importable
-# regardless of how the app is launched or the current working directory.
+# and ``app`` packages then fail to import, and the ``invoice_referee`` package
+# lives under ``src/`` (only importable via an editable install locally). On a
+# clean host such as Streamlit Community Cloud there is no editable install, so
+# make both the project root and ``src/`` importable regardless of how the app
+# is launched or what the current working directory is.
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
+for _p in (_PROJECT_ROOT, _PROJECT_ROOT / "src"):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
+
+# Streamlit Community Cloud injects deployment secrets via ``st.secrets`` rather
+# than a ``.env`` file (``.env`` is intentionally gitignored). Bridge any LLM_*
+# secret into the process environment so ``client_from_env()`` picks it up with
+# no code branching between local and deployed runs.
+try:  # pragma: no cover - exercised only on the deployed host
+    import os as _os
+
+    import streamlit as _st_secrets_probe
+
+    for _k, _v in dict(_st_secrets_probe.secrets).items():
+        if _k.startswith("LLM_") and _k not in _os.environ:
+            _os.environ[_k] = str(_v)
+except Exception:
+    # No secrets file locally (or none set): fall back to real env / .env / fallback.
+    pass
 
 import streamlit as st
 

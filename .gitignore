@@ -32,6 +32,8 @@ htmlcov/
 .env
 .env.*
 !.env.example
+# Streamlit deploy secrets (keep only the template committed)
+.streamlit/secrets.toml
 
 # OS / editor cruft
 .DS_Store

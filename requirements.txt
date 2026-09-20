@@ -1,0 +1,6 @@
+# Runtime dependencies for the deployed Streamlit app (Streamlit Community Cloud
+# installs from this file). The invoice_referee package is imported from ./src
+# via a sys.path shim in app/streamlit_app.py, so no editable install is needed.
+# Everything else the agent uses (urllib, json, dataclasses) is the standard
+# library, so this stays deliberately minimal.
+streamlit>=1.36

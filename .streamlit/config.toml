@@ -1,0 +1,9 @@
+# Streamlit runtime config for the deployed app.
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
