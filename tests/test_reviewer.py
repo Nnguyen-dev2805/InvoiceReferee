@@ -196,6 +196,31 @@ def test_unseen_beyond_authority_escalate(routine_evidence):
     assert result.decision.uncertainty.type is m.UncertaintyType.BEYOND_AUTHORITY
 
 
+def test_review_sets_effective_action_to_decision(routine_evidence):
+    result = review(routine_evidence())
+    assert result.transaction.effective_action is result.decision.action
+
+
+def test_review_continues_existing_audit_sequence(routine_evidence):
+    from invoice_referee.audit.store import AuditStore
+
+    audit = AuditStore(transaction_id="TX-01")
+    audit.append("DOCUMENT_UPLOADED")
+    result = review(routine_evidence(), audit=audit)
+    ids = [e.event_id for e in result.audit_events]
+    assert ids == [f"AUD-{n:04d}" for n in range(1, len(ids) + 1)]
+    assert len(ids) == len(set(ids))
+    assert result.audit_events[0].event_type == "DOCUMENT_UPLOADED"
+
+
+def test_review_rejects_mismatched_audit_transaction(routine_evidence):
+    from invoice_referee.audit.store import AuditStore
+
+    audit = AuditStore(transaction_id="TX-OTHER")
+    with pytest.raises(ValueError):
+        review(routine_evidence(), audit=audit)
+
+
 def test_reviewer_source_has_no_case_id_branching():
     import inspect
     from invoice_referee.services import reviewer

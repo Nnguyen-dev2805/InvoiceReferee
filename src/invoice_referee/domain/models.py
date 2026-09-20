@@ -396,6 +396,7 @@ class Transaction:
     checks: list[CheckResult] = field(default_factory=list)
     evidence_issues: list[EvidenceIssue] = field(default_factory=list)
     decision: Optional[Decision] = None
+    effective_action: Optional[DecisionAction] = None
     audit_log: list[AuditEvent] = field(default_factory=list)
     workflow_status: WorkflowStatus = WorkflowStatus.ACTIVE
     human_stops: list[HumanStop] = field(default_factory=list)

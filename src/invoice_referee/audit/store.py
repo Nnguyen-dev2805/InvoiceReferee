@@ -60,6 +60,78 @@ class AuditStore:
     def record_transaction_created(self, tx: m.Transaction) -> m.AuditEvent:
         return self.append("TRANSACTION_CREATED", reason=f"Transaction {tx.transaction_id} created")
 
+    # --- extraction / OCR events ---------------------------------------------
+
+    def record_document_uploaded(
+        self, document: m.UploadedDocument, *, actor: str = "InvoiceReferee"
+    ) -> m.AuditEvent:
+        return self.append(
+            "DOCUMENT_UPLOADED",
+            actor=actor,
+            input_refs=[document.document_id],
+            details={
+                "filename": document.filename,
+                "mime_type": document.mime_type,
+                "size_bytes": document.size_bytes,
+                "sha256": document.sha256,
+            },
+        )
+
+    def record_document_validated(
+        self, document: m.UploadedDocument, *, actor: str = "InvoiceReferee"
+    ) -> m.AuditEvent:
+        return self.append("DOCUMENT_VALIDATED", actor=actor, input_refs=[document.document_id])
+
+    def record_ocr_completed(self, document: m.OCRDocument) -> m.AuditEvent:
+        return self.append(
+            "OCR_COMPLETED",
+            input_refs=[document.document_id],
+            details={
+                "engine": document.engine,
+                "engine_version": document.engine_version,
+                "block_count": len(document.blocks),
+                "processing_ms": document.processing_ms,
+            },
+        )
+
+    def record_field_event(
+        self,
+        event_type: str,
+        candidate: m.FieldCandidate,
+        *,
+        actor: str = "InvoiceReferee",
+        reason: Optional[str] = None,
+    ) -> m.AuditEvent:
+        """Record a field extraction/flag/confirm/correct event with provenance.
+
+        Raw document bytes are never included; only block IDs and field values.
+        """
+        return self.append(
+            event_type,
+            actor=actor,
+            input_refs=list(candidate.evidence_block_ids),
+            result=candidate.status.value,
+            reason=reason,
+            details={
+                "field_name": candidate.field_name,
+                "raw_text": candidate.raw_text,
+                "normalized_value": candidate.normalized_value,
+                "original_normalized_value": candidate.original_normalized_value,
+                "page_number": candidate.page_number,
+                "extraction_method": candidate.extraction_method,
+            },
+        )
+
+    def record_extraction_reviewed(
+        self, result: m.InvoiceExtractionResult, *, actor: str = "InvoiceReferee"
+    ) -> m.AuditEvent:
+        return self.append(
+            "EXTRACTION_REVIEWED",
+            actor=actor,
+            input_refs=[result.document_id],
+            result=result.status.value,
+        )
+
     def record_check(self, check: m.CheckResult) -> m.AuditEvent:
         return self.append(
             "CHECK_COMPLETED",
@@ -151,6 +223,8 @@ class AuditStore:
             override_id=f"OVR-{len(tx.human_overrides) + 1:03d}",
         )
         tx.human_overrides.append(override)
+        # Override changes only the effective action; the agent decision stays.
+        tx.effective_action = override.overridden_action
         self.append(
             "OVERRIDDEN",
             actor=actor,

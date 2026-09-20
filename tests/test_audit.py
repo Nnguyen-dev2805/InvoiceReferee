@@ -147,6 +147,68 @@ def test_history_survives_stop_then_override():
     assert len(tx.human_overrides) == 1
 
 
+# --- Extraction / OCR events (Task 10) ---------------------------------------
+
+
+def _candidate(name="total_amount", value=30_000_000, status=m.FieldStatus.EXTRACTED):
+    return m.FieldCandidate(
+        field_name=name,
+        raw_text=str(value),
+        normalized_value=value,
+        confidence=0.95,
+        status=status,
+        page_number=1,
+        bounding_box=None,
+        evidence_block_ids=["BLK-001"],
+    )
+
+
+def test_record_document_and_ocr_events_keep_one_sequence():
+    store = AuditStore(transaction_id="TX-OCR")
+    doc = m.UploadedDocument("DOC-1", "inv.pdf", "application/pdf", 1234, "abc", b"%PDF-")
+    store.record_document_uploaded(doc, actor="judge")
+    store.record_document_validated(doc, actor="judge")
+    ocr = m.OCRDocument("DOC-1", [], [], "", "paddleocr", "v1", 12)
+    store.record_ocr_completed(ocr)
+    ids = [e.event_id for e in store.events]
+    assert ids == ["AUD-0001", "AUD-0002", "AUD-0003"]
+    assert [e.event_type for e in store.events] == [
+        "DOCUMENT_UPLOADED",
+        "DOCUMENT_VALIDATED",
+        "OCR_COMPLETED",
+    ]
+
+
+def test_record_field_event_carries_provenance_not_bytes():
+    store = AuditStore(transaction_id="TX-OCR")
+    ev = store.record_field_event("FIELD_CONFIRMED", _candidate(), actor="ap@x")
+    assert ev.event_type == "FIELD_CONFIRMED"
+    assert ev.input_refs == ["BLK-001"]
+    assert ev.details["field_name"] == "total_amount"
+    assert ev.details["extraction_method"] == "OCR_RULE"
+    assert "content" not in ev.details and "image_bytes" not in ev.details
+
+
+def test_record_extraction_reviewed_event():
+    store = AuditStore(transaction_id="TX-OCR")
+    result = m.InvoiceExtractionResult("DOC-1", m.ExtractionStatus.REVIEWED)
+    ev = store.record_extraction_reviewed(result, actor="judge")
+    assert ev.event_type == "EXTRACTION_REVIEWED"
+    assert ev.result == "REVIEWED"
+
+
+def test_override_sets_effective_action_but_preserves_agent_decision():
+    store = AuditStore(transaction_id="TX-001")
+    tx = m.Transaction(transaction_id="TX-001", transaction_type=m.TransactionType.PO_GOODS_PURCHASE)
+    tx.decision = m.Decision(action=m.DecisionAction.AUTO_PROCESS, reason="ok")
+    tx.effective_action = m.DecisionAction.AUTO_PROCESS
+    store.record_override(
+        tx, actor="judge@demo", overridden_action=m.DecisionAction.ESCALATE, reason="manual"
+    )
+    assert tx.decision.action is m.DecisionAction.AUTO_PROCESS
+    assert tx.effective_action is m.DecisionAction.ESCALATE
+
+
 # --- Export ------------------------------------------------------------------
 
 

@@ -28,9 +28,18 @@ def review(
     evidence: dict[str, Any],
     client: Optional[LLMClient] = None,
     model: Optional[str] = None,
+    audit: Optional[AuditStore] = None,
 ) -> m.ReviewResult:
     tx = build_transaction(evidence)
-    audit = AuditStore(transaction_id=tx.transaction_id)
+
+    # Continue an existing audit timeline (e.g. from the OCR extraction phase)
+    # so extraction, review, and human-control events share one ID sequence.
+    if audit is None:
+        audit = AuditStore(transaction_id=tx.transaction_id)
+    elif audit.transaction_id is None:
+        audit.transaction_id = tx.transaction_id
+    elif audit.transaction_id != tx.transaction_id:
+        raise ValueError("audit store transaction_id does not match the reviewed transaction")
     audit.record_transaction_created(tx)
 
     checks = run_checks(tx)
@@ -53,6 +62,7 @@ def review(
     audit.record_decision(decision)
 
     tx.decision = decision
+    tx.effective_action = decision.action
     tx.audit_log = list(audit.events)
     tx.updated_at = datetime.now(timezone.utc).isoformat()
 
