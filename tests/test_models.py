@@ -1,0 +1,342 @@
+"""Tests for domain data contracts (DATA_MODEL.md)."""
+
+import dataclasses
+
+import pytest
+
+from invoice_referee.domain import models as m
+
+
+# --- Enums: exact allowed values ---------------------------------------------
+
+
+def test_decision_action_values():
+    assert {a.value for a in m.DecisionAction} == {
+        "AUTO_PROCESS",
+        "REQUEST_INFO",
+        "ESCALATE",
+    }
+
+
+def test_check_status_values():
+    assert {s.value for s in m.CheckStatus} == {
+        "PASS",
+        "FAIL",
+        "UNKNOWN",
+        "NOT_APPLICABLE",
+    }
+
+
+def test_uncertainty_type_values():
+    assert {u.value for u in m.UncertaintyType} == {
+        "FACTUAL_UNKNOWN",
+        "OUTSIDE_POLICY",
+        "BEYOND_AUTHORITY",
+    }
+
+
+def test_payment_status_values():
+    assert {p.value for p in m.PaymentStatus} == {
+        "UNPAID",
+        "PARTIALLY_PAID",
+        "PAID",
+        "UNKNOWN",
+    }
+
+
+def test_scope_status_is_tristate():
+    assert {s.value for s in m.ScopeStatus} == {
+        "IN_SCOPE",
+        "OUTSIDE_POLICY",
+        "UNKNOWN",
+    }
+
+
+def test_transaction_type_sprint1_only_po_goods():
+    assert {t.value for t in m.TransactionType} == {"PO_GOODS_PURCHASE"}
+
+
+def test_workflow_status_values():
+    assert {w.value for w in m.WorkflowStatus} == {"ACTIVE", "STOPPED"}
+
+
+def test_invoice_type_values():
+    assert {i.value for i in m.InvoiceType} == {
+        "ORIGINAL",
+        "ADJUSTMENT",
+        "REPLACEMENT",
+    }
+
+
+# --- Integer-money validation ------------------------------------------------
+
+
+def test_money_rejects_float():
+    with pytest.raises((TypeError, ValueError)):
+        m.PurchaseOrder(
+            po_id="PO-001",
+            vendor_id="V-ABC",
+            items=[],
+            approved_total=30_000_000.0,  # float money not allowed
+            status="APPROVED",
+        )
+
+
+def test_money_rejects_bool():
+    with pytest.raises((TypeError, ValueError)):
+        m.PaymentRecord(invoice_id="INV-001", status=m.PaymentStatus.UNPAID, paid_amount=True)
+
+
+def test_money_rejects_negative():
+    with pytest.raises(ValueError):
+        m.PaymentRecord(invoice_id="INV-001", status=m.PaymentStatus.PAID, paid_amount=-1)
+
+
+def test_money_accepts_int_zero():
+    rec = m.PaymentRecord(invoice_id="INV-001", status=m.PaymentStatus.UNPAID, paid_amount=0)
+    assert rec.paid_amount == 0
+
+
+def test_invoice_line_total_must_be_int():
+    with pytest.raises((TypeError, ValueError)):
+        m.InvoiceLineItem(
+            item_id="ITEM-001",
+            invoiced_quantity=10,
+            unit_price=3_000_000,
+            line_total=30_000_000.5,
+        )
+
+
+def test_quantity_rejects_float():
+    with pytest.raises((TypeError, ValueError)):
+        m.InvoiceLineItem(
+            item_id="ITEM-001",
+            invoiced_quantity=10.5,
+            unit_price=3_000_000,
+            line_total=30_000_000,
+        )
+
+
+# --- Construction of core evidence objects -----------------------------------
+
+
+def test_purchase_order_construction():
+    po = m.PurchaseOrder(
+        po_id="PO-001",
+        vendor_id="V-ABC",
+        items=[
+            m.POLineItem(
+                item_id="ITEM-001",
+                description="Dell Monitor",
+                ordered_quantity=10,
+                unit_price=3_000_000,
+                line_total=30_000_000,
+            )
+        ],
+        approved_total=30_000_000,
+        status="APPROVED",
+    )
+    assert po.po_id == "PO-001"
+    assert po.items[0].ordered_quantity == 10
+    assert po.currency == "VND"
+
+
+def test_supplier_invoice_optional_related_invoice_defaults_none():
+    inv = m.SupplierInvoice(
+        invoice_id="INV-001",
+        invoice_number="0000123",
+        invoice_series="2C23TTU",
+        invoice_type=m.InvoiceType.ORIGINAL,
+        vendor_id="V-ABC",
+        vendor_tax_code="0101234567",
+        po_id="PO-001",
+        invoice_date="2026-09-13",
+        items=[],
+        total_amount=30_000_000,
+    )
+    assert inv.related_invoice_number is None
+    assert inv.flagged is False
+    assert inv.source_type == m.SourceType.JSON
+
+
+def test_payment_record_optional_payment_date():
+    rec = m.PaymentRecord(
+        invoice_id="INV-001",
+        status=m.PaymentStatus.UNPAID,
+        paid_amount=0,
+    )
+    assert rec.payment_date is None
+
+
+# --- Transaction container ---------------------------------------------------
+
+
+def test_transaction_defaults():
+    tx = m.Transaction(transaction_id="TX-001", transaction_type=m.TransactionType.PO_GOODS_PURCHASE)
+    assert tx.workflow_status == m.WorkflowStatus.ACTIVE
+    assert tx.goods_receipts == []
+    assert tx.payment_history == []
+    assert tx.approvals == []
+    assert tx.checks == []
+    assert tx.audit_log == []
+    assert tx.human_stops == []
+    assert tx.human_overrides == []
+    assert tx.decision is None
+
+
+def test_transaction_lists_are_independent_between_instances():
+    a = m.Transaction(transaction_id="TX-A", transaction_type=m.TransactionType.PO_GOODS_PURCHASE)
+    b = m.Transaction(transaction_id="TX-B", transaction_type=m.TransactionType.PO_GOODS_PURCHASE)
+    a.checks.append("x")
+    assert b.checks == []
+
+
+# --- CheckResult -------------------------------------------------------------
+
+
+def test_check_result_construction():
+    cr = m.CheckResult(
+        check_id="CHECK_QUANTITY",
+        status=m.CheckStatus.FAIL,
+        policy_rule_id="P05",
+        expected=10,
+        actual=12,
+        reason="Invoice quantity exceeds received quantity",
+        evidence_refs=["PO-001", "GR-001", "INV-001"],
+    )
+    assert cr.status is m.CheckStatus.FAIL
+    assert cr.evidence_refs == ["PO-001", "GR-001", "INV-001"]
+
+
+def test_check_result_optional_fields_default():
+    cr = m.CheckResult(check_id="CHECK_VENDOR", status=m.CheckStatus.PASS)
+    assert cr.policy_rule_id is None
+    assert cr.expected is None
+    assert cr.actual is None
+    assert cr.evidence_refs == []
+
+
+# --- PolicyContext -----------------------------------------------------------
+
+
+def test_policy_context_construction():
+    ctx = m.PolicyContext(
+        scope_status=m.ScopeStatus.IN_SCOPE,
+        authority_threshold_vnd=50_000_000,
+        applicable_rule_ids=["P05", "P12"],
+        deterministic_uncertainties=[m.UncertaintyType.FACTUAL_UNKNOWN],
+    )
+    assert ctx.scope_status is m.ScopeStatus.IN_SCOPE
+    assert ctx.authority_threshold_vnd == 50_000_000
+
+
+def test_policy_context_threshold_must_be_int():
+    with pytest.raises((TypeError, ValueError)):
+        m.PolicyContext(
+            scope_status=m.ScopeStatus.IN_SCOPE,
+            authority_threshold_vnd=50_000_000.0,
+        )
+
+
+# --- AgentAssessment ---------------------------------------------------------
+
+
+def test_agent_assessment_construction():
+    a = m.AgentAssessment(
+        proposed_uncertainty_type=m.UncertaintyType.FACTUAL_UNKNOWN,
+        proposed_action=m.DecisionAction.REQUEST_INFO,
+        explanation="Invoice amount exceeds approved PO amount.",
+        primary_check_id="CHECK_AMOUNT",
+        question="Có phê duyệt điều chỉnh thêm 5M không?",
+        target="Purchasing",
+        policy_rule_ids=["P07"],
+        evidence_refs=["PO-001", "INV-001"],
+    )
+    assert a.fallback_used is False
+    assert a.proposed_action is m.DecisionAction.REQUEST_INFO
+
+
+# --- Decision ----------------------------------------------------------------
+
+
+def test_decision_auto_process_has_no_question_or_target():
+    d = m.Decision(
+        action=m.DecisionAction.AUTO_PROCESS,
+        reason="All checks pass and within authority",
+    )
+    assert d.question is None
+    assert d.target is None
+    assert d.policy_rule_ids == []
+
+
+def test_decision_request_info_carries_question():
+    d = m.Decision(
+        action=m.DecisionAction.REQUEST_INFO,
+        reason="Invoice exceeds PO amount",
+        uncertainty=m.Uncertainty(type=m.UncertaintyType.FACTUAL_UNKNOWN, field="invoice.total_amount"),
+        question="Có phê duyệt điều chỉnh thêm 5M không?",
+        target="Purchasing",
+        policy_rule_ids=["P07"],
+    )
+    assert d.action is m.DecisionAction.REQUEST_INFO
+    assert d.question
+
+
+# --- Human controls preserve original decision -------------------------------
+
+
+def test_human_override_rejects_stopped_as_action():
+    # overridden_action must be one of the three user-facing actions
+    with pytest.raises((TypeError, ValueError)):
+        m.HumanOverride(
+            actor="a@example.com",
+            original_action=m.DecisionAction.AUTO_PROCESS,
+            overridden_action="STOPPED",
+            reason="bad",
+            timestamp="2026-09-20T10:12:00+07:00",
+        )
+
+
+def test_human_stop_construction():
+    s = m.HumanStop(
+        actor="a@example.com",
+        previous_workflow_status=m.WorkflowStatus.ACTIVE,
+        new_workflow_status=m.WorkflowStatus.STOPPED,
+        reason="Supplier bank account changed",
+        timestamp="2026-09-20T10:10:00+07:00",
+    )
+    assert s.new_workflow_status is m.WorkflowStatus.STOPPED
+
+
+# --- ReviewResult ------------------------------------------------------------
+
+
+def test_review_result_bundles_outputs():
+    tx = m.Transaction(transaction_id="TX-001", transaction_type=m.TransactionType.PO_GOODS_PURCHASE)
+    ctx = m.PolicyContext(scope_status=m.ScopeStatus.IN_SCOPE, authority_threshold_vnd=50_000_000)
+    decision = m.Decision(action=m.DecisionAction.AUTO_PROCESS, reason="ok")
+    rr = m.ReviewResult(
+        transaction=tx,
+        checks=[],
+        policy_context=ctx,
+        agent_assessment=None,
+        decision=decision,
+        audit_events=[],
+    )
+    assert rr.decision.action is m.DecisionAction.AUTO_PROCESS
+    assert dataclasses.is_dataclass(rr)
+
+
+# --- ExtractedDocument -------------------------------------------------------
+
+
+def test_extracted_document_contract():
+    doc = m.ExtractedDocument(
+        document_type="SUPPLIER_INVOICE",
+        source_type=m.SourceType.JSON,
+        source_ref="fixture://TC01/invoice.json",
+        extractor="json_adapter",
+        fields={"invoice_number": "0000123"},
+    )
+    assert doc.parse_warnings == []
+    assert doc.fields["invoice_number"] == "0000123"
