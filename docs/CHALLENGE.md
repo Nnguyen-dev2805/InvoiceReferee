@@ -1,256 +1,165 @@
-# InvoiceReferee — Challenge Summary
+# InvoiceReferee — Tóm tắt thử thách
 
-## 1. Challenge đã chọn
+## 1. Thử thách đã chọn
 
-**Challenge A — Escalation Referee**
+**Challenge A — Bộ điều phối chuyển tiếp**
 
-Mục tiêu cốt lõi: hệ thống phải tự xử lý các trường hợp thường quy và biết chính xác khi nào cần dừng để hỏi hoặc chuyển cho con người.
+Mục tiêu cốt lõi: hệ thống tự xử lý trường hợp thường quy và biết dừng đúng lúc để hỏi hoặc chuyển cho con người.
 
-InvoiceReferee không được rơi vào hai cực đoan:
+InvoiceReferee không được:
+
 - chuyển mọi trường hợp cho con người;
-- hoặc tự xử lý mọi trường hợp dù dữ liệu còn nghi vấn.
+- tự xử lý khi dữ liệu còn thiếu, sai chính sách, vượt quyền hoặc có nghi vấn.
 
----
+## 2. Quy trình nhóm lựa chọn
 
-## 2. Quy trình mà team chọn
-
-InvoiceReferee tập trung vào quy trình mua hàng có PO và xác nhận nhận hàng:
+Nhóm chọn quy trình kế toán chi phí:
 
 ```text
-Purchase Order
-→ Goods Receipt
-→ Supplier Invoice
-→ Review
-→ Payment Review
+Hóa đơn / Chứng từ / Bằng chứng thanh toán
+      +
+Đề nghị chi của nhân viên / Bằng chứng bổ sung
+      ↓
+Tác tử kế toán kiểm tra
+      ↓
+AUTO_PROCESS / REQUEST_INFO / ESCALATE
+      ↓
+Chuẩn bị bút toán / Kiểm tra thanh toán / Con người quyết định
 ```
 
-Trong Sprint 1, InvoiceReferee phụ trách bước **Review**: kiểm tra bằng chứng giao dịch, xác định hồ sơ có đủ căn cứ để đi tiếp hay cần con người can thiệp.
+Sprint 1 bao phủ:
 
-**Phạm vi Sprint 1:** PO-based goods purchases có Goods Receipt.
+- hóa đơn điện tử;
+- hóa đơn/chứng từ do nhân viên chụp;
+- bằng chứng thanh toán;
+- PO/biên bản nhận hàng/nghiệm thu dịch vụ như bằng chứng bổ sung khi có.
 
----
+## 3. Các nhóm tình huống bắt buộc
 
-## 3. Ba loại tình huống bắt buộc phải phân biệt
+### 3.1. Chưa xác định được dữ kiện
 
-### 3.1. Chưa xác định được thông tin thực tế
+Dữ liệu bị thiếu, không đọc được, mâu thuẫn hoặc chưa đủ bối cảnh kinh doanh.
 
-Dữ liệu bị thiếu, mâu thuẫn hoặc chưa đủ để kết luận.
-
-Ví dụ:
-- PO = 30M
-- Invoice = 35M
-- Chưa biết có PO điều chỉnh hoặc phê duyệt tăng giá hay không.
-
-Kết quả mong đợi:
+Kết quả:
 
 ```text
 REQUEST_INFO
 ```
 
-Hệ thống phải hỏi một câu cụ thể để bổ sung phần thông tin còn thiếu.
+Ví dụ: chứng từ có số tiền nhưng thiếu mục đích kinh doanh/dự án.
 
-### 3.2. Ngoài phạm vi quy định
+### 3.2. Ngoài chính sách
 
-Thông tin đã rõ nhưng trường hợp đó không nằm trong policy mà Agent được phép áp dụng.
+Dữ kiện đã rõ nhưng vi phạm hoặc nằm ngoài chính sách.
 
-Ví dụ:
-- Policy Sprint 1 chỉ bao phủ giao dịch mua hàng có PO.
-- Hệ thống nhận một invoice không có PO và loại giao dịch này không được policy định nghĩa.
-
-Kết quả mong đợi:
+Kết quả:
 
 ```text
 ESCALATE
 ```
+
+Ví dụ: mã số thuế bên mua thuộc công ty khác, trùng lặp rõ ràng, chi phí cá nhân hoặc chứng từ quá hạn.
 
 ### 3.3. Vượt thẩm quyền
 
-Thông tin đã đầy đủ và nhất quán nhưng quyết định cuối cùng vượt quyền của Agent.
+Dữ kiện đầy đủ và có thể hợp lệ, nhưng số tiền/loại chi vượt quyền của tác tử.
 
-Ví dụ:
-- PO = 120M
-- Receipt = đầy đủ
-- Invoice = 120M
-- Policy quy định giao dịch trên 50M cần Finance Manager phê duyệt.
-
-Kết quả mong đợi:
+Kết quả:
 
 ```text
 ESCALATE
 ```
 
----
+### 3.4. Nghi vấn
 
-## 4. Ba hành động chính của hệ thống
+Dữ kiện đọc được nhưng có dấu hiệu bất thường/nghi vấn cần con người kiểm tra.
 
-### AUTO_PROCESS
+Kết quả:
 
-Dùng khi:
-- dữ liệu cần thiết đầy đủ;
-- PO, Goods Receipt và Invoice nhất quán theo policy;
-- không phát hiện duplicate invoice;
-- invoice chưa được thanh toán trước đó;
-- giao dịch nằm trong phạm vi policy;
-- giao dịch nằm trong thẩm quyền tự xử lý của Agent.
+```text
+ESCALATE
+```
 
-`AUTO_PROCESS` chỉ có nghĩa là hồ sơ đã qua bước review thường quy và có thể đi tiếp sang bước payment review. Nó **không** có nghĩa là Agent tự chuyển tiền.
+## 4. Ba hành động hiển thị cho người dùng
 
-### REQUEST_INFO
+### `AUTO_PROCESS`
 
-Dùng khi:
-- thiếu dữ liệu;
-- dữ liệu mâu thuẫn;
-- chưa xác định được sự thật cần thiết để ra quyết định.
+Dùng khi bằng chứng đầy đủ, trường bắt buộc hợp lệ, bối cảnh kinh doanh rõ, đúng chính sách, không trùng lặp, không có nghi vấn và trong thẩm quyền.
 
-Agent phải tạo câu hỏi cụ thể và có thể trả lời trực tiếp.
+### `REQUEST_INFO`
 
-Ví dụ:
+Dùng khi chưa biết đủ dữ kiện để quyết định. Tác tử phải hỏi câu cụ thể.
 
-> PO là 30M nhưng invoice là 35M. Có PO điều chỉnh hoặc phê duyệt tăng thêm 5M không?
+### `ESCALATE`
 
-### ESCALATE
+Dùng khi dữ kiện đã rõ nhưng nằm ngoài chính sách, vượt thẩm quyền hoặc có nghi vấn. Tác tử phải nêu lý do, loại không chắc chắn và đối tượng xử lý nếu chính sách xác định được.
 
-Dùng khi:
-- dữ liệu thực tế đã rõ;
-- nhưng trường hợp nằm ngoài policy;
-- hoặc quyết định vượt thẩm quyền của Agent.
+## 5. Yêu cầu tối thiểu của Sprint 1
 
-Khi chuyển tiếp, hệ thống phải chỉ rõ lý do và người/role cần quyết định nếu policy xác định được.
+- Có ít nhất 15 trường hợp kiểm thử.
+- Bao gồm trường hợp thường quy, chưa xác định dữ kiện, ngoài chính sách, vượt thẩm quyền và nghi vấn.
+- Trường hợp thường quy phải được tự động xử lý.
+- Không mã hóa cứng theo mã trường hợp.
+- Đầu vào mới phải được xử lý qua cùng luồng của sản phẩm.
+- Khi cần con người, câu hỏi phải cụ thể và truy vết được bằng chứng.
+- Có nhật ký kiểm toán và thao tác Dừng/Ghi đè của con người.
 
----
+## 6. Bộ Verify Challenge A
 
-## 5. Yêu cầu bắt buộc của Sprint 1
+Verify gồm 5 trường hợp:
 
-- Chọn một workflow thường quy cụ thể và có policy rõ ràng cho workflow đó.
-- Có tối thiểu **15 test cases**.
-- Test cases phải bao gồm:
-  - trường hợp thường quy;
-  - trường hợp chưa rõ thông tin;
-  - trường hợp ngoài policy;
-  - trường hợp vượt thẩm quyền.
-- Các trường hợp thường quy phải được tự xử lý hoàn toàn.
-- Không được chuyển tiếp tất cả trường hợp cho con người.
-- Không được khẳng định kết quả khi input đã bị gắn cờ nghi vấn hoặc chưa đủ bằng chứng.
-- Khi cần người xử lý, câu hỏi phải cụ thể và trực tiếp.
-- Hệ thống phải xử lý được input mới chưa từng thấy.
-- Không được hard-code quyết định theo test-case ID hoặc dữ liệu cố định.
+- 3 trường hợp thường quy → `AUTO_PROCESS`;
+- 1 trường hợp chưa xác định dữ kiện → `REQUEST_INFO`;
+- 1 trường hợp cần con người quyết định → `ESCALATE`.
 
----
+Verify phải hiển thị:
 
-## 6. Challenge A Verify
-
-Challenge A yêu cầu **5 trường hợp kiểm thử chuyển tiếp** có thể chạy bằng một thao tác:
-
-- 3 trường hợp thường quy → tự xử lý;
-- 2 trường hợp cần con người tham gia.
-
-Hai case cần con người **không bắt buộc cùng mang label `ESCALATE`**. Với decision model của InvoiceReferee, case thiếu fact dùng `REQUEST_INFO`; case outside-policy hoặc beyond-authority dùng `ESCALATE`. Cả hai đều là hành vi dừng tự động hóa để xin thông tin/quyết định từ con người theo tinh thần Challenge A.
-
-Verify phải hiển thị rõ tối thiểu:
-
-| Field | Ý nghĩa |
+| Trường | Ý nghĩa |
 | --- | --- |
-| Case | Tên / mã case |
-| Expected | Kết quả mong đợi |
-| Actual | Kết quả thực tế |
-| Pass/Fail | So sánh Expected và Actual |
-| Uncertainty | FACTUAL_UNKNOWN / OUTSIDE_POLICY / BEYOND_AUTHORITY nếu có |
-| Question | Câu hỏi chuyển tiếp nếu có |
-| Target | Người/role cần trả lời nếu xác định được |
-| Timestamp | Thời điểm chạy |
+| Case | Mã trường hợp |
+| Expected | Hành động kỳ vọng |
+| Actual | Hành động thực tế |
+| Pass/Fail | Kết quả so sánh |
+| Uncertainty | FACTUAL_UNKNOWN / OUTSIDE_POLICY / BEYOND_AUTHORITY / SUSPICIOUS |
+| Question | Câu hỏi bổ sung |
+| Target | Vai trò/người cần trả lời |
+| Timestamp | Thời gian chạy |
 
-Ngoài Challenge A Verify, bộ Verify chung của cuộc thi còn yêu cầu **4 core test cases** chạy bằng một thao tác và có ít nhất một trường hợp từ chối hoặc chuyển tiếp.
+## 7. Luồng đánh giá của giám khảo
 
----
+Giám khảo có thể:
 
-## 7. Giám khảo sẽ kiểm tra như thế nào
+1. Mở đường dẫn trực tuyến.
+2. Chạy Verify bằng một thao tác.
+3. Dán/tải lên JSON chưa từng thấy.
+4. Xem trường hợp thường quy, yêu cầu bổ sung và chuyển tiếp.
+5. Kiểm tra câu hỏi.
+6. Xem nhật ký kiểm toán.
+7. Thử Dừng/Ghi đè.
 
-Trong vòng sơ loại, luồng đánh giá liên quan trực tiếp đến team gồm:
+## 8. Sản phẩm bàn giao
 
-1. Mở **Live URL** và thử thao tác chính.
-2. Chạy **Verify harness** bằng một thao tác.
-3. Đưa vào **2 input mới** mà team chưa từng thấy.
-4. Chạy bài kiểm tra nhanh của **Challenge A**.
-5. Kiểm tra Agent có tự xử lý đúng các case thường quy và chuyển đúng các case cần con người hay không.
-6. Kiểm tra chất lượng câu hỏi chuyển tiếp.
-7. Chọn một hành động để xem **audit log**.
-8. Thử chức năng **Stop / Override**.
+- đường dẫn trực tuyến;
+- kho mã nguồn công khai;
+- bộ Verify;
+- các trường hợp Verify cốt lõi;
+- các trường hợp Verify Challenge A;
+- hướng dẫn vận hành;
+- 5 trang trình bày;
+- video trình diễn dưới 3 phút;
+- nhật ký phát triển;
+- nhật ký kiểm toán trong sản phẩm;
+- Dừng/Ghi đè.
 
-Trong Challenge A, giám khảo còn có thể nhập một trường hợp không rõ ràng mới dựa trên policy do team công bố.
+## 9. Ngoài phạm vi
 
----
+- tuân thủ thuế GTGT/TNDN đầy đủ;
+- kê khai thuế;
+- thanh toán tự động;
+- thay thế ERP;
+- OCR cấp độ sản xuất;
+- bộ máy phát hiện gian lận đầy đủ.
 
-## 8. Deliverables bắt buộc
+Mục tiêu Sprint 1:
 
-Team phải chuẩn bị đầy đủ:
-
-- Live URL công khai, không yêu cầu login;
-- Public repository với lịch sử commit đầy đủ;
-- Verify harness;
-- 4 core Verify cases;
-- 5 Challenge A escalation cases;
-- Runbook từ lúc clone repo sạch đến khi hệ thống chạy;
-- đúng 5 slides;
-- demo video dưới 3 phút;
-- build log 1 trang;
-- audit log trong sản phẩm;
-- human Stop / Override.
-
----
-
-## 9. Các điểm liên quan trực tiếp đến scoring
-
-### 9.1. Khả năng vận hành
-
-- Live URL phải chạy thực tế.
-- Không yêu cầu giám khảo cài đặt hay đăng nhập.
-- Verify phải chạy bằng một thao tác.
-- Hệ thống phải xử lý hợp lý dữ liệu mới.
-
-### 9.2. Human-in-the-loop và accountability
-
-- Phải rõ Agent được quyền quyết gì và con người giữ quyền quyết gì.
-- Decision boundary trên slide phải khớp với sản phẩm thực tế.
-- Audit log phải truy xuất được:
-  - hệ thống đã làm gì;
-  - khi nào;
-  - dựa trên dữ liệu nào;
-  - vì sao.
-- Người dùng phải Stop / Override được.
-- Hệ thống phải giải thích quyết định theo cách người không chuyên kỹ thuật hiểu được.
-
-### 9.3. Challenge A
-
-- Phát hiện đúng case cần chuyển tiếp.
-- Không chuyển nhầm các case thường quy.
-- Phân loại đúng nguyên nhân không chắc chắn.
-- Câu hỏi chuyển tiếp phải đủ cụ thể để người xử lý có thể quyết định trực tiếp.
-
----
-
-## 10. Dữ liệu
-
-- Dữ liệu synthetic / tự sinh được chấp nhận.
-- Team phải công bố rõ phần nào là dữ liệu thật và phần nào là dữ liệu giả lập.
-- Slide 4 phải thể hiện rõ sự phân biệt này.
-- Hệ thống phải nhận được dữ liệu mới; không được chỉ hoạt động trên bộ dữ liệu cố định.
-
----
-
-## 11. Non-goals của Sprint 1
-
-Sprint 1 không cố xây dựng:
-
-- full VAT / tax compliance engine;
-- TNDN validation;
-- tax filing;
-- automatic accounting entries;
-- fraud detection;
-- mọi loại invoice;
-- service-invoice workflow phức tạp;
-- automatic payment;
-- ERP / procurement system hoàn chỉnh.
-
-Mục tiêu Sprint 1 là chứng minh rõ một khả năng:
-
-> **InvoiceReferee tự xử lý các giao dịch mua hàng thường quy khi đủ bằng chứng và biết dừng đúng lúc khi thiếu thông tin, ngoài policy hoặc vượt thẩm quyền.**
+> InvoiceReferee tự xử lý chứng từ chi phí thường quy khi đủ bằng chứng và biết dừng đúng lúc khi thiếu thông tin, ngoài chính sách, vượt thẩm quyền hoặc có nghi vấn.

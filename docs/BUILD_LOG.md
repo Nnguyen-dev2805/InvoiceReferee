@@ -1,73 +1,75 @@
-# InvoiceReferee — Build Log
+# InvoiceReferee — Nhật ký phát triển
 
-> This file is intentionally kept to one-page style. Update it with actual evidence throughout the sprint; do not invent usage or results.
+> Tài liệu này được chủ ý giữ gọn trong một trang. Hãy cập nhật bằng chứng thực tế trong suốt sprint; không tự tạo dữ liệu sử dụng hoặc kết quả.
 
-## Project
+## Dự án
 
-**InvoiceReferee — AI Purchase Invoice Review & Escalation Agent**
+**InvoiceReferee — Tác tử kế toán kiểm tra hóa đơn, biên lai và chứng từ chi phí**
 
-Challenge: OrganizationAI — Challenge A, Escalation Referee.
+Thử thách: OrganizationAI — Challenge A, Bộ điều phối chuyển tiếp.
 
-## Current phase
+## Giai đoạn hiện tại
 
-Pre-code design and specification.
+Thiết kế và đặc tả trước khi viết mã.
 
-Completed planning artifacts:
+Các tài liệu lập kế hoạch đã hoàn thành:
 
-- challenge summary;
-- product specification;
-- synthetic Policy v0;
-- data-model contracts;
-- decision flow;
-- 17-case evaluation set;
-- evaluation plan for unseen inputs and real-user validation;
-- architecture and implementation plan.
+- bản tóm tắt yêu cầu tác tử kế toán;
+- bản tóm tắt thử thách;
+- đặc tả sản phẩm;
+- Chính sách v0 giả lập;
+- hợp đồng mô hình dữ liệu;
+- luồng quyết định;
+- bộ đánh giá 17 trường hợp;
+- kế hoạch đánh giá đầu vào mới và kiểm chứng với người dùng thật;
+- kiến trúc và kế hoạch triển khai.
 
-## AI tools used
+## Công cụ AI đã sử dụng
 
-Record only tools actually used by the team during implementation.
+Chỉ ghi các công cụ thực tế mà nhóm dùng trong quá trình triển khai.
 
-Current planning use:
+Việc sử dụng ở giai đoạn lập kế hoạch hiện tại:
 
-- AI coding assistant used to help structure specifications, challenge requirements, policy cases and implementation planning.
+- trợ lý lập trình AI được dùng để hỗ trợ tái cấu trúc đặc tả, trường hợp chính sách, hợp đồng lược đồ và kế hoạch triển khai.
 
-Before submission, replace this section with the exact tools/models and what each was used for.
+Trước khi nộp bài, thay phần này bằng tên công cụ/mô hình chính xác và mục đích sử dụng của từng công cụ.
 
-## Where AI helped
+## AI đã hỗ trợ ở đâu
 
-Current planning observations:
+Các quan sát trong giai đoạn lập kế hoạch:
 
-- converted a long challenge brief into implementation-focused requirements;
-- pressure-tested the distinction between missing facts, outside-policy cases and beyond-authority cases;
-- helped normalize interfaces so four people can work in parallel;
-- defined the normal runtime as deterministic checks → policy context → LLM assessment → deterministic decision guard;
-- generated candidate edge cases that still require deterministic verification.
+- chuyển yêu cầu kế toán rộng thành tài liệu hướng đến triển khai;
+- làm rõ khác biệt giữa thiếu dữ kiện, ngoài chính sách, vượt thẩm quyền và có nghi vấn;
+- mở rộng phạm vi từ kiểm tra hóa đơn chỉ dựa trên PO sang hóa đơn điện tử + chứng từ nhân viên + bằng chứng bổ sung;
+- chuẩn hóa giao diện để các mô-đun có thể được phát triển song song;
+- định nghĩa chuỗi phép kiểm tra tất định → bối cảnh chính sách → đánh giá của LLM → Bộ bảo vệ quyết định tất định.
 
-## Where AI created cost/risk
+## Chi phí/rủi ro do AI tạo ra
 
-Risks that the team must actively check during implementation:
+Các rủi ro nhóm phải chủ động kiểm tra khi triển khai:
 
-- AI can make business rules sound plausible even when they are synthetic;
-- AI may blur `REQUEST_INFO` and `ESCALATE` unless the decision boundary is explicit;
-- generated questions can be fluent but too generic;
-- AI-generated code must not replace verification with assumptions.
+- AI có thể diễn đạt quy tắc nghiệp vụ giả lập như chính sách thật của công ty;
+- AI có thể làm mờ ranh giới giữa `REQUEST_INFO` và `ESCALATE` nếu Bộ bảo vệ không nghiêm ngặt;
+- câu hỏi được tạo có thể trôi chảy nhưng quá chung chung;
+- đầu ra OCR/thị giác có thể trông đáng tin dù vẫn sai;
+- mã do AI tạo không được thay thế việc kiểm chứng bằng giả định.
 
-All synthetic policy values, especially the 50M authority threshold, must be labelled as synthetic.
+Mọi giá trị chính sách giả lập, đặc biệt ngưỡng thẩm quyền 50 triệu đồng và thời hạn nộp 30 ngày, phải được gắn nhãn là giả lập.
 
-## Largest feature cut
+## Tính năng lớn nhất bị cắt
 
-Sprint 1 intentionally cuts **full invoice/tax automation and broad invoice coverage**.
+Sprint 1 chủ động cắt **tự động hóa thuế/kế toán đầy đủ và OCR cấp độ sản xuất**.
 
-The product handles one narrow workflow: PO-based goods purchases with Goods Receipt. OCR, VAT/TNDN validation, accounting entries, automatic payment, complex service invoices and ERP replacement are outside Sprint 1.
+Sản phẩm tập trung vào một ranh giới kiểm tra có thể kiểm thử cho hóa đơn điện tử, chứng từ của nhân viên và bằng chứng bổ sung. Kiểm tra GTGT/TNDN, kê khai thuế, bút toán tự động, thanh toán tự động, tích hợp ERP và bộ máy phát hiện gian lận đầy đủ nằm ngoài Sprint 1.
 
-Reason: the hackathon rewards a working, testable decision boundary more than a wide but unreliable feature set.
+Lý do: cuộc thi đánh giá cao một ranh giới quyết định hoạt động được và có thể kiểm thử hơn một tập tính năng rộng nhưng thiếu tin cậy.
 
-## Evidence to add before submission
+## Bằng chứng cần bổ sung trước khi nộp
 
-- actual commits and major implementation decisions;
-- actual AI tools/models used;
-- one concrete place AI saved time;
-- one concrete place AI caused rework or cost;
-- actual feature cut if it changes;
-- user feedback and resulting product change if available;
-- known negative/unintended effect found in testing.
+- các commit thực tế và quyết định triển khai quan trọng;
+- công cụ/mô hình AI thực tế đã dùng;
+- một nơi cụ thể AI giúp tiết kiệm thời gian;
+- một nơi cụ thể AI gây làm lại hoặc phát sinh chi phí;
+- tính năng thực tế bị cắt nếu có thay đổi;
+- phản hồi người dùng và thay đổi sản phẩm tương ứng nếu có;
+- tác động tiêu cực/ngoài ý muốn phát hiện trong kiểm thử.

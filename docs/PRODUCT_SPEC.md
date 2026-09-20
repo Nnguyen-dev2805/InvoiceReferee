@@ -1,569 +1,232 @@
-# InvoiceReferee — Product Specification
+# InvoiceReferee — Đặc tả sản phẩm
 
-## 1. Product Overview
+## 1. Tổng quan sản phẩm
 
-**InvoiceReferee** là AI Purchase Invoice Review & Escalation Agent dành cho quy trình mua hàng có Purchase Order (PO) và Goods Receipt.
+**InvoiceReferee** là tác tử kế toán hỗ trợ kiểm tra hóa đơn điện tử, hóa đơn/chứng từ do nhân viên chụp và bằng chứng thanh toán liên quan.
 
-Sản phẩm không cố tự động hóa toàn bộ quy trình kế toán. Vai trò của InvoiceReferee là trả lời một câu hỏi cụ thể:
+Sản phẩm trả lời câu hỏi:
 
-> **Với những bằng chứng hiện có, giao dịch này đã đủ căn cứ và đủ thẩm quyền để đi tiếp chưa?**
+> Với những bằng chứng hiện có, chứng từ hoặc đề nghị chi này có đủ căn cứ, đúng chính sách và nằm trong thẩm quyền để tiếp tục xử lý không?
 
-Hệ thống tự xử lý các trường hợp thường quy và chỉ kéo con người vào khi:
+Hệ thống tự xử lý trường hợp thường quy và yêu cầu con người tham gia khi:
 
-- còn thiếu hoặc mâu thuẫn thông tin;
-- trường hợp nằm ngoài policy;
-- hoặc quyết định vượt thẩm quyền của Agent.
+- thông tin bị thiếu hoặc mâu thuẫn;
+- nội dung nằm ngoài chính sách công ty;
+- số tiền hoặc loại chi vượt thẩm quyền của tác tử;
+- có dấu hiệu bất thường/nghi vấn.
 
----
+## 2. Người dùng mục tiêu
 
-## 2. Problem Statement
+- **Kế toán thanh toán:** kiểm tra hóa đơn, chứng từ và đề nghị chi trước khi nhập liệu hoặc kiểm tra thanh toán.
+- **Nhân viên/người yêu cầu:** bổ sung mục đích kinh doanh, khách hàng/dự án, lý do chi và bằng chứng liên quan.
+- **Bộ phận mua hàng/kho/chủ dự án:** xác nhận đơn đặt hàng, hàng hóa/dịch vụ đã nhận hoặc bối cảnh dự án.
+- **Quản lý tài chính:** phê duyệt trường hợp vượt thẩm quyền, ngoài chính sách hoặc có nghi vấn.
 
-Trong một giao dịch mua hàng, thông tin cần để kế toán kiểm tra trước khi thanh toán thường nằm rải rác ở nhiều nguồn:
+## 3. Phạm vi Sprint 1
 
-- Purchase Order;
-- xác nhận nhận hàng;
-- hóa đơn nhà cung cấp;
-- lịch sử thanh toán;
-- policy nội bộ.
+Sprint 1 xử lý ba nhóm chứng từ:
 
-Người xử lý phải tự ghép các nguồn này lại để trả lời các câu hỏi như:
+1. **Hóa đơn điện tử** từ XML/PDF/văn bản/ảnh/JSON đã trích xuất.
+2. **Hóa đơn/chứng từ do nhân viên chụp** như nhà hàng, taxi/Grab, khách sạn, văn phòng phẩm, in ấn và sửa chữa.
+3. **Bằng chứng bổ sung** như đơn đặt hàng, biên bản nhận hàng, phiếu thu, ảnh chuyển khoản, lịch sử thanh toán và đề nghị chi của nhân viên.
 
-- Nhà cung cấp trên invoice có đúng với PO không?
-- Hàng đã được nhận đủ chưa?
-- Số lượng và đơn giá invoice có khớp không?
-- Tổng tiền invoice có vượt phần đã được phê duyệt không?
-- Invoice này đã xuất hiện trước đó chưa?
-- Invoice này đã được thanh toán chưa?
-- Giao dịch này Agent có quyền cho đi tiếp không?
+Quy trình mua hàng dựa trên PO vẫn là một luồng con của hệ thống, không phải phạm vi duy nhất.
 
-Nếu dữ liệu bị thiếu hoặc bất thường, người xử lý còn phải xác định nên hỏi ai và hỏi điều gì.
+## 4. Mô hình đầu vào
 
-InvoiceReferee gom bằng chứng theo từng transaction, chạy các kiểm tra có thể xác định bằng rule, sau đó đưa ra một trong ba hành động: `AUTO_PROCESS`, `REQUEST_INFO`, hoặc `ESCALATE`.
+### 4.1. Hóa đơn điện tử
 
----
+Các trường bắt buộc tối thiểu:
 
-## 3. Target User
+- tên công ty bên mua;
+- mã số thuế bên mua;
+- tên công ty bên bán;
+- mã số thuế bên bán;
+- ngày lập hóa đơn;
+- tên hàng hóa/dịch vụ;
+- số lượng nếu là hàng hóa;
+- tổng tiền;
+- mẫu số;
+- ký hiệu;
+- số hóa đơn.
 
-### Primary user
+Các trường không bắt buộc:
 
-**Accounts Payable / Kế toán thanh toán bên mua.**
+- mã cơ quan thuế;
+- địa chỉ bên mua/bán;
+- người liên hệ/đại diện bên mua/bán;
+- số lượng nếu là dịch vụ;
+- số tiền bằng chữ;
+- đơn giá, thuế, chiết khấu và phí dịch vụ.
 
-Người này nhận invoice từ supplier và cần kiểm tra hồ sơ trước khi đưa giao dịch sang bước payment review tiếp theo.
+### 4.2. Hóa đơn/chứng từ của nhân viên
 
-### Supporting roles
+Các trường có thể trích xuất:
 
-- **Purchasing:** cung cấp thông tin đã đặt mua và giá đã được phê duyệt.
-- **Warehouse / Receiver:** xác nhận hàng thực tế đã nhận.
-- **Finance Manager:** xử lý các trường hợp vượt thẩm quyền của Agent.
-- **Supplier:** cung cấp invoice và có thể bổ sung thông tin khi hồ sơ thiếu hoặc sai lệch.
+- cửa hàng/nhà cung cấp;
+- ngày giờ giao dịch;
+- hàng hóa/dịch vụ;
+- số lượng, đơn giá và thành tiền từng dòng;
+- tổng số tiền;
+- chiết khấu;
+- thuế/phí dịch vụ;
+- phương thức thanh toán.
 
----
+Bối cảnh cần lấy thêm:
 
-## 4. Sprint 1 Scope
+- người chi/nhân viên;
+- mục đích kinh doanh;
+- khách hàng/dự án;
+- mã chuyến đi/sự kiện/đơn hàng;
+- bằng chứng nhận hàng/dịch vụ nếu cần.
 
-Sprint 1 chỉ xử lý:
+### 4.3. Bằng chứng bổ sung
 
-> **PO-based goods purchases có Goods Receipt.**
+- đơn đặt hàng (PO);
+- biên bản nhận hàng hoặc nghiệm thu dịch vụ;
+- bản ghi thanh toán;
+- khai báo của nhân viên;
+- dữ liệu gốc về nhà cung cấp/khách hàng;
+- lịch sử chứng từ đã xử lý;
+- chính sách công ty.
 
-Luồng nghiệp vụ mục tiêu:
+## 5. Các phép kiểm tra cốt lõi
 
-```text
-Purchase Order
-      ↓
-Goods Received
-      ↓
-Supplier Invoice
-      ↓
-InvoiceReferee Review
-      ↓
-AUTO_PROCESS / REQUEST_INFO / ESCALATE
-      ↓
-Payment Review
-```
+1. **Nhận diện loại chứng từ:** hóa đơn điện tử, chứng từ nhân viên, bằng chứng thanh toán, chứng từ bổ sung hoặc không xác định.
+2. **Độ đầy đủ của trường bắt buộc:** trường bắt buộc theo loại chứng từ và loại chi phí.
+3. **Chất lượng trích xuất:** ảnh mờ, cảnh báo OCR, trường không đọc chắc chắn.
+4. **Danh tính công ty:** mã số thuế/tên bên mua có phải công ty mình hay không.
+5. **Danh tính bên bán/nhà cung cấp:** mã số thuế bên bán, cửa hàng và bản ghi nhà cung cấp.
+6. **Ngày và thời hạn nộp:** có ngày giao dịch/lập hóa đơn và có quá hạn hay không.
+7. **Số học trên dòng:** số lượng × đơn giá, chiết khấu, thuế/phí dịch vụ, thành tiền dòng và tổng tiền.
+8. **Tính nhất quán của số tiền:** số tiền bằng chữ khớp số tiền bằng số nếu có.
+9. **Trùng lặp:** số hóa đơn + mã số thuế bên bán + số tiền, hoặc dấu vân tay của chứng từ/bằng chứng thanh toán.
+10. **Bối cảnh kinh doanh:** nhân viên, mục đích, khách hàng/dự án và loại chi phí.
+11. **Danh mục chính sách:** chi phí cá nhân, rượu bia/mặt hàng bị cấm hoặc loại chi không được hỗ trợ.
+12. **Tính nhất quán của bằng chứng:** chứng từ so với khai báo nhân viên, bằng chứng thanh toán, PO, số lượng nhận hàng hoặc nghiệm thu dịch vụ.
+13. **Trạng thái thanh toán:** chưa thanh toán/đã thanh toán/thanh toán một phần/không xác định.
+14. **Ngưỡng thẩm quyền:** số tiền hoặc loại chi có vượt ngưỡng của tác tử hay không.
+15. **Bất thường/nghi vấn:** nhà cung cấp, số tiền, thời điểm hoặc mẫu hành vi bất thường.
 
-InvoiceReferee không thực hiện chuyển tiền.
+Mã tất định chịu trách nhiệm so sánh tiền, số lượng, trùng lặp, ngày, ngưỡng và ánh xạ quy tắc. LLM chỉ suy luận trên dữ kiện đã có cấu trúc, tạo giải thích/câu hỏi và đề xuất hành động để Bộ bảo vệ quyết định kiểm tra.
 
----
+## 6. Mô hình quyết định
 
-## 5. Product Goal
+Hệ thống có ba hành động hiển thị cho người dùng.
 
-Sprint 1 cần chứng minh được 4 khả năng:
+### `AUTO_PROCESS`
 
-1. Ghép bằng chứng của cùng một giao dịch thành một transaction.
-2. Tự kiểm tra các điều kiện routine bằng logic xác định được.
-3. Phân biệt đúng khi nào được đi tiếp, khi nào cần hỏi thêm và khi nào phải chuyển cho người có quyền.
-4. Lưu lại đầy đủ lý do và lịch sử để con người có thể kiểm tra, dừng hoặc ghi đè quyết định.
+Dùng khi:
 
----
+- chứng từ đọc được và đủ trường bắt buộc;
+- số liệu nội bộ nhất quán;
+- bên mua, công ty và bối cảnh hợp lệ;
+- không còn trùng lặp chưa giải quyết;
+- đúng chính sách;
+- không có bất thường chưa xử lý;
+- nằm trong ngưỡng thẩm quyền.
 
-## 6. Input
+### `REQUEST_INFO`
 
-Một transaction trong Sprint 1 có thể sử dụng các nguồn sau:
+Dùng khi chưa đủ dữ kiện để kết luận:
 
-### 6.1. Purchase Order
+- thiếu trường bắt buộc;
+- ảnh/OCR không chắc chắn;
+- chứng từ không có ngày;
+- chưa rõ mục đích kinh doanh, nhân viên, dự án/khách hàng;
+- chứng từ và khai báo của nhân viên khác nhau;
+- chỉ có ảnh chuyển khoản nhưng chưa rõ hàng hóa/dịch vụ hoặc mục đích;
+- PO, biên bản nhận hàng hoặc nghiệm thu dịch vụ mâu thuẫn;
+- trạng thái thanh toán không rõ.
 
-Thông tin tối thiểu cần dùng:
+`REQUEST_INFO` phải có câu hỏi cụ thể và đối tượng cần trả lời nếu có thể xác định.
 
-- PO ID;
-- vendor;
-- item;
-- ordered quantity;
-- approved unit price;
-- approved total amount.
+### `ESCALATE`
 
-### 6.2. Goods Receipt
+Dùng khi dữ kiện đã rõ nhưng tác tử không được tự quyết:
 
-Thông tin tối thiểu:
+- `OUTSIDE_POLICY`: mã số thuế bên mua là công ty khác, chi phí cá nhân, danh mục bị cấm, chứng từ quá hạn hoặc thiếu mục đích kinh doanh theo chính sách;
+- `BEYOND_AUTHORITY`: số tiền hoặc loại chi vượt ngưỡng của tác tử;
+- `SUSPICIOUS`: dấu hiệu gian lận/bất thường cần con người kiểm tra.
 
-- receipt ID;
-- PO ID;
-- item;
-- received quantity;
-- received date.
-
-### 6.3. Supplier Invoice
-
-Thông tin tối thiểu:
-
-- invoice ID / invoice number;
-- invoice series / ký hiệu;
-- invoice type: original / adjustment / replacement;
-- related original invoice nếu có;
-- vendor và vendor tax code;
-- PO reference;
-- item;
-- invoiced quantity;
-- unit price;
-- total amount;
-- invoice date.
-
-### 6.4. Payment History
-
-Thông tin tối thiểu:
-
-- invoice ID;
-- payment status;
-- paid amount;
-- payment date nếu có.
-
-### 6.5. Approval / Adjustment Evidence
-
-Nếu invoice lệch PO nhưng có phê duyệt thay đổi hợp lệ, approval phải xuất hiện như một evidence có cấu trúc; Agent không được tự suy đoán approval tồn tại.
-
-### 6.6. Company Policy
-
-Policy xác định:
-
-- phạm vi Agent được phép xử lý;
-- rule kiểm tra;
-- authority threshold;
-- trường hợp nào cần human approval;
-- escalation target tương ứng.
-
-Trong Sprint 1, policy và dữ liệu có thể là synthetic nhưng phải được công bố rõ là synthetic.
-
-### 6.7. Input Extraction Strategy
-
-InvoiceReferee tách **đọc tài liệu** khỏi **kiểm tra nghiệp vụ**. Luồng đầu vào chuẩn là:
+## 7. Thứ tự ưu tiên quyết định
 
 ```text
-Raw document / structured data
-        ↓
-Extraction Adapter
-        ↓
-Extracted canonical fields
-        ↓
-Normalization
-        ↓
-Transaction Builder
-```
+1. Đầu vào kỹ thuật không hợp lệ
+      → INPUT_ERROR
 
-Chiến lược theo loại nguồn:
-
-- `JSON/API`: đọc trực tiếp các field có cấu trúc; đây là đường chính của Sprint 1.
-- `XML e-invoice`: parse XML và map tag sang schema `SupplierInvoice`.
-- `PDF có text`: extract text rồi map các trường cần thiết.
-- `PDF scan / image`: dùng OCR hoặc vision extraction rồi map về cùng schema.
-
-Extraction layer chỉ có nhiệm vụ lấy dữ liệu như invoice number, vendor tax code, item, quantity, unit price, total amount và date. Nó **không** kết luận dữ liệu có khớp PO hay không và không tạo `AUTO_PROCESS` / `REQUEST_INFO` / `ESCALATE`.
-
-Nếu một field quan trọng không đọc được hoặc có parse warning, hệ thống phải giữ sự bất định đó (`null`/warning/source metadata) để downstream xử lý; không được đoán field còn thiếu.
-
-Trong Sprint 1, PO, Goods Receipt, Payment History và Approval Evidence dùng structured JSON. Supplier Invoice cũng hỗ trợ JSON trong baseline; XML/PDF/OCR là extension adapter nếu còn thời gian. Cách này giữ trọng tâm hackathon ở transaction reasoning, escalation và audit thay vì xây một OCR system hoàn chỉnh.
-
----
-
-## 7. Transaction as the Core Object
-
-InvoiceReferee không xem một invoice là một file độc lập. Đối tượng chính của hệ thống là **transaction**.
-
-Ví dụ:
-
-```text
-Transaction TX-001
-
-PO-001
-  approved: 30M
-
-GR-001
-  received: 10 / 10
-
-INV-001
-  invoiced: 30M
-
-Payment history
-  status: UNPAID
-```
-
-Điều này cho phép hệ thống kiểm tra lịch sử giao dịch thay vì chỉ đọc nội dung của một invoice riêng lẻ.
-
----
-
-## 8. Core Checks
-
-Sprint 1 tập trung vào 8 kiểm tra chính.
-
-### Check 1 — Vendor Match
-
-Vendor trên invoice phải khớp vendor được phê duyệt trên PO.
-
-### Check 2 — Item Match
-
-Item trên invoice phải thuộc item đã được đặt mua.
-
-### Check 3 — Quantity Match
-
-So sánh ordered quantity, cumulative received quantity và invoiced quantity theo từng item.
-
-Ngoài invoice hiện tại, hệ thống phải cộng quantity của các invoice trước đó cùng PO/item. Tổng quantity đã invoice không được vượt tổng quantity đã xác nhận nhận hàng nếu chưa có bằng chứng bổ sung.
-
-### Check 4 — Unit Price Match
-
-Unit price trên invoice phải khớp giá đã được phê duyệt hoặc có bằng chứng điều chỉnh hợp lệ.
-
-### Check 5 — Amount Check
-
-Invoice amount phải phù hợp với PO và dữ liệu hàng đã nhận.
-
-### Check 6 — Duplicate Invoice
-
-Phát hiện cùng invoice đã xuất hiện trước đó trong transaction history hoặc payment history. Identity ưu tiên `vendor_tax_code + invoice_series + invoice_number`; amount/date chỉ là tín hiệu hỗ trợ.
-
-Invoice có type `ADJUSTMENT` hoặc `REPLACEMENT` và liên kết rõ với invoice gốc phải được giữ như quan hệ lịch sử, không tự động gắn duplicate.
-
-### Check 7 — Payment Status
-
-Phát hiện invoice đã `PAID`, `PARTIALLY_PAID` hoặc có trạng thái chưa rõ để tránh đưa lại vào routine payment review như một invoice mới.
-
-### Check 8 — Cumulative PO Limit
-
-Tổng giá trị các invoice gắn với cùng PO không được vượt giá trị đã được phê duyệt trên PO, trừ khi có adjustment / approval hợp lệ.
-
-Các phép so sánh số lượng và số tiền phải được thực hiện bằng deterministic logic, không giao cho LLM tự tính toán.
-
-### LLM Agent Layer
-
-Sau khi deterministic checks hoàn tất, LLM Agent nhận structured facts, check results và policy context. LLM phải trả structured assessment thay vì text tự do gồm:
-
-- uncertainty type đề xuất;
-- action đề xuất;
-- primary check cần xử lý trước nếu có nhiều vấn đề;
-- explanation;
-- câu hỏi cụ thể nếu cần human;
-- target nếu policy xác định được;
-- policy rule IDs liên quan;
-- check/evidence references được dùng để giải thích.
-
-LLM là phần của normal review flow. Khi có nhiều discrepancy, LLM có nhiệm vụ chọn vấn đề unresolved quan trọng nhất trong tập check đã được xác nhận để tạo một câu hỏi mà người nhận có thể trả lời trực tiếp. LLM không có quyền sửa facts, thay rule result, tự tính số tiền/số lượng hoặc bỏ qua authority constraint. Một deterministic Decision Guard luôn kiểm tra assessment trước final decision.
-
-Nếu LLM lỗi/timeout/output invalid, hệ thống dùng deterministic fallback explanation/question, giữ nguyên policy-correct decision và ghi rõ fallback trong audit. Fallback bảo toàn tính an toàn/vận hành nhưng không được dùng để tuyên bố chất lượng câu hỏi tương đương normal LLM path.
-
----
-
-## 9. Decision Model
-
-Hệ thống chỉ có 3 quyết định user-facing.
-
-### 9.1. AUTO_PROCESS
-
-Điều kiện:
-
-- bằng chứng đầy đủ;
-- các kiểm tra bắt buộc đều đạt;
-- transaction nằm trong policy;
-- không vượt authority threshold.
-
-Ý nghĩa:
-
-> Routine review đã hoàn thành và transaction có thể đi tiếp sang bước payment review.
-
-`AUTO_PROCESS` không đồng nghĩa với tự động thanh toán.
-
-### 9.2. REQUEST_INFO
-
-Dùng khi một sự thật cần thiết chưa xác định được.
-
-Ví dụ:
-
-```text
-PO amount      = 30M
-Invoice amount = 35M
-```
-
-Hệ thống chưa biết có approval tăng giá hay không.
-
-Kết quả:
-
-```text
-REQUEST_INFO
-```
-
-Câu hỏi:
-
-> Có PO điều chỉnh hoặc phê duyệt tăng giá từ 30M lên 35M không?
-
-### 9.3. ESCALATE
-
-Dùng khi facts đã rõ nhưng Agent không được quyền tự quyết.
-
-Hai nhóm chính:
-
-#### Outside policy
-
-Trường hợp không nằm trong phạm vi policy hiện tại.
-
-#### Beyond authority
-
-Trường hợp policy đã rõ nhưng cần người có thẩm quyền phê duyệt.
-
-Ví dụ:
-
-```text
-Transaction amount = 120M
-Policy threshold   = 50M
-```
-
-Kết quả:
-
-```text
-ESCALATE
-Target: Finance Manager
-```
-
----
-
-## 10. Decision Priority
-
-Hệ thống phải xác định transaction type trước khi đòi evidence đặc thù của workflow:
-
-```text
-1. Chưa xác định transaction type
+2. Chưa xác định được loại chứng từ/hồ sơ
       → REQUEST_INFO
 
-2. Transaction type đã rõ và ngoài policy
-      → ESCALATE
-
-3. Transaction thuộc scope nhưng thiếu / mâu thuẫn facts
+3. Dữ kiện bắt buộc bị thiếu, không đọc được hoặc mâu thuẫn
       → REQUEST_INFO
 
-4. Facts đã rõ nhưng vượt authority
-      → ESCALATE
+4. Dữ kiện đã rõ nhưng nằm ngoài chính sách
+      → ESCALATE / OUTSIDE_POLICY
 
-5. Đầy đủ + đúng policy + trong authority
+5. Dữ kiện đã rõ nhưng có cờ nghi vấn
+      → ESCALATE / SUSPICIOUS
+
+6. Dữ kiện đã rõ nhưng vượt thẩm quyền
+      → ESCALATE / BEYOND_AUTHORITY
+
+7. Đủ dữ kiện + đạt các phép kiểm tra + đúng chính sách + trong thẩm quyền
       → AUTO_PROCESS
 ```
 
-Agent không được hỏi Goods Receipt cho một service invoice đã được xác định rõ là outside policy, và không được suy đoán để biến một `REQUEST_INFO` thành `AUTO_PROCESS`.
+Không được biến việc thiếu dữ kiện thành `AUTO_PROCESS`. Không được hỏi bằng chứng không liên quan đến loại chứng từ đã xác định.
 
----
+## 8. Yêu cầu đầu ra
 
-## 11. Specific Question Requirement
+Mỗi kết quả kiểm tra cần có:
 
-Mỗi `REQUEST_INFO` hoặc `ESCALATE` phải tạo câu hỏi cụ thể, dựa trên đúng phần bằng chứng đang thiếu hoặc quyền quyết định đang cần.
+- các trường chứng từ đã chuẩn hóa;
+- cảnh báo/độ tin cậy của quá trình trích xuất nếu có;
+- kết quả kiểm tra theo quy tắc;
+- bối cảnh chính sách;
+- đánh giá của tác tử;
+- quyết định cuối cùng;
+- lý do;
+- câu hỏi/đối tượng cần trả lời nếu có;
+- nhật ký kiểm toán;
+- các trường kế toán/xuất dữ liệu được đề xuất.
 
-Không chấp nhận câu hỏi chung chung như:
+Giao diện phải cho phép dán/tải lên JSON mới để đánh giá đầu vào chưa từng thấy qua đúng luồng `review()` dùng trong sản phẩm.
 
-> Vui lòng kiểm tra lại hồ sơ.
+## 9. Kiểm soát của con người
 
-Ví dụ tốt:
+Con người luôn giữ quyền cuối cùng:
 
-> Hệ thống ghi nhận PO phê duyệt 30M nhưng invoice là 35M. Có phê duyệt điều chỉnh thêm 5M không?
+- **Dừng:** đổi trạng thái luồng công việc thành `STOPPED`, không tạo quyết định nghiệp vụ mới.
+- **Ghi đè:** đổi quyết định có hiệu lực thành một trong `AUTO_PROCESS`, `REQUEST_INFO`, `ESCALATE`, kèm người thực hiện/thời gian/lý do.
 
-Hoặc:
+Nhật ký kiểm toán phải chỉ được ghi nối tiếp ở tầng ứng dụng; thao tác ghi đè không xóa quyết định ban đầu của tác tử.
 
-> Giao dịch 120M vượt ngưỡng 50M của Agent. Finance Manager có phê duyệt giao dịch này không?
+## 10. Tiêu chí thành công
 
----
+Sprint 1 đạt yêu cầu khi:
 
-## 12. Auditability
+- xử lý được ít nhất 15 trường hợp kiểm thử đã mô tả;
+- có cả hóa đơn điện tử và chứng từ của nhân viên;
+- trường hợp thường quy được tự động xử lý;
+- trường hợp không rõ ràng không bị suy đoán;
+- trường hợp ngoài chính sách, vượt thẩm quyền và nghi vấn được chuyển đúng;
+- câu hỏi bổ sung cụ thể;
+- kiểm tra trùng lặp, thanh toán, chính sách và thẩm quyền bằng mã tất định;
+- đầu vào mới được xử lý bằng cùng một logic;
+- nhật ký kiểm toán và Dừng/Ghi đè hoạt động;
+- bộ Verify chạy được bằng một thao tác.
 
-Mỗi transaction phải có audit trail để người dùng có thể xem lại quá trình Agent xử lý.
-
-Tối thiểu cần lưu:
-
-- action;
-- timestamp;
-- input / evidence liên quan;
-- check hoặc policy rule được áp dụng;
-- kết quả;
-- reason;
-- final decision.
-
-Ví dụ:
-
-```text
-10:01  Invoice received
-10:02  PO matched
-10:02  Goods Receipt matched
-10:03  Vendor check       PASS
-10:03  Quantity check     PASS
-10:03  Duplicate check    PASS
-10:04  Authority check    PASS
-10:04  Decision           AUTO_PROCESS
-```
-
----
-
-## 13. Human Stop and Override
-
-Con người luôn giữ quyền cuối cùng.
-
-Người dùng phải có khả năng:
-
-- **Stop** một transaction bằng cách đổi workflow status sang `STOPPED`;
-- **Override** một quyết định của Agent bằng một decision khác trong ba decision hợp lệ;
-- nhập lý do cho mọi human intervention.
-
-Stop không tạo decision thứ tư. Override không được xóa quyết định ban đầu của Agent; audit phải lưu actor, timestamp, quyết định cũ, quyết định mới và lý do.
-
-Ví dụ:
-
-Agent trả `AUTO_PROCESS`, nhưng kế toán phát hiện supplier vừa thay đổi tài khoản ngân hàng và muốn xác minh thủ công.
-
-Kế toán có thể Stop transaction và ghi:
-
-> Pending supplier bank-account verification.
-
----
-
-## 14. Primary User Flow
-
-```text
-1. User chọn hoặc nhập một transaction
-       ↓
-2. Hệ thống gom PO + Receipt + Invoice + Payment History
-       ↓
-3. Chạy core checks
-       ↓
-4. Tạo policy / authority context
-       ↓
-5. LLM Agent reasoning + explanation + question
-       ↓
-6. Decision Guard kiểm tra proposal
-       ↓
-7. Trả final decision
-       ↓
-   AUTO_PROCESS
-   REQUEST_INFO
-   ESCALATE
-       ↓
-8. Hiển thị reason + evidence + question nếu có
-       ↓
-9. Lưu audit log gồm cả AgentAssessment / fallback state
-       ↓
-10. Human có thể Stop / Override
-```
-
----
-
-## 15. Expected UI Output
-
-Ngoài sample selector để demo nhanh, UI phải cho phép judge **paste JSON hoặc upload một JSON transaction mới** và chạy qua đúng production review path. Đây là đường vào cho unseen inputs; không yêu cầu sửa code hoặc thêm fixture trước.
-
-Với mỗi transaction, người dùng cần nhìn thấy tối thiểu:
-
-- Transaction ID;
-- các document / evidence hiện có;
-- kết quả từng check;
-- decision hiện tại;
-- reason;
-- escalation / information question nếu có;
-- escalation target nếu có;
-- LLM explanation / assessment status;
-- audit history;
-- Stop / Override controls.
-
-Ví dụ:
-
-```text
-Transaction: TX-001
-
-Evidence
-PO              ✓
-Goods Receipt   ✓
-Invoice         ✓
-Payment History ✓
-
-Checks
-Vendor          PASS
-Item            PASS
-Quantity        PASS
-Price           PASS
-Amount          PASS
-Duplicate       PASS
-Payment         PASS
-PO Limit        PASS
-
-Decision
-AUTO_PROCESS
-
-Reason
-All required evidence is consistent and the transaction is within agent authority.
-```
-
----
-
-## 16. Sprint 1 Success Criteria
-
-Sprint 1 được xem là đạt mục tiêu sản phẩm khi:
-
-- xử lý được ít nhất 17 documented test cases theo policy;
-- routine cases được tự xử lý;
-- ambiguous cases không bị Agent tự đoán;
-- outside-policy và beyond-authority cases được chuyển đúng;
-- câu hỏi chuyển tiếp cụ thể;
-- input mới có thể được xử lý bằng cùng logic;
-- core logic không phụ thuộc vào case ID;
-- audit trail truy xuất được quyết định;
-- Stop / Override hoạt động;
-- Verify harness chạy được các case yêu cầu của Challenge A.
-
----
-
-## 17. Non-goals
+## 11. Ngoài phạm vi
 
 Sprint 1 không nhằm xây dựng:
 
-- hệ thống OCR hoàn chỉnh;
-- full e-invoice lifecycle;
-- VAT / TNDN compliance engine;
-- tax filing;
-- automatic accounting entries;
-- fraud detection;
-- tất cả loại invoice;
-- complex service-invoice workflows;
-- automatic payment;
-- full procurement platform;
-- ERP replacement.
+- bộ máy tuân thủ thuế GTGT/TNDN đầy đủ;
+- kê khai thuế;
+- bút toán kế toán tự động hoàn chỉnh;
+- thanh toán tự động;
+- hệ thống thay thế ERP;
+- hệ thống OCR cấp độ sản xuất;
+- bộ máy phát hiện gian lận đầy đủ.
 
-OCR, PDF parsing hoặc XML parsing nếu được thêm vào chỉ đóng vai trò **extraction adapter**, output cùng canonical schema như JSON input; chúng không phải giá trị cốt lõi của InvoiceReferee.
-
----
-
-## 18. Product Principle
-
-Nguyên tắc trung tâm của InvoiceReferee:
-
-> **Rule engine xác định facts có thể kiểm chứng; Agent quyết định bước tiếp theo dựa trên evidence, policy và authority; con người giữ quyền can thiệp cuối cùng.**
-
-InvoiceReferee không cố thay kế toán bằng AI. Sản phẩm tự động hóa những quyết định thường quy có đủ bằng chứng và làm rõ chính xác khi nào con người cần tham gia.
+Bộ chuyển đổi OCR/PDF/XML, nếu có, chỉ là tầng trích xuất và phải đưa dữ liệu về lược đồ chuẩn. Giá trị cốt lõi là ranh giới quyết định dựa trên bằng chứng, chính sách và khả năng kiểm toán.

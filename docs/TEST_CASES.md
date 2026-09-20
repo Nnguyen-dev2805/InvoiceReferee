@@ -1,10 +1,10 @@
-# InvoiceReferee — Test Cases
+# InvoiceReferee — Các trường hợp kiểm thử
 
 ## 1. Mục đích
 
-File này là ground truth cho Sprint 1. Implementation chỉ được xem là đúng khi cùng một policy có thể xử lý được các case dưới đây và input mới tương tự mà không hard-code theo case ID.
+Tài liệu này là dữ liệu chuẩn của Sprint 1 cho tác tử kế toán. Việc triển khai được coi là đúng khi cùng một chính sách xử lý được các trường hợp dưới đây và các đầu vào mới tương tự mà không mã hóa cứng theo mã trường hợp.
 
-## 2. Decision labels
+## 2. Nhãn quyết định
 
 ```text
 AUTO_PROCESS
@@ -12,165 +12,165 @@ REQUEST_INFO
 ESCALATE
 ```
 
-## 3. Bộ 17 test cases
+`ESCALATE` phải kèm `uncertainty.type`: `OUTSIDE_POLICY`, `BEYOND_AUTHORITY` hoặc `SUSPICIOUS`.
 
-| ID | Scenario | Facts chính | Expected | Rule |
+## 3. Tối thiểu 17 trường hợp kiểm thử
+
+| Mã | Tình huống | Dữ kiện chính | Kết quả kỳ vọng | Quy tắc |
 | --- | --- | --- | --- | --- |
-| TC01 | Routine exact match | PO 30M, received 10/10, invoice 30M, unpaid | AUTO_PROCESS | P01–P12 pass |
-| TC02 | Routine partial invoice | PO 30M/10 units, received 10, invoice 5 units/15M | AUTO_PROCESS | P05, P07 pass |
-| TC03 | Multiple invoices within PO | Received 10; prior invoice 4 units/12M; new invoice 6 units/18M; total 10 units/30M | AUTO_PROCESS | P05, P08 pass |
-| TC04 | Missing Goods Receipt | PO + invoice có, GR chưa có | REQUEST_INFO | P04 |
-| TC05 | PO chưa xác định | Invoice có PO reference không resolve được | REQUEST_INFO | P01 |
-| TC06 | Vendor mismatch | PO vendor ABC, invoice vendor XYZ, chưa có approval | REQUEST_INFO | P02 |
-| TC07 | Quantity exceeds receipt | Received 8, invoice 10 | REQUEST_INFO | P05 |
-| TC08 | Unit price mismatch | PO 3M/unit, invoice 3.5M/unit | REQUEST_INFO | P06 |
-| TC09 | Invoice exceeds PO | PO 30M, invoice 35M, chưa có amendment | REQUEST_INFO | P07 |
-| TC10 | Cumulative invoices exceed PO | PO 30M, prior invoices 20M, new invoice 15M | REQUEST_INFO | P08 |
-| TC11 | Duplicate invoice | Same vendor tax code + invoice series + invoice number đã tồn tại | REQUEST_INFO | P09 |
-| TC12 | Already paid | Payment history = PAID | REQUEST_INFO | P10 |
-| TC13 | Beyond authority | Tất cả checks pass, amount 120M, threshold 50M | ESCALATE | P12 |
-| TC14 | Outside policy | Service invoice, transaction type rõ, không thuộc PO-goods workflow | ESCALATE | P13 |
-| TC15 | Suspicious critical field | Invoice amount đọc không chắc 45M hay 48M | REQUEST_INFO | P15 |
-| TC16 | Cumulative quantity exceeds receipt | Received 10; prior invoices 8 units; new invoice 4 units → total 12 | REQUEST_INFO | P05 |
-| TC17 | Partially paid | Invoice 30M; payment history = PARTIALLY_PAID, paid 10M | REQUEST_INFO | P10 |
+| TC01 | Hóa đơn điện tử thường quy | Đủ mã số thuế bên mua/bán, số/mẫu số/ký hiệu/ngày hóa đơn, hàng hóa, số tiền 30 triệu; bên mua là công ty mình; chưa thanh toán | AUTO_PROCESS | P01-P15 đạt |
+| TC02 | Chứng từ ăn uống thường quy của nhân viên | Hóa đơn nhà hàng 1,2 triệu có ngày, cửa hàng, nhân viên, khách hàng/dự án, mục đích kinh doanh; bằng chứng thanh toán khớp | AUTO_PROCESS | P08, P09 đạt |
+| TC03 | Mua hàng nhỏ lẻ thường quy | Hóa đơn văn phòng phẩm 800 nghìn có ngày, hàng hóa, mục đích, nhân viên; không trùng lặp và còn hạn | AUTO_PROCESS | P01, P08, P15 đạt |
+| TC04 | Thiếu trường bắt buộc của hóa đơn điện tử | Hóa đơn điện tử thiếu ký hiệu hoặc số hóa đơn | REQUEST_INFO | P01 |
+| TC05 | OCR không đọc được số tiền | Ảnh hóa đơn mờ, tổng tiền không chắc là 45 hay 48 triệu | REQUEST_INFO | P02 |
+| TC06 | Số học không khớp | Số lượng 10 × đơn giá 3 triệu nhưng thành tiền/tổng tiền là 35 triệu | REQUEST_INFO | P05 |
+| TC07 | Số tiền bằng chữ không khớp | Số tiền bằng số là 30 triệu, bằng chữ tương ứng 35 triệu | REQUEST_INFO | P05 |
+| TC08 | Thiếu mã số thuế bên mua | Bên mua ghi “khách lẻ” hoặc để trống mã số thuế | REQUEST_INFO | P03 |
+| TC09 | Mã số thuế bên mua thuộc công ty khác | Mã số thuế bên mua đọc rõ nhưng khác hồ sơ công ty | ESCALATE / OUTSIDE_POLICY | P03 |
+| TC10 | Hóa đơn điện tử trùng lặp | Cùng mã số thuế bên bán + ký hiệu + số hóa đơn đã xử lý | ESCALATE / OUTSIDE_POLICY | P06 |
+| TC11 | Chi phí cá nhân/bị cấm | Chứng từ cho chi phí cá nhân hoặc rượu bia bị cấm theo chính sách; dữ kiện rõ | ESCALATE / OUTSIDE_POLICY | P11 |
+| TC12 | Thiếu mục đích kinh doanh | Chứng từ nhân viên có số tiền/ngày nhưng đề nghị chi thiếu mục đích/dự án | REQUEST_INFO | P08 |
+| TC13 | Chỉ có bằng chứng thanh toán | Chỉ có ảnh chuyển khoản 5 triệu, chưa rõ hàng hóa/dịch vụ, mục đích hoặc hóa đơn | REQUEST_INFO | P08, P09 |
+| TC14 | Bằng chứng mâu thuẫn | PO/đề nghị ghi 10 máy tính, biên bản nhận hàng ghi 8 máy | REQUEST_INFO | P09, P10 |
+| TC15 | Vượt thẩm quyền | Hóa đơn hợp lệ 120 triệu, ngưỡng 50 triệu | ESCALATE / BEYOND_AUTHORITY | P13 |
+| TC16 | Mẫu hành vi đáng ngờ | Cùng nhân viên nộp 5 chứng từ giống nhau trong 10 phút | ESCALATE / SUSPICIOUS | P14 |
+| TC17 | Chứng từ quá hạn | Ngày chứng từ rõ, nộp sau 45 ngày trong khi chính sách cho phép 30 ngày | ESCALATE / OUTSIDE_POLICY | P12 |
 
-## 4. Expected questions
+## 4. Câu hỏi kỳ vọng
 
-### TC04 — Missing Goods Receipt
+### TC04 — Thiếu trường bắt buộc của hóa đơn điện tử
 
-> Chưa có xác nhận nhận hàng cho PO này. Goods Receipt tương ứng ở đâu?
+> Hóa đơn đang thiếu số hóa đơn, ký hiệu hoặc mẫu số bắt buộc. Giá trị chính xác trên hóa đơn là gì?
 
-### TC05 — PO chưa xác định
+### TC05 — OCR không đọc được số tiền
 
-> Không tìm thấy Purchase Order cho invoice này. PO ID hoặc PO liên quan là gì?
+> Số tiền trên hóa đơn chưa đọc chắc chắn là 45 triệu hay 48 triệu đồng. Giá trị chính xác là bao nhiêu?
 
-### TC06 — Vendor mismatch
+### TC06 — Số học không khớp
 
-> Supplier trên PO là ABC nhưng invoice được phát hành bởi XYZ. Có thay đổi supplier đã được phê duyệt không?
+> Hóa đơn ghi số lượng 10 và đơn giá 3 triệu đồng, nhưng thành tiền là 35 triệu đồng. Số lượng, đơn giá hay thành tiền nào là giá trị đúng?
 
-### TC07 — Quantity mismatch
+### TC07 — Số tiền bằng chữ không khớp
 
-> Goods Receipt xác nhận đã nhận 8 đơn vị nhưng invoice tính 10 đơn vị. Có biên bản nhận bổ sung hoặc điều chỉnh nào chưa được cung cấp không?
+> Số tiền bằng số là 30 triệu đồng nhưng số tiền bằng chữ tương ứng 35 triệu đồng. Giá trị nào là giá trị đúng trên hóa đơn?
 
-### TC08 — Price mismatch
+### TC08 — Thiếu mã số thuế bên mua
 
-> PO phê duyệt đơn giá 3M nhưng invoice dùng 3.5M. Có phê duyệt điều chỉnh đơn giá không?
+> Hóa đơn đang ghi “khách lẻ” hoặc thiếu mã số thuế bên mua. Chứng từ này có phải chi phí của công ty mình không, và mã số thuế bên mua đúng là gì?
 
-### TC09 — Amount mismatch
+### TC09 — Mã số thuế bên mua thuộc công ty khác
 
-> PO được phê duyệt 30M nhưng invoice là 35M. Có PO điều chỉnh hoặc phê duyệt tăng thêm 5M không?
+> Mã số thuế bên mua trên hóa đơn thuộc công ty khác, không phải công ty mình. Kế toán hoặc người phụ trách thuế có chấp nhận xử lý chứng từ này không?
 
-### TC10 — Cumulative over PO
+### TC10 — Trùng lặp
 
-> Tổng các invoice cho PO này sẽ đạt 35M, vượt PO 30M. Có PO amendment hoặc phê duyệt bổ sung 5M không?
+> Hóa đơn này trùng mã số thuế bên bán, ký hiệu và số hóa đơn với chứng từ đã xử lý. Đây là bản gửi lại hay có lý do hợp lệ để tiếp tục xử lý?
 
-### TC11 — Duplicate
+### TC11 — Chi phí bị cấm/cá nhân
 
-> Invoice này đã xuất hiện trong lịch sử xử lý. Đây là bản gửi lại của invoice cũ hay một invoice mới hợp lệ?
+> Khoản chi thuộc danh mục không được phép theo chính sách. Người phụ trách tài chính có quyết định ngoại lệ cho khoản chi này không?
 
-### TC12 — Already paid
+### TC12 — Thiếu mục đích kinh doanh
 
-> Payment history cho thấy invoice này đã được thanh toán. Có lý do hợp lệ nào để đưa invoice trở lại payment review không?
+> Chứng từ 1,2 triệu đồng này phục vụ mục đích kinh doanh nào và gắn với khách hàng/dự án nào?
 
-### TC13 — Beyond authority
+### TC13 — Chỉ có bằng chứng thanh toán
 
-> Giao dịch 120M vượt ngưỡng tự xử lý 50M. Finance Manager có phê duyệt giao dịch này không?
+> Ảnh chuyển khoản 5 triệu đồng chưa có hóa đơn, hàng hóa/dịch vụ hoặc mục đích kinh doanh. Khoản chi này thanh toán cho hàng hóa/dịch vụ nào và phục vụ mục đích gì?
 
-### TC14 — Outside policy
+### TC14 — Bằng chứng mâu thuẫn
 
-> Transaction này không thuộc workflow PO-based goods purchase mà policy hiện tại bao phủ. Ai là người có thẩm quyền xử lý loại giao dịch này?
+> PO/đề nghị ghi 10 máy tính nhưng bằng chứng nhận hàng chỉ ghi 8 máy. Số lượng thực nhận để xử lý là bao nhiêu?
 
-### TC15 — Suspicious input
+### TC15 — Vượt thẩm quyền
 
-> Số tiền trên invoice chưa xác định chắc chắn là 45M hay 48M. Giá trị chính xác là bao nhiêu?
+> Giao dịch 120 triệu đồng vượt ngưỡng tự xử lý 50 triệu đồng. Quản lý tài chính có phê duyệt giao dịch này không?
 
-### TC16 — Cumulative quantity exceeds receipt
+### TC16 — Mẫu hành vi đáng ngờ
 
-> Đã nhận 10 đơn vị. Các invoice trước đã tính 8 đơn vị và invoice mới tính thêm 4, tổng thành 12. Có Goods Receipt bổ sung hoặc điều chỉnh được phê duyệt không?
+> Cùng một nhân viên nộp 5 chứng từ gần giống nhau trong 10 phút. Bộ phận tài chính/kiểm soát nội bộ có cần kiểm tra thủ công mẫu hành vi này không?
 
-### TC17 — Partially paid
+### TC17 — Chứng từ quá hạn
 
-> Invoice là 30M và đã thanh toán 10M. Có phải phần còn lại 20M vẫn đang chờ thanh toán không?
+> Chứng từ được nộp sau 45 ngày, vượt chính sách 30 ngày. Người phụ trách tài chính có chấp nhận ngoại lệ cho chứng từ quá hạn này không?
 
-## 5. Challenge A Verify — 5 cases
+## 5. Bộ Verify Challenge A — 5 trường hợp
 
-Đây là bộ 5 case dành riêng cho bài kiểm tra Escalation Referee.
-
-| Verify ID | Source case | Expected | Nhóm |
+| Mã Verify | Trường hợp nguồn | Kết quả kỳ vọng | Nhóm |
 | --- | --- | --- | --- |
-| EV01 | TC01 | AUTO_PROCESS | Routine |
-| EV02 | TC02 | AUTO_PROCESS | Routine |
-| EV03 | TC03 | AUTO_PROCESS | Routine |
-| EV04 | TC07 | REQUEST_INFO | Factual unknown |
-| EV05 | TC13 | ESCALATE | Beyond authority |
+| EV01 | TC01 | AUTO_PROCESS | Hóa đơn điện tử thường quy |
+| EV02 | TC02 | AUTO_PROCESS | Chứng từ nhân viên thường quy |
+| EV03 | TC03 | AUTO_PROCESS | Mua hàng nhỏ lẻ thường quy |
+| EV04 | TC06 | REQUEST_INFO | Chưa xác định được dữ kiện |
+| EV05 | TC15 | ESCALATE | Vượt thẩm quyền |
 
-Điều kiện pass:
+## 6. Bộ Verify cốt lõi — 4 trường hợp
 
-```text
-3 routine → AUTO_PROCESS
-2 human-involved cases → đúng decision theo uncertainty
-```
-
-Hai case cần con người phải hiển thị câu hỏi cụ thể. Verify phải hiển thị `uncertainty_type`; với `ESCALATE` phải hiển thị target nếu policy xác định được. Outside-policy vẫn được kiểm ở bộ Core Verify và toàn bộ evaluation set.
-
-## 6. Core Verify — 4 cases
-
-Để đáp ứng Verify chung của cuộc thi:
-
-| Verify ID | Source case | Expected |
+| Mã Verify | Trường hợp nguồn | Kết quả kỳ vọng |
 | --- | --- | --- |
 | CV01 | TC01 | AUTO_PROCESS |
-| CV02 | TC07 | REQUEST_INFO |
-| CV03 | TC13 | ESCALATE |
-| CV04 | TC14 | ESCALATE |
+| CV02 | TC06 | REQUEST_INFO |
+| CV03 | TC10 | ESCALATE |
+| CV04 | TC11 | ESCALATE |
 
-Verify phải chạy bằng một thao tác và in:
+Verify phải hiển thị:
 
-- case ID;
-- expected;
-- actual;
-- pass/fail;
-- uncertainty type nếu có;
-- question nếu có;
-- target nếu có;
-- timestamp.
+- mã trường hợp;
+- kết quả kỳ vọng;
+- kết quả thực tế;
+- đạt/không đạt;
+- loại không chắc chắn nếu có;
+- câu hỏi nếu có;
+- đối tượng nếu có;
+- dấu thời gian.
 
-## 7. Judge unseen-input principles
+## 7. Nguyên tắc với đầu vào mới
 
-Judge có thể thay đổi vendor, amount, quantity, invoice number hoặc transaction type. Logic phải dựa trên field và policy, không dựa trên các giá trị cụ thể trong test fixture.
+Giám khảo có thể đổi nhà cung cấp, số tiền, số lượng, loại chi phí, nhân viên, dự án, loại chứng từ, số hóa đơn hoặc ngưỡng. Logic phải dựa trên trường dữ liệu và chính sách, không dựa trên mã dữ liệu mẫu.
 
-Ví dụ unseen case hợp lệ:
+Ví dụ đầu vào thường quy mới:
 
 ```text
-PO = 42M
-Received = 14
-Invoice = 42M
-Payment = UNPAID
+Chứng từ nhân viên = 950 nghìn đồng
+Ngày hợp lệ
+Có mục đích/dự án
+Bằng chứng thanh toán khớp
+Không trùng lặp
 ```
 
-Nếu mọi checks pass và amount <= 50M:
+Kết quả kỳ vọng:
 
 ```text
 AUTO_PROCESS
 ```
 
-Ví dụ unseen case vượt quyền:
+Ví dụ đầu vào không rõ ràng mới:
 
 ```text
-PO = 75M
-All checks pass
+Hóa đơn điện tử có tổng tiền nhưng không đọc được mã số thuế bên mua
 ```
 
-Expected:
+Kết quả kỳ vọng:
 
 ```text
-ESCALATE
-BEYOND_AUTHORITY
+REQUEST_INFO
 ```
 
-## 8. Test fixture rule
+Ví dụ đầu vào vượt thẩm quyền mới:
 
-Mỗi case nên được lưu dưới dạng JSON input riêng, ví dụ:
+```text
+Hóa đơn điện tử hợp lệ, số tiền 75 triệu đồng, ngưỡng 50 triệu đồng
+```
+
+Kết quả kỳ vọng:
+
+```text
+ESCALATE / BEYOND_AUTHORITY
+```
+
+## 8. Quy tắc dữ liệu mẫu
+
+Mỗi trường hợp nên được lưu dưới dạng một tệp đầu vào JSON riêng:
 
 ```text
 tests/fixtures/TC01.json
@@ -178,5 +178,4 @@ tests/fixtures/TC01.json
 tests/fixtures/TC17.json
 ```
 
-Expected result được lưu trong test code hoặc một manifest riêng, nhưng production code không được đọc expected result.
-
+Mã sản phẩm không được đọc kết quả kỳ vọng.

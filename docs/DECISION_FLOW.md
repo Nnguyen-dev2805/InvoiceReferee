@@ -1,692 +1,297 @@
-# InvoiceReferee — Decision Flow
+# InvoiceReferee — Luồng quyết định
 
 ## 1. Mục đích
 
-File này mô tả cách InvoiceReferee đi từ input đến quyết định cuối cùng.
-
-Mục tiêu là để mọi thành viên trong team hiểu giống nhau về thứ tự xử lý:
+Tài liệu này mô tả cách InvoiceReferee đi từ đầu vào chứng từ đến quyết định cuối cùng cho hóa đơn điện tử, hóa đơn/chứng từ do nhân viên chụp và bằng chứng bổ sung.
 
 ```text
-Input
+Đầu vào thô
   ↓
-Normalize
+Trích xuất
   ↓
-Build Transaction
+Chuẩn hóa thành CanonicalDocument
   ↓
-Validate Evidence
+Tạo ReviewCase
   ↓
-Run Checks
+Kiểm tra dữ kiện/bối cảnh bắt buộc
   ↓
-Build Policy Context
+Chạy các phép kiểm tra tất định
   ↓
-LLM Agent Assessment
+Tạo PolicyContext
   ↓
-Deterministic Decision Guard
+Đánh giá của tác tử LLM
+  ↓
+Bộ bảo vệ quyết định tất định
   ↓
 AUTO_PROCESS / REQUEST_INFO / ESCALATE
   ↓
-Audit + Human Control
+Kiểm toán + Kiểm soát của con người
 ```
-
----
 
 ## 2. Nguyên tắc quyết định
 
-InvoiceReferee tuân theo 4 nguyên tắc:
+1. Không suy đoán dữ kiện.
+2. Không dùng LLM để thay thế phép kiểm tra tất định.
+3. Không `AUTO_PROCESS` khi thiếu hoặc chưa chắc chắn về dữ kiện quan trọng.
+4. Không `ESCALATE` nếu chỉ thiếu dữ kiện có thể hỏi bổ sung.
+5. Con người luôn có quyền Dừng/Ghi đè.
 
-1. **Không đoán facts.**
-2. **Không dùng LLM để thay deterministic checks.**
-3. **Không escalate nếu case routine đủ rõ và nằm trong quyền Agent.**
-4. **Con người luôn có quyền Stop / Override.**
+## 3. Bước 1 — Nhận đầu vào
 
----
+Đầu vào có thể gồm:
 
-## 3. Step 1 — Nhận input
+- XML/PDF/văn bản/ảnh/JSON của hóa đơn điện tử;
+- ảnh hóa đơn/chứng từ của nhân viên;
+- bằng chứng thanh toán;
+- đề nghị chi của nhân viên;
+- PO/biên bản nhận hàng/nghiệm thu dịch vụ;
+- lịch sử thanh toán;
+- hồ sơ công ty/chính sách.
 
-Input Sprint 1 gồm:
+Đầu vào kỹ thuật sai định dạng trả về `INPUT_ERROR`. Thiếu bằng chứng nghiệp vụ vẫn là đầu vào hợp lệ và được đưa qua bộ máy quyết định.
 
-- Purchase Order;
-- Goods Receipt;
-- Supplier Invoice;
-- Payment History;
-- Company Policy.
+## 4. Bước 2 — Trích xuất
 
-Input có thể đến từ JSON trước. XML/PDF/OCR nếu có chỉ là adapter.
-
-Output của bước này phải là dữ liệu có cấu trúc theo `DATA_MODEL.md`.
-
----
-
-## 4. Step 2 — Normalize dữ liệu
-
-Mục tiêu là đưa dữ liệu từ nhiều nguồn về schema thống nhất.
-
-Ví dụ:
+Bộ chuyển đổi trích xuất chỉ đọc và ánh xạ trường:
 
 ```text
-"30,000,000 VND"
-"30000000"
-30_000_000
+Nguồn thô → ExtractedDocument(fields, warnings, confidence)
 ```
 
-đều được normalize thành:
+Bộ chuyển đổi không được kết luận về chính sách, trùng lặp, tính hợp lệ của số tiền hoặc hành động cuối cùng. Trường không đọc được phải là `null` hoặc có cảnh báo.
 
-```json
-30000000
-```
+## 5. Bước 3 — Chuẩn hóa
 
-Các field chưa biết phải để `null` hoặc đánh dấu `UNKNOWN`, không tự suy đoán.
+Chuẩn hóa về `CanonicalDocument`:
 
-Nếu extraction không chắc chắn, phải đặt `flagged = true` hoặc lưu uncertainty tương ứng.
+- tiền thành số nguyên VND;
+- ngày thành `YYYY-MM-DD`;
+- loại chứng từ thành enum;
+- các dòng hàng thành danh sách chung;
+- giữ lại tham chiếu nguồn và cảnh báo.
 
----
-
-## 5. Step 3 — Build Transaction
-
-Các evidence liên quan phải được gom thành một transaction.
-
-```text
-PO-001
-GR-001
-INV-001
-PAY-001
-   ↓
-TX-001
-```
-
-Liên kết ưu tiên bằng ID rõ ràng như:
-
-- `po_id`;
-- `invoice_id`;
-- `vendor_id`;
-- document references.
-
-Nếu không thể xác định document nào thuộc cùng transaction, đó là factual uncertainty.
-
-Kết quả:
+Nếu loại chứng từ chưa rõ:
 
 ```text
 REQUEST_INFO
 ```
 
----
+## 6. Bước 4 — Tạo `ReviewCase`
 
-## 6. Step 4 — Xác định scope rồi kiểm tra evidence tối thiểu
-
-Trước hết hệ thống phải xác định `transaction_type`.
+Gộp chứng từ và bằng chứng bổ sung thành một `ReviewCase`:
 
 ```text
-transaction_type chưa rõ
-→ REQUEST_INFO
-
-transaction_type đã rõ nhưng ngoài PO_GOODS_PURCHASE
-→ ESCALATE / OUTSIDE_POLICY
-
-transaction_type = PO_GOODS_PURCHASE
-→ mới kiểm tra PO, Goods Receipt, payment và các evidence bắt buộc
+Hóa đơn điện tử / chứng từ / bằng chứng thanh toán
+    + đề nghị chi của nhân viên
+    + PO / nhận hàng / nghiệm thu / lịch sử thanh toán
+    + hồ sơ công ty / chính sách
+        ↓
+ReviewCase
 ```
 
-Điều này ngăn service invoice bị hỏi Goods Receipt chỉ vì đi qua validation của workflow mua hàng hóa.
-
-### PO missing
-
-Nếu chưa tìm thấy PO:
+Nếu không thể xác định chứng từ/bằng chứng nào liên quan đến hồ sơ:
 
 ```text
 REQUEST_INFO
 ```
 
-Nếu đã xác nhận transaction thực sự không có PO:
+## 7. Bước 5 — Kiểm tra dữ kiện bắt buộc
 
-```text
-ESCALATE
-Reason: OUTSIDE_POLICY
-```
+Kiểm tra theo loại chứng từ:
 
-### Goods Receipt missing
+- hóa đơn điện tử cần tên và mã số thuế bên mua/bên bán, ngày, số hóa đơn, mẫu số/ký hiệu, hàng hóa/dịch vụ và tổng tiền;
+- chứng từ nhân viên cần ngày, số tiền, cửa hàng nếu nhìn thấy, phương thức thanh toán/hàng hóa nếu nhìn thấy;
+- đề nghị chi của nhân viên cần người chi, mục đích, khách hàng/dự án khi cần;
+- bằng chứng thanh toán cần số tiền, ngày, người trả/người nhận/mã tham chiếu nếu cần đối chiếu.
 
-Trong workflow Sprint 1:
-
-```text
-REQUEST_INFO
-```
-
-### Suspicious / unreadable field
-
-Ví dụ invoice amount chưa đọc chắc chắn:
+Cảnh báo trích xuất nghiêm trọng, ảnh mờ hoặc trường bị che:
 
 ```text
 REQUEST_INFO
 ```
 
-Không được chạy tiếp và giả định một giá trị.
+## 8. Bước 6 — Chạy phép kiểm tra tất định
 
----
-
-## 7. Step 5 — Chạy deterministic checks
-
-Khi evidence cần thiết đã có, hệ thống chạy các check chính:
+Các phép kiểm tra cốt lõi:
 
 ```text
-1. Vendor Match
-2. Item Match
-3. Quantity Match — current + cumulative quantity theo item
-4. Unit Price Match
-5. Amount Check
-6. Duplicate Invoice
-7. Payment Status
-8. Cumulative PO Limit
+1. Độ đầy đủ của trường bắt buộc
+2. Chất lượng trích xuất
+3. Danh tính bên mua/công ty
+4. Danh tính bên bán/nhà cung cấp
+5. Ngày/thời hạn nộp
+6. Số học trên dòng và số tiền bằng chữ
+7. Phát hiện trùng lặp
+8. Bối cảnh kinh doanh
+9. Tính nhất quán giữa chứng từ/đề nghị chi/thanh toán/bằng chứng
+10. Bằng chứng nhận hàng/dịch vụ
+11. Danh mục chính sách
+12. Trạng thái thanh toán
+13. Ngưỡng thẩm quyền
+14. Bất thường/nghi vấn
+15. Mức độ sẵn sàng để xuất dữ liệu kế toán
 ```
 
-Mỗi check trả về `CheckResult`:
+Bộ máy kiểm tra trả về `CheckResult[]`, không tự tạo quyết định cuối cùng.
 
-```json
-{
-  "check_id": "CHECK_QUANTITY",
-  "policy_rule_id": "P05",
-  "status": "FAIL",
-  "expected": 10,
-  "actual": 12,
-  "reason": "Invoice quantity exceeds received quantity"
-}
-```
+## 9. Bước 7 — Tạo `PolicyContext`
 
-Check engine **không quyết định** `AUTO_PROCESS`, `REQUEST_INFO` hay `ESCALATE`.
+Bộ máy chính sách tạo:
 
-Nó chỉ xác định facts và rule result.
+- `scope_status`: `UNKNOWN`, `OUTSIDE_POLICY`, `IN_SCOPE`;
+- mã các quy tắc áp dụng;
+- ngưỡng thẩm quyền;
+- các điểm không chắc chắn tất định;
+- cờ nghi vấn.
 
----
+`UNKNOWN` là thiếu dữ kiện → `REQUEST_INFO`. `OUTSIDE_POLICY` là dữ kiện đã rõ → `ESCALATE`.
 
-## 8. Step 6 — Build Policy Context
+## 10. Bước 8 — Đánh giá của tác tử LLM
 
-Policy Engine nhận `Transaction + CheckResult[]` và tạo `PolicyContext` bất biến cho lượt review: transaction có nằm trong scope không, authority threshold, applicable rule IDs và uncertainty constraints có thể xác định từ facts.
-
-Scope phải là tri-state: `UNKNOWN`, `OUTSIDE_POLICY`, `IN_SCOPE`. `UNKNOWN` nghĩa là chưa đủ fact để biết transaction thuộc workflow nào; `OUTSIDE_POLICY` nghĩa là loại giao dịch đã biết rõ nhưng Policy v0 không hỗ trợ.
-
-Sau đó LLM Agent nhận:
+LLM nhận:
 
 ```text
-Transaction
-+ CheckResult[]
-+ PolicyContext
+ReviewCase + CheckResult[] + PolicyContext
 ```
 
-và trả `AgentAssessment` có structured fields: proposed uncertainty/action, explanation, question, target và rule IDs. LLM phải reason từ facts đã được cung cấp, không tự tạo hoặc sửa facts.
+LLM trả về `AgentAssessment` có cấu trúc: hành động đề xuất, loại không chắc chắn, giải thích, câu hỏi, đối tượng và tham chiếu bằng chứng. LLM có thể giúp chọn vấn đề quan trọng nhất khi nhiều phép kiểm tra không đạt hoặc chưa xác định, nhưng không được sửa dữ kiện.
 
-### Các uncertainty cần biểu diễn
+Nếu LLM lỗi, hết thời gian hoặc đầu ra không hợp lệ, dùng câu hỏi dự phòng tất định và ghi sự kiện `LLM_FALLBACK_USED`.
 
-### FACTUAL_UNKNOWN
+## 11. Bước 9 — Bộ bảo vệ quyết định
 
-Sử dụng khi chưa đủ facts để kết luận.
-
-Ví dụ:
+Bộ bảo vệ thực thi thứ tự ưu tiên:
 
 ```text
-PO = 30M
-Invoice = 35M
-Không biết có approved amendment hay không
+Đầu vào kỹ thuật lỗi?
+  → INPUT_ERROR
+
+Không xác định được loại hồ sơ/chứng từ?
+  → REQUEST_INFO
+
+Dữ kiện bắt buộc bị thiếu/không đọc được/mâu thuẫn?
+  → REQUEST_INFO
+
+Vi phạm ngoài chính sách đã rõ?
+  → ESCALATE / OUTSIDE_POLICY
+
+Cờ nghi vấn đủ rõ để con người kiểm tra?
+  → ESCALATE / SUSPICIOUS
+
+Số tiền/loại chi vượt thẩm quyền?
+  → ESCALATE / BEYOND_AUTHORITY
+
+Tất cả phép kiểm tra bắt buộc đều đạt?
+  → AUTO_PROCESS
+
+Trường hợp còn lại
+  → REQUEST_INFO
 ```
 
-Kết quả:
+Bộ bảo vệ phải từ chối đề xuất của LLM nếu trái chính sách.
+
+## 12. Ví dụ luồng
+
+### Hóa đơn điện tử thường quy
 
 ```text
-REQUEST_INFO
-```
-
-### OUTSIDE_POLICY
-
-Facts đã rõ nhưng transaction không thuộc workflow policy hiện tại.
-
-Ví dụ:
-
-```text
-Service invoice
-No Goods Receipt workflow
-```
-
-Kết quả:
-
-```text
-ESCALATE
-```
-
-### BEYOND_AUTHORITY
-
-Facts đã rõ, transaction nằm trong policy nhưng vượt quyền Agent.
-
-Ví dụ:
-
-```text
-Amount = 120M
-Agent threshold = 50M
-```
-
-Kết quả:
-
-```text
-ESCALATE
-Target: Finance Manager
-```
-
----
-
-## 9. Step 7 — Deterministic Decision Guard
-
-Decision Guard nhận `AgentAssessment` và áp dụng priority bắt buộc. LLM proposal chỉ được chấp nhận nếu tương thích với facts/policy:
-
-```text
-Transaction type đã xác định?
-        │
-        ├─ NO → REQUEST_INFO
-        │
-        └─ YES
-             ↓
-Transaction type có ngoài policy?
-        │
-        ├─ YES → ESCALATE
-        │
-        └─ NO
-             ↓
-Có fact bắt buộc chưa biết / evidence mâu thuẫn?
-        │
-        ├─ YES → REQUEST_INFO
-        │
-        └─ NO
-             ↓
-Transaction có vượt authority?
-        │
-        ├─ YES → ESCALATE
-        │
-        └─ NO
-             ↓
-Các required checks đều pass?
-        │
-        ├─ YES → AUTO_PROCESS
-        │
-        └─ NO → REQUEST_INFO
-```
-
-Điểm quan trọng:
-
-> `FAIL` của một business check thường cho biết có discrepancy, nhưng nếu chưa biết discrepancy có approval hợp lệ hay không thì kết quả phải là `REQUEST_INFO`, không phải kết luận sai phạm.
-
----
-
-## 10. Step 8 — Explain and generate specific question
-
-Trong normal path, LLM Agent tạo explanation và câu hỏi cụ thể dựa trên structured facts. Nếu LLM provider lỗi/timeout/output invalid, hệ thống dùng deterministic fallback template và audit `LLM_FALLBACK_USED`.
-
-Nếu final decision là `REQUEST_INFO` hoặc `ESCALATE`, câu hỏi phải cụ thể và vẫn phải khớp facts mà Decision Guard đã xác nhận.
-
-### REQUEST_INFO example
-
-Input:
-
-```text
-PO amount      = 30M
-Invoice amount = 35M
-```
-
-Không tốt:
-
-> Vui lòng kiểm tra lại invoice.
-
-Tốt:
-
-> PO được phê duyệt 30M nhưng invoice là 35M. Có PO điều chỉnh hoặc phê duyệt tăng thêm 5M không?
-
-### ESCALATE example
-
-Input:
-
-```text
-Amount = 120M
-Threshold = 50M
-```
-
-Câu hỏi:
-
-> Giao dịch 120M vượt ngưỡng tự xử lý 50M. Finance Manager có phê duyệt giao dịch này không?
-
----
-
-## 11. Step 9 — Ghi audit log
-
-Mỗi bước quan trọng phải tạo audit event.
-
-Ví dụ:
-
-```text
-10:01 TRANSACTION_CREATED
-10:02 PO_MATCHED
-10:02 GOODS_RECEIPT_MATCHED
-10:03 CHECK_VENDOR       PASS
-10:03 CHECK_QUANTITY     PASS
-10:03 CHECK_PAYMENT      PASS
-10:04 AUTHORITY_CHECK    PASS
-10:04 DECISION_MADE      AUTO_PROCESS
-```
-
-Audit phải cho phép trả lời:
-
-- hệ thống đã làm gì;
-- lúc nào;
-- dùng evidence nào;
-- áp dụng rule nào;
-- vì sao ra kết quả đó.
-
----
-
-## 12. Step 10 — Human Stop / Override
-
-Sau decision, human vẫn có quyền can thiệp.
-
-Ví dụ:
-
-```text
-Agent:
-AUTO_PROCESS
-
-Human phát hiện:
-Supplier vừa thay đổi bank account.
-
-Human:
-STOP
-Reason: Pending bank-account verification
-```
-
-Hệ thống phải tách hai thao tác:
-
-- **Stop:** đổi `workflow_status` sang `STOPPED`, giữ nguyên decision của Agent.
-- **Override:** lưu `original_action` và `overridden_action`, trong đó action mới vẫn thuộc ba decision hợp lệ.
-
-Cả hai phải lưu actor, timestamp và reason. Không được xóa history cũ.
-
----
-
-## 13. Routine Case Flow
-
-```text
-PO found
-   ↓
-Goods Receipt found
-   ↓
-Invoice parsed successfully
-   ↓
-Vendor PASS
-   ↓
-Item PASS
-   ↓
-Quantity PASS
-(current + cumulative)
-   ↓
-Price PASS
-   ↓
-Amount PASS
-   ↓
-Duplicate PASS
-   ↓
-Payment PASS
-   ↓
-Cumulative PO PASS
-   ↓
-Inside policy
-   ↓
-Within 50M authority
-   ↓
+Đọc được hóa đơn điện tử
+  ↓
+Đủ trường bắt buộc
+  ↓
+Mã số thuế bên mua khớp công ty
+  ↓
+Số học + trùng lặp + chính sách + thẩm quyền đều đạt
+  ↓
 AUTO_PROCESS
 ```
 
----
-
-## 14. Missing Information Flow
-
-Ví dụ invoice cao hơn PO:
+### Thiếu trường/OCR không đọc được
 
 ```text
-PO = 30M
-Invoice = 35M
-       ↓
-Amount check FAIL
-       ↓
-Có approved adjustment trong evidence?
-       │
-       ├─ YES → dùng adjustment rồi chạy lại checks
-       │
-       └─ NO / UNKNOWN
-              ↓
-       FACTUAL_UNKNOWN
-              ↓
-       REQUEST_INFO
-              ↓
-"Có approval tăng thêm 5M không?"
-```
-
-Khi người dùng bổ sung evidence, transaction được evaluate lại từ facts mới.
-
----
-
-## 15. Beyond Authority Flow
-
-```text
-All evidence complete
-       ↓
-All business checks PASS
-       ↓
-Amount = 120M
-       ↓
-Authority threshold = 50M
-       ↓
-BEYOND_AUTHORITY
-       ↓
-ESCALATE
-       ↓
-Target: Finance Manager
-       ↓
-"Finance Manager có phê duyệt giao dịch 120M này không?"
-```
-
----
-
-## 16. Outside Policy Flow
-
-```text
-Facts complete
-       ↓
-Transaction type determined
-       ↓
-Type not covered by Policy v0
-       ↓
-OUTSIDE_POLICY
-       ↓
-ESCALATE
-```
-
-Agent không được tự tạo policy mới để xử lý transaction này.
-
----
-
-## 17. Duplicate Flow
-
-```text
-Invoice received
-       ↓
-Duplicate check
-       ↓
-Same invoice found in history
-       ↓
-Is this confirmed as a legitimate new invoice?
-       │
-       ├─ UNKNOWN → REQUEST_INFO
-       │
-       └─ confirmed replacement/new identity
-              ↓
-         update evidence
-              ↓
-         evaluate again
-```
-
-Không được đưa duplicate unresolved trở lại payment flow như invoice mới.
-
----
-
-## 18. Paid / Partially-paid Flow
-
-```text
-Invoice received
-       ↓
-Payment History
-       ↓
-Status = PAID
-       ↓
-STOP routine payment progression
-       ↓
-REQUEST_INFO
-       ↓
-"Invoice này đã được thanh toán. Có lý do hợp lệ để đưa lại vào payment review không?"
-
-Status = PARTIALLY_PAID
-       ↓
-STOP routine payment progression
-       ↓
-REQUEST_INFO
-       ↓
-"Nêu paid_amount và hỏi phần còn lại có thực sự đang chờ thanh toán không?"
-```
-
-`STOPPED_ALREADY_PAID` / `STOPPED_PARTIAL_PAYMENT` có thể là internal operational state, nhưng user-facing Agent decision vẫn là `REQUEST_INFO`.
-
----
-
-## 19. Suspicious Input Flow
-
-```text
-Invoice parsed
-       ↓
-Critical field flagged / uncertain
-       ↓
-Do NOT run a confident final decision
-       ↓
+Tổng tiền không chắc là 45 hay 48 triệu đồng
+  ↓
+CHECK_EXTRACTION_QUALITY = UNKNOWN
+  ↓
 FACTUAL_UNKNOWN
-       ↓
+  ↓
 REQUEST_INFO
 ```
 
-Ví dụ:
-
-> Số tiền trên invoice chưa xác định chắc chắn là 45M hay 48M. Giá trị chính xác là bao nhiêu?
-
----
-
-## 20. Re-evaluation after Human Response
-
-`REQUEST_INFO` không phải trạng thái kết thúc.
-
-Khi human cung cấp thêm evidence:
+### Chứng từ nhân viên thiếu mục đích
 
 ```text
+Chứng từ có ngày + số tiền
+Đề nghị chi thiếu mục đích kinh doanh/dự án
+  ↓
+CHECK_BUSINESS_CONTEXT = FAIL
+  ↓
 REQUEST_INFO
-       ↓
-Human answer / new evidence
-       ↓
-Attach evidence
-       ↓
-Normalize
-       ↓
-Re-run affected checks
-       ↓
-Re-run decision
-       ↓
+```
+
+### Mã số thuế bên mua thuộc công ty khác
+
+```text
+Mã số thuế bên mua tồn tại và đọc rõ
+Mã số thuế bên mua != mã số thuế công ty
+  ↓
+OUTSIDE_POLICY
+  ↓
+ESCALATE
+```
+
+### Vượt thẩm quyền
+
+```text
+Mọi dữ kiện/phép kiểm tra đều đạt
+Số tiền = 120 triệu đồng
+Ngưỡng = 50 triệu đồng
+  ↓
+BEYOND_AUTHORITY
+  ↓
+ESCALATE → Quản lý tài chính
+```
+
+### Bất thường/nghi vấn
+
+```text
+Chứng từ đọc được và đầy đủ
+Mẫu hành vi: cùng nhân viên nộp 5 chứng từ tương tự trong 10 phút
+  ↓
+SUSPICIOUS
+  ↓
+ESCALATE → Quản lý tài chính / Kiểm soát nội bộ
+```
+
+## 13. Đánh giá lại
+
+`REQUEST_INFO` không phải điểm kết thúc. Khi có bằng chứng mới:
+
+```text
+Đính kèm bằng chứng mới
+  ↓
+Chuẩn hóa
+  ↓
+Chạy lại các phép kiểm tra bị ảnh hưởng
+  ↓
+Chạy lại Bộ bảo vệ
+  ↓
 AUTO_PROCESS / REQUEST_INFO / ESCALATE
 ```
 
-Decision cũ vẫn phải được giữ trong audit history.
+Quyết định cũ vẫn được giữ trong nhật ký kiểm toán.
 
----
+## 14. Hợp đồng đầu ra cuối cùng
 
-## 21. Trách nhiệm của deterministic logic và Agent
+Mỗi lượt kiểm tra hợp lệ phải có:
 
-### Deterministic logic chịu trách nhiệm
-
-- compare vendor ID;
-- compare item ID;
-- compare current và cumulative quantity theo item;
-- compare unit price;
-- tính total và cumulative total;
-- duplicate lookup;
-- payment-status lookup;
-- authority threshold comparison.
-
-### LLM Agent chịu trách nhiệm
-
-- reason trên structured facts/check results;
-- đề xuất uncertainty/action;
-- diễn giải check results;
-- tạo câu hỏi cụ thể;
-- giải thích decision cho người dùng;
-- hỗ trợ follow-up interaction.
-
-### Decision Guard chịu trách nhiệm
-
-- enforce policy mapping và authority;
-- reject/override LLM proposal trái facts/policy;
-- bảo đảm chỉ phát hành ba user-facing actions hợp lệ;
-- ghi audit khi LLM proposal bị sửa hoặc fallback được dùng.
-
-LLM Agent không được thay đổi output của deterministic checks chỉ để tạo kết quả thuận tiện hơn.
-
----
-
-## 22. Final Decision Contract
-
-Mọi transaction sau một lần evaluation phải kết thúc bằng đúng một trong ba user-facing action:
-
-```text
-AUTO_PROCESS
-REQUEST_INFO
-ESCALATE
-```
-
-Mỗi decision phải có:
-
-- `action`;
-- `reason`;
-- relevant policy rule IDs;
-- timestamp.
-
-`REQUEST_INFO` phải có `question`.
-
-`ESCALATE` phải có `question` và `target` nếu policy xác định được.
-
----
-
-## 23. Flow Summary
-
-```text
-INPUT
-  ↓
-Normalize + Identify Transaction Type
-  ↓
-Build Transaction
-  ↓
-Run Deterministic Checks
-  ↓
-Build PolicyContext
-  ↓
-LLM Agent Assessment
-  ↓
-Deterministic Decision Guard
-  ├─ FACTUAL_UNKNOWN ─────────────→ REQUEST_INFO
-  ├─ OUTSIDE_POLICY ──────────────→ ESCALATE
-  ├─ BEYOND_AUTHORITY ────────────→ ESCALATE
-  └─ all required facts/checks clear
-     and within authority ────────→ AUTO_PROCESS
-  ↓
-Audit Log
-  ↓
-Human Stop/Override
-```
+- hành động;
+- lý do;
+- mã quy tắc chính sách;
+- dấu thời gian;
+- câu hỏi nếu là `REQUEST_INFO` hoặc `ESCALATE`;
+- đối tượng nếu chính sách xác định được.
 
 Nguyên tắc cuối cùng:
 
-> **Nếu chưa biết sự thật thì hỏi. Nếu sự thật đã rõ nhưng Agent không có quyền thì chuyển. Chỉ tự xử lý khi evidence đầy đủ, policy rõ và authority cho phép.**
+> Chưa biết thì hỏi. Biết rõ nhưng sai chính sách, vượt quyền hoặc có nghi vấn thì chuyển. Chỉ tự động xử lý khi bằng chứng đầy đủ, chính sách rõ ràng và thẩm quyền cho phép.

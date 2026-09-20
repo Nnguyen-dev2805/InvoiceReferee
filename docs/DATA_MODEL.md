@@ -1,356 +1,282 @@
-# InvoiceReferee — Data Model
+# InvoiceReferee — Mô hình dữ liệu
 
 ## 1. Mục đích
 
-File này khóa schema dữ liệu chung để các module có thể phát triển độc lập nhưng vẫn ghép được với nhau.
+Tài liệu này cố định lược đồ chung để các phần tiếp nhận dữ liệu, bộ máy kiểm tra, chính sách, tác tử LLM, giao diện và Verify có thể được phát triển độc lập nhưng vẫn ghép nối được.
 
-Đối tượng trung tâm của hệ thống là **Transaction**, không phải một file invoice riêng lẻ.
+Đối tượng trung tâm là **`ReviewCase`**, không phải một tệp hóa đơn riêng lẻ.
 
 ```text
-Purchase Order
-      +
-Goods Receipt
-      +
-Supplier Invoice
-      +
-Payment History
-      +
-Policy
+RawDocument[]
       ↓
-Transaction
+ExtractedDocument[]
       ↓
-Checks
+CanonicalDocument[]
+      +
+EmployeeClaim / SupportingEvidence[] / Policy
+      ↓
+ReviewCase
+      ↓
+CheckResult[] + PolicyContext
+      ↓
+AgentAssessment
       ↓
 Decision
       ↓
-Audit Log
+AuditEvent[]
 ```
-
----
 
 ## 2. Nguyên tắc chung
 
-- Sprint 1 ưu tiên schema đơn giản và rõ ràng.
-- Tiền dùng đơn vị **VND integer**, không dùng float.
-- Quantity dùng số nguyên trong MVP.
-- Date dùng định dạng `YYYY-MM-DD`.
-- Timestamp dùng ISO 8601.
-- ID phải ổn định và có thể dùng để liên kết các evidence.
-- Field chưa biết dùng `null`, không tự điền giá trị đoán.
-- Dữ liệu parse chưa chắc chắn phải có flag để downstream biết không được tin tuyệt đối.
+- Tiền dùng **số nguyên VND**, không dùng số thực.
+- Ngày dùng `YYYY-MM-DD`; dấu thời gian dùng ISO 8601.
+- Trường chưa biết dùng `null`, không tự suy đoán.
+- Cảnh báo/độ tin cậy của quá trình trích xuất phải được giữ đến các bước sau.
+- Quy tắc/phép kiểm tra phải có tham chiếu bằng chứng để kiểm toán.
+- Giao diện và Verify phải dùng cùng một `ReviewResult` từ dịch vụ `review()` của sản phẩm.
 
-### 2.1. ExtractedDocument — extraction contract trước domain objects
+## 3. Kiểu liệt kê
 
-Nguồn dữ liệu thô có thể khác nhau, nhưng trước `Transaction Builder` chúng phải được đưa về cùng canonical schema.
+### `document_type`
 
 ```text
-JSON/API          → structured mapping ┐
-E-invoice XML     → XML parser         │
-Text PDF          → text extraction    ├→ ExtractedDocument → normalization → domain object
-Scan/Image        → OCR/Vision         │
-                                      ┘
+E_INVOICE
+EMPLOYEE_RECEIPT
+PAYMENT_PROOF
+PURCHASE_ORDER
+RECEIVING_PROOF
+SERVICE_ACCEPTANCE
+EMPLOYEE_CLAIM
+OTHER_SUPPORTING_DOC
+UNKNOWN
 ```
 
-Contract tối thiểu cho kết quả extraction:
+### `expense_category`
+
+```text
+MEAL_ENTERTAINMENT
+TRANSPORTATION
+TRAVEL_LODGING
+OFFICE_SUPPLIES
+OPERATIONS
+SERVICE_FEE
+PERSONAL
+PROHIBITED
+UNKNOWN
+```
+
+### `decision.action`
+
+```text
+AUTO_PROCESS
+REQUEST_INFO
+ESCALATE
+```
+
+### `uncertainty.type`
+
+```text
+FACTUAL_UNKNOWN
+OUTSIDE_POLICY
+BEYOND_AUTHORITY
+SUSPICIOUS
+```
+
+Ánh xạ:
+
+```text
+FACTUAL_UNKNOWN  → REQUEST_INFO
+OUTSIDE_POLICY   → ESCALATE
+BEYOND_AUTHORITY → ESCALATE
+SUSPICIOUS       → ESCALATE
+```
+
+## 4. `ExtractedDocument`
+
+Mọi bộ chuyển đổi đều phải trả về hợp đồng này trước khi chuẩn hóa.
 
 ```json
 {
-  "document_type": "SUPPLIER_INVOICE",
-  "source_type": "JSON",
-  "source_ref": "fixture://TC01/invoice.json",
-  "extractor": "json_adapter",
+  "document_id": "DOC-001",
+  "document_type": "E_INVOICE",
+  "source_type": "PDF_TEXT",
+  "source_ref": "upload://invoice-001.pdf",
+  "extractor": "pdf_text_adapter",
   "fields": {
+    "seller_tax_code": "0101234567",
+    "buyer_tax_code": "0319999999",
     "invoice_number": "0000123",
-    "invoice_series": "2C23TTU",
-    "vendor_tax_code": "0101234567",
     "invoice_date": "2026-09-13",
     "total_amount": 30000000
+  },
+  "field_confidence": {
+    "total_amount": 0.98
   },
   "parse_warnings": []
 }
 ```
 
-Object này được xem là contract giữa adapter và normalization layer. Tối thiểu gồm:
+Các trường bắt buộc:
 
-- `document_type`: loại chứng từ mà adapter nhận diện;
-- `source_type`: `JSON`, `XML`, `PDF_TEXT`, `OCR`;
-- `source_ref`: tham chiếu tới nguồn gốc để audit;
-- `extractor`: adapter/parser đã tạo kết quả;
-- `fields`: canonical field names đã trích xuất;
-- `parse_warnings`: các field/đoạn dữ liệu không đọc chắc chắn hoặc không hợp lệ.
+- `document_id`
+- `document_type`
+- `source_type`
+- `source_ref`
+- `extractor`
+- `fields`
+- `parse_warnings`
 
-Với OCR/vision hoặc parser có độ bất định, metadata có thể bổ sung confidence theo field. Confidence chỉ là **tín hiệu extraction**, không phải bằng chứng rằng business fact đúng. Field không đọc chắc chắn phải để `null` hoặc có warning; không được tự suy đoán giá trị để làm cho transaction pass check.
+`source_type` có thể là `JSON`, `XML`, `PDF_TEXT`, `OCR`, `IMAGE` hoặc `MANUAL`.
 
-Sprint 1 dùng JSON structured input làm đường chính. XML/PDF/OCR khi được thêm vào phải output cùng contract này, để `Transaction Builder`, Check Engine, Policy Engine và LLM Agent không cần biết document ban đầu đến từ định dạng nào.
+## 5. `CanonicalDocument`
 
----
-
-## 3. PurchaseOrder
-
-```json
-{
-  "po_id": "PO-001",
-  "vendor_id": "VENDOR-ABC",
-  "vendor_name": "ABC Company",
-  "currency": "VND",
-  "order_date": "2026-09-10",
-  "items": [
-    {
-      "item_id": "ITEM-001",
-      "description": "Dell Monitor",
-      "ordered_quantity": 10,
-      "unit_price": 3000000,
-      "line_total": 30000000
-    }
-  ],
-  "approved_total": 30000000,
-  "status": "APPROVED"
-}
-```
-
-### Required fields
-
-- `po_id`
-- `vendor_id`
-- `items`
-- `approved_total`
-- `status`
-
----
-
-## 4. GoodsReceipt
+Sau khi chuẩn hóa, mỗi chứng từ đi vào `ReviewCase` dưới một cấu trúc chung.
 
 ```json
 {
-  "receipt_id": "GR-001",
-  "po_id": "PO-001",
-  "received_date": "2026-09-12",
-  "items": [
-    {
-      "item_id": "ITEM-001",
-      "description": "Dell Monitor",
-      "received_quantity": 10
-    }
-  ],
-  "status": "RECEIVED"
-}
-```
-
-### Required fields
-
-- `receipt_id`
-- `po_id`
-- `items`
-- `received_date`
-- `status`
-
----
-
-## 5. SupplierInvoice
-
-```json
-{
-  "invoice_id": "INV-001",
+  "document_id": "DOC-001",
+  "document_type": "E_INVOICE",
+  "issuer_name": "Nhà cung cấp ABC",
+  "issuer_tax_code": "0101234567",
+  "buyer_name": "Công ty của chúng ta",
+  "buyer_tax_code": "0319999999",
+  "document_date": "2026-09-13",
+  "invoice_template_no": "1",
+  "invoice_serial_no": "C26TAA",
   "invoice_number": "0000123",
-  "invoice_series": "2C23TTU",
-  "invoice_type": "ORIGINAL",
-  "related_invoice_number": null,
-  "vendor_id": "VENDOR-ABC",
-  "vendor_tax_code": "0101234567",
-  "vendor_name": "ABC Company",
-  "po_id": "PO-001",
-  "invoice_date": "2026-09-13",
+  "tax_authority_code": null,
   "currency": "VND",
   "items": [
     {
-      "item_id": "ITEM-001",
-      "description": "Dell Monitor",
-      "invoiced_quantity": 10,
+      "item_id": null,
+      "description": "Màn hình Dell",
+      "item_type": "GOODS",
+      "quantity": 10,
       "unit_price": 3000000,
       "line_total": 30000000
     }
   ],
+  "subtotal_amount": 30000000,
+  "discount_amount": 0,
+  "tax_amount": 0,
+  "service_charge": 0,
   "total_amount": 30000000,
-  "source_type": "JSON",
-  "confidence": 1.0,
-  "flagged": false
+  "amount_in_words": null,
+  "payment_method": "BANK_TRANSFER",
+  "expense_category": "OFFICE_SUPPLIES",
+  "extraction_warnings": [],
+  "source_refs": ["DOC-001"]
 }
 ```
 
-### Required fields
+Trường bắt buộc theo loại chứng từ:
 
-- `invoice_id`
-- `invoice_number`
-- `invoice_series`
-- `invoice_type`
-- `vendor_id`
-- `vendor_tax_code`
-- `po_id`
-- `invoice_date`
-- `items`
-- `total_amount`
-- `flagged`
+- `E_INVOICE`: tên và mã số thuế bên mua/bên bán, ngày, tên hàng hóa/dịch vụ, số lượng với hàng hóa, tổng tiền, mẫu số, ký hiệu và số hóa đơn.
+- `EMPLOYEE_RECEIPT`: cửa hàng nếu nhìn thấy, ngày giao dịch nếu nhìn thấy, tổng tiền, phương thức thanh toán/hàng hóa nếu nhìn thấy.
+- `PAYMENT_PROOF`: người trả/người nhận nếu nhìn thấy, ngày giao dịch, số tiền và phương thức/mã tham chiếu thanh toán nếu nhìn thấy.
 
-### Notes
+## 6. `EmployeeClaim`
 
-`invoice_type` có thể là:
-
-```text
-ORIGINAL
-ADJUSTMENT
-REPLACEMENT
-```
-
-Nếu `invoice_type` là `ADJUSTMENT` hoặc `REPLACEMENT`, `related_invoice_number` phải trỏ về invoice gốc nếu dữ liệu nguồn cung cấp được quan hệ đó. Sprint 1 dùng metadata này để liên kết lịch sử và tránh false duplicate; không tự suy diễn toàn bộ tác động kế toán/thuế của hóa đơn điều chỉnh.
-
-Duplicate identity ưu tiên:
-
-```text
-vendor_tax_code + invoice_series + invoice_number
-```
-
-`source_type` có thể là:
-
-```text
-JSON
-XML
-PDF_TEXT
-OCR
-```
-
-Trong Sprint 1, JSON có thể là input chính. XML/PDF/OCR chỉ là input adapter bổ sung.
-
-`confidence` chỉ phản ánh độ tin cậy của bước extraction nếu có. Nó không thay thế business rule.
-
----
-
-## 6. ApprovalRecord
-
-Approval/amendment là evidence riêng, không được suy ra từ việc invoice lệch PO.
+Thông tin thường không có sẵn trên hóa đơn/chứng từ.
 
 ```json
 {
-  "approval_id": "APR-001",
-  "po_id": "PO-001",
-  "approval_type": "UNIT_PRICE_CHANGE",
-  "item_id": "ITEM-001",
-  "approved_value": 3500000,
-  "approved_amount_delta": 5000000,
-  "approved_by": "Finance Manager",
-  "approved_at": "2026-09-13T09:00:00+07:00",
-  "status": "APPROVED"
+  "claim_id": "CLM-001",
+  "employee_id": "EMP-001",
+  "employee_name": "Nguyễn Văn A",
+  "business_purpose": "Gặp khách hàng cho Dự án Phoenix",
+  "client_or_project": "Dự án Phoenix",
+  "expense_category": "MEAL_ENTERTAINMENT",
+  "claimed_amount": 1200000,
+  "claim_date": "2026-09-14",
+  "submitted_at": "2026-09-15T09:00:00+07:00"
 }
 ```
 
-`approval_type` Sprint 1 có thể gồm:
+## 7. `SupportingEvidence`
 
-```text
-UNIT_PRICE_CHANGE
-QUANTITY_CHANGE
-AMOUNT_CHANGE
-ITEM_CHANGE
-VENDOR_CHANGE
-```
-
-Chỉ record có `status = APPROVED` mới được dùng để giải thích discrepancy. Không có record thì hệ thống không được tự giả định approval tồn tại.
-
----
-
-## 7. PaymentRecord
+Dùng cho PO, biên bản nhận hàng, nghiệm thu dịch vụ, lịch sử thanh toán và dữ liệu gốc về nhà cung cấp/khách hàng.
 
 ```json
 {
-  "payment_id": "PAY-001",
-  "invoice_id": "INV-001",
-  "status": "UNPAID",
-  "paid_amount": 0,
-  "payment_date": null
+  "evidence_id": "EV-001",
+  "evidence_type": "PURCHASE_ORDER",
+  "linked_document_ids": ["DOC-001"],
+  "fields": {
+    "po_id": "PO-001",
+    "approved_total": 30000000,
+    "ordered_quantity": 10
+  },
+  "source_ref": "api://po/PO-001"
 }
 ```
 
-### Payment status
+`evidence_type` có thể là:
 
 ```text
-UNPAID
-PARTIALLY_PAID
-PAID
-UNKNOWN
+PURCHASE_ORDER
+RECEIVING_PROOF
+SERVICE_ACCEPTANCE
+PAYMENT_RECORD
+PROCESSED_HISTORY
+VENDOR_MASTER
+COMPANY_PROFILE
+POLICY_CONFIG
 ```
 
-`UNKNOWN` phải dẫn tới `REQUEST_INFO` nếu payment status là fact cần thiết để quyết định.
-
-`PARTIALLY_PAID` cũng không được coi là routine `UNPAID`. Hệ thống phải dừng luồng thường quy, hiển thị `paid_amount` và yêu cầu xác nhận phần còn lại trước khi đưa transaction đi tiếp.
-
----
-
-## 8. Transaction
-
-Đây là object trung tâm mà các module phía sau sử dụng.
+## 8. `ReviewCase`
 
 ```json
 {
-  "transaction_id": "TX-001",
-  "transaction_type": "PO_GOODS_PURCHASE",
-  "po": {},
-  "goods_receipts": [],
-  "invoice": {},
-  "payment_history": [],
-  "approvals": [],
+  "case_id": "CASE-001",
+  "case_type": "EXPENSE_DOCUMENT_REVIEW",
+  "documents": [],
+  "employee_claim": null,
+  "supporting_evidence": [],
+  "company_profile": {
+    "company_name": "Công ty của chúng ta",
+    "tax_code": "0319999999"
+  },
   "checks": [],
   "decision": null,
-  "audit_log": [],
   "workflow_status": "ACTIVE",
-  "human_stops": [],
-  "human_overrides": [],
   "created_at": "2026-09-20T10:00:00+07:00",
   "updated_at": "2026-09-20T10:00:00+07:00"
 }
 ```
 
-### workflow_status
+`case_type`:
 
-Trạng thái vận hành của transaction:
+```text
+E_INVOICE_REVIEW
+EMPLOYEE_EXPENSE_CLAIM
+PAYMENT_PROOF_REVIEW
+MIXED_EVIDENCE_REVIEW
+UNKNOWN
+```
+
+`workflow_status`:
 
 ```text
 ACTIVE
 STOPPED
 ```
 
-`STOPPED` là human-control state, không phải một giá trị của `Decision.action`.
-
-### transaction_type
-
-Sprint 1 chỉ support:
-
-```text
-PO_GOODS_PURCHASE
-```
-
-Các loại khác phải được nhận diện là outside policy thay vì cố ép vào schema hiện tại.
-
----
-
-## 9. CheckResult
-
-Mỗi rule/check trả về cùng một schema để Policy Engine, LLM Agent và Decision Guard không phụ thuộc implementation bên trong từng check.
+## 9. `CheckResult`
 
 ```json
 {
-  "check_id": "CHECK_QUANTITY",
-  "policy_rule_id": "P05",
+  "check_id": "CHECK_REQUIRED_FIELDS",
+  "policy_rule_id": "P01",
   "status": "FAIL",
-  "expected": 10,
-  "actual": 12,
-  "reason": "Invoice quantity exceeds confirmed received quantity",
-  "evidence_refs": [
-    "PO-001",
-    "GR-001",
-    "INV-001"
-  ]
+  "expected": ["buyer_tax_code"],
+  "actual": null,
+  "reason": "Thiếu mã số thuế bắt buộc của bên mua",
+  "evidence_refs": ["DOC-001"]
 }
 ```
 
-### Check status
+`status`:
 
 ```text
 PASS
@@ -359,66 +285,21 @@ UNKNOWN
 NOT_APPLICABLE
 ```
 
-Ý nghĩa:
+`FAIL` không tự động đồng nghĩa với `ESCALATE`; Bộ bảo vệ quyết định phải ánh xạ theo chính sách.
 
-- `PASS`: đủ evidence và rule đạt.
-- `FAIL`: đủ evidence và rule không đạt.
-- `UNKNOWN`: thiếu hoặc mâu thuẫn evidence để xác định.
-- `NOT_APPLICABLE`: check không áp dụng cho transaction hiện tại.
-
-`FAIL` không tự động đồng nghĩa với `ESCALATE`. Policy/Decision Guard phải xác định failure đó dẫn tới fact còn thiếu, outside policy hay beyond authority.
-
----
-
-## 10. Uncertainty
-
-Khi hệ thống không thể tự quyết, cần biểu diễn rõ loại uncertainty.
-
-```json
-{
-  "type": "FACTUAL_UNKNOWN",
-  "field": "invoice.total_amount",
-  "reason": "PO amount and invoice amount differ without adjustment evidence"
-}
-```
-
-### Uncertainty type
-
-```text
-FACTUAL_UNKNOWN
-OUTSIDE_POLICY
-BEYOND_AUTHORITY
-```
-
-Mapping:
-
-```text
-FACTUAL_UNKNOWN
-    → REQUEST_INFO
-
-OUTSIDE_POLICY
-    → ESCALATE
-
-BEYOND_AUTHORITY
-    → ESCALATE
-```
-
----
-
-## 11. PolicyContext
-
-Structured constraints cung cấp cho LLM và Decision Guard:
+## 10. `PolicyContext`
 
 ```json
 {
   "scope_status": "IN_SCOPE",
   "authority_threshold_vnd": 50000000,
-  "applicable_rule_ids": ["P05", "P07", "P12"],
-  "deterministic_uncertainties": ["FACTUAL_UNKNOWN"]
+  "applicable_rule_ids": ["P01", "P05", "P12"],
+  "deterministic_uncertainties": ["FACTUAL_UNKNOWN"],
+  "suspicious_flags": []
 }
 ```
 
-`scope_status` có đúng ba trạng thái:
+`scope_status`:
 
 ```text
 IN_SCOPE
@@ -426,119 +307,71 @@ OUTSIDE_POLICY
 UNKNOWN
 ```
 
-Không dùng boolean `in_scope`, vì `UNKNOWN` phải dẫn tới `REQUEST_INFO` còn `OUTSIDE_POLICY` phải dẫn tới `ESCALATE`. `PolicyContext` được tạo từ Policy v0 + deterministic facts. LLM không được sửa object này.
-
----
-
-## 12. AgentAssessment
-
-Structured output bắt buộc từ LLM Agent:
+## 11. `AgentAssessment`
 
 ```json
 {
   "proposed_uncertainty_type": "FACTUAL_UNKNOWN",
   "proposed_action": "REQUEST_INFO",
-  "primary_check_id": "CHECK_AMOUNT",
-  "explanation": "Invoice amount exceeds the approved PO amount and adjustment evidence is missing.",
-  "question": "PO được phê duyệt 30M nhưng invoice là 35M. Có phê duyệt điều chỉnh thêm 5M không?",
-  "target": "Purchasing",
-  "policy_rule_ids": ["P07"],
-  "evidence_refs": ["PO-001", "INV-001"],
+  "primary_check_id": "CHECK_BUSINESS_CONTEXT",
+  "explanation": "Chứng từ có tổng tiền nhưng thiếu mục đích kinh doanh và dự án.",
+  "question": "Chứng từ 1,2 triệu đồng đã có tổng tiền nhưng chưa có mục đích kinh doanh/dự án. Khoản chi này phục vụ mục đích kinh doanh nào và gắn với khách hàng/dự án nào?",
+  "target": "Nhân viên",
+  "policy_rule_ids": ["P08"],
+  "evidence_refs": ["DOC-002", "CLM-001"],
   "model": "configured-llm",
   "prompt_version": "v1",
   "fallback_used": false
 }
 ```
 
-`AgentAssessment` là proposal/explanation layer, **không phải final decision**. `primary_check_id` phải trỏ tới một check thực sự có trong `CheckResult[]`; `policy_rule_ids` và `evidence_refs` cũng phải trace được về input hiện có. Decision Guard phải validate assessment với `Transaction`, `CheckResult[]` và `PolicyContext`.
+LLM không được tự tạo/sửa dữ kiện, tự tính tiền/số lượng hoặc bỏ qua thẩm quyền.
 
-Nếu provider lỗi hoặc structured output invalid, tạo assessment fallback với `fallback_used = true`; fallback question/explanation có thể dùng deterministic templates nhưng final action vẫn do Guard xác nhận.
-
----
-
-## 13. Decision
+## 12. `Decision`
 
 ```json
 {
   "action": "REQUEST_INFO",
-  "reason": "Invoice amount exceeds PO amount and no approved adjustment is available",
+  "reason": "Chứng từ của nhân viên đang thiếu mục đích kinh doanh",
   "uncertainty": {
     "type": "FACTUAL_UNKNOWN",
-    "field": "invoice.total_amount"
+    "field": "employee_claim.business_purpose"
   },
-  "question": "PO được phê duyệt 30M nhưng invoice là 35M. Có phê duyệt điều chỉnh thêm 5M không?",
-  "target": "Purchasing",
-  "policy_rule_ids": ["P07"],
+  "question": "Khoản chi 1,2 triệu đồng này phục vụ mục đích kinh doanh nào và gắn với khách hàng/dự án nào?",
+  "target": "Nhân viên",
+  "policy_rule_ids": ["P08"],
   "decided_at": "2026-09-20T10:04:00+07:00"
 }
 ```
 
-### Decision action
+Quy tắc:
 
-Chỉ có 3 giá trị user-facing:
+- `AUTO_PROCESS`: `question = null`, `target = null`.
+- `REQUEST_INFO`: loại không chắc chắn phải là `FACTUAL_UNKNOWN` và phải có `question`.
+- `ESCALATE`: loại không chắc chắn phải là `OUTSIDE_POLICY`, `BEYOND_AUTHORITY` hoặc `SUSPICIOUS`; nên có `target` khi chính sách xác định được.
 
-```text
-AUTO_PROCESS
-REQUEST_INFO
-ESCALATE
-```
-
-### Field behavior
-
-#### AUTO_PROCESS
-
-```json
-{
-  "action": "AUTO_PROCESS",
-  "question": null,
-  "target": null
-}
-```
-
-#### REQUEST_INFO
-
-Phải có:
-
-- `reason`
-- `uncertainty.type = FACTUAL_UNKNOWN`
-- `question`
-
-`target` có thể là role có khả năng cung cấp fact, ví dụ `Purchasing`, `Warehouse`, `Accounting`, hoặc `Supplier`.
-
-#### ESCALATE
-
-Phải có:
-
-- `reason`
-- uncertainty là `OUTSIDE_POLICY` hoặc `BEYOND_AUTHORITY`
-- `question`
-- `target` nếu xác định được từ policy.
-
----
-
-## 14. AuditEvent
+## 13. `AuditEvent`
 
 ```json
 {
   "event_id": "AUD-001",
-  "transaction_id": "TX-001",
+  "case_id": "CASE-001",
   "event_type": "CHECK_COMPLETED",
   "actor": "InvoiceReferee",
   "timestamp": "2026-09-20T10:03:00+07:00",
   "rule_id": "P05",
-  "input_refs": ["GR-001", "INV-001"],
+  "input_refs": ["DOC-001"],
   "result": "PASS",
-  "reason": "Invoiced quantity 10 does not exceed received quantity 10",
+  "reason": "Mã số thuế bên mua khớp hồ sơ công ty",
   "details": {}
 }
 ```
 
-`details` là object tùy chọn cho metadata theo từng event. Ví dụ `LLM_ASSESSMENT_CREATED` có thể lưu `model`, `prompt_version`, `primary_check_id`, `fallback_used`; `DECISION_GUARD_APPLIED` có thể lưu `proposed_action`, `final_action` và `proposal_overridden`. Không lưu secret/API key hoặc toàn bộ raw prompt nếu có dữ liệu nhạy cảm.
-
-### Suggested event types
+Các loại sự kiện đề xuất:
 
 ```text
-TRANSACTION_CREATED
+CASE_CREATED
+DOCUMENT_EXTRACTED
 EVIDENCE_ATTACHED
 CHECK_COMPLETED
 LLM_ASSESSMENT_CREATED
@@ -551,29 +384,9 @@ STOPPED
 OVERRIDDEN
 ```
 
-Audit log phải append-only ở mức logic ứng dụng: event cũ không được xóa chỉ vì decision sau đó bị override.
+## 14. Kiểm soát của con người
 
-### ReviewResult
-
-Output thống nhất mà UI và Verify cùng sử dụng:
-
-```text
-ReviewResult
-├── transaction
-├── checks
-├── policy_context
-├── agent_assessment
-├── decision
-└── audit_events
-```
-
-UI và Verify không được tự tính lại decision từ các field này; cả hai phải nhận cùng `ReviewResult` từ production `review()` service.
-
----
-
-## 15. Human Controls
-
-### HumanStop
+### `HumanStop`
 
 ```json
 {
@@ -582,13 +395,11 @@ UI và Verify không được tự tính lại decision từ các field này; c�
   "timestamp": "2026-09-20T10:10:00+07:00",
   "previous_workflow_status": "ACTIVE",
   "new_workflow_status": "STOPPED",
-  "reason": "Supplier bank account changed and requires manual verification"
+  "reason": "Cần xác minh nhà cung cấp theo cách thủ công"
 }
 ```
 
-Stop chỉ thay đổi `workflow_status`; decision ban đầu của Agent vẫn giữ nguyên trong audit history.
-
-### HumanOverride
+### `HumanOverride`
 
 ```json
 {
@@ -597,199 +408,22 @@ Stop chỉ thay đổi `workflow_status`; decision ban đầu của Agent vẫn 
   "timestamp": "2026-09-20T10:12:00+07:00",
   "original_action": "AUTO_PROCESS",
   "overridden_action": "ESCALATE",
-  "reason": "Manual finance approval required after external verification"
+  "reason": "Quản lý tài chính yêu cầu kiểm tra thủ công"
 }
 ```
 
-`overridden_action` chỉ nhận một trong ba decision user-facing: `AUTO_PROCESS`, `REQUEST_INFO`, `ESCALATE`. Không dùng `STOPPED` làm decision.
-
----
-
-## 16. Evidence Reference
-
-Các check và audit event không nên copy toàn bộ document vào output. Chúng chỉ cần tham chiếu bằng ID.
-
-Ví dụ:
-
-```json
-{
-  "evidence_refs": [
-    "PO-001",
-    "GR-001",
-    "INV-001",
-    "PAY-001"
-  ]
-}
-```
-
-Điều này giúp trace được quyết định mà không làm object kết quả phình to.
-
----
-
-## 17. Example — Routine Transaction
-
-```json
-{
-  "transaction_id": "TX-001",
-  "transaction_type": "PO_GOODS_PURCHASE",
-  "po": {
-    "po_id": "PO-001",
-    "vendor_id": "VENDOR-ABC",
-    "approved_total": 30000000
-  },
-  "goods_receipts": [
-    {
-      "receipt_id": "GR-001",
-      "po_id": "PO-001"
-    }
-  ],
-  "invoice": {
-    "invoice_id": "INV-001",
-    "vendor_id": "VENDOR-ABC",
-    "po_id": "PO-001",
-    "total_amount": 30000000,
-    "flagged": false
-  },
-  "payment_history": [
-    {
-      "invoice_id": "INV-001",
-      "status": "UNPAID"
-    }
-  ],
-  "checks": [
-    {"check_id": "CHECK_VENDOR", "status": "PASS"},
-    {"check_id": "CHECK_QUANTITY", "status": "PASS"},
-    {"check_id": "CHECK_AMOUNT", "status": "PASS"},
-    {"check_id": "CHECK_DUPLICATE", "status": "PASS"},
-    {"check_id": "CHECK_PAYMENT", "status": "PASS"}
-  ],
-  "decision": {
-    "action": "AUTO_PROCESS",
-    "reason": "Required evidence is consistent and transaction is within authority",
-    "question": null,
-    "target": null
-  }
-}
-```
-
----
-
-## 18. Example — Missing Fact
-
-```json
-{
-  "transaction_id": "TX-002",
-  "checks": [
-    {
-      "check_id": "CHECK_AMOUNT",
-      "policy_rule_id": "P07",
-      "status": "FAIL",
-      "expected": 30000000,
-      "actual": 35000000,
-      "reason": "Invoice amount exceeds approved PO amount"
-    }
-  ],
-  "decision": {
-    "action": "REQUEST_INFO",
-    "reason": "No approved adjustment is available",
-    "uncertainty": {
-      "type": "FACTUAL_UNKNOWN",
-      "field": "approved_adjustment"
-    },
-    "question": "PO được phê duyệt 30M nhưng invoice là 35M. Có phê duyệt điều chỉnh thêm 5M không?",
-    "target": "Purchasing"
-  }
-}
-```
-
----
-
-## 19. Example — Beyond Authority
-
-```json
-{
-  "transaction_id": "TX-003",
-  "invoice": {
-    "invoice_id": "INV-003",
-    "total_amount": 120000000
-  },
-  "decision": {
-    "action": "ESCALATE",
-    "reason": "Transaction exceeds the 50M agent authority threshold",
-    "uncertainty": {
-      "type": "BEYOND_AUTHORITY",
-      "field": "transaction_amount"
-    },
-    "question": "Giao dịch 120M vượt ngưỡng tự xử lý 50M. Finance Manager có phê duyệt giao dịch này không?",
-    "target": "Finance Manager",
-    "policy_rule_ids": ["P12"]
-  }
-}
-```
-
----
-
-## 20. Interface giữa các module
-
-Để 4 người có thể code song song, interface tối thiểu cần khóa như sau:
+## 15. `ReviewResult`
 
 ```text
-Raw Evidence
-    ↓
-Extraction Adapter
-    ↓
-ExtractedDocument / canonical fields
-    ↓
-Normalization
-    ↓
-PurchaseOrder / GoodsReceipt / SupplierInvoice / PaymentRecord / ApprovalRecord
-    ↓
-Transaction Builder
-    ↓
-Transaction
-    ↓
-Check Engine
-    ↓
-List[CheckResult]
-    ↓
-Policy Engine
-    ↓
-PolicyContext
-    ↓
-LLM Agent
-    ↓
-AgentAssessment
-    ↓
-Decision Guard
-    ↓
-Decision
-    ↓
-Audit / UI / Verify
+ReviewResult
+├── review_case
+├── extracted_documents
+├── canonical_documents
+├── checks
+├── policy_context
+├── agent_assessment
+├── decision
+└── audit_events
 ```
 
-Mỗi module chỉ phụ thuộc schema đầu vào/đầu ra, không phụ thuộc implementation nội bộ của module khác.
-
----
-
-## 21. Schema cần được xem là contract
-
-Trước khi bắt đầu code, team phải thống nhất và hạn chế thay đổi tùy tiện các object sau:
-
-1. `ExtractedDocument`
-2. `PurchaseOrder`
-3. `GoodsReceipt`
-4. `SupplierInvoice`
-5. `PaymentRecord`
-6. `ApprovalRecord`
-7. `Transaction`
-8. `CheckResult`
-9. `Uncertainty`
-10. `PolicyContext`
-11. `AgentAssessment`
-12. `Decision`
-13. `ReviewResult`
-14. `AuditEvent`
-15. `HumanStop`
-16. `HumanOverride`
-
-Nếu cần thay schema sau khi code đã được chia cho nhiều người, thay đổi phải được thông báo vì nó có thể phá interface giữa các module.
+Mã sản phẩm, giao diện và Verify không được tự tính lại quyết định; tất cả phải dùng `ReviewResult` từ `review()`.

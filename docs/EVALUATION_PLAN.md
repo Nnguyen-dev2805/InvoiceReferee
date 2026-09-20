@@ -1,120 +1,121 @@
-# InvoiceReferee — Evaluation Plan
+# InvoiceReferee — Kế hoạch đánh giá
 
 ## 1. Mục tiêu
 
-File này định nghĩa cách chứng minh InvoiceReferee hoạt động trên dữ liệu mới và cách thu thập bằng chứng người dùng thực tế mà không bịa dữ liệu hoặc feedback.
+Chứng minh tác tử xử lý được chứng từ mới, không mã hóa cứng dữ liệu mẫu và biết dừng khi thiếu dữ kiện, nằm ngoài chính sách, vượt thẩm quyền hoặc có nghi vấn.
 
-## 2. Sprint 1 — Evaluation kỹ thuật
+## 2. Đánh giá kỹ thuật Sprint 1
 
-### Ground truth
+### Dữ liệu chuẩn
 
-- 17 documented cases trong `TEST_CASES.md`.
-- Core Verify: 4 case.
-- Challenge A Verify: 5 case.
-- Full Verify: một thao tác chạy cả hai suite qua cùng production `review()` path.
-- Production code không được đọc expected labels.
+- 17 trường hợp đã mô tả trong `TEST_CASES.md`.
+- Bộ Verify cốt lõi: 4 trường hợp.
+- Bộ Verify Challenge A: 5 trường hợp.
+- Bộ Verify đầy đủ chạy qua luồng `review()` của sản phẩm bằng một thao tác.
+- Mã sản phẩm không được đọc nhãn kết quả kỳ vọng.
 
-### Unseen-input test
+### Phạm vi bắt buộc
 
-Tạo ít nhất 2 transaction mới không nằm trong fixtures:
+Bộ đánh giá phải có:
 
-1. một routine case với vendor/amount/quantity mới;
-2. một abnormal case, ưu tiên factual-unknown hoặc beyond-authority.
+- hóa đơn điện tử thường quy;
+- chứng từ nhân viên thường quy;
+- thiếu trường bắt buộc;
+- OCR/giá trị không đọc được;
+- số học không khớp;
+- sai mã số thuế bên mua;
+- trùng lặp;
+- chi phí cá nhân/bị cấm;
+- thiếu mục đích kinh doanh;
+- chỉ có bằng chứng thanh toán;
+- bằng chứng PO/nhận hàng/đề nghị chi mâu thuẫn;
+- vượt thẩm quyền;
+- bất thường/nghi vấn;
+- chứng từ quá hạn.
 
-Judge/user phải có thể paste hoặc upload JSON vào Streamlit và chạy qua cùng `review()` service.
+### Kiểm thử đầu vào mới
 
-### Metrics
+Tạo ít nhất 3 đầu vào mới không nằm trong dữ liệu mẫu:
 
-Ghi tối thiểu:
+1. Một hóa đơn điện tử thường quy với nhà cung cấp, số tiền và số hóa đơn mới.
+2. Một chứng từ nhân viên thiếu mục đích kinh doanh.
+3. Một trường hợp ngoài chính sách, có nghi vấn hoặc vượt thẩm quyền.
 
-- expected action vs actual action;
-- uncertainty type;
-- pass/fail;
-- question có cụ thể hay không;
-- structured `AgentAssessment` có hợp lệ hay không;
-- LLM proposal có bị Decision Guard sửa hay không;
-- có dùng deterministic fallback hay không;
-- timestamp.
+Giao diện phải cho phép dán/tải lên JSON mới và gọi cùng dịch vụ `review()`.
 
-### LLM/Decision Guard evaluation
+### Chỉ số
 
-LLM là một phần của normal review path nên phải được đánh giá riêng, nhưng output của LLM không được dùng làm ground truth cho phép tính hoặc business facts.
+Ghi lại tối thiểu:
 
-Theo dõi tối thiểu:
+- hành động kỳ vọng so với hành động thực tế;
+- loại không chắc chắn;
+- đạt/không đạt;
+- mã phép kiểm tra không đạt;
+- câu hỏi có cụ thể hay không;
+- `AgentAssessment` có cấu trúc hợp lệ hay không;
+- đề xuất của LLM có bị Bộ bảo vệ sửa hay không;
+- có dùng phương án dự phòng hay không;
+- dấu thời gian.
 
-- **Structured-output validity rate:** tỷ lệ response parse được thành `AgentAssessment` hợp lệ.
-- **LLM/Guard disagreement rate:** tỷ lệ proposal của LLM bị Decision Guard reject/override.
-- **Fallback rate:** tỷ lệ provider lỗi/timeout/output invalid khiến hệ thống dùng deterministic fallback.
-- **Question answerability:** câu hỏi có nêu đủ dữ kiện để người nhận trả lời trong một câu mà không cần mở lại toàn bộ hồ sơ hay không.
-- **Primary-issue validity:** `primary_check_id` phải trỏ tới check đang tồn tại và chưa được giải quyết; LLM không được tự tạo vấn đề mới.
-- **Explanation groundedness:** explanation chỉ được dựa trên `Transaction`, `CheckResult[]` và `PolicyContext`; policy/check/evidence references phải trace được về input hiện có.
+## 3. Đánh giá LLM/Bộ bảo vệ quyết định
 
-Các test bắt buộc:
+Các kiểm thử bắt buộc:
 
-1. fake LLM đề xuất `AUTO_PROCESS` khi có `FACTUAL_UNKNOWN` → Guard phải trả `REQUEST_INFO`;
-2. fake LLM đề xuất `AUTO_PROCESS` khi vượt authority → Guard phải trả `ESCALATE`;
-3. fake LLM đề xuất `AUTO_PROCESS` cho input bị P15 flagged → Guard phải trả `REQUEST_INFO`;
-4. provider timeout/error → final action vẫn do deterministic rules xác định, fallback được dùng và audit ghi nhận;
-5. provider trả structured output invalid → fallback được dùng, không bỏ qua Guard;
-6. một unseen case có nhiều mismatch → LLM phải chọn một unresolved check hợp lệ làm câu hỏi chính, Guard vẫn quyết action theo policy;
-7. routine case với valid assessment → `AUTO_PROCESS` nếu deterministic facts/policy đều cho phép.
+1. LLM giả đề xuất `AUTO_PROCESS` khi có `FACTUAL_UNKNOWN` → Bộ bảo vệ trả `REQUEST_INFO`.
+2. LLM giả đề xuất `AUTO_PROCESS` khi số tiền vượt ngưỡng → Bộ bảo vệ trả `ESCALATE / BEYOND_AUTHORITY`.
+3. LLM giả đề xuất `AUTO_PROCESS` khi mã số thuế bên mua thuộc công ty khác → Bộ bảo vệ trả `ESCALATE / OUTSIDE_POLICY`.
+4. LLM giả đề xuất `AUTO_PROCESS` khi có cờ nghi vấn rõ → Bộ bảo vệ trả `ESCALATE / SUSPICIOUS`.
+5. Nhà cung cấp mô hình hết thời gian/lỗi → hành động cuối cùng vẫn theo quy tắc tất định và có nhật ký dùng phương án dự phòng.
+6. Nhà cung cấp mô hình trả đầu ra có cấu trúc không hợp lệ → dùng phương án dự phòng + Bộ bảo vệ.
+7. Trường hợp thường quy với đánh giá hợp lệ → `AUTO_PROCESS`.
 
-Đối với tiêu chí Challenge A về chất lượng câu hỏi, một câu hỏi chỉ được xem là đạt mức cao khi người nhận có thể quyết định/trả lời ngay từ nội dung câu hỏi và dữ kiện được nêu, không phải mở lại toàn bộ PO/invoice/receipt để hiểu hệ thống đang hỏi gì.
+Theo dõi:
 
-## 3. Challenge A quality metrics
+- tỷ lệ đầu ra có cấu trúc hợp lệ;
+- tỷ lệ bất đồng giữa LLM và Bộ bảo vệ;
+- tỷ lệ dùng phương án dự phòng;
+- khả năng trả lời câu hỏi;
+- mức độ giải thích bám sát bằng chứng.
 
-Khi có tập độc lập lớn hơn, theo dõi:
+## 4. Chỉ số chất lượng Challenge A
 
-- **Missed human-intervention rate:** case đáng lẽ cần người nhưng hệ thống lại AUTO_PROCESS.
-- **Unnecessary human-intervention rate:** routine case bị REQUEST_INFO/ESCALATE không cần thiết.
-- **Routine auto-processing rate:** tỷ lệ routine case đi qua tự động.
-- **Question answerability:** người nhận có thể trả lời câu hỏi ngay từ thông tin được nêu hay vẫn phải tự mở lại toàn bộ hồ sơ.
+- **Tỷ lệ bỏ sót can thiệp của con người:** trường hợp cần người nhưng tác tử trả `AUTO_PROCESS`.
+- **Tỷ lệ can thiệp không cần thiết:** trường hợp thường quy bị `REQUEST_INFO`/`ESCALATE`.
+- **Tỷ lệ tự động xử lý trường hợp thường quy:** trường hợp thường quy đi qua tự động.
+- **Khả năng trả lời câu hỏi:** người nhận có thể trả lời trực tiếp từ câu hỏi hay không.
 
-## 4. Sprint 2 — Real-user validation
+## 5. Kiểm chứng với người dùng thật trong Sprint 2
 
-Không điền tên hoặc quote giả. Chỉ cập nhật khi đã phỏng vấn/test thật.
+Không điền phản hồi giả. Chỉ cập nhật khi có phỏng vấn hoặc kiểm thử thật.
 
-| Slot | Target role | Evidence cần thu |
+| Vị trí | Vai trò mục tiêu | Bằng chứng cần thu |
 | --- | --- | --- |
-| U1 | Kế toán thanh toán / Accounts Payable | chức danh, workflow hiện tại, quote nguyên văn, pain point |
-| U2 | Purchasing / Procurement | chức danh, cách xử lý mismatch/approval, quote nguyên văn |
-| U3 | Finance Manager hoặc người phê duyệt | authority boundary, escalation expectation, quote nguyên văn |
+| U1 | Kế toán thanh toán | luồng công việc hiện tại, điểm đau, trích dẫn nguyên văn |
+| U2 | Nhân viên nộp chi phí | thông tin thường thiếu, trở ngại khi bổ sung |
+| U3 | Quản lý tài chính/người phê duyệt | ranh giới thẩm quyền, kỳ vọng khi chuyển tiếp |
 
-## 5. Before / After measurement
+## 6. Đo lường trước/sau
 
-Chọn 5–10 transaction mẫu và đo cùng một nhiệm vụ:
+Chọn 5-10 chứng từ mẫu và đo:
 
-**Before:** người dùng tự đọc PO + receipt + invoice + payment history và quyết định bước tiếp theo.
+**Trước:** người dùng tự đọc hóa đơn/chứng từ/bối cảnh và quyết định.
 
-**After:** người dùng dùng InvoiceReferee rồi xác nhận/override kết quả.
+**Sau:** người dùng dùng InvoiceReferee rồi xác nhận/ghi đè.
 
-Ghi:
+Ghi lại:
 
-- thời gian xử lý mỗi case;
-- số mismatch bị bỏ sót;
-- số lần phải mở lại chứng từ;
-- số escalation không cần thiết;
-- số quyết định Agent bị human override.
+- thời gian xử lý;
+- số điểm không khớp bị bỏ sót;
+- số lần phải hỏi lại nhân viên;
+- số lần chuyển tiếp không cần thiết;
+- số quyết định bị ghi đè.
 
-## 6. Product change from feedback
+## 7. Kỷ luật về bằng chứng
 
-Mỗi feedback dùng để thay sản phẩm phải có:
+Phân biệt:
 
-- người/role đưa feedback;
-- vấn đề họ gặp;
-- thay đổi cụ thể;
-- commit hoặc before/after evidence;
-- tác động tích cực;
-- ít nhất một bất cập hoặc trade-off phát sinh.
+- `SYNTHETIC`: chính sách/dữ liệu tự sinh;
+- `REAL`: dữ liệu/phản hồi từ người dùng thật;
+- `UNVERIFIED`: giả thuyết chưa xác nhận.
 
-Không ghi “không có bất cập”. Nếu chưa quan sát được tác động tiêu cực, ghi rõ là **chưa đủ evidence** và tiếp tục test.
-
-## 7. Evidence discipline
-
-Phân biệt rõ:
-
-- `SYNTHETIC`: policy/data tự sinh để prototype/evaluation;
-- `REAL`: dữ liệu hoặc feedback thu từ người dùng thật;
-- `UNVERIFIED`: giả thuyết chưa được xác nhận.
-
-Không biến synthetic 50M authority threshold thành claim về policy thật của doanh nghiệp hoặc quy định pháp luật.
+Không biến ngưỡng giả lập 50 triệu đồng thành tuyên bố về chính sách thật.

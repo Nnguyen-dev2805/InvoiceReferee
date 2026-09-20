@@ -1,8 +1,8 @@
 # InvoiceReferee
 
-**AI Purchase Invoice Review & Escalation Agent**
+**Tác tử kế toán kiểm tra hóa đơn, biên lai và chứng từ chi phí**
 
-InvoiceReferee hỗ trợ kế toán bên mua kiểm tra các giao dịch mua hàng có PO và Goods Receipt. Hệ thống gom bằng chứng của cùng một transaction, chạy các kiểm tra deterministic, áp dụng policy và trả một trong ba quyết định:
+InvoiceReferee hỗ trợ kế toán kiểm tra hóa đơn điện tử, hóa đơn/chứng từ do nhân viên chụp và các bằng chứng thanh toán liên quan. Hệ thống trích xuất dữ liệu, chuẩn hóa về một lược đồ chung, chạy các quy tắc nghiệp vụ, áp dụng chính sách nội bộ và trả về một trong ba hành động:
 
 ```text
 AUTO_PROCESS
@@ -10,229 +10,137 @@ REQUEST_INFO
 ESCALATE
 ```
 
-`AUTO_PROCESS` chỉ có nghĩa là hồ sơ routine đã đủ căn cứ để đi tiếp sang bước payment review; hệ thống không tự chuyển tiền.
+`AUTO_PROCESS` chỉ có nghĩa là chứng từ đã đủ căn cứ để chuyển sang bước nhập liệu hoặc kiểm tra thanh toán. Hệ thống không tự chuyển tiền và không thay thế quyền phê duyệt cuối cùng của con người.
 
-## Sprint 1 scope
+## Phạm vi Sprint 1
 
-```text
-Purchase Order
-→ Goods Receipt
-→ Supplier Invoice
-→ Review
-→ Payment Review
-```
-
-Sprint 1 chỉ bao phủ **PO-based goods purchases có Goods Receipt**.
-
-## Business Workflow
-
-Luồng nghiệp vụ mà InvoiceReferee hỗ trợ:
+Sprint 1 tập trung vào việc kiểm tra chứng từ chi phí với hai nhóm đầu vào chính:
 
 ```text
-Purchasing tạo PO đã được phê duyệt
+Hóa đơn điện tử / XML / PDF / ảnh
+Chứng từ nhân viên / biên lai / bằng chứng thanh toán
+Bằng chứng bổ sung: đơn đặt hàng, biên bản nhận hàng, đề nghị chi,
+                    dự án/khách hàng, lịch sử thanh toán
         ↓
-Warehouse / Receiver xác nhận hàng đã nhận
+Trích xuất + Chuẩn hóa
         ↓
-Supplier gửi invoice
+Kiểm tra chính sách / Tính nhất quán / Thẩm quyền
         ↓
-Accounts Payable nhận hồ sơ
-        ↓
-InvoiceReferee review PO + Receipt + Invoice + Payment History
-        ↓
-┌──────────────────┬──────────────────┬──────────────────┐
-│   AUTO_PROCESS   │   REQUEST_INFO   │     ESCALATE     │
-│ hồ sơ routine    │ còn thiếu /      │ ngoài policy /   │
-│ đủ căn cứ        │ mâu thuẫn fact   │ vượt thẩm quyền  │
-└────────┬─────────┴────────┬─────────┴────────┬─────────┘
-         ↓                  ↓                  ↓
- Payment Review       Bổ sung evidence     Human decision
+AUTO_PROCESS / REQUEST_INFO / ESCALATE
 ```
 
-`AUTO_PROCESS` chỉ đưa hồ sơ sang bước review thanh toán tiếp theo, không tự chuyển tiền.
+Đơn đặt hàng (PO) và biên bản nhận hàng vẫn được hỗ trợ như **bằng chứng bổ sung** cho giao dịch mua hàng hóa, nhưng không còn là phạm vi duy nhất của sản phẩm.
 
-## System Flow
+## Bài toán nghiệp vụ
 
-Luồng xử lý bên trong hệ thống:
+Kế toán cần xử lý nhiều loại chứng từ:
+
+- hóa đơn điện tử có cấu trúc rõ ràng: mã số thuế, bên mua/bán, ngày lập, mẫu số, ký hiệu, số hóa đơn, hàng hóa/dịch vụ và thành tiền;
+- hóa đơn/chứng từ do nhân viên chụp: nhà hàng, taxi/Grab, khách sạn, văn phòng phẩm, in ấn, sửa chữa, chuyển khoản ngân hàng/ví điện tử;
+- dữ liệu nằm ngoài chứng từ: người chi, mục đích kinh doanh, khách hàng/dự án, đơn đặt hàng, bằng chứng nhận hàng/dịch vụ, lịch sử thanh toán và chính sách nội bộ.
+
+Tác tử phải biết khi nào đã đủ căn cứ, khi nào thiếu thông tin, khi nào vi phạm chính sách, khi nào vượt thẩm quyền và khi nào có dấu hiệu bất thường.
+
+## Ranh giới quyết định
 
 ```text
-Raw Input (JSON baseline; XML/PDF/Image adapters optional)
-  ↓
-Extraction / Canonical Mapping
-  ↓
-Normalization
-  ↓
-Identify Transaction Type
-  ↓
-Build Transaction
-  ↓
-Validate Required Evidence
-  ↓
-Run Deterministic Checks
-  ↓
-Apply Policy + Authority Constraints
-  ↓
-LLM Agent Assessment
-  ├── reason over structured facts
-  ├── propose uncertainty/action
-  ├── explain result
-  └── generate specific question
-  ↓
-Deterministic Decision Guard
-  ↓
-Final Decision
-  ├── AUTO_PROCESS
-  ├── REQUEST_INFO
-  └── ESCALATE
-  ↓
-Audit Log
-  ↓
-Human Stop / Override
-  ↓
-UI / Verify
+AUTO_PROCESS
+  Chứng từ đọc được, đầy đủ trường bắt buộc, số liệu nhất quán,
+  đúng công ty/chính sách, không trùng lặp, có bối cảnh kinh doanh
+  và nằm trong hạn mức tác tử được phép xử lý.
+
+REQUEST_INFO
+  Thiếu trường bắt buộc, OCR/ảnh mờ, thông tin mâu thuẫn,
+  chưa rõ mục đích kinh doanh/dự án/người chi, hóa đơn và khai báo khác nhau,
+  hoặc chưa đủ bằng chứng nhận hàng/dịch vụ.
+
+ESCALATE
+  Dữ kiện đã rõ nhưng nằm ngoài quy định, vượt thẩm quyền,
+  hoặc có bất thường/nghi vấn cần con người quyết định.
 ```
 
-LLM là một component chính thức trong execution path: nó nhận structured facts đã được kiểm chứng để reasoning, chọn vấn đề chưa được giải quyết cần hỏi trước, giải thích và tạo một câu hỏi hành động cụ thể. Các phép so sánh số lượng, số tiền, duplicate, payment status và authority threshold vẫn là deterministic. `Decision Guard` kiểm tra output của LLM với policy trước khi phát hành final decision, nên LLM không thể tự sửa facts hoặc vượt policy.
+Để giữ Challenge A gọn, hành động hiển thị cho người dùng chỉ gồm ba nhãn trên. Bên trong `ESCALATE` phải phân biệt `OUTSIDE_POLICY`, `BEYOND_AUTHORITY` và `SUSPICIOUS`.
 
-## Data Flow
-
-Dữ liệu chính đi qua hệ thống như sau:
+## Luồng hệ thống
 
 ```text
-PurchaseOrder
-      +
-GoodsReceipt[]
-      +
-SupplierInvoice
-      +
-PaymentRecord[]
-      +
-ApprovalRecord[]
-      +
-Transaction History
-      ↓
-Transaction
-      ↓
-CheckResult[] + PolicyContext
-      ↓
-AgentAssessment (LLM)
-      ↓
-Decision Guard
-      ↓
-Decision
-      ↓
-AuditEvent[]
-      +
-HumanStop / HumanOverride
+Đầu vào thô (JSON/XML/PDF/Ảnh)
+  ↓
+Bộ chuyển đổi trích xuất
+  ↓
+Ánh xạ chứng từ chuẩn
+  ↓
+Chuẩn hóa trường dữ liệu + cảnh báo nguồn
+  ↓
+Tạo hồ sơ kiểm tra
+  ↓
+Kiểm tra trường bắt buộc / bối cảnh kinh doanh
+  ↓
+Chạy các phép kiểm tra tất định
+  ↓
+Áp dụng chính sách + ràng buộc thẩm quyền
+  ↓
+Đánh giá của tác tử LLM
+  ├── suy luận trên dữ kiện có cấu trúc
+  ├── đề xuất loại không chắc chắn/hành động
+  ├── tạo câu hỏi cụ thể
+  └── giải thích kết quả
+  ↓
+Bộ bảo vệ quyết định tất định
+  ↓
+Quyết định cuối cùng + nhật ký kiểm toán
 ```
 
-`Transaction` là object trung tâm. Invoice không được review tách biệt khi đã có PO, Goods Receipt, payment history hoặc evidence liên quan trong lịch sử giao dịch.
+LLM là thành phần hỗ trợ suy luận và giao tiếp trên dữ kiện có cấu trúc. Các phép so sánh tiền, số lượng, trùng lặp, trạng thái thanh toán, ngưỡng thẩm quyền và ánh xạ quy tắc vẫn do mã tất định xử lý.
 
-## Core checks
+## Các phép kiểm tra cốt lõi
 
-1. Vendor match
-2. Item match
-3. Quantity match, gồm cumulative quantity theo item
-4. Unit price match
-5. Amount check
-6. Duplicate invoice
-7. Payment status
-8. Cumulative PO limit
+1. Độ đầy đủ của trường bắt buộc theo loại chứng từ.
+2. Mã số thuế/tên bên mua có khớp với công ty hay không.
+3. Danh tính bên bán/nhà cung cấp và định danh hóa đơn.
+4. Tính hợp lệ của ngày và thời hạn nộp chứng từ.
+5. Tính nhất quán giữa dòng hàng, số lượng, đơn giá và thành tiền.
+6. Số tiền bằng chữ so với số tiền bằng số, nếu có.
+7. Trùng lặp hóa đơn, biên lai hoặc bằng chứng thanh toán.
+8. Mục đích kinh doanh, nhân viên, khách hàng/dự án.
+9. Tính nhất quán giữa biên lai, đề nghị chi và bằng chứng thanh toán.
+10. Kiểm tra danh mục theo chính sách: chi phí cá nhân, rượu bia, mặt hàng bị cấm, thiếu mục đích.
+11. Bằng chứng nhận hàng/dịch vụ khi được yêu cầu.
+12. Ngưỡng thẩm quyền.
+13. Cờ bất thường/nghi vấn.
 
-## Documentation
+## Tài liệu
 
-- `docs/CHALLENGE.md` — đề thi yêu cầu gì và judge kiểm tra thế nào
-- `docs/PRODUCT_SPEC.md` — sản phẩm Sprint 1 phải làm gì
-- `docs/POLICY.md` — decision boundary và policy v0
-- `docs/DATA_MODEL.md` — schema contract giữa các module
-- `docs/DECISION_FLOW.md` — flow từ input đến decision
-- `docs/TEST_CASES.md` — 17 test cases + Verify cases
-- `docs/ARCHITECTURE.md` — module, interface và ownership
-- `docs/EVALUATION_PLAN.md` — kế hoạch unseen tests, user feedback và đo lường Sprint 2
-- `docs/superpowers/specs/2026-09-20-invoice-referee-design.md` — design spec tổng hợp
-- `docs/superpowers/plans/2026-09-20-invoice-referee-implementation.md` — implementation plan
-- `docs/BUILD_LOG.md` — nhật ký phát triển
-- `docs/Challenge_Brief_OrganizationAI_VN.docx.md` — challenge brief gốc
+- `docs/ACCOUNTING_AGENT_REQUIREMENTS.md` - yêu cầu bài toán kế toán đã chốt.
+- `docs/PRODUCT_SPEC.md` - chức năng sản phẩm trong Sprint 1.
+- `docs/POLICY.md` - ranh giới quyết định và chính sách v0.
+- `docs/DATA_MODEL.md` - hợp đồng lược đồ giữa các mô-đun.
+- `docs/DECISION_FLOW.md` - luồng từ đầu vào đến quyết định.
+- `docs/TEST_CASES.md` - bộ kiểm thử tối thiểu 15 trường hợp.
+- `docs/ARCHITECTURE.md` - mô-đun, giao diện và phạm vi phụ trách.
+- `docs/EVALUATION_PLAN.md` - kiểm thử dữ liệu mới, phản hồi người dùng và đo lường.
+- `docs/CHALLENGE.md` - ánh xạ với Challenge A.
+- `docs/BUILD_LOG.md` - nhật ký phát triển.
 
+## Chạy và kiểm tra
 
-## Run & Verify
-
-> Các lệnh dưới đây là contract dự kiến ở giai đoạn pre-code và phải được kiểm tra lại sau khi implementation hoàn tất.
-
-### Requirements
-
-- Python 3.12+
-- Git
-
-### Setup
-
-```bash
-git clone <public-repository-url>
-cd InvoiceReferee
-python3.12 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -e '.[dev]'
-```
-
-### Tests
-
-```bash
-pytest -v
-```
-
-### Full Verify — judge path
-
-Một lệnh chạy cả Core Verify và Challenge A Verify qua đúng production `review()` service:
+> Các lệnh dưới đây là hợp đồng dự kiến ở giai đoạn trước khi viết mã và phải được kiểm tra lại sau khi hoàn tất triển khai.
 
 ```bash
 python -m verify.harness --suite all
 ```
 
-UI phải có nút tương đương **Run Full Verify** để giám khảo không cần mở terminal. Kết quả hiển thị suite, case, expected, actual, pass/fail, uncertainty, question/target khi có, LLM/fallback status và timestamp.
-
-### Core Verify
-
-```bash
-python -m verify.harness --suite core
-```
-
-Expected cases:
+Bộ kiểm tra cốt lõi phải có ít nhất:
 
 ```text
 TC01 → AUTO_PROCESS
-TC07 → REQUEST_INFO
-TC13 → ESCALATE
-TC14 → ESCALATE
+TC06 → REQUEST_INFO
+TC10 → ESCALATE
+TC11 → ESCALATE
 ```
 
-### Challenge A Verify
+Giao diện phải cho phép dán/tải lên JSON mới để kiểm thử đầu vào chưa từng thấy qua đúng luồng `review()` dùng trong sản phẩm. Kết quả hiển thị quyết định, loại không chắc chắn, quy tắc không đạt, câu hỏi/đối tượng cần trả lời, cảnh báo trích xuất và lịch sử kiểm toán.
 
-```bash
-python -m verify.harness --suite escalation
-```
+## Trạng thái hiện tại
 
-Expected cases:
-
-```text
-EV01 → AUTO_PROCESS
-EV02 → AUTO_PROCESS
-EV03 → AUTO_PROCESS
-EV04 → REQUEST_INFO
-EV05 → ESCALATE
-```
-
-### Run UI
-
-```bash
-streamlit run app/streamlit_app.py
-```
-
-Homepage phải hướng dẫn judge thao tác đầu tiên, không yêu cầu login, và cho phép paste/upload JSON mới để test unseen input.
-
-### Submission smoke check
-
-Trước demo/deploy cần kiểm tra tối thiểu: routine case, một `REQUEST_INFO`, một `ESCALATE`, audit history, Stop/Override, hai Verify suites và ít nhất hai unseen JSON inputs qua đúng production `review()` path.
-
-## Current state
-
-Project đang ở giai đoạn **pre-code specification**. Các tài liệu cốt lõi đã được chốt trước khi bắt đầu implementation.
+Dự án đang ở giai đoạn **đặc tả trước khi viết mã**. Tài liệu đã được điều chỉnh từ phạm vi chỉ dựa trên PO sang tác tử kế toán kiểm tra hóa đơn, chứng từ và bằng chứng chi phí.

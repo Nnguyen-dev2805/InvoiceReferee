@@ -1,232 +1,184 @@
-# InvoiceReferee — Policy v0
+# InvoiceReferee — Chính sách v0
 
 ## 1. Mục đích
 
-File này định nghĩa **ranh giới quyết định của InvoiceReferee trong Sprint 1**.
+Chính sách v0 định nghĩa ranh giới quyết định cho bản thử nghiệm tác tử kế toán. Đây là **chính sách giả lập**, dùng để đánh giá và trình diễn, không phải chính sách thật của một doanh nghiệp cụ thể.
 
-Policy này là **synthetic policy dùng cho prototype và evaluation**, không phải policy thật của một doanh nghiệp cụ thể.
+Mục tiêu:
 
-Mục tiêu của policy là giúp hệ thống phân biệt rõ:
+- chứng từ thường quy và hợp lệ → `AUTO_PROCESS`;
+- dữ kiện thiếu hoặc chưa chắc chắn → `REQUEST_INFO`;
+- ngoài quy định, vượt thẩm quyền hoặc có nghi vấn → `ESCALATE`.
 
-- khi nào được `AUTO_PROCESS`;
-- khi nào phải `REQUEST_INFO`;
-- khi nào phải `ESCALATE`.
+## 2. Phạm vi
 
----
+Chính sách v0 áp dụng cho:
 
-## 2. Phạm vi policy
+- hóa đơn điện tử của công ty;
+- hóa đơn/chứng từ do nhân viên chụp;
+- bằng chứng thanh toán và bằng chứng bổ sung liên quan đến việc kiểm tra chi phí;
+- PO, biên bản nhận hàng hoặc nghiệm thu dịch vụ như bằng chứng bổ sung khi có.
 
-Policy v0 chỉ áp dụng cho:
+Chính sách v0 chưa phải bộ máy xử lý thuế/GTGT/TNDN hoàn chỉnh.
 
-> **PO-based goods purchases có Goods Receipt.**
-
-Một transaction nằm trong phạm vi khi có thể liên kết được tối thiểu:
-
-- Purchase Order;
-- Goods Receipt;
-- Supplier Invoice;
-- Payment History hoặc trạng thái thanh toán;
-- policy / authority rule tương ứng.
-
-Các loại transaction khác không được Agent tự suy diễn theo policy này.
-
----
-
-## 3. Ba loại quyết định
-
-### AUTO_PROCESS
-
-Chỉ dùng khi:
-
-- facts cần thiết đã đầy đủ;
-- các rule bắt buộc đều đạt;
-- transaction nằm trong phạm vi policy;
-- transaction nằm trong thẩm quyền của Agent.
-
-`AUTO_PROCESS` nghĩa là transaction đã qua routine review và có thể đi tiếp sang payment review.
-
-Nó **không** có nghĩa là tự động thanh toán.
-
-### REQUEST_INFO
-
-Dùng khi Agent **chưa biết đủ sự thật** để áp dụng policy.
-
-Ví dụ:
-
-- thiếu Goods Receipt;
-- không tìm thấy PO;
-- PO và Invoice lệch số tiền nhưng chưa biết có approval điều chỉnh hay không;
-- dữ liệu giữa hai nguồn mâu thuẫn;
-- payment status chưa xác định được.
-
-Agent phải hỏi một câu cụ thể để bổ sung đúng phần facts còn thiếu.
-
-### ESCALATE
-
-Dùng khi facts đã rõ nhưng:
-
-- transaction nằm ngoài policy;
-- hoặc quyết định vượt thẩm quyền của Agent.
-
-Agent phải nêu rõ:
-
-- lý do chuyển tiếp;
-- người/role cần quyết định nếu policy xác định được;
-- câu hỏi cụ thể cần được trả lời.
-
----
-
-## 4. Thứ tự ưu tiên quyết định
-
-Policy/Decision Guard phải xác định **transaction type trước**, rồi mới yêu cầu evidence đặc thù của workflow PO-based goods purchase. Điều này tránh lỗi ví dụ service invoice bị hỏi Goods Receipt dù policy đã xác định rõ loại giao dịch đó nằm ngoài phạm vi.
-
-`PolicyContext.scope_status` phải phân biệt ba trạng thái: `UNKNOWN`, `OUTSIDE_POLICY`, `IN_SCOPE`. Không gộp `UNKNOWN` và `OUTSIDE_POLICY` vào cùng một boolean.
+## 3. Thứ tự ưu tiên quyết định
 
 ```text
-1. Chưa xác định được transaction type
+1. Đầu vào kỹ thuật lỗi hoặc sai định dạng
+      → INPUT_ERROR
+
+2. Không xác định được loại chứng từ/hồ sơ
       → REQUEST_INFO
 
-2. Transaction type đã rõ và ngoài phạm vi policy
-      → ESCALATE
-
-3. Transaction thuộc phạm vi nhưng facts bắt buộc thiếu / mâu thuẫn
+3. Dữ kiện bắt buộc bị thiếu, không đọc được, có cảnh báo OCR nghiêm trọng
+   hoặc mâu thuẫn
       → REQUEST_INFO
 
-4. Facts đã rõ nhưng vượt thẩm quyền
-      → ESCALATE
+4. Dữ kiện đã rõ nhưng vi phạm/nằm ngoài chính sách
+      → ESCALATE / OUTSIDE_POLICY
 
-5. Đủ facts + đúng policy + trong authority
+5. Dữ kiện đã rõ nhưng có cờ bất thường/nghi vấn
+      → ESCALATE / SUSPICIOUS
+
+6. Dữ kiện đã rõ nhưng vượt thẩm quyền
+      → ESCALATE / BEYOND_AUTHORITY
+
+7. Đủ dữ kiện + đạt các phép kiểm tra + đúng chính sách + trong thẩm quyền
       → AUTO_PROCESS
 ```
 
-Nguyên tắc quan trọng:
+Nguyên tắc: chưa biết dữ kiện thì hỏi; dữ kiện đã rõ nhưng tác tử không có quyền thì chuyển; chỉ tự động xử lý khi đầy đủ bằng chứng.
 
-> **Không yêu cầu evidence chỉ áp dụng cho workflow PO-based goods purchase nếu transaction đã được xác định rõ là ngoài policy.**
+## 4. Quy tắc chính sách
 
-> **Trong một transaction thuộc scope, không được dùng ESCALATE hoặc AUTO_PROCESS để che một fact bắt buộc còn chưa xác định.**
+### P01 — Trường bắt buộc theo loại chứng từ
 
----
+Hóa đơn điện tử phải có:
 
-## 5. Policy Rules
+- tên công ty bên mua;
+- mã số thuế bên mua;
+- tên công ty bên bán;
+- mã số thuế bên bán;
+- ngày lập hóa đơn;
+- tên hàng hóa/dịch vụ;
+- số lượng nếu là hàng hóa;
+- tổng tiền;
+- mẫu số;
+- ký hiệu;
+- số hóa đơn.
 
-### P01 — PO bắt buộc phải xác định được
-
-Nếu transaction thuộc workflow mua hàng có PO nhưng không tìm được PO tương ứng:
-
-```text
-REQUEST_INFO
-```
-
-Câu hỏi mẫu:
-
-> Không tìm thấy Purchase Order cho invoice này. PO ID hoặc PO liên quan là gì?
-
-Nếu facts xác nhận rõ transaction thực sự **không sử dụng PO** thì transaction nằm ngoài policy v0:
-
-```text
-ESCALATE
-```
-
----
-
-### P02 — Supplier phải khớp PO
-
-Supplier trên invoice phải khớp supplier được phê duyệt trên PO.
-
-Nếu không khớp và chưa có bằng chứng giải thích:
+Hóa đơn/chứng từ của nhân viên phải có tối thiểu tổng tiền và ngày giao dịch, hoặc lời giải thích hợp lệ về ngày. Nếu chứng từ quá mờ, bị che hoặc thiếu trường cần thiết:
 
 ```text
 REQUEST_INFO
 ```
 
-Câu hỏi mẫu:
+### P02 — Không coi dữ liệu trích xuất không chắc chắn là đạt
 
-> Supplier trên PO là ABC nhưng invoice được phát hành bởi XYZ. Có thay đổi supplier đã được phê duyệt không?
-
----
-
-### P03 — Item phải thuộc PO
-
-Item trên invoice phải tồn tại trong PO tương ứng.
-
-Nếu invoice chứa item không có trong PO và chưa có amendment/approval:
+Nếu OCR/bộ phân tích không đọc chắc chắn trường quan trọng như tổng tiền, ngày, số hóa đơn hoặc mã số thuế bên bán/bên mua:
 
 ```text
 REQUEST_INFO
 ```
 
-Câu hỏi mẫu:
+Ví dụ câu hỏi:
 
-> Invoice có item chưa xuất hiện trong PO. Có PO điều chỉnh hoặc phê duyệt bổ sung item này không?
+> Số tiền trên chứng từ chưa đọc chắc chắn là 45 triệu hay 48 triệu đồng. Giá trị chính xác là bao nhiêu?
 
----
+### P03 — Bên mua phải là công ty mình khi chứng từ yêu cầu bên mua
 
-### P04 — Goods Receipt là bằng chứng nhận hàng bắt buộc
+Với hóa đơn điện tử dùng để ghi nhận chi phí công ty, mã số thuế/tên bên mua phải khớp hồ sơ công ty.
 
-Đối với workflow Sprint 1, phải có Goods Receipt hoặc bằng chứng nhận hàng tương đương được policy công nhận.
-
-Nếu Goods Receipt bị thiếu:
+Nếu thiếu mã số thuế bên mua:
 
 ```text
 REQUEST_INFO
 ```
 
-Câu hỏi mẫu:
-
-> Chưa có xác nhận nhận hàng cho PO này. Goods Receipt tương ứng ở đâu?
-
----
-
-### P05 — Invoice quantity không được vượt received quantity
-
-Điều kiện routine phải kiểm tra cả invoice hiện tại và lịch sử các invoice trước đó theo từng item:
+Nếu mã số thuế bên mua rõ ràng thuộc công ty khác:
 
 ```text
-invoiced_quantity <= received_quantity
-
-sum(prior_invoiced_quantity_by_item) + current_invoiced_quantity
-    <= cumulative_received_quantity_by_item
+ESCALATE / OUTSIDE_POLICY
 ```
 
-Nếu invoice hiện tại hoặc tổng quantity đã invoice vượt lượng hàng đã nhận và chưa có approval/bằng chứng nhận bổ sung:
+### P04 — Danh tính bên bán/nhà cung cấp phải truy vết được
+
+Mã số thuế bên bán, cửa hàng hoặc nhà cung cấp phải đủ để truy vết. Nếu không đọc được:
 
 ```text
 REQUEST_INFO
 ```
 
-Câu hỏi mẫu:
-
-> Goods Receipt xác nhận đã nhận 8 đơn vị nhưng invoice tính 10 đơn vị. Có biên bản nhận bổ sung hoặc điều chỉnh nào chưa được cung cấp không?
-
-Ví dụ cumulative:
-
-> Tổng các invoice của ITEM-001 sẽ thành 16 đơn vị trong khi mới xác nhận nhận 10 đơn vị. Có Goods Receipt bổ sung hoặc điều chỉnh đã được phê duyệt không?
-
----
-
-### P06 — Unit price phải khớp approved price
-
-Điều kiện routine:
+Nếu nhà cung cấp nằm trong danh sách bị chặn hoặc bị cấm:
 
 ```text
-invoice_unit_price == approved_unit_price
+ESCALATE / OUTSIDE_POLICY
 ```
 
-Nếu lệch giá và chưa có approval/amendment:
+### P05 — Tính nhất quán số học
+
+Nếu có các dòng hàng:
+
+```text
+quantity * unit_price - discount + tax/service_charge == line/grand total
+```
+
+Nếu có số tiền bằng chữ thì phải khớp với số tiền bằng số. Nếu số liệu tự mâu thuẫn:
 
 ```text
 REQUEST_INFO
 ```
 
-Câu hỏi mẫu:
+### P06 — Phát hiện trùng lặp
 
-> PO phê duyệt đơn giá 3M nhưng invoice dùng 3.5M. Có phê duyệt điều chỉnh đơn giá không?
+Định danh trùng lặp ưu tiên:
 
----
+```text
+seller_tax_code + invoice_serial_no + invoice_number
+```
 
-### P07 — Invoice total không được vượt phần đã được phê duyệt
+Hoặc với hóa đơn/chứng từ/bằng chứng thanh toán:
 
-Nếu invoice amount vượt giá trị có thể chứng minh từ PO / quantity / approved price và chưa có amendment:
+```text
+merchant + date/time + amount + payment_ref/image_hash
+```
+
+Nếu trùng rõ ràng với chứng từ đã xử lý:
+
+```text
+ESCALATE / OUTSIDE_POLICY
+```
+
+Nếu chỉ có tín hiệu yếu, chưa đủ kết luận:
+
+```text
+REQUEST_INFO
+```
+
+### P07 — Trạng thái thanh toán
+
+Nếu chứng từ/lịch sử thanh toán cho thấy đã `PAID` hoặc `PARTIALLY_PAID` nhưng người dùng gửi lại như đề nghị chi mới:
+
+```text
+REQUEST_INFO
+```
+
+Nếu trạng thái thanh toán không rõ và cần thiết cho quyết định:
+
+```text
+REQUEST_INFO
+```
+
+### P08 — Chứng từ nhân viên phải có bối cảnh kinh doanh
+
+Hóa đơn/chứng từ của nhân viên cần có:
+
+- người chi/nhân viên;
+- mục đích kinh doanh;
+- loại chi phí;
+- khách hàng/dự án/chuyến đi/sự kiện khi liên quan.
+
+Nếu thiếu bối cảnh:
 
 ```text
 REQUEST_INFO
@@ -234,353 +186,198 @@ REQUEST_INFO
 
 Ví dụ:
 
-```text
-PO total      = 30M
-Invoice total = 35M
-```
+> Chứng từ 1,2 triệu đồng chưa có mục đích kinh doanh hoặc dự án. Khoản chi này phục vụ mục đích kinh doanh nào?
 
-Câu hỏi mẫu:
+### P09 — Tính nhất quán giữa chứng từ, đề nghị chi và thanh toán
 
-> PO được phê duyệt 30M nhưng invoice là 35M. Có PO điều chỉnh hoặc phê duyệt tăng thêm 5M không?
+Hóa đơn, khai báo của nhân viên, bằng chứng thanh toán, PO, biên bản nhận hàng hoặc nghiệm thu dịch vụ không được mâu thuẫn.
 
----
+Ví dụ:
 
-### P08 — Tổng invoice theo PO không được vượt PO
+- PO ghi 10 máy tính nhưng phiếu nhận hàng ghi 8 máy;
+- nhân viên đề nghị 1,5 triệu đồng nhưng hóa đơn ghi 1,2 triệu đồng;
+- ảnh chuyển khoản có số tiền nhưng không có hàng hóa/dịch vụ hoặc mục đích.
 
-Với nhiều invoice cùng tham chiếu một PO:
-
-```text
-sum(valid_invoice_amounts) <= approved_po_amount
-```
-
-Nếu tổng invoice vượt PO và chưa có adjustment:
+Nếu mâu thuẫn chưa có bằng chứng giải thích:
 
 ```text
 REQUEST_INFO
 ```
 
-Câu hỏi mẫu:
+### P10 — Bằng chứng nhận hàng/dịch vụ
 
-> Tổng các invoice cho PO này vượt giá trị đã được phê duyệt. Có PO amendment hoặc phê duyệt bổ sung không?
+Việc mua hàng hóa/dịch vụ cần bằng chứng đã nhận hàng/dịch vụ nếu chính sách yêu cầu. PO, biên bản nhận hàng hoặc nghiệm thu dịch vụ là bằng chứng bổ sung, không bắt buộc với mọi hóa đơn.
 
----
-
-### P09 — Duplicate invoice không được xử lý như invoice mới
-
-Duplicate identity ưu tiên dùng các định danh ổn định:
-
-```text
-vendor_tax_code + invoice_series + invoice_number
-```
-
-Nếu dữ liệu không có đủ ba trường trên, có thể fallback sang `vendor_id + invoice_number`, nhưng phải coi đây là bằng chứng yếu hơn. `amount` và `invoice_date` chỉ là tín hiệu hỗ trợ, không đủ để tự kết luận duplicate.
-
-Nếu cùng invoice identity đã tồn tại trong lịch sử:
+Nếu loại chi phí yêu cầu bằng chứng nhưng chưa có:
 
 ```text
 REQUEST_INFO
 ```
 
-Backend có thể đánh dấu transaction ở trạng thái `STOPPED_DUPLICATE` trong khi chờ người dùng xác nhận.
+### P11 — Chi phí bị cấm hoặc mang tính cá nhân
 
-Câu hỏi mẫu:
+Nếu dữ kiện đã rõ và khoản chi thuộc danh mục không được phép:
 
-> Invoice này đã xuất hiện trong lịch sử xử lý. Đây là bản gửi lại của invoice cũ hay một invoice mới hợp lệ?
-
-Agent không được tiếp tục như một invoice mới khi duplicate chưa được giải thích.
-
-Nếu invoice được khai báo rõ là `ADJUSTMENT` hoặc `REPLACEMENT` và có `related_invoice_number`, hệ thống phải liên kết nó với invoice gốc thay vì tự động coi là duplicate. Sprint 1 chỉ nhận diện và giữ quan hệ này; tác động kế toán/thuế phức tạp của hóa đơn điều chỉnh/thay thế không được tự suy diễn nếu policy chưa mô tả.
-
----
-
-### P10 — Invoice đã có thanh toán không được quay lại routine payment queue
-
-Nếu payment history xác định invoice đã `PAID`:
-
-```text
-REQUEST_INFO
-```
-
-Backend có thể đánh dấu `STOPPED_ALREADY_PAID`.
-
-Câu hỏi mẫu:
-
-> Payment history cho thấy invoice này đã được thanh toán. Có lý do hợp lệ nào để đưa invoice trở lại payment review không?
-
-Không được `AUTO_PROCESS` một invoice đã thanh toán như một invoice mới.
-
-Nếu payment history là `PARTIALLY_PAID`, transaction cũng phải dừng routine flow:
-
-```text
-REQUEST_INFO
-```
-
-Câu hỏi phải nêu rõ số tiền đã trả và số tiền còn lại cần xác minh, ví dụ:
-
-> Invoice 30M đã được thanh toán 10M. Có phải phần còn lại 20M vẫn đang chờ thanh toán không?
-
----
-
-### P11 — Payment status chưa rõ thì không được suy đoán
-
-Nếu payment history bị thiếu hoặc mâu thuẫn đến mức không xác định được invoice đã thanh toán hay chưa:
-
-```text
-REQUEST_INFO
-```
-
-Câu hỏi mẫu:
-
-> Chưa xác định được trạng thái thanh toán của invoice này. Invoice hiện là UNPAID, PARTIALLY_PAID hay PAID?
-
----
-
-### P12 — Authority threshold
-
-Synthetic authority rule cho Sprint 1:
-
-```text
-transaction_amount <= 50,000,000 VND
-    → Agent có thể AUTO_PROCESS nếu mọi rule khác đều đạt
-
-transaction_amount > 50,000,000 VND
-    → Finance Manager approval required
-```
-
-Khi transaction vượt 50M và facts đã rõ:
-
-```text
-ESCALATE
-Target: Finance Manager
-```
-
-Câu hỏi mẫu:
-
-> Giao dịch có giá trị 120M, vượt ngưỡng tự xử lý 50M. Finance Manager có phê duyệt giao dịch này không?
-
-Ngưỡng 50M là dữ liệu synthetic phục vụ prototype, không phải quy định pháp lý hay policy thật của một doanh nghiệp cụ thể.
-
----
-
-### P13 — Outside-policy transaction
-
-Nếu transaction type đã được xác định rõ nhưng không thuộc phạm vi:
-
-- PO-based goods purchase;
-- có Goods Receipt;
-- và các rule của policy v0;
+- chi tiêu cá nhân;
+- rượu bia/danh mục bị cấm theo chính sách;
+- tiếp khách không có mục đích kinh doanh sau khi đã xác định đầy đủ dữ kiện;
+- chứng từ được nộp quá hạn theo chính sách;
 
 thì:
 
 ```text
-ESCALATE
+ESCALATE / OUTSIDE_POLICY
 ```
 
-Ví dụ:
+### P12 — Thời hạn nộp
 
-- service invoice không có Goods Receipt;
-- advance-payment workflow;
-- tax-only adjustment workflow;
-- loại transaction chưa được policy định nghĩa.
+Quy tắc giả lập:
 
-Câu hỏi mẫu:
+```text
+submission_date - document_date <= 30 days
+```
 
-> Transaction này không thuộc workflow PO-based goods purchase mà policy hiện tại bao phủ. Ai là người có thẩm quyền xử lý loại giao dịch này?
+Nếu quá hạn và ngày tháng đã rõ:
 
----
+```text
+ESCALATE / OUTSIDE_POLICY
+```
 
-### P14 — Conflicting evidence
-
-Nếu hai nguồn bằng chứng đáng tin cậy mâu thuẫn nhau và không có rule xác định nguồn nào thắng:
+Nếu thiếu ngày giao dịch/lập hóa đơn:
 
 ```text
 REQUEST_INFO
 ```
 
-Agent không được chọn một nguồn tùy ý.
+### P13 — Ngưỡng thẩm quyền
 
-Câu hỏi phải chỉ rõ hai facts đang xung đột.
+Quy tắc thẩm quyền giả lập:
 
----
+```text
+amount <= 50,000,000 VND
+    → Tác tử có thể AUTO_PROCESS nếu mọi quy tắc khác đều đạt
 
-### P15 — Suspicious / flagged input
+amount > 50,000,000 VND
+    → Cần Quản lý tài chính phê duyệt
+```
 
-Nếu input đã được gắn cờ nghi vấn, parse không chắc chắn hoặc chứa giá trị không thể xác minh:
+Kết quả:
+
+```text
+ESCALATE / BEYOND_AUTHORITY
+```
+
+### P14 — Bất thường/nghi vấn
+
+Nếu có dấu hiệu bất thường:
+
+- số tiền cao bất thường so với lịch sử;
+- nhà cung cấp mới hoặc lạ trong loại chi phí rủi ro;
+- nhiều hóa đơn giống nhau;
+- giao dịch ngoài giờ hoặc ngày nghỉ;
+- nhân viên nộp nhiều chứng từ sát nhau;
+- ảnh có dấu hiệu chỉnh sửa;
+- hàng hóa/dịch vụ không tương xứng với mục đích kinh doanh;
+
+thì:
+
+```text
+ESCALATE / SUSPICIOUS
+```
+
+Nếu tín hiệu chưa đủ mạnh và cần bổ sung dữ kiện:
 
 ```text
 REQUEST_INFO
 ```
 
-Agent không được đưa ra kết luận chắc chắn dựa trên dữ liệu đó.
+### P15 — Mức độ sẵn sàng để xuất dữ liệu kế toán
 
-Ví dụ:
+Chỉ được trả về `AUTO_PROCESS` khi có đủ trường tối thiểu cho hệ thống phía sau nhập/xuất dữ liệu:
 
-> Số tiền trên invoice chưa đọc chắc chắn là 45M hay 48M. Giá trị chính xác là bao nhiêu?
+- ngày chứng từ;
+- nhà cung cấp/cửa hàng;
+- bối cảnh bên mua/công ty nếu cần;
+- loại chi phí;
+- tổng tiền;
+- trường thuế/phí nếu có, hoặc được đánh dấu là không có;
+- mục đích/bối cảnh kinh doanh với chứng từ của nhân viên;
+- định danh duy nhất của chứng từ/thanh toán.
 
----
+Nếu thiếu trường bắt buộc để xuất dữ liệu:
 
-## 6. Điều kiện để AUTO_PROCESS
+```text
+REQUEST_INFO
+```
 
-Một transaction chỉ được `AUTO_PROCESS` khi **tất cả** điều kiện sau đúng:
+## 5. Điều kiện `AUTO_PROCESS`
 
-1. Transaction thuộc phạm vi policy v0.
-2. PO được xác định.
-3. Goods Receipt được xác định.
-4. Supplier match.
-5. Item match.
-6. Invoice hiện tại và cumulative invoiced quantity theo từng item không vượt cumulative received quantity.
-7. Unit price match hoặc đã có approved adjustment.
-8. Invoice total hợp lệ.
-9. Cumulative invoice total không vượt PO.
-10. Không có unresolved duplicate.
-11. Invoice có payment status `UNPAID`; không có `PAID`, `PARTIALLY_PAID` hoặc trạng thái chưa rõ.
-12. Không có conflicting / suspicious fact chưa giải quyết.
-13. Transaction amount không vượt authority threshold hoặc đã có approval phù hợp với workflow sau này.
+Một hồ sơ chỉ được `AUTO_PROCESS` khi tất cả điều kiện sau đều đúng:
 
-Nếu bất kỳ fact cần thiết nào chưa rõ, không được `AUTO_PROCESS`.
+1. Đã xác định loại chứng từ/hồ sơ.
+2. Đầy đủ các trường quan trọng bắt buộc.
+3. Không có cảnh báo trích xuất nghiêm trọng.
+4. Danh tính bên mua/công ty hợp lệ nếu áp dụng.
+5. Số học và số tiền nhất quán.
+6. Không còn trùng lặp chưa giải quyết.
+7. Trạng thái thanh toán không mâu thuẫn.
+8. Đầy đủ bối cảnh kinh doanh.
+9. Đủ bằng chứng nhận hàng/dịch vụ nếu cần.
+10. Không thuộc danh mục bị cấm, cá nhân hoặc quá hạn.
+11. Không còn cờ nghi vấn chưa giải quyết.
+12. Số tiền nằm trong ngưỡng thẩm quyền.
 
----
+## 6. Đối tượng chuyển tiếp
 
-## 7. Escalation Targets
-
-Policy v0 dùng các target sau:
-
-| Tình huống | Target |
+| Tình huống | Đối tượng |
 | --- | --- |
-| Vượt ngưỡng 50M | Finance Manager |
-| Outside-policy transaction | Accounting / Finance owner |
-| Authority không xác định | Finance Manager |
+| Vượt ngưỡng 50 triệu đồng | Quản lý tài chính |
+| Ngoài chính sách/danh mục bị cấm | Chủ chính sách kế toán/tài chính |
+| Bất thường/nghi vấn | Quản lý tài chính/kiểm soát nội bộ |
+| Mã số thuế bên mua thuộc công ty khác | Kế toán/người phụ trách thuế |
+| Chi phí nhân viên thiếu bối cảnh | Nhân viên/người yêu cầu |
+| Thiếu PO/bằng chứng nhận hàng hoặc dịch vụ | Bộ phận mua hàng/kho/chủ dự án |
 
-Các trường hợp thiếu facts không mặc định chuyển cho Finance Manager; trước hết phải `REQUEST_INFO` từ nguồn có thể cung cấp facts cần thiết.
+Thiếu dữ kiện không mặc định chuyển cho Quản lý tài chính; trước hết phải hỏi nguồn có thể cung cấp dữ kiện.
 
----
+## 7. Chất lượng câu hỏi
 
-## 8. Question Quality Rules
+Mỗi `REQUEST_INFO` hoặc `ESCALATE` phải có câu hỏi:
 
-Mọi câu hỏi của Agent phải:
+- nêu dữ kiện/quy tắc đang gặp vấn đề;
+- đưa ra số liệu/bằng chứng liên quan;
+- có thể trả lời trực tiếp;
+- không chung chung kiểu “kiểm tra lại giúp tôi”.
 
-1. Nêu rõ fact nào đang thiếu hoặc rule nào cần quyết định.
-2. Đưa số liệu / evidence liên quan nếu có.
-3. Có thể được trả lời trực tiếp.
-4. Không dùng câu chung chung như "Please review" hoặc "Kiểm tra lại giúp tôi".
+## 8. Ranh giới của LLM
 
-Mẫu:
+Mã tất định bắt buộc xử lý:
 
-```text
-[Fact hiện có]
-+ [điểm thiếu / xung đột / vượt quyền]
-+ [câu hỏi trực tiếp]
-```
+- tiền và số lượng;
+- định danh trùng lặp;
+- trạng thái thanh toán;
+- ngày/thời hạn nộp;
+- ngưỡng thẩm quyền;
+- ánh xạ chính sách.
 
-Ví dụ:
+Tác tử LLM chỉ:
 
-> PO phê duyệt 30M nhưng invoice là 35M. Có phê duyệt điều chỉnh thêm 5M không?
+- suy luận trên dữ kiện/phép kiểm tra có cấu trúc;
+- đề xuất loại không chắc chắn/hành động;
+- chọn vấn đề chưa giải quyết quan trọng nhất;
+- tạo giải thích và câu hỏi;
+- xác định đối tượng từ bối cảnh chính sách.
 
----
+Bộ bảo vệ quyết định phải từ chối đề xuất trái quy tắc, ví dụ `FACTUAL_UNKNOWN → AUTO_PROCESS` hoặc số tiền trên 50 triệu đồng → `AUTO_PROCESS`.
 
-## 9. Human Stop / Override Policy
+## 9. Dừng/ghi đè bởi con người
 
-Con người có hai loại can thiệp khác nhau và hệ thống phải lưu riêng:
-
-### Stop
-
-`STOP` thay đổi trạng thái vận hành của workflow, ví dụ `ACTIVE → STOPPED`. Nó **không phải decision thứ tư của Agent** và không được thay `Decision.action`.
-
-Stop phải lưu actor, timestamp và reason.
-
-### Override
-
-Override thay đổi quyết định hiệu lực của con người sau khi Agent đã đưa ra một trong ba decision hợp lệ.
-
-Override phải lưu:
-
-- original decision;
-- overridden decision;
-- actor;
-- timestamp;
-- reason.
-
-`overridden decision` vẫn phải thuộc `AUTO_PROCESS`, `REQUEST_INFO`, `ESCALATE`. Không dùng `STOPPED` làm decision.
-
-Không được xóa hoặc ghi đè mất quyết định ban đầu của Agent.
-
----
-
-## 10. Audit Requirement
-
-Mỗi rule evaluation phải ghi được tối thiểu:
-
-- rule ID;
-- evidence được dùng;
-- expected value nếu có;
-- actual value nếu có;
-- result;
-- reason;
-- timestamp.
-
-Ví dụ:
+`STOP` là trạng thái luồng công việc, không phải quyết định nghiệp vụ. `OVERRIDE` chỉ được đổi quyết định có hiệu lực thành một trong:
 
 ```text
-Rule: P05_QUANTITY
-Expected: received_quantity >= invoiced_quantity
-Received: 8
-Invoiced: 10
-Result: NEEDS_INFO
-Reason: Invoice quantity exceeds confirmed received quantity
-```
-
----
-
-## 11. Không dùng LLM để quyết định facts xác định được
-
-Các rule sau phải dùng deterministic logic:
-
-- số lượng lớn hơn / nhỏ hơn;
-- giá trị tiền;
-- duplicate identity;
-- payment status;
-- cumulative quantity theo item;
-- cumulative PO amount;
-- authority threshold.
-
-LLM Agent là component chính thức sau deterministic checks. Nó phải:
-
-- reason trên structured facts và check results;
-- đề xuất `uncertainty_type` và action;
-- chọn một primary unresolved check trong số check results hiện có khi cần hỏi người;
-- giải thích result bằng ngôn ngữ tự nhiên;
-- tạo câu hỏi cụ thể từ structured facts;
-- xác định target từ policy context khi có;
-- trả check/evidence references để explanation có thể trace lại.
-
-Mọi output của LLM phải đi qua deterministic Decision Guard. Guard không chấp nhận proposal trái mapping policy, ví dụ `FACTUAL_UNKNOWN → AUTO_PROCESS` hoặc transaction vượt 50M → `AUTO_PROCESS`.
-
-LLM không được tự tính, tự sửa facts, thay rule result hoặc tạo policy mới để làm transaction pass. Nếu LLM lỗi/timeout/output invalid, hệ thống dùng deterministic fallback và ghi audit event tương ứng.
-
----
-
-## 12. Policy v0 Summary
-
-```text
-Transaction type chưa rõ
-        ↓
-REQUEST_INFO
-
-Transaction type đã rõ và ngoài policy
-        ↓
-ESCALATE
-
-Transaction thuộc scope nhưng thiếu / mâu thuẫn bằng chứng
-        ↓
-REQUEST_INFO
-
-Facts đã rõ nhưng vượt authority
-        ↓
-ESCALATE
-
-Facts đầy đủ + checks pass + trong policy + trong authority
-        ↓
 AUTO_PROCESS
+REQUEST_INFO
+ESCALATE
 ```
 
-Policy v0 ưu tiên **không đoán**, nhưng cũng không được **over-escalate** các case routine.
+Nhật ký kiểm toán phải lưu quyết định ban đầu, quyết định/trạng thái mới, người thực hiện, thời gian và lý do.
