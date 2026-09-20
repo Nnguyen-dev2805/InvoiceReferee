@@ -156,7 +156,7 @@ HumanStop / HumanOverride
 
 ## Run & Verify
 
-> Các lệnh dưới đây là contract dự kiến ở giai đoạn pre-code và phải được kiểm tra lại sau khi implementation hoàn tất.
+> Các lệnh dưới đây đã được chạy end-to-end trên môi trường sạch (Python 3.12): `pytest` xanh và cả ba Verify suite pass.
 
 ### Requirements
 
@@ -235,4 +235,31 @@ Trước demo/deploy cần kiểm tra tối thiểu: routine case, một `REQUES
 
 ## Current state
 
-Project đang ở giai đoạn **pre-code specification**. Các tài liệu cốt lõi đã được chốt trước khi bắt đầu implementation.
+Sprint 1 MVP đã chạy end-to-end. Trạng thái đã kiểm chứng:
+
+- `pytest` — **181 passed** (domain, ingestion, checks, policy/decision, agent, audit, reviewer, verify, presentation, app smoke).
+- `python -m verify.harness --suite core` → **4/4** (TC01 AUTO_PROCESS, TC07 REQUEST_INFO, TC13/TC14 ESCALATE).
+- `python -m verify.harness --suite escalation` → **5/5** (3 routine AUTO_PROCESS, TC07 REQUEST_INFO, TC13 ESCALATE).
+- `python -m verify.harness --suite all` → **9/9** (judge path một thao tác).
+- Streamlit UI: sample + paste/upload JSON qua đúng `review()`, hiển thị checks/decision/audit, Stop/Override, và nút Run Full Verify (kiểm bằng Streamlit `AppTest`).
+- Unseen inputs: routine 42M → `AUTO_PROCESS`; 75M → `ESCALATE` (`BEYOND_AUTHORITY`, target Finance Manager).
+
+LLM Agent mặc định chạy **deterministic fallback** khi chưa cấu hình provider; Decision Guard luôn quyết định action cuối, nên decision là policy-correct dù có hay không có LLM.
+
+### Kiến trúc mã nguồn
+
+```text
+src/invoice_referee/
+├── domain/models.py         # 16 schema contracts (integer VND, tri-state scope)
+├── ingestion/               # json_adapter + normalization
+├── transaction/builder.py   # build_transaction()
+├── checks/                  # 8 deterministic checks + engine
+├── policy/                  # config (Policy v0) + engine (scope + resolve_action)
+├── agent/                   # llm_client + prompts + service (fallback-safe)
+├── decision/                # guard + fallback_questions
+├── audit/store.py           # append-only audit + Stop/Override
+└── services/reviewer.py     # review() orchestrator (UI + Verify entry point)
+verify/                      # harness + manifest (expected labels, tách khỏi review())
+app/                         # streamlit_app + presentation helpers
+tests/fixtures/TC01..TC17    # 17 documented cases
+```

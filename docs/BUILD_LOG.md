@@ -10,28 +10,37 @@ Challenge: OrganizationAI — Challenge A, Escalation Referee.
 
 ## Current phase
 
-Pre-code design and specification.
+Sprint 1 MVP implemented end-to-end (Tasks 1–9 of the implementation plan).
 
-Completed planning artifacts:
+Verified state:
 
-- challenge summary;
-- product specification;
-- synthetic Policy v0;
-- data-model contracts;
-- decision flow;
-- 17-case evaluation set;
-- evaluation plan for unseen inputs and real-user validation;
-- architecture and implementation plan.
+- `pytest` — 181 passed (domain, ingestion, checks, policy/decision, agent, audit,
+  reviewer integration, verify harness, UI presentation, Streamlit app smoke).
+- `python -m verify.harness --suite core` → 4/4; `--suite escalation` → 5/5;
+  `--suite all` → 9/9, all through the production `review()` path.
+- Streamlit UI runs sample + paste/upload JSON, shows checks/decision/audit, and
+  exposes Stop/Override plus a one-click Run Full Verify.
+
+Completed planning artifacts (unchanged sources of truth):
+
+- challenge summary; product specification; synthetic Policy v0; data-model
+  contracts; decision flow; 17-case evaluation set; evaluation plan; architecture
+  and implementation plan.
+
+Implemented modules: `domain/`, `ingestion/`, `transaction/`, `checks/` (8 checks),
+`policy/`, `agent/` (LLM boundary + fallback), `decision/` (guard + fallback
+questions), `audit/`, `services/reviewer.py`, `verify/harness.py`, `app/`.
 
 ## AI tools used
 
 Record only tools actually used by the team during implementation.
 
-Current planning use:
+- AI coding assistant (Kiro / claude-opus based agent) used to scaffold the
+  package, drive test-driven development for the domain contracts, checks, policy,
+  decision guard, audit and reviewer, generate the 17 fixtures, and build the
+  Verify harness and Streamlit UI.
 
-- AI coding assistant used to help structure specifications, challenge requirements, policy cases and implementation planning.
-
-Before submission, replace this section with the exact tools/models and what each was used for.
+Before submission, confirm the exact tools/models and what each was used for.
 
 ## Where AI helped
 
