@@ -90,7 +90,7 @@ def _extract_document(uploaded, po_json: str, actor: str) -> None:
     """Validate + OCR-extract an uploaded invoice into session state."""
     from invoice_referee.services.extractor import extract_invoice, ExtractionError
     from invoice_referee.ingestion.file_validation import DocumentInputError
-    from invoice_referee.ingestion.ocr import PaddleOCREngine
+    from invoice_referee.ingestion.ocr_config import engine_from_env
 
     suffix = uploaded.name.rsplit(".", 1)[-1].lower()
     mime = _MIME_BY_SUFFIX.get(suffix)
@@ -109,17 +109,21 @@ def _extract_document(uploaded, po_json: str, actor: str) -> None:
     transaction_id = norm.normalize_id(base_evidence.get("transaction_id")) or "TX-OCR"
 
     try:
+        engine = engine_from_env()  # PaddleOCR local by default; Mistral if configured
         result, audit = extract_invoice(
             transaction_id=transaction_id,
             filename=uploaded.name,
             claimed_mime=mime,
             content=uploaded.read(),
             po=po,
-            engine=PaddleOCREngine(),
+            engine=engine,
             actor=actor,
         )
     except DocumentInputError as exc:
         st.error(f"Document input error: {exc}")  # technical, not a business decision
+        return
+    except ValueError as exc:  # e.g. OCR engine misconfiguration
+        st.error(f"OCR engine configuration error: {exc}")
         return
     except ExtractionError as exc:
         st.error(f"Extraction failed: {exc}")

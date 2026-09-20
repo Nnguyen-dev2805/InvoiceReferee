@@ -193,3 +193,187 @@ def _get(obj: Any, key: str):
     if isinstance(obj, dict):
         return obj.get(key)
     return getattr(obj, key, None)
+
+
+# --- Mistral Document AI OCR adapter -----------------------------------------
+#
+# A hosted alternative to the local model: it avoids downloading/warming weights
+# but sends the (rendered) invoice page to Mistral. Provider-specific shape
+# still stops here — analyze() returns the same provider-neutral OCRDocument.
+# Mistral OCR returns Markdown per page; ``markdown_to_blocks`` converts that to
+# the neutral block schema (header key:value lines + Markdown-table cells).
+
+MISTRAL_ENGINE_NAME = "mistral-ocr"
+MISTRAL_OCR_URL = "https://api.mistral.ai/v1/ocr"
+
+
+def _is_table_row(line: str) -> bool:
+    s = line.strip()
+    return s.startswith("|") and s.endswith("|") and s.count("|") >= 2
+
+
+def _is_table_separator(line: str) -> bool:
+    s = line.strip().strip("|")
+    cells = [c.strip() for c in s.split("|")]
+    return bool(cells) and all(set(c) <= set("-: ") and "-" in c for c in cells if c != "")
+
+
+def _split_row(line: str) -> list[str]:
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def markdown_to_blocks(markdown: str, page_number: int) -> list[dict]:
+    """Convert one page of Mistral OCR Markdown into neutral block dicts.
+
+    Non-table lines become TEXT/KEY_VALUE blocks; a Markdown table becomes
+    TABLE_CELL blocks with row/column indices (header row = row 0, data rows
+    from row 1). Bounding boxes are not available from Markdown, so blocks carry
+    no ``poly`` (a full-page box is used) but always retain a block id.
+    """
+    blocks: list[dict] = []
+    counter = 0
+    lines = markdown.splitlines()
+    i = 0
+    table_index = 0
+    while i < len(lines):
+        line = lines[i]
+        if _is_table_row(line) and i + 1 < len(lines) and _is_table_separator(lines[i + 1]):
+            # Header row.
+            header = _split_row(line)
+            for col, cell in enumerate(header):
+                counter += 1
+                blocks.append(_md_block(f"P{page_number}-T{table_index}H{col}", cell, page_number,
+                                        block_type="TABLE_CELL", row=0, col=col))
+            i += 2  # skip header + separator
+            data_row = 1
+            while i < len(lines) and _is_table_row(lines[i]):
+                for col, cell in enumerate(_split_row(lines[i])):
+                    counter += 1
+                    blocks.append(_md_block(f"P{page_number}-T{table_index}R{data_row}C{col}", cell,
+                                            page_number, block_type="TABLE_CELL", row=data_row, col=col))
+                data_row += 1
+                i += 1
+            table_index += 1
+            continue
+
+        text = line.strip()
+        if text and not _is_table_separator(line):
+            counter += 1
+            btype = "KEY_VALUE" if ":" in text or "：" in text else "TEXT"
+            blocks.append(_md_block(f"P{page_number}-B{counter:04d}", text, page_number, block_type=btype))
+        i += 1
+    return blocks
+
+
+def _md_block(block_id, text, page_number, *, block_type, row=None, col=None) -> dict:
+    return {
+        "block_id": block_id,
+        "text": text,
+        # Mistral basic OCR does not return per-line confidence; leave it unset
+        # so validation marks critical fields NEEDS_CONFIRMATION (fail-closed).
+        "confidence": None,
+        "poly": None,
+        "block_type": block_type,
+        "row_index": row,
+        "column_index": col,
+    }
+
+
+def _map_mistral_response(raw_pages: list[dict], pages: list[m.DocumentPage]) -> list[m.OCRBlock]:
+    blocks: list[m.OCRBlock] = []
+    for page in raw_pages:
+        page_number = page.get("page_number", 1)
+        for block in page.get("blocks", []):
+            conf = block.get("confidence")
+            blocks.append(
+                m.OCRBlock(
+                    block_id=block["block_id"],
+                    page_number=page_number,
+                    text=block.get("text", ""),
+                    # Mistral basic OCR gives no per-line confidence. Use 0.0 so
+                    # validation marks every field NEEDS_CONFIRMATION: a hosted
+                    # OCR value is never auto-trusted, a human confirms it first.
+                    confidence=0.0 if conf is None else float(conf),
+                    bounding_box=m.BoundingBox(0.0, 0.0, 1.0, 1.0),
+                    block_type=block.get("block_type", "TEXT"),
+                    row_index=block.get("row_index"),
+                    column_index=block.get("column_index"),
+                )
+            )
+    return blocks
+
+
+class MistralOCREngine:
+    """Mistral Document AI OCR adapter (hosted; no local model download).
+
+    ``transcribe`` (callable: DocumentPage -> Markdown str) can be injected for
+    deterministic tests. By default each rendered page image is sent to the
+    Mistral OCR endpoint as a base64 data URL and the returned Markdown is parsed.
+    """
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: str = "mistral-ocr-latest",
+        timeout: float = 60.0,
+        transcribe=None,
+        urlopen=None,
+    ):
+        self._api_key = api_key
+        self._model = model
+        self._timeout = timeout
+        self._transcribe = transcribe
+        self._urlopen = urlopen
+
+    def analyze(self, pages: list[m.DocumentPage]) -> m.OCRDocument:
+        if not pages:
+            raise ValueError("analyze requires at least one page")
+        started = time.perf_counter()
+        raw_pages = []
+        for page in pages:
+            markdown = (self._transcribe or self._call_api)(page)
+            raw_pages.append(
+                {"page_number": page.page_number, "blocks": markdown_to_blocks(markdown, page.page_number)}
+            )
+        blocks = _map_mistral_response(raw_pages, pages)
+        return m.OCRDocument(
+            document_id=pages[0].document_id,
+            pages=pages,
+            blocks=blocks,
+            full_text="\n".join(b.text for b in blocks),
+            engine=MISTRAL_ENGINE_NAME,
+            engine_version=self._model,
+            processing_ms=int((time.perf_counter() - started) * 1000),
+            warnings=[],
+        )
+
+    def _call_api(self, page: m.DocumentPage) -> str:
+        import base64
+        import json as _json
+        import urllib.request
+
+        if not self._api_key:
+            raise ValueError("MistralOCREngine requires an API key for live calls")
+
+        b64 = base64.b64encode(page.image_bytes).decode("ascii")
+        payload = {
+            "model": self._model,
+            "document": {"type": "image_url", "image_url": f"data:image/png;base64,{b64}"},
+        }
+        request = urllib.request.Request(
+            MISTRAL_OCR_URL,
+            data=_json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self._api_key}",
+                "User-Agent": "InvoiceReferee/0.1",
+            },
+            method="POST",
+        )
+        opener = self._urlopen or urllib.request.urlopen
+        with opener(request, timeout=self._timeout) as resp:
+            data = _json.loads(resp.read())
+        result_pages = data.get("pages") or []
+        if not result_pages:
+            return ""
+        return result_pages[0].get("markdown", "")

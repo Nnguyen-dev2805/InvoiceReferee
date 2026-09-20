@@ -296,6 +296,20 @@ RUN_OCR_RUNTIME=1 python -m verify.ocr_harness --live-ocr
 Trong UI, chọn nguồn **Invoice Document**, upload file, dán JSON PO/GR/payment,
 bấm *Process invoice*, xác nhận các field, rồi *Confirm extraction & Review*.
 
+**Chọn engine OCR.** Mặc định dùng PaddleOCR local (offline, riêng tư, không phí).
+Để dùng **Mistral Document AI OCR** (hosted, không cần tải model về máy) — hữu ích
+để thử kiến trúc end-to-end nhanh — đặt trong `.env`:
+
+```dotenv
+OCR_ENGINE=mistral
+MISTRAL_API_KEY=...    # https://console.mistral.ai/api-keys
+```
+
+Engine chỉ là adapter sau `OCREngine`; đổi engine không thay đổi validate field,
+human confirm, hay business review. Mistral basic OCR không trả confidence theo
+dòng nên mọi field vào trạng thái `NEEDS_CONFIRMATION` — người phải xác nhận
+trước khi review (fail-closed).
+
 ## Current state
 
 Sprint 1 đã chạy end-to-end (JSON review + OCR document path). Trạng thái đã kiểm chứng:
