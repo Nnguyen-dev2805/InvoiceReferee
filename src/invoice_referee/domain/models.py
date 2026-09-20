@@ -130,6 +130,7 @@ class POLineItem:
     unit_price: Optional[int]
     line_total: Optional[int]
     description: Optional[str] = None
+    supplier_sku: Optional[str] = None
 
     def __post_init__(self) -> None:
         # Validate only present values; a missing critical field stays None

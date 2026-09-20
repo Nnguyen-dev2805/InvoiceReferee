@@ -100,6 +100,7 @@ def to_po_line_item(raw: dict) -> m.POLineItem:
         ordered_quantity=_quantity(raw.get("ordered_quantity")),
         unit_price=normalize_money(raw.get("unit_price")),
         line_total=normalize_money(raw.get("line_total")),
+        supplier_sku=normalize_id(raw.get("supplier_sku")),
     )
 
 
