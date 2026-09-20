@@ -35,5 +35,10 @@ htmlcov/
 # Streamlit deploy secrets (keep only the template committed)
 .streamlit/secrets.toml
 
+# OCR model / runtime caches (weights are downloaded/warmed, never committed)
+.paddlex/
+.paddlex_cache/
+.ocr_home/
+
 # OS / editor cruft
 .DS_Store

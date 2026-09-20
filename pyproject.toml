@@ -16,6 +16,13 @@ dependencies = [
 dev = [
     "pytest>=8.0",
 ]
+ocr = [
+    "PyMuPDF>=1.26,<2",
+    "Pillow>=11,<13",
+    "opencv-python-headless>=4.10,<5",
+    "paddlepaddle==3.3.0",
+    "paddleocr[doc-parser]>=3.5,<3.7",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -23,3 +30,6 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "ocr_runtime: requires the optional local OCR runtime",
+]

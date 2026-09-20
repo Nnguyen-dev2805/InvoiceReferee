@@ -174,6 +174,25 @@ python -m pip install --upgrade pip
 pip install -e '.[dev]'
 ```
 
+### OCR development setup (tuỳ chọn)
+
+Chỉ review JSON có cấu trúc (mặc định, không cần OCR):
+
+```bash
+pip install -e '.[dev]'
+```
+
+Trích xuất Supplier Invoice từ PDF/ảnh (PaddleOCR/PP-StructureV3 local):
+
+```bash
+pip install -e '.[dev,ocr]'
+RUN_OCR_RUNTIME=1 pytest tests/test_ocr_runtime.py -v
+```
+
+macOS chạy PaddlePaddle trên CPU. Bản deploy công khai phải cài extra `ocr`
+và warm model weights trước khi giám khảo thao tác. Core JSON review vẫn chạy
+và test được đầy đủ khi **không** cài extra `ocr`.
+
 ### LLM provider (tuỳ chọn, OpenAI-compatible)
 
 LLM Agent dùng chuẩn OpenAI Chat Completions, đổi provider chỉ bằng `base_url` + `model`.
