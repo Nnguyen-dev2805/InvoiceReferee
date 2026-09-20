@@ -232,6 +232,23 @@ Tổng giá trị các invoice gắn với cùng PO không được vượt giá
 
 Các phép so sánh số lượng và số tiền phải được thực hiện bằng deterministic logic, không giao cho LLM tự tính toán.
 
+### LLM Agent Layer
+
+Sau khi deterministic checks hoàn tất, LLM Agent nhận structured facts, check results và policy context. LLM phải trả structured assessment thay vì text tự do gồm:
+
+- uncertainty type đề xuất;
+- action đề xuất;
+- primary check cần xử lý trước nếu có nhiều vấn đề;
+- explanation;
+- câu hỏi cụ thể nếu cần human;
+- target nếu policy xác định được;
+- policy rule IDs liên quan;
+- check/evidence references được dùng để giải thích.
+
+LLM là phần của normal review flow. Khi có nhiều discrepancy, LLM có nhiệm vụ chọn vấn đề unresolved quan trọng nhất trong tập check đã được xác nhận để tạo một câu hỏi mà người nhận có thể trả lời trực tiếp. LLM không có quyền sửa facts, thay rule result, tự tính số tiền/số lượng hoặc bỏ qua authority constraint. Một deterministic Decision Guard luôn kiểm tra assessment trước final decision.
+
+Nếu LLM lỗi/timeout/output invalid, hệ thống dùng deterministic fallback explanation/question, giữ nguyên policy-correct decision và ghi rõ fallback trong audit. Fallback bảo toàn tính an toàn/vận hành nhưng không được dùng để tuyên bố chất lượng câu hỏi tương đương normal LLM path.
+
 ---
 
 ## 9. Decision Model
@@ -409,19 +426,23 @@ Kế toán có thể Stop transaction và ghi:
        ↓
 3. Chạy core checks
        ↓
-4. Áp dụng policy và authority
+4. Tạo policy / authority context
        ↓
-5. Trả quyết định
+5. LLM Agent reasoning + explanation + question
+       ↓
+6. Decision Guard kiểm tra proposal
+       ↓
+7. Trả final decision
        ↓
    AUTO_PROCESS
    REQUEST_INFO
    ESCALATE
        ↓
-6. Hiển thị reason + evidence + question nếu có
+8. Hiển thị reason + evidence + question nếu có
        ↓
-7. Lưu audit log
+9. Lưu audit log gồm cả AgentAssessment / fallback state
        ↓
-8. Human có thể Stop / Override
+10. Human có thể Stop / Override
 ```
 
 ---
@@ -439,6 +460,7 @@ Với mỗi transaction, người dùng cần nhìn thấy tối thiểu:
 - reason;
 - escalation / information question nếu có;
 - escalation target nếu có;
+- LLM explanation / assessment status;
 - audit history;
 - Stop / Override controls.
 

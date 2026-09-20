@@ -4,7 +4,7 @@
 
 **Goal:** Build an end-to-end InvoiceReferee MVP that reviews PO-based goods purchase transactions and returns `AUTO_PROCESS`, `REQUEST_INFO`, or `ESCALATE` with auditability and one-click Verify.
 
-**Architecture:** A single Python application with isolated domain, ingestion, transaction, check, policy/decision, audit, review-service and UI/Verify modules. Deterministic logic owns factual and numeric checks; the decision layer applies policy and authority boundaries.
+**Architecture:** A single Python application with isolated domain, ingestion, transaction, deterministic-check, policy, LLM-agent, decision-guard, audit, review-service and UI/Verify modules. Deterministic logic owns factual and numeric checks. The LLM reasons over verified facts and proposes an assessment; a deterministic Decision Guard enforces policy and authority before any final action is released.
 
 **Tech Stack:** Python 3.12, pytest, Streamlit, JSON fixtures.
 
@@ -18,6 +18,9 @@
 - Authority threshold is synthetic 50,000,000 VND.
 - Production code must not branch on test-case IDs.
 - Numeric/business checks are deterministic.
+- LLM output is structured as `AgentAssessment`; it never becomes the final decision directly.
+- Every LLM proposal passes through a deterministic Decision Guard.
+- Provider timeout/error/invalid output uses an audited deterministic fallback; fallback must not change the policy-correct action.
 - `AUTO_PROCESS` never means automatic payment.
 - Human Stop/Override must preserve the original decision; Stop changes workflow status, not `Decision.action`.
 - Transaction type is classified before workflow-specific evidence validation.
@@ -40,7 +43,7 @@
 
 - [ ] Create Python package layout under `src/invoice_referee/`.
 - [ ] Define enums/constants for decision action, check status, uncertainty type and payment status.
-- [ ] Define dataclasses for `PurchaseOrder`, `GoodsReceipt`, `SupplierInvoice`, `PaymentRecord`, `ApprovalRecord`, `Transaction`, `CheckResult`, `Decision`, `AuditEvent`, `HumanStop`, `HumanOverride`.
+- [ ] Define dataclasses for `PurchaseOrder`, `GoodsReceipt`, `SupplierInvoice`, `PaymentRecord`, `ApprovalRecord`, `Transaction`, `CheckResult`, `Uncertainty`, `PolicyContext`, `AgentAssessment`, `Decision`, `ReviewResult`, `AuditEvent`, `HumanStop`, `HumanOverride`.
 - [ ] Write tests for integer-money validation, allowed enum values and optional/null fields.
 - [ ] Run `pytest tests/test_models.py -v` and confirm pass.
 - [ ] Commit: `feat: add domain data contracts`.
@@ -89,32 +92,44 @@
 - [ ] Write failing tests for all 8 check groups using values from TC01, TC07, TC08, TC09, TC10, TC11, TC12, TC16 and TC17.
 - [ ] Implement each check as a pure function where practical; quantity check must evaluate current and cumulative quantity, and payment check must handle PARTIALLY_PAID.
 - [ ] Implement `run_checks(transaction) -> list[CheckResult]`.
+- [ ] Gate PO-specific checks by transaction type. For unknown/outside-policy types, workflow-specific checks must return `NOT_APPLICABLE` or be skipped without creating fake missing-evidence failures.
 - [ ] Ensure no check returns final `Decision` values.
 - [ ] Run `pytest tests/test_checks.py -v`.
 - [ ] Commit: `feat: add deterministic invoice checks`.
 
-### Task 4: Policy and decision engine
+### Task 4: Policy, LLM Agent, and Decision Guard
 
 **Owner:** Person 3
 
 **Files:**
 - Create: `src/invoice_referee/policy/config.py`
 - Create: `src/invoice_referee/policy/engine.py`
-- Create: `src/invoice_referee/decision/engine.py`
-- Create: `src/invoice_referee/decision/questions.py`
+- Create: `src/invoice_referee/agent/llm_client.py`
+- Create: `src/invoice_referee/agent/prompts.py`
+- Create: `src/invoice_referee/agent/service.py`
+- Create: `src/invoice_referee/decision/guard.py`
+- Create: `src/invoice_referee/decision/fallback_questions.py`
+- Create: `tests/test_agent.py`
 - Create: `tests/test_decision.py`
 
 **Interfaces:**
-- Consumes `Transaction` + `list[CheckResult]`.
-- Produces `Decision`.
+- Policy consumes `Transaction + list[CheckResult]` and produces immutable `PolicyContext`.
+- LLM Agent consumes `Transaction + list[CheckResult] + PolicyContext` and produces structured `AgentAssessment`.
+- Decision Guard consumes verified facts plus `AgentAssessment` and produces final `Decision`.
 
 - [ ] Encode Policy v0 IDs P01–P15 and the 50M synthetic authority threshold.
-- [ ] Write failing tests for factual unknown, outside policy, beyond authority and clean routine flow.
-- [ ] Implement decision priority: unknown transaction type → outside policy → in-scope factual unknown → beyond authority → auto-process.
-- [ ] Implement question templates that include concrete evidence values.
-- [ ] Ensure `REQUEST_INFO` always has a question and `ESCALATE` has target when policy knows it.
-- [ ] Run `pytest tests/test_decision.py -v`.
-- [ ] Commit: `feat: add policy and decision boundary`.
+- [ ] Implement `build_policy_context(transaction, checks) -> PolicyContext` without mutating facts/checks; `scope_status` must be tri-state `UNKNOWN | OUTSIDE_POLICY | IN_SCOPE`.
+- [ ] Implement prompt v1. The LLM receives only normalized transaction facts, check results and policy context; it must not perform authoritative arithmetic or rewrite facts. For multi-issue cases it selects one valid unresolved check as `primary_check_id` and returns traceable policy/evidence references.
+- [ ] Implement the provider boundary with timeout/error handling and strict structured-output validation.
+- [ ] Write Agent tests for valid structured output, timeout/provider error and invalid output.
+- [ ] Implement deterministic Decision Guard priority: unknown transaction type → outside policy → in-scope factual unknown → beyond authority → auto-process.
+- [ ] Add safety tests where the LLM proposes `AUTO_PROCESS` despite `FACTUAL_UNKNOWN`, `OUTSIDE_POLICY`, `BEYOND_AUTHORITY` or P15 flagged input; Guard must reject/override the proposal.
+- [ ] Add a multi-issue test proving `primary_check_id`, policy rule IDs and evidence refs must exist in the supplied checks/input; invented references are invalid structured output.
+- [ ] Keep deterministic explanation/question templates only for provider-error/invalid-output fallback and mark fallback use in the assessment/audit.
+- [ ] Ensure `REQUEST_INFO` always has a concrete question and `ESCALATE` has target when policy knows it.
+- [ ] Persist model identifier when configured, prompt version, LLM/Guard disagreement and fallback state for auditability.
+- [ ] Run `pytest tests/test_agent.py tests/test_decision.py -v`.
+- [ ] Commit: `feat: add policy llm assessment and decision guard`.
 
 ### Task 5: Audit and human control
 
@@ -130,7 +145,7 @@
 - [ ] Write failing tests that decision history remains after Stop/Override and Stop does not mutate `Decision.action`.
 - [ ] Implement append-only in-memory audit store with export-to-JSON method.
 - [ ] Implement `record_stop(...)` for workflow status and `record_override(...)` preserving `original_action`.
-- [ ] Add events for transaction creation, check completion, decision, stop and override.
+- [ ] Add events for transaction creation, check completion, LLM assessment/fallback, Decision Guard, final decision, stop and override.
 - [ ] Run `pytest tests/test_audit.py -v`.
 - [ ] Commit: `feat: add audit trail and human override`.
 
@@ -146,8 +161,9 @@
 - Produces one `ReviewResult` for UI and Verify.
 
 - [ ] Write integration test for TC01 end-to-end before implementation.
-- [ ] Implement `review(evidence) -> ReviewResult` using builder → checks → decision → audit.
+- [ ] Implement `review(evidence) -> ReviewResult` using builder → checks → policy context → LLM assessment → decision guard → audit.
 - [ ] Add integration tests for TC09, TC13 and TC14.
+- [ ] Add integration tests for normal LLM execution, provider-failure fallback and invalid structured output.
 - [ ] Ensure the reviewer contains no case-ID branches.
 - [ ] Run `pytest tests/test_reviewer.py -v`.
 - [ ] Commit: `feat: integrate review workflow`.
@@ -168,8 +184,10 @@
 - [ ] Add manifest mapping case IDs to expected decisions outside production code.
 - [ ] Implement Core Verify: TC01, TC07, TC13, TC14.
 - [ ] Implement Challenge A Verify: TC01, TC02, TC03, TC07, TC13.
-- [ ] Output case, expected, actual, pass/fail, uncertainty type, question, target and timestamp.
+- [ ] Implement `--suite all` as the judge path that runs Core + Challenge A suites from one command and reports each suite/case clearly.
+- [ ] Output case, expected, actual, pass/fail, uncertainty type, question, target, LLM/fallback status and timestamp.
 - [ ] Add one mutation/unseen test that changes amounts without changing code.
+- [ ] Add one test with a fake unsafe LLM proposal and prove the production Decision Guard still returns the policy-correct action.
 - [ ] Run `pytest tests/test_verify.py -v`.
 - [ ] Commit: `test: add sprint one verify harness`.
 
@@ -187,10 +205,11 @@
 - [ ] Add a homepage one-line instruction for judge.
 - [ ] Add sample selector plus paste/upload JSON for arbitrary unseen transactions.
 - [ ] Show evidence and 8 check results.
-- [ ] Show final decision, reason, question and target.
+- [ ] Show LLM assessment status/explanation plus final decision, reason, question and target.
+- [ ] Surface when deterministic fallback was used because the LLM provider failed or returned invalid output.
 - [ ] Add Audit History view.
 - [ ] Add Stop and Override controls with required reason.
-- [ ] Add one-click Core Verify and Escalation Verify.
+- [ ] Add one-click **Run Full Verify** plus separate Core Verify and Escalation Verify controls for debugging.
 - [ ] Manually run the UI and capture any integration defects as tests before fixing.
 - [ ] Commit: `feat: add judge-ready demo ui`.
 
@@ -205,7 +224,9 @@
 - [ ] Run the full test suite: `pytest -v`.
 - [ ] Run all 17 fixtures through reviewer and compare expected actions.
 - [ ] Run Core Verify and Challenge A Verify from a clean process.
+- [ ] Run Full Verify (`--suite all`) from a clean process and confirm one action exposes both required suites.
 - [ ] Run at least two unseen inputs not stored as fixtures.
+- [ ] Test normal LLM execution, provider timeout/error, invalid structured output and LLM/Guard disagreement.
 - [ ] Test Stop/Override and inspect resulting audit entries.
 - [ ] Validate setup from a clean clone/environment using the Run & Verify section in `README.md`.
 - [ ] Deploy public Streamlit URL and verify no login is required.
@@ -219,7 +240,7 @@ After Task 1 locks the contracts:
 ```text
 Person 1 → Task 2
 Person 2 → Task 3, then fixtures + Verify lead
-Person 3 → Task 4 + expected-outcome/question review
+Person 3 → Task 4 (policy + LLM Agent + Decision Guard) + expected-outcome/question review
 Person 4 → Task 5 + reviewer integration + UI/deploy
 ```
 
@@ -238,4 +259,3 @@ All 17 cases have implemented behavior; Verify and UI are integrated.
 ### Day 3
 
 No major new features. Focus on regression fixes, unseen inputs, deployment, slides/video and reproducibility.
-

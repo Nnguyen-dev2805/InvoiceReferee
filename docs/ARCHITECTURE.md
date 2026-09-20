@@ -34,8 +34,18 @@ Kiến trúc Sprint 1 ưu tiên:
                   └────────┬───────────┘
                             ↓
                   ┌────────────────────┐
-                  │ Decision Engine    │
-                  │ policy + authority │
+                  │ Policy Constraints │
+                  │ scope + authority  │
+                  └────────┬───────────┘
+                            ↓
+                  ┌────────────────────┐
+                  │    LLM Agent       │
+                  │ structured output  │
+                  └────────┬───────────┘
+                            ↓
+                  ┌────────────────────┐
+                  │  Decision Guard    │
+                  │ deterministic gate │
                   └────────┬───────────┘
                             ↓
           ┌─────────────────┼─────────────────┐
@@ -80,9 +90,13 @@ InvoiceReferee/
 │       ├── policy/
 │       │   ├── config.py
 │       │   └── engine.py
+│       ├── agent/
+│       │   ├── llm_client.py
+│       │   ├── prompts.py
+│       │   └── service.py
 │       ├── decision/
-│       │   ├── engine.py
-│       │   └── questions.py
+│       │   ├── guard.py
+│       │   └── fallback_questions.py
 │       ├── audit/
 │       │   └── store.py
 │       └── services/
@@ -122,15 +136,39 @@ Chạy 8 deterministic checks và trả `List[CheckResult]`. Không quyết đ�
 
 ### Policy Engine
 
-Áp dụng Policy v0, scope và authority threshold.
+Áp dụng Policy v0 và tạo `PolicyContext`: `scope_status` (`IN_SCOPE`, `OUTSIDE_POLICY`, `UNKNOWN`), authority constraints và các rule liên quan. Policy Engine không giao arithmetic hoặc factual checks cho LLM.
 
-### Decision Engine
+### LLM Agent
 
-Phân loại uncertainty và trả một `Decision` duy nhất.
+Là component chính thức của Sprint 1. Nó nhận `Transaction + CheckResult[] + PolicyContext` đã được chuẩn hóa và trả structured `AgentAssessment` gồm:
 
-### Question Generator
+- proposed uncertainty type;
+- proposed action;
+- primary unresolved check cần xử lý trước;
+- explanation;
+- specific question nếu cần;
+- target nếu xác định được;
+- policy rule IDs được viện dẫn;
+- check/evidence references làm căn cứ.
 
-Sinh câu hỏi cụ thể từ structured facts. Sprint 1 có thể dùng deterministic templates để Verify ổn định; LLM adapter có thể bổ sung sau mà không thay decision logic.
+Giá trị chính của LLM ở Sprint 1 là **triage và communication**: khi nhiều check cùng fail/unknown, nó chọn một vấn đề chính mà con người có thể trả lời ngay, rồi tạo explanation/question dựa trên đúng evidence đã có. LLM không được tự sửa facts, tự tính lại deterministic checks hoặc tạo policy mới.
+
+### Decision Guard
+
+Kiểm tra `AgentAssessment` bằng deterministic constraints trước khi tạo `Decision` cuối cùng. Nếu LLM đề xuất action trái với facts/policy, Guard phải reject/override proposal và ghi mismatch vào audit. Mapping cứng vẫn là:
+
+```text
+FACTUAL_UNKNOWN   → REQUEST_INFO
+OUTSIDE_POLICY    → ESCALATE
+BEYOND_AUTHORITY  → ESCALATE
+all required facts/checks clear + in authority → AUTO_PROCESS
+```
+
+`scope_status = UNKNOWN` được xử lý như factual uncertainty về transaction type và phải `REQUEST_INFO`; `scope_status = OUTSIDE_POLICY` mới được `ESCALATE` theo P13.
+
+### Fallback Question Generator
+
+Template deterministic chỉ là fallback khi LLM provider lỗi/timeout hoặc output không hợp lệ. Fallback không thay đổi final action; nó giữ hệ thống an toàn và chạy được nhưng có thể cho câu hỏi kém linh hoạt hơn normal LLM path. Audit phải ghi rõ `llm_fallback_used = true`.
 
 ### Audit Store
 
@@ -138,11 +176,13 @@ Append audit events và human overrides. Sprint 1 có thể lưu in-memory/sessi
 
 ### Reviewer Service
 
-Orchestrator duy nhất gọi builder → checks → decision → audit. UI và Verify gọi service này thay vì tự gọi từng module.
+Orchestrator duy nhất gọi builder → checks → policy context → LLM agent → decision guard → audit. UI và Verify gọi service này thay vì tự gọi từng module.
 
 ### Verify Harness
 
 Chạy fixtures qua đúng production reviewer service, không dùng logic riêng để “giả pass”.
+
+Harness hỗ trợ `core`, `escalation` và `all`; `all` là judge path một thao tác, còn hai suite riêng phục vụ debug/đối chiếu.
 
 ### Demo UI input
 
@@ -153,7 +193,9 @@ Sample selector chỉ để judge thử nhanh. UI phải có thêm paste/upload 
 ```python
 build_transaction(evidence) -> Transaction
 run_checks(transaction) -> list[CheckResult]
-decide(transaction, checks, policy) -> Decision
+build_policy_context(transaction, checks) -> PolicyContext
+assess(transaction, checks, policy_context) -> AgentAssessment
+guard(assessment, transaction, checks, policy_context) -> Decision
 review(evidence) -> ReviewResult
 run_verify(case_ids) -> list[VerifyResult]
 ```
@@ -163,6 +205,8 @@ run_verify(case_ids) -> list[VerifyResult]
 ```text
 transaction
 checks
+policy_context
+agent_assessment
 decision
 audit_events
 ```
@@ -179,14 +223,17 @@ Deterministic logic:
 - cumulative PO amount;
 - authority threshold.
 
-Agent/LLM layer nếu dùng:
+LLM Agent bắt buộc trong normal execution path:
 
-- giải thích kết quả;
-- tạo câu hỏi tự nhiên;
+- reason trên structured facts/check results;
+- đề xuất uncertainty/action theo policy context;
+- chọn primary unresolved check trong số các check hợp lệ đã được hệ thống tạo ra;
+- giải thích kết quả cho người dùng;
+- tạo câu hỏi cụ thể;
 - điều phối follow-up;
-- hỗ trợ classify narrative input sau khi facts đã structured.
+- hỗ trợ hiểu narrative input sau khi facts đã structured.
 
-LLM không được thay đổi facts hoặc rule result.
+Decision Guard deterministic chịu trách nhiệm chấp nhận hoặc sửa proposal theo policy. LLM không được thay đổi facts, rule result, arithmetic hoặc authority threshold.
 
 ## 7. Data storage for Sprint 1
 
@@ -268,4 +315,3 @@ Unseen tests
 - multi-agent orchestration không cần thiết;
 - full ERP integration;
 - production-grade distributed audit storage.
-

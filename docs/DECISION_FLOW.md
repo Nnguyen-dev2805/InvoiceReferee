@@ -17,9 +17,11 @@ Validate Evidence
   ↓
 Run Checks
   ↓
-Classify Uncertainty
+Build Policy Context
   ↓
-Apply Policy + Authority
+LLM Agent Assessment
+  ↓
+Deterministic Decision Guard
   ↓
 AUTO_PROCESS / REQUEST_INFO / ESCALATE
   ↓
@@ -195,9 +197,23 @@ Nó chỉ xác định facts và rule result.
 
 ---
 
-## 8. Step 6 — Phân loại uncertainty
+## 8. Step 6 — Build Policy Context
 
-Decision Engine nhận `CheckResult[]` và xác định loại uncertainty.
+Policy Engine nhận `Transaction + CheckResult[]` và tạo `PolicyContext` bất biến cho lượt review: transaction có nằm trong scope không, authority threshold, applicable rule IDs và uncertainty constraints có thể xác định từ facts.
+
+Scope phải là tri-state: `UNKNOWN`, `OUTSIDE_POLICY`, `IN_SCOPE`. `UNKNOWN` nghĩa là chưa đủ fact để biết transaction thuộc workflow nào; `OUTSIDE_POLICY` nghĩa là loại giao dịch đã biết rõ nhưng Policy v0 không hỗ trợ.
+
+Sau đó LLM Agent nhận:
+
+```text
+Transaction
++ CheckResult[]
++ PolicyContext
+```
+
+và trả `AgentAssessment` có structured fields: proposed uncertainty/action, explanation, question, target và rule IDs. LLM phải reason từ facts đã được cung cấp, không tự tạo hoặc sửa facts.
+
+### Các uncertainty cần biểu diễn
 
 ### FACTUAL_UNKNOWN
 
@@ -254,9 +270,9 @@ Target: Finance Manager
 
 ---
 
-## 9. Step 7 — Decision Priority
+## 9. Step 7 — Deterministic Decision Guard
 
-Thứ tự bắt buộc:
+Decision Guard nhận `AgentAssessment` và áp dụng priority bắt buộc. LLM proposal chỉ được chấp nhận nếu tương thích với facts/policy:
 
 ```text
 Transaction type đã xác định?
@@ -296,9 +312,11 @@ Các required checks đều pass?
 
 ---
 
-## 10. Step 8 — Generate specific question
+## 10. Step 8 — Explain and generate specific question
 
-Nếu decision là `REQUEST_INFO` hoặc `ESCALATE`, hệ thống phải tạo câu hỏi cụ thể.
+Trong normal path, LLM Agent tạo explanation và câu hỏi cụ thể dựa trên structured facts. Nếu LLM provider lỗi/timeout/output invalid, hệ thống dùng deterministic fallback template và audit `LLM_FALLBACK_USED`.
+
+Nếu final decision là `REQUEST_INFO` hoặc `ESCALATE`, câu hỏi phải cụ thể và vẫn phải khớp facts mà Decision Guard đã xác nhận.
 
 ### REQUEST_INFO example
 
@@ -599,15 +617,23 @@ Decision cũ vẫn phải được giữ trong audit history.
 - payment-status lookup;
 - authority threshold comparison.
 
-### Agent / LLM có thể chịu trách nhiệm
+### LLM Agent chịu trách nhiệm
 
-- điều phối workflow;
+- reason trên structured facts/check results;
+- đề xuất uncertainty/action;
 - diễn giải check results;
-- phân loại uncertainty dựa trên structured facts;
 - tạo câu hỏi cụ thể;
-- giải thích decision cho người dùng.
+- giải thích decision cho người dùng;
+- hỗ trợ follow-up interaction.
 
-Agent không được thay đổi output của deterministic checks chỉ để tạo kết quả thuận tiện hơn.
+### Decision Guard chịu trách nhiệm
+
+- enforce policy mapping và authority;
+- reject/override LLM proposal trái facts/policy;
+- bảo đảm chỉ phát hành ba user-facing actions hợp lệ;
+- ghi audit khi LLM proposal bị sửa hoặc fallback được dùng.
+
+LLM Agent không được thay đổi output của deterministic checks chỉ để tạo kết quả thuận tiện hơn.
 
 ---
 
@@ -637,43 +663,28 @@ Mỗi decision phải có:
 ## 23. Flow Summary
 
 ```text
-                 ┌─────────────────┐
-                 │      INPUT      │
-                 └────────┬────────┘
-                          ↓
-                 Normalize + Build
-                    Transaction
-                          ↓
-              Transaction type known?
-                    │           │
-                   NO          YES
-                    ↓           ↓
-              REQUEST_INFO   In policy?
-                                │      │
-                               NO     YES
-                                ↓      ↓
-                           ESCALATE  Evidence complete?
-                                     │           │
-                                    NO          YES
-                                     ↓           ↓
-                               REQUEST_INFO   Run Checks
-                                                 ↓
-                                        Facts unresolved?
-                                           │          │
-                                          YES        NO
-                                           ↓          ↓
-                                    REQUEST_INFO   Within
-                                                   authority?
-                                        │      │
-                                       NO     YES
-                                        ↓      ↓
-                                   ESCALATE  AUTO_PROCESS
-                                        \      /
-                                         \    /
-                                          ↓  ↓
-                                      Audit Log
-                                          ↓
-                                  Human Stop/Override
+INPUT
+  ↓
+Normalize + Identify Transaction Type
+  ↓
+Build Transaction
+  ↓
+Run Deterministic Checks
+  ↓
+Build PolicyContext
+  ↓
+LLM Agent Assessment
+  ↓
+Deterministic Decision Guard
+  ├─ FACTUAL_UNKNOWN ─────────────→ REQUEST_INFO
+  ├─ OUTSIDE_POLICY ──────────────→ ESCALATE
+  ├─ BEYOND_AUTHORITY ────────────→ ESCALATE
+  └─ all required facts/checks clear
+     and within authority ────────→ AUTO_PROCESS
+  ↓
+Audit Log
+  ↓
+Human Stop/Override
 ```
 
 Nguyên tắc cuối cùng:

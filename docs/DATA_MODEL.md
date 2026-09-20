@@ -288,7 +288,7 @@ Các loại khác phải được nhận diện là outside policy thay vì cố
 
 ## 9. CheckResult
 
-Mỗi rule/check trả về cùng một schema để Decision Engine không phụ thuộc implementation bên trong từng check.
+Mỗi rule/check trả về cùng một schema để Policy Engine, LLM Agent và Decision Guard không phụ thuộc implementation bên trong từng check.
 
 ```json
 {
@@ -322,7 +322,7 @@ NOT_APPLICABLE
 - `UNKNOWN`: thiếu hoặc mâu thuẫn evidence để xác định.
 - `NOT_APPLICABLE`: check không áp dụng cho transaction hiện tại.
 
-`FAIL` không tự động đồng nghĩa với `ESCALATE`. Decision Engine phải xem failure đó là thiếu fact, outside policy hay beyond authority.
+`FAIL` không tự động đồng nghĩa với `ESCALATE`. Policy/Decision Guard phải xác định failure đó dẫn tới fact còn thiếu, outside policy hay beyond authority.
 
 ---
 
@@ -361,7 +361,58 @@ BEYOND_AUTHORITY
 
 ---
 
-## 11. Decision
+## 11. PolicyContext
+
+Structured constraints cung cấp cho LLM và Decision Guard:
+
+```json
+{
+  "scope_status": "IN_SCOPE",
+  "authority_threshold_vnd": 50000000,
+  "applicable_rule_ids": ["P05", "P07", "P12"],
+  "deterministic_uncertainties": ["FACTUAL_UNKNOWN"]
+}
+```
+
+`scope_status` có đúng ba trạng thái:
+
+```text
+IN_SCOPE
+OUTSIDE_POLICY
+UNKNOWN
+```
+
+Không dùng boolean `in_scope`, vì `UNKNOWN` phải dẫn tới `REQUEST_INFO` còn `OUTSIDE_POLICY` phải dẫn tới `ESCALATE`. `PolicyContext` được tạo từ Policy v0 + deterministic facts. LLM không được sửa object này.
+
+---
+
+## 12. AgentAssessment
+
+Structured output bắt buộc từ LLM Agent:
+
+```json
+{
+  "proposed_uncertainty_type": "FACTUAL_UNKNOWN",
+  "proposed_action": "REQUEST_INFO",
+  "primary_check_id": "CHECK_AMOUNT",
+  "explanation": "Invoice amount exceeds the approved PO amount and adjustment evidence is missing.",
+  "question": "PO được phê duyệt 30M nhưng invoice là 35M. Có phê duyệt điều chỉnh thêm 5M không?",
+  "target": "Purchasing",
+  "policy_rule_ids": ["P07"],
+  "evidence_refs": ["PO-001", "INV-001"],
+  "model": "configured-llm",
+  "prompt_version": "v1",
+  "fallback_used": false
+}
+```
+
+`AgentAssessment` là proposal/explanation layer, **không phải final decision**. `primary_check_id` phải trỏ tới một check thực sự có trong `CheckResult[]`; `policy_rule_ids` và `evidence_refs` cũng phải trace được về input hiện có. Decision Guard phải validate assessment với `Transaction`, `CheckResult[]` và `PolicyContext`.
+
+Nếu provider lỗi hoặc structured output invalid, tạo assessment fallback với `fallback_used = true`; fallback question/explanation có thể dùng deterministic templates nhưng final action vẫn do Guard xác nhận.
+
+---
+
+## 13. Decision
 
 ```json
 {
@@ -421,7 +472,7 @@ Phải có:
 
 ---
 
-## 12. AuditEvent
+## 14. AuditEvent
 
 ```json
 {
@@ -433,9 +484,12 @@ Phải có:
   "rule_id": "P05",
   "input_refs": ["GR-001", "INV-001"],
   "result": "PASS",
-  "reason": "Invoiced quantity 10 does not exceed received quantity 10"
+  "reason": "Invoiced quantity 10 does not exceed received quantity 10",
+  "details": {}
 }
 ```
+
+`details` là object tùy chọn cho metadata theo từng event. Ví dụ `LLM_ASSESSMENT_CREATED` có thể lưu `model`, `prompt_version`, `primary_check_id`, `fallback_used`; `DECISION_GUARD_APPLIED` có thể lưu `proposed_action`, `final_action` và `proposal_overridden`. Không lưu secret/API key hoặc toàn bộ raw prompt nếu có dữ liệu nhạy cảm.
 
 ### Suggested event types
 
@@ -443,6 +497,9 @@ Phải có:
 TRANSACTION_CREATED
 EVIDENCE_ATTACHED
 CHECK_COMPLETED
+LLM_ASSESSMENT_CREATED
+LLM_FALLBACK_USED
+DECISION_GUARD_APPLIED
 DECISION_MADE
 INFO_REQUESTED
 ESCALATED
@@ -452,9 +509,25 @@ OVERRIDDEN
 
 Audit log phải append-only ở mức logic ứng dụng: event cũ không được xóa chỉ vì decision sau đó bị override.
 
+### ReviewResult
+
+Output thống nhất mà UI và Verify cùng sử dụng:
+
+```text
+ReviewResult
+├── transaction
+├── checks
+├── policy_context
+├── agent_assessment
+├── decision
+└── audit_events
+```
+
+UI và Verify không được tự tính lại decision từ các field này; cả hai phải nhận cùng `ReviewResult` từ production `review()` service.
+
 ---
 
-## 13. Human Controls
+## 15. Human Controls
 
 ### HumanStop
 
@@ -488,7 +561,7 @@ Stop chỉ thay đổi `workflow_status`; decision ban đầu của Agent vẫn 
 
 ---
 
-## 14. Evidence Reference
+## 16. Evidence Reference
 
 Các check và audit event không nên copy toàn bộ document vào output. Chúng chỉ cần tham chiếu bằng ID.
 
@@ -509,7 +582,7 @@ Ví dụ:
 
 ---
 
-## 15. Example — Routine Transaction
+## 17. Example — Routine Transaction
 
 ```json
 {
@@ -557,7 +630,7 @@ Ví dụ:
 
 ---
 
-## 16. Example — Missing Fact
+## 18. Example — Missing Fact
 
 ```json
 {
@@ -587,7 +660,7 @@ Ví dụ:
 
 ---
 
-## 17. Example — Beyond Authority
+## 19. Example — Beyond Authority
 
 ```json
 {
@@ -612,7 +685,7 @@ Ví dụ:
 
 ---
 
-## 18. Interface giữa các module
+## 20. Interface giữa các module
 
 Để 4 người có thể code song song, interface tối thiểu cần khóa như sau:
 
@@ -629,7 +702,15 @@ Check Engine
     ↓
 List[CheckResult]
     ↓
-Decision Engine
+Policy Engine
+    ↓
+PolicyContext
+    ↓
+LLM Agent
+    ↓
+AgentAssessment
+    ↓
+Decision Guard
     ↓
 Decision
     ↓
@@ -640,7 +721,7 @@ Mỗi module chỉ phụ thuộc schema đầu vào/đầu ra, không phụ thu�
 
 ---
 
-## 19. Schema cần được xem là contract
+## 21. Schema cần được xem là contract
 
 Trước khi bắt đầu code, team phải thống nhất và hạn chế thay đổi tùy tiện các object sau:
 
@@ -652,9 +733,12 @@ Trước khi bắt đầu code, team phải thống nhất và hạn chế thay 
 6. `Transaction`
 7. `CheckResult`
 8. `Uncertainty`
-9. `Decision`
-10. `AuditEvent`
-11. `HumanStop`
-12. `HumanOverride`
+9. `PolicyContext`
+10. `AgentAssessment`
+11. `Decision`
+12. `ReviewResult`
+13. `AuditEvent`
+14. `HumanStop`
+15. `HumanOverride`
 
 Nếu cần thay schema sau khi code đã được chia cho nhiều người, thay đổi phải được thông báo vì nó có thể phá interface giữa các module.

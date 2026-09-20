@@ -78,7 +78,9 @@ Agent phải nêu rõ:
 
 ## 4. Thứ tự ưu tiên quyết định
 
-Decision Engine phải xác định **transaction type trước**, rồi mới yêu cầu evidence đặc thù của workflow PO-based goods purchase. Điều này tránh lỗi ví dụ service invoice bị hỏi Goods Receipt dù policy đã xác định rõ loại giao dịch đó nằm ngoài phạm vi.
+Policy/Decision Guard phải xác định **transaction type trước**, rồi mới yêu cầu evidence đặc thù của workflow PO-based goods purchase. Điều này tránh lỗi ví dụ service invoice bị hỏi Goods Receipt dù policy đã xác định rõ loại giao dịch đó nằm ngoài phạm vi.
+
+`PolicyContext.scope_status` phải phân biệt ba trạng thái: `UNKNOWN`, `OUTSIDE_POLICY`, `IN_SCOPE`. Không gộp `UNKNOWN` và `OUTSIDE_POLICY` vào cùng một boolean.
 
 ```text
 1. Chưa xác định được transaction type
@@ -541,14 +543,19 @@ Các rule sau phải dùng deterministic logic:
 - cumulative PO amount;
 - authority threshold.
 
-LLM / Agent có thể hỗ trợ:
+LLM Agent là component chính thức sau deterministic checks. Nó phải:
 
-- điều phối các bước;
-- giải thích result;
+- reason trên structured facts và check results;
+- đề xuất `uncertainty_type` và action;
+- chọn một primary unresolved check trong số check results hiện có khi cần hỏi người;
+- giải thích result bằng ngôn ngữ tự nhiên;
 - tạo câu hỏi cụ thể từ structured facts;
-- nhận diện loại uncertainty sau khi facts đã được chuẩn hóa.
+- xác định target từ policy context khi có;
+- trả check/evidence references để explanation có thể trace lại.
 
-LLM không được tự tính hoặc tự sửa facts để làm transaction pass policy.
+Mọi output của LLM phải đi qua deterministic Decision Guard. Guard không chấp nhận proposal trái mapping policy, ví dụ `FACTUAL_UNKNOWN → AUTO_PROCESS` hoặc transaction vượt 50M → `AUTO_PROCESS`.
+
+LLM không được tự tính, tự sửa facts, thay rule result hoặc tạo policy mới để làm transaction pass. Nếu LLM lỗi/timeout/output invalid, hệ thống dùng deterministic fallback và ghi audit event tương ứng.
 
 ---
 

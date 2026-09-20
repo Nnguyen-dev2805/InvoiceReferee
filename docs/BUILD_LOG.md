@@ -40,6 +40,7 @@ Current planning observations:
 - converted a long challenge brief into implementation-focused requirements;
 - pressure-tested the distinction between missing facts, outside-policy cases and beyond-authority cases;
 - helped normalize interfaces so four people can work in parallel;
+- defined the normal runtime as deterministic checks → policy context → LLM assessment → deterministic decision guard;
 - generated candidate edge cases that still require deterministic verification.
 
 ## Where AI created cost/risk
@@ -70,4 +71,3 @@ Reason: the hackathon rewards a working, testable decision boundary more than a 
 - actual feature cut if it changes;
 - user feedback and resulting product change if available;
 - known negative/unintended effect found in testing.
-

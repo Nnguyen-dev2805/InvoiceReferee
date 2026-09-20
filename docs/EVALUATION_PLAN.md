@@ -11,6 +11,7 @@ File này định nghĩa cách chứng minh InvoiceReferee hoạt động trên 
 - 17 documented cases trong `TEST_CASES.md`.
 - Core Verify: 4 case.
 - Challenge A Verify: 5 case.
+- Full Verify: một thao tác chạy cả hai suite qua cùng production `review()` path.
 - Production code không được đọc expected labels.
 
 ### Unseen-input test
@@ -30,7 +31,35 @@ Ghi tối thiểu:
 - uncertainty type;
 - pass/fail;
 - question có cụ thể hay không;
+- structured `AgentAssessment` có hợp lệ hay không;
+- LLM proposal có bị Decision Guard sửa hay không;
+- có dùng deterministic fallback hay không;
 - timestamp.
+
+### LLM/Decision Guard evaluation
+
+LLM là một phần của normal review path nên phải được đánh giá riêng, nhưng output của LLM không được dùng làm ground truth cho phép tính hoặc business facts.
+
+Theo dõi tối thiểu:
+
+- **Structured-output validity rate:** tỷ lệ response parse được thành `AgentAssessment` hợp lệ.
+- **LLM/Guard disagreement rate:** tỷ lệ proposal của LLM bị Decision Guard reject/override.
+- **Fallback rate:** tỷ lệ provider lỗi/timeout/output invalid khiến hệ thống dùng deterministic fallback.
+- **Question answerability:** câu hỏi có nêu đủ dữ kiện để người nhận trả lời trong một câu mà không cần mở lại toàn bộ hồ sơ hay không.
+- **Primary-issue validity:** `primary_check_id` phải trỏ tới check đang tồn tại và chưa được giải quyết; LLM không được tự tạo vấn đề mới.
+- **Explanation groundedness:** explanation chỉ được dựa trên `Transaction`, `CheckResult[]` và `PolicyContext`; policy/check/evidence references phải trace được về input hiện có.
+
+Các test bắt buộc:
+
+1. fake LLM đề xuất `AUTO_PROCESS` khi có `FACTUAL_UNKNOWN` → Guard phải trả `REQUEST_INFO`;
+2. fake LLM đề xuất `AUTO_PROCESS` khi vượt authority → Guard phải trả `ESCALATE`;
+3. fake LLM đề xuất `AUTO_PROCESS` cho input bị P15 flagged → Guard phải trả `REQUEST_INFO`;
+4. provider timeout/error → final action vẫn do deterministic rules xác định, fallback được dùng và audit ghi nhận;
+5. provider trả structured output invalid → fallback được dùng, không bỏ qua Guard;
+6. một unseen case có nhiều mismatch → LLM phải chọn một unresolved check hợp lệ làm câu hỏi chính, Guard vẫn quyết action theo policy;
+7. routine case với valid assessment → `AUTO_PROCESS` nếu deterministic facts/policy đều cho phép.
+
+Đối với tiêu chí Challenge A về chất lượng câu hỏi, một câu hỏi chỉ được xem là đạt mức cao khi người nhận có thể quyết định/trả lời ngay từ nội dung câu hỏi và dữ kiện được nêu, không phải mở lại toàn bộ PO/invoice/receipt để hiểu hệ thống đang hỏi gì.
 
 ## 3. Challenge A quality metrics
 

@@ -105,7 +105,9 @@ Every review must make it possible to reconstruct:
 Input Adapter
 → Transaction Builder
 → Deterministic Check Engine
-→ Policy/Decision Engine
+→ Policy Context
+→ LLM Agent Assessment
+→ Deterministic Decision Guard
 → Audit
 → UI / Verify
 ```
@@ -140,7 +142,7 @@ Use the smallest stack that supports a public demo:
 - Streamlit for the demo UI;
 - JSON fixtures for Sprint 1 data.
 
-LLM use must remain outside deterministic calculations. Template-based questions are allowed as a stable fallback; an LLM adapter may improve natural-language explanations without becoming a correctness dependency.
+LLM Agent is a first-class Sprint 1 component in the normal review path. It reasons over verified structured facts and produces a structured assessment with proposed uncertainty/action, explanation, specific question and target. Deterministic calculations remain outside the LLM, and a deterministic Decision Guard validates every proposal before the final action is released. Template-based explanation/questions exist only as a provider-error or invalid-output fallback, which must be visible in audit logs.
 
 ## 15. Failure behavior
 

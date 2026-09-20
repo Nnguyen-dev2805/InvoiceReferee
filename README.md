@@ -67,11 +67,17 @@ Validate Required Evidence
   ↓
 Run Deterministic Checks
   ↓
-Apply Policy + Authority
+Apply Policy + Authority Constraints
   ↓
-Classify Uncertainty
+LLM Agent Assessment
+  ├── reason over structured facts
+  ├── propose uncertainty/action
+  ├── explain result
+  └── generate specific question
   ↓
-Decision
+Deterministic Decision Guard
+  ↓
+Final Decision
   ├── AUTO_PROCESS
   ├── REQUEST_INFO
   └── ESCALATE
@@ -83,7 +89,7 @@ Human Stop / Override
 UI / Verify
 ```
 
-Các phép so sánh số lượng, số tiền, duplicate, payment status và authority threshold được xử lý bằng deterministic logic. Agent/LLM chỉ hỗ trợ điều phối, giải thích và tạo câu hỏi từ facts đã được chuẩn hóa.
+LLM là một component chính thức trong execution path: nó nhận structured facts đã được kiểm chứng để reasoning, chọn vấn đề chưa được giải quyết cần hỏi trước, giải thích và tạo một câu hỏi hành động cụ thể. Các phép so sánh số lượng, số tiền, duplicate, payment status và authority threshold vẫn là deterministic. `Decision Guard` kiểm tra output của LLM với policy trước khi phát hành final decision, nên LLM không thể tự sửa facts hoặc vượt policy.
 
 ## Data Flow
 
@@ -104,9 +110,11 @@ Transaction History
       ↓
 Transaction
       ↓
-CheckResult[]
+CheckResult[] + PolicyContext
       ↓
-Uncertainty
+AgentAssessment (LLM)
+      ↓
+Decision Guard
       ↓
 Decision
       ↓
@@ -170,6 +178,16 @@ pip install -e '.[dev]'
 pytest -v
 ```
 
+### Full Verify — judge path
+
+Một lệnh chạy cả Core Verify và Challenge A Verify qua đúng production `review()` service:
+
+```bash
+python -m verify.harness --suite all
+```
+
+UI phải có nút tương đương **Run Full Verify** để giám khảo không cần mở terminal. Kết quả hiển thị suite, case, expected, actual, pass/fail, uncertainty, question/target khi có, LLM/fallback status và timestamp.
+
 ### Core Verify
 
 ```bash
@@ -216,4 +234,3 @@ Trước demo/deploy cần kiểm tra tối thiểu: routine case, một `REQUES
 ## Current state
 
 Project đang ở giai đoạn **pre-code specification**. Các tài liệu cốt lõi đã được chốt trước khi bắt đầu implementation.
-
