@@ -97,9 +97,9 @@ InvoiceReferee/
 │   ├── test_audit.py
 │   └── test_verify.py
 ├── docs/
-├── README.md
-├── RUNBOOK.md
-└── BUILD_LOG.md
+│   ├── BUILD_LOG.md
+│   └── Challenge_Brief_OrganizationAI_VN.docx.md
+└── README.md
 ```
 
 ## 4. Module responsibilities

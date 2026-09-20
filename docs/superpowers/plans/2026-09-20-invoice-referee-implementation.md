@@ -199,16 +199,15 @@
 **Owner:** Integration lead
 
 **Files:**
-- Modify: `RUNBOOK.md`
-- Modify: `BUILD_LOG.md`
 - Modify: `README.md`
+- Modify: `docs/BUILD_LOG.md`
 
 - [ ] Run the full test suite: `pytest -v`.
 - [ ] Run all 17 fixtures through reviewer and compare expected actions.
 - [ ] Run Core Verify and Challenge A Verify from a clean process.
 - [ ] Run at least two unseen inputs not stored as fixtures.
 - [ ] Test Stop/Override and inspect resulting audit entries.
-- [ ] Validate setup from a clean clone/environment using `RUNBOOK.md`.
+- [ ] Validate setup from a clean clone/environment using the Run & Verify section in `README.md`.
 - [ ] Deploy public Streamlit URL and verify no login is required.
 - [ ] Update Build Log with actual AI tools, failures, time costs and largest cut feature.
 - [ ] Commit: `docs: finalize runbook and build evidence`.
