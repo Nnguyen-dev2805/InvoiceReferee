@@ -1,0 +1,361 @@
+{
+  "pages": [
+    {
+      "page_number": 1,
+      "blocks": [
+        {
+          "block_id": "BLK-SER",
+          "text": "Ký hiệu: 2C23TTU",
+          "confidence": 0.97,
+          "poly": [
+            [
+              80,
+              100
+            ],
+            [
+              900,
+              100
+            ],
+            [
+              900,
+              130
+            ],
+            [
+              80,
+              130
+            ]
+          ],
+          "block_type": "KEY_VALUE"
+        },
+        {
+          "block_id": "BLK-NUM",
+          "text": "Số hóa đơn: 0000123",
+          "confidence": 0.97,
+          "poly": [
+            [
+              80,
+              140
+            ],
+            [
+              900,
+              140
+            ],
+            [
+              900,
+              170
+            ],
+            [
+              80,
+              170
+            ]
+          ],
+          "block_type": "KEY_VALUE"
+        },
+        {
+          "block_id": "BLK-TAX",
+          "text": "Mã số thuế: 0101234567",
+          "confidence": 0.97,
+          "poly": [
+            [
+              80,
+              180
+            ],
+            [
+              900,
+              180
+            ],
+            [
+              900,
+              210
+            ],
+            [
+              80,
+              210
+            ]
+          ],
+          "block_type": "KEY_VALUE"
+        },
+        {
+          "block_id": "BLK-PO",
+          "text": "Số PO: PO-001",
+          "confidence": 0.97,
+          "poly": [
+            [
+              80,
+              220
+            ],
+            [
+              900,
+              220
+            ],
+            [
+              900,
+              250
+            ],
+            [
+              80,
+              250
+            ]
+          ],
+          "block_type": "KEY_VALUE"
+        },
+        {
+          "block_id": "BLK-DATE",
+          "text": "Ngày hóa đơn: 2026-09-13",
+          "confidence": 0.97,
+          "poly": [
+            [
+              80,
+              260
+            ],
+            [
+              900,
+              260
+            ],
+            [
+              900,
+              290
+            ],
+            [
+              80,
+              290
+            ]
+          ],
+          "block_type": "KEY_VALUE"
+        },
+        {
+          "block_id": "BLK-TOT",
+          "text": "Tổng cộng: 45 trieu hoac 48 trieu",
+          "confidence": 0.55,
+          "poly": [
+            [
+              80,
+              300
+            ],
+            [
+              900,
+              300
+            ],
+            [
+              900,
+              330
+            ],
+            [
+              80,
+              330
+            ]
+          ],
+          "block_type": "KEY_VALUE"
+        },
+        {
+          "block_id": "H0",
+          "text": "Mô tả",
+          "confidence": 0.97,
+          "poly": [
+            [
+              80,
+              400
+            ],
+            [
+              280,
+              400
+            ],
+            [
+              280,
+              430
+            ],
+            [
+              160,
+              430
+            ]
+          ],
+          "block_type": "TABLE_CELL",
+          "row_index": 0,
+          "column_index": 0
+        },
+        {
+          "block_id": "H1",
+          "text": "Số lượng",
+          "confidence": 0.97,
+          "poly": [
+            [
+              300,
+              400
+            ],
+            [
+              500,
+              400
+            ],
+            [
+              500,
+              430
+            ],
+            [
+              380,
+              430
+            ]
+          ],
+          "block_type": "TABLE_CELL",
+          "row_index": 0,
+          "column_index": 1
+        },
+        {
+          "block_id": "H2",
+          "text": "Đơn giá",
+          "confidence": 0.97,
+          "poly": [
+            [
+              520,
+              400
+            ],
+            [
+              720,
+              400
+            ],
+            [
+              720,
+              430
+            ],
+            [
+              600,
+              430
+            ]
+          ],
+          "block_type": "TABLE_CELL",
+          "row_index": 0,
+          "column_index": 2
+        },
+        {
+          "block_id": "H3",
+          "text": "Thành tiền",
+          "confidence": 0.97,
+          "poly": [
+            [
+              740,
+              400
+            ],
+            [
+              940,
+              400
+            ],
+            [
+              940,
+              430
+            ],
+            [
+              820,
+              430
+            ]
+          ],
+          "block_type": "TABLE_CELL",
+          "row_index": 0,
+          "column_index": 3
+        },
+        {
+          "block_id": "R1C0",
+          "text": "Dell Monitor",
+          "confidence": 0.97,
+          "poly": [
+            [
+              80,
+              440
+            ],
+            [
+              280,
+              440
+            ],
+            [
+              280,
+              470
+            ],
+            [
+              160,
+              470
+            ]
+          ],
+          "block_type": "TABLE_CELL",
+          "row_index": 1,
+          "column_index": 0
+        },
+        {
+          "block_id": "R1C1",
+          "text": "10",
+          "confidence": 0.97,
+          "poly": [
+            [
+              300,
+              440
+            ],
+            [
+              500,
+              440
+            ],
+            [
+              500,
+              470
+            ],
+            [
+              380,
+              470
+            ]
+          ],
+          "block_type": "TABLE_CELL",
+          "row_index": 1,
+          "column_index": 1
+        },
+        {
+          "block_id": "R1C2",
+          "text": "3.000.000",
+          "confidence": 0.97,
+          "poly": [
+            [
+              520,
+              440
+            ],
+            [
+              720,
+              440
+            ],
+            [
+              720,
+              470
+            ],
+            [
+              600,
+              470
+            ]
+          ],
+          "block_type": "TABLE_CELL",
+          "row_index": 1,
+          "column_index": 2
+        },
+        {
+          "block_id": "R1C3",
+          "text": "30.000.000",
+          "confidence": 0.97,
+          "poly": [
+            [
+              740,
+              440
+            ],
+            [
+              940,
+              440
+            ],
+            [
+              940,
+              470
+            ],
+            [
+              820,
+              470
+            ]
+          ],
+          "block_type": "TABLE_CELL",
+          "row_index": 1,
+          "column_index": 3
+        }
+      ]
+    }
+  ]
+}

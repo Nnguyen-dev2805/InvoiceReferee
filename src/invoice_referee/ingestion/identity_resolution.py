@@ -34,7 +34,9 @@ def _human_or_structured_candidate(
     )
 
 
-def _needs_confirmation_candidate(field_name: str, reason: str) -> m.FieldCandidate:
+def _needs_confirmation_candidate(
+    field_name: str, reason: str, method: str = "PO_DESCRIPTION_MATCH"
+) -> m.FieldCandidate:
     return m.FieldCandidate(
         field_name=field_name,
         raw_text=None,
@@ -44,7 +46,7 @@ def _needs_confirmation_candidate(field_name: str, reason: str) -> m.FieldCandid
         page_number=None,
         bounding_box=None,
         evidence_block_ids=[],
-        extraction_method="OCR_RULE",
+        extraction_method=method,
         warnings=[reason],
     )
 

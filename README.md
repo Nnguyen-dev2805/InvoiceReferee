@@ -273,33 +273,63 @@ Homepage phải hướng dẫn judge thao tác đầu tiên, không yêu cầu l
 
 Trước demo/deploy cần kiểm tra tối thiểu: routine case, một `REQUEST_INFO`, một `ESCALATE`, audit history, Stop/Override, hai Verify suites và ít nhất hai unseen JSON inputs qua đúng production `review()` path.
 
+### Supplier-Invoice OCR (Sprint 1, tuỳ chọn)
+
+Ngoài JSON có cấu trúc, hệ thống nhận **một Supplier Invoice** dạng PDF/PNG/JPEG,
+trích xuất field bằng PaddleOCR/PP-StructureV3 local, cho người xác nhận từng
+critical field, rồi đưa evidence đã review qua đúng `review()` production. PO,
+Goods Receipt, Payment History vẫn là JSON có cấu trúc.
+
+Nguyên tắc: OCR **chỉ trích fact ứng viên**, không tự ra quyết định. Field thiếu
+giữ `None` (không hoá `""`/`0`), mọi field máy trích có provenance (page + bbox +
+block IDs), `vendor_id`/`item_id` chỉ resolve khi khớp chính xác tax-code/SKU,
+và người phải xác nhận/sửa/đánh-dấu-unknown mọi critical field trước khi review.
+
+```bash
+pip install -e '.[dev,ocr]'
+# Đánh giá trích xuất trên bộ 15 tài liệu synthetic (recorded, deterministic):
+python -m verify.ocr_harness
+# Chạy model local thật trên 15 tài liệu:
+RUN_OCR_RUNTIME=1 python -m verify.ocr_harness --live-ocr
+```
+
+Trong UI, chọn nguồn **Invoice Document**, upload file, dán JSON PO/GR/payment,
+bấm *Process invoice*, xác nhận các field, rồi *Confirm extraction & Review*.
+
 ## Current state
 
-Sprint 1 MVP đã chạy end-to-end. Trạng thái đã kiểm chứng:
+Sprint 1 đã chạy end-to-end (JSON review + OCR document path). Trạng thái đã kiểm chứng:
 
-- `pytest` — **181 passed** (domain, ingestion, checks, policy/decision, agent, audit, reviewer, verify, presentation, app smoke).
+- `pytest` — **338 passed, 2 skipped** (2 skip là smoke OCR runtime, bật bằng `RUN_OCR_RUNTIME=1`).
 - `python -m verify.harness --suite core` → **4/4** (TC01 AUTO_PROCESS, TC07 REQUEST_INFO, TC13/TC14 ESCALATE).
 - `python -m verify.harness --suite escalation` → **5/5** (3 routine AUTO_PROCESS, TC07 REQUEST_INFO, TC13 ESCALATE).
 - `python -m verify.harness --suite all` → **9/9** (judge path một thao tác).
-- Streamlit UI: sample + paste/upload JSON qua đúng `review()`, hiển thị checks/decision/audit, Stop/Override, và nút Run Full Verify (kiểm bằng Streamlit `AppTest`).
-- Unseen inputs: routine 42M → `AUTO_PROCESS`; 75M → `ESCALATE` (`BEYOND_AUTHORITY`, target Finance Manager).
+- `python -m verify.ocr_harness` (recorded) → **15/15 tài liệu**: field exact-match 100%, action accuracy 100%, **false auto-confirm = 0**, provenance coverage 100%.
+- OCR e2e (7 kịch bản): OCR01 AUTO_PROCESS, OCR06 REQUEST_INFO (amount unknown), OCR07 AUTO_PROCESS (sửa PO), OCR08 REQUEST_INFO (quá số lượng), OCR09 ESCALATE (beyond authority), OCR10 REQUEST_INFO (sai PO), engine lỗi → `ExtractionError` (không phải quyết định).
+- Streamlit UI: sample + paste/upload JSON + **Invoice Document** qua đúng `review()`, hiển thị checks/decision/audit, Stop/Override, nút Run Full Verify (kiểm bằng Streamlit `AppTest`).
 
-LLM Agent mặc định chạy **deterministic fallback** khi chưa cấu hình provider; Decision Guard luôn quyết định action cuối, nên decision là policy-correct dù có hay không có LLM.
+LLM Agent mặc định chạy **deterministic fallback** khi chưa cấu hình provider; Decision Guard luôn quyết định action cuối, nên decision là policy-correct dù có hay không có LLM. LLM mapper cho OCR **tắt mặc định** và luôn cần người xác nhận khi bật.
 
 ### Kiến trúc mã nguồn
 
 ```text
 src/invoice_referee/
-├── domain/models.py         # 16 schema contracts (integer VND, tri-state scope)
-├── ingestion/               # json_adapter + normalization
-├── transaction/builder.py   # build_transaction()
-├── checks/                  # 8 deterministic checks + engine
+├── domain/models.py         # schema contracts (integer VND, tri-state scope, OCR contracts)
+├── ingestion/               # json_adapter + normalization (fail-closed)
+│   ├── file_validation.py   # magic-byte upload validation
+│   ├── document_router.py + pdf_renderer.py + image_preprocessing.py
+│   ├── ocr.py               # OCREngine + PaddleOCR adapter
+│   ├── invoice_fields.py + identity_resolution.py
+│   ├── extraction_validation.py + llm_mapper.py + pipeline.py
+├── transaction/builder.py   # build_transaction() + evidence_issues
+├── checks/                  # 8 deterministic checks + engine (UNKNOWN on absent facts)
 ├── policy/                  # config (Policy v0) + engine (scope + resolve_action)
 ├── agent/                   # llm_client + prompts + service (fallback-safe)
 ├── decision/                # guard + fallback_questions
-├── audit/store.py           # append-only audit + Stop/Override
-└── services/reviewer.py     # review() orchestrator (UI + Verify entry point)
-verify/                      # harness + manifest (expected labels, tách khỏi review())
-app/                         # streamlit_app + presentation helpers
-tests/fixtures/TC01..TC17    # 17 documented cases
+├── audit/store.py           # append-only audit + extraction/OCR events + Stop/Override
+└── services/                # reviewer.review() + extractor.extract_invoice()
+verify/                      # harness + manifest + ocr_harness (expected labels tách khỏi review())
+app/                         # streamlit_app + presentation + extraction_presentation
+tests/fixtures/TC01..TC17    # 17 documented business cases
+tests/fixtures_ocr/          # generator + 15 synthetic OCR docs + recorded responses + manifest
 ```

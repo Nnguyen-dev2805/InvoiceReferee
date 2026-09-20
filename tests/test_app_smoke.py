@@ -44,3 +44,11 @@ def test_sample_review_shows_decision():
     assert not at.exception
     markdown_blob = " ".join(md.value for md in at.markdown)
     assert "AUTO_PROCESS" in markdown_blob
+
+
+def test_document_mode_rejects_missing_upload_without_exception():
+    at = _fresh()
+    at.radio[0].set_value("Invoice Document").run()
+    next(b for b in at.button if b.label == "Process invoice").click().run()
+    assert not at.exception
+    assert any("Upload" in w.value for w in at.warning)

@@ -49,9 +49,18 @@ from invoice_referee.transaction.builder import build_transaction
 from invoice_referee.services.reviewer import review
 from invoice_referee.audit.store import AuditStore
 from invoice_referee.agent.config import client_from_env
+from invoice_referee.ingestion import normalization as norm
 from verify import harness
 
 from app import presentation as p
+from app import extraction_presentation as ep
+
+_MIME_BY_SUFFIX = {
+    "pdf": "application/pdf",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+}
 
 st.set_page_config(page_title="InvoiceReferee", page_icon="🧾", layout="wide")
 
@@ -68,13 +77,110 @@ _CHECK_ICON = {
 }
 
 
-def _run_review(evidence: dict) -> None:
+def _run_review(evidence: dict, audit: AuditStore | None = None) -> None:
     """Run a review and store result + a fresh human-control audit store in session."""
     # Uses the configured LLM provider when a key is set, else deterministic fallback.
     client = client_from_env()
-    result = review(evidence, client=client, model=getattr(client, "model", None))
+    result = review(evidence, client=client, model=getattr(client, "model", None), audit=audit)
     st.session_state["result"] = result
     st.session_state["human_audit"] = AuditStore(transaction_id=result.transaction.transaction_id)
+
+
+def _extract_document(uploaded, po_json: str, actor: str) -> None:
+    """Validate + OCR-extract an uploaded invoice into session state."""
+    from invoice_referee.services.extractor import extract_invoice, ExtractionError
+    from invoice_referee.ingestion.file_validation import DocumentInputError
+    from invoice_referee.ingestion.ocr import PaddleOCREngine
+
+    suffix = uploaded.name.rsplit(".", 1)[-1].lower()
+    mime = _MIME_BY_SUFFIX.get(suffix)
+    if mime is None:
+        st.error("Unsupported file type. Upload a PDF, PNG, or JPEG invoice.")
+        return
+
+    try:
+        base_evidence = p.parse_json_input(po_json)
+    except ValueError as exc:
+        st.error(f"Structured PO/GR/payment JSON is invalid: {exc}")
+        return
+
+    po_raw = base_evidence.get("purchase_order") or base_evidence.get("po") or {}
+    po = norm.to_purchase_order(po_raw)
+    transaction_id = norm.normalize_id(base_evidence.get("transaction_id")) or "TX-OCR"
+
+    try:
+        result, audit = extract_invoice(
+            transaction_id=transaction_id,
+            filename=uploaded.name,
+            claimed_mime=mime,
+            content=uploaded.read(),
+            po=po,
+            engine=PaddleOCREngine(),
+            actor=actor,
+        )
+    except DocumentInputError as exc:
+        st.error(f"Document input error: {exc}")  # technical, not a business decision
+        return
+    except ExtractionError as exc:
+        st.error(f"Extraction failed: {exc}")
+        return
+
+    st.session_state["extraction_result"] = result
+    st.session_state["extraction_audit"] = audit
+    st.session_state["extraction_base_evidence"] = base_evidence
+    st.session_state.pop("result", None)
+
+
+def _render_extraction_review() -> None:
+    """Confirm/correct/mark-unknown extracted fields, then run business review."""
+    from invoice_referee.ingestion.pipeline import (
+        apply_field_reviews,
+        reviewed_invoice_to_evidence,
+        FieldReview,
+    )
+
+    result: m.InvoiceExtractionResult = st.session_state["extraction_result"]
+    st.subheader("Extracted fields — confirm before review")
+    st.caption(
+        "Every critical field must be Confirmed, Corrected, or Marked unknown. "
+        "OCR extracts candidate facts only; the decision still comes from the "
+        "deterministic policy pipeline."
+    )
+    st.dataframe(ep.field_rows(result), use_container_width=True, hide_index=True)
+    if result.line_items:
+        st.dataframe(ep.line_item_rows(result), use_container_width=True, hide_index=True)
+
+    with st.form("field_reviews"):
+        form_values: dict[str, dict] = {}
+        for name, candidate in result.fields.items():
+            c1, c2 = st.columns([1, 2])
+            action = c1.selectbox(
+                name,
+                ["CONFIRM", "CORRECT", "MARK_UNKNOWN"],
+                key=f"act_{name}",
+            )
+            value = c2.text_input(
+                f"{name} value (for Correct)",
+                value="" if candidate.normalized_value is None else str(candidate.normalized_value),
+                key=f"val_{name}",
+            )
+            reason = c2.text_input(f"{name} reason", key=f"rsn_{name}")
+            form_values[name] = {"action": action, "value": value, "reason": reason}
+        submitted = st.form_submit_button("Confirm extraction & Review", type="primary")
+
+    if submitted:
+        reviews = ep.build_field_reviews(form_values, result)
+        try:
+            reviewed = apply_field_reviews(result, reviews, actor="judge@demo")
+        except ValueError as exc:
+            st.error(str(exc))  # e.g. missing reason for Correct/Mark unknown
+            return
+        audit: AuditStore = st.session_state["extraction_audit"]
+        audit.record_extraction_reviewed(reviewed, actor="judge@demo")
+        evidence = reviewed_invoice_to_evidence(reviewed, st.session_state["extraction_base_evidence"])
+        _run_review(evidence, audit=audit)
+        st.session_state.pop("extraction_result", None)
+        st.rerun()
 
 
 def _render_evidence(tx: m.Transaction) -> None:
@@ -250,9 +356,32 @@ def main() -> None:
 
     with st.sidebar:
         st.header("Input")
-        mode = st.radio("Nguồn dữ liệu", ["Sample case", "Paste JSON", "Upload JSON"])
+        mode = st.radio(
+            "Nguồn dữ liệu",
+            ["Sample case", "Paste JSON", "Upload JSON", "Invoice Document"],
+        )
         evidence = None
         error = None
+
+        if mode == "Invoice Document":
+            st.caption(
+                "Upload one Supplier Invoice (PDF/PNG/JPEG). PO, Goods Receipt and "
+                "payment history stay structured JSON below."
+            )
+            uploaded_doc = st.file_uploader(
+                "Invoice file", type=["pdf", "png", "jpg", "jpeg"], key="doc_upload"
+            )
+            po_json = st.text_area(
+                "Structured PO / GR / payment JSON",
+                height=200,
+                key="doc_base_json",
+                placeholder='{ "transaction_id": "...", "purchase_order": { ... }, "goods_receipts": [ ... ] }',
+            )
+            if st.button("Process invoice", type="primary"):
+                if uploaded_doc is None:
+                    st.warning("Upload an invoice file first.")
+                else:
+                    _extract_document(uploaded_doc, po_json or "{}", actor="judge@demo")
 
         if mode == "Sample case":
             case_id = st.selectbox("Sample", p.list_sample_cases())
@@ -277,6 +406,13 @@ def main() -> None:
             st.error(error)  # technical input error, kept separate from business uncertainty
         if evidence is not None:
             _run_review(evidence)
+
+    # An in-progress OCR extraction takes over the main panel until confirmed.
+    if st.session_state.get("extraction_result") is not None:
+        _render_extraction_review()
+        st.divider()
+        _render_verify()
+        return
 
     result = st.session_state.get("result")
     if result is None:
