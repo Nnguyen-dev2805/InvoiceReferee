@@ -37,7 +37,7 @@ def engine_from_env(env: Optional[dict[str, str]] = None) -> OCREngine:
         api_key = _resolve(env, "MISTRAL_API_KEY")
         if not api_key:
             raise ValueError("OCR_ENGINE=mistral requires MISTRAL_API_KEY")
-        model = _resolve(env, "MISTRAL_OCR_MODEL") or "mistral-ocr-latest"
+        model = _resolve(env, "MISTRAL_OCR_MODEL") or "ocr-4-1"
         timeout_raw = _resolve(env, "MISTRAL_OCR_TIMEOUT")
         try:
             timeout = float(timeout_raw) if timeout_raw else 60.0

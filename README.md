@@ -302,13 +302,16 @@ bấm *Process invoice*, xác nhận các field, rồi *Confirm extraction & Rev
 
 ```dotenv
 OCR_ENGINE=mistral
-MISTRAL_API_KEY=...    # https://console.mistral.ai/api-keys
+MISTRAL_API_KEY=...          # https://console.mistral.ai/api-keys
+MISTRAL_OCR_MODEL=ocr-4-1    # mặc định; OCR 4.1 cho bbox + confidence theo khối
 ```
 
 Engine chỉ là adapter sau `OCREngine`; đổi engine không thay đổi validate field,
-human confirm, hay business review. Mistral basic OCR không trả confidence theo
-dòng nên mọi field vào trạng thái `NEEDS_CONFIRMATION` — người phải xác nhận
-trước khi review (fail-closed).
+human confirm, hay business review. Mặc định dùng **OCR 4.1**: adapter bật
+`include_blocks` + `confidence_scores_granularity=block`, nên field mang bounding
+box và confidence thật (threshold tin cậy hoạt động đúng). Nếu response không có
+`blocks` (model cũ), adapter tự lùi về parse Markdown và field vào
+`NEEDS_CONFIRMATION` (fail-closed).
 
 ## Current state
 

@@ -53,10 +53,74 @@ def test_engine_returns_provider_neutral_ocrdocument():
     assert any(b.block_type == "TABLE_CELL" for b in doc.blocks)
 
 
-def test_mistral_confidence_is_zero_so_fields_need_confirmation():
+def test_mistral_markdown_confidence_is_zero_so_fields_need_confirmation():
     engine = MistralOCREngine(transcribe=lambda page: SAMPLE_MARKDOWN)
     doc = engine.analyze([_page()])
     assert all(b.confidence == 0.0 for b in doc.blocks)
+
+
+# --- OCR-4+ blocks path (real bbox + block confidence) -----------------------
+
+SAMPLE_PAGE_RESULT = {
+    "markdown": "ignored when blocks present",
+    "blocks": [
+        {
+            "type": "text",
+            "markdown": "Số hóa đơn: 0000123",
+            "confidence": 0.98,
+            "bbox": {"top_left_x": 80, "top_left_y": 100, "bottom_right_x": 620, "bottom_right_y": 140},
+        },
+        {
+            "type": "text",
+            "markdown": "Mã số thuế: 0101234567",
+            "confidence": 0.95,
+            "bbox": [80, 160, 620, 200],
+        },
+        {
+            "type": "table",
+            "markdown": "| Mô tả | Số lượng | Đơn giá | Thành tiền |\n| --- | --- | --- | --- |\n| Dell Monitor | 10 | 3.000.000 | 30.000.000 |",
+            "confidence": 0.93,
+            "bbox": {"top_left_x": 60, "top_left_y": 400, "bottom_right_x": 940, "bottom_right_y": 520},
+        },
+        {
+            "type": "text",
+            "markdown": "Tổng cộng: 30.000.000 VND",
+            "confidence": 0.99,
+            "bbox": {"top_left_x": 80, "top_left_y": 560, "bottom_right_x": 620, "bottom_right_y": 600},
+        },
+    ],
+}
+
+
+def test_ocr4_blocks_carry_real_confidence_and_bbox():
+    engine = MistralOCREngine(transcribe=lambda page: SAMPLE_PAGE_RESULT)
+    doc = engine.analyze([_page()])
+    num = next(b for b in doc.blocks if "0000123" in b.text)
+    assert num.confidence == pytest.approx(0.98)
+    # 80/1000 .. 620/1000 normalized.
+    assert num.bounding_box.x1 == pytest.approx(0.08)
+    assert num.bounding_box.x2 == pytest.approx(0.62)
+    assert num.bounding_box.y1 == pytest.approx(100 / 1400)
+
+
+def test_ocr4_table_block_expands_into_cells():
+    engine = MistralOCREngine(transcribe=lambda page: SAMPLE_PAGE_RESULT)
+    doc = engine.analyze([_page()])
+    cells = [b for b in doc.blocks if b.block_type == "TABLE_CELL"]
+    assert cells
+    assert {b.row_index for b in cells} == {0, 1}
+    # Cells inherit the table's confidence.
+    assert all(b.confidence == pytest.approx(0.93) for b in cells)
+
+
+def test_ocr4_fields_extract_with_confidence():
+    engine = MistralOCREngine(transcribe=lambda page: SAMPLE_PAGE_RESULT)
+    doc = engine.analyze([_page()])
+    result = extract_invoice_fields(doc)
+    assert result.fields["invoice_number"].normalized_value == "0000123"
+    assert result.fields["invoice_number"].confidence == pytest.approx(0.98)
+    assert result.fields["total_amount"].normalized_value == 30_000_000
+    assert result.line_items[0]["unit_price"].normalized_value == 3_000_000
 
 
 def test_extracted_fields_flow_from_mistral_markdown():
@@ -76,7 +140,7 @@ def test_live_call_requires_api_key():
         engine.analyze([_page()])
 
 
-def test_call_api_posts_base64_and_parses_markdown():
+def test_call_api_posts_base64_and_requests_blocks():
     captured = {}
 
     class _Resp:
@@ -97,12 +161,17 @@ def test_call_api_posts_base64_and_parses_markdown():
 
         captured["url"] = request.full_url
         captured["auth"] = request.headers.get("Authorization")
-        body = json.dumps({"pages": [{"markdown": SAMPLE_MARKDOWN}]}).encode()
+        captured["payload"] = json.loads(request.data)
+        body = json.dumps({"pages": [SAMPLE_PAGE_RESULT]}).encode()
         return _Resp(body)
 
-    engine = MistralOCREngine(api_key="sk-test", urlopen=fake_urlopen)
+    engine = MistralOCREngine(api_key="sk-test", model="ocr-4-1", urlopen=fake_urlopen)
     doc = engine.analyze([_page()])
     assert captured["url"].endswith("/v1/ocr")
     assert captured["auth"] == "Bearer sk-test"
+    # OCR-4+ block extraction + block confidence must be requested.
+    assert captured["payload"]["include_blocks"] is True
+    assert captured["payload"]["confidence_scores_granularity"] == "block"
+    assert captured["payload"]["model"] == "ocr-4-1"
     assert doc.engine == MISTRAL_ENGINE_NAME
     assert any("0000123" in b.text for b in doc.blocks)
