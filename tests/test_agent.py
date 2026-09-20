@@ -61,6 +61,27 @@ def test_valid_structured_output_is_parsed(routine_evidence, build_inputs):
     assert a.policy_rule_ids == ["P07"]
 
 
+def test_markdown_fenced_json_is_parsed_not_fallback(routine_evidence, build_inputs):
+    # Many models wrap JSON in ```json ... ``` fences. That cosmetic wrapping must
+    # not force the normal LLM path into the deterministic fallback.
+    tx, checks, ctx = _inputs(build_inputs, _amount_mismatch(routine_evidence))
+    inner = {
+        "proposed_uncertainty_type": "FACTUAL_UNKNOWN",
+        "proposed_action": "REQUEST_INFO",
+        "primary_check_id": "CHECK_AMOUNT",
+        "explanation": "Invoice amount exceeds approved PO amount.",
+        "question": "Có phê duyệt tăng thêm không?",
+        "target": "Purchasing",
+        "policy_rule_ids": ["P07"],
+        "evidence_refs": ["PO-001", "INV-001"],
+    }
+    body = "```json\n" + json.dumps(inner) + "\n```"
+    a = agent_service.assess(tx, checks, ctx, client=FakeClient(body))
+    assert a.fallback_used is False
+    assert a.proposed_action is m.DecisionAction.REQUEST_INFO
+    assert a.primary_check_id == "CHECK_AMOUNT"
+
+
 def test_provider_error_uses_audited_fallback(routine_evidence, build_inputs):
     tx, checks, ctx = _inputs(build_inputs, _amount_mismatch(routine_evidence))
     a = agent_service.assess(tx, checks, ctx, client=ErrorClient(LLMError("boom")))

@@ -10,7 +10,15 @@ from __future__ import annotations
 from typing import Optional
 
 from invoice_referee.domain import models as m
+from invoice_referee.policy.config import AUTHORITY_THRESHOLD_VND
 from invoice_referee.policy.engine import PolicyOutcome
+
+
+def _vnd(value: Optional[int]) -> str:
+    """Format integer VND for a human reader (e.g. 120000000 -> '120.000.000 ₫')."""
+    if value is None or not isinstance(value, int) or isinstance(value, bool):
+        return "—"
+    return f"{value:,}".replace(",", ".") + " ₫"
 
 
 def _check(checks: list[m.CheckResult], check_id: Optional[str]) -> Optional[m.CheckResult]:
@@ -42,7 +50,7 @@ def build_question(
     if outcome.uncertainty_type is m.UncertaintyType.BEYOND_AUTHORITY:
         amount = inv.total_amount if inv and inv.total_amount is not None else (po.approved_total if po else None)
         return (
-            f"Giao dịch {amount} vượt ngưỡng tự xử lý {50_000_000}. "
+            f"Giao dịch {_vnd(amount)} vượt ngưỡng tự xử lý {_vnd(AUTHORITY_THRESHOLD_VND)}. "
             "Finance Manager có phê duyệt giao dịch này không?"
         )
 
@@ -71,12 +79,12 @@ def build_question(
             )
         if cid == "CHECK_PRICE":
             return (
-                f"PO phê duyệt đơn giá {cr.expected} nhưng invoice dùng {cr.actual}. "
+                f"PO phê duyệt đơn giá {_vnd(cr.expected)} nhưng invoice dùng {_vnd(cr.actual)}. "
                 "Có phê duyệt điều chỉnh đơn giá không?"
             )
         if cid == "CHECK_AMOUNT":
             return (
-                f"PO được phê duyệt {cr.expected} nhưng invoice là {cr.actual}. "
+                f"PO được phê duyệt {_vnd(cr.expected)} nhưng invoice là {_vnd(cr.actual)}. "
                 "Có PO điều chỉnh hoặc phê duyệt tăng thêm không?"
             )
         if cid == "CHECK_DUPLICATE":
@@ -91,8 +99,8 @@ def build_question(
                 total = inv.total_amount if inv else None
                 remaining = (total - paid) if (total is not None) else None
                 return (
-                    f"Invoice là {total} và đã thanh toán {paid}. "
-                    f"Có phải phần còn lại {remaining} vẫn đang chờ thanh toán không?"
+                    f"Invoice là {_vnd(total)} và đã thanh toán {_vnd(paid)}. "
+                    f"Có phải phần còn lại {_vnd(remaining)} vẫn đang chờ thanh toán không?"
                 )
             if status == "PAID":
                 return (
@@ -102,7 +110,7 @@ def build_question(
             return "Chưa xác định được trạng thái thanh toán của invoice này. Invoice hiện là UNPAID, PARTIALLY_PAID hay PAID?"
         if cid == "CHECK_PO_LIMIT":
             return (
-                f"Tổng các invoice cho PO này sẽ đạt {cr.actual}, vượt PO {cr.expected}. "
+                f"Tổng các invoice cho PO này sẽ đạt {_vnd(cr.actual)}, vượt PO {_vnd(cr.expected)}. "
                 "Có PO amendment hoặc phê duyệt bổ sung không?"
             )
 

@@ -34,6 +34,11 @@ Rules:
 - For multiple issues, choose the single most important unresolved check.
 - Never propose AUTO_PROCESS when any required check is unresolved or the amount
   is beyond authority.
+- Write "explanation" and "question" in Vietnamese, addressed to the finance/
+  accounting staff who will handle the case. Format money with dot thousand
+  separators and the ₫ sign (e.g. 120.000.000 ₫).
+- The question must be specific enough to answer in one reply without reopening
+  the original documents.
 """
 
 

@@ -48,6 +48,10 @@ class OpenAICompatibleClient(LLMClient):
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.api_key}",
+                # urllib's default User-Agent is rejected (HTTP 403) by some
+                # providers (e.g. xKiro). Send an explicit one so the normal
+                # LLM path is not silently forced into the fallback.
+                "User-Agent": "InvoiceReferee/0.1 (+https://github.com/Nnguyen-dev2805/InvoiceReferee)",
             },
             method="POST",
         )

@@ -124,7 +124,20 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     client = client_from_env()
     results = run_suite(args.suite, client=client)
-    source = "LLM" if client is not None else "deterministic fallback"
+
+    # Report what actually ran, not merely whether a client was configured. A
+    # configured provider can still fall back per-case (error/timeout/invalid
+    # output); the header must reflect the real LLM vs fallback split.
+    llm_rows = sum(1 for r in results if not r.fallback_used)
+    total_rows = len(results)
+    if client is None:
+        source = "deterministic fallback (no LLM provider configured)"
+    elif llm_rows == total_rows:
+        source = "LLM"
+    elif llm_rows == 0:
+        source = "deterministic fallback (LLM provider configured but every call fell back)"
+    else:
+        source = f"mixed: {llm_rows}/{total_rows} via LLM, {total_rows - llm_rows} fell back"
     print(
         f"InvoiceReferee Verify — suite '{args.suite}' ({source}) "
         f"@ {datetime.now(timezone.utc).isoformat()}\n"

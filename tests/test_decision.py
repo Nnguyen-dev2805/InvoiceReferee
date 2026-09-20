@@ -118,6 +118,27 @@ def test_beyond_authority_resolves_escalate(routine_evidence, build_inputs):
     assert "P12" in outcome.policy_rule_ids
 
 
+# --- Fallback question formatting --------------------------------------------
+
+
+def test_fallback_question_formats_money_for_humans(routine_evidence, build_inputs):
+    from invoice_referee.decision import fallback_questions
+
+    ev = routine_evidence()
+    ev["purchase_order"]["approved_total"] = 120_000_000
+    ev["purchase_order"]["items"][0]["unit_price"] = 12_000_000
+    ev["purchase_order"]["items"][0]["line_total"] = 120_000_000
+    ev["invoice"]["total_amount"] = 120_000_000
+    ev["invoice"]["items"][0]["unit_price"] = 12_000_000
+    ev["invoice"]["items"][0]["line_total"] = 120_000_000
+    outcome, tx, checks, _ctx = _resolve(build_inputs, ev)
+    q = fallback_questions.build_question(outcome, tx, checks)
+    # Money must be human-formatted (dot thousands + ₫), never a raw integer.
+    assert "120.000.000 ₫" in q
+    assert "50.000.000 ₫" in q
+    assert "120000000" not in q
+
+
 # --- Decision Guard: accepts matching, overrides unsafe proposals ------------
 
 

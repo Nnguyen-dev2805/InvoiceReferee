@@ -73,6 +73,31 @@ def test_complete_builds_chat_completions_url_and_auth():
     assert captured["body"]["messages"][0]["content"] == "hello"
 
 
+def test_complete_sends_user_agent_header():
+    # Some providers (e.g. xKiro) reject urllib's default User-Agent with HTTP 403.
+    # The client must send an explicit User-Agent so the normal LLM path works.
+    captured = {}
+
+    def _open(req, timeout=None):
+        captured["user_agent"] = req.get_header("User-agent")
+
+        class _R:
+            def read(self):
+                return _chat_body("{}").encode()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        return _R()
+
+    _client(_open).complete("x")
+    assert captured["user_agent"]
+    assert "InvoiceReferee" in captured["user_agent"]
+
+
 def test_timeout_maps_to_llm_timeout():
     def _open(req, timeout=None):
         raise TimeoutError("slow")

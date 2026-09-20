@@ -38,11 +38,34 @@ def _valid_evidence_ids(tx: m.Transaction, checks: list[m.CheckResult]) -> set[s
     return ids
 
 
+def _extract_json_object(body: str) -> str:
+    """Return the JSON object text from a model reply.
+
+    Models often wrap JSON in ```json ... ``` fences or add a little prose. Strip
+    fences and, failing that, slice from the first ``{`` to the last ``}`` so the
+    normal LLM path is not forced into the fallback by cosmetic formatting.
+    """
+    text = body.strip()
+    if text.startswith("```"):
+        # Drop the opening fence line (``` or ```json) and any closing fence.
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.rstrip().endswith("```"):
+            text = text.rstrip()[:-3]
+        text = text.strip()
+    if text.startswith("{") and text.endswith("}"):
+        return text
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return text[start : end + 1]
+    return text
+
+
 def _parse_and_validate(
     body: str, tx: m.Transaction, checks: list[m.CheckResult], model: Optional[str], prompt_version: str
 ) -> m.AgentAssessment:
     """Parse strict structured output. Raises ValueError if invalid/untraceable."""
-    data = json.loads(body)
+    data = json.loads(_extract_json_object(body))
     if not isinstance(data, dict):
         raise ValueError("assessment is not a JSON object")
 
