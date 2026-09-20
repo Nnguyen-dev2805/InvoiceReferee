@@ -1,0 +1,39 @@
+{
+  "transaction_id": "TX14",
+  "transaction_type": "SERVICE_INVOICE",
+  "invoice": {
+    "invoice_id": "INV-014",
+    "invoice_number": "0000200",
+    "invoice_series": "2C23TTU",
+    "invoice_type": "ORIGINAL",
+    "related_invoice_number": null,
+    "vendor_id": "V-ABC",
+    "vendor_tax_code": "0101234567",
+    "vendor_name": "ABC Company",
+    "po_id": null,
+    "invoice_date": "2026-09-13",
+    "currency": "VND",
+    "items": [
+      {
+        "item_id": "ITEM-001",
+        "description": "Dell Monitor",
+        "invoiced_quantity": 1,
+        "unit_price": 20000000,
+        "line_total": 20000000
+      }
+    ],
+    "total_amount": 20000000,
+    "source_type": "JSON",
+    "confidence": 1.0,
+    "flagged": false
+  },
+  "payment_history": [
+    {
+      "payment_id": "PAY-001",
+      "invoice_id": "INV-014",
+      "status": "UNPAID",
+      "paid_amount": 0,
+      "payment_date": null
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "transaction_id": "TX16",
+  "transaction_type": "PO_GOODS_PURCHASE",
+  "purchase_order": {
+    "po_id": "PO-001",
+    "vendor_id": "V-ABC",
+    "vendor_name": "ABC Company",
+    "currency": "VND",
+    "order_date": "2026-09-10",
+    "items": [
+      {
+        "item_id": "ITEM-001",
+        "description": "Dell Monitor",
+        "ordered_quantity": 10,
+        "unit_price": 3000000,
+        "line_total": 30000000
+      }
+    ],
+    "approved_total": 30000000,
+    "status": "APPROVED"
+  },
+  "goods_receipts": [
+    {
+      "receipt_id": "GR-001",
+      "po_id": "PO-001",
+      "received_date": "2026-09-12",
+      "items": [
+        {
+          "item_id": "ITEM-001",
+          "description": "Dell Monitor",
+          "received_quantity": 10
+        }
+      ],
+      "status": "RECEIVED"
+    }
+  ],
+  "invoice": {
+    "invoice_id": "INV-016",
+    "invoice_number": "0000126",
+    "invoice_series": "2C23TTU",
+    "invoice_type": "ORIGINAL",
+    "related_invoice_number": null,
+    "vendor_id": "V-ABC",
+    "vendor_tax_code": "0101234567",
+    "vendor_name": "ABC Company",
+    "po_id": "PO-001",
+    "invoice_date": "2026-09-13",
+    "currency": "VND",
+    "items": [
+      {
+        "item_id": "ITEM-001",
+        "description": "Dell Monitor",
+        "invoiced_quantity": 4,
+        "unit_price": 3000000,
+        "line_total": 12000000
+      }
+    ],
+    "total_amount": 12000000,
+    "source_type": "JSON",
+    "confidence": 1.0,
+    "flagged": false
+  },
+  "prior_invoices": [
+    {
+      "invoice_id": "INV-016A",
+      "invoice_number": "0000125",
+      "invoice_series": "2C23TTU",
+      "invoice_type": "ORIGINAL",
+      "related_invoice_number": null,
+      "vendor_id": "V-ABC",
+      "vendor_tax_code": "0101234567",
+      "vendor_name": "ABC Company",
+      "po_id": "PO-001",
+      "invoice_date": "2026-09-13",
+      "currency": "VND",
+      "items": [
+        {
+          "item_id": "ITEM-001",
+          "description": "Dell Monitor",
+          "invoiced_quantity": 8,
+          "unit_price": 3000000,
+          "line_total": 24000000
+        }
+      ],
+      "total_amount": 24000000,
+      "source_type": "JSON",
+      "confidence": 1.0,
+      "flagged": false
+    }
+  ],
+  "payment_history": [
+    {
+      "payment_id": "PAY-001",
+      "invoice_id": "INV-016",
+      "status": "UNPAID",
+      "paid_amount": 0,
+      "payment_date": null
+    }
+  ]
+}
