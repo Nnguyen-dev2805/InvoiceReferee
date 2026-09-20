@@ -174,6 +174,27 @@ python -m pip install --upgrade pip
 pip install -e '.[dev]'
 ```
 
+### LLM provider (tuỳ chọn, OpenAI-compatible)
+
+LLM Agent dùng chuẩn OpenAI Chat Completions, đổi provider chỉ bằng `base_url` + `model`.
+Cấu hình qua `.env` ở thư mục gốc (copy từ `.env.example`):
+
+```bash
+cp .env.example .env
+# rồi điền LLM_API_KEY
+```
+
+```dotenv
+LLM_BASE_URL=https://api.xkiro.com/v1   # hoặc DeepSeek/OpenAI/gateway nội bộ
+LLM_API_KEY=sk-...
+LLM_MODEL=claude-opus-4.8
+LLM_TIMEOUT=30
+```
+
+Không có `LLM_API_KEY` thì hệ thống chạy **deterministic fallback** — Decision Guard
+vẫn quyết định action, nên kết quả luôn policy-correct dù có hay không có LLM.
+`.env` đã được `.gitignore`; không commit key.
+
 ### Tests
 
 ```bash

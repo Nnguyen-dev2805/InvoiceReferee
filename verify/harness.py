@@ -119,8 +119,16 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--suite", choices=["core", "escalation", "all"], default="all")
     args = parser.parse_args(argv)
 
-    results = run_suite(args.suite)
-    print(f"InvoiceReferee Verify — suite '{args.suite}' @ {datetime.now(timezone.utc).isoformat()}\n")
+    # Use the configured LLM provider when available; otherwise deterministic fallback.
+    from invoice_referee.agent.config import client_from_env
+
+    client = client_from_env()
+    results = run_suite(args.suite, client=client)
+    source = "LLM" if client is not None else "deterministic fallback"
+    print(
+        f"InvoiceReferee Verify — suite '{args.suite}' ({source}) "
+        f"@ {datetime.now(timezone.utc).isoformat()}\n"
+    )
     _print_table(results)
     passed, total = _summary(results)
     print(f"\n{passed}/{total} cases passed.")

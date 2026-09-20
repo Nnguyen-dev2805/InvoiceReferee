@@ -18,6 +18,7 @@ from invoice_referee.domain import models as m
 from invoice_referee.transaction.builder import build_transaction
 from invoice_referee.services.reviewer import review
 from invoice_referee.audit.store import AuditStore
+from invoice_referee.agent.config import client_from_env
 from verify import harness
 
 from app import presentation as p
@@ -39,7 +40,9 @@ _CHECK_ICON = {
 
 def _run_review(evidence: dict) -> None:
     """Run a review and store result + a fresh human-control audit store in session."""
-    result = review(evidence)
+    # Uses the configured LLM provider when a key is set, else deterministic fallback.
+    client = client_from_env()
+    result = review(evidence, client=client, model=getattr(client, "model", None))
     st.session_state["result"] = result
     st.session_state["human_audit"] = AuditStore(transaction_id=result.transaction.transaction_id)
 
