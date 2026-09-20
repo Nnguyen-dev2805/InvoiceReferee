@@ -1,0 +1,27 @@
+{
+  "pages": [
+    {
+      "page_number": 1,
+      "blocks": [
+        {
+          "block_id": "BLK-001",
+          "text": "30.000.000 VND",
+          "confidence": 0.97,
+          "poly": [[124, 700], [992, 700], [992, 800], [124, 800]],
+          "block_type": "TEXT",
+          "row_index": null,
+          "column_index": null
+        },
+        {
+          "block_id": "BLK-002",
+          "text": "Ky hieu: 2C23TTU",
+          "confidence": 0.93,
+          "poly": [[124, 100], [620, 100], [620, 150], [124, 150]],
+          "block_type": "KEY_VALUE",
+          "row_index": null,
+          "column_index": null
+        }
+      ]
+    }
+  ]
+}
