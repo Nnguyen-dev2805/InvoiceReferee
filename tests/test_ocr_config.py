@@ -42,6 +42,6 @@ def test_mistral_model_and_timeout_overrides():
     assert engine._timeout == 30.0
 
 
-def test_mistral_defaults_to_ocr_4_1():
+def test_mistral_defaults_to_latest_ocr_alias():
     engine = engine_from_env(env={"OCR_ENGINE": "mistral", "MISTRAL_API_KEY": "sk-x"})
-    assert engine._model == "ocr-4-1"
+    assert engine._model == "mistral-ocr-latest"

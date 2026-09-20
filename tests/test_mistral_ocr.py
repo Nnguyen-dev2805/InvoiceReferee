@@ -61,32 +61,35 @@ def test_mistral_markdown_confidence_is_zero_so_fields_need_confirmation():
 
 # --- OCR-4+ blocks path (real bbox + block confidence) -----------------------
 
+# Mirrors the real Mistral OCR page schema: flat top_left_*/bottom_right_*
+# pixel coords, ``content`` text, and nested ``confidence_scores``.
 SAMPLE_PAGE_RESULT = {
     "markdown": "ignored when blocks present",
+    "dimensions": {"width": 1000, "height": 1400, "dpi": 200},
     "blocks": [
         {
             "type": "text",
-            "markdown": "Số hóa đơn: 0000123",
-            "confidence": 0.98,
-            "bbox": {"top_left_x": 80, "top_left_y": 100, "bottom_right_x": 620, "bottom_right_y": 140},
+            "content": "Số hóa đơn: 0000123",
+            "confidence_scores": {"average_content_confidence_score": 0.98},
+            "top_left_x": 80, "top_left_y": 100, "bottom_right_x": 620, "bottom_right_y": 140,
         },
         {
             "type": "text",
-            "markdown": "Mã số thuế: 0101234567",
-            "confidence": 0.95,
-            "bbox": [80, 160, 620, 200],
+            "content": "Mã số thuế: 0101234567",
+            "confidence_scores": {"average_content_confidence_score": 0.95},
+            "top_left_x": 80, "top_left_y": 160, "bottom_right_x": 620, "bottom_right_y": 200,
         },
         {
             "type": "table",
-            "markdown": "| Mô tả | Số lượng | Đơn giá | Thành tiền |\n| --- | --- | --- | --- |\n| Dell Monitor | 10 | 3.000.000 | 30.000.000 |",
-            "confidence": 0.93,
-            "bbox": {"top_left_x": 60, "top_left_y": 400, "bottom_right_x": 940, "bottom_right_y": 520},
+            "content": "| Mô tả | Số lượng | Đơn giá | Thành tiền |\n| --- | --- | --- | --- |\n| Dell Monitor | 10 | 3.000.000 | 30.000.000 |",
+            "confidence_scores": {"average_content_confidence_score": 0.93},
+            "top_left_x": 60, "top_left_y": 400, "bottom_right_x": 940, "bottom_right_y": 520,
         },
         {
             "type": "text",
-            "markdown": "Tổng cộng: 30.000.000 VND",
-            "confidence": 0.99,
-            "bbox": {"top_left_x": 80, "top_left_y": 560, "bottom_right_x": 620, "bottom_right_y": 600},
+            "content": "Tổng cộng: 30.000.000 VND",
+            "confidence_scores": {"average_content_confidence_score": 0.99},
+            "top_left_x": 80, "top_left_y": 560, "bottom_right_x": 620, "bottom_right_y": 600,
         },
     ],
 }
@@ -97,7 +100,7 @@ def test_ocr4_blocks_carry_real_confidence_and_bbox():
     doc = engine.analyze([_page()])
     num = next(b for b in doc.blocks if "0000123" in b.text)
     assert num.confidence == pytest.approx(0.98)
-    # 80/1000 .. 620/1000 normalized.
+    # Normalized against Mistral's reported page dimensions (1000x1400).
     assert num.bounding_box.x1 == pytest.approx(0.08)
     assert num.bounding_box.x2 == pytest.approx(0.62)
     assert num.bounding_box.y1 == pytest.approx(100 / 1400)

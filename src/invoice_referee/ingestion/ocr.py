@@ -205,7 +205,7 @@ def _get(obj: Any, key: str):
 
 MISTRAL_ENGINE_NAME = "mistral-ocr"
 MISTRAL_OCR_URL = "https://api.mistral.ai/v1/ocr"
-DEFAULT_MISTRAL_OCR_MODEL = "ocr-4-1"
+DEFAULT_MISTRAL_OCR_MODEL = "mistral-ocr-latest"
 
 
 def _is_table_row(line: str) -> bool:
@@ -279,21 +279,47 @@ def _md_block(block_id, text, page_number, *, block_type, row=None, col=None) ->
     }
 
 
-def _bbox_to_poly(bbox) -> Optional[list[list[float]]]:
-    """Convert a Mistral block bbox (dict or [x0,y0,x1,y1]) into a poly, defensively."""
-    if bbox is None:
+def _block_bbox(block: dict) -> Optional[list[list[float]]]:
+    """Poly from a Mistral block: flat top_left_*/bottom_right_* or a nested bbox."""
+    x0 = block.get("top_left_x")
+    y0 = block.get("top_left_y")
+    x1 = block.get("bottom_right_x")
+    y1 = block.get("bottom_right_y")
+    if None in (x0, y0, x1, y1):
+        bbox = block.get("bbox")
+        if isinstance(bbox, dict):
+            x0 = bbox.get("top_left_x", bbox.get("x0"))
+            y0 = bbox.get("top_left_y", bbox.get("y0"))
+            x1 = bbox.get("bottom_right_x", bbox.get("x1"))
+            y1 = bbox.get("bottom_right_y", bbox.get("y1"))
+        elif isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
+            x0, y0, x1, y1 = bbox[:4]
+    if None in (x0, y0, x1, y1):
         return None
-    if isinstance(bbox, dict):
-        x0 = bbox.get("top_left_x", bbox.get("x0", bbox.get("x_min", bbox.get("xmin"))))
-        y0 = bbox.get("top_left_y", bbox.get("y0", bbox.get("y_min", bbox.get("ymin"))))
-        x1 = bbox.get("bottom_right_x", bbox.get("x1", bbox.get("x_max", bbox.get("xmax"))))
-        y1 = bbox.get("bottom_right_y", bbox.get("y1", bbox.get("y_max", bbox.get("ymax"))))
-        if None in (x0, y0, x1, y1):
-            return None
-        return [[float(x0), float(y0)], [float(x1), float(y0)], [float(x1), float(y1)], [float(x0), float(y1)]]
-    if isinstance(bbox, (list, tuple)) and len(bbox) >= 4:
-        x0, y0, x1, y1 = bbox[:4]
-        return [[float(x0), float(y0)], [float(x1), float(y0)], [float(x1), float(y1)], [float(x0), float(y1)]]
+    return [[float(x0), float(y0)], [float(x1), float(y0)], [float(x1), float(y1)], [float(x0), float(y1)]]
+
+
+def _block_confidence(block: dict) -> Optional[float]:
+    """Block-level confidence from Mistral's confidence_scores, or a flat field."""
+    scores = block.get("confidence_scores")
+    if isinstance(scores, dict):
+        val = scores.get("average_content_confidence_score")
+        if val is not None:
+            return float(val)
+    conf = block.get("confidence")
+    return float(conf) if conf is not None else None
+
+
+def _block_content(block: dict) -> str:
+    return block.get("content") or block.get("markdown") or block.get("text") or ""
+
+
+def _page_dimensions(result) -> Optional[tuple[int, int]]:
+    """(width, height) from a Mistral page-result dict, if present."""
+    if isinstance(result, dict):
+        dims = result.get("dimensions")
+        if isinstance(dims, dict) and dims.get("width") and dims.get("height"):
+            return int(dims["width"]), int(dims["height"])
     return None
 
 
@@ -303,19 +329,20 @@ def _looks_like_markdown_table(content: str) -> bool:
 
 
 def blocks_from_mistral_page(page_result: dict, page_number: int) -> list[dict]:
-    """Convert an OCR-4+ page ``blocks`` array into neutral block dicts.
+    """Convert a Mistral page ``blocks`` array into neutral block dicts.
 
-    Uses real block bounding boxes and block-level confidence when present. A
-    block whose content is a Markdown table is expanded into TABLE_CELL blocks
-    (inheriting the table's box/confidence) so line-item reconstruction works.
+    Reads the real block schema (flat top_left_*/bottom_right_* pixel coords,
+    ``content`` text, ``confidence_scores.average_content_confidence_score``,
+    ``type``). A block whose content is a Markdown table is expanded into
+    TABLE_CELL blocks (inheriting the table's box/confidence).
     """
     out: list[dict] = []
     counter = 0
     table_index = 0
     for block in page_result.get("blocks", []):
-        content = block.get("markdown") or block.get("text") or block.get("content") or ""
-        conf = block.get("confidence")
-        poly = _bbox_to_poly(block.get("bbox"))
+        content = _block_content(block)
+        conf = _block_confidence(block)
+        poly = _block_bbox(block)
         label = str(block.get("type") or block.get("label") or "").lower()
 
         if _looks_like_markdown_table(content) or "table" in label:
@@ -351,7 +378,9 @@ def _map_mistral_response(raw_pages: list[dict], pages: list[m.DocumentPage]) ->
     blocks: list[m.OCRBlock] = []
     for page in raw_pages:
         page_number = page.get("page_number", 1)
-        width, height = dims.get(page_number, (1, 1))
+        # Block coordinates are in Mistral's reported page space; prefer it over
+        # our rendered page size (they differ, e.g. PDF rendered at 300 DPI).
+        width, height = page.get("dimensions") or dims.get(page_number, (1, 1))
         for block in page.get("blocks", []):
             poly = block.get("poly")
             box = _normalized_box(poly, width, height) if poly else m.BoundingBox(0.0, 0.0, 1.0, 1.0)
@@ -408,7 +437,11 @@ class MistralOCREngine:
         for page in pages:
             result = (self._transcribe or self._call_api)(page)
             raw_pages.append(
-                {"page_number": page.page_number, "blocks": self._to_blocks(result, page.page_number)}
+                {
+                    "page_number": page.page_number,
+                    "blocks": self._to_blocks(result, page.page_number),
+                    "dimensions": _page_dimensions(result),
+                }
             )
         blocks = _map_mistral_response(raw_pages, pages)
         return m.OCRDocument(
@@ -424,7 +457,7 @@ class MistralOCREngine:
 
     @staticmethod
     def _to_blocks(result, page_number: int) -> list[dict]:
-        # str -> Markdown path; dict with blocks -> OCR-4+ path; else its markdown.
+        # str -> Markdown path; dict with blocks -> block path; else its markdown.
         if isinstance(result, str):
             return markdown_to_blocks(result, page_number)
         if isinstance(result, dict) and result.get("blocks"):
