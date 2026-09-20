@@ -159,6 +159,65 @@ def test_supplier_invoice_optional_related_invoice_defaults_none():
     assert inv.source_type == m.SourceType.JSON
 
 
+def test_supplier_invoice_unreadable_amount_stays_none():
+    # TC15: an unreadable/uncertain amount must remain unknown, not guessed.
+    inv = m.SupplierInvoice(
+        invoice_id="INV-015",
+        invoice_number="0000999",
+        invoice_series="2C23TTU",
+        invoice_type=m.InvoiceType.ORIGINAL,
+        vendor_id="V-ABC",
+        vendor_tax_code="0101234567",
+        po_id="PO-015",
+        invoice_date="2026-09-13",
+        items=[],
+        total_amount=None,
+        flagged=True,
+    )
+    assert inv.total_amount is None
+    assert inv.flagged is True
+
+
+def test_supplier_invoice_amount_still_rejects_float_when_present():
+    with pytest.raises((TypeError, ValueError)):
+        m.SupplierInvoice(
+            invoice_id="INV-001",
+            invoice_number="0000123",
+            invoice_series="2C23TTU",
+            invoice_type=m.InvoiceType.ORIGINAL,
+            vendor_id="V-ABC",
+            vendor_tax_code="0101234567",
+            po_id="PO-001",
+            invoice_date="2026-09-13",
+            items=[],
+            total_amount=30_000_000.0,
+        )
+
+
+def test_transaction_preserves_raw_declared_type():
+    tx = m.Transaction(
+        transaction_id="TX-014",
+        transaction_type=None,
+        declared_transaction_type="SERVICE_INVOICE",
+    )
+    # Known-but-unsupported type is preserved for tri-state scope classification.
+    assert tx.transaction_type is None
+    assert tx.declared_transaction_type == "SERVICE_INVOICE"
+
+
+def test_transaction_declared_type_defaults_none():
+    tx = m.Transaction(transaction_id="TX-1", transaction_type=m.TransactionType.PO_GOODS_PURCHASE)
+    assert tx.declared_transaction_type is None
+
+
+def test_transaction_prior_invoices_default_empty_and_independent():
+    a = m.Transaction(transaction_id="TX-A", transaction_type=m.TransactionType.PO_GOODS_PURCHASE)
+    b = m.Transaction(transaction_id="TX-B", transaction_type=m.TransactionType.PO_GOODS_PURCHASE)
+    assert a.prior_invoices == []
+    a.prior_invoices.append("x")
+    assert b.prior_invoices == []
+
+
 def test_payment_record_optional_payment_date():
     rec = m.PaymentRecord(
         invoice_id="INV-001",

@@ -199,7 +199,7 @@ class SupplierInvoice:
     po_id: str
     invoice_date: str
     items: list[InvoiceLineItem]
-    total_amount: int
+    total_amount: Optional[int]
     related_invoice_number: Optional[str] = None
     vendor_name: Optional[str] = None
     currency: str = "VND"
@@ -208,7 +208,10 @@ class SupplierInvoice:
     flagged: bool = False
 
     def __post_init__(self) -> None:
-        _money(self.total_amount, "total_amount")
+        # Money is validated only when present; an unreadable amount stays None
+        # (it must not be guessed into a passing value).
+        if self.total_amount is not None:
+            _money(self.total_amount, "total_amount")
 
 
 @dataclass
@@ -354,9 +357,11 @@ class HumanOverride:
 class Transaction:
     transaction_id: str
     transaction_type: Optional[TransactionType]
+    declared_transaction_type: Optional[str] = None
     po: Optional[PurchaseOrder] = None
     goods_receipts: list[GoodsReceipt] = field(default_factory=list)
     invoice: Optional[SupplierInvoice] = None
+    prior_invoices: list[SupplierInvoice] = field(default_factory=list)
     payment_history: list[PaymentRecord] = field(default_factory=list)
     approvals: list[ApprovalRecord] = field(default_factory=list)
     checks: list[CheckResult] = field(default_factory=list)
