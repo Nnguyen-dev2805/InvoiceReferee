@@ -162,6 +162,35 @@ Policy xác định:
 
 Trong Sprint 1, policy và dữ liệu có thể là synthetic nhưng phải được công bố rõ là synthetic.
 
+### 6.7. Input Extraction Strategy
+
+InvoiceReferee tách **đọc tài liệu** khỏi **kiểm tra nghiệp vụ**. Luồng đầu vào chuẩn là:
+
+```text
+Raw document / structured data
+        ↓
+Extraction Adapter
+        ↓
+Extracted canonical fields
+        ↓
+Normalization
+        ↓
+Transaction Builder
+```
+
+Chiến lược theo loại nguồn:
+
+- `JSON/API`: đọc trực tiếp các field có cấu trúc; đây là đường chính của Sprint 1.
+- `XML e-invoice`: parse XML và map tag sang schema `SupplierInvoice`.
+- `PDF có text`: extract text rồi map các trường cần thiết.
+- `PDF scan / image`: dùng OCR hoặc vision extraction rồi map về cùng schema.
+
+Extraction layer chỉ có nhiệm vụ lấy dữ liệu như invoice number, vendor tax code, item, quantity, unit price, total amount và date. Nó **không** kết luận dữ liệu có khớp PO hay không và không tạo `AUTO_PROCESS` / `REQUEST_INFO` / `ESCALATE`.
+
+Nếu một field quan trọng không đọc được hoặc có parse warning, hệ thống phải giữ sự bất định đó (`null`/warning/source metadata) để downstream xử lý; không được đoán field còn thiếu.
+
+Trong Sprint 1, PO, Goods Receipt, Payment History và Approval Evidence dùng structured JSON. Supplier Invoice cũng hỗ trợ JSON trong baseline; XML/PDF/OCR là extension adapter nếu còn thời gian. Cách này giữ trọng tâm hackathon ở transaction reasoning, escalation và audit thay vì xây một OCR system hoàn chỉnh.
+
 ---
 
 ## 7. Transaction as the Core Object
@@ -527,7 +556,7 @@ Sprint 1 không nhằm xây dựng:
 - full procurement platform;
 - ERP replacement.
 
-OCR, PDF parsing hoặc XML parsing nếu được thêm vào chỉ đóng vai trò **input adapter**, không phải giá trị cốt lõi của InvoiceReferee.
+OCR, PDF parsing hoặc XML parsing nếu được thêm vào chỉ đóng vai trò **extraction adapter**, output cùng canonical schema như JSON input; chúng không phải giá trị cốt lõi của InvoiceReferee.
 
 ---
 

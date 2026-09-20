@@ -4,7 +4,7 @@
 
 **Goal:** Build an end-to-end InvoiceReferee MVP that reviews PO-based goods purchase transactions and returns `AUTO_PROCESS`, `REQUEST_INFO`, or `ESCALATE` with auditability and one-click Verify.
 
-**Architecture:** A single Python application with isolated domain, ingestion, transaction, deterministic-check, policy, LLM-agent, decision-guard, audit, review-service and UI/Verify modules. Deterministic logic owns factual and numeric checks. The LLM reasons over verified facts and proposes an assessment; a deterministic Decision Guard enforces policy and authority before any final action is released.
+**Architecture:** A single Python application with isolated domain, extraction/ingestion, transaction, deterministic-check, policy, LLM-agent, decision-guard, audit, review-service and UI/Verify modules. Raw inputs are extracted/mapped into one canonical schema before transaction construction. Deterministic logic owns factual and numeric checks. The LLM reasons over verified facts and proposes an assessment; a deterministic Decision Guard enforces policy and authority before any final action is released.
 
 **Tech Stack:** Python 3.12, pytest, Streamlit, JSON fixtures.
 
@@ -26,6 +26,8 @@
 - Transaction type is classified before workflow-specific evidence validation.
 - Duplicate identity prefers vendor tax code + invoice series + invoice number.
 - Quantity checks include cumulative invoiced quantity versus cumulative received quantity per item.
+- Extraction adapters never make business decisions. Unknown/unreliable parsed fields remain `null` or carry parse warnings; they are not guessed into valid values.
+- Sprint 1 required ingestion path is structured JSON. XML, text-PDF and OCR/vision adapters are extensions that must output the same canonical field contract.
 
 ---
 
@@ -43,31 +45,39 @@
 
 - [ ] Create Python package layout under `src/invoice_referee/`.
 - [ ] Define enums/constants for decision action, check status, uncertainty type and payment status.
-- [ ] Define dataclasses for `PurchaseOrder`, `GoodsReceipt`, `SupplierInvoice`, `PaymentRecord`, `ApprovalRecord`, `Transaction`, `CheckResult`, `Uncertainty`, `PolicyContext`, `AgentAssessment`, `Decision`, `ReviewResult`, `AuditEvent`, `HumanStop`, `HumanOverride`.
+- [ ] Define dataclasses for `ExtractedDocument`, `PurchaseOrder`, `GoodsReceipt`, `SupplierInvoice`, `PaymentRecord`, `ApprovalRecord`, `Transaction`, `CheckResult`, `Uncertainty`, `PolicyContext`, `AgentAssessment`, `Decision`, `ReviewResult`, `AuditEvent`, `HumanStop`, `HumanOverride`.
 - [ ] Write tests for integer-money validation, allowed enum values and optional/null fields.
 - [ ] Run `pytest tests/test_models.py -v` and confirm pass.
 - [ ] Commit: `feat: add domain data contracts`.
 
-### Task 2: JSON ingestion, normalization and transaction builder
+### Task 2: JSON extraction/mapping, normalization and transaction builder
 
 **Owner:** Person 1
 
 **Files:**
-- Create: `src/invoice_referee/ingestion/json_loader.py`
+- Create: `src/invoice_referee/ingestion/json_adapter.py`
 - Create: `src/invoice_referee/ingestion/normalization.py`
 - Create: `src/invoice_referee/transaction/builder.py`
+- Create: `tests/test_ingestion.py`
 - Create: `tests/test_builder.py`
 
 **Interfaces:**
-- Consumes raw JSON dicts/files.
+- Consumes raw JSON dicts/files through the Sprint 1 extraction adapter.
+- Produces canonical domain objects while preserving source/parse-warning metadata needed for audit and uncertainty handling.
 - Produces `Transaction`.
 
 - [ ] Write failing tests for normal transaction linking, missing PO, multiple goods receipts, invoice relationship metadata, approval evidence and unknown payment status.
+- [ ] Define the extraction contract: `document_type`, `source_type`, `source_ref`, extracted `fields`, and `parse_warnings` (optional per-field confidence may be added by non-JSON adapters).
+- [ ] Implement JSON mapping as the required Sprint 1 adapter; structured fields should pass through without OCR or LLM extraction.
+- [ ] Test `JSON → ExtractedDocument → normalized domain object`, including preservation of `source_ref` and `parse_warnings`.
 - [ ] Implement normalization for IDs, integer VND, ISO dates and `null` unknowns.
 - [ ] Implement `build_transaction(evidence) -> Transaction`.
 - [ ] Ensure builder does not invent missing documents.
-- [ ] Run `pytest tests/test_builder.py -v`.
+- [ ] Add a test proving an unreadable/uncertain critical field remains unknown instead of being guessed into a passing transaction.
+- [ ] Run `pytest tests/test_ingestion.py tests/test_builder.py -v`.
 - [ ] Commit: `feat: build normalized transactions`.
+
+**Extension after the JSON vertical slice is stable:** add XML e-invoice parsing, text-PDF extraction or OCR/vision adapters one at a time. Each extension must terminate at the same extraction contract and reuse the existing normalization/builder/check pipeline.
 
 ### Task 3: Deterministic check engine
 

@@ -15,13 +15,19 @@ Kiến trúc Sprint 1 ưu tiên:
 ## 2. High-level architecture
 
 ```text
-                   ┌──────────────────┐
-                   │      Input       │
-                   │ JSON/XML/PDF/... │
-                   └────────┬─────────┘
+                   ┌──────────────────────┐
+                   │    Raw Evidence      │
+                   │ JSON/XML/PDF/Image   │
+                   └──────────┬───────────┘
+                              ↓
+                  ┌────────────────────┐
+                  │ Extraction Adapter │
+                  │ parse / OCR / map  │
+                  └────────┬───────────┘
                             ↓
                   ┌────────────────────┐
-                  │ Ingestion/Normalize│
+                  │    Normalize       │
+                  │ canonical fields   │
                   └────────┬───────────┘
                             ↓
                   ┌────────────────────┐
@@ -73,7 +79,7 @@ InvoiceReferee/
 │       ├── domain/
 │       │   └── models.py
 │       ├── ingestion/
-│       │   ├── json_loader.py
+│       │   ├── json_adapter.py
 │       │   └── normalization.py
 │       ├── transaction/
 │       │   └── builder.py
@@ -124,7 +130,34 @@ Chứa schema contract từ `DATA_MODEL.md`. Không chứa business orchestratio
 
 ### Ingestion
 
-Đọc input và normalize thành domain objects. Sprint 1 ưu tiên JSON; XML/PDF/OCR chỉ thêm khi core đã ổn.
+Ingestion có hai trách nhiệm tách biệt: **extraction** và **normalization**.
+
+```text
+Raw source
+  ↓
+Extraction Adapter
+  ↓
+Extracted fields + source metadata + parse warnings
+  ↓
+Normalization
+  ↓
+PurchaseOrder / GoodsReceipt / SupplierInvoice / PaymentRecord / ApprovalRecord
+```
+
+Adapter được chọn theo loại nguồn:
+
+- structured JSON/API → đọc trực tiếp key/value và map sang canonical schema;
+- e-invoice XML → XML parser theo field/tag của tài liệu;
+- text-based PDF → PDF text extraction rồi map field;
+- scanned PDF/image → OCR hoặc vision extraction, sau đó map field.
+
+Mọi adapter phải trả về cùng **canonical field contract** trước khi `Transaction Builder` chạy. Adapter chỉ trích xuất dữ liệu; nó không được quyết định vendor có khớp, amount có hợp lệ, invoice có duplicate hay action cuối cùng là gì.
+
+Contract trung gian này là `ExtractedDocument` trong `DATA_MODEL.md`. Vì vậy khi bổ sung XML/PDF/OCR về sau, chỉ adapter thay đổi; normalization, builder và business pipeline được tái sử dụng.
+
+Nếu một field không đọc được hoặc extraction không chắc chắn, adapter phải giữ `null`/warning và source reference thay vì tự đoán. Critical parse warning phải còn nhìn thấy ở downstream để transaction không bị `AUTO_PROCESS` chỉ vì OCR/parse đã điền một giá trị thiếu căn cứ.
+
+Sprint 1 implementation bắt buộc hỗ trợ structured JSON end-to-end. XML/PDF/OCR là adapter mở rộng sau khi core ổn; chúng không được làm thay đổi schema downstream hay business checks.
 
 ### Transaction Builder
 

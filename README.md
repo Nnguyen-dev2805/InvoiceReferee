@@ -55,9 +55,11 @@ InvoiceReferee review PO + Receipt + Invoice + Payment History
 Luồng xử lý bên trong hệ thống:
 
 ```text
-Input
+Raw Input (JSON baseline; XML/PDF/Image adapters optional)
   ↓
-Ingestion / Normalize
+Extraction / Canonical Mapping
+  ↓
+Normalization
   ↓
 Identify Transaction Type
   ↓

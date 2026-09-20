@@ -39,6 +39,50 @@ Audit Log
 - Field chưa biết dùng `null`, không tự điền giá trị đoán.
 - Dữ liệu parse chưa chắc chắn phải có flag để downstream biết không được tin tuyệt đối.
 
+### 2.1. ExtractedDocument — extraction contract trước domain objects
+
+Nguồn dữ liệu thô có thể khác nhau, nhưng trước `Transaction Builder` chúng phải được đưa về cùng canonical schema.
+
+```text
+JSON/API          → structured mapping ┐
+E-invoice XML     → XML parser         │
+Text PDF          → text extraction    ├→ ExtractedDocument → normalization → domain object
+Scan/Image        → OCR/Vision         │
+                                      ┘
+```
+
+Contract tối thiểu cho kết quả extraction:
+
+```json
+{
+  "document_type": "SUPPLIER_INVOICE",
+  "source_type": "JSON",
+  "source_ref": "fixture://TC01/invoice.json",
+  "extractor": "json_adapter",
+  "fields": {
+    "invoice_number": "0000123",
+    "invoice_series": "2C23TTU",
+    "vendor_tax_code": "0101234567",
+    "invoice_date": "2026-09-13",
+    "total_amount": 30000000
+  },
+  "parse_warnings": []
+}
+```
+
+Object này được xem là contract giữa adapter và normalization layer. Tối thiểu gồm:
+
+- `document_type`: loại chứng từ mà adapter nhận diện;
+- `source_type`: `JSON`, `XML`, `PDF_TEXT`, `OCR`;
+- `source_ref`: tham chiếu tới nguồn gốc để audit;
+- `extractor`: adapter/parser đã tạo kết quả;
+- `fields`: canonical field names đã trích xuất;
+- `parse_warnings`: các field/đoạn dữ liệu không đọc chắc chắn hoặc không hợp lệ.
+
+Với OCR/vision hoặc parser có độ bất định, metadata có thể bổ sung confidence theo field. Confidence chỉ là **tín hiệu extraction**, không phải bằng chứng rằng business fact đúng. Field không đọc chắc chắn phải để `null` hoặc có warning; không được tự suy đoán giá trị để làm cho transaction pass check.
+
+Sprint 1 dùng JSON structured input làm đường chính. XML/PDF/OCR khi được thêm vào phải output cùng contract này, để `Transaction Builder`, Check Engine, Policy Engine và LLM Agent không cần biết document ban đầu đến từ định dạng nào.
+
 ---
 
 ## 3. PurchaseOrder
@@ -690,7 +734,13 @@ Ví dụ:
 Để 4 người có thể code song song, interface tối thiểu cần khóa như sau:
 
 ```text
-Input Adapter
+Raw Evidence
+    ↓
+Extraction Adapter
+    ↓
+ExtractedDocument / canonical fields
+    ↓
+Normalization
     ↓
 PurchaseOrder / GoodsReceipt / SupplierInvoice / PaymentRecord / ApprovalRecord
     ↓
@@ -725,20 +775,21 @@ Mỗi module chỉ phụ thuộc schema đầu vào/đầu ra, không phụ thu�
 
 Trước khi bắt đầu code, team phải thống nhất và hạn chế thay đổi tùy tiện các object sau:
 
-1. `PurchaseOrder`
-2. `GoodsReceipt`
-3. `SupplierInvoice`
-4. `PaymentRecord`
-5. `ApprovalRecord`
-6. `Transaction`
-7. `CheckResult`
-8. `Uncertainty`
-9. `PolicyContext`
-10. `AgentAssessment`
-11. `Decision`
-12. `ReviewResult`
-13. `AuditEvent`
-14. `HumanStop`
-15. `HumanOverride`
+1. `ExtractedDocument`
+2. `PurchaseOrder`
+3. `GoodsReceipt`
+4. `SupplierInvoice`
+5. `PaymentRecord`
+6. `ApprovalRecord`
+7. `Transaction`
+8. `CheckResult`
+9. `Uncertainty`
+10. `PolicyContext`
+11. `AgentAssessment`
+12. `Decision`
+13. `ReviewResult`
+14. `AuditEvent`
+15. `HumanStop`
+16. `HumanOverride`
 
 Nếu cần thay schema sau khi code đã được chia cho nhiều người, thay đổi phải được thông báo vì nó có thể phá interface giữa các module.

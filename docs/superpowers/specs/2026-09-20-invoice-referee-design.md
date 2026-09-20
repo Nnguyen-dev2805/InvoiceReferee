@@ -32,7 +32,17 @@ The system does not execute payment.
 - Payment History
 - Synthetic Company Policy v0
 
-JSON is the primary Sprint 1 format. XML/PDF/OCR are adapters, not the core product.
+JSON is the primary Sprint 1 format. The input boundary is explicitly split into extraction and normalization:
+
+```text
+JSON/API      → structured mapping ┐
+XML           → XML parser         │
+Text PDF      → text extraction    ├→ canonical fields → normalization → domain objects
+Scan/Image    → OCR/Vision         │
+                                  ┘
+```
+
+All adapters must preserve missing/uncertain fields as unknown or parse warnings instead of guessing values. XML/PDF/OCR are extension adapters, not the core product; the required Sprint 1 vertical slice uses structured JSON.
 
 ## 5. Transaction model
 
@@ -102,7 +112,10 @@ Every review must make it possible to reconstruct:
 ## 11. Architecture
 
 ```text
-Input Adapter
+Raw Evidence
+→ Extraction Adapter
+→ Canonical Fields / Parse Warnings
+→ Normalization
 → Transaction Builder
 → Deterministic Check Engine
 → Policy Context
@@ -169,4 +182,3 @@ Malformed or unsupported technical input returns a technical input error. Missin
 - audit events are visible;
 - Stop/Override is functional;
 - one-click Verify uses the production review path.
-
