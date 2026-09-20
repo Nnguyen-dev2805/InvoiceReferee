@@ -18,8 +18,17 @@ def check_item(tx: m.Transaction) -> m.CheckResult:
             evidence_refs=s.evidence_refs(tx),
         )
 
-    po_items = {line.item_id for line in tx.po.items}
     invoice_items = [line.item_id for line in tx.invoice.items]
+    if not invoice_items or any(i is None for i in invoice_items):
+        return m.CheckResult(
+            check_id=CHECK_ID,
+            status=m.CheckStatus.UNKNOWN,
+            policy_rule_id="P03",
+            reason="Invoice line items are missing an item identifier",
+            evidence_refs=s.evidence_refs(tx),
+        )
+
+    po_items = {line.item_id for line in tx.po.items if line.item_id is not None}
     unknown_items = [i for i in invoice_items if i not in po_items]
 
     if not unknown_items:

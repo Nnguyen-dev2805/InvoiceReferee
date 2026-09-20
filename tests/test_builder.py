@@ -24,6 +24,7 @@ def _routine_evidence():
                 "receipt_id": "GR-001",
                 "po_id": "PO-001",
                 "received_date": "2026-09-12",
+                "status": "RECEIVED",
                 "items": [{"item_id": "ITEM-001", "received_quantity": 10}],
             }
         ],
@@ -178,3 +179,53 @@ def test_unreadable_invoice_amount_stays_unknown_end_to_end():
     tx = build_transaction(ev)
     assert tx.invoice.total_amount is None
     assert tx.invoice.flagged is True
+
+
+# --- Evidence issues (Task 3) ------------------------------------------------
+
+
+def test_routine_evidence_has_no_issues():
+    tx = build_transaction(_routine_evidence())
+    assert tx.evidence_issues == []
+
+
+def test_po_not_approved_is_an_evidence_issue():
+    ev = _routine_evidence()
+    ev["purchase_order"]["status"] = "DRAFT"
+    tx = build_transaction(ev)
+    assert any(i.issue_id == "PO_STATUS" for i in tx.evidence_issues)
+
+
+def test_missing_po_status_is_an_evidence_issue():
+    ev = _routine_evidence()
+    del ev["purchase_order"]["status"]
+    tx = build_transaction(ev)
+    assert any(i.issue_id == "PO_STATUS" for i in tx.evidence_issues)
+
+
+def test_invoice_pointing_to_wrong_po_is_an_evidence_issue():
+    ev = _routine_evidence()
+    ev["invoice"]["po_id"] = "PO-WRONG"
+    tx = build_transaction(ev)
+    assert any(i.issue_id == "INVOICE_PO_LINK" for i in tx.evidence_issues)
+
+
+def test_receipt_pointing_to_wrong_po_is_an_evidence_issue():
+    ev = _routine_evidence()
+    ev["goods_receipts"][0]["po_id"] = "PO-WRONG"
+    tx = build_transaction(ev)
+    assert any(i.issue_id == "RECEIPT_PO_LINK" for i in tx.evidence_issues)
+
+
+def test_receipt_not_received_is_an_evidence_issue():
+    ev = _routine_evidence()
+    ev["goods_receipts"][0]["status"] = "PENDING"
+    tx = build_transaction(ev)
+    assert any(i.issue_id == "RECEIPT_STATUS" for i in tx.evidence_issues)
+
+
+def test_missing_receipt_status_is_an_evidence_issue():
+    ev = _routine_evidence()
+    del ev["goods_receipts"][0]["status"]
+    tx = build_transaction(ev)
+    assert any(i.issue_id == "RECEIPT_STATUS" for i in tx.evidence_issues)

@@ -36,6 +36,63 @@ def _classify_type(
     return None, None
 
 
+def _evidence_issues(
+    po: Optional[m.PurchaseOrder],
+    receipts: list[m.GoodsReceipt],
+    invoice: Optional[m.SupplierInvoice],
+) -> list[m.EvidenceIssue]:
+    """Structural linkage/status problems that must block AUTO_PROCESS.
+
+    These are fail-closed facts (wrong PO linkage, a PO that is not APPROVED, a
+    Goods Receipt that is not RECEIVED). A missing status stays a problem: it is
+    never assumed to be the routine value. Absent documents are handled by the
+    Policy Engine's required-document presence rules, not here.
+    """
+    issues: list[m.EvidenceIssue] = []
+
+    if po is not None and po.status != "APPROVED":
+        issues.append(
+            m.EvidenceIssue(
+                issue_id="PO_STATUS",
+                policy_rule_id="P14",
+                reason="Purchase Order is not in APPROVED status",
+                evidence_refs=[po.po_id] if po.po_id else [],
+            )
+        )
+
+    if po is not None and invoice is not None and po.po_id and invoice.po_id != po.po_id:
+        issues.append(
+            m.EvidenceIssue(
+                issue_id="INVOICE_PO_LINK",
+                policy_rule_id="P14",
+                reason="Invoice references a different PO than the linked Purchase Order",
+                evidence_refs=[x for x in (po.po_id, invoice.invoice_id) if x],
+            )
+        )
+
+    for receipt in receipts:
+        if po is not None and po.po_id and receipt.po_id != po.po_id:
+            issues.append(
+                m.EvidenceIssue(
+                    issue_id="RECEIPT_PO_LINK",
+                    policy_rule_id="P14",
+                    reason="Goods Receipt references a different PO than the linked Purchase Order",
+                    evidence_refs=[x for x in (receipt.receipt_id, po.po_id) if x],
+                )
+            )
+        if receipt.status != "RECEIVED":
+            issues.append(
+                m.EvidenceIssue(
+                    issue_id="RECEIPT_STATUS",
+                    policy_rule_id="P14",
+                    reason="Goods Receipt is not in RECEIVED status",
+                    evidence_refs=[receipt.receipt_id] if receipt.receipt_id else [],
+                )
+            )
+
+    return issues
+
+
 def build_transaction(evidence: dict[str, Any]) -> m.Transaction:
     """Build a :class:`Transaction` from a raw evidence dict.
 
@@ -71,6 +128,7 @@ def build_transaction(evidence: dict[str, Any]) -> m.Transaction:
         prior_invoices=prior_invoices,
         payment_history=payment_history,
         approvals=approvals,
+        evidence_issues=_evidence_issues(po, goods_receipts, invoice),
         created_at=evidence.get("created_at"),
         updated_at=evidence.get("updated_at"),
     )

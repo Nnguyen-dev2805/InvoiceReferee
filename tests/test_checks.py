@@ -38,6 +38,7 @@ def _tc01_evidence():
                 "receipt_id": "GR-001",
                 "po_id": "PO-001",
                 "received_date": "2026-09-12",
+                "status": "RECEIVED",
                 "items": [{"item_id": "ITEM-001", "received_quantity": 10}],
             }
         ],
@@ -108,10 +109,32 @@ def test_vendor_mismatch_with_approved_change_passes():
     ev = _tc01_evidence()
     ev["invoice"]["vendor_id"] = "V-XYZ"
     ev["approvals"] = [
-        {"approval_id": "APR-1", "po_id": "PO-001", "approval_type": "VENDOR_CHANGE", "status": "APPROVED"}
+        {
+            "approval_id": "APR-1",
+            "po_id": "PO-001",
+            "approval_type": "VENDOR_CHANGE",
+            "approved_text_value": "V-XYZ",
+            "status": "APPROVED",
+        }
     ]
     r = vendor_check.check_vendor(_tx(ev))
     assert r.status is m.CheckStatus.PASS
+
+
+def test_vendor_change_approval_for_other_vendor_does_not_cover():
+    ev = _tc01_evidence()
+    ev["invoice"]["vendor_id"] = "V-XYZ"
+    ev["approvals"] = [
+        {
+            "approval_id": "APR-1",
+            "po_id": "PO-001",
+            "approval_type": "VENDOR_CHANGE",
+            "approved_text_value": "V-OTHER",
+            "status": "APPROVED",
+        }
+    ]
+    r = vendor_check.check_vendor(_tx(ev))
+    assert r.status is m.CheckStatus.FAIL
 
 
 def test_vendor_unknown_when_po_missing():
@@ -177,6 +200,64 @@ def test_quantity_unknown_when_no_goods_receipt():
     assert r.status is m.CheckStatus.UNKNOWN
 
 
+def test_quantity_unknown_when_received_quantity_missing():
+    ev = _tc01_evidence()
+    del ev["goods_receipts"][0]["items"][0]["received_quantity"]
+    r = quantity_check.check_quantity(_tx(ev))
+    assert r.status is m.CheckStatus.UNKNOWN
+
+
+def test_quantity_approval_must_bind_to_item_and_quantity():
+    # Over-receipt on ITEM-001, but the approval is for a different item.
+    ev = _tc01_evidence()
+    ev["goods_receipts"][0]["items"][0]["received_quantity"] = 8
+    ev["invoice"]["items"][0]["invoiced_quantity"] = 12
+    ev["approvals"] = [
+        {
+            "approval_id": "APR-1",
+            "po_id": "PO-001",
+            "approval_type": "QUANTITY_CHANGE",
+            "item_id": "OTHER",
+            "approved_value": 12,
+            "status": "APPROVED",
+        }
+    ]
+    r = quantity_check.check_quantity(_tx(ev))
+    assert r.status is m.CheckStatus.FAIL
+
+
+def test_quantity_over_receipt_with_exact_approval_passes():
+    ev = _tc01_evidence()
+    ev["goods_receipts"][0]["items"][0]["received_quantity"] = 8
+    ev["invoice"]["items"][0]["invoiced_quantity"] = 12
+    ev["approvals"] = [
+        {
+            "approval_id": "APR-1",
+            "po_id": "PO-001",
+            "approval_type": "QUANTITY_CHANGE",
+            "item_id": "ITEM-001",
+            "approved_value": 12,
+            "status": "APPROVED",
+        }
+    ]
+    r = quantity_check.check_quantity(_tx(ev))
+    assert r.status is m.CheckStatus.PASS
+
+
+def test_vendor_unknown_when_vendor_id_missing():
+    ev = _tc01_evidence()
+    ev["invoice"]["vendor_id"] = None
+    r = vendor_check.check_vendor(_tx(ev))
+    assert r.status is m.CheckStatus.UNKNOWN
+
+
+def test_item_unknown_when_item_id_missing():
+    ev = _tc01_evidence()
+    ev["invoice"]["items"][0]["item_id"] = None
+    r = item_check.check_item(_tx(ev))
+    assert r.status is m.CheckStatus.UNKNOWN
+
+
 # --- Price (P06) -------------------------------------------------------------
 
 
@@ -203,6 +284,48 @@ def test_unit_price_mismatch_with_approval_passes():
     ]
     r = price_check.check_price(_tx(ev))
     assert r.status is m.CheckStatus.PASS
+
+
+def test_price_approval_value_must_equal_invoice_value():
+    # Approval authorises 3,100,000 but the invoice bills 3,500,000 -> not covered.
+    ev = _tc01_evidence()
+    ev["invoice"]["items"][0]["unit_price"] = 3_500_000
+    ev["approvals"] = [
+        {
+            "approval_id": "APR-1",
+            "po_id": "PO-001",
+            "approval_type": "UNIT_PRICE_CHANGE",
+            "item_id": "ITEM-001",
+            "approved_value": 3_100_000,
+            "status": "APPROVED",
+        }
+    ]
+    r = price_check.check_price(_tx(ev))
+    assert r.status is m.CheckStatus.FAIL
+
+
+def test_price_approval_for_other_po_does_not_cover():
+    ev = _tc01_evidence()
+    ev["invoice"]["items"][0]["unit_price"] = 3_500_000
+    ev["approvals"] = [
+        {
+            "approval_id": "APR-1",
+            "po_id": "PO-999",
+            "approval_type": "UNIT_PRICE_CHANGE",
+            "item_id": "ITEM-001",
+            "approved_value": 3_500_000,
+            "status": "APPROVED",
+        }
+    ]
+    r = price_check.check_price(_tx(ev))
+    assert r.status is m.CheckStatus.FAIL
+
+
+def test_unit_price_missing_is_unknown():
+    ev = _tc01_evidence()
+    ev["invoice"]["items"][0]["unit_price"] = None
+    r = price_check.check_price(_tx(ev))
+    assert r.status is m.CheckStatus.UNKNOWN
 
 
 # --- Amount (P07) ------------------------------------------------------------

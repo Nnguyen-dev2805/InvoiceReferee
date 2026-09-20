@@ -131,6 +131,18 @@ def resolve_action(
             reason="A critical invoice field is flagged/unreadable and cannot be trusted.",
         )
 
+    # 3a-bis. Structural evidence problems (wrong linkage, non-routine status)
+    # block AUTO_PROCESS before ordinary mismatch checks are considered.
+    if tx.evidence_issues:
+        issue = tx.evidence_issues[0]
+        return PolicyOutcome(
+            action=m.DecisionAction.REQUEST_INFO,
+            uncertainty_type=m.UncertaintyType.FACTUAL_UNKNOWN,
+            policy_rule_ids=[issue.policy_rule_id],
+            target="Accounting",
+            reason=issue.reason,
+        )
+
     # 3b. Any unresolved (FAIL/UNKNOWN) required check -> ask.
     unresolved = _unresolved_checks(checks)
     if unresolved:

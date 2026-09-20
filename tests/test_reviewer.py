@@ -83,6 +83,26 @@ def test_tc14_outside_policy_escalate(routine_evidence):
     assert result.policy_context.scope_status is m.ScopeStatus.OUTSIDE_POLICY
 
 
+# --- Fail-closed linkage/status safety (Task 3) ------------------------------
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda e: e["invoice"].update({"po_id": "PO-WRONG"}),
+        lambda e: e["goods_receipts"][0].update({"po_id": "PO-WRONG"}),
+        lambda e: e["purchase_order"].update({"status": "DRAFT"}),
+        lambda e: e["goods_receipts"][0].update({"status": "PENDING"}),
+    ],
+)
+def test_invalid_link_or_status_never_auto_processes(routine_evidence, mutate):
+    evidence = routine_evidence()
+    mutate(evidence)
+    result = review(evidence)
+    assert result.decision.action is m.DecisionAction.REQUEST_INFO
+    assert result.transaction.evidence_issues
+
+
 # --- LLM path variations -----------------------------------------------------
 
 

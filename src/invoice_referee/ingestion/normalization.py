@@ -202,6 +202,7 @@ def to_approval_record(raw: dict) -> m.ApprovalRecord:
         approval_type=normalize_id(raw.get("approval_type")),
         item_id=normalize_id(raw.get("item_id")),
         approved_value=normalize_money(raw.get("approved_value")),
+        approved_text_value=normalize_id(raw.get("approved_text_value")),
         approved_amount_delta=normalize_money(raw.get("approved_amount_delta")),
         approved_by=raw.get("approved_by"),
         approved_at=raw.get("approved_at"),

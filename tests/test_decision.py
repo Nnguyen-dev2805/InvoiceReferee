@@ -103,6 +103,22 @@ def test_amount_mismatch_resolves_request_info_not_violation(routine_evidence, b
     assert outcome.primary_check_id == "CHECK_AMOUNT"
 
 
+def test_evidence_issue_resolves_request_info_before_authority(routine_evidence, build_inputs):
+    # A beyond-authority amount AND a wrong PO link: the structural issue wins
+    # and routes to REQUEST_INFO (never AUTO_PROCESS, never straight ESCALATE).
+    ev = routine_evidence()
+    ev["purchase_order"]["approved_total"] = 120_000_000
+    ev["purchase_order"]["items"][0]["unit_price"] = 12_000_000
+    ev["purchase_order"]["items"][0]["line_total"] = 120_000_000
+    ev["invoice"]["total_amount"] = 120_000_000
+    ev["invoice"]["items"][0]["unit_price"] = 12_000_000
+    ev["invoice"]["items"][0]["line_total"] = 120_000_000
+    ev["goods_receipts"][0]["status"] = "PENDING"
+    outcome, *_ = _resolve(build_inputs, ev)
+    assert outcome.action is m.DecisionAction.REQUEST_INFO
+    assert outcome.policy_rule_ids == ["P14"]
+
+
 def test_beyond_authority_resolves_escalate(routine_evidence, build_inputs):
     ev = routine_evidence()
     ev["purchase_order"]["approved_total"] = 120_000_000

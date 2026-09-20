@@ -233,6 +233,7 @@ class ApprovalRecord:
     status: Optional[str]
     item_id: Optional[str] = None
     approved_value: Optional[int] = None
+    approved_text_value: Optional[str] = None
     approved_amount_delta: Optional[int] = None
     approved_by: Optional[str] = None
     approved_at: Optional[str] = None
@@ -268,6 +269,21 @@ class CheckResult:
     expected: Any = None
     actual: Any = None
     reason: Optional[str] = None
+    evidence_refs: list[str] = field(default_factory=list)
+
+
+@dataclass
+class EvidenceIssue:
+    """A structural evidence problem found while linking a Transaction.
+
+    Distinct from a CheckResult: an issue means the evidence cannot be trusted
+    to auto-process (wrong linkage or a non-routine document status), not that a
+    business comparison failed. It maps to REQUEST_INFO, never AUTO_PROCESS.
+    """
+
+    issue_id: str
+    policy_rule_id: str
+    reason: str
     evidence_refs: list[str] = field(default_factory=list)
 
 
@@ -377,6 +393,7 @@ class Transaction:
     payment_history: list[PaymentRecord] = field(default_factory=list)
     approvals: list[ApprovalRecord] = field(default_factory=list)
     checks: list[CheckResult] = field(default_factory=list)
+    evidence_issues: list[EvidenceIssue] = field(default_factory=list)
     decision: Optional[Decision] = None
     audit_log: list[AuditEvent] = field(default_factory=list)
     workflow_status: WorkflowStatus = WorkflowStatus.ACTIVE
@@ -396,4 +413,129 @@ class ReviewResult:
     policy_context: PolicyContext
     agent_assessment: Optional[AgentAssessment]
     decision: Decision
+    audit_events: list[AuditEvent] = field(default_factory=list)
+
+
+# --- OCR / document extraction contracts -------------------------------------
+#
+# These describe the Supplier-Invoice OCR path only. They carry candidate facts
+# with provenance; they never carry a final Agent action. See
+# docs/superpowers/specs/2026-09-20-invoice-ocr-pipeline-design.md sections 8.x.
+
+
+class FieldStatus(str, Enum):
+    EXTRACTED = "EXTRACTED"
+    NEEDS_CONFIRMATION = "NEEDS_CONFIRMATION"
+    CONFIRMED = "CONFIRMED"
+    CORRECTED = "CORRECTED"
+    MISSING = "MISSING"
+    INVALID = "INVALID"
+    CONFLICTING = "CONFLICTING"
+
+
+class ExtractionStatus(str, Enum):
+    PROCESSING = "PROCESSING"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
+    REVIEWED = "REVIEWED"
+    FAILED = "FAILED"
+
+
+@dataclass
+class UploadedDocument:
+    """A validated uploaded document. Raw bytes live here, never in audit events."""
+
+    document_id: str
+    filename: str
+    mime_type: str
+    size_bytes: int
+    sha256: str
+    content: bytes
+
+
+@dataclass
+class DocumentPage:
+    document_id: str
+    page_number: int
+    image_bytes: bytes
+    width: int
+    height: int
+    dpi: int
+    native_text: Optional[str]
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class BoundingBox:
+    """Coordinates normalized to page dimensions (0..1), ordered x1<=x2, y1<=y2."""
+
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+
+    def __post_init__(self) -> None:
+        if not (0.0 <= self.x1 <= self.x2 <= 1.0):
+            raise ValueError("x coordinates must be normalized and ordered (0<=x1<=x2<=1)")
+        if not (0.0 <= self.y1 <= self.y2 <= 1.0):
+            raise ValueError("y coordinates must be normalized and ordered (0<=y1<=y2<=1)")
+
+
+@dataclass
+class OCRBlock:
+    block_id: str
+    page_number: int
+    text: str
+    confidence: float
+    bounding_box: BoundingBox
+    block_type: str  # TEXT | KEY_VALUE | TABLE_CELL
+    row_index: Optional[int] = None
+    column_index: Optional[int] = None
+
+
+@dataclass
+class OCRDocument:
+    document_id: str
+    pages: list[DocumentPage]
+    blocks: list[OCRBlock]
+    full_text: str
+    engine: str
+    engine_version: str
+    processing_ms: int
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass
+class FieldCandidate:
+    """One extracted field value with provenance and human-review lineage.
+
+    ``extraction_method`` is one of NATIVE_PDF_TEXT, OCR_RULE, OCR_TABLE,
+    LLM_ASSISTED, or HUMAN. A missing value stays ``None``; it is never coerced
+    into an empty string or zero to satisfy a downstream dataclass.
+    """
+
+    field_name: str
+    raw_text: Optional[str]
+    normalized_value: Any
+    confidence: Optional[float]
+    status: FieldStatus
+    page_number: Optional[int]
+    bounding_box: Optional[BoundingBox]
+    evidence_block_ids: list[str] = field(default_factory=list)
+    extraction_method: str = "OCR_RULE"
+    warnings: list[str] = field(default_factory=list)
+    original_raw_text: Optional[str] = None
+    original_normalized_value: Any = None
+
+    def __post_init__(self) -> None:
+        if self.confidence is not None and not (0.0 <= self.confidence <= 1.0):
+            raise ValueError("confidence must be within [0, 1] or None")
+
+
+@dataclass
+class InvoiceExtractionResult:
+    document_id: str
+    status: ExtractionStatus
+    fields: dict[str, FieldCandidate] = field(default_factory=dict)
+    line_items: list[dict[str, FieldCandidate]] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     audit_events: list[AuditEvent] = field(default_factory=list)

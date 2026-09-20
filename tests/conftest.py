@@ -24,6 +24,7 @@ _ROUTINE = {
             "receipt_id": "GR-001",
             "po_id": "PO-001",
             "received_date": "2026-09-12",
+            "status": "RECEIVED",
             "items": [{"item_id": "ITEM-001", "received_quantity": 10}],
         }
     ],

@@ -32,6 +32,15 @@ def check_duplicate(tx: m.Transaction) -> m.CheckResult:
             evidence_refs=s.evidence_refs(tx),
         )
 
+    if inv.invoice_number is None:
+        return m.CheckResult(
+            check_id=CHECK_ID,
+            status=m.CheckStatus.UNKNOWN,
+            policy_rule_id="P09",
+            reason="Invoice number is missing; duplicate identity cannot be established",
+            evidence_refs=s.evidence_refs(tx),
+        )
+
     # Adjustment/replacement linked to an original is an intentional relationship.
     if inv.invoice_type in (m.InvoiceType.ADJUSTMENT, m.InvoiceType.REPLACEMENT) and inv.related_invoice_number:
         return m.CheckResult(
@@ -52,7 +61,7 @@ def check_duplicate(tx: m.Transaction) -> m.CheckResult:
                 expected="unique invoice identity",
                 actual=inv.invoice_number,
                 reason="Invoice identity already exists in history",
-                evidence_refs=s.evidence_refs(tx) + [prior.invoice_id],
+                evidence_refs=s.evidence_refs(tx) + ([prior.invoice_id] if prior.invoice_id else []),
             )
 
     return m.CheckResult(

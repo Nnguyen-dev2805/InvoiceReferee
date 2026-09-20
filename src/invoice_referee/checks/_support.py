@@ -14,22 +14,69 @@ from invoice_referee.domain import models as m
 APPROVED = "APPROVED"
 
 
-def has_approval(tx: m.Transaction, approval_type: str, item_id: Optional[str] = None) -> bool:
-    """True if an APPROVED approval of ``approval_type`` (optionally for an item) exists."""
+def _po_id(tx: m.Transaction) -> Optional[str]:
+    return tx.po.po_id if tx.po else None
+
+
+def has_approval(
+    tx: m.Transaction,
+    approval_type: str,
+    *,
+    item_id: Optional[str] = None,
+    approved_value: Optional[int] = None,
+    approved_text_value: Optional[str] = None,
+) -> bool:
+    """True only if an exact, PO-bound APPROVED approval exists.
+
+    An approval must belong to the same PO and carry the exact item/value the
+    caller is trying to justify. A blanket approval no longer silently covers a
+    mismatch it was never issued for.
+    """
     for a in tx.approvals:
-        if a.status == APPROVED and a.approval_type == approval_type:
-            if item_id is None or a.item_id is None or a.item_id == item_id:
-                return True
+        if a.status != APPROVED:
+            continue
+        if a.po_id != _po_id(tx):
+            continue
+        if a.approval_type != approval_type:
+            continue
+        if item_id is not None and a.item_id != item_id:
+            continue
+        if approved_value is not None and a.approved_value != approved_value:
+            continue
+        if approved_text_value is not None and a.approved_text_value != approved_text_value:
+            continue
+        return True
     return False
 
 
 def approved_amount_delta(tx: m.Transaction) -> int:
-    """Sum of approved explicit amount increases (AMOUNT_CHANGE)."""
+    """Sum of approved explicit amount increases (AMOUNT_CHANGE) for this PO."""
     total = 0
     for a in tx.approvals:
-        if a.status == APPROVED and a.approval_type == "AMOUNT_CHANGE" and a.approved_amount_delta:
+        if (
+            a.status == APPROVED
+            and a.po_id == _po_id(tx)
+            and a.approval_type == "AMOUNT_CHANGE"
+            and a.approved_amount_delta
+        ):
             total += a.approved_amount_delta
     return total
+
+
+def invoice_quantity_facts_complete(tx: m.Transaction) -> bool:
+    """True only if every quantity fact needed for the quantity check is present."""
+    for gr in tx.goods_receipts:
+        for line in gr.items:
+            if line.item_id is None or line.received_quantity is None:
+                return False
+    invoices = list(tx.prior_invoices)
+    if tx.invoice:
+        invoices.append(tx.invoice)
+    for inv in invoices:
+        for line in inv.items:
+            if line.item_id is None or line.invoiced_quantity is None:
+                return False
+    return True
 
 
 def cumulative_received_by_item(tx: m.Transaction) -> dict[str, int]:
@@ -66,9 +113,9 @@ def prior_invoice_total_for_po(tx: m.Transaction) -> int:
 
 def evidence_refs(tx: m.Transaction) -> list[str]:
     refs: list[str] = []
-    if tx.po:
+    if tx.po and tx.po.po_id:
         refs.append(tx.po.po_id)
-    refs.extend(gr.receipt_id for gr in tx.goods_receipts)
-    if tx.invoice:
+    refs.extend(gr.receipt_id for gr in tx.goods_receipts if gr.receipt_id)
+    if tx.invoice and tx.invoice.invoice_id:
         refs.append(tx.invoice.invoice_id)
     return refs

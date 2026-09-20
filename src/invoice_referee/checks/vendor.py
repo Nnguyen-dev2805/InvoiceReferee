@@ -18,11 +18,20 @@ def check_vendor(tx: m.Transaction) -> m.CheckResult:
             evidence_refs=s.evidence_refs(tx),
         )
 
+    if tx.po.vendor_id is None or tx.invoice.vendor_id is None:
+        return m.CheckResult(
+            check_id=CHECK_ID,
+            status=m.CheckStatus.UNKNOWN,
+            policy_rule_id="P02",
+            reason="Vendor identity is missing on the PO or invoice",
+            evidence_refs=s.evidence_refs(tx),
+        )
+
     expected = tx.po.vendor_id
     actual = tx.invoice.vendor_id
     if actual == expected:
         status, reason = m.CheckStatus.PASS, "Invoice vendor matches approved PO vendor"
-    elif s.has_approval(tx, "VENDOR_CHANGE"):
+    elif s.has_approval(tx, "VENDOR_CHANGE", approved_text_value=actual):
         status, reason = m.CheckStatus.PASS, "Vendor differs but an approved vendor change exists"
     else:
         status, reason = m.CheckStatus.FAIL, "Invoice vendor does not match PO vendor"

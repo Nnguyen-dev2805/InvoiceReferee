@@ -27,6 +27,15 @@ def check_amount(tx: m.Transaction) -> m.CheckResult:
             evidence_refs=s.evidence_refs(tx),
         )
 
+    if tx.po.approved_total is None:
+        return m.CheckResult(
+            check_id=CHECK_ID,
+            status=m.CheckStatus.UNKNOWN,
+            policy_rule_id="P07",
+            reason="Approved PO amount is unreadable/unknown",
+            evidence_refs=s.evidence_refs(tx),
+        )
+
     approved_ceiling = tx.po.approved_total + s.approved_amount_delta(tx)
     actual = tx.invoice.total_amount
 

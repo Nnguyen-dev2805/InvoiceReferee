@@ -399,3 +399,134 @@ def test_extracted_document_contract():
     )
     assert doc.parse_warnings == []
     assert doc.fields["invoice_number"] == "0000123"
+
+
+# --- OCR / extraction contracts (Task 4) -------------------------------------
+
+
+def test_field_status_values():
+    assert {s.value for s in m.FieldStatus} == {
+        "EXTRACTED",
+        "NEEDS_CONFIRMATION",
+        "CONFIRMED",
+        "CORRECTED",
+        "MISSING",
+        "INVALID",
+        "CONFLICTING",
+    }
+
+
+def test_extraction_status_values():
+    assert {s.value for s in m.ExtractionStatus} == {
+        "PROCESSING",
+        "NEEDS_REVIEW",
+        "REVIEWED",
+        "FAILED",
+    }
+
+
+def test_bounding_box_requires_normalized_coordinates():
+    with pytest.raises(ValueError):
+        m.BoundingBox(-0.1, 0.0, 1.0, 1.0)
+
+
+def test_bounding_box_requires_ordered_coordinates():
+    with pytest.raises(ValueError):
+        m.BoundingBox(0.9, 0.0, 0.1, 1.0)  # x1 > x2
+
+
+def test_bounding_box_accepts_valid_normalized_box():
+    box = m.BoundingBox(0.1, 0.7, 0.8, 0.8)
+    assert box.x1 == 0.1
+    assert box.y2 == 0.8
+
+
+def test_field_candidate_preserves_provenance():
+    candidate = m.FieldCandidate(
+        field_name="total_amount",
+        raw_text="30.000.000 VND",
+        normalized_value=30_000_000,
+        confidence=0.94,
+        status=m.FieldStatus.EXTRACTED,
+        page_number=1,
+        bounding_box=m.BoundingBox(0.1, 0.7, 0.8, 0.8),
+        evidence_block_ids=["BLK-001"],
+        extraction_method="OCR_RULE",
+        warnings=[],
+    )
+    assert candidate.evidence_block_ids == ["BLK-001"]
+    assert candidate.original_normalized_value is None
+
+
+def test_field_candidate_rejects_out_of_range_confidence():
+    with pytest.raises(ValueError):
+        m.FieldCandidate(
+            field_name="total_amount",
+            raw_text="x",
+            normalized_value=None,
+            confidence=1.5,
+            status=m.FieldStatus.EXTRACTED,
+            page_number=1,
+            bounding_box=None,
+        )
+
+
+def test_field_candidate_allows_none_confidence():
+    candidate = m.FieldCandidate(
+        field_name="po_id",
+        raw_text="PO-001",
+        normalized_value="PO-001",
+        confidence=None,
+        status=m.FieldStatus.NEEDS_CONFIRMATION,
+        page_number=1,
+        bounding_box=None,
+        extraction_method="HUMAN",
+    )
+    assert candidate.confidence is None
+
+
+def test_extraction_result_lists_are_instance_local():
+    first = m.InvoiceExtractionResult("DOC-A", m.ExtractionStatus.NEEDS_REVIEW)
+    second = m.InvoiceExtractionResult("DOC-B", m.ExtractionStatus.NEEDS_REVIEW)
+    first.warnings.append("x")
+    first.line_items.append({})
+    assert second.warnings == []
+    assert second.line_items == []
+
+
+def test_document_page_carries_native_text_and_warnings():
+    page = m.DocumentPage(
+        document_id="DOC-1",
+        page_number=1,
+        image_bytes=b"\x89PNG",
+        width=1240,
+        height=1754,
+        dpi=300,
+        native_text="Invoice No: 123",
+    )
+    assert page.native_text == "Invoice No: 123"
+    assert page.warnings == []
+
+
+def test_ocr_document_holds_blocks_and_engine_metadata():
+    block = m.OCRBlock(
+        block_id="BLK-001",
+        page_number=1,
+        text="30.000.000 VND",
+        confidence=0.97,
+        bounding_box=m.BoundingBox(0.1, 0.7, 0.8, 0.8),
+        block_type="TABLE_CELL",
+        row_index=0,
+        column_index=3,
+    )
+    doc = m.OCRDocument(
+        document_id="DOC-1",
+        pages=[],
+        blocks=[block],
+        full_text="30.000.000 VND",
+        engine="paddleocr-pp-structure-v3",
+        engine_version="fixture-v1",
+        processing_ms=0,
+    )
+    assert doc.blocks[0].block_id == "BLK-001"
+    assert doc.warnings == []

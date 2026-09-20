@@ -18,15 +18,26 @@ def check_price(tx: m.Transaction) -> m.CheckResult:
             evidence_refs=s.evidence_refs(tx),
         )
 
-    po_price = {line.item_id: line.unit_price for line in tx.po.items}
+    po_price = {line.item_id: line.unit_price for line in tx.po.items if line.item_id is not None}
     mismatch = None
     for line in tx.invoice.items:
         approved = po_price.get(line.item_id)
         if approved is None:
             continue  # item existence is handled by CHECK_ITEM
+        if line.unit_price is None:
+            return m.CheckResult(
+                check_id=CHECK_ID,
+                status=m.CheckStatus.UNKNOWN,
+                policy_rule_id="P06",
+                reason=f"Item {line.item_id}: invoice unit price is missing",
+                evidence_refs=s.evidence_refs(tx),
+            )
         if line.unit_price != approved:
-            # An approved price change for this item resolves the mismatch.
-            if s.has_approval(tx, "UNIT_PRICE_CHANGE", item_id=line.item_id):
+            # Only an approved price change bound to this exact item AND the exact
+            # invoiced unit price resolves the mismatch.
+            if s.has_approval(
+                tx, "UNIT_PRICE_CHANGE", item_id=line.item_id, approved_value=line.unit_price
+            ):
                 continue
             mismatch = (line.item_id, approved, line.unit_price)
             break

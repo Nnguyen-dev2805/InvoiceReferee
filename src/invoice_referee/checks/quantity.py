@@ -18,9 +18,17 @@ def check_quantity(tx: m.Transaction) -> m.CheckResult:
             evidence_refs=s.evidence_refs(tx),
         )
 
+    if not s.invoice_quantity_facts_complete(tx):
+        return m.CheckResult(
+            check_id=CHECK_ID,
+            status=m.CheckStatus.UNKNOWN,
+            policy_rule_id="P05",
+            reason="A required item identifier or quantity is missing",
+            evidence_refs=s.evidence_refs(tx),
+        )
+
     received = s.cumulative_received_by_item(tx)
     invoiced = s.cumulative_invoiced_by_item(tx)
-    has_qty_approval = s.has_approval(tx, "QUANTITY_CHANGE")
 
     worst_item = None
     for item_id, inv_qty in invoiced.items():
@@ -39,7 +47,9 @@ def check_quantity(tx: m.Transaction) -> m.CheckResult:
         )
 
     item_id, rec_qty, inv_qty = worst_item
-    if has_qty_approval:
+    # An over-receipt is only covered by an approval bound to this exact item
+    # and the invoiced quantity it authorises.
+    if s.has_approval(tx, "QUANTITY_CHANGE", item_id=item_id, approved_value=inv_qty):
         status, reason = m.CheckStatus.PASS, "Quantity over receipt covered by approved quantity change"
     else:
         status = m.CheckStatus.FAIL
