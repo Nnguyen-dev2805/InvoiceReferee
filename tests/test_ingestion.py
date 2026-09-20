@@ -178,3 +178,91 @@ def test_to_approval_record_only_uses_structured_fields():
     )
     assert apr.approved_value == 3_500_000
     assert apr.status == "APPROVED"
+
+
+# --- Fail-closed: missing critical fields stay unknown (Task 2) ---------------
+
+
+def _invoice_raw():
+    return {
+        "invoice_id": "INV-001",
+        "invoice_number": "0000123",
+        "invoice_series": "2C23TTU",
+        "invoice_type": "ORIGINAL",
+        "vendor_id": "V-ABC",
+        "vendor_tax_code": "0101234567",
+        "po_id": "PO-001",
+        "invoice_date": "2026-09-13",
+        "total_amount": 30_000_000,
+        "items": [],
+    }
+
+
+def test_missing_invoice_line_values_stay_unknown():
+    line = norm.to_invoice_line_item({"description": "Monitor"})
+    assert line.item_id is None
+    assert line.invoiced_quantity is None
+    assert line.unit_price is None
+    assert line.line_total is None
+
+
+def test_missing_po_line_values_stay_unknown():
+    line = norm.to_po_line_item({"description": "Monitor"})
+    assert line.item_id is None
+    assert line.ordered_quantity is None
+    assert line.unit_price is None
+    assert line.line_total is None
+
+
+def test_missing_receipt_line_values_stay_unknown():
+    line = norm.to_receipt_line_item({"description": "Monitor"})
+    assert line.item_id is None
+    assert line.received_quantity is None
+
+
+def test_missing_po_values_stay_unknown():
+    po = norm.to_purchase_order({"items": []})
+    assert po.po_id is None
+    assert po.vendor_id is None
+    assert po.approved_total is None
+    assert po.status is None
+
+
+def test_missing_goods_receipt_values_stay_unknown():
+    gr = norm.to_goods_receipt({"items": []})
+    assert gr.receipt_id is None
+    assert gr.po_id is None
+    assert gr.received_date is None
+    assert gr.status is None
+
+
+def test_purchase_order_carries_vendor_tax_code():
+    po = norm.to_purchase_order(
+        {"po_id": "PO-001", "vendor_id": "V-ABC", "vendor_tax_code": "0101234567", "items": []}
+    )
+    assert po.vendor_tax_code == "0101234567"
+
+
+def test_missing_invoice_identity_values_stay_unknown():
+    inv = norm.to_supplier_invoice({"items": []})
+    assert inv.invoice_id is None
+    assert inv.invoice_number is None
+    assert inv.invoice_series is None
+    assert inv.vendor_id is None
+    assert inv.vendor_tax_code is None
+    assert inv.po_id is None
+    assert inv.invoice_date is None
+    assert inv.total_amount is None
+
+
+def test_missing_payment_amount_stays_unknown():
+    rec = norm.to_payment_record({"invoice_id": "INV-001", "status": "UNPAID"})
+    assert rec.paid_amount is None
+
+
+def test_invalid_invoice_date_stays_unknown_and_flags_invoice():
+    raw = _invoice_raw()
+    raw["invoice_date"] = "13/09/2026"
+    invoice = norm.to_supplier_invoice(raw)
+    assert invoice.invoice_date is None
+    assert invoice.flagged is True

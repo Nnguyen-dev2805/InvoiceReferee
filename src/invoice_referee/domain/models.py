@@ -125,40 +125,49 @@ class ExtractedDocument:
 
 @dataclass
 class POLineItem:
-    item_id: str
-    ordered_quantity: int
-    unit_price: int
-    line_total: int
+    item_id: Optional[str]
+    ordered_quantity: Optional[int]
+    unit_price: Optional[int]
+    line_total: Optional[int]
     description: Optional[str] = None
 
     def __post_init__(self) -> None:
-        _quantity(self.ordered_quantity, "ordered_quantity")
-        _money(self.unit_price, "unit_price")
-        _money(self.line_total, "line_total")
+        # Validate only present values; a missing critical field stays None
+        # (it must never be guessed into a passing 0).
+        if self.ordered_quantity is not None:
+            _quantity(self.ordered_quantity, "ordered_quantity")
+        if self.unit_price is not None:
+            _money(self.unit_price, "unit_price")
+        if self.line_total is not None:
+            _money(self.line_total, "line_total")
 
 
 @dataclass
 class ReceiptLineItem:
-    item_id: str
-    received_quantity: int
+    item_id: Optional[str]
+    received_quantity: Optional[int]
     description: Optional[str] = None
 
     def __post_init__(self) -> None:
-        _quantity(self.received_quantity, "received_quantity")
+        if self.received_quantity is not None:
+            _quantity(self.received_quantity, "received_quantity")
 
 
 @dataclass
 class InvoiceLineItem:
-    item_id: str
-    invoiced_quantity: int
-    unit_price: int
-    line_total: int
+    item_id: Optional[str]
+    invoiced_quantity: Optional[int]
+    unit_price: Optional[int]
+    line_total: Optional[int]
     description: Optional[str] = None
 
     def __post_init__(self) -> None:
-        _quantity(self.invoiced_quantity, "invoiced_quantity")
-        _money(self.unit_price, "unit_price")
-        _money(self.line_total, "line_total")
+        if self.invoiced_quantity is not None:
+            _quantity(self.invoiced_quantity, "invoiced_quantity")
+        if self.unit_price is not None:
+            _money(self.unit_price, "unit_price")
+        if self.line_total is not None:
+            _money(self.line_total, "line_total")
 
 
 # --- Evidence documents ------------------------------------------------------
@@ -166,43 +175,45 @@ class InvoiceLineItem:
 
 @dataclass
 class PurchaseOrder:
-    po_id: str
-    vendor_id: str
+    po_id: Optional[str]
+    vendor_id: Optional[str]
     items: list[POLineItem]
-    approved_total: int
-    status: str
+    approved_total: Optional[int]
+    status: Optional[str]
+    vendor_tax_code: Optional[str] = None
     vendor_name: Optional[str] = None
-    currency: str = "VND"
+    currency: Optional[str] = "VND"
     order_date: Optional[str] = None
 
     def __post_init__(self) -> None:
-        _money(self.approved_total, "approved_total")
+        if self.approved_total is not None:
+            _money(self.approved_total, "approved_total")
 
 
 @dataclass
 class GoodsReceipt:
-    receipt_id: str
-    po_id: str
+    receipt_id: Optional[str]
+    po_id: Optional[str]
     items: list[ReceiptLineItem]
-    received_date: str
-    status: str = "RECEIVED"
+    received_date: Optional[str]
+    status: Optional[str] = None
 
 
 @dataclass
 class SupplierInvoice:
-    invoice_id: str
-    invoice_number: str
-    invoice_series: str
+    invoice_id: Optional[str]
+    invoice_number: Optional[str]
+    invoice_series: Optional[str]
     invoice_type: InvoiceType
-    vendor_id: str
-    vendor_tax_code: str
-    po_id: str
-    invoice_date: str
+    vendor_id: Optional[str]
+    vendor_tax_code: Optional[str]
+    po_id: Optional[str]
+    invoice_date: Optional[str]
     items: list[InvoiceLineItem]
     total_amount: Optional[int]
     related_invoice_number: Optional[str] = None
     vendor_name: Optional[str] = None
-    currency: str = "VND"
+    currency: Optional[str] = "VND"
     source_type: SourceType = SourceType.JSON
     confidence: float = 1.0
     flagged: bool = False
@@ -216,10 +227,10 @@ class SupplierInvoice:
 
 @dataclass
 class ApprovalRecord:
-    approval_id: str
-    po_id: str
-    approval_type: str
-    status: str
+    approval_id: Optional[str]
+    po_id: Optional[str]
+    approval_type: Optional[str]
+    status: Optional[str]
     item_id: Optional[str] = None
     approved_value: Optional[int] = None
     approved_amount_delta: Optional[int] = None
@@ -235,14 +246,15 @@ class ApprovalRecord:
 
 @dataclass
 class PaymentRecord:
-    invoice_id: str
+    invoice_id: Optional[str]
     status: PaymentStatus
-    paid_amount: int = 0
+    paid_amount: Optional[int] = None
     payment_date: Optional[str] = None
     payment_id: Optional[str] = None
 
     def __post_init__(self) -> None:
-        _money(self.paid_amount, "paid_amount")
+        if self.paid_amount is not None:
+            _money(self.paid_amount, "paid_amount")
 
 
 # --- Analysis objects --------------------------------------------------------
