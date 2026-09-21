@@ -1,0 +1,130 @@
+import base64
+from pathlib import Path
+
+from streamlit.testing.v1 import AppTest
+
+from invoice_referee.domain import ClaimDraft, EvidenceRole, UploadPayload
+from invoice_referee.storage import LocalCaseStore, LocalEvidenceRepository
+
+
+def test_description_only_submission_runs_end_to_end(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app_path = Path(__file__).parents[2] / "app" / "streamlit_app.py"
+    monkeypatch.setenv("INVOICE_REFEREE_DATA_DIR", str(tmp_path))
+
+    app = AppTest.from_file(str(app_path), default_timeout=10).run()
+
+    assert len(app.exception) == 0
+    assert len(app.text_input) == 4
+    assert len(app.text_area) == 1
+    assert [button.label for button in app.button] == ["Xóa nội dung", "Gửi kiểm tra"]
+
+    app.text_input[1].set_value("Nguyễn Văn A")
+    app.text_input[2].set_value("a@example.com")
+    app.text_input[3].set_value("Đề nghị hoàn ứng tiếp khách")
+    app.text_area[0].set_value(
+        "Em đi tiếp khách công ty ABC tối qua hết 2.500.000 đồng."
+    )
+    app.button[1].click().run()
+
+    assert len(app.exception) == 0
+    case_dirs = list((tmp_path / "submissions").glob("CASE-*"))
+    assert len(case_dirs) == 1
+    assert (case_dirs[0] / "submission.json").exists()
+    assert (case_dirs[0] / "audit.jsonl").exists()
+
+
+def test_sidebar_opens_ocr_debug_for_submitted_image(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    submissions_root = tmp_path / "submissions"
+    store = LocalCaseStore(
+        submissions_root,
+        id_factory=lambda: "CASE-OCR-UI",
+    )
+    store.save_submission(
+        ClaimDraft(
+            employee_name="Nguyễn Văn A",
+            employee_email="a@example.com",
+            subject="Kiểm tra bill",
+            body="Chi phí dự án Phoenix",
+        ),
+        [
+            UploadPayload(
+                original_name="bill.png",
+                content=base64.b64decode(
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC"
+                    "AAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+                ),
+                mime_type="image/png",
+                role=EvidenceRole.PRIMARY_DOCUMENT,
+            )
+        ],
+        [],
+    )
+    repository = LocalEvidenceRepository(submissions_root)
+    evidence = repository.list_cases()[0].evidence[0]
+    repository.save_ocr_result(
+        evidence,
+        {
+            "provider": "mistral",
+            "model": "mistral-ocr-latest",
+            "response": {
+                "pages": [
+                    {
+                        "index": 0,
+                        "markdown": "# HÓA ĐƠN",
+                        "dimensions": {"dpi": 200, "width": 100, "height": 100},
+                        "confidence_scores": {
+                            "word_confidence_scores": [
+                                {"text": "#", "confidence": 0.99, "start_index": 0},
+                                {
+                                    "text": " HÓA",
+                                    "confidence": 0.95,
+                                    "start_index": 1,
+                                },
+                                {
+                                    "text": " ĐƠN",
+                                    "confidence": 0.98,
+                                    "start_index": 5,
+                                },
+                            ],
+                            "average_page_confidence_score": 0.97,
+                            "minimum_page_confidence_score": 0.95,
+                        },
+                        "blocks": [
+                            {
+                                "type": "title",
+                                "content": "# HÓA ĐƠN",
+                                "top_left_x": 1,
+                                "top_left_y": 1,
+                                "bottom_right_x": 80,
+                                "bottom_right_y": 20,
+                            }
+                        ],
+                    }
+                ]
+            },
+        },
+    )
+    monkeypatch.setenv("INVOICE_REFEREE_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
+    app_path = Path(__file__).parents[2] / "app" / "streamlit_app.py"
+
+    app = AppTest.from_file(str(app_path), default_timeout=10).run()
+    app.radio[0].set_value("OCR kiểm thử").run()
+
+    assert len(app.exception) == 0
+    assert len(app.selectbox) == 2
+    assert [button.label for button in app.button] == ["Chạy OCR"]
+    assert [tab.label for tab in app.tabs] == [
+        "Văn bản",
+        "Confidence theo từ",
+        "Blocks",
+        "JSON",
+    ]
+    assert len(app.expander) == 1
+    assert "Block 01 · title · exact" in app.expander[0].label

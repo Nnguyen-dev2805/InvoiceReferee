@@ -4,6 +4,8 @@
 
 Tài liệu này mô tả cách InvoiceReferee đi từ đầu vào chứng từ đến quyết định cuối cùng cho hóa đơn điện tử, hóa đơn/chứng từ do nhân viên chụp và bằng chứng bổ sung.
 
+Sơ đồ triển khai chi tiết và phân công `HARDCODE`/`CONFIG`/`TOOL`/`LLM`/`HUMAN` nằm trong `AGENT_WORKFLOW.md`.
+
 ```text
 Đầu vào thô
   ↓

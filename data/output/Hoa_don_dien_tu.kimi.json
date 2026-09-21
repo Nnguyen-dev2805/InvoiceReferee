@@ -1,0 +1,36 @@
+{
+  "seller_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+  "seller_tax_code": "0110329220",
+  "buyer_name": "CÔNG TY CỔ PHẦN KIẾN TRÚC VÀ XÂY DỰNG IGS",
+  "buyer_tax_code": "0110329573",
+  "invoice_date": "11/07/2023",
+  "template_number": "2C23TTU",
+  "serial_number": "2C23TTU",
+  "invoice_number": "00002438",
+  "items": [
+    {
+      "no": 1,
+      "description": "Khóa học thực hành kế toán tổng hợp",
+      "unit": "Khóa",
+      "quantity": 2,
+      "unit_price": 3500000,
+      "amount": 7000000
+    },
+    {
+      "no": 2,
+      "description": "Dịch vụ kế toán thuế quý 3/2023",
+      "unit": "Quý",
+      "quantity": 1,
+      "unit_price": 2000000,
+      "amount": 2000000
+    }
+  ],
+  "total_amount": 9000000,
+  "amount_in_words": "Chín triệu đồng./.",
+  "extraction_warnings": [
+    "Trường 'Mẫu số - Ký hiệu' trên hóa đơn hiển thị gộp một giá trị duy nhất '2C23TTU', nên cả template_number và serial_number đều ghi nhận cùng giá trị này.",
+    "Hóa đơn ghi cả tên người mua cá nhân 'Nguyễn Thị Mai' lẫn tên đơn vị 'CÔNG TY CỔ PHẦN KIẾN TRÚC VÀ XÂY DỰNG IGS'; buyer_name lấy theo tên đơn vị vì mã số thuế thuộc về công ty.",
+    "Hóa đơn bán hàng không có dòng thuế GTGT riêng; total_amount lấy theo dòng 'Tổng cộng tiền thanh toán'.",
+    "Số lượng trên hóa đơn hiển thị dạng '02' và '01', đã chuyển thành số nguyên 2 và 1."
+  ]
+}

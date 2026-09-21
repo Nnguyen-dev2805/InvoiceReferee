@@ -1,3 +1,11 @@
 .agents
 AGENTS.md
 .codegraph
+data/models/
+data/submissions/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example

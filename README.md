@@ -113,9 +113,11 @@ LLM là thành phần hỗ trợ suy luận và giao tiếp trên dữ kiện c�
 
 - `docs/ACCOUNTING_AGENT_REQUIREMENTS.md` - yêu cầu bài toán kế toán đã chốt.
 - `docs/PRODUCT_SPEC.md` - chức năng sản phẩm trong Sprint 1.
-- `docs/POLICY.md` - ranh giới quyết định và chính sách v0.
+- `docs/POLICY.md` - policy thực thi v1 và ranh giới quyết định.
 - `docs/DATA_MODEL.md` - hợp đồng lược đồ giữa các mô-đun.
 - `docs/DECISION_FLOW.md` - luồng từ đầu vào đến quyết định.
+- `docs/AGENT_WORKFLOW.md` - workflow chi tiết, điều kiện và ranh giới giữa mã tất định, tool, LLM và con người.
+- `docs/WORKFLOW_DIAGRAMS.md` - ba sơ đồ dễ đọc: Data Flow, Business Workflow và Agent Workflow.
 - `docs/TEST_CASES.md` - bộ kiểm thử tối thiểu 15 trường hợp.
 - `docs/ARCHITECTURE.md` - mô-đun, giao diện và phạm vi phụ trách.
 - `docs/EVALUATION_PLAN.md` - kiểm thử dữ liệu mới, phản hồi người dùng và đo lường.
@@ -124,7 +126,51 @@ LLM là thành phần hỗ trợ suy luận và giao tiếp trên dữ kiện c�
 
 ## Chạy và kiểm tra
 
-> Các lệnh dưới đây là hợp đồng dự kiến ở giai đoạn trước khi viết mã và phải được kiểm tra lại sau khi hoàn tất triển khai.
+### Giao diện nộp hồ sơ
+
+```powershell
+python -m streamlit run app/streamlit_app.py
+```
+
+Mở `http://localhost:8501`. Giao diện tiếp nhận hai nhóm dữ liệu:
+
+- chứng từ chính, có thể để trống;
+- nội dung đề nghị dạng email và tài liệu bổ sung.
+
+Sidebar có hai không gian làm việc:
+
+- `Nhân viên`: gửi hồ sơ chi phí;
+- `OCR kiểm thử`: chọn evidence đã gửi, chạy Mistral OCR và xem văn bản,
+  confidence theo từng từ, ảnh có bounding box, cấu trúc
+  `page -> block -> words` cùng JSON thô. Đây là trang debug tạm thời.
+
+Hồ sơ đã tiếp nhận được lưu cục bộ trong `data/submissions/{case_id}`. Thư mục
+này bị Git bỏ qua vì có thể chứa dữ liệu nhạy cảm. Kết quả OCR debug được lưu
+trong `data/submissions/{case_id}/ocr/{evidence_id}.json`.
+
+### Tái cấu trúc confidence OCR
+
+Chuyển danh sách word và block rời rạc của Mistral thành cấu trúc phân cấp
+`page -> block -> words`:
+
+```powershell
+python scripts/restructure_mistral_ocr.py data/output/page-metadata.json
+```
+
+Mặc định, kết quả được ghi vào
+`data/output/page-metadata.hierarchical.json`. Dùng `-o <đường-dẫn>` để chọn
+file đầu ra khác. Tool hỗ trợ cả JSON camelCase do Mistral xuất và JSON
+snake_case được lưu từ Python SDK.
+
+### Kiểm thử phần đã triển khai
+
+```powershell
+python -m pytest -q
+```
+
+### Verify mục tiêu
+
+Lệnh Verify dưới đây là hợp đồng của giai đoạn tiếp theo và chưa được triển khai:
 
 ```bash
 python -m verify.harness --suite all
@@ -143,4 +189,6 @@ Giao diện phải cho phép dán/tải lên JSON mới để kiểm thử đầ
 
 ## Trạng thái hiện tại
 
-Dự án đang ở giai đoạn **đặc tả trước khi viết mã**. Tài liệu đã được điều chỉnh từ phạm vi chỉ dựa trên PO sang tác tử kế toán kiểm tra hóa đơn, chứng từ và bằng chứng chi phí.
+Dự án đã có giao diện Streamlit tiếp nhận hồ sơ, model đầu vào, validation kỹ
+thuật, lưu trữ cục bộ và audit sự kiện tạo hồ sơ/đính kèm evidence. OCR, check
+engine, Decision Guard, Verify và màn hình xử lý của kế toán là các phần tiếp theo.

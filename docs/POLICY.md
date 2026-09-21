@@ -1,383 +1,716 @@
-# InvoiceReferee — Chính sách v0
+# InvoiceReferee - Policy thực thi v1
 
-## 1. Mục đích
+## 1. Mục tiêu và phạm vi
 
-Chính sách v0 định nghĩa ranh giới quyết định cho bản thử nghiệm tác tử kế toán. Đây là **chính sách giả lập**, dùng để đánh giá và trình diễn, không phải chính sách thật của một doanh nghiệp cụ thể.
+Tài liệu này là nguồn chính sách chuẩn để triển khai `PolicyEngine` và
+`DecisionGuard`. Policy áp dụng cho:
 
-Mục tiêu:
+- hóa đơn điện tử;
+- bill, biên lai, phiếu thanh toán POS và chứng từ nhân viên chụp;
+- bằng chứng thanh toán ngân hàng hoặc ví điện tử;
+- description/report do nhân viên cung cấp;
+- PO, phiếu kiểm kê, phiếu nhận hàng và biên bản nghiệm thu;
+- dữ liệu nội bộ như hồ sơ công ty, lịch sử chứng từ và hạn mức phê duyệt.
 
-- chứng từ thường quy và hợp lệ → `AUTO_PROCESS`;
-- dữ kiện thiếu hoặc chưa chắc chắn → `REQUEST_INFO`;
-- ngoài quy định, vượt thẩm quyền hoặc có nghi vấn → `ESCALATE`.
+Policy hỗ trợ kiểm tra và chuẩn bị dữ liệu kế toán. `AUTO_PROCESS` chỉ có nghĩa
+là hồ sơ đủ điều kiện chuyển sang bước nhập liệu hoặc quy trình phê duyệt tiếp
+theo; Agent không tự chuyển tiền và không thay thế quyền phê duyệt của con người.
 
-## 2. Phạm vi
+Đây là policy giả lập cho dự án. Các giá trị như MST công ty, hạn mức và thời hạn
+nộp phải được cấu hình lại khi áp dụng cho doanh nghiệp thật.
 
-Chính sách v0 áp dụng cho:
+## 2. Nguyên tắc bắt buộc
 
-- hóa đơn điện tử của công ty;
-- hóa đơn/chứng từ do nhân viên chụp;
-- bằng chứng thanh toán và bằng chứng bổ sung liên quan đến việc kiểm tra chi phí;
-- PO, biên bản nhận hàng hoặc nghiệm thu dịch vụ như bằng chứng bổ sung khi có.
+1. Không mã hóa cứng theo tên nhà hàng, mẫu bill hoặc mã test case.
+2. Mọi dữ kiện phải giữ `value`, `confidence`, `source_ref` và vị trí nguồn nếu có.
+3. Trường không đọc được phải là `null`; LLM không được tự điền bằng suy đoán.
+4. Description là lời khai về bối cảnh kinh doanh, không phải bằng chứng thanh toán.
+5. LLM/VLM được phép hiểu tài liệu đa dạng, nhưng không được ra quyết định cuối.
+6. Tiền, số lượng, ngày, trùng lặp, hạn mức và thứ tự quyết định phải do code tất định xử lý.
+7. Thiếu hoặc mâu thuẫn dữ kiện quan trọng dẫn đến `REQUEST_INFO`, không phải tự động từ chối.
+8. Dữ kiện đã rõ nhưng sai policy, đáng ngờ hoặc vượt quyền dẫn đến `ESCALATE`.
+9. Chỉ `AUTO_PROCESS` khi mọi phép kiểm tra bắt buộc đã `PASS` hoặc `NOT_APPLICABLE`.
+10. Mọi bước phải truy vết được qua `evidence_refs`, `rule_ids` và audit log.
 
-Chính sách v0 chưa phải bộ máy xử lý thuế/GTGT/TNDN hoàn chỉnh.
+## 3. Vai trò của từng thành phần
 
-## 3. Thứ tự ưu tiên quyết định
+| Thành phần | Được làm | Không được làm |
+| --- | --- | --- |
+| OCR/Vision tool | Đọc text, bbox, confidence, loại tài liệu và ứng viên dữ kiện | Kết luận hợp lệ hoặc duyệt chi |
+| LLM extractor | Ánh xạ dữ liệu đa dạng vào schema mềm, trích business context | Bịa dữ kiện, sửa số tiền, bỏ qua nguồn |
+| LLM policy planner | Đề xuất loại chi phí và các check cần chạy từ `CHECK_REGISTRY` | Tạo check mới hoặc bỏ check bắt buộc |
+| Tool nội bộ | Tra hồ sơ công ty, lịch sử, PO, kiểm kê, thanh toán | Ra quyết định cuối |
+| Check engine | Chạy phép kiểm tra tất định và trả `CheckResult[]` | Viết giải thích không có bằng chứng |
+| LLM reasoning | Tóm tắt vấn đề, tạo câu hỏi rõ ràng và đề xuất người xử lý | Ghi đè `CheckResult` |
+| Decision guard | Áp dụng đúng thứ tự ưu tiên và tạo `Decision` | Bỏ qua check bắt buộc |
+| Human | Bổ sung dữ kiện, phê duyệt ngoại lệ, dừng hoặc override có lý do | Xóa lịch sử quyết định cũ |
 
-```text
-1. Đầu vào kỹ thuật lỗi hoặc sai định dạng
-      → INPUT_ERROR
+## 4. Hợp đồng dữ liệu tối thiểu
 
-2. Không xác định được loại chứng từ/hồ sơ
-      → REQUEST_INFO
+### 4.1. Đầu vào `Submission`
 
-3. Dữ kiện bắt buộc bị thiếu, không đọc được, có cảnh báo OCR nghiêm trọng
-   hoặc mâu thuẫn
-      → REQUEST_INFO
-
-4. Dữ kiện đã rõ nhưng vi phạm/nằm ngoài chính sách
-      → ESCALATE / OUTSIDE_POLICY
-
-5. Dữ kiện đã rõ nhưng có cờ bất thường/nghi vấn
-      → ESCALATE / SUSPICIOUS
-
-6. Dữ kiện đã rõ nhưng vượt thẩm quyền
-      → ESCALATE / BEYOND_AUTHORITY
-
-7. Đủ dữ kiện + đạt các phép kiểm tra + đúng chính sách + trong thẩm quyền
-      → AUTO_PROCESS
+```json
+{
+  "case_id": "CASE-001",
+  "submitted_at": "2026-09-21T10:00:00+07:00",
+  "submitted_by": "EMP-001",
+  "description": "Tiếp khách công ty ABC cho dự án X",
+  "evidence": [
+    {
+      "source_ref": "DOC-001",
+      "mime_type": "image/jpeg",
+      "declared_type": null
+    }
+  ]
+}
 ```
 
-Nguyên tắc: chưa biết dữ kiện thì hỏi; dữ kiện đã rõ nhưng tác tử không có quyền thì chuyển; chỉ tự động xử lý khi đầy đủ bằng chứng.
+`description` được phép rỗng ở tầng tiếp nhận, nhưng policy sẽ yêu cầu bổ sung nếu
+không đủ business context. `evidence` được phép rỗng để Agent vẫn tạo hồ sơ và hỏi
+đúng thông tin còn thiếu.
 
-## 4. Quy tắc chính sách
+### 4.2. Dữ kiện chuẩn `Fact`
 
-### P01 — Trường bắt buộc theo loại chứng từ
+Mọi extractor phải trả dữ kiện theo cấu trúc tương đương:
 
-Hóa đơn điện tử phải có:
-
-- tên công ty bên mua;
-- mã số thuế bên mua;
-- tên công ty bên bán;
-- mã số thuế bên bán;
-- ngày lập hóa đơn;
-- tên hàng hóa/dịch vụ;
-- số lượng nếu là hàng hóa;
-- tổng tiền;
-- mẫu số;
-- ký hiệu;
-- số hóa đơn.
-
-Hóa đơn/chứng từ của nhân viên phải có tối thiểu tổng tiền và ngày giao dịch, hoặc lời giải thích hợp lệ về ngày. Nếu chứng từ quá mờ, bị che hoặc thiếu trường cần thiết:
-
-```text
-REQUEST_INFO
+```json
+{
+  "name": "total_amount",
+  "value": 2500000,
+  "normalized_value": 2500000,
+  "confidence": 0.97,
+  "source_ref": "DOC-001",
+  "source_kind": "OCR",
+  "bbox": [120, 640, 890, 710],
+  "raw_text": "TONG CONG 2.500.000",
+  "warnings": []
+}
 ```
 
-### P02 — Không coi dữ liệu trích xuất không chắc chắn là đạt
-
-Nếu OCR/bộ phân tích không đọc chắc chắn trường quan trọng như tổng tiền, ngày, số hóa đơn hoặc mã số thuế bên bán/bên mua:
+Các `source_kind` hợp lệ:
 
 ```text
-REQUEST_INFO
+STRUCTURED_DOCUMENT
+OCR
+VISION_MODEL
+EMPLOYEE_DESCRIPTION
+INTERNAL_SYSTEM
+HUMAN_CONFIRMED
 ```
 
-Ví dụ câu hỏi:
+Không được chuyển dữ kiện từ `EMPLOYEE_DESCRIPTION` thành dữ kiện đã được chứng
+từ xác nhận. Ví dụ, nhân viên khai 2.500.000 đồng chỉ tạo
+`claimed_amount = 2500000`, không tự tạo `document.total_amount`.
 
-> Số tiền trên chứng từ chưa đọc chắc chắn là 45 triệu hay 48 triệu đồng. Giá trị chính xác là bao nhiêu?
-
-### P03 — Bên mua phải là công ty mình khi chứng từ yêu cầu bên mua
-
-Với hóa đơn điện tử dùng để ghi nhận chi phí công ty, mã số thuế/tên bên mua phải khớp hồ sơ công ty.
-
-Nếu thiếu mã số thuế bên mua:
+### 4.3. Trạng thái phép kiểm tra
 
 ```text
-REQUEST_INFO
+PASS            Đã kiểm tra và đạt.
+FAIL            Đã có bằng chứng rõ rằng vi phạm policy.
+UNKNOWN         Thiếu, mờ, mâu thuẫn hoặc tool chưa trả được kết quả.
+NOT_APPLICABLE  Không áp dụng cho hồ sơ này.
 ```
 
-Nếu mã số thuế bên mua rõ ràng thuộc công ty khác:
+Mỗi `CheckResult` phải có tối thiểu:
+
+```json
+{
+  "check_id": "CHECK_ARITHMETIC",
+  "rule_id": "P05",
+  "status": "UNKNOWN",
+  "failure_class": "FACTUAL_UNKNOWN",
+  "is_mandatory": true,
+  "reason": "10 x 3.000.000 khác thành tiền 35.000.000",
+  "evidence_refs": ["DOC-001"],
+  "details": {
+    "expected": 30000000,
+    "actual": 35000000
+  }
+}
+```
+
+`failure_class` chỉ nhận một trong:
 
 ```text
-ESCALATE / OUTSIDE_POLICY
+FACTUAL_UNKNOWN
+OUTSIDE_POLICY
+SUSPICIOUS
+BEYOND_AUTHORITY
+SYSTEM_ERROR
+null
 ```
 
-### P04 — Danh tính bên bán/nhà cung cấp phải truy vết được
+## 5. Cấu hình policy
 
-Mã số thuế bên bán, cửa hàng hoặc nhà cung cấp phải đủ để truy vết. Nếu không đọc được:
+Khối YAML dưới đây là cấu hình mặc định mà code có thể chuyển thành `PolicyConfig`.
+Giá trị doanh nghiệp không được rải trực tiếp trong check implementation.
+
+<!-- POLICY_CONFIG_START -->
+```yaml
+policy_version: "1.0.0"
+currency: VND
+
+decision_actions:
+  - AUTO_PROCESS
+  - REQUEST_INFO
+  - ESCALATE
+
+thresholds:
+  critical_fact_confidence: 0.85
+  non_critical_fact_confidence: 0.60
+  authority_amount_vnd: 50000000
+  submission_window_days: 30
+  arithmetic_tolerance_vnd: 1
+  duplicate_similarity_review_threshold: 0.85
+
+company_profile:
+  legal_name: CONFIG_REQUIRED
+  tax_codes: []
+
+document_profiles:
+  E_INVOICE:
+    required_facts:
+      - buyer_name
+      - buyer_tax_code
+      - seller_name
+      - seller_tax_code
+      - invoice_date
+      - item_name
+      - total_amount
+      - template_number
+      - serial_number
+      - invoice_number
+    conditional_required_facts:
+      - fact: quantity
+        when: item_type == GOODS
+    optional_facts:
+      - tax_authority_code
+      - buyer_contact
+      - buyer_address
+      - seller_contact
+      - seller_address
+      - amount_in_words
+
+  RECEIPT:
+    required_facts:
+      - merchant_name
+      - transaction_date
+      - total_amount
+    optional_facts:
+      - transaction_time
+      - items
+      - quantity
+      - unit_price
+      - discount
+      - tax_amount
+      - service_charge
+      - payment_method
+
+  PAYMENT_PROOF:
+    required_facts:
+      - transaction_date
+      - total_amount
+      - payer_or_payee
+    optional_facts:
+      - payment_reference
+      - payment_method
+    supporting_only: true
+
+business_context:
+  required_facts:
+    - claimant_id
+    - business_purpose
+    - expense_category
+  conditional_required_facts:
+    - fact: client_or_project
+      when: expense_category in [MEALS, TRAVEL, LODGING] or company_policy_requires_project == true
+
+duplicate_keys:
+  E_INVOICE:
+    exact:
+      - [seller_tax_code, serial_number, invoice_number]
+      - [seller_tax_code, invoice_number, total_amount]
+  RECEIPT:
+    exact:
+      - [merchant_name, transaction_date, total_amount, payment_reference]
+      - [image_hash]
+    probable:
+      - [merchant_name, transaction_date, total_amount]
+  PAYMENT_PROOF:
+    exact:
+      - [payment_reference]
+      - [payer_or_payee, transaction_date, total_amount, image_hash]
+
+prohibited_categories:
+  - PERSONAL_EXPENSE
+  - ALCOHOL_WHEN_NOT_ALLOWED
+
+evidence_requirements:
+  description_only_allowed_for_auto_process: false
+  payment_proof_only_allowed_for_auto_process: false
+  goods_requires_receiving_evidence: true
+  services_requires_acceptance_when_configured: true
+
+escalation_targets:
+  OUTSIDE_POLICY: POLICY_OWNER
+  SUSPICIOUS: INTERNAL_CONTROL
+  BEYOND_AUTHORITY: FINANCE_MANAGER
+```
+<!-- POLICY_CONFIG_END -->
+
+`CONFIG_REQUIRED` làm policy không sẵn sàng chạy production. Khi chưa cấu hình
+MST công ty, `CHECK_BUYER_IDENTITY` phải là `UNKNOWN`, không được tự cho `PASS`.
+
+## 6. Schema mềm cho bill đa dạng
+
+Bill không bị ép phải có cùng layout hoặc cùng toàn bộ trường. Extractor tạo một
+`FactGraph` gồm các fact đọc được và quan hệ giữa chúng. Policy chỉ yêu cầu:
+
+- hồ sơ được phân loại vào một profile gần nhất;
+- các fact tối thiểu của profile đó có đủ bằng chứng;
+- các check bắt buộc của case đã chạy;
+- trường có xuất hiện thì được giữ lại và đối chiếu, kể cả khi là optional.
+
+LLM policy planner được chọn check trong `CHECK_REGISTRY`, nhưng code luôn hợp nhất
+đề xuất đó với `mandatory_checks`. Công thức:
 
 ```text
-REQUEST_INFO
+checks_to_run = mandatory_checks(case_profile)
+              UNION planner_suggested_checks
+              UNION checks_required_by_available_facts
 ```
 
-Nếu nhà cung cấp nằm trong danh sách bị chặn hoặc bị cấm:
+Planner không thể xóa `CHECK_DUPLICATE`, `CHECK_BUSINESS_CONTEXT`,
+`CHECK_POLICY_CATEGORY`, `CHECK_ANOMALY`, `CHECK_AUTHORITY` và
+`CHECK_EXPORT_READINESS`.
+
+## 7. Xử lý confidence và OCR
+
+1. OCR chạy trên toàn bộ ảnh và trả word/block cùng bbox, confidence.
+2. Code ánh xạ block vào trường dữ kiện dự kiến.
+3. Nếu confidence đạt ngưỡng của loại trường, tiếp tục chuẩn hóa.
+4. Nếu confidence thấp, gửi crop có vùng lân cận cho VLM/LLM để xác định
+   `CRITICAL`, `NON_CRITICAL` hoặc `UNKNOWN`.
+5. Code ghi đè thành `CRITICAL` nếu block liên quan trường bắt buộc, identity,
+   ngày, tiền, số lượng, đơn giá hoặc thành tiền.
+6. `CRITICAL` hoặc `UNKNOWN` chưa được xác nhận dẫn đến
+   `CHECK_EXTRACTION_QUALITY = UNKNOWN`.
+7. `NON_CRITICAL` được phép đi tiếp nhưng phải lưu warning và audit.
+
+VLM có thể đề xuất cách đọc lại block, nhưng đề xuất không tự động thay thế fact
+quan trọng. Fact quan trọng chỉ được chấp nhận khi có nguồn có cấu trúc, nguồn độc
+lập khớp nhau hoặc xác nhận của con người.
+
+## 8. Check registry P01-P15
+
+Tên `check_id` dưới đây là hợp đồng ổn định giữa check engine, policy engine,
+decision guard, audit và test. Không đổi tên tùy theo loại bill.
+
+| Rule | `check_id` | Thành phần thực hiện |
+| --- | --- | --- |
+| P01 | `CHECK_REQUIRED_FACTS` | Code + PolicyConfig |
+| P02 | `CHECK_EXTRACTION_QUALITY` | Code trên output OCR/VLM |
+| P03 | `CHECK_BUYER_IDENTITY` | Code + Company Profile tool |
+| P04 | `CHECK_SELLER_IDENTITY` | Code + Vendor Master tool |
+| P05 | `CHECK_ARITHMETIC` | Code dùng `Decimal` |
+| P06 | `CHECK_DUPLICATE` | Code + Processed History tool |
+| P07 | `CHECK_PAYMENT_STATUS` | Code + Payment History tool |
+| P08 | `CHECK_BUSINESS_CONTEXT` | Code trên fact do LLM/hệ thống trích xuất |
+| P09 | `CHECK_CROSS_SOURCE_CONSISTENCY` | Code; LLM chỉ ánh xạ ngữ nghĩa |
+| P10 | `CHECK_EVIDENCE_SUFFICIENCY` | Code + PolicyConfig |
+| P11 | `CHECK_POLICY_CATEGORY` | Code + PolicyConfig; LLM đề xuất category |
+| P12 | `CHECK_SUBMISSION_WINDOW` | Code |
+| P13 | `CHECK_AUTHORITY` | Code + PolicyConfig |
+| P14 | `CHECK_ANOMALY` | Code/tool lịch sử và forensic |
+| P15 | `CHECK_EXPORT_READINESS` | Code + schema hệ thống đích |
+
+### P01 - Phân loại và đủ trường bắt buộc
+
+`CHECK_REQUIRED_FACTS` do code thực hiện theo `document_profiles`.
+
+- `PASS`: đủ mọi fact bắt buộc và điều kiện.
+- `UNKNOWN`: thiếu fact, chưa rõ là hàng hóa hay dịch vụ, hoặc chưa phân loại được tài liệu.
+- `NOT_APPLICABLE`: chỉ dùng cho evidence bổ sung không phải chứng từ chính.
+- Khi `UNKNOWN`: `REQUEST_INFO / FACTUAL_UNKNOWN`.
+
+Số lượng bắt buộc với hàng hóa; không bắt buộc với dịch vụ. Không được mặc định
+bill thiếu item là sai nếu profile chỉ yêu cầu merchant, ngày và tổng tiền.
+
+### P02 - Chất lượng trích xuất
+
+`CHECK_EXTRACTION_QUALITY` do code đánh giá trên confidence, warning và provenance.
+
+- Trường quan trọng rõ và đạt ngưỡng: `PASS`.
+- Ảnh mờ, bị che, OCR lỗi hoặc hai extractor đọc khác nhau: `UNKNOWN`.
+- Lỗi file/MIME khiến không thể trích xuất gì: `SYSTEM_ERROR`, không phải quyết định nghiệp vụ.
+
+### P03 - Danh tính bên mua
+
+`CHECK_BUYER_IDENTITY` dùng Company Profile tool.
+
+- MST bên mua khớp một MST được cấu hình: `PASS`.
+- MST trống, ghi "khách lẻ" hoặc không đọc được: `UNKNOWN / FACTUAL_UNKNOWN`.
+- MST đọc rõ nhưng thuộc công ty khác: `FAIL / OUTSIDE_POLICY`.
+- Với receipt không có trường bên mua: `NOT_APPLICABLE`, trừ khi policy doanh nghiệp yêu cầu.
+
+### P04 - Danh tính bên bán/merchant
+
+`CHECK_SELLER_IDENTITY` dùng fact và Vendor Master nếu có.
+
+- Có seller/merchant truy vết được, không bị chặn: `PASS`.
+- Không đọc được seller/merchant bắt buộc: `UNKNOWN`.
+- Vendor bị chặn rõ ràng: `FAIL / OUTSIDE_POLICY`.
+
+### P05 - Tính nhất quán số học
+
+`CHECK_ARITHMETIC` phải dùng `Decimal`, không dùng số thực nhị phân.
 
 ```text
-ESCALATE / OUTSIDE_POLICY
+line_expected = quantity * unit_price - line_discount + line_tax_or_fee
+subtotal_expected = sum(line_total)
+grand_total_expected = subtotal - discount + tax + service_charge
 ```
 
-### P05 — Tính nhất quán số học
+- Chỉ kiểm tra công thức khi các toán hạng liên quan có mặt.
+- Chênh lệch không quá `arithmetic_tolerance_vnd`: `PASS`.
+- Dữ kiện đầy đủ nhưng phép tính không khớp: `UNKNOWN / FACTUAL_UNKNOWN`, vì
+  Agent biết có mâu thuẫn nhưng chưa biết số nào đúng.
+- Số tiền bằng chữ khác số tiền bằng số: `UNKNOWN / FACTUAL_UNKNOWN`.
+- Thiếu item trên receipt nhưng tổng tiền rõ không tự động là lỗi số học.
 
-Nếu có các dòng hàng:
+### P06 - Trùng lặp
+
+`CHECK_DUPLICATE` luôn chạy và tra Processed History.
+
+- Chỉ so một exact/probable key khi tất cả thành phần trong key đều khác `null`.
+- Khớp một `exact` key với hồ sơ đã xử lý và không có dữ kiện phản chứng:
+  `FAIL / OUTSIDE_POLICY`.
+- Chỉ khớp key `probable`, fuzzy text hoặc similarity vượt ngưỡng:
+  `UNKNOWN / FACTUAL_UNKNOWN` để con người xác minh.
+- Không tìm thấy trùng: `PASS`.
+- History tool không truy cập được: `UNKNOWN`; không được mặc định là không trùng.
+
+Ảnh giống nhau nhưng là nhiều trang của cùng một submission không được xem là hai
+đề nghị chi. Duplicate được kiểm tra ở cấp chứng từ/giao dịch, không chỉ cấp file.
+
+### P07 - Trạng thái thanh toán và dòng tiền
+
+`CHECK_PAYMENT_STATUS` đối chiếu đề nghị chi với payment evidence/history.
+
+- Chưa thanh toán hoặc đây là đề nghị hoàn ứng có bằng chứng phù hợp: `PASS`.
+- Đã thanh toán toàn bộ nhưng bị gửi như yêu cầu chi mới: `UNKNOWN` và hỏi mục đích gửi lại.
+- Số tiền chuyển khoản khác chứng từ mà không có giải thích: `UNKNOWN`.
+- Không yêu cầu kiểm tra thanh toán cho loại luồng hiện tại: `NOT_APPLICABLE`.
+
+### P08 - Business context
+
+`CHECK_BUSINESS_CONTEXT` đối chiếu description với dữ liệu nhân viên/hệ thống.
+
+- Có người chi, mục đích kinh doanh, loại chi và client/project khi áp dụng: `PASS`.
+- Thiếu description hoặc thiếu một trường bắt buộc: `UNKNOWN / FACTUAL_UNKNOWN`.
+- Description nêu rõ mục đích cá nhân: chuyển sang P11, không coi là thiếu context.
+
+Hóa đơn điện tử đầy đủ vẫn phải có business context của nghiệp vụ đang yêu cầu
+xử lý. Thiếu mục đích lần đầu luôn là `REQUEST_INFO`, không mặc định là vi phạm.
+
+### P09 - Nhất quán giữa nhiều nguồn
+
+`CHECK_CROSS_SOURCE_CONSISTENCY` so sánh các fact cùng nghĩa giữa invoice, bill,
+description, payment, PO, phiếu kiểm kê, nhận hàng và nghiệm thu.
+
+- Các giá trị vật chất khớp nhau: `PASS`.
+- Invoice ghi 10 nhưng phiếu nhận ghi 8, hoặc số tiền chứng từ khác khai báo:
+  `UNKNOWN / FACTUAL_UNKNOWN`.
+- Khác biệt đã có bằng chứng hợp lệ như giao hàng từng phần và policy cho phép:
+  `PASS` kèm warning/audit.
+
+LLM được dùng để nhận ra hai nhãn có cùng ý nghĩa; phép so sánh giá trị cuối cùng
+phải do code thực hiện.
+
+### P10 - Đủ bằng chứng
+
+`CHECK_EVIDENCE_SUFFICIENCY` dựa trên `evidence_requirements` và loại chi phí.
+
+- Hàng hóa cần bằng chứng nhận hàng/kiểm kê khi policy yêu cầu.
+- Dịch vụ cần nghiệm thu khi cấu hình yêu cầu.
+- Description đơn lẻ không đủ để `AUTO_PROCESS`.
+- Ảnh chuyển khoản đơn lẻ không đủ nếu chưa rõ item và mục đích.
+- Thiếu evidence bắt buộc: `UNKNOWN / FACTUAL_UNKNOWN`.
+
+### P11 - Danh mục ngoài quy định
+
+`CHECK_POLICY_CATEGORY` so khớp loại chi với danh mục policy.
+
+- Chi phí hợp lệ: `PASS`.
+- Chi tiêu cá nhân, rượu bia bị cấm hoặc danh mục bị cấm khác đã xác định rõ:
+  `FAIL / OUTSIDE_POLICY`.
+- LLM chỉ đề xuất category. Nếu confidence phân loại thấp hoặc mô tả mơ hồ:
+  `UNKNOWN`, không được tự kết luận vi phạm.
+
+### P12 - Thời hạn nộp
+
+`CHECK_SUBMISSION_WINDOW` tính theo ngày địa phương:
 
 ```text
-quantity * unit_price - discount + tax/service_charge == line/grand total
+age_days = date(submitted_at) - document_date
 ```
 
-Nếu có số tiền bằng chữ thì phải khớp với số tiền bằng số. Nếu số liệu tự mâu thuẫn:
+- `age_days <= submission_window_days`: `PASS`.
+- Quá hạn và ngày đã rõ: `FAIL / OUTSIDE_POLICY`.
+- Thiếu hoặc không đọc được ngày: `UNKNOWN / FACTUAL_UNKNOWN`.
 
-```text
-REQUEST_INFO
-```
+### P13 - Thẩm quyền
 
-### P06 — Phát hiện trùng lặp
+`CHECK_AUTHORITY` so sánh tổng giá trị cần xử lý với hạn mức hiện hành.
 
-Định danh trùng lặp ưu tiên:
+- `amount <= authority_amount_vnd`: `PASS`.
+- `amount > authority_amount_vnd`: `FAIL / BEYOND_AUTHORITY`.
+- Tổng tiền chưa rõ: `UNKNOWN / FACTUAL_UNKNOWN`.
 
-```text
-seller_tax_code + invoice_serial_no + invoice_number
-```
+P13 chỉ quyết định chuyển cấp sau khi các dữ kiện và check nghiệp vụ khác đã đủ.
+Một hồ sơ vừa thiếu dữ kiện vừa có số tiền khai báo vượt hạn mức vẫn cần hoàn thiện
+dữ kiện trước khi chuyển phê duyệt.
 
-Hoặc với hóa đơn/chứng từ/bằng chứng thanh toán:
+### P14 - Bất thường/nghi vấn
 
-```text
-merchant + date/time + amount + payment_ref/image_hash
-```
+`CHECK_ANOMALY` luôn chạy. Các tín hiệu gồm:
 
-Nếu trùng rõ ràng với chứng từ đã xử lý:
-
-```text
-ESCALATE / OUTSIDE_POLICY
-```
-
-Nếu chỉ có tín hiệu yếu, chưa đủ kết luận:
-
-```text
-REQUEST_INFO
-```
-
-### P07 — Trạng thái thanh toán
-
-Nếu chứng từ/lịch sử thanh toán cho thấy đã `PAID` hoặc `PARTIALLY_PAID` nhưng người dùng gửi lại như đề nghị chi mới:
-
-```text
-REQUEST_INFO
-```
-
-Nếu trạng thái thanh toán không rõ và cần thiết cho quyết định:
-
-```text
-REQUEST_INFO
-```
-
-### P08 — Chứng từ nhân viên phải có bối cảnh kinh doanh
-
-Hóa đơn/chứng từ của nhân viên cần có:
-
-- người chi/nhân viên;
-- mục đích kinh doanh;
-- loại chi phí;
-- khách hàng/dự án/chuyến đi/sự kiện khi liên quan.
-
-Nếu thiếu bối cảnh:
-
-```text
-REQUEST_INFO
-```
-
-Ví dụ:
-
-> Chứng từ 1,2 triệu đồng chưa có mục đích kinh doanh hoặc dự án. Khoản chi này phục vụ mục đích kinh doanh nào?
-
-### P09 — Tính nhất quán giữa chứng từ, đề nghị chi và thanh toán
-
-Hóa đơn, khai báo của nhân viên, bằng chứng thanh toán, PO, biên bản nhận hàng hoặc nghiệm thu dịch vụ không được mâu thuẫn.
-
-Ví dụ:
-
-- PO ghi 10 máy tính nhưng phiếu nhận hàng ghi 8 máy;
-- nhân viên đề nghị 1,5 triệu đồng nhưng hóa đơn ghi 1,2 triệu đồng;
-- ảnh chuyển khoản có số tiền nhưng không có hàng hóa/dịch vụ hoặc mục đích.
-
-Nếu mâu thuẫn chưa có bằng chứng giải thích:
-
-```text
-REQUEST_INFO
-```
-
-### P10 — Bằng chứng nhận hàng/dịch vụ
-
-Việc mua hàng hóa/dịch vụ cần bằng chứng đã nhận hàng/dịch vụ nếu chính sách yêu cầu. PO, biên bản nhận hàng hoặc nghiệm thu dịch vụ là bằng chứng bổ sung, không bắt buộc với mọi hóa đơn.
-
-Nếu loại chi phí yêu cầu bằng chứng nhưng chưa có:
-
-```text
-REQUEST_INFO
-```
-
-### P11 — Chi phí bị cấm hoặc mang tính cá nhân
-
-Nếu dữ kiện đã rõ và khoản chi thuộc danh mục không được phép:
-
-- chi tiêu cá nhân;
-- rượu bia/danh mục bị cấm theo chính sách;
-- tiếp khách không có mục đích kinh doanh sau khi đã xác định đầy đủ dữ kiện;
-- chứng từ được nộp quá hạn theo chính sách;
-
-thì:
-
-```text
-ESCALATE / OUTSIDE_POLICY
-```
-
-### P12 — Thời hạn nộp
-
-Quy tắc giả lập:
-
-```text
-submission_date - document_date <= 30 days
-```
-
-Nếu quá hạn và ngày tháng đã rõ:
-
-```text
-ESCALATE / OUTSIDE_POLICY
-```
-
-Nếu thiếu ngày giao dịch/lập hóa đơn:
-
-```text
-REQUEST_INFO
-```
-
-### P13 — Ngưỡng thẩm quyền
-
-Quy tắc thẩm quyền giả lập:
-
-```text
-amount <= 50,000,000 VND
-    → Tác tử có thể AUTO_PROCESS nếu mọi quy tắc khác đều đạt
-
-amount > 50,000,000 VND
-    → Cần Quản lý tài chính phê duyệt
-```
+- ảnh có bằng chứng chỉnh sửa từ forensic tool;
+- nhiều submission gần giống từ cùng người trong thời gian ngắn;
+- số tiền lệch mạnh so với lịch sử cùng loại chi/vendor;
+- vendor mới trong loại chi rủi ro;
+- giao dịch ngoài giờ/ngày nghỉ kết hợp với tín hiệu khác;
+- hàng hóa/dịch vụ không tương xứng với mục đích khai báo;
+- cấu trúc chia nhỏ giao dịch để né hạn mức.
 
 Kết quả:
 
-```text
-ESCALATE / BEYOND_AUTHORITY
-```
+- Tín hiệu mạnh từ tool hoặc dữ liệu lịch sử: `FAIL / SUSPICIOUS`.
+- Chỉ có suy đoán ngữ nghĩa của LLM, không có dữ kiện hỗ trợ: `UNKNOWN`.
+- Không có tín hiệu: `PASS`.
 
-### P14 — Bất thường/nghi vấn
+Không dùng một tín hiệu yếu như "giao dịch cuối tuần" làm căn cứ duy nhất để
+`ESCALATE`.
 
-Nếu có dấu hiệu bất thường:
+### P15 - Sẵn sàng xuất dữ liệu kế toán
 
-- số tiền cao bất thường so với lịch sử;
-- nhà cung cấp mới hoặc lạ trong loại chi phí rủi ro;
-- nhiều hóa đơn giống nhau;
-- giao dịch ngoài giờ hoặc ngày nghỉ;
-- nhân viên nộp nhiều chứng từ sát nhau;
-- ảnh có dấu hiệu chỉnh sửa;
-- hàng hóa/dịch vụ không tương xứng với mục đích kinh doanh;
-
-thì:
-
-```text
-ESCALATE / SUSPICIOUS
-```
-
-Nếu tín hiệu chưa đủ mạnh và cần bổ sung dữ kiện:
-
-```text
-REQUEST_INFO
-```
-
-### P15 — Mức độ sẵn sàng để xuất dữ liệu kế toán
-
-Chỉ được trả về `AUTO_PROCESS` khi có đủ trường tối thiểu cho hệ thống phía sau nhập/xuất dữ liệu:
+`CHECK_EXPORT_READINESS` kiểm tra payload đích có tối thiểu:
 
 - ngày chứng từ;
-- nhà cung cấp/cửa hàng;
-- bối cảnh bên mua/công ty nếu cần;
+- seller/merchant;
+- tổng tiền và tiền tệ;
 - loại chi phí;
-- tổng tiền;
-- trường thuế/phí nếu có, hoặc được đánh dấu là không có;
-- mục đích/bối cảnh kinh doanh với chứng từ của nhân viên;
-- định danh duy nhất của chứng từ/thanh toán.
+- định danh duy nhất/fingerprint;
+- business purpose;
+- tax/fee nếu có, hoặc trạng thái `NOT_PRESENT`;
+- source references.
 
-Nếu thiếu trường bắt buộc để xuất dữ liệu:
+Thiếu trường đích bắt buộc: `UNKNOWN / FACTUAL_UNKNOWN`.
 
-```text
-REQUEST_INFO
-```
+## 9. Các check bắt buộc theo hồ sơ
 
-## 5. Điều kiện `AUTO_PROCESS`
+| Check | E-invoice | Receipt/bill | Payment proof | Description only |
+| --- | --- | --- | --- | --- |
+| P01 Required facts | Bắt buộc | Bắt buộc | Bắt buộc | Không áp dụng cho document |
+| P02 Extraction quality | Bắt buộc | Bắt buộc | Bắt buộc | Không áp dụng |
+| P03 Buyer identity | Bắt buộc | Theo cấu hình | Theo cấu hình | Không áp dụng |
+| P04 Seller identity | Bắt buộc | Bắt buộc | Theo dữ liệu | Không áp dụng |
+| P05 Arithmetic | Khi đủ toán hạng | Khi đủ toán hạng | Không áp dụng | Không áp dụng |
+| P06 Duplicate | Bắt buộc | Bắt buộc | Bắt buộc | Bắt buộc ở cấp submission |
+| P07 Payment status | Bắt buộc | Bắt buộc | Bắt buộc | Theo luồng |
+| P08 Business context | Bắt buộc | Bắt buộc | Bắt buộc | Bắt buộc |
+| P09 Cross-source | Khi có từ 2 nguồn | Khi có từ 2 nguồn | Khi có từ 2 nguồn | Khi có dữ liệu hệ thống |
+| P10 Evidence | Theo loại chi | Theo loại chi | Bắt buộc | Luôn `UNKNOWN` nếu không có evidence |
+| P11 Policy category | Bắt buộc | Bắt buộc | Bắt buộc | Bắt buộc |
+| P12 Submission window | Bắt buộc | Bắt buộc | Bắt buộc | Chưa có ngày chứng từ thì `UNKNOWN` |
+| P13 Authority | Bắt buộc | Bắt buộc | Bắt buộc | Dùng claimed amount nhưng không thể auto-pass |
+| P14 Anomaly | Bắt buộc | Bắt buộc | Bắt buộc | Bắt buộc |
+| P15 Export readiness | Bắt buộc | Bắt buộc | Bắt buộc | Luôn `UNKNOWN` nếu thiếu chứng từ |
 
-Một hồ sơ chỉ được `AUTO_PROCESS` khi tất cả điều kiện sau đều đúng:
+## 10. Decision guard
 
-1. Đã xác định loại chứng từ/hồ sơ.
-2. Đầy đủ các trường quan trọng bắt buộc.
-3. Không có cảnh báo trích xuất nghiêm trọng.
-4. Danh tính bên mua/công ty hợp lệ nếu áp dụng.
-5. Số học và số tiền nhất quán.
-6. Không còn trùng lặp chưa giải quyết.
-7. Trạng thái thanh toán không mâu thuẫn.
-8. Đầy đủ bối cảnh kinh doanh.
-9. Đủ bằng chứng nhận hàng/dịch vụ nếu cần.
-10. Không thuộc danh mục bị cấm, cá nhân hoặc quá hạn.
-11. Không còn cờ nghi vấn chưa giải quyết.
-12. Số tiền nằm trong ngưỡng thẩm quyền.
+### 10.1. Thứ tự quyết định
 
-## 6. Đối tượng chuyển tiếp
-
-| Tình huống | Đối tượng |
-| --- | --- |
-| Vượt ngưỡng 50 triệu đồng | Quản lý tài chính |
-| Ngoài chính sách/danh mục bị cấm | Chủ chính sách kế toán/tài chính |
-| Bất thường/nghi vấn | Quản lý tài chính/kiểm soát nội bộ |
-| Mã số thuế bên mua thuộc công ty khác | Kế toán/người phụ trách thuế |
-| Chi phí nhân viên thiếu bối cảnh | Nhân viên/người yêu cầu |
-| Thiếu PO/bằng chứng nhận hàng hoặc dịch vụ | Bộ phận mua hàng/kho/chủ dự án |
-
-Thiếu dữ kiện không mặc định chuyển cho Quản lý tài chính; trước hết phải hỏi nguồn có thể cung cấp dữ kiện.
-
-## 7. Chất lượng câu hỏi
-
-Mỗi `REQUEST_INFO` hoặc `ESCALATE` phải có câu hỏi:
-
-- nêu dữ kiện/quy tắc đang gặp vấn đề;
-- đưa ra số liệu/bằng chứng liên quan;
-- có thể trả lời trực tiếp;
-- không chung chung kiểu “kiểm tra lại giúp tôi”.
-
-## 8. Ranh giới của LLM
-
-Mã tất định bắt buộc xử lý:
-
-- tiền và số lượng;
-- định danh trùng lặp;
-- trạng thái thanh toán;
-- ngày/thời hạn nộp;
-- ngưỡng thẩm quyền;
-- ánh xạ chính sách.
-
-Tác tử LLM chỉ:
-
-- suy luận trên dữ kiện/phép kiểm tra có cấu trúc;
-- đề xuất loại không chắc chắn/hành động;
-- chọn vấn đề chưa giải quyết quan trọng nhất;
-- tạo giải thích và câu hỏi;
-- xác định đối tượng từ bối cảnh chính sách.
-
-Bộ bảo vệ quyết định phải từ chối đề xuất trái quy tắc, ví dụ `FACTUAL_UNKNOWN → AUTO_PROCESS` hoặc số tiền trên 50 triệu đồng → `AUTO_PROCESS`.
-
-## 9. Dừng/ghi đè bởi con người
-
-`STOP` là trạng thái luồng công việc, không phải quyết định nghiệp vụ. `OVERRIDE` chỉ được đổi quyết định có hiệu lực thành một trong:
+Decision guard không dùng nội dung giải thích của LLM để thay đổi kết quả check.
+Nó áp dụng thứ tự sau:
 
 ```text
-AUTO_PROCESS
-REQUEST_INFO
-ESCALATE
+1. Pipeline hoặc audit store lỗi nghiêm trọng
+   -> SYSTEM_ERROR, không phát hành quyết định nghiệp vụ.
+
+2. Có FAIL / OUTSIDE_POLICY đã được xác nhận
+   -> ESCALATE / OUTSIDE_POLICY.
+
+3. Có FAIL / SUSPICIOUS với bằng chứng đủ mạnh
+   -> ESCALATE / SUSPICIOUS.
+
+4. Có UNKNOWN bắt buộc hoặc FACTUAL_UNKNOWN chưa giải quyết
+   -> REQUEST_INFO / FACTUAL_UNKNOWN.
+
+5. Có FAIL / BEYOND_AUTHORITY và không còn UNKNOWN bắt buộc
+   -> ESCALATE / BEYOND_AUTHORITY.
+
+6. Mọi check bắt buộc là PASS hoặc NOT_APPLICABLE
+   -> AUTO_PROCESS.
+
+7. Trường hợp còn lại
+   -> REQUEST_INFO / FACTUAL_UNKNOWN.
 ```
 
-Nhật ký kiểm toán phải lưu quyết định ban đầu, quyết định/trạng thái mới, người thực hiện, thời gian và lý do.
+Một vi phạm rõ như MST công ty khác hoặc duplicate chính xác không cần hỏi thêm
+các dữ kiện không thể làm thay đổi vi phạm đó. Decision vẫn phải trả toàn bộ
+`findings`, kể cả finding phụ.
+
+### 10.2. Mã giả có thể triển khai
+
+```python
+def decide(checks: list[CheckResult]) -> Decision:
+    if has_system_failure(checks):
+        raise ReviewSystemError()
+
+    if has_confirmed(checks, "OUTSIDE_POLICY"):
+        return escalate("OUTSIDE_POLICY", primary_finding(checks))
+
+    if has_confirmed(checks, "SUSPICIOUS"):
+        return escalate("SUSPICIOUS", primary_finding(checks))
+
+    if has_mandatory_unknown(checks):
+        return request_info(primary_unknown(checks))
+
+    if has_confirmed(checks, "BEYOND_AUTHORITY"):
+        return escalate("BEYOND_AUTHORITY", primary_finding(checks))
+
+    if all_mandatory_resolved(checks):
+        return auto_process(checks)
+
+    return request_info(primary_unresolved(checks))
+```
+
+`has_confirmed` chỉ nhận `CheckResult.status == FAIL` và có `evidence_refs`.
+Không được coi output LLM đơn lẻ là finding đã xác nhận.
+
+## 11. Quy tắc tạo câu hỏi và chuyển cấp
+
+`REQUEST_INFO` phải hỏi đúng người có thể bổ sung fact:
+
+- thiếu purpose/client/project: hỏi nhân viên;
+- thiếu/không rõ giá trị trên ảnh: hỏi nhân viên hoặc kế toán kèm crop liên quan;
+- thiếu nhận hàng: hỏi kho/mua hàng/chủ dự án;
+- payment status chưa rõ: hỏi kế toán thanh toán.
+
+`ESCALATE` dùng target từ config:
+
+- `OUTSIDE_POLICY`: chủ policy hoặc kế toán phụ trách;
+- `SUSPICIOUS`: kiểm soát nội bộ;
+- `BEYOND_AUTHORITY`: quản lý tài chính.
+
+Câu hỏi phải nêu giá trị đang có, giá trị xung đột và yêu cầu xác nhận cụ thể.
+Không dùng câu chung chung như "vui lòng kiểm tra lại".
+
+## 12. Bộ 15 test case chấp nhận bắt buộc
+
+Các case dưới đây là hợp đồng acceptance tối thiểu. Việc triển khai phải tạo kết
+quả từ fact và rule, tuyệt đối không rẽ nhánh theo `case_id`.
+
+| Mã | Tình huống | Check quyết định | Kết quả bắt buộc |
+| --- | --- | --- | --- |
+| AT01 | E-invoice hàng hóa hợp lệ + description/report đầy đủ | P01-P15 đạt | `AUTO_PROCESS` |
+| AT02 | E-invoice dịch vụ hợp lệ, không có quantity, context đầy đủ | P01 áp dụng điều kiện dịch vụ; các check đạt | `AUTO_PROCESS` |
+| AT03 | E-invoice hợp lệ nhưng thiếu business purpose/client-project cần thiết | P08 `UNKNOWN` | `REQUEST_INFO / FACTUAL_UNKNOWN` |
+| AT04 | E-invoice thiếu serial, invoice number hoặc trường bắt buộc khác | P01 `UNKNOWN` | `REQUEST_INFO / FACTUAL_UNKNOWN` |
+| AT05 | Bill ăn uống rõ + description tiếp khách + payment khớp | P01, P07-P09 đạt | `AUTO_PROCESS` |
+| AT06 | Bill cà phê rõ + description họp dự án + payment khớp | P01, P07-P09 đạt | `AUTO_PROCESS` |
+| AT07 | Bill mờ hoặc OCR không đọc được ngày/tổng tiền quan trọng | P02 `UNKNOWN` | `REQUEST_INFO / FACTUAL_UNKNOWN` |
+| AT08 | Bill có subtotal, discount, tax/service charge không khớp tổng | P05 `UNKNOWN` | `REQUEST_INFO / FACTUAL_UNKNOWN` |
+| AT09 | E-invoice 10 mặt hàng + phiếu kiểm kê/nhận hàng 10, tiền khớp | P09, P10 đạt | `AUTO_PROCESS` |
+| AT10 | E-invoice 10 mặt hàng nhưng phiếu kiểm kê/nhận hàng ghi 8 | P09 `UNKNOWN` | `REQUEST_INFO / FACTUAL_UNKNOWN` |
+| AT11 | E-invoice và report xung đột số tiền hoặc trạng thái nghiệm thu | P09/P10 `UNKNOWN` | `REQUEST_INFO / FACTUAL_UNKNOWN` |
+| AT12 | Hóa đơn có tín hiệu chỉnh sửa hoặc mẫu chia nhỏ giao dịch có bằng chứng | P14 `FAIL` | `ESCALATE / SUSPICIOUS` |
+| AT13 | Chỉ có description "tiếp khách ABC tối qua hết 2.500.000đ" | P08/P10/P15 chưa đủ | `REQUEST_INFO / FACTUAL_UNKNOWN` |
+| AT14 | Identity hóa đơn trùng chính xác hồ sơ đã xử lý | P06 `FAIL` | `ESCALATE / OUTSIDE_POLICY` |
+| AT15 | Hóa đơn hoàn toàn hợp lệ nhưng tổng tiền trên 50 triệu | P13 `FAIL`, không còn unknown | `ESCALATE / BEYOND_AUTHORITY` |
+
+## 13. Test case biên bắt buộc nên có
+
+| Mã | Tình huống | Kết quả bắt buộc |
+| --- | --- | --- |
+| AT16 | MST bên mua rõ nhưng thuộc công ty khác | `ESCALATE / OUTSIDE_POLICY` |
+| AT17 | Chi phí cá nhân hoặc danh mục bị cấm đã rõ | `ESCALATE / OUTSIDE_POLICY` |
+| AT18 | Chứng từ nộp sau 30 ngày, ngày tháng rõ | `ESCALATE / OUTSIDE_POLICY` |
+| AT19 | Chỉ có ảnh chuyển khoản, chưa rõ item và purpose | `REQUEST_INFO / FACTUAL_UNKNOWN` |
+| AT20 | Số tiền bằng chữ khác số tiền bằng số | `REQUEST_INFO / FACTUAL_UNKNOWN` |
+| AT21 | Duplicate chỉ là fuzzy/probable, chưa đủ exact key | `REQUEST_INFO / FACTUAL_UNKNOWN` |
+| AT22 | Vendor bị chặn trong Vendor Master | `ESCALATE / OUTSIDE_POLICY` |
+| AT23 | Hóa đơn hợp lệ nhưng History tool lỗi | `REQUEST_INFO / FACTUAL_UNKNOWN` |
+
+## 14. Điều kiện bất biến để viết unit test
+
+```text
+INVARIANT-01: Không có evidence không bao giờ AUTO_PROCESS.
+INVARIANT-02: Có mandatory UNKNOWN không bao giờ AUTO_PROCESS.
+INVARIANT-03: Exact duplicate không bao giờ AUTO_PROCESS.
+INVARIANT-04: MST bên mua thuộc công ty khác không bao giờ AUTO_PROCESS.
+INVARIANT-05: OUTSIDE_POLICY đã xác nhận luôn ESCALATE.
+INVARIANT-06: SUSPICIOUS đã xác nhận luôn ESCALATE.
+INVARIANT-07: Vượt hạn mức chỉ ESCALATE sau khi không còn mandatory UNKNOWN.
+INVARIANT-08: LLM lỗi vẫn phải tạo quyết định an toàn từ check engine.
+INVARIANT-09: Optional fact thiếu không tự tạo REQUEST_INFO.
+INVARIANT-10: Quantity thiếu ở dịch vụ không làm P01 UNKNOWN.
+INVARIANT-11: Quantity thiếu ở hàng hóa làm P01 UNKNOWN.
+INVARIANT-12: Description amount không được thay document amount.
+INVARIANT-13: Mọi FAIL/UNKNOWN phải có reason và evidence_refs/source_refs.
+INVARIANT-14: Human override không xóa quyết định và audit cũ.
+INVARIANT-15: Không có nhánh xử lý dựa trên case_id hoặc tên file fixture.
+```
+
+## 15. Đầu ra quyết định
+
+```json
+{
+  "action": "REQUEST_INFO",
+  "uncertainty_type": "FACTUAL_UNKNOWN",
+  "primary_check_id": "CHECK_BUSINESS_CONTEXT",
+  "reason": "Hồ sơ chưa có mục đích kinh doanh",
+  "question": "Khoản chi 2.500.000 đồng phục vụ mục đích kinh doanh nào và liên quan khách hàng/dự án nào?",
+  "target": "EMPLOYEE",
+  "policy_rule_ids": ["P08"],
+  "evidence_refs": ["CLAIM-001"],
+  "findings": [],
+  "policy_version": "1.0.0",
+  "decided_at": "2026-09-21T10:05:00+07:00"
+}
+```
+
+Quy tắc đầu ra:
+
+- `AUTO_PROCESS`: `uncertainty_type`, `question`, `target` là `null`.
+- `REQUEST_INFO`: `uncertainty_type = FACTUAL_UNKNOWN`, bắt buộc có câu hỏi và target.
+- `ESCALATE`: uncertainty là `OUTSIDE_POLICY`, `SUSPICIOUS` hoặc `BEYOND_AUTHORITY`.
+- Luôn trả `policy_version`, rule/check liên quan và nguồn bằng chứng.
+- Dữ liệu chuẩn hóa để nhập kế toán chỉ được phát hành khi action là `AUTO_PROCESS`;
+  các action khác có thể trả bản nháp nhưng phải gắn `not_ready_for_posting = true`.
+
+## 16. Audit và đánh giá lại
+
+Tối thiểu phải ghi:
+
+```text
+CASE_CREATED
+DOCUMENT_EXTRACTED
+FACT_NORMALIZED
+CHECK_PLANNED
+CHECK_COMPLETED
+LLM_ASSESSMENT_CREATED hoặc LLM_FALLBACK_USED
+DECISION_GUARD_APPLIED
+DECISION_MADE
+INFO_REQUESTED hoặc ESCALATED
+HUMAN_CONFIRMED, STOPPED hoặc OVERRIDDEN nếu có
+```
+
+Khi nhận dữ kiện mới, hệ thống tạo version mới của `ReviewCase`, chạy lại các check
+bị ảnh hưởng và Decision Guard. Không sửa hoặc xóa quyết định trước đó.
+
+Nguyên tắc cuối cùng:
+
+> Chưa biết thì hỏi. Biết rõ nhưng sai policy, đáng ngờ hoặc vượt quyền thì chuyển.
+> Chỉ tự động xử lý khi dữ kiện đầy đủ, check bắt buộc đã đạt và audit còn nguyên vẹn.

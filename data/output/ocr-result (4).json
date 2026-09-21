@@ -1,0 +1,224 @@
+{
+  "filename": "Hoa_don_dien_tu.jpg",
+  "confidence": 0.988,
+  "pages": 1,
+  "structuring_status": "success",
+  "structured_data": {
+    "document_type": "invoice",
+    "document_number": "00002438",
+    "issue_date": "2023-07-11",
+    "due_date": null,
+    "currency": "VND",
+    "references": {
+      "order_number": null,
+      "delivery_note_number": null,
+      "customer_po_number": null,
+      "other_references": [
+        "2C23TTU",
+        "00B6C354D9CCF448A3B1A58180C35B6737",
+        "HND3SJ"
+      ]
+    },
+    "supplier": {
+      "name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+      "tax_id": "0110329220",
+      "address": "Số 9A, ngõ 181 đường Xuân Thủy, Phường Dịch Vọng Hậu, Quận Cầu Giấy, Thành phố Hà Nội, Việt Nam",
+      "phone": null,
+      "email": null
+    },
+    "customer": {
+      "name": "CÔNG TY CỔ PHẦN KIẾN TRÚC VÀ XÂY DỰNG IGS",
+      "tax_id": "0110329573",
+      "address": "Số 10, xóm Giữa, thôn Đồng Lai, Xã Liên Hồng, Huyện Đan Phượng, Thành phố Hà Nội, Việt Nam",
+      "phone": null,
+      "email": null
+    },
+    "items": [
+      {
+        "code": null,
+        "description": "Khóa học thực hành kế toán tổng hợp",
+        "item_type": "service",
+        "quantity": 2,
+        "unit_price": 3500000,
+        "discount_percent": null,
+        "discount_amount": null,
+        "net_amount": 7000000,
+        "taxes": [],
+        "total": 7000000,
+        "custom_fields": null
+      },
+      {
+        "code": null,
+        "description": "Dịch vụ kế toán thuế quý 3/2023",
+        "item_type": "service",
+        "quantity": 1,
+        "unit_price": 2000000,
+        "discount_percent": null,
+        "discount_amount": null,
+        "net_amount": 2000000,
+        "taxes": [],
+        "total": 2000000,
+        "custom_fields": null
+      }
+    ],
+    "totals": {
+      "gross_subtotal": 9000000,
+      "discount_total": 0,
+      "net_subtotal": 9000000,
+      "taxes": [],
+      "tax_total": 0,
+      "surcharges": [],
+      "surcharge_total": 0,
+      "withholdings": [],
+      "withholding_total": 0,
+      "total": 9000000,
+      "total_payable": 9000000
+    },
+    "payment": {
+      "method": null,
+      "status": null,
+      "bank_account": null,
+      "reference": null,
+      "terms": null
+    },
+    "notes": "Số tiền viết bằng chữ: Chín triệu đồng./. Mã của Cơ quan thuế: 00B6C354D9CCF448A3B1A58180C35B6737. Hóa đơn điện tử tra cứu tại http://tracuu.ehoadon.vn.",
+    "metadata": {
+      "language": "vi",
+      "page_count": 1,
+      "has_logo": null,
+      "has_stamp": null,
+      "has_signature": true
+    },
+    "document_type_raw": "invoice"
+  },
+  "structure_confidence": 1,
+  "confidence_details": {
+    "ocr": {
+      "score": 0.965,
+      "factors": {
+        "text_length": 1692,
+        "length_score": 1,
+        "legibility_ratio": 0.912,
+        "financial_patterns_found": 3,
+        "pattern_score": 1,
+        "ocr_quality": "high"
+      }
+    },
+    "structuring": {
+      "score": 1,
+      "factors": {
+        "json_valid": true,
+        "critical_fields": {
+          "document_type": true,
+          "document_number": true,
+          "supplier": true,
+          "items": true
+        },
+        "completeness_score": 1,
+        "important_fields_ratio": 1,
+        "numeric_consistency": {
+          "checks_passed": 2,
+          "checks_total": 2,
+          "errors": []
+        }
+      }
+    },
+    "combined": {
+      "score": 0.988,
+      "factors": {
+        "ocr_confidence": 0.965,
+        "structuring_confidence": 1,
+        "combined_confidence": 0.988,
+        "ocr_factors": {
+          "text_length": 1692,
+          "length_score": 1,
+          "legibility_ratio": 0.912,
+          "financial_patterns_found": 3,
+          "pattern_score": 1,
+          "ocr_quality": "high"
+        },
+        "structuring_factors": {
+          "json_valid": true,
+          "critical_fields": {
+            "document_type": true,
+            "document_number": true,
+            "supplier": true,
+            "items": true
+          },
+          "completeness_score": 1,
+          "important_fields_ratio": 1,
+          "numeric_consistency": {
+            "checks_passed": 2,
+            "checks_total": 2,
+            "errors": []
+          }
+        }
+      }
+    }
+  },
+  "arithmetic_validation": {
+    "valid": true,
+    "errors": [],
+    "warnings": [],
+    "checks_performed": 5,
+    "checks_passed": 5
+  },
+  "schema_validation": {
+    "valid": true,
+    "errors": [],
+    "warnings": []
+  },
+  "cross_validation": {
+    "cross_valid": true,
+    "score": 0.8,
+    "checks": [
+      {
+        "field": "document_number",
+        "value": "00002438",
+        "found_in_text": true
+      },
+      {
+        "field": "totals.total",
+        "value": "9000000.0",
+        "found_in_text": false
+      },
+      {
+        "field": "supplier.name",
+        "value": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+        "found_in_text": true
+      },
+      {
+        "field": "supplier.tax_id",
+        "value": "0110329220",
+        "found_in_text": true
+      },
+      {
+        "field": "issue_date",
+        "value": "2023-07-11",
+        "found_in_text": true
+      }
+    ],
+    "warnings": [
+      "total 9000000.0 no encontrado en texto OCR"
+    ]
+  },
+  "structure_metadata": {
+    "input_tokens": 3675,
+    "output_tokens": 582,
+    "total_tokens": 4257,
+    "reasoning_tokens": 0,
+    "processing_time_seconds": 5.881443023681641,
+    "finish_reason": "stop",
+    "limits_applied": {
+      "instructions_max_chars": 2000,
+      "issuer_rules_max_chars": 6000
+    }
+  },
+  "status": "success",
+  "processing_time_ms": 7715,
+  "tokens": {
+    "input": 3675,
+    "output": 582,
+    "total": 4257
+  }
+}
