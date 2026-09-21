@@ -2,6 +2,7 @@
 .agents
 AGENTS.md
 .codegraph
+.claude
 
 # Python bytecode / caches
 __pycache__/

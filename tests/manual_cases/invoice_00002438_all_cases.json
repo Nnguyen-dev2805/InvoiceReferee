@@ -1,0 +1,1829 @@
+{
+  "_meta": {
+    "source_invoice": "codex-clipboard-55584ee1-4f5d-4cf7-8021-507eadb1c1fa.png",
+    "source_invoice_facts": {
+      "invoice_number": "00002438",
+      "invoice_series": "2C23TTU",
+      "invoice_date": "2023-07-11",
+      "vendor_tax_code": "0110329220",
+      "total_amount": 9000000
+    },
+    "usage": [
+      "Choose Invoice Document in the Streamlit UI and upload the source image.",
+      "Copy one case.base_evidence object into Structured PO / GR / payment JSON.",
+      "Apply the case.ocr_field_reviews actions during extraction confirmation.",
+      "Compare the final decision with case.expected."
+    ],
+    "warning": "Only TC14 is fully faithful to the attached service invoice. Other cases add synthetic PO/GR/payment/history or contradict visible values to exercise policy branches.",
+    "current_ui_limitation": "The current Streamlit extraction form confirms header fields but does not expose line-item review controls; line_items[...] overrides are executable through the OCR harness but not fully through the current manual UI."
+  },
+  "cases": {
+    "TC01": {
+      "title": "Routine exact match",
+      "faithful_to_source": false,
+      "synthetic_reason": "Treats the service lines as synthetic PO catalog items",
+      "base_evidence": {
+        "transaction_id": "TX-TC01-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 9000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 2,
+              "unit_price": 3500000,
+              "line_total": 7000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 1,
+              "unit_price": 2000000,
+              "line_total": 2000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 2
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 1
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC01",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "AUTO_PROCESS",
+        "uncertainty_type": null,
+        "policy_rule_ids": [],
+        "target": null
+      }
+    },
+    "TC02": {
+      "title": "Routine partial invoice",
+      "faithful_to_source": false,
+      "synthetic_reason": "Synthetic larger PO/receipt; attached invoice bills only part",
+      "base_evidence": {
+        "transaction_id": "TX-TC02-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 18000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 4,
+              "unit_price": 3500000,
+              "line_total": 14000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 2,
+              "unit_price": 2000000,
+              "line_total": 4000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 4
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 2
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC02",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "AUTO_PROCESS",
+        "uncertainty_type": null,
+        "policy_rule_ids": [],
+        "target": null
+      }
+    },
+    "TC03": {
+      "title": "Multiple invoices within PO",
+      "faithful_to_source": false,
+      "synthetic_reason": "Adds a prior invoice and doubles PO/receipt capacity",
+      "base_evidence": {
+        "transaction_id": "TX-TC03-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 18000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 4,
+              "unit_price": 3500000,
+              "line_total": 14000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 2,
+              "unit_price": 2000000,
+              "line_total": 4000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 4
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 2
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [
+          {
+            "invoice_id": "INV-PRIOR-0001",
+            "invoice_number": "00002000",
+            "invoice_series": "2C23TTU",
+            "invoice_type": "ORIGINAL",
+            "vendor_id": "VENDOR-0110329220",
+            "vendor_tax_code": "0110329220",
+            "po_id": "PO-IMG-00002438",
+            "invoice_date": "2023-07-01",
+            "currency": "VND",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "invoiced_quantity": 2,
+                "unit_price": 3500000,
+                "line_total": 7000000
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "invoiced_quantity": 1,
+                "unit_price": 2000000,
+                "line_total": 2000000
+              }
+            ],
+            "total_amount": 9000000,
+            "source_type": "JSON",
+            "flagged": false
+          }
+        ],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC02",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "AUTO_PROCESS",
+        "uncertainty_type": null,
+        "policy_rule_ids": [],
+        "target": null
+      }
+    },
+    "TC04": {
+      "title": "Missing Goods Receipt",
+      "faithful_to_source": false,
+      "synthetic_reason": "Declares PO goods but omits receipt",
+      "base_evidence": {
+        "transaction_id": "TX-TC04-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 9000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 2,
+              "unit_price": 3500000,
+              "line_total": 7000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 1,
+              "unit_price": 2000000,
+              "line_total": 2000000
+            }
+          ]
+        },
+        "goods_receipts": [],
+        "prior_invoices": [],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC04",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "REQUEST_INFO",
+        "uncertainty_type": "FACTUAL_UNKNOWN",
+        "policy_rule_ids": [
+          "P04"
+        ],
+        "target": "Warehouse"
+      }
+    },
+    "TC05": {
+      "title": "PO not found",
+      "faithful_to_source": false,
+      "synthetic_reason": "Declares PO goods but provides no PO",
+      "base_evidence": {
+        "transaction_id": "TX-TC05-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": null,
+        "goods_receipts": [],
+        "prior_invoices": [],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC05",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "REQUEST_INFO",
+        "uncertainty_type": "FACTUAL_UNKNOWN",
+        "policy_rule_ids": [
+          "P01"
+        ],
+        "target": "Purchasing"
+      }
+    },
+    "TC06": {
+      "title": "Vendor mismatch",
+      "faithful_to_source": false,
+      "synthetic_reason": "Companion PO belongs to another vendor",
+      "base_evidence": {
+        "transaction_id": "TX-TC06-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-OTHER",
+          "vendor_tax_code": "0999999999",
+          "vendor_name": "NHÀ CUNG CẤP KHÁC",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 9000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 2,
+              "unit_price": 3500000,
+              "line_total": 7000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 1,
+              "unit_price": 2000000,
+              "line_total": 2000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 2
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 1
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC06",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "REQUEST_INFO",
+        "uncertainty_type": "FACTUAL_UNKNOWN",
+        "policy_rule_ids": [
+          "P02"
+        ],
+        "target": "Purchasing"
+      }
+    },
+    "TC07": {
+      "title": "Quantity exceeds receipt",
+      "faithful_to_source": false,
+      "synthetic_reason": "Receipt confirms only one course while invoice quantity is two",
+      "base_evidence": {
+        "transaction_id": "TX-TC07-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 9000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 2,
+              "unit_price": 3500000,
+              "line_total": 7000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 1,
+              "unit_price": 2000000,
+              "line_total": 2000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 1
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 1
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC07",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "REQUEST_INFO",
+        "uncertainty_type": "FACTUAL_UNKNOWN",
+        "policy_rule_ids": [
+          "P05"
+        ],
+        "target": "Warehouse"
+      }
+    },
+    "TC08": {
+      "title": "Unit price mismatch",
+      "faithful_to_source": false,
+      "synthetic_reason": "PO approves 3,000,000 while image shows 3,500,000",
+      "base_evidence": {
+        "transaction_id": "TX-TC08-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 8000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 2,
+              "unit_price": 3000000,
+              "line_total": 6000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 1,
+              "unit_price": 2000000,
+              "line_total": 2000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 2
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 1
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC08",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "REQUEST_INFO",
+        "uncertainty_type": "FACTUAL_UNKNOWN",
+        "policy_rule_ids": [
+          "P06"
+        ],
+        "target": "Purchasing"
+      }
+    },
+    "TC09": {
+      "title": "Invoice exceeds PO",
+      "faithful_to_source": false,
+      "synthetic_reason": "PO ceiling is 8,000,000 while image total is 9,000,000",
+      "base_evidence": {
+        "transaction_id": "TX-TC09-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 8000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 2,
+              "unit_price": 3500000,
+              "line_total": 7000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 1,
+              "unit_price": 2000000,
+              "line_total": 2000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 2
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 1
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC09",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "REQUEST_INFO",
+        "uncertainty_type": "FACTUAL_UNKNOWN",
+        "policy_rule_ids": [
+          "P07"
+        ],
+        "target": "Purchasing"
+      }
+    },
+    "TC10": {
+      "title": "Cumulative invoices exceed PO",
+      "faithful_to_source": false,
+      "synthetic_reason": "Prior invoice 2,000,000 plus current 9,000,000 exceeds PO 9,000,000",
+      "base_evidence": {
+        "transaction_id": "TX-TC10-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 9000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 2,
+              "unit_price": 3500000,
+              "line_total": 7000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 1,
+              "unit_price": 2000000,
+              "line_total": 2000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 2
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 1
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [
+          {
+            "invoice_id": "INV-PRIOR-PO-LIMIT",
+            "invoice_number": "00002001",
+            "invoice_series": "2C23TTU",
+            "invoice_type": "ORIGINAL",
+            "vendor_id": "VENDOR-0110329220",
+            "vendor_tax_code": "0110329220",
+            "po_id": "PO-IMG-00002438",
+            "invoice_date": "2023-07-01",
+            "currency": "VND",
+            "items": [],
+            "total_amount": 2000000,
+            "source_type": "JSON",
+            "flagged": false
+          }
+        ],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC10",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "REQUEST_INFO",
+        "uncertainty_type": "FACTUAL_UNKNOWN",
+        "policy_rule_ids": [
+          "P08"
+        ],
+        "target": "Purchasing"
+      }
+    },
+    "TC11": {
+      "title": "Duplicate invoice",
+      "faithful_to_source": false,
+      "synthetic_reason": "Prior history contains the same tax code, series, and invoice number",
+      "base_evidence": {
+        "transaction_id": "TX-TC11-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 9000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 2,
+              "unit_price": 3500000,
+              "line_total": 7000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 1,
+              "unit_price": 2000000,
+              "line_total": 2000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 2
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 1
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [
+          {
+            "invoice_id": "INV-PRIOR-DUP",
+            "invoice_number": "00002438",
+            "invoice_series": "2C23TTU",
+            "invoice_type": "ORIGINAL",
+            "vendor_id": "VENDOR-0110329220",
+            "vendor_tax_code": "0110329220",
+            "po_id": "PO-IMG-00002438",
+            "invoice_date": "2023-07-11",
+            "currency": "VND",
+            "items": [],
+            "total_amount": 9000000,
+            "source_type": "JSON",
+            "flagged": false
+          }
+        ],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC11",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "REQUEST_INFO",
+        "uncertainty_type": "FACTUAL_UNKNOWN",
+        "policy_rule_ids": [
+          "P09"
+        ],
+        "target": "Accounting"
+      }
+    },
+    "TC12": {
+      "title": "Already paid",
+      "faithful_to_source": false,
+      "synthetic_reason": "Payment history marks the invoice paid",
+      "base_evidence": {
+        "transaction_id": "TX-TC12-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 9000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 2,
+              "unit_price": 3500000,
+              "line_total": 7000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 1,
+              "unit_price": 2000000,
+              "line_total": 2000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 2
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 1
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC12",
+            "invoice_id": "INV-00002438",
+            "status": "PAID",
+            "paid_amount": 9000000,
+            "payment_date": "2023-07-12"
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "REQUEST_INFO",
+        "uncertainty_type": "FACTUAL_UNKNOWN",
+        "policy_rule_ids": [
+          "P10"
+        ],
+        "target": "Accounting"
+      }
+    },
+    "TC13": {
+      "title": "Beyond authority",
+      "faithful_to_source": false,
+      "synthetic_reason": "Requires overriding the visible 9,000,000 total to 120,000,000; use only to test authority logic",
+      "base_evidence": {
+        "transaction_id": "TX-TC13-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 120000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 2,
+              "unit_price": 35000000,
+              "line_total": 70000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 1,
+              "unit_price": 50000000,
+              "line_total": 50000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 2
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 1
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC13",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          },
+          "total_amount": {
+            "action": "CORRECT",
+            "value": 120000000,
+            "reason": "Synthetic authority test; contradicts the attached image"
+          },
+          "line_items[0].unit_price": {
+            "action": "CORRECT",
+            "value": 35000000,
+            "reason": "Synthetic authority test"
+          },
+          "line_items[0].line_total": {
+            "action": "CORRECT",
+            "value": 70000000,
+            "reason": "Synthetic authority test"
+          },
+          "line_items[1].unit_price": {
+            "action": "CORRECT",
+            "value": 50000000,
+            "reason": "Synthetic authority test"
+          },
+          "line_items[1].line_total": {
+            "action": "CORRECT",
+            "value": 50000000,
+            "reason": "Synthetic authority test"
+          }
+        }
+      },
+      "expected": {
+        "action": "ESCALATE",
+        "uncertainty_type": "BEYOND_AUTHORITY",
+        "policy_rule_ids": [
+          "P12"
+        ],
+        "target": "Finance Manager"
+      }
+    },
+    "TC14": {
+      "title": "Known outside policy",
+      "faithful_to_source": true,
+      "synthetic_reason": null,
+      "base_evidence": {
+        "transaction_id": "TX-TC14-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "SERVICE_INVOICE",
+        "purchase_order": null,
+        "goods_receipts": [],
+        "prior_invoices": [],
+        "payment_history": [],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are in VND"
+          },
+          "po_id": {
+            "action": "MARK_UNKNOWN",
+            "reason": "No PO reference is printed on the invoice"
+          },
+          "line_items[0].item_id": {
+            "action": "MARK_UNKNOWN",
+            "reason": "No internal item ID on invoice"
+          },
+          "line_items[1].item_id": {
+            "action": "MARK_UNKNOWN",
+            "reason": "No internal item ID on invoice"
+          }
+        }
+      },
+      "expected": {
+        "action": "ESCALATE",
+        "uncertainty_type": "OUTSIDE_POLICY",
+        "policy_rule_ids": [
+          "P13"
+        ],
+        "target": "Accounting / Finance owner"
+      }
+    },
+    "TC15": {
+      "title": "Suspicious critical field",
+      "faithful_to_source": false,
+      "synthetic_reason": "Marks a legible amount unknown to exercise P15; use a degraded image for a faithful OCR test",
+      "base_evidence": {
+        "transaction_id": "TX-TC15-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 9000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 2,
+              "unit_price": 3500000,
+              "line_total": 7000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 1,
+              "unit_price": 2000000,
+              "line_total": 2000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 2
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 1
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC15",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          },
+          "total_amount": {
+            "action": "MARK_UNKNOWN",
+            "reason": "Synthetic unreadable-field test; the supplied image itself is legible"
+          }
+        }
+      },
+      "expected": {
+        "action": "REQUEST_INFO",
+        "uncertainty_type": "FACTUAL_UNKNOWN",
+        "policy_rule_ids": [
+          "P15"
+        ],
+        "target": "Supplier"
+      }
+    },
+    "TC16": {
+      "title": "Cumulative quantity exceeds receipt",
+      "faithful_to_source": false,
+      "synthetic_reason": "Prior quantity one plus current quantity two exceeds received quantity two",
+      "base_evidence": {
+        "transaction_id": "TX-TC16-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 12500000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 3,
+              "unit_price": 3500000,
+              "line_total": 10500000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 1,
+              "unit_price": 2000000,
+              "line_total": 2000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 2
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 1
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [
+          {
+            "invoice_id": "INV-PRIOR-QTY",
+            "invoice_number": "00002002",
+            "invoice_series": "2C23TTU",
+            "invoice_type": "ORIGINAL",
+            "vendor_id": "VENDOR-0110329220",
+            "vendor_tax_code": "0110329220",
+            "po_id": "PO-IMG-00002438",
+            "invoice_date": "2023-07-01",
+            "currency": "VND",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "invoiced_quantity": 1,
+                "unit_price": 3500000,
+                "line_total": 3500000
+              }
+            ],
+            "total_amount": 3500000,
+            "source_type": "JSON",
+            "flagged": false
+          }
+        ],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC16",
+            "invoice_id": "INV-00002438",
+            "status": "UNPAID",
+            "paid_amount": 0,
+            "payment_date": null
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "REQUEST_INFO",
+        "uncertainty_type": "FACTUAL_UNKNOWN",
+        "policy_rule_ids": [
+          "P05"
+        ],
+        "target": "Warehouse"
+      }
+    },
+    "TC17": {
+      "title": "Partially paid",
+      "faithful_to_source": false,
+      "synthetic_reason": "Payment history records a 4,000,000 partial payment",
+      "base_evidence": {
+        "transaction_id": "TX-TC17-00002438",
+        "invoice_id": "INV-00002438",
+        "transaction_type": "PO_GOODS_PURCHASE",
+        "purchase_order": {
+          "po_id": "PO-IMG-00002438",
+          "vendor_id": "VENDOR-0110329220",
+          "vendor_tax_code": "0110329220",
+          "vendor_name": "CÔNG TY KẾ TOÁN THIÊN ƯNG",
+          "currency": "VND",
+          "order_date": "2023-07-10",
+          "status": "APPROVED",
+          "approved_total": 9000000,
+          "items": [
+            {
+              "item_id": "ITEM-COURSE",
+              "supplier_sku": null,
+              "description": "Khóa học thực hành kế toán tổng hợp",
+              "ordered_quantity": 2,
+              "unit_price": 3500000,
+              "line_total": 7000000
+            },
+            {
+              "item_id": "ITEM-TAX-Q3",
+              "supplier_sku": null,
+              "description": "Dịch vụ kế toán thuế quý 3/2023",
+              "ordered_quantity": 1,
+              "unit_price": 2000000,
+              "line_total": 2000000
+            }
+          ]
+        },
+        "goods_receipts": [
+          {
+            "receipt_id": "GR-IMG-00002438",
+            "po_id": "PO-IMG-00002438",
+            "received_date": "2023-07-11",
+            "status": "RECEIVED",
+            "items": [
+              {
+                "item_id": "ITEM-COURSE",
+                "description": "Khóa học thực hành kế toán tổng hợp",
+                "received_quantity": 2
+              },
+              {
+                "item_id": "ITEM-TAX-Q3",
+                "description": "Dịch vụ kế toán thuế quý 3/2023",
+                "received_quantity": 1
+              }
+            ]
+          }
+        ],
+        "prior_invoices": [],
+        "payment_history": [
+          {
+            "payment_id": "PAY-TC17",
+            "invoice_id": "INV-00002438",
+            "status": "PARTIALLY_PAID",
+            "paid_amount": 4000000,
+            "payment_date": "2023-07-12"
+          }
+        ],
+        "approvals": []
+      },
+      "ocr_field_reviews": {
+        "mode": "CONFIRM_ALL",
+        "overrides": {
+          "invoice_type": {
+            "action": "CORRECT",
+            "value": "ORIGINAL",
+            "reason": "Invoice is an original sales invoice"
+          },
+          "currency": {
+            "action": "CORRECT",
+            "value": "VND",
+            "reason": "Amounts are denominated in VND"
+          },
+          "po_id": {
+            "action": "CORRECT",
+            "value": "PO-IMG-00002438",
+            "reason": "Synthetic companion PO mapping for this test"
+          },
+          "line_items[0].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-COURSE",
+            "reason": "Synthetic PO item mapping"
+          },
+          "line_items[1].item_id": {
+            "action": "CORRECT",
+            "value": "ITEM-TAX-Q3",
+            "reason": "Synthetic PO item mapping"
+          }
+        }
+      },
+      "expected": {
+        "action": "REQUEST_INFO",
+        "uncertainty_type": "FACTUAL_UNKNOWN",
+        "policy_rule_ids": [
+          "P10"
+        ],
+        "target": "Accounting"
+      }
+    }
+  }
+}
