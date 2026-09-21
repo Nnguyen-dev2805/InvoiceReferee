@@ -1,55 +1,157 @@
-"""Kimi adapter for one-shot case extraction and reasoning."""
+"""Kimi adapters for extraction-quality checks without business decisions."""
 
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, TypeVar
 
-from invoice_referee.domain import KimiAnalysis
+from pydantic import BaseModel
+
+from invoice_referee.domain import ConfidenceAnalysis
+
+MAX_OUTPUT_TOKENS = 8192
+MAX_REPAIR_CONTEXT_CHARS = 16_000
+AnalysisModel = TypeVar("AnalysisModel", bound=BaseModel)
 
 
-SYSTEM_PROMPT = """Bạn là tác tử hỗ trợ kế toán Việt Nam.
-Bạn nhận business context và kết quả OCR của từng tài liệu độc lập.
-Chỉ dùng dữ kiện được cung cấp, không tự bịa hoặc điền giá trị còn thiếu.
-Hãy xác định business context có đủ để hiểu mục đích khoản chi hay không và
-hai nguồn có mâu thuẫn trực tiếp về số tiền, ngày, đối tác hoặc nội dung chi hay không.
-Trả về đúng một JSON object, không bọc Markdown, theo schema:
-{
-  "business_context_present": true,
-  "conflict_detected": false,
-  "summary": "Tóm tắt ngắn cho kế toán",
-  "reasoning": "Lý do rõ ràng, nêu dữ kiện và nguồn đã đối chiếu",
-  "conflicts": []
-}
-Không trả chain-of-thought; chỉ trả kết luận và rationale có thể kiểm toán.
+REPAIR_PROMPT = """Phản hồi trước không thể được hệ thống đọc thành JSON đúng schema.
+Hãy tạo lại toàn bộ kết quả. Chỉ trả về đúng một JSON object hợp lệ, không dùng
+Markdown, không thêm lời dẫn, không thêm nội dung sau JSON. Mọi chuỗi phải
+được escape đúng chuẩn JSON và không được bỏ sót đối tượng cần đánh giá.
 """
 
 
-def _parse_json_object(response_text: str) -> dict[str, Any]:
-    text = response_text.strip()
-    if text.startswith("```"):
-        first_newline = text.find("\n")
-        text = text[first_newline + 1 :] if first_newline >= 0 else text
-        if text.endswith("```"):
-            text = text[:-3].strip()
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError:
-        start = text.find("{")
-        end = text.rfind("}")
-        if start < 0 or end <= start:
-            raise ValueError("Kimi không trả về JSON object hợp lệ.") from None
+CONFIDENCE_SYSTEM_PROMPT = """Bạn là Confidence Quality Agent kiểm tra chất
+lượng extraction của các candidate block có word confidence thấp. Bạn không
+phải tác tử duyệt kế toán.
+
+Nhiệm vụ duy nhất:
+1. Phân loại từng evidence theo toàn bộ OCR context và giữ nguyên evidence_id
+   trong document_types.
+2. Đánh giá MỌI candidate block đúng một lần và giữ nguyên candidate_id.
+3. Xác định phần confidence thấp có làm mơ hồ dữ liệu tài chính/định danh hay
+   chỉ làm sai chính tả nội dung mô tả như tên món ăn.
+4. Không sửa hoặc tự đoán chữ/số. Chỉ ghi observed_text đúng nội dung OCR.
+5. Chọn review_action cho từng block. Chỉ tạo human_question khi action là
+   ASK_HUMAN; câu hỏi phải chỉ rõ evidence, block, trường và điều cần xác nhận.
+6. Nếu nội dung vẫn nhận diện được ở mức ngữ nghĩa và có thể liên quan policy
+   (ví dụ bia/rượu), gắn semantic_category và DEFER_TO_POLICY. Không tự kết
+   luận nội dung đó được phép hay bị cấm.
+
+Không kiểm tra missing field toàn tài liệu, policy, xung đột, tính hợp lệ,
+gian lận, hạn mức hoặc đưa ra PASS/REJECT.
+
+importance chỉ được là CRITICAL, NON_CRITICAL, UNKNOWN.
+quality_state chỉ được là READABLE, SEMANTICALLY_READABLE, UNCERTAIN,
+UNREADABLE, UNKNOWN.
+- READABLE: phần confidence thấp không làm giá trị cần dùng trở nên mơ hồ.
+- SEMANTICALLY_READABLE: chữ có thể sai nhưng vẫn nhận diện được loại nội dung.
+- UNCERTAIN/UNREADABLE: không đủ tin cậy để dùng mà không có người xác minh.
+- UNKNOWN: không đủ context để đánh giá.
+
+review_action chỉ được là:
+- CONTINUE: lỗi không ảnh hưởng dữ liệu cần dùng ở bước extraction.
+- ASK_HUMAN: phải xác minh trước khi tiếp tục vì dữ liệu tài chính, định danh
+  hoặc đối tượng hàng hóa bắt buộc đang không rõ.
+- DEFER_TO_POLICY: extraction đủ hiểu ý nghĩa chung nhưng nội dung có thể cần
+  Policy Agent xem xét. Action này KHÔNG chặn extraction và không hỏi human.
+
+Quy tắc theo loại chứng từ:
+- Bill nhà hàng/cafe: tên món sai vài ký tự thường là CONTINUE nếu số lượng,
+  đơn giá, thành tiền và tổng tiền rõ.
+- Tên đồ uống như "Helineken" vẫn nhận diện được là bia: dùng
+  SEMANTICALLY_READABLE + DEFER_TO_POLICY, không ASK_HUMAN chỉ vì sai chính tả.
+- Hóa đơn điện tử, phiếu nhập kho, mua tài sản/vật tư: ASK_HUMAN nếu tên hàng
+  mờ đến mức không xác định được đối tượng mua.
+- Tổng tiền, thuế, ngày, số hóa đơn, MST, số lượng, đơn giá hoặc thành tiền:
+  ASK_HUMAN khi phần giá trị cần dùng thực sự không rõ.
+- Lời chào, chân trang và tên món không ảnh hưởng đối soát: CONTINUE.
+
+Map canonical_fields theo ngữ nghĩa, không phụ thuộc nhãn hay layout cố định.
+Trả về đúng một JSON object, không bọc Markdown:
+{
+  "document_types": {"EV-001": "PAPER_RECEIPT"},
+  "block_assessments": [
+    {
+      "candidate_id": "EV-001:page-0-block-4",
+      "importance": "CRITICAL",
+      "quality_state": "UNCERTAIN",
+      "review_action": "ASK_HUMAN",
+      "canonical_fields": ["total_amount"],
+      "observed_text": "2.442.960đ",
+      "semantic_category": null,
+      "reason": "Giá trị tiền nằm trong block có confidence thấp.",
+      "human_question": "Vui lòng xác nhận tổng thanh toán tại block B04 có phải 2.442.960đ không."
+    }
+  ]
+}
+Không trả chain-of-thought, kết luận hồ sơ hay khẳng định nghiệp vụ.
+"""
+
+
+def _json_objects(response_text: str) -> list[dict[str, Any]]:
+    """Find complete JSON objects even when the model adds surrounding text."""
+
+    text = response_text.strip().lstrip("\ufeff")
+    decoder = json.JSONDecoder()
+    objects: list[dict[str, Any]] = []
+    seen_ranges: set[tuple[int, int]] = set()
+
+    for start, character in enumerate(text):
+        if character != "{":
+            continue
         try:
-            parsed = json.loads(text[start : end + 1])
-        except json.JSONDecodeError as exc:
-            raise ValueError("Kimi không trả về JSON object hợp lệ.") from exc
-    if not isinstance(parsed, dict):
-        raise ValueError("Kimi response phải là một JSON object.")
-    return parsed
+            parsed, consumed = decoder.raw_decode(text[start:])
+        except json.JSONDecodeError:
+            continue
+        end = start + consumed
+        if isinstance(parsed, dict) and (start, end) not in seen_ranges:
+            objects.append(parsed)
+            seen_ranges.add((start, end))
+
+    return objects
+
+
+def _parse_analysis(
+    response_text: str,
+    model_type: type[AnalysisModel],
+) -> AnalysisModel:
+    objects = _json_objects(response_text)
+    if not objects:
+        raise ValueError("Kimi không trả về JSON object hoàn chỉnh.")
+
+    validation_errors: list[str] = []
+    for parsed in objects:
+        try:
+            return model_type.model_validate(parsed)
+        except Exception as exc:
+            validation_errors.append(str(exc).splitlines()[0])
+
+    detail = validation_errors[0] if validation_errors else "sai schema"
+    raise ValueError(f"Kimi trả về JSON nhưng không đúng schema: {detail}")
+
+
+class KimiResponseError(ValueError):
+    """Raised after every bounded JSON recovery attempt has failed."""
+
+    def __init__(self, stage: str, diagnostics: list[dict[str, Any]]) -> None:
+        self.stage = stage
+        self.diagnostics = diagnostics
+        details = "; ".join(
+            (
+                f"lần {item['attempt']}: {item['character_count']} ký tự, "
+                f"finish_reason={item['finish_reason']}, lỗi={item['error']}"
+            )
+            for item in diagnostics
+        )
+        super().__init__(
+            f"Kimi {stage} không trả về JSON hợp lệ sau "
+            f"{len(diagnostics)} lần thử. {details}"
+        )
 
 
 class KimiReasoningAdapter:
-    """Call one OpenAI-compatible Kimi endpoint per complete case."""
+    """Call Kimi only for confidence-quality assessment."""
 
     def __init__(
         self,
@@ -68,24 +170,89 @@ class KimiReasoningAdapter:
         self.client = client
         self.model = model
 
-    def analyze(self, case_payload: dict[str, Any]) -> KimiAnalysis:
+    def _complete(self, messages: list[dict[str, str]]) -> tuple[str, str]:
         completion = self.client.chat.completions.create(
             model=self.model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": json.dumps(
-                        case_payload,
-                        ensure_ascii=False,
-                        separators=(",", ":"),
-                    ),
-                },
-            ],
+            messages=messages,
             temperature=0.1,
-            max_tokens=4096,
+            max_tokens=MAX_OUTPUT_TOKENS,
             top_p=0.95,
             stream=False,
+            extra_body={"reasoning_effort": "low"},
         )
-        response_text = completion.choices[0].message.content or ""
-        return KimiAnalysis.model_validate(_parse_json_object(response_text))
+        choice = completion.choices[0]
+        content = choice.message.content
+        if isinstance(content, str):
+            response_text = content
+        elif content is None:
+            response_text = ""
+        else:
+            response_text = json.dumps(content, ensure_ascii=False, default=str)
+        return response_text, str(getattr(choice, "finish_reason", "unknown"))
+
+    def _analyze(
+        self,
+        case_payload: dict[str, Any],
+        *,
+        stage: str,
+        system_prompt: str,
+        model_type: type[AnalysisModel],
+    ) -> AnalysisModel:
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": json.dumps(
+                    case_payload,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+            },
+        ]
+        diagnostics: list[dict[str, Any]] = []
+
+        response_text, finish_reason = self._complete(messages)
+        try:
+            return _parse_analysis(response_text, model_type)
+        except ValueError as exc:
+            diagnostics.append(
+                {
+                    "attempt": 1,
+                    "character_count": len(response_text),
+                    "finish_reason": finish_reason,
+                    "error": str(exc),
+                }
+            )
+
+        repair_messages = [
+            *messages,
+            {
+                "role": "assistant",
+                "content": response_text[-MAX_REPAIR_CONTEXT_CHARS:],
+            },
+            {"role": "user", "content": REPAIR_PROMPT},
+        ]
+        repaired_text, repaired_finish_reason = self._complete(repair_messages)
+        try:
+            return _parse_analysis(repaired_text, model_type)
+        except ValueError as exc:
+            diagnostics.append(
+                {
+                    "attempt": 2,
+                    "character_count": len(repaired_text),
+                    "finish_reason": repaired_finish_reason,
+                    "error": str(exc),
+                }
+            )
+            raise KimiResponseError(stage, diagnostics) from exc
+
+    def analyze_confidence(
+        self,
+        case_payload: dict[str, Any],
+    ) -> ConfidenceAnalysis:
+        return self._analyze(
+            case_payload,
+            stage="Confidence Quality Agent",
+            system_prompt=CONFIDENCE_SYSTEM_PROMPT,
+            model_type=ConfidenceAnalysis,
+        )

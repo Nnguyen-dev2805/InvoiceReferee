@@ -7,9 +7,12 @@ from typing import Any
 
 import streamlit as st
 
+from app.components.bbox_overlay import render_bbox_overlay
+from invoice_referee.extraction import restructure_mistral_ocr
 from invoice_referee.storage import LocalEvidenceRepository, StoredCase
 
 IMAGE_SUFFIXES = {".jpeg", ".jpg", ".png", ".webp"}
+DELETE_STATE_PREFIX = "accounting-confirm-delete-"
 
 
 def _case_title(case: StoredCase, result: dict[str, Any]) -> str:
@@ -17,20 +20,39 @@ def _case_title(case: StoredCase, result: dict[str, Any]) -> str:
     return f"{case.case_id} · {subject} · {result.get('decision', 'UNKNOWN')}"
 
 
-def _render_evidence(case: StoredCase) -> None:
+def _render_evidence(
+    case: StoredCase,
+    repository: LocalEvidenceRepository,
+) -> None:
     if not case.evidence:
         st.caption("Không có evidence đính kèm.")
         return
 
     st.markdown("**Evidence**")
+    show_bounding_boxes = st.toggle(
+        "Hiện bounding boxes",
+        value=False,
+        key=f"accounting-bbox-{case.case_id}",
+    )
     columns = st.columns(min(3, len(case.evidence)))
     for index, evidence in enumerate(case.evidence):
         with columns[index % len(columns)]:
             suffix = evidence.absolute_path.suffix.lower()
             if suffix in IMAGE_SUFFIXES:
+                preview: Any = evidence.absolute_path
+                caption = evidence.original_name
+                if show_bounding_boxes:
+                    ocr_result = repository.load_ocr_result(evidence)
+                    try:
+                        if ocr_result:
+                            page = restructure_mistral_ocr(ocr_result)["pages"][0]
+                            preview = render_bbox_overlay(evidence.absolute_path, page)
+                            caption = f"{evidence.original_name} · OCR blocks"
+                    except (IndexError, OSError, TypeError, ValueError):
+                        st.warning("Không thể dựng bounding boxes cho ảnh này.")
                 st.image(
-                    evidence.absolute_path.read_bytes(),
-                    caption=evidence.original_name,
+                    preview,
+                    caption=caption,
                     width="stretch",
                 )
             else:
@@ -45,13 +67,157 @@ def _render_evidence(case: StoredCase) -> None:
                 )
 
 
-def _render_case(case: StoredCase, result: dict[str, Any]) -> None:
-    with st.expander(_case_title(case, result)):
+def _render_quality_review(result: dict[str, Any]) -> None:
+    candidates = result.get("low_confidence_candidates") or []
+    if not candidates:
+        return
+    confidence_analysis = result.get("confidence_analysis")
+    legacy_analysis = result.get("kimi_analysis")
+    if not confidence_analysis and not legacy_analysis:
+        rule_ids = {
+            finding.get("rule_id") for finding in result.get("findings") or []
+        }
+        if {
+            "CONFIDENCE_AGENT_ERROR",
+            "KIMI_PROCESSING_ERROR",
+        }.intersection(rule_ids):
+            st.warning(
+                "Confidence Quality Agent không hoàn thành nên chưa có assessment "
+                "cho các block confidence thấp."
+            )
+        else:
+            st.info(
+                "Hồ sơ này chưa có kết quả Confidence Quality Agent. Có thể đây "
+                "là kết quả được tạo trước workflow hiện tại."
+            )
+        return
+
+    assessments = {
+        item.get("candidate_id"): item
+        for item in (
+            (confidence_analysis or {}).get("block_assessments")
+            or (legacy_analysis or {}).get("block_assessments")
+            or []
+        )
+    }
+    st.markdown("**Confidence Quality Agent**")
+    policy_signal_count = sum(
+        item.get("review_action") == "DEFER_TO_POLICY"
+        for item in assessments.values()
+    )
+    if policy_signal_count:
+        st.warning(
+            f"Có {policy_signal_count} tín hiệu không chặn extraction và đang chờ "
+            "Policy Agent xem xét."
+        )
+    st.dataframe(
+        [
+            {
+                "Candidate": candidate.get("candidate_id"),
+                "Nội dung block": candidate.get("content"),
+                "Word thấp": ", ".join(
+                    f"{word.get('text', '').strip()} ({word.get('confidence', 0):.3f})"
+                    for word in candidate.get("low_words") or []
+                ),
+                "Mức quan trọng": (
+                    assessments.get(candidate.get("candidate_id"), {}).get("importance")
+                    or "UNKNOWN"
+                ),
+                "Chất lượng": (
+                    assessments.get(candidate.get("candidate_id"), {}).get("quality_state")
+                    or "UNKNOWN"
+                ),
+                "Hành động": (
+                    assessments.get(candidate.get("candidate_id"), {}).get("review_action")
+                    or "ASK_HUMAN"
+                ),
+                "Nhóm ngữ nghĩa": assessments.get(
+                    candidate.get("candidate_id"), {}
+                ).get("semantic_category"),
+                "Canonical fields": ", ".join(
+                    assessments.get(candidate.get("candidate_id"), {}).get(
+                        "canonical_fields", []
+                    )
+                ),
+                "Lý do": assessments.get(candidate.get("candidate_id"), {}).get(
+                    "reason", "Thiếu assessment cho candidate này."
+                ),
+                "Câu hỏi cho người kiểm tra": assessments.get(
+                    candidate.get("candidate_id"), {}
+                ).get("human_question"),
+            }
+            for candidate in candidates
+        ],
+        hide_index=True,
+        width="stretch",
+    )
+
+
+def _render_delete_controls(
+    case: StoredCase,
+    repository: LocalEvidenceRepository,
+) -> None:
+    state_key = f"{DELETE_STATE_PREFIX}{case.case_id}"
+    st.divider()
+
+    if not st.session_state.get(state_key, False):
+        _, action_column = st.columns([4, 1])
+        with action_column:
+            if st.button(
+                "Xóa hồ sơ",
+                icon=":material/delete:",
+                key=f"delete-case-{case.case_id}",
+                use_container_width=True,
+            ):
+                st.session_state[state_key] = True
+                st.rerun()
+        return
+
+    st.warning(
+        f"Xóa vĩnh viễn {case.case_id}? Evidence, kết quả OCR và kết quả xử lý "
+        "của hồ sơ này sẽ bị xóa."
+    )
+    _, confirm_column, cancel_column = st.columns([3, 1, 1])
+    with confirm_column:
+        if st.button(
+            "Xác nhận xóa",
+            icon=":material/delete_forever:",
+            type="primary",
+            key=f"confirm-delete-case-{case.case_id}",
+            use_container_width=True,
+        ):
+            try:
+                repository.delete_case(case.case_id)
+            except (OSError, ValueError) as exc:
+                st.error(f"Không thể xóa hồ sơ: {exc}")
+            else:
+                st.session_state.pop(state_key, None)
+                st.session_state.pop("accounting-case-selector-passed", None)
+                st.session_state.pop("accounting-case-selector-needs-human", None)
+                st.toast(f"Đã xóa {case.case_id}.")
+                st.rerun()
+    with cancel_column:
+        if st.button(
+            "Hủy",
+            icon=":material/close:",
+            key=f"cancel-delete-case-{case.case_id}",
+            use_container_width=True,
+        ):
+            st.session_state.pop(state_key, None)
+            st.rerun()
+
+
+def _render_case(
+    case: StoredCase,
+    result: dict[str, Any],
+    repository: LocalEvidenceRepository,
+) -> None:
+    with st.expander(_case_title(case, result), expanded=True):
         st.markdown("**Business context**")
         st.write(case.body or "Không có nội dung.")
 
         summary_columns = st.columns(2)
-        summary_columns[0].metric("Quyết định", result.get("decision", "UNKNOWN"))
+        summary_columns[0].metric("Định tuyến extraction", result.get("decision", "UNKNOWN"))
         summary_columns[1].metric(
             "Evidence đã OCR",
             len(result.get("ocr_evidence_ids") or []),
@@ -79,6 +245,8 @@ def _render_case(case: StoredCase, result: dict[str, Any]) -> None:
                 width="stretch",
             )
 
+        _render_quality_review(result)
+
         conflicts = ((result.get("kimi_analysis") or {}).get("conflicts") or [])
         if conflicts:
             st.markdown("**Dữ kiện mâu thuẫn**")
@@ -86,15 +254,29 @@ def _render_case(case: StoredCase, result: dict[str, Any]) -> None:
 
         for error in result.get("processing_errors") or []:
             st.warning(error)
-        _render_evidence(case)
+        _render_evidence(case, repository)
+        _render_delete_controls(case, repository)
 
 
-def _render_queue(items: list[tuple[StoredCase, dict[str, Any]]]) -> None:
+def _render_queue(
+    items: list[tuple[StoredCase, dict[str, Any]]],
+    repository: LocalEvidenceRepository,
+    *,
+    queue_key: str,
+) -> None:
     if not items:
         st.info("Chưa có hồ sơ trong nhóm này.")
         return
-    for case, result in items:
-        _render_case(case, result)
+
+    item_by_case_id = {case.case_id: (case, result) for case, result in items}
+    selected_case_id = st.selectbox(
+        "Chọn hồ sơ",
+        options=list(item_by_case_id),
+        format_func=lambda case_id: _case_title(*item_by_case_id[case_id]),
+        key=f"accounting-case-selector-{queue_key}",
+    )
+    case, result = item_by_case_id[selected_case_id]
+    _render_case(case, result, repository)
 
 
 def render_accounting_review(repository: LocalEvidenceRepository) -> None:
@@ -121,9 +303,9 @@ def render_accounting_review(repository: LocalEvidenceRepository) -> None:
     ]
 
     passed_tab, human_tab = st.tabs(
-        [f"Đã pass ({len(passed)})", f"Cần xử lý ({len(needs_human)})"]
+        [f"Extraction rõ ({len(passed)})", f"Cần xác minh ({len(needs_human)})"]
     )
     with passed_tab:
-        _render_queue(passed)
+        _render_queue(passed, repository, queue_key="passed")
     with human_tab:
-        _render_queue(needs_human)
+        _render_queue(needs_human, repository, queue_key="needs-human")

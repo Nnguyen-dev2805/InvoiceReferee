@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -135,9 +136,23 @@ class LocalEvidenceRepository:
             return None
         return json.loads(output_path.read_text(encoding="utf-8"))
 
+    def delete_case(self, case_id: str) -> None:
+        """Permanently remove one case and all of its stored artifacts."""
+
+        case_dir = self._case_dir(case_id)
+        if not case_dir.is_dir():
+            raise FileNotFoundError(f"Không tìm thấy hồ sơ: {case_id}")
+        shutil.rmtree(case_dir)
+
     def _case_dir(self, case_id: str) -> Path:
         root = self.submissions_root.resolve()
+        if (
+            not case_id.startswith("CASE-")
+            or Path(case_id).name != case_id
+            or case_id in {".", ".."}
+        ):
+            raise ValueError("Case ID không hợp lệ.")
         case_dir = (root / case_id).resolve()
-        if not case_dir.is_relative_to(root):
+        if case_dir.parent != root:
             raise ValueError("Case path không hợp lệ.")
         return case_dir

@@ -139,7 +139,8 @@ Mở `http://localhost:8501`. Giao diện tiếp nhận hai nhóm dữ liệu:
 
 Sidebar có ba không gian làm việc:
 
-- `Nhân viên`: gửi hồ sơ; Submit tự chạy Missing Gate, OCR và Kimi;
+- `Nhân viên`: gửi hồ sơ; Submit tự chạy Source Gate, OCR rồi đến Confidence
+  Quality Agent khi có candidate;
 - `Kế toán`: xem hai hàng đợi `Đã pass` và `Cần xử lý` cùng reasoning;
 - `OCR kiểm thử`: chỉ xem evidence đã được Mistral OCR xử lý, gồm văn bản,
   confidence theo từng từ, ảnh có bounding box, cấu trúc
@@ -149,6 +150,22 @@ Hồ sơ đã tiếp nhận được lưu cục bộ trong `data/submissions/{ca
 này bị Git bỏ qua vì có thể chứa dữ liệu nhạy cảm. Kết quả OCR debug được lưu
 trong `data/submissions/{case_id}/ocr/{evidence_id}.json`; quyết định và
 reasoning được lưu trong `data/submissions/{case_id}/processing.json`.
+
+Confidence Gate mặc định gom các block có meaningful word dưới `0.85`. Nếu có
+candidate, toàn bộ candidate của mọi evidence được gửi trong cùng một lần gọi
+Confidence Quality Agent cùng OCR context. Agent tự phân loại loại chứng từ,
+đánh giá chất lượng extraction và chọn `CONTINUE`, `ASK_HUMAN` hoặc
+`DEFER_TO_POLICY`; không đưa ra quyết định nghiệp vụ. Chỉ `ASK_HUMAN` chặn
+pipeline. `DEFER_TO_POLICY` tạo cảnh báo không chặn để Agent nghiệp vụ xử lý
+sau. Với bill ăn uống, tên món sai vài ký tự không chặn nếu số lượng, đơn giá,
+thành tiền và tổng tiền vẫn rõ. Có thể đổi ngưỡng bằng
+`OCR_WORD_REVIEW_THRESHOLD` trong `.env`.
+
+Không có candidate thì không gọi LLM; có candidate thì gọi Kimi một lần cho
+toàn bộ hồ sơ. Call này được retry đúng một lần nếu JSON không hoàn chỉnh hoặc
+sai schema. Sau retry vẫn lỗi, hồ sơ chuyển sang `NEEDS_HUMAN`. Trạng thái
+`PASS` tại đây chỉ có nghĩa Confidence Quality Gate cho phép đi tiếp; hệ thống
+chưa kiểm tra missing value, policy hoặc tính hợp lệ của chứng từ.
 
 ### Tái cấu trúc confidence OCR
 

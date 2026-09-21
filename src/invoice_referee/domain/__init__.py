@@ -2,8 +2,12 @@
 
 from .errors import SubmissionValidationError
 from .processing import (
+    BlockAssessment,
     CaseProcessingResult,
+    ConfidenceAnalysis,
+    FieldAssessment,
     KimiAnalysis,
+    MissingValueAnalysis,
     ProcessingDecision,
     RuleFinding,
 )
@@ -16,11 +20,15 @@ from .submission import (
 )
 
 __all__ = [
+    "BlockAssessment",
     "ClaimDraft",
     "CaseProcessingResult",
+    "ConfidenceAnalysis",
     "EvidenceRecord",
     "EvidenceRole",
+    "FieldAssessment",
     "KimiAnalysis",
+    "MissingValueAnalysis",
     "ProcessingDecision",
     "RuleFinding",
     "SubmissionReceipt",

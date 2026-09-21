@@ -171,6 +171,20 @@ def test_accounting_page_splits_processed_cases(tmp_path: Path, monkeypatch) -> 
     app.radio[0].set_value("Kế toán").run()
 
     assert len(app.exception) == 0
-    assert [tab.label for tab in app.tabs] == ["Đã pass (0)", "Cần xử lý (1)"]
+    assert [tab.label for tab in app.tabs] == [
+        "Extraction rõ (0)",
+        "Cần xác minh (1)",
+    ]
     assert len(app.expander) == 1
     assert "CASE-ACCOUNTING-UI" in app.expander[0].label
+    assert any(button.label == "Xóa hồ sơ" for button in app.button)
+
+    next(button for button in app.button if button.label == "Xóa hồ sơ").click().run()
+    assert any(button.label == "Xác nhận xóa" for button in app.button)
+
+    next(
+        button for button in app.button if button.label == "Xác nhận xóa"
+    ).click().run()
+    app.run()
+    assert not (submissions_root / "CASE-ACCOUNTING-UI").exists()
+    assert len(app.expander) == 0

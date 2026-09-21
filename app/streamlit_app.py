@@ -37,7 +37,10 @@ initialize_submission_state()
 
 
 @st.cache_resource
-def build_submission_service(submissions_root: str) -> SubmitCaseService:
+def build_submission_service(
+    submissions_root: str,
+    word_confidence_threshold: float,
+) -> SubmitCaseService:
     settings_root = Path(submissions_root)
     store = LocalCaseStore(settings_root)
     repository = LocalEvidenceRepository(settings_root)
@@ -45,6 +48,7 @@ def build_submission_service(submissions_root: str) -> SubmitCaseService:
         repository,
         build_ocr_adapter(),
         build_kimi_adapter(),
+        word_confidence_threshold=word_confidence_threshold,
     )
     return SubmitCaseService(store, processor=processor)
 
@@ -84,7 +88,10 @@ selected_page = render_sidebar()
 
 if selected_page == EMPLOYEE_PAGE:
     render_employee_submission(
-        build_submission_service(str(settings.submissions_root))
+        build_submission_service(
+            str(settings.submissions_root),
+            settings.ocr_word_review_threshold,
+        )
     )
 elif selected_page == ACCOUNTING_PAGE:
     render_accounting_review(repository)

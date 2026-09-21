@@ -11,6 +11,7 @@ from pathlib import Path
 class AppSettings:
     project_root: Path
     data_root: Path
+    ocr_word_review_threshold: float = 0.85
 
     @property
     def submissions_root(self) -> Path:
@@ -24,4 +25,11 @@ class AppSettings:
             if configured_data_root
             else project_root / "data"
         )
-        return cls(project_root=project_root, data_root=data_root)
+        threshold = float(os.getenv("OCR_WORD_REVIEW_THRESHOLD", "0.85"))
+        if not 0 < threshold <= 1:
+            raise ValueError("OCR_WORD_REVIEW_THRESHOLD phải nằm trong (0, 1].")
+        return cls(
+            project_root=project_root,
+            data_root=data_root,
+            ocr_word_review_threshold=threshold,
+        )
