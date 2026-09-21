@@ -8,6 +8,7 @@ from .confidence import (
 )
 from .mistral_ocr import MistralOcrAdapter, OcrExecution
 from .kimi_reasoning import KimiReasoningAdapter, KimiResponseError
+from .conflict_reasoning import CONFLICT_SYSTEM_PROMPT
 from .word_block_mapper import restructure_mistral_ocr
 from .ocr_quality import (
     DEFAULT_WORD_REVIEW_THRESHOLD,
@@ -22,6 +23,7 @@ __all__ = [
     "MistralOcrAdapter",
     "KimiReasoningAdapter",
     "KimiResponseError",
+    "CONFLICT_SYSTEM_PROMPT",
     "OcrExecution",
     "confidence_level",
     "collect_low_confidence_blocks",

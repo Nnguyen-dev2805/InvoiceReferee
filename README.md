@@ -139,9 +139,9 @@ Mở `http://localhost:8501`. Giao diện tiếp nhận hai nhóm dữ liệu:
 
 Sidebar có ba không gian làm việc:
 
-- `Nhân viên`: gửi hồ sơ; Submit tự chạy Source Gate, OCR rồi đến Confidence
-  Quality Agent khi có candidate;
-- `Kế toán`: xem hai hàng đợi `Đã pass` và `Cần xử lý` cùng reasoning;
+- `Nhân viên`: gửi hồ sơ; Submit tự chạy Source Gate, OCR, Confidence Quality
+  Agent khi có candidate rồi đến policy kiểm kê;
+- `Kế toán`: xem hai hàng đợi `Đã pass` và `Cần xác minh` cùng reasoning;
 - `OCR kiểm thử`: chỉ xem evidence đã được Mistral OCR xử lý, gồm văn bản,
   confidence theo từng từ, ảnh có bounding box, cấu trúc
   `page -> block -> words` cùng JSON thô. Đây là trang debug tạm thời.
@@ -151,21 +151,35 @@ này bị Git bỏ qua vì có thể chứa dữ liệu nhạy cảm. Kết qu�
 trong `data/submissions/{case_id}/ocr/{evidence_id}.json`; quyết định và
 reasoning được lưu trong `data/submissions/{case_id}/processing.json`.
 
-Confidence Gate mặc định gom các block có meaningful word dưới `0.85`. Nếu có
-candidate, toàn bộ candidate của mọi evidence được gửi trong cùng một lần gọi
-Confidence Quality Agent cùng OCR context. Agent tự phân loại loại chứng từ,
-đánh giá chất lượng extraction và chọn `CONTINUE`, `ASK_HUMAN` hoặc
-`DEFER_TO_POLICY`; không đưa ra quyết định nghiệp vụ. Chỉ `ASK_HUMAN` chặn
-pipeline. `DEFER_TO_POLICY` tạo cảnh báo không chặn để Agent nghiệp vụ xử lý
-sau. Với bill ăn uống, tên món sai vài ký tự không chặn nếu số lượng, đơn giá,
-thành tiền và tổng tiền vẫn rõ. Có thể đổi ngưỡng bằng
-`OCR_WORD_REVIEW_THRESHOLD` trong `.env`.
+Confidence Gate mặc định gom các block có meaningful word dưới `0.85` theo
+từng evidence. Mỗi evidence có candidate được gửi trong **một lần gọi Kimi
+riêng**; payload chỉ chứa OCR text và candidate block của chính evidence đó,
+không chứa business context hoặc chứng từ khác. Confidence Quality Agent chỉ
+đánh giá chất lượng đọc, trả `requires_verification` và khuyến nghị `CONTINUE`
+hoặc `ASK_HUMAN`; nó không kiểm tra thiếu trường, policy hay xung đột đa nguồn.
+Với bill ăn uống, tên món sai vài ký tự không chặn nếu vẫn nhận diện chắc ý nghĩa.
+Có thể đổi ngưỡng bằng `OCR_WORD_REVIEW_THRESHOLD` trong `.env`.
 
-Không có candidate thì không gọi LLM; có candidate thì gọi Kimi một lần cho
-toàn bộ hồ sơ. Call này được retry đúng một lần nếu JSON không hoàn chỉnh hoặc
-sai schema. Sau retry vẫn lỗi, hồ sơ chuyển sang `NEEDS_HUMAN`. Trạng thái
-`PASS` tại đây chỉ có nghĩa Confidence Quality Gate cho phép đi tiếp; hệ thống
-chưa kiểm tra missing value, policy hoặc tính hợp lệ của chứng từ.
+Code tạo Quality Gate riêng cho từng evidence. Thông tin chưa rõ thuộc field cần
+cho đối chiếu như tên hàng, số lượng, đơn vị, đơn giá, thành tiền, tổng tiền hoặc
+trạng thái nhận hàng sẽ dừng hồ sơ để kế toán xác nhận. Field chưa rõ nhưng nằm
+ngoài policy kiểm kê hiện tại, chẳng hạn thuế suất, được giữ thành cảnh báo và
+không bị Confidence Agent tự diễn giải thành quyết định nghiệp vụ.
+
+Chỉ khi **tất cả evidence cần thiết đã CLEAR**, Cross-source Conflict Agent mới
+được gọi đúng một lần với JSON gồm business context, OCR text và block context
+của toàn bộ bill/report. Agent trích xuất fact độc lập theo từng nguồn, đề xuất
+ghép các dòng hàng cùng nghĩa, liệt kê phép so sánh và xung đột ngữ nghĩa; nó
+không được tự quyết định PASS/FAIL. Code kiểm tra coverage, `Decimal`, đơn vị,
+source references và các chênh lệch trước khi tạo kết quả cuối.
+
+Với `n` evidence có block confidence thấp, số lần gọi Kimi bình thường là `n + 1`:
+`n` lần Confidence độc lập và `1` lần Conflict. Evidence không có candidate sẽ
+không gọi Confidence. Mỗi lần gọi được retry đúng một lần nếu JSON sai schema;
+Conflict được gọi sửa thêm một lần nếu bỏ sót document. Bất kỳ Quality Gate nào
+bị chặn thì Conflict Agent không chạy. Xung đột số lượng, đơn giá, thành tiền,
+trạng thái nhận hàng hoặc xung đột ngữ nghĩa chuyển hồ sơ sang `NEEDS_HUMAN`
+với câu hỏi cụ thể cho kế toán.
 
 ### Tái cấu trúc confidence OCR
 
@@ -208,6 +222,7 @@ Giao diện phải cho phép dán/tải lên JSON mới để kiểm thử đầ
 
 ## Trạng thái hiện tại
 
-Dự án đã có giao diện Streamlit tiếp nhận hồ sơ, model đầu vào, validation kỹ
-thuật, lưu trữ cục bộ và audit sự kiện tạo hồ sơ/đính kèm evidence. OCR, check
-engine, Decision Guard, Verify và màn hình xử lý của kế toán là các phần tiếp theo.
+Dự án đã có giao diện Streamlit tiếp nhận hồ sơ, OCR, Confidence Gate, policy
+đối chiếu hóa đơn với phiếu nhập kho/report, hàng đợi kế toán, lưu trữ cục bộ và
+audit cơ bản. Các policy nghiệp vụ còn lại, Decision Guard đầy đủ và Verify là
+các phần tiếp theo.

@@ -7,7 +7,12 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
-from invoice_referee.domain import ConfidenceAnalysis
+from invoice_referee.domain import (
+    ConfidenceAnalysis,
+    ConflictAnalysis,
+)
+
+from .conflict_reasoning import CONFLICT_SYSTEM_PROMPT
 
 MAX_OUTPUT_TOKENS = 8192
 MAX_REPAIR_CONTEXT_CHARS = 16_000
@@ -21,89 +26,71 @@ Markdown, không thêm lời dẫn, không thêm nội dung sau JSON. Mọi chu�
 """
 
 
-CONFIDENCE_SYSTEM_PROMPT = """Bạn là Confidence Quality Agent kiểm tra chất
-lượng extraction của các candidate block có word confidence thấp. Bạn không
-phải tác tử duyệt kế toán.
+CONFIDENCE_SYSTEM_PROMPT = """Bạn là Evidence Confidence Quality Agent. Mỗi
+lần bạn chỉ đánh giá MỘT evidence đã được OCR và các candidate block có word
+confidence thấp của chính evidence đó.
 
 Nhiệm vụ duy nhất:
-1. Phân loại từng evidence theo toàn bộ OCR context và giữ nguyên evidence_id
-   trong document_types.
-2. Đánh giá MỌI candidate block đúng một lần và giữ nguyên candidate_id.
-3. Xác định phần confidence thấp có làm mơ hồ dữ liệu tài chính/định danh hay
-   chỉ làm sai chính tả nội dung mô tả như tên món ăn.
-4. Không sửa hoặc tự đoán chữ/số. Chỉ ghi observed_text đúng nội dung OCR.
-5. Chọn review_action cho từng block. Chỉ tạo human_question khi action là
-   ASK_HUMAN; câu hỏi phải chỉ rõ chứng từ, thông tin và điều cần xác nhận.
-6. Nếu nội dung vẫn nhận diện được ở mức ngữ nghĩa và có thể liên quan policy
-   (ví dụ bia/rượu), gắn semantic_category và DEFER_TO_POLICY. Không tự kết
-   luận nội dung đó được phép hay bị cấm.
+1. Đánh giá MỌI candidate block đúng một lần, giữ nguyên candidate_id.
+2. Xác định nội dung còn đọc được nguyên giá trị, chỉ đọc được ý nghĩa chung,
+   chưa chắc chắn hay không đọc được.
+3. Map nội dung vào canonical_fields theo ngữ nghĩa.
+4. Đặt requires_verification=true khi giá trị trong block không thể được dùng
+   an toàn nếu chưa có người xác nhận. Đặt false khi vẫn đọc được hoặc chỉ là
+   nội dung không thiết yếu.
+5. Không sửa, tự đoán hoặc lấy dữ liệu từ nguồn khác để bù vào phần chưa rõ.
 
-Không kiểm tra missing field toàn tài liệu, policy, xung đột, tính hợp lệ,
-gian lận, hạn mức hoặc đưa ra PASS/REJECT.
+Bạn KHÔNG nhận và KHÔNG được sử dụng business context hoặc chứng từ khác. Không
+kiểm tra missing field toàn tài liệu, conflict, policy, thuế, danh mục chi phí,
+hạn mức, gian lận hoặc đưa ra quyết định hồ sơ.
 
-Quy tắc viết cho kế toán:
-- reason là ghi chú kỹ thuật ngắn để kiểm toán nội bộ.
-- human_question phải là tiếng Việt tự nhiên, ngắn gọn và có thể hành động.
-- Dùng tên file hoặc loại chứng từ để kế toán nhận biết nguồn.
-- Không đưa candidate_id, evidence_id, page/block ID, confidence score, tên
-  schema, canonical field hay thuật ngữ OCR vào human_question.
-- Không nói "block này", "confidence thấp" hoặc "OCR đọc" với kế toán.
-- Nêu trực tiếp thông tin cần xác nhận và giá trị đang nhìn thấy nếu có.
-- Nếu một vùng có nhiều thông tin liên quan, gom thành một câu hỏi dễ đọc.
-
-Ví dụ human_question tốt:
-- "Vui lòng kiểm tra hóa đơn Hoa_don.jpg và xác nhận tổng thanh toán có phải
-  2.442.960đ không."
-- "Vui lòng xác nhận mã số thuế người bán và người mua trên hóa đơn điện tử."
-
-Ví dụ không được dùng:
-- "Xác nhận EV-001 tại page-0-block-4 vì confidence 0.62."
-
-importance chỉ được là CRITICAL, NON_CRITICAL, UNKNOWN.
 quality_state chỉ được là READABLE, SEMANTICALLY_READABLE, UNCERTAIN,
-UNREADABLE, UNKNOWN.
-- READABLE: phần confidence thấp không làm giá trị cần dùng trở nên mơ hồ.
-- SEMANTICALLY_READABLE: chữ có thể sai nhưng vẫn nhận diện được loại nội dung.
-- UNCERTAIN/UNREADABLE: không đủ tin cậy để dùng mà không có người xác minh.
-- UNKNOWN: không đủ context để đánh giá.
+UNREADABLE hoặc UNKNOWN:
+- READABLE: giá trị vẫn đọc được đầy đủ.
+- SEMANTICALLY_READABLE: chữ có thể sai nhưng vẫn nhận diện chắc ý nghĩa chung.
+- UNCERTAIN/UNREADABLE: giá trị không thể sử dụng an toàn.
+- UNKNOWN: context trong evidence chưa đủ để đánh giá.
 
-review_action chỉ được là:
-- CONTINUE: lỗi không ảnh hưởng dữ liệu cần dùng ở bước extraction.
-- ASK_HUMAN: phải xác minh trước khi tiếp tục vì dữ liệu tài chính, định danh
-  hoặc đối tượng hàng hóa bắt buộc đang không rõ.
-- DEFER_TO_POLICY: extraction đủ hiểu ý nghĩa chung nhưng nội dung có thể cần
-  Policy Agent xem xét. Action này KHÔNG chặn extraction và không hỏi human.
+review_action chỉ là khuyến nghị chất lượng:
+- CONTINUE khi requires_verification=false.
+- ASK_HUMAN khi requires_verification=true.
+Không dùng DEFER_TO_POLICY. Quality Gate bằng code sẽ quyết định field nào cần
+cho bước đối chiếu tiếp theo.
 
-Quy tắc theo loại chứng từ:
-- Bill nhà hàng/cafe: tên món sai vài ký tự thường là CONTINUE nếu số lượng,
-  đơn giá, thành tiền và tổng tiền rõ.
-- Tên đồ uống, đồ ăn hay các đồ dùng không phải định danh liên quan đến nhiệp vụ kế toán như "Helineken" vẫn nhận diện được là bia: dùng
-  SEMANTICALLY_READABLE + DEFER_TO_POLICY, không ASK_HUMAN chỉ vì sai chính tả.
-- Hóa đơn điện tử, phiếu nhập kho, mua tài sản/vật tư: ASK_HUMAN nếu tên hàng
-  mờ đến mức không xác định được đối tượng mua.
-- Tổng tiền, thuế, ngày, số hóa đơn, MST, số lượng, đơn giá hoặc thành tiền:
-  ASK_HUMAN khi phần giá trị cần dùng thực sự không rõ.
-- Lời chào, chân trang và tên món không ảnh hưởng đối soát: CONTINUE.
+Ví dụ:
+- "Helineken" vẫn nhận diện chắc là một tên mặt hàng: SEMANTICALLY_READABLE,
+  requires_verification=false.
+- Tổng tiền chỉ nhìn được một phần: UNCERTAIN, requires_verification=true.
+- Lời chào hoặc chân trang mờ: NON_CRITICAL, requires_verification=false.
+- Thuế suất không đọc được: canonical_fields=["tax_rate"], UNCERTAIN và
+  requires_verification=true. Agent chỉ báo chất lượng; không tự quyết định nó
+  có chặn kiểm kê hay không.
 
-Map canonical_fields theo ngữ nghĩa, không phụ thuộc nhãn hay layout cố định.
+Quy tắc viết human_question:
+- Chỉ tạo khi requires_verification=true.
+- Dùng tên file hoặc loại chứng từ, nêu trực tiếp giá trị cần xác nhận.
+- Không đưa candidate_id, evidence_id, page/block ID, confidence score, schema,
+  canonical field hoặc thuật ngữ OCR vào câu hỏi.
+
 Trả về đúng một JSON object, không bọc Markdown:
 {
-  "document_types": {"EV-001": "PAPER_RECEIPT"},
   "block_assessments": [
     {
       "candidate_id": "EV-001:page-0-block-4",
       "importance": "CRITICAL",
       "quality_state": "UNCERTAIN",
       "review_action": "ASK_HUMAN",
+      "requires_verification": true,
       "canonical_fields": ["total_amount"],
-      "observed_text": "2.442.960đ",
+      "observed_text": "2.442.?60đ",
       "semantic_category": null,
-      "reason": "Giá trị tiền nằm trong block có confidence thấp.",
-      "human_question": "Vui lòng xác nhận tổng thanh toán tại block B04 có phải 2.442.960đ không."
+      "reason": "Không đọc chắc một chữ số của tổng thanh toán.",
+      "human_question": "Vui lòng kiểm tra hóa đơn và xác nhận tổng thanh toán."
     }
   ]
 }
-Không trả chain-of-thought, kết luận hồ sơ hay khẳng định nghiệp vụ.
+
+Không trả chain-of-thought, policy, conflict hoặc kết luận hồ sơ.
 """
 
 
@@ -169,7 +156,7 @@ class KimiResponseError(ValueError):
 
 
 class KimiReasoningAdapter:
-    """Call Kimi only for confidence-quality assessment."""
+    """Call Kimi for bounded structured extraction stages."""
 
     def __init__(
         self,
@@ -273,4 +260,15 @@ class KimiReasoningAdapter:
             stage="Confidence Quality Agent",
             system_prompt=CONFIDENCE_SYSTEM_PROMPT,
             model_type=ConfidenceAnalysis,
+        )
+
+    def analyze_conflict(
+        self,
+        case_payload: dict[str, Any],
+    ) -> ConflictAnalysis:
+        return self._analyze(
+            case_payload,
+            stage="Cross-source Conflict Agent",
+            system_prompt=CONFLICT_SYSTEM_PROMPT,
+            model_type=ConflictAnalysis,
         )

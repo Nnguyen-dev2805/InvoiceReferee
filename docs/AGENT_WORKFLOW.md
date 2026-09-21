@@ -16,7 +16,55 @@ Workflow dùng bốn loại thành phần:
 
 `HARDCODE` trong tài liệu này nghĩa là **logic tất định được viết bằng mã**, không có nghĩa là ghi trực tiếp mọi giá trị chính sách vào mã nguồn. Ví dụ, phép so sánh `amount > authority_threshold` là `HARDCODE`, còn `authority_threshold = 50.000.000 VND` là `CONFIG` giả lập.
 
-> **Trạng thái hiện tại:** repo đã có bản thử nghiệm EasyOCR và Kimi Vision trong notebook. Parser chuẩn, `ReviewCase`, P01-P15, các tool tra cứu, LLM Reasoning, Decision Guard và Audit Store dưới đây là workflow mục tiêu cần triển khai; chưa được coi là đã hoạt động chỉ vì xuất hiện trong sơ đồ.
+> **Trạng thái hiện tại:** ứng dụng dùng Mistral OCR, Confidence Quality Agent
+> theo từng evidence, Cross-source Conflict Agent và policy kiểm kê tất định.
+> P01-P15, tra cứu dữ liệu nội bộ và Decision Guard đầy đủ ở các phần sau vẫn là
+> workflow mục tiêu, chưa được coi là đã triển khai chỉ vì xuất hiện trong sơ đồ.
+
+### 1.1. Workflow kiểm kê đang triển khai
+
+```mermaid
+flowchart TD
+    A["Nhân viên submit<br/>bill + report/file bổ sung + text"]
+    B["Source Gate<br/>HARDCODE"]
+    C1["OCR bill<br/>Mistral TOOL"]
+    C2["OCR report/file bổ sung<br/>Mistral TOOL"]
+    D1{"Bill có block<br/>word confidence < 0.85?"}
+    D2{"Report có block<br/>word confidence < 0.85?"}
+    E1["Confidence Agent #1<br/>chỉ nhận bill"]
+    E2["Confidence Agent #2<br/>chỉ nhận report"]
+    F1{"Bill CLEAR?"}
+    F2{"Report CLEAR?"}
+    H["NEEDS_HUMAN<br/>nêu field cần xác nhận"]
+    I["Conflict Agent<br/>bill facts + report facts + text"]
+    J["Code kiểm tra coverage, mapping,<br/>số lượng, đơn vị, đơn giá, thành tiền,<br/>trạng thái nhận hàng"]
+    K{"Có chênh lệch<br/>hoặc conflict?"}
+    L["PASS"]
+
+    A --> B
+    B --> C1 --> D1
+    B --> C2 --> D2
+    D1 -- "Không" --> F1
+    D1 -- "Có" --> E1 --> F1
+    D2 -- "Không" --> F2
+    D2 -- "Có" --> E2 --> F2
+    F1 -- "Không" --> H
+    F2 -- "Không" --> H
+    F1 -- "Có" --> I
+    F2 -- "Có" --> I
+    I --> J --> K
+    K -- "Có" --> H
+    K -- "Không" --> L
+```
+
+Ranh giới dữ liệu bắt buộc:
+
+- Mỗi file được OCR độc lập; không lấy text của file này bù cho file khác.
+- Mỗi lần gọi Confidence chỉ nhận đúng một evidence, không nhận business context.
+- Nếu một evidence bị chặn, không gọi Conflict Agent.
+- Conflict Agent chỉ nhận các nguồn đã qua Quality Gate và không tự ra quyết định.
+- Kết quả của Conflict Agent phải qua kiểm tra tất định trước khi lưu `PASS` hoặc
+  `NEEDS_HUMAN`.
 
 ## 2. Workflow tổng thể
 

@@ -9,7 +9,9 @@ from typing import Any
 from invoice_referee.domain import (
     CaseProcessingResult,
     ConfidenceAnalysis,
+    ConflictAnalysis,
     EvidenceRole,
+    EvidenceQualityResult,
     ProcessingDecision,
     RuleFinding,
 )
@@ -19,6 +21,7 @@ from invoice_referee.extraction import (
     restructure_mistral_ocr,
 )
 from invoice_referee.storage import LocalEvidenceRepository, StoredCase, StoredEvidence
+from invoice_referee.policy import evaluate_inventory_consistency
 
 VIETNAM_TZ = timezone(timedelta(hours=7))
 OCR_SUFFIXES = {".jpeg", ".jpg", ".pdf", ".png", ".webp"}
@@ -34,10 +37,13 @@ ACCOUNTING_FIELD_LABELS = {
     "serial_number": "ký hiệu hóa đơn",
     "item_name": "tên hàng hóa hoặc dịch vụ",
     "quantity": "số lượng",
+    "unit": "đơn vị tính",
     "unit_price": "đơn giá",
     "line_amount": "thành tiền",
+    "tax_rate": "thuế suất",
     "tax_amount": "tiền thuế",
     "total_amount": "tổng thanh toán",
+    "receipt_status": "trạng thái nhận hàng",
     "payment_method": "phương thức thanh toán",
     "transaction_reference": "mã giao dịch",
 }
@@ -50,6 +56,20 @@ TECHNICAL_QUESTION_MARKERS = (
     "ev-",
 )
 
+CONFLICT_REQUIRED_FIELDS = {
+    "seller_name",
+    "seller_tax_code",
+    "invoice_date",
+    "invoice_number",
+    "item_name",
+    "quantity",
+    "unit",
+    "unit_price",
+    "line_amount",
+    "total_amount",
+    "receipt_status",
+}
+
 
 def _ocr_markdown(response: dict[str, Any]) -> str:
     pages = response.get("pages") or []
@@ -61,7 +81,7 @@ def _ocr_markdown(response: dict[str, Any]) -> str:
 
 
 class CaseProcessingService:
-    """Run source gates, OCR, then confidence-quality review."""
+    """Run per-evidence OCR quality gates before cross-source policies."""
 
     def __init__(
         self,
@@ -172,95 +192,216 @@ class CaseProcessingService:
                 processing_errors=processing_errors,
             )
 
+        confidence_analysis: ConfidenceAnalysis | None = None
         if not low_confidence_candidates:
-            findings = [
+            confidence_findings = [
                 RuleFinding(
                     rule_id="OCR_CONFIDENCE_REVIEW",
                     status="PASS",
-                    message="Không có meaningful word dưới ngưỡng confidence.",
+                    message="Mọi evidence đều qua ngưỡng chất lượng OCR.",
                 )
             ]
+        else:
+            if self.reasoning_adapter is None:
+                return self._technical_failure(
+                    case,
+                    "KIMI_NOT_CONFIGURED",
+                    "Kimi chưa được cấu hình nên chưa thể kiểm tra confidence OCR.",
+                    ocr_evidence_ids=ocr_evidence_ids,
+                    low_confidence_candidates=low_confidence_candidates,
+                )
+
+            merged_analysis = ConfidenceAnalysis()
+            for document in documents:
+                if not document["candidate_blocks"]:
+                    continue
+                try:
+                    evidence_analysis = self.reasoning_adapter.analyze_confidence(
+                        {
+                            "case_id": case.case_id,
+                            "ocr_word_review_threshold": self.word_confidence_threshold,
+                            "evidence": {
+                                "evidence_id": document["evidence_id"],
+                                "role": document["role"],
+                                "filename": document["filename"],
+                                "ocr_text": document["ocr_text"],
+                                "candidate_blocks": document["candidate_blocks"],
+                            },
+                        }
+                    )
+                except Exception as exc:
+                    return self._technical_failure(
+                        case,
+                        "CONFIDENCE_AGENT_ERROR",
+                        (
+                            f"Chưa hoàn tất kiểm tra độ rõ của "
+                            f"{document['filename']}; cần kế toán kiểm tra lại."
+                        ),
+                        ocr_evidence_ids=ocr_evidence_ids,
+                        low_confidence_candidates=low_confidence_candidates,
+                        confidence_analysis=(
+                            merged_analysis
+                            if merged_analysis.block_assessments
+                            else None
+                        ),
+                        processing_errors=[str(exc)],
+                    )
+                merged_analysis.document_types.update(
+                    evidence_analysis.document_types
+                )
+                merged_analysis.block_assessments.extend(
+                    evidence_analysis.block_assessments
+                )
+
+            confidence_analysis = merged_analysis
+            confidence_findings = self._confidence_findings(
+                low_confidence_candidates,
+                confidence_analysis,
+            )
+
+        evidence_quality = self._evidence_quality_results(
+            documents,
+            confidence_analysis,
+        )
+
+        if self._has_blocking_findings(confidence_findings):
             return self._save_result(
                 case,
-                decision=ProcessingDecision.PASS,
-                summary="Chứng từ không có thông tin nào cần kiểm tra thêm về độ rõ.",
-                reasoning="Không có thông tin nào cần kế toán xác nhận ở bước này.",
-                findings=findings,
+                decision=ProcessingDecision.NEEDS_HUMAN,
+                summary="Chứng từ có thông tin quan trọng cần kế toán xác nhận.",
+                reasoning=self._confidence_questions(confidence_findings),
+                findings=confidence_findings,
                 ocr_evidence_ids=ocr_evidence_ids,
                 low_confidence_candidates=low_confidence_candidates,
+                confidence_analysis=confidence_analysis,
+                evidence_quality=evidence_quality,
             )
 
         if self.reasoning_adapter is None:
             return self._technical_failure(
                 case,
                 "KIMI_NOT_CONFIGURED",
-                "Kimi chưa được cấu hình nên chưa thể kiểm tra confidence OCR.",
+                "Kimi chưa được cấu hình nên chưa thể đối chiếu các nguồn dữ liệu.",
                 ocr_evidence_ids=ocr_evidence_ids,
                 low_confidence_candidates=low_confidence_candidates,
+                confidence_analysis=confidence_analysis,
+                evidence_quality=evidence_quality,
+                previous_findings=confidence_findings,
             )
 
-        try:
-            confidence_analysis = self.reasoning_adapter.analyze_confidence(
+        conflict_payload = {
+            "schema_version": "1.0",
+            "case_id": case.case_id,
+            "workflow": "CROSS_SOURCE_CONFLICT",
+            "business_context": {
+                "subject": case.subject,
+                "description": case.body,
+            },
+            "documents": [
                 {
-                    "case_id": case.case_id,
-                    "ocr_word_review_threshold": self.word_confidence_threshold,
-                    "business_context": {
-                        "subject": case.subject,
-                        "description": case.body,
-                    },
-                    "documents": [
-                        {
-                            "evidence_id": document["evidence_id"],
-                            "role": document["role"],
-                            "filename": document["filename"],
-                            "ocr_text": document["ocr_text"],
-                            "candidate_blocks": document["candidate_blocks"],
-                        }
-                        for document in documents
-                        if document["candidate_blocks"]
-                    ],
+                    "evidence_id": document["evidence_id"],
+                    "role": document["role"],
+                    "filename": document["filename"],
+                    "quality_gate": "PASS",
+                    "ocr_text": document["ocr_text"],
+                    "pages": document["pages"],
                 }
+                for document in documents
+            ],
+        }
+        try:
+            conflict_analysis = self.reasoning_adapter.analyze_conflict(
+                conflict_payload
             )
         except Exception as exc:
             return self._technical_failure(
                 case,
-                "CONFIDENCE_AGENT_ERROR",
-                "Hệ thống chưa hoàn tất kiểm tra độ rõ của chứng từ; cần kế toán kiểm tra lại.",
+                "CONFLICT_AGENT_ERROR",
+                "Hệ thống chưa hoàn tất đối chiếu bill và report; cần kế toán kiểm tra lại.",
                 ocr_evidence_ids=ocr_evidence_ids,
                 low_confidence_candidates=low_confidence_candidates,
+                confidence_analysis=confidence_analysis,
+                evidence_quality=evidence_quality,
+                previous_findings=confidence_findings,
                 processing_errors=[str(exc)],
             )
 
-        confidence_findings = self._confidence_findings(
-            low_confidence_candidates,
-            confidence_analysis,
+        document_roles = {
+            document["evidence_id"]: document["role"] for document in documents
+        }
+        document_names = {
+            document["evidence_id"]: document["filename"] for document in documents
+        }
+        conflict_findings = evaluate_inventory_consistency(
+            conflict_analysis,
+            document_roles,
+            document_names,
         )
-        findings = confidence_findings
+        if any(
+            finding.rule_id == "INVENTORY_EXTRACTION_COVERAGE_INVALID"
+            for finding in conflict_findings
+        ):
+            actual_ids = {
+                fact.evidence_id for fact in conflict_analysis.document_facts
+            }
+            required_documents = [
+                {
+                    "evidence_id": document["evidence_id"],
+                    "role": document["role"],
+                    "filename": document["filename"],
+                }
+                for document in documents
+            ]
+            repair_payload = {
+                **conflict_payload,
+                "repair_request": {
+                    "reason": (
+                        "Kết quả trước không bao phủ chính xác mọi document đầu vào."
+                    ),
+                    "required_documents": required_documents,
+                    "missing_evidence_ids": sorted(
+                        set(document_roles).difference(actual_ids)
+                    ),
+                    "unexpected_evidence_ids": sorted(
+                        actual_ids.difference(document_roles)
+                    ),
+                    "instruction": (
+                        "Trả lại toàn bộ JSON từ đầu, document_facts phải có đúng "
+                        "một object cho từng required document."
+                    ),
+                },
+                "previous_invalid_result": conflict_analysis.model_dump(mode="json"),
+            }
+            try:
+                repaired_analysis = self.reasoning_adapter.analyze_conflict(
+                    repair_payload
+                )
+            except Exception as exc:
+                processing_errors.append(
+                    f"Conflict coverage repair không hoàn tất: {exc}"
+                )
+            else:
+                conflict_analysis = repaired_analysis
+                conflict_findings = evaluate_inventory_consistency(
+                    conflict_analysis,
+                    document_roles,
+                    document_names,
+                )
+        findings = [*confidence_findings, *conflict_findings]
         decision = (
             ProcessingDecision.NEEDS_HUMAN
             if self._has_blocking_findings(findings)
             else ProcessingDecision.PASS
         )
         if decision == ProcessingDecision.NEEDS_HUMAN:
-            summary = "Chứng từ có thông tin quan trọng cần kế toán xác nhận."
-            reasoning = self._confidence_questions(confidence_findings)
+            summary = "Bill và report có dữ liệu cần kế toán xác nhận."
+            reasoning = self._finding_questions(conflict_findings)
+        elif conflict_analysis.applicability == "APPLICABLE":
+            summary = "Bill, report và nội dung khai báo thống nhất."
+            reasoning = "Không có chênh lệch kiểm kê nào cần kế toán xác nhận."
         else:
-            policy_signal_count = sum(
-                item.review_action == "DEFER_TO_POLICY"
-                for item in confidence_analysis.block_assessments
-            )
-            if policy_signal_count:
-                summary = (
-                    f"Có {policy_signal_count} nội dung cần được kiểm tra theo "
-                    "chính sách chi phí."
-                )
-                reasoning = (
-                    "Chứng từ vẫn có thể tiếp tục xử lý; các nội dung này sẽ được "
-                    "xem xét ở bước kiểm tra chính sách."
-                )
-            else:
-                summary = "Các thông tin chưa rõ không ảnh hưởng đến việc đọc chứng từ."
-                reasoning = "Không có thông tin nào cần kế toán xác nhận ở bước này."
+            summary = "Đối chiếu nhận hàng không áp dụng cho hồ sơ này."
+            reasoning = "Không có conflict đa nguồn nào cần kế toán xác nhận."
 
         return self._save_result(
             case,
@@ -271,6 +412,9 @@ class CaseProcessingService:
             ocr_evidence_ids=ocr_evidence_ids,
             low_confidence_candidates=low_confidence_candidates,
             confidence_analysis=confidence_analysis,
+            evidence_quality=evidence_quality,
+            conflict_analysis=conflict_analysis,
+            processing_errors=processing_errors,
         )
 
     @staticmethod
@@ -336,7 +480,7 @@ class CaseProcessingService:
                 )
                 continue
 
-            if assessment.review_action == "ASK_HUMAN":
+            if CaseProcessingService._assessment_blocks_conflict(assessment):
                 question = CaseProcessingService._accountant_question(
                     assessment,
                     candidate,
@@ -349,16 +493,22 @@ class CaseProcessingService:
                         source_refs=[candidate_id],
                     )
                 )
-            elif assessment.review_action == "DEFER_TO_POLICY":
-                category = assessment.semantic_category or "chưa phân loại"
+            elif (
+                CaseProcessingService._assessment_requires_verification(assessment)
+                or assessment.review_action == "DEFER_TO_POLICY"
+            ):
                 source_file = candidate.get("source_file") or "chứng từ"
+                labels = [
+                    ACCOUNTING_FIELD_LABELS.get(field, field.replace("_", " "))
+                    for field in assessment.canonical_fields
+                ] or ["thông tin này"]
                 findings.append(
                     RuleFinding(
-                        rule_id="OCR_POLICY_SIGNAL",
+                        rule_id="OCR_NON_BLOCKING_QUALITY_WARNING",
                         status="WARN",
                         message=(
-                            f"{source_file} có nội dung thuộc nhóm {category}; "
-                            "cần xem xét ở bước kiểm tra chính sách chi phí."
+                            f"{source_file} có {', '.join(labels)} chưa rõ, nhưng "
+                            "không cần cho bước đối chiếu bill và report hiện tại."
                         ),
                         source_refs=[candidate_id],
                     )
@@ -374,6 +524,58 @@ class CaseProcessingService:
                 )
             )
         return findings
+
+    @staticmethod
+    def _assessment_requires_verification(assessment: Any) -> bool:
+        if assessment.requires_verification is not None:
+            return bool(assessment.requires_verification)
+        return assessment.review_action == "ASK_HUMAN"
+
+    @staticmethod
+    def _assessment_blocks_conflict(assessment: Any) -> bool:
+        if not CaseProcessingService._assessment_requires_verification(assessment):
+            return False
+        fields = set(assessment.canonical_fields)
+        return not fields or bool(fields.intersection(CONFLICT_REQUIRED_FIELDS))
+
+    @classmethod
+    def _evidence_quality_results(
+        cls,
+        documents: list[dict[str, Any]],
+        analysis: ConfidenceAnalysis | None,
+    ) -> list[EvidenceQualityResult]:
+        assessments = {
+            assessment.candidate_id: assessment
+            for assessment in (analysis.block_assessments if analysis else [])
+        }
+        results: list[EvidenceQualityResult] = []
+        for document in documents:
+            blocking_fields: set[str] = set()
+            warning_fields: set[str] = set()
+            status = "CLEAR"
+            candidates = document["candidate_blocks"]
+            for candidate in candidates:
+                assessment = assessments.get(candidate["candidate_id"])
+                if assessment is None:
+                    status = "ERROR"
+                    continue
+                if cls._assessment_blocks_conflict(assessment):
+                    if status != "ERROR":
+                        status = "NEEDS_HUMAN"
+                    blocking_fields.update(assessment.canonical_fields)
+                elif cls._assessment_requires_verification(assessment):
+                    warning_fields.update(assessment.canonical_fields)
+            results.append(
+                EvidenceQualityResult(
+                    evidence_id=document["evidence_id"],
+                    filename=document["filename"],
+                    status=status,
+                    candidate_count=len(candidates),
+                    blocking_fields=sorted(blocking_fields),
+                    warning_fields=sorted(warning_fields),
+                )
+            )
+        return results
 
     @staticmethod
     def _accountant_question(
@@ -498,6 +700,9 @@ class CaseProcessingService:
         *,
         ocr_evidence_ids: list[str] | None = None,
         low_confidence_candidates: list[dict[str, Any]] | None = None,
+        confidence_analysis: ConfidenceAnalysis | None = None,
+        evidence_quality: list[EvidenceQualityResult] | None = None,
+        previous_findings: list[RuleFinding] | None = None,
         processing_errors: list[str] | None = None,
     ) -> CaseProcessingResult:
         return self._save_result(
@@ -506,6 +711,7 @@ class CaseProcessingService:
             summary=message,
             reasoning=message,
             findings=[
+                *(previous_findings or []),
                 RuleFinding(
                     rule_id=rule_id,
                     status="ERROR",
@@ -514,6 +720,8 @@ class CaseProcessingService:
             ],
             ocr_evidence_ids=ocr_evidence_ids,
             low_confidence_candidates=low_confidence_candidates,
+            confidence_analysis=confidence_analysis,
+            evidence_quality=evidence_quality,
             processing_errors=processing_errors,
         )
 
@@ -528,6 +736,8 @@ class CaseProcessingService:
         ocr_evidence_ids: list[str] | None = None,
         low_confidence_candidates: list[dict[str, Any]] | None = None,
         confidence_analysis: ConfidenceAnalysis | None = None,
+        evidence_quality: list[EvidenceQualityResult] | None = None,
+        conflict_analysis: ConflictAnalysis | None = None,
         processing_errors: list[str] | None = None,
     ) -> CaseProcessingResult:
         result = CaseProcessingResult(
@@ -540,6 +750,8 @@ class CaseProcessingService:
             ocr_evidence_ids=ocr_evidence_ids or [],
             low_confidence_candidates=low_confidence_candidates or [],
             confidence_analysis=confidence_analysis,
+            evidence_quality=evidence_quality or [],
+            conflict_analysis=conflict_analysis,
             processing_errors=processing_errors or [],
         )
         self.repository.save_processing_result(

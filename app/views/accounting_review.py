@@ -48,6 +48,25 @@ def _friendly_field_text(fields: list[str]) -> str:
 
 
 def _accounting_summary(result: dict[str, Any]) -> str:
+    inventory_findings = [
+        finding
+        for finding in result.get("findings") or []
+        if str(finding.get("rule_id") or "").startswith("INVENTORY_")
+    ]
+    if inventory_findings:
+        if any(
+            finding.get("status") in {"FAIL", "ERROR"}
+            for finding in inventory_findings
+        ):
+            return result.get("summary") or (
+                "Hóa đơn và nguồn kiểm kê có dữ liệu cần kế toán xác nhận."
+            )
+        inventory_analysis = result.get("inventory_analysis") or {}
+        if inventory_analysis.get("applicability") == "APPLICABLE":
+            return result.get("summary") or (
+                "Hóa đơn và nguồn nhận hàng thống nhất ở policy kiểm kê."
+            )
+
     analysis = result.get("confidence_analysis") or {}
     assessments = analysis.get("block_assessments") or []
     if not assessments:
@@ -63,6 +82,51 @@ def _accounting_summary(result: dict[str, Any]) -> str:
 
 
 def _accounting_reasoning(case: StoredCase, result: dict[str, Any]) -> str:
+    inventory_questions: list[str] = []
+    inventory_analysis = (
+        result.get("conflict_analysis")
+        or result.get("inventory_analysis")
+        or {}
+    )
+    extracted_ids = {
+        document.get("evidence_id")
+        for document in inventory_analysis.get("document_facts") or []
+        if document.get("evidence_id")
+    }
+    for finding in result.get("findings") or []:
+        rule_id = str(finding.get("rule_id") or "")
+        if not rule_id.startswith("INVENTORY_") or finding.get("status") not in {
+            "FAIL",
+            "ERROR",
+        }:
+            continue
+        if rule_id == "INVENTORY_EXTRACTION_COVERAGE_INVALID":
+            missing_evidence = [
+                evidence
+                for evidence in case.evidence
+                if evidence.evidence_id not in extracted_ids
+            ]
+            for evidence in missing_evidence:
+                role_label = (
+                    "chứng từ chính"
+                    if evidence.role == "PRIMARY_DOCUMENT"
+                    else "chứng từ hỗ trợ"
+                )
+                inventory_questions.append(
+                    f"Policy kiểm kê chưa trích xuất {role_label} "
+                    f"'{evidence.original_name}'. Các thông tin chưa có gồm: loại "
+                    "chứng từ; nhà cung cấp và MST; ngày chứng từ; trạng thái nhận "
+                    "hàng; danh sách hàng hóa với tên, số lượng, đơn vị, đơn giá "
+                    "và thành tiền."
+                )
+            if missing_evidence:
+                continue
+        message = str(finding.get("message") or "").strip()
+        if message:
+            inventory_questions.append(message)
+    if inventory_questions:
+        return " ".join(inventory_questions)
+
     analysis = result.get("confidence_analysis") or {}
     assessments = analysis.get("block_assessments") or []
     if not assessments:
@@ -160,6 +224,24 @@ def _render_evidence(
 
 
 def _render_quality_review(result: dict[str, Any]) -> None:
+    evidence_quality = result.get("evidence_quality") or []
+    if evidence_quality:
+        st.markdown("**Chất lượng từng chứng từ**")
+        st.dataframe(
+            [
+                {
+                    "Chứng từ": item.get("filename"),
+                    "Trạng thái": item.get("status"),
+                    "Vùng cần đánh giá": item.get("candidate_count"),
+                    "Field chặn": ", ".join(item.get("blocking_fields") or []),
+                    "Cảnh báo": ", ".join(item.get("warning_fields") or []),
+                }
+                for item in evidence_quality
+            ],
+            hide_index=True,
+            width="stretch",
+        )
+
     candidates = result.get("low_confidence_candidates") or []
     if not candidates:
         return
@@ -192,16 +274,7 @@ def _render_quality_review(result: dict[str, Any]) -> None:
             or []
         )
     }
-    st.markdown("**Confidence Quality Agent**")
-    policy_signal_count = sum(
-        item.get("review_action") == "DEFER_TO_POLICY"
-        for item in assessments.values()
-    )
-    if policy_signal_count:
-        st.warning(
-            f"Có {policy_signal_count} tín hiệu không chặn extraction và đang chờ "
-            "Policy Agent xem xét."
-        )
+    st.markdown("**Chi tiết Confidence Quality Agent**")
     st.dataframe(
         [
             {
@@ -243,6 +316,89 @@ def _render_quality_review(result: dict[str, Any]) -> None:
         hide_index=True,
         width="stretch",
     )
+
+
+def _render_inventory_review(result: dict[str, Any]) -> None:
+    analysis = result.get("conflict_analysis") or result.get("inventory_analysis")
+    if not analysis:
+        return
+
+    st.markdown("**Đối chiếu bill và report**")
+    applicability = analysis.get("applicability") or "UNKNOWN"
+    reason = analysis.get("applicability_reason") or "Không có giải thích."
+    if applicability == "APPLICABLE":
+        st.caption(f"Áp dụng · {reason}")
+    elif applicability == "NOT_APPLICABLE":
+        st.caption(f"Không áp dụng · {reason}")
+    else:
+        st.warning(f"Chưa xác định được phạm vi áp dụng: {reason}")
+
+    rows: list[dict[str, Any]] = []
+    for document in analysis.get("document_facts") or []:
+        items = document.get("items") or []
+        if not items:
+            rows.append(
+                {
+                    "Nguồn": document.get("evidence_id"),
+                    "Loại": document.get("document_type"),
+                    "Nhà cung cấp": document.get("supplier_name"),
+                    "Trạng thái nhận": document.get("receipt_status"),
+                    "Hàng hóa": None,
+                    "Số lượng": None,
+                    "Đơn vị": None,
+                    "Đơn giá": None,
+                    "Thành tiền": None,
+                }
+            )
+            continue
+        for item in items:
+            rows.append(
+                {
+                    "Nguồn": document.get("evidence_id"),
+                    "Loại": document.get("document_type"),
+                    "Nhà cung cấp": document.get("supplier_name"),
+                    "Trạng thái nhận": document.get("receipt_status"),
+                    "Hàng hóa": item.get("raw_name"),
+                    "Số lượng": item.get("quantity"),
+                    "Đơn vị": item.get("unit"),
+                    "Đơn giá": item.get("unit_price"),
+                    "Thành tiền": item.get("line_amount"),
+                }
+            )
+    if rows:
+        st.dataframe(rows, hide_index=True, width="stretch")
+
+    comparisons = analysis.get("comparisons") or []
+    if comparisons:
+        st.markdown("**Các phép so sánh do Conflict Agent đề xuất**")
+        st.dataframe(
+            [
+                {
+                    "Field": item.get("field"),
+                    "Hàng hóa": item.get("item_name"),
+                    "Nguồn trái": (item.get("left") or {}).get("source_id"),
+                    "Giá trị trái": (item.get("left") or {}).get("value"),
+                    "Nguồn phải": (item.get("right") or {}).get("source_id"),
+                    "Giá trị phải": (item.get("right") or {}).get("value"),
+                    "Trạng thái đề xuất": item.get("status"),
+                    "Giải thích": item.get("reason"),
+                }
+                for item in comparisons
+            ],
+            hide_index=True,
+            width="stretch",
+        )
+
+    text_report = analysis.get("text_report") or {}
+    if text_report.get("is_inventory_report"):
+        st.caption(
+            "Báo cáo nhân viên: "
+            f"{text_report.get('receipt_status') or 'UNKNOWN'}"
+        )
+
+    warnings = analysis.get("extraction_warnings") or []
+    for warning in warnings:
+        st.warning(warning)
 
 
 def _render_delete_controls(
@@ -309,7 +465,7 @@ def _render_case(
         st.write(case.body or "Không có nội dung.")
 
         summary_columns = st.columns(2)
-        summary_columns[0].metric("Định tuyến extraction", result.get("decision", "UNKNOWN"))
+        summary_columns[0].metric("Kết quả xử lý", result.get("decision", "UNKNOWN"))
         summary_columns[1].metric(
             "Evidence đã OCR",
             len(result.get("ocr_evidence_ids") or []),
@@ -338,6 +494,7 @@ def _render_case(
             )
 
         _render_quality_review(result)
+        _render_inventory_review(result)
 
         conflicts = ((result.get("kimi_analysis") or {}).get("conflicts") or [])
         if conflicts:
@@ -395,7 +552,7 @@ def render_accounting_review(repository: LocalEvidenceRepository) -> None:
     ]
 
     passed_tab, human_tab = st.tabs(
-        [f"Extraction rõ ({len(passed)})", f"Cần xác minh ({len(needs_human)})"]
+        [f"Đã pass ({len(passed)})", f"Cần xác minh ({len(needs_human)})"]
     )
     with passed_tab:
         _render_queue(passed, repository, queue_key="passed")

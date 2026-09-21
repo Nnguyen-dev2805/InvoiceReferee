@@ -172,7 +172,7 @@ def test_accounting_page_splits_processed_cases(tmp_path: Path, monkeypatch) -> 
 
     assert len(app.exception) == 0
     assert [tab.label for tab in app.tabs] == [
-        "Extraction rõ (0)",
+        "Đã pass (0)",
         "Cần xác minh (1)",
     ]
     assert len(app.expander) == 1
