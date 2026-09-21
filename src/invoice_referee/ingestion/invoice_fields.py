@@ -34,6 +34,7 @@ from invoice_referee.ingestion.document_structure import (
     normalize_label,
 )
 from invoice_referee.ingestion.candidate_resolver import resolve_field_candidates
+from invoice_referee.ingestion.extraction_validation import validate_extraction
 
 # --- Extraction-only field sets (do NOT leak into business schema) --------------
 
@@ -586,6 +587,7 @@ def extract_invoice_fields(document: m.OCRDocument) -> m.InvoiceExtractionResult
     Public signature is unchanged from the pre-structure-aware pipeline. Internally
     this now runs structure analysis, section-aware header extraction, table
     item/summary extraction, explicit candidate resolution, and validation.
+    Validation assigns confirmation status and emits arithmetic/semantic warnings.
     """
     structure = analyze_document_structure(document)
     header_sets = extract_header_candidates(document, structure)
@@ -605,7 +607,9 @@ def extract_invoice_fields(document: m.OCRDocument) -> m.InvoiceExtractionResult
     if not selected_fields:
         warnings.append("no header fields could be extracted")
 
-    return m.InvoiceExtractionResult(
+    _add_cross_field_warnings(document, structure, selected_fields, table, warnings)
+
+    result = m.InvoiceExtractionResult(
         document_id=document.document_id,
         status=m.ExtractionStatus.NEEDS_REVIEW,
         fields=selected_fields,
@@ -614,3 +618,82 @@ def extract_invoice_fields(document: m.OCRDocument) -> m.InvoiceExtractionResult
         line_item_candidate_sets=table.line_item_candidate_sets,
         warnings=warnings,
     )
+
+    validate_extraction(result)
+    return result
+
+
+def _add_cross_field_warnings(
+    document: m.OCRDocument,
+    structure: m.DocumentStructure,
+    selected_fields: dict[str, m.FieldCandidate],
+    table: TableExtraction,
+    warnings: list[str],
+) -> None:
+    """Semantic cross-field warnings that no single field can assert alone.
+
+    These are advisory signals for human review; they do not change the selected
+    candidate or suppress CONFLICTING status. Extraction-only money fields are
+    scoped to ``InvoiceExtractionResult`` and never leak into the business schema.
+    """
+    # Warn when seller and buyer tax codes are identical (possible copy/paste).
+    _warn_identical_seller_buyer_tax(document, structure, selected_fields, warnings)
+
+    # Warn when the header total disagrees with the reconstructed line sum.
+    _warn_total_vs_line_sum(selected_fields, table, warnings)
+
+
+def _warn_identical_seller_buyer_tax(
+    document, structure, selected_fields, warnings
+) -> None:
+    seller_tax = _find_tax_in_section(document, structure, "SELLER")
+    buyer_tax = _find_tax_in_section(document, structure, "BUYER")
+    if seller_tax is not None and buyer_tax is not None and seller_tax == buyer_tax:
+        warnings.append(
+            "seller and buyer tax code are identical; possible copy/paste error"
+        )
+
+
+def _find_tax_in_section(document, structure, section_name: str) -> Optional[str]:
+    """Return the normalized tax code text found in the named section, if any."""
+    for block in document.blocks:
+        if block.block_type == "TABLE_CELL":
+            continue
+        if structure.section_by_block_id.get(block.block_id) != section_name:
+            continue
+        parts = _split_label_value(block.text)
+        if parts is None:
+            continue
+        # Match the tax-code label specifically ("mã số thuế" / "mst" / "tax code").
+        label = parts[0]
+        for alias in HEADER_ALIASES["vendor_tax_code"]:
+            if alias in label:
+                return norm.normalize_id(parts[1])
+    return None
+
+
+def _warn_total_vs_line_sum(
+    selected_fields: dict[str, m.FieldCandidate],
+    table: TableExtraction,
+    warnings: list[str],
+) -> None:
+    """Warn when present line totals don't add up to the invoice total."""
+    total = _value_from_candidate(selected_fields.get("total_amount"))
+    if total is None:
+        return
+    line_sum = 0
+    have_all = bool(table.selected_line_items)
+    for line in table.selected_line_items:
+        line_total = _value_from_candidate(line.get("line_total"))
+        if line_total is None:
+            have_all = False
+        else:
+            line_sum += line_total
+    if have_all and line_sum != total:
+        warnings.append(
+            f"sum of line totals ({line_sum}) does not equal invoice total ({total})"
+        )
+
+
+def _value_from_candidate(candidate: Optional[m.FieldCandidate]):
+    return candidate.normalized_value if candidate is not None else None

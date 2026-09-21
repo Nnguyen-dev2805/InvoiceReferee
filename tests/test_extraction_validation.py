@@ -104,3 +104,87 @@ def test_sum_of_lines_vs_total_mismatch_is_warned():
     result = _result(fields=fields, line_items=[line])
     validated = validate_extraction(result)
     assert any("sum of line totals" in w for w in validated.warnings)
+
+
+# --- Task 6: separated-confidence validation ----------------------------------
+
+
+def _candidate_v2(
+    name="total_amount",
+    value=30_000_000,
+    provider_confidence=0.99,
+    mapping_score=0.99,
+    extraction_method="EXACT_KEY_VALUE",
+    status=m.FieldStatus.EXTRACTED,
+    warnings=None,
+):
+    return m.FieldCandidate(
+        field_name=name,
+        raw_text=str(value) if value is not None else None,
+        normalized_value=value,
+        confidence=None,
+        status=status,
+        page_number=1,
+        bounding_box=None,
+        extraction_method=extraction_method,
+        warnings=list(warnings or []),
+        provider_confidence=provider_confidence,
+        mapping_score=mapping_score,
+    )
+
+
+def _result_v2(fields=None, line_items=None):
+    return m.InvoiceExtractionResult(
+        document_id="DOC-1",
+        status=m.ExtractionStatus.NEEDS_REVIEW,
+        fields=fields or {},
+        line_items=line_items or [],
+        audit_events=[],
+        field_candidates={},
+        line_item_candidate_sets=[],
+        warnings=[],
+    )
+
+
+def test_fuzzy_spatial_always_requires_confirmation_even_with_high_ocr_confidence():
+    candidate = _candidate_v2(
+        extraction_method="FUZZY_SPATIAL",
+        provider_confidence=0.999,
+        mapping_score=0.92,
+    )
+    result = _result_v2(fields={"total_amount": candidate})
+    validated = validate_extraction(result)
+    assert validated.fields["total_amount"].status is m.FieldStatus.NEEDS_CONFIRMATION
+
+
+def test_provider_annotation_always_requires_confirmation():
+    candidate = _candidate_v2(
+        extraction_method="PROVIDER_ANNOTATION",
+        provider_confidence=0.999,
+    )
+    result = _result_v2(fields={"po_id": candidate})
+    validated = validate_extraction(result)
+    assert validated.fields["po_id"].status is m.FieldStatus.NEEDS_CONFIRMATION
+
+
+def test_uses_provider_confidence_not_mapping_score_for_ocr_threshold():
+    # OCR confidence below threshold, mapping score high -> still needs confirmation.
+    candidate = _candidate_v2(
+        extraction_method="EXACT_SPATIAL",
+        provider_confidence=0.50,
+        mapping_score=1.0,
+    )
+    result = _result_v2(fields={"total_amount": candidate})
+    validated = validate_extraction(result)
+    assert validated.fields["total_amount"].status is m.FieldStatus.NEEDS_CONFIRMATION
+
+
+def test_conflicting_status_is_preserved():
+    candidate = _candidate_v2(
+        extraction_method="TABLE_SUMMARY",
+        provider_confidence=0.99,
+        status=m.FieldStatus.CONFLICTING,
+    )
+    result = _result_v2(fields={"total_amount": candidate})
+    validated = validate_extraction(result)
+    assert validated.fields["total_amount"].status is m.FieldStatus.CONFLICTING

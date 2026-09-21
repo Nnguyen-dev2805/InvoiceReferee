@@ -40,6 +40,16 @@ def _has_conflict(candidate: m.FieldCandidate) -> bool:
     return any("native" in w.lower() and "text" in w.lower() for w in candidate.warnings)
 
 
+# Extraction methods that require human confirmation regardless of OCR confidence
+# or mapping score. Fuzzy/spatial-OCR/provider/annotation methods always need a
+# human in the loop because their evidence is not exact.
+_NEEDS_CONFIRMATION_METHODS = frozenset({
+    "LLM_ASSISTED",
+    "FUZZY_SPATIAL",
+    "PROVIDER_ANNOTATION",
+})
+
+
 def _validate_candidate(candidate: m.FieldCandidate, *, critical: bool) -> m.FieldStatus:
     # Preserve statuses a human has already set.
     if candidate.status in (m.FieldStatus.CONFIRMED, m.FieldStatus.CORRECTED):
@@ -51,14 +61,26 @@ def _validate_candidate(candidate: m.FieldCandidate, *, critical: bool) -> m.Fie
     if candidate.status is m.FieldStatus.INVALID:
         return m.FieldStatus.INVALID
 
+    if candidate.status is m.FieldStatus.CONFLICTING:
+        return m.FieldStatus.CONFLICTING
+
     if _has_conflict(candidate):
         return m.FieldStatus.CONFLICTING
+
+    if candidate.extraction_method in _NEEDS_CONFIRMATION_METHODS:
+        return m.FieldStatus.NEEDS_CONFIRMATION
 
     if candidate.extraction_method == "LLM_ASSISTED":
         return m.FieldStatus.NEEDS_CONFIRMATION
 
+    # Use provider OCR confidence (not mapping_score) for the OCR threshold.
+    # mapping_score reflects label match quality, not image/word readability.
     threshold = CRITICAL_CONFIDENCE if critical else NON_CRITICAL_CONFIDENCE
-    if candidate.confidence is None or candidate.confidence < threshold:
+    conf = candidate.provider_confidence
+    if conf is None:
+        # Legacy candidates with no provider_confidence fall back to confidence.
+        conf = candidate.confidence
+    if conf is None or conf < threshold:
         return m.FieldStatus.NEEDS_CONFIRMATION
 
     return m.FieldStatus.EXTRACTED
@@ -75,6 +97,7 @@ def validate_extraction(result: m.InvoiceExtractionResult) -> m.InvoiceExtractio
             )
 
     _validate_line_arithmetic(result)
+    _validate_summary_components(result)
     return result
 
 
@@ -106,3 +129,32 @@ def _validate_line_arithmetic(result: m.InvoiceExtractionResult) -> None:
 
 def _value(candidate):
     return candidate.normalized_value if candidate is not None else None
+
+
+_SUMMARY_COMPONENT_FIELDS = ("subtotal_amount", "tax_amount", "discount_amount", "shipping_amount")
+
+
+def _validate_summary_components(result: m.InvoiceExtractionResult) -> None:
+    """Warn when present summary components don't reconcile with the grand total.
+
+    Only fires when *all* components AND the header total are present: a partial
+    set triggers no arithmetic claim (plan quality invariant: be conservative).
+    The formula: subtotal + tax - discount + shipping == total.
+    """
+    present = {name: _value(result.fields.get(name)) for name in _SUMMARY_COMPONENT_FIELDS}
+    if any(v is None for v in present.values()):
+        return
+    header_total = _value(result.fields.get("total_amount"))
+    if header_total is None:
+        return
+    subtotal = present["subtotal_amount"]
+    tax = present["tax_amount"]
+    discount = present["discount_amount"]
+    shipping = present["shipping_amount"]
+    expected = subtotal + tax + shipping - discount
+    if expected != header_total:
+        result.warnings.append(
+            f"sum of components (subtotal {subtotal} + tax {tax} + shipping "
+            f"{shipping} - discount {discount} = {expected}) does not equal "
+            f"invoice total ({header_total})"
+        )
