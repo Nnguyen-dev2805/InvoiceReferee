@@ -61,6 +61,17 @@ HEADER_ALIASES: dict[str, tuple[str, ...]] = {
                      "tổng cộng", "total amount"),
 }
 
+# Tax-code labels shared by both parties. A tax code is attributed to the seller,
+# the buyer, or neither purely by the section it sits in (see
+# ``_tax_code_field_for_section``); the label itself never decides.
+TAX_CODE_ALIASES: tuple[str, ...] = HEADER_ALIASES["vendor_tax_code"]
+
+# Extraction-only field names for the party tax codes. ``buyer_tax_code`` and
+# ``unscoped_tax_code`` are evidence for human review only: they never enter the
+# business schema, the vendor mapping, or duplicate identity.
+BUYER_TAX_CODE_FIELD = "buyer_tax_code"
+UNSCOPED_TAX_CODE_FIELD = "unscoped_tax_code"
+
 # Line-item column aliases (normalized, longest-first) -> canonical field names.
 LINE_COLUMNS: dict[str, tuple[str, ...]] = {
     "description": ("tên hàng hóa, dịch vụ", "mô tả", "description", "tên hàng", "diễn giải"),
@@ -233,6 +244,25 @@ def _section_role_for(structure, block: m.OCRBlock) -> Optional[str]:
     return structure.section_by_block_id.get(block.block_id)
 
 
+def _tax_code_field_for_section(section: Optional[str]) -> str:
+    """Which tax-code field a block belongs to, from its section alone.
+
+    A tax-code label is shared by both parties ("Mã số thuế" / "MST"), so the
+    section is the only reliable signal:
+
+    - SELLER, or HEADER (before any party anchor — the Vietnamese convention
+      prints the seller's tax code in the invoice header) -> the vendor's code;
+    - BUYER -> the buyer's code;
+    - anything else (SIGNATURE, FOOTER, ITEM_TABLE, SUMMARY, unknown) -> a code
+      we cannot attribute, kept for human review rather than guessed.
+    """
+    if section in ("SELLER", m.SectionRole.HEADER.value):
+        return "vendor_tax_code"
+    if section == "BUYER":
+        return BUYER_TAX_CODE_FIELD
+    return UNSCOPED_TAX_CODE_FIELD
+
+
 def _exact_key_value_candidates(document: m.OCRDocument, structure) -> dict[str, list[m.FieldCandidate]]:
     """One-block ``label: value`` candidates (EXACT_KEY_VALUE)."""
     fields: dict[str, list[m.FieldCandidate]] = defaultdict(list)
@@ -245,15 +275,28 @@ def _exact_key_value_candidates(document: m.OCRDocument, structure) -> dict[str,
         label, value = parts
         if not value:
             continue
+        section = _section_role_for(structure, block)
         field_name = _match_field(label)
         if field_name is None:
             continue
+        if field_name == "vendor_tax_code":
+            # Route by section, never by label or reading order: both parties
+            # print the same label, so the label alone cannot identify the party.
+            field_name = _tax_code_field_for_section(section)
         normalized = normalize_candidate_value(field_name, value)
-        fields[field_name].append(_candidate(
+        candidate = _candidate(
             field_name, value, normalized, block,
             extraction_method="EXACT_KEY_VALUE",
-            section_role=_section_role_for(structure, block),
-        ))
+            section_role=section,
+        )
+        if field_name == UNSCOPED_TAX_CODE_FIELD and normalized is not None:
+            # We could not attribute this code to a party, so it is never trusted
+            # as the vendor's; a human has to say whose it is.
+            candidate.status = m.FieldStatus.NEEDS_CONFIRMATION
+            candidate.warnings = list(candidate.warnings) + [
+                "tax code is not attributable to a seller or buyer section; confirm whose it is"
+            ]
+        fields[field_name].append(candidate)
     return fields
 
 
@@ -281,16 +324,9 @@ def _section_aware_candidates(document: m.OCRDocument, structure) -> dict[str, l
         parts = _split_label_value(text)
         label = normalize_label(parts[0] if parts else text)
 
-        # vendor_tax_code from the SELLER section only.
-        if section == "SELLER" and _match_field(label) == "vendor_tax_code":
-            parts = _split_label_value(text)
-            value = parts[1] if parts else text
-            normalized = norm.normalize_id(value)
-            fields["vendor_tax_code"].append(_candidate(
-                "vendor_tax_code", value, normalized, block,
-                extraction_method="SECTION_AWARE", section_role=section,
-            ))
-            continue
+        # Tax-code routing by section is handled once in
+        # ``_exact_key_value_candidates`` so a tax block yields exactly one
+        # candidate; duplicating it here would re-introduce a false conflict.
 
         # invoice_date: a date-bearing block in HEADER or SIGNATURE. The bare
         # "ngày" alias must not match a different date such as "Ngày giao hàng"
@@ -681,30 +717,12 @@ def _add_cross_field_warnings(
 def _warn_identical_seller_buyer_tax(
     document, structure, selected_fields, warnings
 ) -> None:
-    seller_tax = _find_tax_in_section(document, structure, "SELLER")
-    buyer_tax = _find_tax_in_section(document, structure, "BUYER")
+    seller_tax = _value_from_candidate(selected_fields.get("vendor_tax_code"))
+    buyer_tax = _value_from_candidate(selected_fields.get(BUYER_TAX_CODE_FIELD))
     if seller_tax is not None and buyer_tax is not None and seller_tax == buyer_tax:
         warnings.append(
             "seller and buyer tax code are identical; possible copy/paste error"
         )
-
-
-def _find_tax_in_section(document, structure, section_name: str) -> Optional[str]:
-    """Return the normalized tax code text found in the named section, if any."""
-    for block in document.blocks:
-        if block.block_type == "TABLE_CELL":
-            continue
-        if structure.section_by_block_id.get(block.block_id) != section_name:
-            continue
-        parts = _split_label_value(block.text)
-        if parts is None:
-            continue
-        # Match the tax-code label specifically ("mã số thuế" / "mst" / "tax code").
-        label = parts[0]
-        for alias in HEADER_ALIASES["vendor_tax_code"]:
-            if alias in label:
-                return norm.normalize_id(parts[1])
-    return None
 
 
 def _warn_total_vs_line_sum(

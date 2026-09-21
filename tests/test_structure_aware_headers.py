@@ -136,6 +136,111 @@ def test_seller_tax_code_uses_section_not_first_unscoped_match():
     assert candidates["vendor_tax_code"][0].section_role == "SELLER"
 
 
+# --- tax-code semantic routing (seller vs buyer) -------------------------------
+
+
+def test_seller_and_buyer_tax_codes_route_to_separate_fields():
+    """Two different tax codes are two different facts, not one conflict."""
+    from invoice_referee.ingestion.document_structure import analyze_document_structure
+
+    document_obj = document(seller_buyer_blocks())
+    structure = analyze_document_structure(document_obj)
+    candidates = extract_header_candidates(document_obj, structure)
+
+    assert "vendor_tax_code" in candidates
+    assert "buyer_tax_code" in candidates
+    assert "unscoped_tax_code" not in candidates
+
+    vendor = resolve_field_candidates("vendor_tax_code", candidates["vendor_tax_code"])
+    buyer = resolve_field_candidates("buyer_tax_code", candidates["buyer_tax_code"])
+    assert vendor.selected.normalized_value == "0110329220"
+    assert buyer.selected.normalized_value == "0110329573"
+    assert vendor.selected.status is not m.FieldStatus.CONFLICTING
+    assert buyer.selected.status is not m.FieldStatus.CONFLICTING
+
+
+def test_seller_and_buyer_tax_codes_keep_their_own_provenance():
+    from invoice_referee.ingestion.document_structure import analyze_document_structure
+
+    document_obj = document(seller_buyer_blocks())
+    structure = analyze_document_structure(document_obj)
+    candidates = extract_header_candidates(document_obj, structure)
+
+    vendor = resolve_field_candidates("vendor_tax_code", candidates["vendor_tax_code"])
+    buyer = resolve_field_candidates("buyer_tax_code", candidates["buyer_tax_code"])
+    assert vendor.selected.evidence_block_ids == ["SELLER-TAX"]
+    assert vendor.selected.section_role == "SELLER"
+    assert buyer.selected.evidence_block_ids == ["BUYER-TAX"]
+    assert buyer.selected.section_role == "BUYER"
+
+
+def test_two_different_seller_tax_codes_conflict():
+    """Two different values that are both the seller's tax code are a real conflict."""
+    from invoice_referee.ingestion.document_structure import analyze_document_structure
+
+    document_obj = document([
+        text_block("Đơn vị bán (Seller): CÔNG TY A", "SELLER-NAME",
+                   box=m.BoundingBox(0.05, 0.10, 0.6, 0.13)),
+        text_block("Mã số thuế: 0110329220", "SELLER-TAX-1",
+                   box=m.BoundingBox(0.05, 0.14, 0.4, 0.17)),
+        text_block("Mã số thuế: 0110329999", "SELLER-TAX-2",
+                   box=m.BoundingBox(0.05, 0.18, 0.4, 0.21)),
+    ])
+    structure = analyze_document_structure(document_obj)
+    candidates = extract_header_candidates(document_obj, structure)
+    resolution = resolve_field_candidates("vendor_tax_code", candidates["vendor_tax_code"])
+    assert resolution.conflicting is True
+    assert resolution.selected.status is m.FieldStatus.CONFLICTING
+
+
+def test_tax_code_in_an_unknown_section_is_not_claimed_as_vendor():
+    """A tax code we cannot attribute to a party must not become the vendor's."""
+    from invoice_referee.ingestion.document_structure import analyze_document_structure
+
+    document_obj = document([
+        # No seller/buyer anchor, and the block sits below the item table, so the
+        # structure cannot attribute it to either party.
+        table_cell("Mô tả", row=0, col=0,
+                   box=m.BoundingBox(0.05, 0.30, 0.5, 0.35)),
+        table_cell("Dịch vụ X", row=1, col=0,
+                   box=m.BoundingBox(0.05, 0.36, 0.5, 0.40)),
+        text_block("Mã số thuế: 0110329220", "ORPHAN-TAX",
+                   box=m.BoundingBox(0.05, 0.60, 0.4, 0.63)),
+    ])
+    structure = analyze_document_structure(document_obj)
+    assert structure.section_by_block_id["ORPHAN-TAX"] is m.SectionRole.SIGNATURE
+
+    candidates = extract_header_candidates(document_obj, structure)
+    assert "vendor_tax_code" not in candidates
+    assert "unscoped_tax_code" in candidates
+
+    unscoped = resolve_field_candidates("unscoped_tax_code", candidates["unscoped_tax_code"])
+    assert unscoped.selected.normalized_value == "0110329220"
+    assert unscoped.selected.status is m.FieldStatus.NEEDS_CONFIRMATION
+    assert unscoped.selected.evidence_block_ids == ["ORPHAN-TAX"]
+
+
+def test_header_tax_code_is_treated_as_the_seller():
+    """Invoices that print the tax code above any party anchor mean the seller."""
+    from invoice_referee.ingestion.document_structure import analyze_document_structure
+
+    document_obj = document([
+        text_block("Số hóa đơn: 0000123", "NUM",
+                   box=m.BoundingBox(0.05, 0.05, 0.4, 0.08)),
+        text_block("Mã số thuế: 0110329220", "HDR-TAX",
+                   box=m.BoundingBox(0.05, 0.09, 0.4, 0.12)),
+    ])
+    structure = analyze_document_structure(document_obj)
+    assert structure.section_by_block_id["HDR-TAX"] is m.SectionRole.HEADER
+
+    candidates = extract_header_candidates(document_obj, structure)
+    assert "vendor_tax_code" in candidates
+    assert "buyer_tax_code" not in candidates
+    vendor = resolve_field_candidates("vendor_tax_code", candidates["vendor_tax_code"])
+    assert vendor.selected.normalized_value == "0110329220"
+    assert vendor.selected.status is not m.FieldStatus.CONFLICTING
+
+
 def test_header_date_outranks_signature_date():
     from invoice_referee.ingestion.document_structure import analyze_document_structure
     document_obj = document([
@@ -219,7 +324,12 @@ def test_inline_fuzzy_matching_only_repairs_label_not_value(value, expected):
 
 
 def test_exact_key_value_block_extracts_and_marks_confirmed():
-    """Backward-compat: simple label:value blocks still produce candidates."""
+    """Backward-compat: simple label:value blocks still produce candidates.
+
+    A tax code with no structure at all cannot be attributed to a party, so it
+    lands in ``unscoped_tax_code`` for human review rather than being guessed as
+    the vendor's (see ``test_tax_code_in_an_unknown_section_is_not_claimed_as_vendor``).
+    """
     document_obj = document([
         text_block("Ký hiệu: 2C23TTU", "B1"),
         text_block("Số hóa đơn: 0000123", "B2"),
@@ -229,5 +339,6 @@ def test_exact_key_value_block_extracts_and_marks_confirmed():
     candidates = extract_header_candidates(document_obj, None)
     assert candidates["invoice_series"][0].normalized_value == "2C23TTU"
     assert candidates["invoice_number"][0].normalized_value == "0000123"
-    assert candidates["vendor_tax_code"][0].normalized_value == "0101234567"
+    assert "vendor_tax_code" not in candidates
+    assert candidates["unscoped_tax_code"][0].normalized_value == "0101234567"
     assert candidates["total_amount"][0].normalized_value == 30_000_000

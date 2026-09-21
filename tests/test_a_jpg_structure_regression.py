@@ -40,6 +40,19 @@ def test_a_jpg_structure_regression(a_jpg_ocr_document):
     )
 
 
+def test_a_jpg_tax_code_is_the_seller_and_not_a_false_conflict(a_jpg_ocr_document):
+    """The recorded tax block is the seller's; nothing here conflicts with it."""
+    from invoice_referee.domain import models as m
+
+    result = validate_extraction(extract_invoice_fields(a_jpg_ocr_document))
+    vendor = result.fields["vendor_tax_code"]
+    assert vendor.normalized_value == "0110329220"
+    assert vendor.status is not m.FieldStatus.CONFLICTING
+    # The capture contains no buyer tax block, so no buyer/unscoped code exists.
+    assert "buyer_tax_code" not in result.fields
+    assert "unscoped_tax_code" not in result.fields
+
+
 def test_a_jpg_line_item_descriptions_are_real_goods(a_jpg_ocr_document):
     result = validate_extraction(extract_invoice_fields(a_jpg_ocr_document))
     descriptions = [line["description"].normalized_value for line in result.line_items]
