@@ -13,11 +13,103 @@ from invoice_referee.storage import LocalEvidenceRepository, StoredCase
 
 IMAGE_SUFFIXES = {".jpeg", ".jpg", ".png", ".webp"}
 DELETE_STATE_PREFIX = "accounting-confirm-delete-"
+ACCOUNTING_FIELD_LABELS = {
+    "seller_name": "tên người bán",
+    "seller_tax_code": "mã số thuế người bán",
+    "buyer_name": "tên người mua",
+    "buyer_tax_code": "mã số thuế người mua",
+    "invoice_date": "ngày chứng từ",
+    "invoice_number": "số hóa đơn",
+    "template_number": "mẫu số hóa đơn",
+    "serial_number": "ký hiệu hóa đơn",
+    "quantity": "số lượng",
+    "unit_price": "đơn giá",
+    "line_amount": "thành tiền",
+    "tax_amount": "tiền thuế",
+    "total_amount": "tổng thanh toán",
+    "transaction_reference": "mã giao dịch",
+}
+TECHNICAL_MARKERS = ("candidate", "block", "page-", "confidence", "ocr", "ev-")
 
 
 def _case_title(case: StoredCase, result: dict[str, Any]) -> str:
     subject = case.subject or "Không có chủ đề"
     return f"{case.case_id} · {subject} · {result.get('decision', 'UNKNOWN')}"
+
+
+def _friendly_field_text(fields: list[str]) -> str:
+    labels = [
+        ACCOUNTING_FIELD_LABELS.get(field, field.replace("_", " "))
+        for field in fields
+    ] or ["thông tin chưa rõ"]
+    if len(labels) == 1:
+        return labels[0]
+    return ", ".join(labels[:-1]) + f" và {labels[-1]}"
+
+
+def _accounting_summary(result: dict[str, Any]) -> str:
+    analysis = result.get("confidence_analysis") or {}
+    assessments = analysis.get("block_assessments") or []
+    if not assessments:
+        return result.get("summary") or "Không có tóm tắt."
+    if result.get("decision") == "NEEDS_HUMAN":
+        return "Chứng từ có thông tin quan trọng cần kế toán xác nhận."
+    policy_count = sum(
+        item.get("review_action") == "DEFER_TO_POLICY" for item in assessments
+    )
+    if policy_count:
+        return f"Có {policy_count} nội dung cần kiểm tra theo chính sách chi phí."
+    return "Các thông tin chưa rõ không ảnh hưởng đến việc đọc chứng từ."
+
+
+def _accounting_reasoning(case: StoredCase, result: dict[str, Any]) -> str:
+    analysis = result.get("confidence_analysis") or {}
+    assessments = analysis.get("block_assessments") or []
+    if not assessments:
+        return result.get("reasoning") or "Không có nội dung cần xử lý."
+    if result.get("decision") != "NEEDS_HUMAN":
+        if any(
+            item.get("review_action") == "DEFER_TO_POLICY"
+            for item in assessments
+        ):
+            return (
+                "Chứng từ vẫn có thể tiếp tục xử lý; nội dung được đánh dấu sẽ "
+                "được xem xét ở bước kiểm tra chính sách."
+            )
+        return "Không có thông tin nào cần kế toán xác nhận ở bước này."
+
+    candidates = {
+        item.get("candidate_id"): item
+        for item in result.get("low_confidence_candidates") or []
+    }
+    filenames = {
+        evidence.evidence_id: evidence.original_name for evidence in case.evidence
+    }
+    questions: list[str] = []
+    for assessment in assessments:
+        if assessment.get("review_action") != "ASK_HUMAN":
+            continue
+        question = str(assessment.get("human_question") or "").strip()
+        if question and not any(
+            marker in question.lower() for marker in TECHNICAL_MARKERS
+        ):
+            questions.append(question)
+            continue
+
+        candidate = candidates.get(assessment.get("candidate_id")) or {}
+        source_file = (
+            candidate.get("source_file")
+            or filenames.get(candidate.get("evidence_id"))
+            or "chứng từ"
+        )
+        field_text = _friendly_field_text(assessment.get("canonical_fields") or [])
+        questions.append(
+            f"Vui lòng kiểm tra {source_file} và xác nhận {field_text}."
+        )
+
+    return " ".join(questions) or (
+        result.get("reasoning") or "Vui lòng kiểm tra lại chứng từ."
+    )
 
 
 def _render_evidence(
@@ -139,7 +231,7 @@ def _render_quality_review(result: dict[str, Any]) -> None:
                         "canonical_fields", []
                     )
                 ),
-                "Lý do": assessments.get(candidate.get("candidate_id"), {}).get(
+                "Phân tích kỹ thuật": assessments.get(candidate.get("candidate_id"), {}).get(
                     "reason", "Thiếu assessment cho candidate này."
                 ),
                 "Câu hỏi cho người kiểm tra": assessments.get(
@@ -223,10 +315,10 @@ def _render_case(
             len(result.get("ocr_evidence_ids") or []),
         )
 
-        st.markdown("**Kết luận**")
-        st.write(result.get("summary") or "Không có tóm tắt.")
-        st.markdown("**Reasoning**")
-        st.write(result.get("reasoning") or "Không có reasoning.")
+        st.markdown("**Tóm tắt cho kế toán**")
+        st.write(_accounting_summary(result))
+        st.markdown("**Nội dung cần xử lý**")
+        st.write(_accounting_reasoning(case, result))
 
         findings = result.get("findings") or []
         if findings:

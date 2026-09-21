@@ -225,7 +225,11 @@ def test_uncertain_critical_low_confidence_block_asks_human(tmp_path: Path) -> N
     result = CaseProcessingService(repository, ocr, agent).process_case(case_id)
 
     assert result.decision == ProcessingDecision.NEEDS_HUMAN
-    assert "Vui lòng xác nhận" in result.reasoning
+    assert "Vui lòng kiểm tra" in result.reasoning
+    assert "bill.jpg" in result.reasoning
+    assert "EV-" not in result.reasoning
+    assert "block" not in result.reasoning.lower()
+    assert "confidence" not in result.reasoning.lower()
     assert any(
         item.rule_id == "LOW_CONFIDENCE_ASK_HUMAN"
         for item in result.findings
@@ -272,12 +276,12 @@ def test_semantically_readable_policy_signal_does_not_block_extraction(
     result = CaseProcessingService(repository, ocr, agent).process_case(case_id)
 
     assert result.decision == ProcessingDecision.PASS
-    assert "Policy Agent" in result.summary
+    assert "chính sách chi phí" in result.summary
     assert any(
         item.rule_id == "OCR_POLICY_SIGNAL" and item.status == "WARN"
         for item in result.findings
     )
-    assert result.reasoning.startswith("Không cần hỏi người ở bước OCR")
+    assert result.reasoning.startswith("Chứng từ vẫn có thể tiếp tục xử lý")
 
 
 def test_unassessed_low_confidence_block_fails_closed(tmp_path: Path) -> None:

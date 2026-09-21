@@ -23,6 +23,32 @@ from invoice_referee.storage import LocalEvidenceRepository, StoredCase, StoredE
 VIETNAM_TZ = timezone(timedelta(hours=7))
 OCR_SUFFIXES = {".jpeg", ".jpg", ".pdf", ".png", ".webp"}
 BLOCKING_FINDING_STATUSES = {"FAIL", "ERROR"}
+ACCOUNTING_FIELD_LABELS = {
+    "seller_name": "tên người bán",
+    "seller_tax_code": "mã số thuế người bán",
+    "buyer_name": "tên người mua",
+    "buyer_tax_code": "mã số thuế người mua",
+    "invoice_date": "ngày chứng từ",
+    "invoice_number": "số hóa đơn",
+    "template_number": "mẫu số hóa đơn",
+    "serial_number": "ký hiệu hóa đơn",
+    "item_name": "tên hàng hóa hoặc dịch vụ",
+    "quantity": "số lượng",
+    "unit_price": "đơn giá",
+    "line_amount": "thành tiền",
+    "tax_amount": "tiền thuế",
+    "total_amount": "tổng thanh toán",
+    "payment_method": "phương thức thanh toán",
+    "transaction_reference": "mã giao dịch",
+}
+TECHNICAL_QUESTION_MARKERS = (
+    "candidate",
+    "block",
+    "page-",
+    "confidence",
+    "ocr",
+    "ev-",
+)
 
 
 def _ocr_markdown(response: dict[str, Any]) -> str:
@@ -109,6 +135,8 @@ class CaseProcessingService:
                     evidence_id=evidence.evidence_id,
                     threshold=self.word_confidence_threshold,
                 )
+                for candidate in evidence_candidates:
+                    candidate["source_file"] = evidence.original_name
                 low_confidence_candidates.extend(evidence_candidates)
                 documents.append(
                     {
@@ -155,8 +183,8 @@ class CaseProcessingService:
             return self._save_result(
                 case,
                 decision=ProcessingDecision.PASS,
-                summary="Không có block confidence thấp cần xem xét.",
-                reasoning="Hồ sơ chỉ hoàn thành Confidence Quality Gate; chưa được kiểm tra missing value, policy hoặc tính hợp lệ nghiệp vụ.",
+                summary="Chứng từ không có thông tin nào cần kiểm tra thêm về độ rõ.",
+                reasoning="Không có thông tin nào cần kế toán xác nhận ở bước này.",
                 findings=findings,
                 ocr_evidence_ids=ocr_evidence_ids,
                 low_confidence_candidates=low_confidence_candidates,
@@ -197,7 +225,7 @@ class CaseProcessingService:
             return self._technical_failure(
                 case,
                 "CONFIDENCE_AGENT_ERROR",
-                "Confidence Quality Agent không trả về kết quả hợp lệ; cần người kiểm tra.",
+                "Hệ thống chưa hoàn tất kiểm tra độ rõ của chứng từ; cần kế toán kiểm tra lại.",
                 ocr_evidence_ids=ocr_evidence_ids,
                 low_confidence_candidates=low_confidence_candidates,
                 processing_errors=[str(exc)],
@@ -214,11 +242,8 @@ class CaseProcessingService:
             else ProcessingDecision.PASS
         )
         if decision == ProcessingDecision.NEEDS_HUMAN:
-            summary = "Có block OCR quan trọng cần người xác minh."
-            reasoning = self._confidence_questions(
-                confidence_analysis,
-                confidence_findings,
-            )
+            summary = "Chứng từ có thông tin quan trọng cần kế toán xác nhận."
+            reasoning = self._confidence_questions(confidence_findings)
         else:
             policy_signal_count = sum(
                 item.review_action == "DEFER_TO_POLICY"
@@ -226,16 +251,16 @@ class CaseProcessingService:
             )
             if policy_signal_count:
                 summary = (
-                    "Confidence Quality Gate hoàn thành; có "
-                    f"{policy_signal_count} tín hiệu được chuyển sang Policy Agent."
+                    f"Có {policy_signal_count} nội dung cần được kiểm tra theo "
+                    "chính sách chi phí."
                 )
                 reasoning = (
-                    "Không cần hỏi người ở bước OCR. Tín hiệu policy được giữ lại "
-                    "để kiểm tra ở giai đoạn nghiệp vụ sau."
+                    "Chứng từ vẫn có thể tiếp tục xử lý; các nội dung này sẽ được "
+                    "xem xét ở bước kiểm tra chính sách."
                 )
             else:
-                summary = "Các block confidence thấp không cần người xác minh."
-                reasoning = "Hồ sơ chỉ hoàn thành Confidence Quality Gate; chưa được kiểm tra missing value, policy hoặc tính hợp lệ nghiệp vụ."
+                summary = "Các thông tin chưa rõ không ảnh hưởng đến việc đọc chứng từ."
+                reasoning = "Không có thông tin nào cần kế toán xác nhận ở bước này."
 
         return self._save_result(
             case,
@@ -297,20 +322,24 @@ class CaseProcessingService:
             candidate_id = candidate["candidate_id"]
             assessment = assessment_by_id.get(candidate_id)
             if assessment is None or assessment_counts.get(candidate_id) != 1:
+                source_file = candidate.get("source_file") or "chứng từ"
                 findings.append(
                     RuleFinding(
                         rule_id="LOW_CONFIDENCE_BLOCK_UNKNOWN",
                         status="FAIL",
-                        message=f"Vui lòng kiểm tra {candidate_id}; block chưa được đánh giá duy nhất một lần.",
+                        message=(
+                            f"Chưa thể hoàn tất kiểm tra chất lượng cho {source_file}. "
+                            "Vui lòng kiểm tra lại chứng từ."
+                        ),
                         source_refs=[candidate_id],
                     )
                 )
                 continue
 
             if assessment.review_action == "ASK_HUMAN":
-                question = assessment.human_question or (
-                    f"Vui lòng kiểm tra {candidate_id} và xác nhận "
-                    f"{', '.join(assessment.canonical_fields) or 'nội dung OCR'}."
+                question = CaseProcessingService._accountant_question(
+                    assessment,
+                    candidate,
                 )
                 findings.append(
                     RuleFinding(
@@ -322,13 +351,14 @@ class CaseProcessingService:
                 )
             elif assessment.review_action == "DEFER_TO_POLICY":
                 category = assessment.semantic_category or "chưa phân loại"
+                source_file = candidate.get("source_file") or "chứng từ"
                 findings.append(
                     RuleFinding(
                         rule_id="OCR_POLICY_SIGNAL",
                         status="WARN",
                         message=(
-                            f"Chuyển Policy Agent xem xét nhóm {category}: "
-                            f"{assessment.reason}"
+                            f"{source_file} có nội dung thuộc nhóm {category}; "
+                            "cần xem xét ở bước kiểm tra chính sách chi phí."
                         ),
                         source_refs=[candidate_id],
                     )
@@ -339,11 +369,42 @@ class CaseProcessingService:
                 RuleFinding(
                     rule_id="OCR_CONFIDENCE_REVIEW",
                     status="PASS",
-                    message="Các block confidence thấp không cần người xác minh.",
+                    message="Không có thông tin nào cần kế toán xác nhận ở bước này.",
                     source_refs=sorted(expected_ids),
                 )
             )
         return findings
+
+    @staticmethod
+    def _accountant_question(
+        assessment: Any,
+        candidate: dict[str, Any],
+    ) -> str:
+        question = (assessment.human_question or "").strip()
+        if question and not any(
+            marker in question.lower() for marker in TECHNICAL_QUESTION_MARKERS
+        ):
+            return question
+
+        source_file = candidate.get("source_file") or "chứng từ"
+        labels = [
+            ACCOUNTING_FIELD_LABELS.get(field, field.replace("_", " "))
+            for field in assessment.canonical_fields
+        ]
+        if not labels:
+            labels = ["thông tin chưa rõ"]
+        if len(labels) == 1:
+            field_text = labels[0]
+        else:
+            field_text = ", ".join(labels[:-1]) + f" và {labels[-1]}"
+
+        observed_text = assessment.observed_text.strip()
+        if observed_text and len(observed_text) <= 80:
+            return (
+                f"Vui lòng kiểm tra {source_file} và xác nhận {field_text} "
+                f"có phải là '{observed_text}' không."
+            )
+        return f"Vui lòng kiểm tra {source_file} và xác nhận {field_text}."
 
     @staticmethod
     def _missing_source_findings(
@@ -426,17 +487,8 @@ class CaseProcessingService:
         )
 
     @classmethod
-    def _confidence_questions(
-        cls,
-        analysis: ConfidenceAnalysis,
-        findings: list[RuleFinding],
-    ) -> str:
-        questions = [
-            item.human_question
-            for item in analysis.block_assessments
-            if item.human_question and item.review_action == "ASK_HUMAN"
-        ]
-        return " ".join(questions) or cls._finding_questions(findings)
+    def _confidence_questions(cls, findings: list[RuleFinding]) -> str:
+        return cls._finding_questions(findings)
 
     def _technical_failure(
         self,

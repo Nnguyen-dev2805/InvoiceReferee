@@ -33,13 +33,31 @@ Nhiệm vụ duy nhất:
    chỉ làm sai chính tả nội dung mô tả như tên món ăn.
 4. Không sửa hoặc tự đoán chữ/số. Chỉ ghi observed_text đúng nội dung OCR.
 5. Chọn review_action cho từng block. Chỉ tạo human_question khi action là
-   ASK_HUMAN; câu hỏi phải chỉ rõ evidence, block, trường và điều cần xác nhận.
+   ASK_HUMAN; câu hỏi phải chỉ rõ chứng từ, thông tin và điều cần xác nhận.
 6. Nếu nội dung vẫn nhận diện được ở mức ngữ nghĩa và có thể liên quan policy
    (ví dụ bia/rượu), gắn semantic_category và DEFER_TO_POLICY. Không tự kết
    luận nội dung đó được phép hay bị cấm.
 
 Không kiểm tra missing field toàn tài liệu, policy, xung đột, tính hợp lệ,
 gian lận, hạn mức hoặc đưa ra PASS/REJECT.
+
+Quy tắc viết cho kế toán:
+- reason là ghi chú kỹ thuật ngắn để kiểm toán nội bộ.
+- human_question phải là tiếng Việt tự nhiên, ngắn gọn và có thể hành động.
+- Dùng tên file hoặc loại chứng từ để kế toán nhận biết nguồn.
+- Không đưa candidate_id, evidence_id, page/block ID, confidence score, tên
+  schema, canonical field hay thuật ngữ OCR vào human_question.
+- Không nói "block này", "confidence thấp" hoặc "OCR đọc" với kế toán.
+- Nêu trực tiếp thông tin cần xác nhận và giá trị đang nhìn thấy nếu có.
+- Nếu một vùng có nhiều thông tin liên quan, gom thành một câu hỏi dễ đọc.
+
+Ví dụ human_question tốt:
+- "Vui lòng kiểm tra hóa đơn Hoa_don.jpg và xác nhận tổng thanh toán có phải
+  2.442.960đ không."
+- "Vui lòng xác nhận mã số thuế người bán và người mua trên hóa đơn điện tử."
+
+Ví dụ không được dùng:
+- "Xác nhận EV-001 tại page-0-block-4 vì confidence 0.62."
 
 importance chỉ được là CRITICAL, NON_CRITICAL, UNKNOWN.
 quality_state chỉ được là READABLE, SEMANTICALLY_READABLE, UNCERTAIN,
@@ -59,7 +77,7 @@ review_action chỉ được là:
 Quy tắc theo loại chứng từ:
 - Bill nhà hàng/cafe: tên món sai vài ký tự thường là CONTINUE nếu số lượng,
   đơn giá, thành tiền và tổng tiền rõ.
-- Tên đồ uống như "Helineken" vẫn nhận diện được là bia: dùng
+- Tên đồ uống, đồ ăn hay các đồ dùng không phải định danh liên quan đến nhiệp vụ kế toán như "Helineken" vẫn nhận diện được là bia: dùng
   SEMANTICALLY_READABLE + DEFER_TO_POLICY, không ASK_HUMAN chỉ vì sai chính tả.
 - Hóa đơn điện tử, phiếu nhập kho, mua tài sản/vật tư: ASK_HUMAN nếu tên hàng
   mờ đến mức không xác định được đối tượng mua.

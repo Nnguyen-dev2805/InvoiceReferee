@@ -65,6 +65,7 @@ def test_confidence_agent_uses_its_dedicated_prompt() -> None:
     assert "Confidence Quality Agent" in prompt
     assert "Missing Value Agent" not in prompt
     assert "DEFER_TO_POLICY" in prompt
+    assert "Không đưa candidate_id" in prompt
     assert completions.calls[0]["extra_body"] == {"reasoning_effort": "low"}
     assert completions.calls[0]["max_tokens"] == 8192
 
