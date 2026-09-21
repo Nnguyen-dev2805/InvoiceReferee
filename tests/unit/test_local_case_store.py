@@ -14,8 +14,6 @@ def test_store_persists_metadata_file_and_audit_log(tmp_path: Path) -> None:
         id_factory=lambda: "CASE-TEST-STORE",
     )
     claim = ClaimDraft(
-        employee_name="Trần Thị B",
-        employee_email="b@example.com",
         subject="Chi phí văn phòng phẩm",
         body="Mua dây cáp cho dự án Orion",
     )

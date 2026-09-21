@@ -135,18 +135,20 @@ python -m streamlit run app/streamlit_app.py
 Mở `http://localhost:8501`. Giao diện tiếp nhận hai nhóm dữ liệu:
 
 - chứng từ chính, có thể để trống;
-- nội dung đề nghị dạng email và tài liệu bổ sung.
+- business context dạng nội dung đề nghị và tài liệu bổ sung.
 
-Sidebar có hai không gian làm việc:
+Sidebar có ba không gian làm việc:
 
-- `Nhân viên`: gửi hồ sơ chi phí;
-- `OCR kiểm thử`: chọn evidence đã gửi, chạy Mistral OCR và xem văn bản,
+- `Nhân viên`: gửi hồ sơ; Submit tự chạy Missing Gate, OCR và Kimi;
+- `Kế toán`: xem hai hàng đợi `Đã pass` và `Cần xử lý` cùng reasoning;
+- `OCR kiểm thử`: chỉ xem evidence đã được Mistral OCR xử lý, gồm văn bản,
   confidence theo từng từ, ảnh có bounding box, cấu trúc
   `page -> block -> words` cùng JSON thô. Đây là trang debug tạm thời.
 
 Hồ sơ đã tiếp nhận được lưu cục bộ trong `data/submissions/{case_id}`. Thư mục
 này bị Git bỏ qua vì có thể chứa dữ liệu nhạy cảm. Kết quả OCR debug được lưu
-trong `data/submissions/{case_id}/ocr/{evidence_id}.json`.
+trong `data/submissions/{case_id}/ocr/{evidence_id}.json`; quyết định và
+reasoning được lưu trong `data/submissions/{case_id}/processing.json`.
 
 ### Tái cấu trúc confidence OCR
 

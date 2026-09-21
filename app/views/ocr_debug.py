@@ -11,7 +11,6 @@ import streamlit as st
 from app.components.bbox_overlay import render_bbox_overlay
 from app.components.submission_form import format_size
 from invoice_referee.extraction import (
-    MistralOcrAdapter,
     REVIEW_CONFIDENCE_THRESHOLD,
     extract_word_confidence_rows,
     restructure_mistral_ocr,
@@ -23,7 +22,7 @@ OCR_SUFFIXES = {".jpeg", ".jpg", ".pdf", ".png", ".webp"}
 
 def _case_label(case: StoredCase) -> str:
     date = case.submitted_at[:16].replace("T", " ") if case.submitted_at else "Không rõ ngày"
-    return f"{case.case_id} · {case.employee_name} · {date}"
+    return f"{case.case_id} · {case.subject} · {date}"
 
 
 def _evidence_label(evidence: StoredEvidence) -> str:
@@ -53,7 +52,7 @@ def _render_preview(
         st.image(
             preview,
             caption=caption,
-            use_container_width=True,
+            width="stretch",
         )
     else:
         st.markdown(
@@ -308,22 +307,25 @@ def _render_result(result: dict[str, Any], evidence: StoredEvidence) -> None:
 
 def render_ocr_debug(
     repository: LocalEvidenceRepository,
-    adapter: MistralOcrAdapter | None,
 ) -> None:
     st.markdown(
         """
         <div class="ir-page-heading">
           <div class="page-kicker debug">Công cụ nội bộ</div>
           <h1>OCR kiểm thử</h1>
-          <p>Chọn evidence đã gửi để chạy Mistral OCR và xem dữ liệu thô.</p>
+          <p>Xem lại kết quả của những evidence đã được Mistral OCR xử lý.</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    cases = repository.list_cases()
+    cases = [
+        case
+        for case in repository.list_cases()
+        if any(repository.load_ocr_result(evidence) for evidence in case.evidence)
+    ]
     if not cases:
-        st.info("Chưa có hồ sơ nào. Hãy gửi một hồ sơ ở mục Nhân viên trước.")
+        st.info("Chưa có hồ sơ nào đã chạy OCR.")
         return
 
     selected_case = st.selectbox(
@@ -335,9 +337,10 @@ def render_ocr_debug(
         evidence
         for evidence in selected_case.evidence
         if Path(evidence.original_name).suffix.lower() in OCR_SUFFIXES
+        and repository.load_ocr_result(evidence) is not None
     ]
     if not supported_evidence:
-        st.warning("Hồ sơ này không có ảnh hoặc PDF phù hợp để chạy OCR.")
+        st.warning("Hồ sơ này chưa có kết quả OCR.")
         return
 
     selected_evidence = st.selectbox(
@@ -346,12 +349,7 @@ def render_ocr_debug(
         format_func=_evidence_label,
     )
 
-    result_key = (
-        f"ocr-result-{selected_case.case_id}-{selected_evidence.evidence_id}"
-    )
-    result = st.session_state.get(result_key)
-    if result is None:
-        result = repository.load_ocr_result(selected_evidence)
+    result = repository.load_ocr_result(selected_evidence)
 
     preview_col, result_col = st.columns([0.78, 1.22], gap="large")
     with preview_col:
@@ -364,45 +362,8 @@ def render_ocr_debug(
 
     with result_col:
         with st.container(border=True):
-            header_left, action_right = st.columns([1.5, 1])
-            with header_left:
-                st.markdown('<div class="section-heading">Kết quả OCR</div>', unsafe_allow_html=True)
-                st.caption("Model: mistral-ocr-latest · confidence: word")
-            with action_right:
-                run_ocr = st.button(
-                    "Chạy OCR",
-                    type="primary",
-                    icon=":material/document_scanner:",
-                    use_container_width=True,
-                    disabled=adapter is None,
-                )
-
-            if adapter is None and result is None:
-                st.error("MISTRAL_API_KEY chưa được cấu hình trong .env.")
-                return
-
-            if run_ocr:
-                try:
-                    with st.spinner("Đang đọc evidence bằng Mistral OCR..."):
-                        execution = adapter.process(
-                            selected_evidence.absolute_path,
-                            selected_evidence.mime_type,
-                        )
-                        result = {
-                            "schema_version": "1.0",
-                            "case_id": selected_case.case_id,
-                            "evidence_id": selected_evidence.evidence_id,
-                            "source_file": selected_evidence.original_name,
-                            **execution.to_dict(),
-                        }
-                        repository.save_ocr_result(selected_evidence, result)
-                        st.session_state[result_key] = result
-                    st.rerun()
-                except Exception as exc:
-                    st.error(f"Không thể chạy OCR: {exc}")
-                    return
-
-            if result:
-                _render_result(result, selected_evidence)
-            else:
-                st.info("Chưa có kết quả OCR cho evidence này.")
+            st.markdown('<div class="section-heading">Kết quả OCR</div>', unsafe_allow_html=True)
+            st.caption(
+                f"Model: {result.get('model', 'mistral-ocr-latest')} · confidence: word"
+            )
+            _render_result(result, selected_evidence)

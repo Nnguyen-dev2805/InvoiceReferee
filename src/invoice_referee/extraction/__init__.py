@@ -7,12 +7,14 @@ from .confidence import (
     extract_word_confidence_rows,
 )
 from .mistral_ocr import MistralOcrAdapter, OcrExecution
+from .kimi_reasoning import KimiReasoningAdapter
 from .word_block_mapper import restructure_mistral_ocr
 
 __all__ = [
     "LOW_CONFIDENCE_THRESHOLD",
     "REVIEW_CONFIDENCE_THRESHOLD",
     "MistralOcrAdapter",
+    "KimiReasoningAdapter",
     "OcrExecution",
     "confidence_level",
     "extract_word_confidence_rows",

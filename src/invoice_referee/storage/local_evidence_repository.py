@@ -24,8 +24,8 @@ class StoredEvidence:
 class StoredCase:
     case_id: str
     submitted_at: str
-    employee_name: str
     subject: str
+    body: str
     evidence: tuple[StoredEvidence, ...]
 
 
@@ -46,6 +46,12 @@ class LocalEvidenceRepository:
             except (OSError, ValueError, KeyError, json.JSONDecodeError):
                 continue
         return sorted(cases, key=lambda case: case.submitted_at, reverse=True)
+
+    def get_case(self, case_id: str) -> StoredCase:
+        metadata_path = self._case_dir(case_id) / "submission.json"
+        if not metadata_path.is_file():
+            raise FileNotFoundError(f"Không tìm thấy hồ sơ: {case_id}")
+        return self._read_case(metadata_path)
 
     def _read_case(self, metadata_path: Path) -> StoredCase:
         payload = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -74,8 +80,8 @@ class LocalEvidenceRepository:
         return StoredCase(
             case_id=case_id,
             submitted_at=str(payload.get("submitted_at") or ""),
-            employee_name=str(claim.get("employee_name") or "Không rõ nhân viên"),
             subject=str(claim.get("subject") or "Không có chủ đề"),
+            body=str(claim.get("body") or ""),
             evidence=tuple(evidence),
         )
 
@@ -96,6 +102,35 @@ class LocalEvidenceRepository:
 
     def load_ocr_result(self, evidence: StoredEvidence) -> dict[str, Any] | None:
         output_path = self._case_dir(evidence.case_id) / "ocr" / f"{evidence.evidence_id}.json"
+        if not output_path.is_file():
+            return None
+        return json.loads(output_path.read_text(encoding="utf-8"))
+
+    def save_processing_result(
+        self,
+        case_id: str,
+        result: dict[str, Any],
+    ) -> Path:
+        case_dir = self._case_dir(case_id)
+        output_path = case_dir / "processing.json"
+        output_path.write_text(
+            json.dumps(result, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        audit_path = case_dir / "audit.jsonl"
+        audit_event = {
+            "event_type": "CASE_PROCESSED",
+            "case_id": case_id,
+            "actor": "invoice_referee_agent",
+            "timestamp": result.get("processed_at"),
+            "decision": result.get("decision"),
+        }
+        with audit_path.open("a", encoding="utf-8") as audit_file:
+            audit_file.write(json.dumps(audit_event, ensure_ascii=False) + "\n")
+        return output_path
+
+    def load_processing_result(self, case_id: str) -> dict[str, Any] | None:
+        output_path = self._case_dir(case_id) / "processing.json"
         if not output_path.is_file():
             return None
         return json.loads(output_path.read_text(encoding="utf-8"))

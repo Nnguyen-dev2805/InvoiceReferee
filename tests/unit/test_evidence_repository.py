@@ -7,8 +7,6 @@ from invoice_referee.storage import LocalCaseStore, LocalEvidenceRepository
 def test_repository_reads_evidence_and_round_trips_ocr_result(tmp_path: Path) -> None:
     store = LocalCaseStore(tmp_path, id_factory=lambda: "CASE-OCR-001")
     claim = ClaimDraft(
-        employee_name="Nguyễn Văn A",
-        employee_email="a@example.com",
         subject="Đề nghị kiểm tra OCR",
         body="Chi phí tiếp khách",
     )

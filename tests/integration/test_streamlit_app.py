@@ -17,13 +17,11 @@ def test_description_only_submission_runs_end_to_end(
     app = AppTest.from_file(str(app_path), default_timeout=10).run()
 
     assert len(app.exception) == 0
-    assert len(app.text_input) == 4
+    assert len(app.text_input) == 2
     assert len(app.text_area) == 1
     assert [button.label for button in app.button] == ["Xóa nội dung", "Gửi kiểm tra"]
 
-    app.text_input[1].set_value("Nguyễn Văn A")
-    app.text_input[2].set_value("a@example.com")
-    app.text_input[3].set_value("Đề nghị hoàn ứng tiếp khách")
+    app.text_input[1].set_value("Đề nghị hoàn ứng tiếp khách")
     app.text_area[0].set_value(
         "Em đi tiếp khách công ty ABC tối qua hết 2.500.000 đồng."
     )
@@ -34,6 +32,7 @@ def test_description_only_submission_runs_end_to_end(
     assert len(case_dirs) == 1
     assert (case_dirs[0] / "submission.json").exists()
     assert (case_dirs[0] / "audit.jsonl").exists()
+    assert (case_dirs[0] / "processing.json").exists()
 
 
 def test_sidebar_opens_ocr_debug_for_submitted_image(
@@ -47,8 +46,6 @@ def test_sidebar_opens_ocr_debug_for_submitted_image(
     )
     store.save_submission(
         ClaimDraft(
-            employee_name="Nguyễn Văn A",
-            employee_email="a@example.com",
             subject="Kiểm tra bill",
             body="Chi phí dự án Phoenix",
         ),
@@ -119,7 +116,7 @@ def test_sidebar_opens_ocr_debug_for_submitted_image(
 
     assert len(app.exception) == 0
     assert len(app.selectbox) == 2
-    assert [button.label for button in app.button] == ["Chạy OCR"]
+    assert [button.label for button in app.button] == []
     assert [tab.label for tab in app.tabs] == [
         "Văn bản",
         "Confidence theo từ",
@@ -128,3 +125,52 @@ def test_sidebar_opens_ocr_debug_for_submitted_image(
     ]
     assert len(app.expander) == 1
     assert "Block 01 · title · exact" in app.expander[0].label
+
+
+def test_accounting_page_splits_processed_cases(tmp_path: Path, monkeypatch) -> None:
+    submissions_root = tmp_path / "submissions"
+    store = LocalCaseStore(
+        submissions_root,
+        id_factory=lambda: "CASE-ACCOUNTING-UI",
+    )
+    store.save_submission(
+        ClaimDraft(
+            subject="Hoàn ứng tiếp khách",
+            body="Tiếp khách công ty ABC",
+        ),
+        [],
+        [],
+    )
+    repository = LocalEvidenceRepository(submissions_root)
+    repository.save_processing_result(
+        "CASE-ACCOUNTING-UI",
+        {
+            "schema_version": "1.0",
+            "case_id": "CASE-ACCOUNTING-UI",
+            "decision": "NEEDS_HUMAN",
+            "processed_at": "2026-09-21T10:00:00+07:00",
+            "summary": "Thiếu bill evidence.",
+            "reasoning": "Hồ sơ chỉ có business context.",
+            "findings": [
+                {
+                    "rule_id": "MISSING_BILL_EVIDENCE",
+                    "status": "FAIL",
+                    "message": "Hồ sơ không có bill hoặc chứng từ chính.",
+                    "source_refs": [],
+                }
+            ],
+            "ocr_evidence_ids": [],
+            "kimi_analysis": None,
+            "processing_errors": [],
+        },
+    )
+    monkeypatch.setenv("INVOICE_REFEREE_DATA_DIR", str(tmp_path))
+    app_path = Path(__file__).parents[2] / "app" / "streamlit_app.py"
+
+    app = AppTest.from_file(str(app_path), default_timeout=10).run()
+    app.radio[0].set_value("Kế toán").run()
+
+    assert len(app.exception) == 0
+    assert [tab.label for tab in app.tabs] == ["Đã pass (0)", "Cần xử lý (1)"]
+    assert len(app.expander) == 1
+    assert "CASE-ACCOUNTING-UI" in app.expander[0].label

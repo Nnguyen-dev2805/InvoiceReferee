@@ -182,8 +182,6 @@ Thông tin thường không có sẵn trên hóa đơn/chứng từ.
 ```json
 {
   "claim_id": "CLM-001",
-  "employee_id": "EMP-001",
-  "employee_name": "Nguyễn Văn A",
   "business_purpose": "Gặp khách hàng cho Dự án Phoenix",
   "client_or_project": "Dự án Phoenix",
   "expense_category": "MEAL_ENTERTAINMENT",

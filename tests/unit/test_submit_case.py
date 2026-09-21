@@ -19,8 +19,6 @@ def make_service(tmp_path: Path) -> SubmitCaseService:
 
 def valid_claim(body: str = "Tiếp khách công ty ABC cho dự án Phoenix") -> ClaimDraft:
     return ClaimDraft(
-        employee_name="Nguyễn Văn A",
-        employee_email="a@example.com",
         subject="Đề nghị hoàn ứng",
         body=body,
     )

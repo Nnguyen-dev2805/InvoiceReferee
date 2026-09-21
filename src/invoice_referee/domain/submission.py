@@ -20,8 +20,6 @@ class ClaimDraft(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     recipient: str = "Phòng Kế toán"
-    employee_name: str = ""
-    employee_email: str = ""
     subject: str = ""
     body: str = ""
 

@@ -97,20 +97,6 @@ def render_submission_form(
                     disabled=True,
                     key=f"recipient-{form_version}",
                 )
-                identity_left, identity_right = st.columns(2, gap="medium")
-                with identity_left:
-                    employee_name = st.text_input(
-                        "Người gửi *",
-                        placeholder="Nguyễn Văn A",
-                        key=f"employee-name-{form_version}",
-                    )
-                with identity_right:
-                    employee_email = st.text_input(
-                        "Email *",
-                        placeholder="nguyenvana@company.vn",
-                        key=f"employee-email-{form_version}",
-                    )
-
                 subject = st.text_input(
                     "Chủ đề",
                     placeholder="Đề nghị hoàn ứng chi phí tiếp khách",
@@ -163,8 +149,6 @@ def render_submission_form(
 
     claim = ClaimDraft(
         recipient="Phòng Kế toán",
-        employee_name=employee_name,
-        employee_email=employee_email,
         subject=subject,
         body=body,
     )
@@ -173,7 +157,8 @@ def render_submission_form(
         *_to_payloads(supporting_files, EvidenceRole.SUPPORTING_DOCUMENT),
     ]
     try:
-        receipt = service.submit(claim, uploads)
+        with st.spinner("Đang kiểm tra dữ liệu, chạy OCR và phân tích hồ sơ..."):
+            receipt = service.submit(claim, uploads)
     except SubmissionValidationError as exc:
         return "invalid", exc.issues
     return "submitted", receipt.model_dump(mode="json")

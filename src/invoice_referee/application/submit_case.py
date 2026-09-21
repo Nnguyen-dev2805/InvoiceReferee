@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from invoice_referee.domain import (
     ClaimDraft,
@@ -32,9 +32,6 @@ SUPPORTING_EXTENSIONS = PRIMARY_EXTENSIONS | {
     ".xls",
     ".xlsx",
 }
-EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-
-
 @dataclass(frozen=True, slots=True)
 class SubmissionLimits:
     max_files: int = 12
@@ -49,9 +46,11 @@ class SubmitCaseService:
         self,
         store: CaseStore,
         limits: SubmissionLimits | None = None,
+        processor: Any | None = None,
     ) -> None:
         self.store = store
         self.limits = limits or SubmissionLimits()
+        self.processor = processor
 
     def submit(
         self,
@@ -63,7 +62,11 @@ class SubmitCaseService:
             raise SubmissionValidationError(issues)
 
         unique_uploads, warnings = self._deduplicate(uploads)
-        return self.store.save_submission(claim, unique_uploads, warnings)
+        receipt = self.store.save_submission(claim, unique_uploads, warnings)
+        if self.processor is None:
+            return receipt
+        result = self.processor.process_case(receipt.case_id)
+        return receipt.model_copy(update={"status": result.decision.value})
 
     def _validate(
         self,
@@ -71,13 +74,6 @@ class SubmitCaseService:
         uploads: list[UploadPayload],
     ) -> list[str]:
         issues: list[str] = []
-        if not claim.employee_name:
-            issues.append("Nhập tên nhân viên gửi đề nghị.")
-        if not claim.employee_email:
-            issues.append("Nhập email nhân viên.")
-        elif not EMAIL_PATTERN.match(claim.employee_email):
-            issues.append("Email nhân viên chưa đúng định dạng.")
-
         if not claim.body and not uploads:
             issues.append("Nhập nội dung đề nghị hoặc đính kèm ít nhất một tệp.")
 

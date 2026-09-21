@@ -113,7 +113,7 @@ class LocalCaseStore:
                 {
                     "event_type": "CASE_CREATED",
                     "case_id": case_id,
-                    "actor": claim.employee_email or claim.employee_name,
+                    "actor": "employee_submission",
                     "timestamp": submitted_at,
                     "reason": "Nhân viên gửi hồ sơ chi phí",
                 },
@@ -121,7 +121,7 @@ class LocalCaseStore:
                     {
                         "event_type": "EVIDENCE_ATTACHED",
                         "case_id": case_id,
-                        "actor": claim.employee_email or claim.employee_name,
+                        "actor": "employee_submission",
                         "timestamp": submitted_at,
                         "evidence_id": record.evidence_id,
                         "role": record.role.value,

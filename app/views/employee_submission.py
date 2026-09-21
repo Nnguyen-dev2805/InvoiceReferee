@@ -31,11 +31,17 @@ def render_employee_submission(service: SubmitCaseService) -> None:
         total_files = int(receipt["primary_document_count"]) + int(
             receipt["supporting_document_count"]
         )
+        status_labels = {
+            "PASS": "Đã pass",
+            "NEEDS_HUMAN": "Cần kế toán xử lý",
+            "RECEIVED": "Đã tiếp nhận",
+        }
+        status = str(receipt.get("status") or "RECEIVED")
         st.markdown(
             '<div class="receipt-strip">'
             f'<strong>Đã tiếp nhận {receipt["case_id"]}</strong><br>'
             f'{total_files} tệp · {format_size(int(receipt["total_size_bytes"]))} · '
-            "Trạng thái: Chờ xử lý"
+            f'Trạng thái: {status_labels.get(status, status)}'
             "</div>",
             unsafe_allow_html=True,
         )
