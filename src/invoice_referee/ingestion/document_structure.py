@@ -88,9 +88,13 @@ def _group_table_rows(document: m.OCRDocument) -> dict[tuple[int, int, int], lis
     for block in document.blocks:
         if block.block_type != "TABLE_CELL":
             continue
-        if block.table_index is None or block.row_index is None:
+        if block.row_index is None:
             continue
-        rows[(block.page_number, block.table_index, block.row_index)].append(block)
+        # Legacy/recorded fixtures sometimes omit ``table_index`` on cells that
+        # carry a row index. Treat those as table 0 so they are not silently
+        # dropped (table_index is None-safe for grouping, not a fatal signal).
+        table_idx = block.table_index if block.table_index is not None else 0
+        rows[(block.page_number, table_idx, block.row_index)].append(block)
     for cells in rows.values():
         cells.sort(key=lambda b: b.column_index if b.column_index is not None else 10_000)
     return dict(rows)

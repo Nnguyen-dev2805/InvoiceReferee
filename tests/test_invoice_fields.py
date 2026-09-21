@@ -8,7 +8,8 @@ from invoice_referee.domain import models as m
 from invoice_referee.ingestion.invoice_fields import extract_invoice_fields
 
 
-def _block(block_id, text, *, row=None, col=None, block_type="TEXT", conf=0.96, page=1):
+def _block(block_id, text, *, row=None, col=None, table_index=0,
+           block_type="TEXT", conf=0.96, page=1):
     return m.OCRBlock(
         block_id=block_id,
         page_number=page,
@@ -18,6 +19,7 @@ def _block(block_id, text, *, row=None, col=None, block_type="TEXT", conf=0.96, 
         block_type=block_type,
         row_index=row,
         column_index=col,
+        table_index=table_index if block_type == "TABLE_CELL" and row is not None else None,
     )
 
 

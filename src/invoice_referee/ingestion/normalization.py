@@ -58,14 +58,23 @@ _DATE_INPUT_FORMATS = (
     "%Y/%m/%d",   # 2026/09/13
 )
 
+# Vietnamese long form: "Ngày 10 tháng 07 năm 2023" (day/month/year).
+# Allows optional leading "ngày" (already stripped as an alias label elsewhere)
+# and optional "ngày"/"tháng"/"năm" markers.
+_VI_DATE_RE = re.compile(
+    r"(?:ngày\s*)?(?P<day>\d{1,2})\s*(?:tháng\s*|/|-|\.)(?P<month>\d{1,2})"
+    r"\s*(?:năm\s*|/|-|\.)(?P<year>\d{4})"
+)
+
 
 def normalize_date(value: Any) -> Optional[str]:
     """Return an ISO ``YYYY-MM-DD`` string, or ``None`` if unparseable.
 
     Accepts ISO plus common day-first invoice formats (dd/mm/yyyy, dd-mm-yyyy,
-    dd.mm.yyyy) and normalizes them to ISO. Ambiguity note: a value like
-    ``03/04/2026`` is read day-first as 3 April 2026 (Vietnamese convention);
-    an impossible date (month > 12, day > 31) returns ``None``.
+    dd.mm.yyyy) and the Vietnamese long form ``Ngày 10 tháng 07 năm 2023``.
+    Ambiguity note: a value like ``03/04/2026`` is read day-first as 3 April
+    2026 (Vietnamese convention); an impossible date (month > 12, day > 31)
+    returns ``None``.
     """
     if value is None:
         return None
@@ -79,6 +88,13 @@ def normalize_date(value: Any) -> Optional[str]:
             parsed = datetime.strptime(s, fmt)
         except ValueError:
             continue
+        return parsed.strftime("%Y-%m-%d")
+    m = _VI_DATE_RE.search(s)
+    if m:
+        try:
+            parsed = datetime(int(m["year"]), int(m["month"]), int(m["day"]))
+        except ValueError:
+            return None
         return parsed.strftime("%Y-%m-%d")
     return None
 
