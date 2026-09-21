@@ -40,7 +40,7 @@ Ghi tối thiểu:
 
 Đường OCR và structure-aware có bộ đo riêng, **không** trộn vào Core/Escalation ở trên — evidence trích xuất không được làm phồng suite nghiệp vụ.
 
-**`verify.ocr_harness` — 15 tài liệu ghi sẵn (OCR01–OCR15), không suy luận model:**
+**`verify.semantic_harness` — chẩn đoán opt-in (`--live`), không lưu response:**
 
 | Metric | Giá trị đo được |
 |---|---|
@@ -49,7 +49,7 @@ Ghi tối thiểu:
 | false auto-confirms | 0 |
 | provenance coverage | 100.0% |
 
-**`verify.structure_harness` — 20 fixture ghi sẵn trên 10 family bố cục (ST01–ST20):**
+**Bộ fixture rule-path (15 OCR + 20 ST) đã bị xoá** cùng label/layout mapper.
 
 | Metric | Giá trị đo được |
 |---|---|

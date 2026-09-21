@@ -89,12 +89,11 @@ InvoiceReferee/
 │       │   ├── image_preprocessing.py  # EXIF/skew/colour normalisation (lazy)
 │       │   ├── ocr.py                  # OCREngine protocol + adapters
 │       │   ├── ocr_config.py           # engine selection from env
-│       │   ├── document_structure.py   # sections, row roles, neighbours
-│       │   ├── invoice_fields.py       # deterministic candidate extraction
-│       │   ├── candidate_resolver.py   # explicit agreement/conflict resolution
+│       │   ├── grounding.py            # citation verifier for LLM mappings
+│       │   ├── semantic_extraction.py  # LLM semantic extractor (the only one)
+│       │   ├── field_normalization.py  # raw text -> typed value, by field name
 │       │   ├── extraction_validation.py# status cascade + arithmetic warnings
 │       │   ├── identity_resolution.py  # exact PO vendor/SKU mapping only
-│       │   ├── llm_mapper.py           # optional, grounded, off by default
 │       │   └── pipeline.py             # human confirmation -> canonical evidence
 │       ├── transaction/
 │       │   └── builder.py
@@ -129,11 +128,10 @@ InvoiceReferee/
 ├── verify/
 │   ├── harness.py                   # business Verify suites (core/escalation/all)
 │   ├── manifest.py                  # business expected labels
-│   ├── ocr_harness.py               # recorded-response OCR metrics
-│   └── structure_harness.py         # structure-generalization metrics
+│   └── semantic_harness.py          # opt-in live LLM diagnostic
 ├── tests/
 │   ├── fixtures/                    # TC01-TC17 business cases
-│   ├── fixtures_ocr/                # recorded OCR responses + manifest
+│   ├── fixtures_structure/          # recorded block sets (a.jpg, b.jpg)
 │   └── fixtures_structure/          # recorded block sets + structure manifest
 └── docs/
 ```
@@ -175,26 +173,40 @@ Nếu một field không đọc được hoặc extraction không chắc chắn,
 
 Sprint 1 implementation bắt buộc hỗ trợ structured JSON end-to-end. XML/PDF/OCR là adapter mở rộng sau khi core ổn; chúng không được làm thay đổi schema downstream hay business checks.
 
-### Structure-aware extraction (document path)
+### LLM-first semantic extraction (document path)
 
-Đường OCR của Sprint 1 gồm hai tầng tách biệt rõ ràng:
+Đường tài liệu của Sprint 1 có **một** extractor: LLM. Không còn label/layout/fuzzy
+mapper, nên không có đường nào để âm thầm đoán nhãn.
 
-**`document_structure.py` — phân tích bố cục, không đọc giá trị.** Nhận `OCRDocument` và trả `DocumentStructure`: `section_by_block_id` (HEADER/SELLER/BUYER/ITEM_TABLE/SUMMARY/SIGNATURE/FOOTER), `row_role_by_key` (COLUMN_HEADER/DATA/SUBTOTAL/TAX/DISCOUNT/SHIPPING/GRAND_TOTAL/…), `blocks_by_table_row` và hai map láng giềng `right_neighbor_by_block_id` / `below_neighbor_by_block_id`. Module này **không** chuẩn hoá hay diễn giải giá trị; nó chỉ trả lời "ý nghĩa nằm ở đâu". Chỉ dùng `re`, `unicodedata` và standard library.
+**`semantic_extraction.py` — LLM là extractor, không phải người quyết định.** Prompt
+đưa toàn bộ OCR block (kèm `block_id`) và allow-list field theo document type. Model
+chỉ được: chọn `document_type` từ danh sách và cite block đã dựa vào; chọn field
+trong allow-list của type đó; **copy nguyên văn** `raw_text` từ block được cite.
+Model không được chuẩn hoá, tính toán, sửa OCR text, bịa block_id, hay phát ra
+identity/policy/action. Mọi candidate sinh ra là `LLM_ASSISTED` +
+`NEEDS_CONFIRMATION`.
 
-**`invoice_fields.py` — trích xuất candidate, deterministic.** Sinh `FieldCandidate` từ nhiều nguồn, theo thứ tự ưu tiên cố định:
+**`grounding.py` — verifier thuần, fail-closed.** Chấp nhận một mapping chỉ khi:
+block_id tồn tại; `raw_text` xuất hiện nguyên văn trong block được cite (đủ để chặn
+luôn normalized value, phép tính, và sửa OCR); field nằm trong allow-list của
+document type; và response không chứa forbidden key (`vendor_id`, `item_id`,
+`po_id`, `policy_rule_ids`, `action`, …) — một forbidden key **loại bỏ toàn bộ
+response**, vì model phát ra policy output thì không đáng tin ở phần còn lại.
+`document_type == UNKNOWN` ⇒ không field nào được nhận.
 
-| Nguồn | Method | Ghi chú |
-|---|---|---|
-| `label: value` một block | `EXACT_KEY_VALUE` | Tách theo `:`/`：`, so khớp nhãn |
-| Theo section (SELLER tax, HEADER/SIGNATURE date) | `SECTION_AWARE` | Loại nhiễu buyer/seller trùng nhãn |
-| Nhãn gắn giá trị qua láng giềng phải, rồi dưới | `EXACT_SPATIAL` | Cả hai block ID vào provenance |
-| Nhãn mờ (fuzzy ≥ 0.82) | `FUZZY_SPATIAL` | Luôn `NEEDS_CONFIRMATION` |
-| Bảng: dòng DATA → line item, dòng summary → tiền header | `TABLE_ITEM` / `TABLE_SUMMARY` | |
-| Giải mã ngữ nghĩa có căn cứ | `LLM_ASSISTED` | Mặc định TẮT; luôn cần người xác nhận |
+**`field_normalization.py` — code quyết định giá trị.** `raw_text` đã grounded được
+chuyển thành giá trị theo *tên field*: tiền → integer VND, ngày → ISO, số lượng →
+integer. Số lượng thập phân (`1,65`) không biểu diễn được nên trả `None` + human
+review, chứ không bị đọc thành `165`. Giá trị không đọc được luôn giữ `None`.
 
-**Hai loại điểm số tách biệt, không bao giờ gộp:** `provider_confidence` là độ tin của OCR vào văn bản; `mapping_score` là độ khớp nhãn–khái niệm. Resolver sắp xếp theo **độ ưu tiên method**, không theo điểm số.
+**`extraction_validation.py` — thác trạng thái fail-closed.** `MISSING` → `INVALID`
+→ `CONFLICTING` → `NEEDS_CONFIRMATION` (method rủi ro, hoặc confidence dưới 0.90
+critical / 0.80 non-critical, hoặc `None`) → `EXTRACTED`. Không sửa giá trị, chỉ
+gắn cảnh báo. `LLM_ASSISTED` **luôn** `NEEDS_CONFIRMATION`: không field nào từ model
+được auto-accept.
 
-**`candidate_resolver.py` — hợp nhất và xung đột tường minh.** Candidate cùng giá trị được gộp provenance; khác giá trị → `CONFLICTING` + warning, **không ghi đè im lặng**. `HUMAN` luôn có độ ưu tiên cao nhất.
+**`identity_resolution.py`** bind `vendor_id`/`item_id` chỉ khi khớp chính xác
+tax-code/SKU với PO. Model không bao giờ cấp identity.
 
 **`extraction_validation.py` — thác trạng thái fail-closed.** `MISSING` → `INVALID` → `CONFLICTING` → `NEEDS_CONFIRMATION` (method rủi ro, hoặc confidence dưới 0.90 critical / 0.80 non-critical, hoặc `None`) → `EXTRACTED`. Không sửa giá trị, chỉ gắn cảnh báo.
 

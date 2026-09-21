@@ -812,13 +812,14 @@ Nếu cần thay schema sau khi code đã được chia cho nhiều người, th
 - `BoundingBox` — `frozen`, toạ độ chuẩn hoá `0..1`, validate thứ tự và biên.
 - `OCRBlock` — đơn vị trung lập của provider: `block_id`, `page_number`, `text`, `confidence`, `bounding_box`, `block_type`, `row_index`, `column_index`, `table_index`.
 - `OCRDocument` — kết quả một lần chạy OCR + metadata engine.
-- `DocumentStructure` — `section_by_block_id`, `row_role_by_key`, `blocks_by_table_row`, `right_neighbor_by_block_id`, `below_neighbor_by_block_id`, `warnings`.
 
 **Trích xuất và xác nhận:**
 
 - `FieldCandidate` — một giá trị ứng viên kèm provenance (`page_number`, `bounding_box`, `evidence_block_ids`), method, hai loại điểm số tách biệt (`provider_confidence`, `mapping_score`), lineage sửa đổi của người (`original_*`, `reviewed_by`, `reviewed_at`, `review_reason`).
 - `InvoiceExtractionResult` — `status` (`ExtractionStatus`), `fields`, `line_items`, `field_candidates`, `line_item_candidate_sets`, `warnings`, `audit_events`.
 
-**Enum bổ sung:** `FieldStatus`, `ExtractionStatus`, `SectionRole`, `TableRowRole`.
+**Enum bổ sung:** `FieldStatus`, `ExtractionStatus`, `DocumentType`.
+
+**Contract receipt (không phải invoice):** `MerchantReceipt`, `MerchantReceiptLineItem`. Receipt có field profile riêng và **không** đi vào `review()` theo PO.
 
 `InvoiceExtractionResult.status` chỉ đạt `REVIEWED` qua `pipeline.apply_field_reviews`, và chỉ khi mọi trường critical đã `CONFIRMED`/`CORRECTED`. Xem `ARCHITECTURE.md` § "Structure-aware extraction" cho luồng đầy đủ.

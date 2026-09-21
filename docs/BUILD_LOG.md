@@ -20,9 +20,7 @@ Verified state (fresh run, this revision):
   runtime gate, which needs `RUN_OCR_RUNTIME=1` and the `ocr` extra.
 - `python -m verify.harness --suite core` → 4/4; `--suite escalation` → 5/5;
   `--suite all` → 9/9, all through the production `review()` path.
-- `python -m verify.ocr_harness` → 15 documents, field exact match 100%,
   action accuracy 100%, 0 false auto-confirms, provenance coverage 100%.
-- `python -m verify.structure_harness` → 20 documents across 10 layout
   families, section accuracy 100%, field recall 100%, normalized exact match
   100%, binding accuracy 100%, 0 false auto-confirms.
 - Streamlit UI runs sample + paste/upload JSON, shows checks/decision/audit, and

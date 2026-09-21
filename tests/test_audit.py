@@ -221,7 +221,6 @@ def test_record_field_event_captures_conflict_and_alternatives():
     selected.extraction_method = "TABLE_SUMMARY"
     selected.provider_confidence = 0.99
     selected.mapping_score = 1.0
-    selected.section_role = "SUMMARY"
     alt = _candidate(value=7_000_000)
     alt.extraction_method = "EXACT_KEY_VALUE"
     ev = store.record_field_event(
@@ -230,7 +229,6 @@ def test_record_field_event_captures_conflict_and_alternatives():
     assert ev.details["selected_method"] == "TABLE_SUMMARY"
     assert ev.details["provider_confidence"] == 0.99
     assert ev.details["mapping_score"] == 1.0
-    assert ev.details["section_role"] == "SUMMARY"
     assert ev.details["alternative_count"] == 1
     assert ev.details["conflict"] is True
     assert ev.details["evidence_block_ids"] == ["BLK-001"]

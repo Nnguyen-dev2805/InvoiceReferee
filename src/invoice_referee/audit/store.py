@@ -134,7 +134,6 @@ class AuditStore:
                 "selected_method": candidate.extraction_method,
                 "provider_confidence": candidate.provider_confidence,
                 "mapping_score": candidate.mapping_score,
-                "section_role": candidate.section_role,
                 "evidence_block_ids": list(candidate.evidence_block_ids),
                 "alternative_count": len(alternatives),
                 # Record the rejected values, not just how many there were, so a

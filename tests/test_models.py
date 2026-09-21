@@ -544,7 +544,7 @@ def test_ocr_document_holds_blocks_and_engine_metadata():
     assert doc.warnings == []
 
 
-# --- Task 1: structure-aware extraction contracts ----------------------------
+# --- document-path extraction contracts ---------------------------------------
 
 
 def _candidate(
@@ -554,7 +554,6 @@ def _candidate(
     confidence=None,
     provider_confidence=None,
     mapping_score=None,
-    section_role=None,
 ):
     return m.FieldCandidate(
         field_name=field_name,
@@ -566,7 +565,6 @@ def _candidate(
         bounding_box=None,
         provider_confidence=provider_confidence,
         mapping_score=mapping_score,
-        section_role=section_role,
     )
 
 
@@ -589,13 +587,11 @@ def test_field_candidate_separates_provider_and_mapping_scores():
     candidate = _candidate(
         provider_confidence=0.99,
         mapping_score=0.91,
-        section_role=m.SectionRole.SUMMARY.value,
     )
     assert candidate.provider_confidence == 0.99
     assert candidate.mapping_score == 0.91
     # Compatibility alias during migration: confidence mirrors provider_confidence.
     assert candidate.confidence == 0.99
-    assert candidate.section_role == "SUMMARY"
 
 
 def test_field_candidate_confidence_defaults_to_provider_confidence():
@@ -618,22 +614,3 @@ def test_extraction_result_candidate_sets_are_instance_local():
     assert second.line_item_candidate_sets == []
 
 
-def test_section_and_row_role_enum_values():
-    assert {r.value for r in m.SectionRole} == {
-        "HEADER", "SELLER", "BUYER", "ITEM_TABLE",
-        "SUMMARY", "SIGNATURE", "FOOTER", "UNKNOWN",
-    }
-    assert {r.value for r in m.TableRowRole} == {
-        "COLUMN_HEADER", "ORDINAL_HEADER", "DATA", "EMPTY",
-        "SUBTOTAL", "TAX", "DISCOUNT", "SHIPPING", "GRAND_TOTAL", "AMBIGUOUS",
-    }
-
-
-def test_document_structure_is_instance_local():
-    a = m.DocumentStructure()
-    b = m.DocumentStructure()
-    a.section_by_block_id["X"] = m.SectionRole.SELLER
-    a.row_role_by_key[(1, 0, 9)] = m.TableRowRole.GRAND_TOTAL
-    assert b.section_by_block_id == {}
-    assert b.row_role_by_key == {}
-    assert b.warnings == []

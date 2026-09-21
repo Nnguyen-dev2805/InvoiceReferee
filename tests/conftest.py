@@ -13,9 +13,9 @@ from invoice_referee.checks import engine
 _FIXTURES_STRUCTURE = Path(__file__).parent / "fixtures_structure"
 
 
-def _load_a_jpg_document():
-    """Load the recorded provider-neutral block set captured from ``a.jpg``."""
-    with open(_FIXTURES_STRUCTURE / "a_jpg_blocks.json", encoding="utf-8") as fh:
+def _load_recorded_document(filename):
+    """Load a recorded provider-neutral block set from ``fixtures_structure``."""
+    with open(_FIXTURES_STRUCTURE / filename, encoding="utf-8") as fh:
         raw = json.load(fh)
     page = raw["pages"][0]
     width = page["dimensions"]["width"]
@@ -57,7 +57,17 @@ def _load_a_jpg_document():
 @pytest.fixture
 def a_jpg_ocr_document():
     """The recorded ``a.jpg`` block set as an ``OCRDocument``."""
-    return _load_a_jpg_document()
+    return _load_recorded_document("a_jpg_blocks.json")
+
+
+@pytest.fixture
+def b_jpg_ocr_document():
+    """The recorded receipt block set (the task spec's ``b.jpg``).
+
+    Captured live from ``data/image/sen_non_bo.jpg`` — the real ``PHIẾU TẠM TĨNH``
+    whose receipt number and total the extraction spec names.
+    """
+    return _load_recorded_document("b_jpg_blocks.json")
 
 _ROUTINE = {
     "transaction_id": "TX-01",

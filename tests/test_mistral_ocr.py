@@ -10,7 +10,6 @@ from invoice_referee.ingestion.ocr import (
     MISTRAL_ENGINE_NAME,
     markdown_to_blocks,
 )
-from invoice_referee.ingestion.invoice_fields import extract_invoice_fields
 
 
 SAMPLE_MARKDOWN = """HOA DON GIA TRI GIA TANG
@@ -114,27 +113,6 @@ def test_ocr4_table_block_expands_into_cells():
     assert {b.row_index for b in cells} == {0, 1}
     # Cells inherit the table's confidence.
     assert all(b.confidence == pytest.approx(0.93) for b in cells)
-
-
-def test_ocr4_fields_extract_with_confidence():
-    engine = MistralOCREngine(transcribe=lambda page: SAMPLE_PAGE_RESULT)
-    doc = engine.analyze([_page()])
-    result = extract_invoice_fields(doc)
-    assert result.fields["invoice_number"].normalized_value == "0000123"
-    assert result.fields["invoice_number"].confidence == pytest.approx(0.98)
-    assert result.fields["total_amount"].normalized_value == 30_000_000
-    assert result.line_items[0]["unit_price"].normalized_value == 3_000_000
-
-
-def test_extracted_fields_flow_from_mistral_markdown():
-    engine = MistralOCREngine(transcribe=lambda page: SAMPLE_MARKDOWN)
-    doc = engine.analyze([_page()])
-    result = extract_invoice_fields(doc)
-    assert result.fields["invoice_number"].normalized_value == "0000123"
-    assert result.fields["vendor_tax_code"].normalized_value == "0101234567"
-    assert result.fields["total_amount"].normalized_value == 30_000_000
-    assert len(result.line_items) == 1
-    assert result.line_items[0]["unit_price"].normalized_value == 3_000_000
 
 
 def test_live_call_requires_api_key():

@@ -21,7 +21,7 @@ flowchart TD
         R["document_router + pdf_renderer<br/>PDF→ảnh 300DPI / ảnh→RGB PNG"]
         P["image_preprocessing<br/>EXIF, RGB, deskew 0.5–10°"]
         E["OCREngine.analyze()<br/>Paddle local / Mistral hosted"]
-        F["invoice_fields<br/>block → field + line item + provenance"]
+        F["semantic_extraction + grounding<br/>block → field (LLM, có căn cứ) + provenance"]
         ID["identity_resolution<br/>tax-code/SKU khớp chính xác"]
         VAL["extraction_validation<br/>confidence / conflict / LLM"]
         HC["Con người xác nhận<br/>confirm / correct / mark-unknown"]
@@ -76,7 +76,7 @@ flowchart TD
     PADDLE --> OD["OCRDocument<br/>OCRBlock[]: text + bbox 0–1 + confidence"]
     MIS --> OD
 
-    OD --> XF["extract_invoice_fields<br/>nhãn:giá trị → header;<br/>TABLE_CELL → line item"]
+    OD --> XF["extract_semantics<br/>LLM map block → field<br/>+ grounding verifier"]
     XF --> IDR["resolve_invoice_identities<br/>vendor_id/item_id: khớp chính xác<br/>hoặc NEEDS_CONFIRMATION"]
     IDR --> LLM{"LLM mapper?<br/>(tắt mặc định)"}
     LLM -->|bật| LLMM["map_unresolved_fields<br/>grounded, cite block, cần người duyệt"]
@@ -158,10 +158,10 @@ flowchart LR
         PREP["image_preprocessing"]
         OCRM["ocr (OCREngine + Paddle/Mistral)"]
         OCFG["ocr_config (chọn engine)"]
-        IFLD["invoice_fields"]
+        IFLD["semantic_extraction + grounding"]
         IDRS["identity_resolution"]
         EVAL["extraction_validation"]
-        LMAP["llm_mapper (tuỳ chọn)"]
+        LMAP["field_normalization (code)"]
         PIPE["pipeline (FieldReview, handoff)"]
     end
 
@@ -181,7 +181,7 @@ flowchart LR
 
     subgraph edge["Rìa hệ thống"]
         APP["app/ (streamlit + presentation)"]
-        VFY["verify/ (harness, manifest, ocr_harness)"]
+        VFY["verify/ (harness, manifest, semantic_harness)"]
     end
 
     APP --> EXT

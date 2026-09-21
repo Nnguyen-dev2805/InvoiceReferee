@@ -9,7 +9,7 @@ a fully reviewed extraction into the raw evidence dict the existing production
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -144,6 +144,163 @@ def _is_untrusted(candidate: Optional[m.FieldCandidate]) -> bool:
     # ``None`` means the field never produced a candidate, which is as
     # untrustworthy as an explicitly MISSING one.
     return candidate is None or candidate.status in _UNTRUSTED
+
+
+# --- document-type routing ----------------------------------------------------
+
+# Fields that belong on a receipt and never on an invoice, and vice versa. Used
+# only to build the routed evidence; never to move a value between contracts.
+_RECEIPT_HEADER_FIELDS = (
+    "merchant_name",
+    "receipt_number",
+    "receipt_datetime",
+    "table_number",
+    "cashier_name",
+    "subtotal_amount",
+    "tax_amount",
+    "total_amount",
+)
+
+
+
+def _receipt_line(line: dict[str, m.FieldCandidate]) -> m.MerchantReceiptLineItem:
+    def value(name):
+        candidate = line.get(name)
+        return candidate.normalized_value if candidate is not None else None
+
+    return m.MerchantReceiptLineItem(
+        description=value("description"),
+        quantity=value("invoiced_quantity") or value("quantity"),
+        unit_price=value("unit_price"),
+        line_total=value("line_total"),
+    )
+
+
+def reviewed_extraction_to_evidence(
+    result: m.InvoiceExtractionResult,
+    base_evidence: dict[str, Any],
+    *,
+    allow_receipt: bool = False,
+) -> dict[str, Any]:
+    """Route a reviewed extraction into canonical evidence by document type.
+
+    Only a ``SUPPLIER_INVOICE`` becomes invoice evidence for the PO-based business
+    review. A receipt is either refused (``allow_receipt=False``) or emitted under
+    its own ``receipt`` key — never as an invoice, because the business pipeline
+    would read a receipt's ``Số:`` as an invoice number and its total as an invoice
+    total. ``UNKNOWN`` is refused for the same reason: an unestablished type is a
+    fail-closed condition, not an invoice.
+
+    Unlike :func:`reviewed_invoice_to_evidence`, this does not require the
+    extraction to be fully reviewed first: routing is a type decision, and the
+    business pipeline is what turns missing facts into ``REQUEST_INFO``.
+    """
+    if result.document_type is m.DocumentType.SUPPLIER_INVOICE:
+        return _invoice_evidence(result, base_evidence)
+
+    if result.document_type.is_receipt:
+        if not allow_receipt:
+            raise m.UnsupportedDocumentTypeError(
+                f"{result.document_type.value} is not a supplier invoice and cannot "
+                "enter the PO-based invoice review path"
+            )
+        return _receipt_evidence(result, base_evidence)
+
+    raise m.UnsupportedDocumentTypeError(
+        f"document type {result.document_type.value} is not established; "
+        "an untyped extraction cannot be routed as an invoice"
+    )
+
+
+def _field_provenance(result: m.InvoiceExtractionResult) -> dict[str, dict[str, Any]]:
+    return {
+        name: {
+            "extraction_method": cand.extraction_method,
+            "page_number": cand.page_number,
+            "evidence_block_ids": list(cand.evidence_block_ids),
+            "status": cand.status.value,
+        }
+        for name, cand in result.fields.items()
+    }
+
+
+def _invoice_evidence(
+    result: m.InvoiceExtractionResult, base_evidence: dict[str, Any]
+) -> dict[str, Any]:
+    from invoice_referee.ingestion.normalization import normalize_id
+
+    evidence = dict(base_evidence)
+    invoice = dict(evidence.get("invoice") or {})
+
+    for name, candidate in result.fields.items():
+        invoice[name] = candidate.normalized_value
+
+    line_items = [
+        {name: cand.normalized_value for name, cand in line.items()}
+        for line in result.line_items
+    ]
+    if line_items:
+        invoice["items"] = line_items
+
+    invoice_id = normalize_id(base_evidence.get("invoice_id")) or (
+        f"INV-{result.document_id.removeprefix('DOC-')}"
+    )
+    invoice["invoice_id"] = invoice_id
+    invoice["source_type"] = "OCR"
+
+    flagged = any(_is_untrusted(result.fields.get(n)) for n in CRITICAL_FIELDS)
+    for line in result.line_items:
+        if any(_is_untrusted(line.get(n)) for n in CRITICAL_LINE_FIELDS):
+            flagged = True
+    invoice["flagged"] = flagged
+
+    evidence["invoice"] = invoice
+    evidence["document_type"] = result.document_type.value
+    evidence["extraction_metadata"] = {
+        "document_id": result.document_id,
+        "status": result.status.value,
+        "document_type": result.document_type.value,
+        "warnings": list(result.warnings),
+        "field_provenance": _field_provenance(result),
+    }
+    return evidence
+
+
+def _receipt_evidence(
+    result: m.InvoiceExtractionResult, base_evidence: dict[str, Any]
+) -> dict[str, Any]:
+    """Build receipt evidence. Never writes an ``invoice`` key."""
+    from invoice_referee.ingestion.normalization import normalize_id
+
+    evidence = {k: v for k, v in base_evidence.items() if k != "invoice"}
+    receipt: dict[str, Any] = {
+        name: result.fields[name].normalized_value
+        for name in _RECEIPT_HEADER_FIELDS
+        if name in result.fields
+    }
+    receipt["items"] = [
+        {name: value for name, value in asdict(_receipt_line(line)).items() if value is not None}
+        for line in result.line_items
+    ]
+    receipt["receipt_id"] = normalize_id(base_evidence.get("receipt_id")) or (
+        f"RCPT-{result.document_id.removeprefix('DOC-')}"
+    )
+    receipt["source_type"] = "OCR"
+    receipt["document_type"] = result.document_type.value
+    # A receipt is never auto-processed by the PO path; a missing total is still a
+    # fact the human must resolve, so an untrusted total flags the receipt.
+    receipt["flagged"] = _is_untrusted(result.fields.get("total_amount"))
+
+    evidence["receipt"] = receipt
+    evidence["document_type"] = result.document_type.value
+    evidence["extraction_metadata"] = {
+        "document_id": result.document_id,
+        "status": result.status.value,
+        "document_type": result.document_type.value,
+        "warnings": list(result.warnings),
+        "field_provenance": _field_provenance(result),
+    }
+    return evidence
 
 
 def reviewed_invoice_to_evidence(

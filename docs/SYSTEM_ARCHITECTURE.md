@@ -257,8 +257,8 @@ Human controls (thêm sau, không xoá lịch sử cũ): `STOPPED`, `OVERRIDDEN`
 
 16 business dataclass (xem `DATA_MODEL.md` §21.1) cộng với các contract của đường
 tài liệu (xem `DATA_MODEL.md` §21.2): line-item types, `UploadedDocument`,
-`DocumentPage`, `BoundingBox`, `OCRBlock`, `OCRDocument`, `DocumentStructure`,
-`FieldCandidate`, `InvoiceExtractionResult`.
+`DocumentPage`, `BoundingBox`, `OCRBlock`, `OCRDocument`, `DocumentType`,
+`FieldCandidate`, `InvoiceExtractionResult`, `MerchantReceipt`.
 
 ```text
 ExtractedDocument                     ← ranh giới extraction
@@ -307,8 +307,7 @@ Kết quả hiện tại: **core 4/4 · escalation 5/5 · all 9/9**.
 | Unit + integration + smoke | `pytest -q` | **509 passed, 2 skipped** |
 | 17 documented cases | `verify/harness` parametrized | khớp manifest |
 | Core / Escalation / All | CLI + `tests/test_verify.py` | 4/4 · 5/5 · 9/9 |
-| OCR extraction (recorded) | `verify.ocr_harness` | 15 docs, action accuracy 100%, false auto-confirm 0 |
-| Structure-aware (recorded) | `verify.structure_harness` | 20 docs / 10 families, field recall 100%, exact match 100%, false auto-confirm 0 |
+| LLM semantic extraction (live) | `verify.semantic_harness --live` | opt-in diagnostic; no response stored |
 | `a.jpg` end-to-end | `tests/test_a_jpg_structure_regression.py` | 2 items, total/date/tax đúng, provenance đủ |
 | Unseen input (không sửa code) | mutation 42M→AUTO, 75M→ESCALATE | pass |
 | LLM proposal không an toàn | `UnsafeClient` luôn AUTO_PROCESS | Guard vẫn ESCALATE/REQUEST_INFO |

@@ -18,7 +18,7 @@ from invoice_referee.ingestion.pipeline import FieldReview, apply_field_reviews
 
 
 def _cand(name, value, status=m.FieldStatus.EXTRACTED, box=None, method="EXACT_KEY_VALUE",
-          provider_confidence=0.95, mapping_score=1.0, section_role="HEADER",
+          provider_confidence=0.95, mapping_score=1.0,
           evidence=None):
     return m.FieldCandidate(
         field_name=name,
@@ -32,7 +32,6 @@ def _cand(name, value, status=m.FieldStatus.EXTRACTED, box=None, method="EXACT_K
         extraction_method=method,
         provider_confidence=provider_confidence,
         mapping_score=mapping_score,
-        section_role=section_role,
     )
 
 
@@ -60,10 +59,10 @@ def test_field_rows_expose_value_status_and_provenance():
     assert total["page"] == 1
 
 
-def test_field_rows_show_method_scores_section_and_conflict():
+def test_field_rows_show_method_scores_and_conflict():
     selected = _cand("total_amount", 9_000_000, status=m.FieldStatus.CONFLICTING,
-                     method="TABLE_SUMMARY", provider_confidence=0.99, mapping_score=1.0,
-                     section_role="SUMMARY", evidence=["R9C0", "R9C5"])
+                     method="LLM_ASSISTED", provider_confidence=0.99, mapping_score=1.0,
+                     evidence=["R9C0", "R9C5"])
     alt = _cand("total_amount", 7_000_000, method="EXACT_KEY_VALUE", evidence=["KV-1"])
     result = _result(
         fields={"total_amount": selected},
@@ -72,10 +71,9 @@ def test_field_rows_show_method_scores_section_and_conflict():
     )
     row = field_rows(result)[0]
     assert row["field"] == "total_amount"
-    assert row["method"] == "TABLE_SUMMARY"
+    assert row["method"] == "LLM_ASSISTED"
     assert row["ocr_confidence"] == pytest.approx(0.99)
     assert row["mapping_score"] == pytest.approx(1.0)
-    assert row["section"] == "SUMMARY"
     assert row["alternatives"] == 1
     assert row["status"] == "CONFLICTING"
     assert row["evidence"] == ["R9C0", "R9C5"]

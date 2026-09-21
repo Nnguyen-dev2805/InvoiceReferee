@@ -122,6 +122,18 @@ def _extract_document(uploaded, po_json: str, actor: str) -> None:
 
     try:
         engine = engine_from_env()  # PaddleOCR local by default; Mistral if configured
+        # Extraction is LLM-first and only: without a client no field can be
+        # extracted, so a missing key is surfaced as a configuration error rather
+        # than silently producing an empty extraction.
+        from invoice_referee.agent.config import client_from_env
+
+        llm_client = client_from_env()
+        if llm_client is None:
+            st.error(
+                "Extraction needs an LLM provider. Set LLM_API_KEY (and optionally "
+                "LLM_BASE_URL / LLM_MODEL) in .env, then try again."
+            )
+            return
         result, audit = extract_invoice(
             transaction_id=transaction_id,
             filename=uploaded.name,
@@ -130,6 +142,7 @@ def _extract_document(uploaded, po_json: str, actor: str) -> None:
             po=po,
             engine=engine,
             actor=actor,
+            llm_client=llm_client,
         )
     except DocumentInputError as exc:
         st.error(f"Document input error: {exc}")  # technical, not a business decision

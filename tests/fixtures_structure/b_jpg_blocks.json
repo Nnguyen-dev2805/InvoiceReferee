@@ -1,0 +1,1698 @@
+{
+ "document_id": "B-JPG",
+ "engine": "mistral-ocr",
+ "engine_version": "mistral-ocr-latest",
+ "source_note": "recorded from sen_non_bo.jpg; image bytes and raw response are NOT stored",
+ "pages": [
+  {
+   "page_number": 1,
+   "dimensions": {
+    "width": 1152,
+    "height": 2560,
+    "dpi": 300
+   },
+   "blocks": [
+    {
+     "block_id": "P1-BLK0001",
+     "page_number": 1,
+     "text": "C. Hân + Bình 09496236/4",
+     "confidence": 0.7173421505823196,
+     "block_type": "TEXT",
+     "poly": [
+      [
+       291,
+       436
+      ],
+      [
+       898,
+       436
+      ],
+      [
+       898,
+       528
+      ],
+      [
+       291,
+       528
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0002",
+     "page_number": 1,
+     "text": "# Cốm Mục Sinh Thất\nSEN NAM BỘ\nĐiểm đến lý tưởng cho mọi gia đình",
+     "confidence": 0.8588368194882942,
+     "block_type": "TEXT",
+     "poly": [
+      [
+       323,
+       630
+      ],
+      [
+       871,
+       630
+      ],
+      [
+       871,
+       841
+      ],
+      [
+       323,
+       841
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0003",
+     "page_number": 1,
+     "text": "PHIẾU TẠM TĨNH",
+     "confidence": 0.9891759846596209,
+     "block_type": "TEXT",
+     "poly": [
+      [
+       477,
+       848
+      ],
+      [
+       723,
+       848
+      ],
+      [
+       723,
+       884
+      ],
+      [
+       477,
+       884
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0004",
+     "page_number": 1,
+     "text": "Số: 2627003876",
+     "confidence": 0.9973994326671634,
+     "block_type": "KEY_VALUE",
+     "poly": [
+      [
+       514,
+       892
+      ],
+      [
+       678,
+       892
+      ],
+      [
+       678,
+       917
+      ],
+      [
+       514,
+       917
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0005",
+     "page_number": 1,
+     "text": "Ngày: 18/09/2026 (10:03 - 21:52)",
+     "confidence": 0.9995544202233111,
+     "block_type": "KEY_VALUE",
+     "poly": [
+      [
+       309,
+       923
+      ],
+      [
+       642,
+       923
+      ],
+      [
+       642,
+       953
+      ],
+      [
+       309,
+       953
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0006",
+     "page_number": 1,
+     "text": "Bản: CHỐI 28",
+     "confidence": 0.9640943919497076,
+     "block_type": "KEY_VALUE",
+     "poly": [
+      [
+       309,
+       956
+      ],
+      [
+       461,
+       956
+      ],
+      [
+       461,
+       981
+      ],
+      [
+       309,
+       981
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0007",
+     "page_number": 1,
+     "text": "Phục vụ: THẢO TRÌNH",
+     "confidence": 0.9791637627312114,
+     "block_type": "KEY_VALUE",
+     "poly": [
+      [
+       309,
+       987
+      ],
+      [
+       557,
+       987
+      ],
+      [
+       557,
+       1015
+      ],
+      [
+       309,
+       1015
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0008",
+     "page_number": 1,
+     "text": "Thư ngắn: Tạ Ngọc Loan",
+     "confidence": 0.9346413461401342,
+     "block_type": "KEY_VALUE",
+     "poly": [
+      [
+       309,
+       1017
+      ],
+      [
+       573,
+       1017
+      ],
+      [
+       573,
+       1048
+      ],
+      [
+       309,
+       1048
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-M0-P1-T0H0",
+     "page_number": 1,
+     "text": "Tên món",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 0,
+     "column_index": 0,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0H1",
+     "page_number": 1,
+     "text": "SL",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 0,
+     "column_index": 1,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0H2",
+     "page_number": 1,
+     "text": "ĐG",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 0,
+     "column_index": 2,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0H3",
+     "page_number": 1,
+     "text": "TT",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 0,
+     "column_index": 3,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R1C0",
+     "page_number": 1,
+     "text": "Nước Suối",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 1,
+     "column_index": 0,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R1C1",
+     "page_number": 1,
+     "text": "1",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 1,
+     "column_index": 1,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R1C2",
+     "page_number": 1,
+     "text": "12.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 1,
+     "column_index": 2,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R1C3",
+     "page_number": 1,
+     "text": "12.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 1,
+     "column_index": 3,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R2C0",
+     "page_number": 1,
+     "text": "Coca",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 2,
+     "column_index": 0,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R2C1",
+     "page_number": 1,
+     "text": "2",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 2,
+     "column_index": 1,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R2C2",
+     "page_number": 1,
+     "text": "15.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 2,
+     "column_index": 2,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R2C3",
+     "page_number": 1,
+     "text": "30.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 2,
+     "column_index": 3,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R3C0",
+     "page_number": 1,
+     "text": "Khăn Lạnh",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 3,
+     "column_index": 0,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R3C1",
+     "page_number": 1,
+     "text": "15",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 3,
+     "column_index": 1,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R3C2",
+     "page_number": 1,
+     "text": "3.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 3,
+     "column_index": 2,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R3C3",
+     "page_number": 1,
+     "text": "45.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 3,
+     "column_index": 3,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R4C0",
+     "page_number": 1,
+     "text": "Bùi Tiger Bac Lon 25µml",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 4,
+     "column_index": 0,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R4C1",
+     "page_number": 1,
+     "text": "96",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 4,
+     "column_index": 1,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R4C2",
+     "page_number": 1,
+     "text": "21.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 4,
+     "column_index": 2,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R4C3",
+     "page_number": 1,
+     "text": "2.016.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 4,
+     "column_index": 3,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R5C0",
+     "page_number": 1,
+     "text": "Gà Ta Hấp Mắm Nhì",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 5,
+     "column_index": 0,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R5C1",
+     "page_number": 1,
+     "text": "1,65",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 5,
+     "column_index": 1,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R5C2",
+     "page_number": 1,
+     "text": "255.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 5,
+     "column_index": 2,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R5C3",
+     "page_number": 1,
+     "text": "420.750",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 5,
+     "column_index": 3,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R6C0",
+     "page_number": 1,
+     "text": "Cá Tầm 2 món",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 6,
+     "column_index": 0,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R6C1",
+     "page_number": 1,
+     "text": "1,55",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 6,
+     "column_index": 1,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R6C2",
+     "page_number": 1,
+     "text": "500.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 6,
+     "column_index": 2,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R6C3",
+     "page_number": 1,
+     "text": "775.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 6,
+     "column_index": 3,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R7C0",
+     "page_number": 1,
+     "text": "Gỏi Tép Đồng Bông Điện Điện",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 7,
+     "column_index": 0,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R7C1",
+     "page_number": 1,
+     "text": "1",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 7,
+     "column_index": 1,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R7C2",
+     "page_number": 1,
+     "text": "105.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 7,
+     "column_index": 2,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R7C3",
+     "page_number": 1,
+     "text": "105.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 7,
+     "column_index": 3,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R8C0",
+     "page_number": 1,
+     "text": "Cơm Cháy Khô Cà Dừa",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 8,
+     "column_index": 0,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R8C1",
+     "page_number": 1,
+     "text": "1",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 8,
+     "column_index": 1,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R8C2",
+     "page_number": 1,
+     "text": "195.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 8,
+     "column_index": 2,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R8C3",
+     "page_number": 1,
+     "text": "195.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 8,
+     "column_index": 3,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R9C0",
+     "page_number": 1,
+     "text": "Phụ Thu Chế Biến",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 9,
+     "column_index": 0,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R9C1",
+     "page_number": 1,
+     "text": "1",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 9,
+     "column_index": 1,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R9C2",
+     "page_number": 1,
+     "text": "100.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 9,
+     "column_index": 2,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-M0-P1-T0R9C3",
+     "page_number": 1,
+     "text": "100.000",
+     "confidence": 0.9570689750861979,
+     "block_type": "TABLE_CELL",
+     "poly": [
+      [
+       309,
+       1058
+      ],
+      [
+       886,
+       1058
+      ],
+      [
+       886,
+       1543
+      ],
+      [
+       309,
+       1543
+      ]
+     ],
+     "row_index": 9,
+     "column_index": 3,
+     "table_index": 0
+    },
+    {
+     "block_id": "P1-BLK0009",
+     "page_number": 1,
+     "text": "Tiền hàng - 1000.000 (cụ) 3.698.750đ",
+     "confidence": 0.8593058695516634,
+     "block_type": "TEXT",
+     "poly": [
+      [
+       331,
+       1545
+      ],
+      [
+       889,
+       1545
+      ],
+      [
+       889,
+       1596
+      ],
+      [
+       331,
+       1596
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0010",
+     "page_number": 1,
+     "text": "Tiền thuế GTGT Cần: 336.820đ",
+     "confidence": 0.9456001771003095,
+     "block_type": "KEY_VALUE",
+     "poly": [
+      [
+       331,
+       1596
+      ],
+      [
+       889,
+       1596
+      ],
+      [
+       889,
+       1632
+      ],
+      [
+       331,
+       1632
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0011",
+     "page_number": 1,
+     "text": "Thuế GTGT (10%) 304.600c",
+     "confidence": 0.9397688129654087,
+     "block_type": "TEXT",
+     "poly": [
+      [
+       371,
+       1632
+      ],
+      [
+       889,
+       1632
+      ],
+      [
+       889,
+       1666
+      ],
+      [
+       371,
+       1666
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0012",
+     "page_number": 1,
+     "text": "Thuế GTGT (8%) 132.220c",
+     "confidence": 0.9929367159467968,
+     "block_type": "TEXT",
+     "poly": [
+      [
+       371,
+       1668
+      ],
+      [
+       889,
+       1668
+      ],
+      [
+       889,
+       1702
+      ],
+      [
+       371,
+       1702
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0013",
+     "page_number": 1,
+     "text": "Tổng thanh toán 4.035.570đ",
+     "confidence": 0.9998412700632674,
+     "block_type": "TEXT",
+     "poly": [
+      [
+       331,
+       1709
+      ],
+      [
+       887,
+       1709
+      ],
+      [
+       887,
+       1753
+      ],
+      [
+       331,
+       1753
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0014",
+     "page_number": 1,
+     "text": "Còn phải thu 4.035.570đ",
+     "confidence": 0.9986129215428877,
+     "block_type": "TEXT",
+     "poly": [
+      [
+       331,
+       1755
+      ],
+      [
+       889,
+       1755
+      ],
+      [
+       889,
+       1794
+      ],
+      [
+       331,
+       1794
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0015",
+     "page_number": 1,
+     "text": "BILL NÀY CHỈ CÓ GIÁ TRỊ XUẤT HĐ VAT\nTẠI THỜI ĐIỂM TỈNH TIỀN.",
+     "confidence": 0.9805904505766032,
+     "block_type": "TEXT",
+     "poly": [
+      [
+       385,
+       1812
+      ],
+      [
+       834,
+       1812
+      ],
+      [
+       834,
+       1876
+      ],
+      [
+       385,
+       1876
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0016",
+     "page_number": 1,
+     "text": "Thông tin xuất hóa đơn: 0917 939 663",
+     "confidence": 0.9994922741680023,
+     "block_type": "KEY_VALUE",
+     "poly": [
+      [
+       396,
+       1881
+      ],
+      [
+       830,
+       1881
+      ],
+      [
+       830,
+       1909
+      ],
+      [
+       396,
+       1909
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0017",
+     "page_number": 1,
+     "text": "836683668 ACB CÔNG TY TNHH MTV ẨM THỰC",
+     "confidence": 0.9949358751314645,
+     "block_type": "TEXT",
+     "poly": [
+      [
+       336,
+       1912
+      ],
+      [
+       888,
+       1912
+      ],
+      [
+       888,
+       1940
+      ],
+      [
+       336,
+       1940
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0018",
+     "page_number": 1,
+     "text": "SEN NAM BỘ (Vui lòng kiểm tra kỹ bill trước khi",
+     "confidence": 0.9916021003750188,
+     "block_type": "TEXT",
+     "poly": [
+      [
+       336,
+       1942
+      ],
+      [
+       887,
+       1942
+      ],
+      [
+       887,
+       1971
+      ],
+      [
+       336,
+       1971
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0019",
+     "page_number": 1,
+     "text": "thanh toán)",
+     "confidence": 0.9921713139941692,
+     "block_type": "TEXT",
+     "poly": [
+      [
+       543,
+       1971
+      ],
+      [
+       677,
+       1971
+      ],
+      [
+       677,
+       1999
+      ],
+      [
+       543,
+       1999
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    },
+    {
+     "block_id": "P1-BLK0020",
+     "page_number": 1,
+     "text": "CUKCUK - Một sản phẩm của MISA",
+     "confidence": 0.9994166033872294,
+     "block_type": "TEXT",
+     "poly": [
+      [
+       424,
+       2027
+      ],
+      [
+       822,
+       2027
+      ],
+      [
+       822,
+       2058
+      ],
+      [
+       424,
+       2058
+      ]
+     ],
+     "row_index": null,
+     "column_index": null,
+     "table_index": null
+    }
+   ]
+  }
+ ]
+}

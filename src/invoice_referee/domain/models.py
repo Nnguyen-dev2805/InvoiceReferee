@@ -227,6 +227,64 @@ class SupplierInvoice:
 
 
 @dataclass
+class MerchantReceiptLineItem:
+    """One line of a non-invoice receipt (restaurant bill, POS slip).
+
+    Deliberately without ``item_id``: a receipt line is free text, and resolving
+    it to an internal item would be a guess. There is also no ``unit_price``
+    requirement — many receipts print only a line total.
+
+    Named distinctly from :class:`ReceiptLineItem`, which is a *goods receipt*
+    line (an inbound delivery against a PO). The two are unrelated documents.
+    """
+
+    description: Optional[str]
+    quantity: Optional[int] = None
+    unit_price: Optional[int] = None
+    line_total: Optional[int] = None
+
+    def __post_init__(self) -> None:
+        if self.quantity is not None:
+            _quantity(self.quantity, "quantity")
+        if self.unit_price is not None:
+            _money(self.unit_price, "unit_price")
+        if self.line_total is not None:
+            _money(self.line_total, "line_total")
+
+
+@dataclass
+class MerchantReceipt:
+    """Canonical evidence for a receipt that is NOT a supplier invoice.
+
+    Kept as a separate contract from :class:`SupplierInvoice` so a receipt cannot
+    be mistaken for one: it has no ``invoice_number``/``invoice_series`` and no
+    tax codes, because those fields do not exist on a restaurant bill or a POS
+    slip. A receipt never enters the PO-based ``review()`` path.
+    """
+
+    receipt_id: Optional[str]
+    document_type: DocumentType
+    merchant_name: Optional[str] = None
+    receipt_number: Optional[str] = None
+    receipt_datetime: Optional[str] = None
+    table_number: Optional[str] = None
+    cashier_name: Optional[str] = None
+    items: list[MerchantReceiptLineItem] = field(default_factory=list)
+    subtotal_amount: Optional[int] = None
+    tax_amount: Optional[int] = None
+    total_amount: Optional[int] = None
+    currency: Optional[str] = "VND"
+    source_type: SourceType = SourceType.OCR
+    flagged: bool = False
+
+    def __post_init__(self) -> None:
+        for name in ("subtotal_amount", "tax_amount", "total_amount"):
+            value = getattr(self, name)
+            if value is not None:
+                _money(value, name)
+
+
+@dataclass
 class ApprovalRecord:
     approval_id: Optional[str]
     po_id: Optional[str]
@@ -454,6 +512,41 @@ class ExtractionStatus(str, Enum):
     FAILED = "FAILED"
 
 
+class DocumentType(str, Enum):
+    """What kind of document the OCR capture is.
+
+    Only ``SUPPLIER_INVOICE`` may become invoice evidence for the PO-based
+    business review. Receipt types carry their own field profile and stop at
+    human review: a receipt must never be dressed up as a supplier invoice.
+    ``UNKNOWN`` means the type could not be established, which is a fail-closed
+    condition, not a default.
+    """
+
+    SUPPLIER_INVOICE = "SUPPLIER_INVOICE"
+    RESTAURANT_RECEIPT = "RESTAURANT_RECEIPT"
+    TEMPORARY_BILL = "TEMPORARY_BILL"
+    POS_RECEIPT = "POS_RECEIPT"
+    UNKNOWN = "UNKNOWN"
+
+    @property
+    def is_receipt(self) -> bool:
+        return self in (
+            DocumentType.RESTAURANT_RECEIPT,
+            DocumentType.TEMPORARY_BILL,
+            DocumentType.POS_RECEIPT,
+        )
+
+
+class UnsupportedDocumentTypeError(ValueError):
+    """Raised when an extraction is routed into a path it does not belong to.
+
+    A receipt must never be converted into supplier-invoice evidence: the
+    business pipeline only understands PO-based invoices, so a receipt routed
+    there would have its ``Số:`` read as an invoice number and its total as an
+    invoice total. Refusing is the fail-closed behaviour.
+    """
+
+
 @dataclass
 class UploadedDocument:
     """A validated uploaded document. Raw bytes live here, never in audit events."""
@@ -494,34 +587,6 @@ class BoundingBox:
             raise ValueError("y coordinates must be normalized and ordered (0<=y1<=y2<=1)")
 
 
-class SectionRole(str, Enum):
-    """Coarse document region a block belongs to (structure-aware extraction)."""
-
-    HEADER = "HEADER"
-    SELLER = "SELLER"
-    BUYER = "BUYER"
-    ITEM_TABLE = "ITEM_TABLE"
-    SUMMARY = "SUMMARY"
-    SIGNATURE = "SIGNATURE"
-    FOOTER = "FOOTER"
-    UNKNOWN = "UNKNOWN"
-
-
-class TableRowRole(str, Enum):
-    """Role of a single table row inside an invoice item table."""
-
-    COLUMN_HEADER = "COLUMN_HEADER"
-    ORDINAL_HEADER = "ORDINAL_HEADER"
-    DATA = "DATA"
-    EMPTY = "EMPTY"
-    SUBTOTAL = "SUBTOTAL"
-    TAX = "TAX"
-    DISCOUNT = "DISCOUNT"
-    SHIPPING = "SHIPPING"
-    GRAND_TOTAL = "GRAND_TOTAL"
-    AMBIGUOUS = "AMBIGUOUS"
-
-
 @dataclass
 class OCRBlock:
     block_id: str
@@ -549,29 +614,6 @@ class OCRDocument:
 
 
 @dataclass
-class DocumentStructure:
-    """Deterministic structural view of an ``OCRDocument``.
-
-    Derived from block positions, table indices, and reading order. It carries
-    no field values — only where meaning lives — so extractors can bind labels
-    to values using structure instead of one-block string heuristics.
-
-    ``row_role_by_key`` is keyed by ``(page_number, table_index, row_index)``.
-    """
-
-    section_by_block_id: dict[str, "SectionRole"] = field(default_factory=dict)
-    row_role_by_key: dict[tuple[int, int, int], "TableRowRole"] = field(
-        default_factory=dict
-    )
-    blocks_by_table_row: dict[tuple[int, int, int], list["OCRBlock"]] = field(
-        default_factory=dict
-    )
-    right_neighbor_by_block_id: dict[str, list[str]] = field(default_factory=dict)
-    below_neighbor_by_block_id: dict[str, list[str]] = field(default_factory=dict)
-    warnings: list[str] = field(default_factory=list)
-
-
-@dataclass
 class FieldCandidate:
     """One extracted field value with provenance and human-review lineage.
 
@@ -592,13 +634,11 @@ class FieldCandidate:
     warnings: list[str] = field(default_factory=list)
     original_raw_text: Optional[str] = None
     original_normalized_value: Any = None
-    # Structure-aware scoring, kept strictly separate and never combined:
+    # Scoring, kept strictly separate and never combined:
     #   provider_confidence -> OCR engine trust in the raw text;
-    #   mapping_score       -> how well a label matched a field concept;
-    #   section_role        -> document region the value came from.
+    #   mapping_score       -> how well a label matched a field concept.
     provider_confidence: Optional[float] = None
     mapping_score: Optional[float] = None
-    section_role: Optional[str] = None
     # Human-review lineage: who touched this field, why, and when. Recorded in
     # structured form (not only inside ``warnings``) so a review is auditable.
     reviewed_by: Optional[str] = None
@@ -626,6 +666,10 @@ class InvoiceExtractionResult:
     document_id: str
     status: ExtractionStatus
     fields: dict[str, FieldCandidate] = field(default_factory=dict)
+    # What kind of document this extraction came from. Appended with a default so
+    # every existing construction keeps working; ``UNKNOWN`` is a fail-closed
+    # value that routing refuses rather than a synonym for "invoice".
+    document_type: "DocumentType" = DocumentType.UNKNOWN
     line_items: list[dict[str, FieldCandidate]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     audit_events: list[AuditEvent] = field(default_factory=list)

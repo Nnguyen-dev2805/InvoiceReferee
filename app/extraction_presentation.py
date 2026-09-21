@@ -23,7 +23,6 @@ def field_rows(result: m.InvoiceExtractionResult) -> list[dict]:
             "confidence": candidate.confidence,
             "ocr_confidence": candidate.provider_confidence,
             "mapping_score": candidate.mapping_score,
-            "section": candidate.section_role,
             "method": candidate.extraction_method,
             "alternatives": len(alternatives_for(result, name)),
             "evidence": list(candidate.evidence_block_ids),

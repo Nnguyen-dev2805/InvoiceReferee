@@ -140,7 +140,7 @@ def _warn_once(warnings: list[str], message: str) -> None:
     """Append ``message`` unless already present.
 
     ``validate_extraction`` runs more than once over the same result (inside
-    ``extract_invoice_fields`` and again in the extractor service), so a naive
+    ``validate_extraction`` is called more than once on the same result, so a naive
     append would duplicate every arithmetic warning.
     """
     if message not in warnings:

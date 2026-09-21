@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 
 import pytest
 
@@ -66,6 +67,27 @@ class FailingEngine:
         raise RuntimeError("model unavailable")
 
 
+class CountingLLMClient(LLMClient):
+    """Replays a grounded semantic response and counts the calls."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def complete(self, prompt: str) -> str:
+        self.calls += 1
+        return json.dumps({
+            "document_type": {"value": "SUPPLIER_INVOICE", "block_ids": ["B1"]},
+            "fields": [
+                {"field_name": "invoice_series", "raw_text": "2C23TTU", "block_ids": ["B1"]},
+                {"field_name": "invoice_number", "raw_text": "0000123", "block_ids": ["B2"]},
+                {"field_name": "vendor_tax_code", "raw_text": "0101234567", "block_ids": ["B3"]},
+                {"field_name": "total_amount", "raw_text": "30.000.000", "block_ids": ["B4"]},
+            ],
+            "line_items": [],
+        })
+
+
+
 def test_extract_invoice_runs_every_stage():
     result, audit = extract_invoice(
         transaction_id="TX-001",
@@ -75,9 +97,10 @@ def test_extract_invoice_runs_every_stage():
         po=_po(),
         engine=FakeEngine(),
         actor="judge@demo",
+        llm_client=CountingLLMClient(),
     )
     assert result.status is m.ExtractionStatus.NEEDS_REVIEW
-    assert "total_amount" in result.fields
+    assert result.fields["total_amount"].normalized_value == 30_000_000
     assert result.fields["vendor_id"].normalized_value == "V-ABC"  # resolved by tax code
     types = [e.event_type for e in audit.events][:3]
     assert types == ["DOCUMENT_UPLOADED", "DOCUMENT_VALIDATED", "OCR_COMPLETED"]
@@ -93,6 +116,7 @@ def test_extract_invoice_shares_transaction_id_on_audit():
         po=_po(),
         engine=FakeEngine(),
         actor="judge@demo",
+        llm_client=CountingLLMClient(),
     )
     assert audit.transaction_id == "TX-XYZ"
 
@@ -123,17 +147,7 @@ def test_engine_failure_raises_extraction_error_not_business_decision():
         )
 
 
-class CountingLLMClient(LLMClient):
-    def __init__(self):
-        self.calls = 0
-
-    def complete(self, prompt: str) -> str:
-        self.calls += 1
-        return '{"mappings":[]}'
-
-
-def test_llm_mapping_flag_off_never_calls_the_client():
-    """enable_llm_mapping=False must make no semantic client call."""
+def test_extractor_calls_the_semantic_client_exactly_once():
     client = CountingLLMClient()
     result, _ = extract_invoice(
         transaction_id="TX-001",
@@ -144,13 +158,14 @@ def test_llm_mapping_flag_off_never_calls_the_client():
         engine=FakeEngine(),
         actor="judge@demo",
         llm_client=client,
-        enable_llm_mapping=False,
     )
-    assert client.calls == 0
+    assert client.calls == 1
+    assert result.document_type is m.DocumentType.SUPPLIER_INVOICE
+    assert result.fields["vendor_id"].normalized_value == "V-ABC"
 
 
-def test_llm_mapping_flag_on_and_even_with_empty_client_is_harmless():
-    """enable_llm_mapping with a client never throws; unresolved fields stay None."""
+def test_without_a_client_extraction_fails_closed():
+    """No client means no fields and human review, never a silent substitution."""
     result, _ = extract_invoice(
         transaction_id="TX-001",
         filename="invoice.pdf",
@@ -159,8 +174,9 @@ def test_llm_mapping_flag_on_and_even_with_empty_client_is_harmless():
         po=_po(),
         engine=FakeEngine(),
         actor="judge@demo",
-        llm_client=CountingLLMClient(),
-        enable_llm_mapping=True,
     )
-    # total_amount is deterministically resolved; the mapping ran but added nothing.
-    assert result.fields["total_amount"].normalized_value == 30_000_000
+    assert result.document_type is m.DocumentType.UNKNOWN
+    assert result.status is m.ExtractionStatus.NEEDS_REVIEW
+    assert not any(
+        c.extraction_method == "LLM_ASSISTED" for c in result.fields.values()
+    )
