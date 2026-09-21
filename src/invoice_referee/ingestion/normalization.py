@@ -25,22 +25,33 @@ def normalize_money(value: Any) -> Optional[int]:
     if isinstance(value, bool):
         return None
     if isinstance(value, int):
-        return value
+        return value if value >= 0 else None
     if isinstance(value, float):
-        return int(value) if value.is_integer() else None
+        if not value.is_integer() or value < 0:
+            return None
+        return int(value)
     if isinstance(value, str):
         s = value.strip().upper()
         for suffix in _MONEY_SUFFIXES:
             s = s.replace(suffix, "")
+        s = s.replace("_", "").replace(" ", "")
+        # Negative money is not a valid VND amount; it must stay unknown so the
+        # caller flags it rather than tripping the non-negative contract.
+        if not s or s.startswith(("-", "+")):
+            return None
         # Thousand separators in both English ("30,000,000") and Vietnamese
-        # ("30.000.000") formatting; VND has no fractional part.
-        s = s.replace(",", "").replace(".", "").replace("_", "").replace(" ", "")
-        if s.startswith("-"):
-            sign, digits = -1, s[1:]
-        else:
-            sign, digits = 1, s
-        if digits.isdigit():
-            return sign * int(digits)
+        # ("30.000.000") formatting. A separator must be followed by exactly
+        # three digits; anything else ("1.5", "30,5") is an ambiguous decimal
+        # and VND has no minor unit, so the value stays unknown.
+        if "." in s or "," in s:
+            groups = re.split(r"[.,]", s)
+            if not groups[0].isdigit():
+                return None
+            if not all(group.isdigit() and len(group) == 3 for group in groups[1:]):
+                return None
+            return int("".join(groups))
+        if s.isdigit():
+            return int(s)
         return None
     return None
 
@@ -89,6 +100,16 @@ def normalize_date(value: Any) -> Optional[str]:
         except ValueError:
             continue
         return parsed.strftime("%Y-%m-%d")
+    # OCR often reads a timestamp alongside the date ("13/09/2026 14:30").
+    # No accepted format carries a time, so retry with the leading token.
+    head = s.split()[0] if " " in s else ""
+    if head and head != s:
+        for fmt in _DATE_INPUT_FORMATS:
+            try:
+                parsed = datetime.strptime(head, fmt)
+            except ValueError:
+                continue
+            return parsed.strftime("%Y-%m-%d")
     m = _VI_DATE_RE.search(s)
     if m:
         try:
@@ -104,6 +125,18 @@ def normalize_id(value: Any) -> Optional[str]:
     if value is None:
         return None
     s = str(value).strip()
+    return s or None
+
+
+def normalize_text(value: Any) -> Optional[str]:
+    """Return a stripped string, or ``None`` for a missing or non-string value.
+
+    Unlike :func:`normalize_id`, a wrong type (number, list, dict) is rejected
+    instead of being stringified into a bogus value.
+    """
+    if not isinstance(value, str):
+        return None
+    s = value.strip()
     return s or None
 
 
@@ -128,6 +161,21 @@ def _enum(value: Any, enum_cls, default):
         return enum_cls(str(value).strip().upper())
     except ValueError:
         return default
+
+
+def _enum_or_none(value: Any, enum_cls):
+    """Return an enum member, ``None`` for a supplied-but-unparseable value.
+
+    Distinct from :func:`_enum`, which swallows an unparseable value into a
+    default. Here an absent value is the caller's business; a supplied garbage
+    value returns ``None`` so the caller can flag it instead of guessing.
+    """
+    if value is None:
+        return None
+    try:
+        return enum_cls(str(value).strip().upper())
+    except ValueError:
+        return None
 
 
 # --- Domain object builders --------------------------------------------------
@@ -199,25 +247,38 @@ def _supplied_but_unparseable(raw: dict, key: str, normalized: Any) -> bool:
 def to_supplier_invoice(raw: dict) -> m.SupplierInvoice:
     total_amount = normalize_money(raw.get("total_amount"))
     invoice_date = normalize_date(raw.get("invoice_date"))
+    # Sprint 1 is VND-only: an absent currency block is routine and defaults to
+    # VND. Any *other* supplied currency is out of scope and must not silently
+    # pass as VND, so it is surfaced as None + flag.
+    currency = normalize_id(raw.get("currency"))
+    currency_unsupported = currency is not None and currency.upper() != "VND"
+    # An absent invoice type is an ordinary original invoice. A supplied type we
+    # cannot parse (e.g. "CREDIT_NOTE") must not silently become ORIGINAL.
+    invoice_type = _enum_or_none(raw.get("invoice_type"), m.InvoiceType)
+    invoice_type_unreadable = invoice_type is None and _supplied_but_unparseable(
+        raw, "invoice_type", invoice_type
+    )
     # A critical field that was supplied but could not be read is an uncertainty
     # we must surface, not silently drop.
     flagged = (
         bool(raw.get("flagged", False))
         or _supplied_but_unparseable(raw, "total_amount", total_amount)
         or _supplied_but_unparseable(raw, "invoice_date", invoice_date)
+        or currency_unsupported
+        or invoice_type_unreadable
     )
     return m.SupplierInvoice(
         invoice_id=normalize_id(raw.get("invoice_id")),
         invoice_number=normalize_id(raw.get("invoice_number")),
         invoice_series=normalize_id(raw.get("invoice_series")),
-        invoice_type=_enum(raw.get("invoice_type"), m.InvoiceType, m.InvoiceType.ORIGINAL),
+        invoice_type=invoice_type or m.InvoiceType.ORIGINAL,
         related_invoice_number=normalize_id(raw.get("related_invoice_number")),
         vendor_id=normalize_id(raw.get("vendor_id")),
         vendor_tax_code=normalize_id(raw.get("vendor_tax_code")),
         vendor_name=raw.get("vendor_name"),
         po_id=normalize_id(raw.get("po_id")),
         invoice_date=invoice_date,
-        currency=normalize_id(raw.get("currency")) or "VND",
+        currency=None if currency_unsupported else (currency or "VND"),
         items=[to_invoice_line_item(i) for i in raw.get("items", []) if i],
         total_amount=total_amount,
         source_type=_enum(raw.get("source_type"), m.SourceType, m.SourceType.JSON),

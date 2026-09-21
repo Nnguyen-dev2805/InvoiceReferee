@@ -31,13 +31,16 @@ def check_item(tx: m.Transaction) -> m.CheckResult:
     po_items = {line.item_id for line in tx.po.items if line.item_id is not None}
     unknown_items = [i for i in invoice_items if i not in po_items]
 
+    # Every extra item needs its own ITEM_CHANGE approval bound to that exact
+    # item; a blanket approval for the PO must not cover an arbitrary item.
+    uncovered = [i for i in unknown_items if not s.has_approval(tx, "ITEM_CHANGE", item_id=i)]
     if not unknown_items:
         status, reason = m.CheckStatus.PASS, "All invoice items exist on the PO"
-    elif s.has_approval(tx, "ITEM_CHANGE"):
+    elif not uncovered:
         status, reason = m.CheckStatus.PASS, "Extra items covered by an approved item change"
     else:
         status = m.CheckStatus.FAIL
-        reason = f"Invoice items not present on PO: {', '.join(unknown_items)}"
+        reason = f"Invoice items not present on PO: {', '.join(uncovered)}"
 
     return m.CheckResult(
         check_id=CHECK_ID,

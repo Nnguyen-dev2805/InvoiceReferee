@@ -205,6 +205,13 @@ def build_policy_context(
 
     # Deterministic uncertainty implied by the facts (single, priority-ordered).
     outcome = resolve_action(tx, checks, ctx)
+    # Structural branches of resolve_action (missing PO/GR, flagged input,
+    # evidence issues) carry rules that no check reports. Fold them into the
+    # rule set the LLM sees so it never reasons from a set that omits the rule
+    # actually governing the case.
+    for rule_id in outcome.policy_rule_ids:
+        if rule_id not in ctx.applicable_rule_ids:
+            ctx.applicable_rule_ids.append(rule_id)
     if outcome.uncertainty_type is not None:
         ctx.deterministic_uncertainties = [outcome.uncertainty_type]
     return ctx

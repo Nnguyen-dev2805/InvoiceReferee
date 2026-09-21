@@ -119,7 +119,7 @@ def build_transaction(evidence: dict[str, Any]) -> m.Transaction:
     transaction_type, declared_type = _classify_type(evidence, invoice, po)
 
     return m.Transaction(
-        transaction_id=norm.normalize_id(evidence.get("transaction_id")) or "",
+        transaction_id=norm.normalize_id(evidence.get("transaction_id")),
         transaction_type=transaction_type,
         declared_transaction_type=declared_type,
         po=po,
@@ -129,6 +129,6 @@ def build_transaction(evidence: dict[str, Any]) -> m.Transaction:
         payment_history=payment_history,
         approvals=approvals,
         evidence_issues=_evidence_issues(po, goods_receipts, invoice),
-        created_at=evidence.get("created_at"),
-        updated_at=evidence.get("updated_at"),
+        created_at=norm.normalize_text(evidence.get("created_at")),
+        updated_at=norm.normalize_text(evidence.get("updated_at")),
     )

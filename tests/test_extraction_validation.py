@@ -179,6 +179,24 @@ def test_uses_provider_confidence_not_mapping_score_for_ocr_threshold():
     assert validated.fields["total_amount"].status is m.FieldStatus.NEEDS_CONFIRMATION
 
 
+def test_repeated_validation_does_not_duplicate_warnings():
+    """validate_extraction is called more than once on the same result."""
+    result = _result(
+        fields={"total_amount": _candidate(name="total_amount", value=100)},
+        line_items=[
+            {
+                "invoiced_quantity": _candidate("invoiced_quantity", 1, method="TABLE_ITEM"),
+                "unit_price": _candidate("unit_price", 2, method="TABLE_ITEM"),
+                "line_total": _candidate("line_total", 3, method="TABLE_ITEM"),
+            }
+        ],
+    )
+    validate_extraction(result)
+    first = list(result.warnings)
+    validate_extraction(result)
+    assert result.warnings == first
+
+
 def test_conflicting_status_is_preserved():
     candidate = _candidate_v2(
         extraction_method="TABLE_SUMMARY",

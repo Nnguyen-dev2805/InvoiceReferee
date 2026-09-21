@@ -20,10 +20,12 @@ def check_price(tx: m.Transaction) -> m.CheckResult:
 
     po_price = {line.item_id: line.unit_price for line in tx.po.items if line.item_id is not None}
     mismatch = None
+    compared = 0
     for line in tx.invoice.items:
         approved = po_price.get(line.item_id)
         if approved is None:
             continue  # item existence is handled by CHECK_ITEM
+        compared += 1
         if line.unit_price is None:
             return m.CheckResult(
                 check_id=CHECK_ID,
@@ -43,6 +45,16 @@ def check_price(tx: m.Transaction) -> m.CheckResult:
             break
 
     if mismatch is None:
+        if compared == 0:
+            # No invoice line could be compared against a PO price. That is an
+            # absent fact, not a match; a vacuous PASS would hide it.
+            return m.CheckResult(
+                check_id=CHECK_ID,
+                status=m.CheckStatus.UNKNOWN,
+                policy_rule_id="P06",
+                reason="No invoice line could be compared against a PO unit price",
+                evidence_refs=s.evidence_refs(tx),
+            )
         return m.CheckResult(
             check_id=CHECK_ID,
             status=m.CheckStatus.PASS,

@@ -56,6 +56,24 @@ def test_builds_routine_transaction():
     assert tx.payment_history[0].status is m.PaymentStatus.UNPAID
 
 
+def test_missing_transaction_id_stays_none_not_empty_string():
+    """A missing critical identifier must stay None, never become ""."""
+    ev = _routine_evidence()
+    del ev["transaction_id"]
+    tx = build_transaction(ev)
+    assert tx.transaction_id is None
+
+
+def test_non_string_timestamps_stay_unknown():
+    """created_at/updated_at are ISO strings; a wrong type must not leak through."""
+    ev = _routine_evidence()
+    ev["created_at"] = 1758326400
+    ev["updated_at"] = {"when": "now"}
+    tx = build_transaction(ev)
+    assert tx.created_at is None
+    assert tx.updated_at is None
+
+
 def test_missing_po_is_not_invented():
     ev = _routine_evidence()
     del ev["purchase_order"]

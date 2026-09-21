@@ -107,3 +107,25 @@ def test_no_table_yields_no_line_items():
 def test_no_headers_records_warning():
     result = extract_invoice_fields(_doc([_block("B1", "random text with no label")]))
     assert "no header fields could be extracted" in result.warnings
+
+
+@pytest.mark.parametrize(
+    "text,unwanted_field",
+    [
+        ("Số tài khoản: 1234567890", "invoice_number"),
+        ("Số điện thoại: 0901234567", "invoice_number"),
+        ("Số fax: 0281234567", "invoice_number"),
+        ("Số hợp đồng: HD-2026-01", "invoice_number"),
+        ("Mẫu số: 01GTKT", "invoice_number"),
+        ("Ngày giao hàng: 13/09/2026", "invoice_date"),
+    ],
+)
+def test_bare_short_aliases_do_not_match_unrelated_labels(text, unwanted_field):
+    """A one-word alias like "số"/"ngày" must not match an unrelated label."""
+    result = extract_invoice_fields(_doc([_block("B1", text)]))
+    assert unwanted_field not in result.fields
+
+
+def test_full_label_still_matches_bare_alias_field():
+    result = extract_invoice_fields(_doc([_block("B1", "Số hóa đơn: 0000123")]))
+    assert result.fields["invoice_number"].normalized_value == "0000123"

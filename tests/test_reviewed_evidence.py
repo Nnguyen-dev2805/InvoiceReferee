@@ -106,6 +106,21 @@ def test_mark_unknown_never_becomes_zero():
     assert evidence["invoice"]["flagged"] is True
 
 
+def test_human_review_records_actor_reason_and_timestamp():
+    """Invariant 19: a human edit must be reconstructable, not just a warning string."""
+    result = _result(fields={"total_amount": _candidate("total_amount", 30_000_000)})
+    reviewed = apply_field_reviews(
+        result,
+        {"total_amount": FieldReview.correct(31_000_000, reason="OCR misread 1 as 0")},
+        actor="ap@example.com",
+    )
+    cand = reviewed.fields["total_amount"]
+    assert cand.reviewed_by == "ap@example.com"
+    assert cand.review_reason == "OCR misread 1 as 0"
+    assert cand.reviewed_at is not None
+    assert cand.original_normalized_value == 30_000_000
+
+
 def test_line_item_review_by_key():
     line = {"unit_price": _candidate("unit_price", 3_000_000)}
     result = _result(line_items=[line])
@@ -130,6 +145,26 @@ def test_status_reviewed_only_when_all_critical_resolved():
 
     reviewed2 = apply_field_reviews(result, {"po_id": FieldReview.confirm()}, actor="ap@x")
     assert reviewed2.status is m.ExtractionStatus.REVIEWED
+
+
+def test_absent_critical_field_blocks_reviewed():
+    """A critical field with no candidate at all is unresolved, not silently ok."""
+    fields = _full_reviewed_fields()
+    del fields["po_id"]
+    result = _result(fields=fields)
+    reviews = {name: FieldReview.confirm() for name in result.fields}
+    reviewed = apply_field_reviews(result, reviews, actor="ap@x")
+    assert reviewed.status is m.ExtractionStatus.NEEDS_REVIEW
+
+
+def test_absent_critical_field_flags_evidence():
+    fields = _full_reviewed_fields()
+    del fields["po_id"]
+    result = _result(fields=fields)
+    reviews = {name: FieldReview.confirm() for name in result.fields}
+    reviewed = apply_field_reviews(result, reviews, actor="ap@x")
+    evidence = reviewed_invoice_to_evidence(reviewed, _base_evidence())
+    assert evidence["invoice"]["flagged"] is True
 
 
 # --- reviewed_invoice_to_evidence --------------------------------------------

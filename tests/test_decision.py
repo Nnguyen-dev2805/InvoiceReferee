@@ -87,6 +87,38 @@ def test_missing_goods_receipt_resolves_request_info_p04(routine_evidence, build
     assert "P04" in outcome.policy_rule_ids
 
 
+def test_applicable_rule_ids_include_the_governing_structural_rule(
+    routine_evidence, build_inputs
+):
+    """The rule set handed to the LLM must contain the rule that decides the case."""
+    ev = routine_evidence()
+    del ev["goods_receipts"]
+    outcome, _tx, _checks, ctx = _resolve(build_inputs, ev)
+    assert "P04" in outcome.policy_rule_ids
+    assert set(outcome.policy_rule_ids) <= set(ctx.applicable_rule_ids)
+
+
+def test_applicable_rule_ids_include_missing_po_rule(routine_evidence, build_inputs):
+    ev = routine_evidence()
+    del ev["purchase_order"]
+    outcome, _tx, _checks, ctx = _resolve(build_inputs, ev)
+    assert "P01" in ctx.applicable_rule_ids
+
+
+def test_applicable_rule_ids_include_flagged_input_rule(routine_evidence, build_inputs):
+    ev = routine_evidence()
+    ev["invoice"]["total_amount"] = "45M hoặc 48M"
+    outcome, _tx, _checks, ctx = _resolve(build_inputs, ev)
+    assert "P15" in ctx.applicable_rule_ids
+
+
+def test_applicable_rule_ids_include_evidence_issue_rule(routine_evidence, build_inputs):
+    ev = routine_evidence()
+    ev["purchase_order"]["status"] = "DRAFT"
+    _outcome, _tx, _checks, ctx = _resolve(build_inputs, ev)
+    assert "P14" in ctx.applicable_rule_ids
+
+
 def test_flagged_input_resolves_request_info_p15(routine_evidence, build_inputs):
     ev = routine_evidence()
     ev["invoice"]["total_amount"] = "45M hoặc 48M"

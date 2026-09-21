@@ -11,6 +11,7 @@ import pytest
 from invoice_referee.domain import models as m
 from invoice_referee.ingestion.document_structure import (
     analyze_document_structure,
+    classify_table_row,
     normalize_label,
 )
 
@@ -109,6 +110,49 @@ def test_classifies_a_jpg_table_rows():
     for row in range(4, 9):
         assert structure.row_role_by_key[(1, 0, row)] is m.TableRowRole.EMPTY
     assert structure.row_role_by_key[(1, 0, 9)] is m.TableRowRole.GRAND_TOTAL
+
+
+def test_table_cells_without_table_index_still_get_a_section():
+    """A provider emitting row_index but no table_index must not lose sections."""
+    row = [
+        table_cell("Mô tả", row=0, col=0, table=None),
+        table_cell("Thành tiền", row=0, col=1, table=None),
+        table_cell("Dịch vụ X", row=1, col=0, table=None),
+        table_cell("1.000.000", row=1, col=1, table=None),
+    ]
+    structure = analyze_document_structure(document(row))
+    assert structure.section_by_block_id, "table cells must still be sectioned"
+    assert all(
+        role is m.SectionRole.ITEM_TABLE
+        for role in structure.section_by_block_id.values()
+    )
+
+
+def test_data_row_with_summary_word_in_description_is_not_a_summary_row():
+    """An item described as "tax finalization" is a line item, not a tax total."""
+    row = [
+        table_cell("Dịch vụ tax finalization", row=1, col=0),
+        table_cell("1", row=1, col=1),
+        table_cell("2.000.000", row=1, col=2),
+    ]
+    assert classify_table_row(row) is m.TableRowRole.DATA
+
+
+def test_data_row_with_shipping_word_in_description_is_not_a_summary_row():
+    row = [
+        table_cell("Shipping container rental", row=1, col=0),
+        table_cell("1", row=1, col=1),
+        table_cell("3.000.000", row=1, col=2),
+    ]
+    assert classify_table_row(row) is m.TableRowRole.DATA
+
+
+def test_real_tax_total_row_is_still_tax():
+    row = [
+        table_cell("Tổng tiền thuế", row=1, col=0),
+        table_cell("800.000", row=1, col=1),
+    ]
+    assert classify_table_row(row) is m.TableRowRole.TAX
 
 
 def test_specific_summary_labels_beat_generic_total():

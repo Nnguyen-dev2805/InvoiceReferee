@@ -10,13 +10,39 @@ action and a specific question so the pipeline stays safe and operational.
 from __future__ import annotations
 
 import json
-from typing import Optional
+from typing import Any, Optional
 
 from invoice_referee.domain import models as m
 from invoice_referee.agent import prompts
 from invoice_referee.agent.llm_client import LLMClient, LLMError
+from invoice_referee.policy import config
 from invoice_referee.policy.engine import resolve_action
 from invoice_referee.decision import fallback_questions
+
+
+def _string_list(value: Any, field_name: str) -> list[str]:
+    """Coerce a provider field to ``list[str]`` or raise ValueError.
+
+    Providers occasionally emit a scalar or an object where a list is expected;
+    a wrong type must degrade to the deterministic fallback, never crash.
+    """
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError(f"{field_name} must be a list")
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError(f"{field_name} entries must be strings")
+    return list(value)
+
+
+def _optional_str(value: Any, field_name: str) -> Optional[str]:
+    """Coerce a provider field to ``Optional[str]`` or raise ValueError."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a string")
+    return value
 
 
 def _valid_check_ids(checks: list[m.CheckResult]) -> set[str]:
@@ -77,7 +103,7 @@ def _parse_and_validate(
     if primary is not None and primary not in _valid_check_ids(checks):
         raise ValueError(f"primary_check_id {primary} not in checks")
 
-    evidence_refs = data.get("evidence_refs", []) or []
+    evidence_refs = _string_list(data.get("evidence_refs"), "evidence_refs")
     valid_evidence = _valid_evidence_ids(tx, checks)
     for ref in evidence_refs:
         if ref not in valid_evidence:
@@ -87,14 +113,21 @@ def _parse_and_validate(
     if not explanation:
         raise ValueError("explanation is required")
 
+    question = _optional_str(data.get("question"), "question")
+    target = _optional_str(data.get("target"), "target")
+    policy_rule_ids = _string_list(data.get("policy_rule_ids"), "policy_rule_ids")
+    unknown_rules = [r for r in policy_rule_ids if r not in config.POLICY_RULES]
+    if unknown_rules:
+        raise ValueError(f"policy_rule_ids {unknown_rules} are not known policy rules")
+
     return m.AgentAssessment(
         proposed_uncertainty_type=uncertainty,
         proposed_action=action,
         explanation=explanation,
         primary_check_id=primary,
-        question=data.get("question"),
-        target=data.get("target"),
-        policy_rule_ids=list(data.get("policy_rule_ids", []) or []),
+        question=question,
+        target=target,
+        policy_rule_ids=policy_rule_ids,
         evidence_refs=list(evidence_refs),
         model=model,
         prompt_version=prompt_version,

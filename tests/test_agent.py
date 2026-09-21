@@ -137,6 +137,67 @@ def test_invented_evidence_ref_is_invalid_and_falls_back(routine_evidence, build
     assert a.fallback_used is True
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"evidence_refs": 5},
+        {"policy_rule_ids": 5},
+        {"question": 123},
+        {"target": 42},
+        {"primary_check_id": 123},
+        {"evidence_refs": [None]},
+        {"policy_rule_ids": {"P07": True}},
+    ],
+)
+def test_malformed_llm_field_types_fall_back_instead_of_crashing(
+    routine_evidence, build_inputs, payload
+):
+    """A provider emitting wrong JSON types must degrade to the fallback."""
+    tx, checks, ctx = _inputs(build_inputs, _amount_mismatch(routine_evidence))
+    body = json.dumps(
+        {
+            "proposed_uncertainty_type": "FACTUAL_UNKNOWN",
+            "proposed_action": "REQUEST_INFO",
+            "explanation": "x",
+            **payload,
+        }
+    )
+    a = agent_service.assess(tx, checks, ctx, client=FakeClient(body))
+    assert a.fallback_used is True
+
+def test_invented_policy_rule_id_is_invalid_and_falls_back(routine_evidence, build_inputs):
+    tx, checks, ctx = _inputs(build_inputs, _amount_mismatch(routine_evidence))
+    body = json.dumps(
+        {
+            "proposed_uncertainty_type": "FACTUAL_UNKNOWN",
+            "proposed_action": "REQUEST_INFO",
+            "primary_check_id": "CHECK_AMOUNT",
+            "explanation": "x",
+            "question": "?",
+            "policy_rule_ids": ["P99"],
+            "evidence_refs": ["PO-001"],
+        }
+    )
+    a = agent_service.assess(tx, checks, ctx, client=FakeClient(body))
+    assert a.fallback_used is True
+
+def test_known_policy_rule_ids_are_accepted(routine_evidence, build_inputs):
+    tx, checks, ctx = _inputs(build_inputs, _amount_mismatch(routine_evidence))
+    body = json.dumps(
+        {
+            "proposed_uncertainty_type": "FACTUAL_UNKNOWN",
+            "proposed_action": "REQUEST_INFO",
+            "primary_check_id": "CHECK_AMOUNT",
+            "explanation": "x",
+            "question": "?",
+            "policy_rule_ids": ["P07"],
+            "evidence_refs": ["PO-001"],
+        }
+    )
+    a = agent_service.assess(tx, checks, ctx, client=FakeClient(body))
+    assert a.fallback_used is False
+    assert a.policy_rule_ids == ["P07"]
+
 def test_no_client_uses_fallback(routine_evidence, build_inputs):
     tx, checks, ctx = _inputs(build_inputs, _amount_mismatch(routine_evidence))
     a = agent_service.assess(tx, checks, ctx, client=None)

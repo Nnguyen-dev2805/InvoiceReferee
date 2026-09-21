@@ -54,6 +54,27 @@ def test_map_paddle_response_normalizes_box_and_reads_fields(recorded_paddle_res
     assert blocks[1].block_type == "KEY_VALUE"
 
 
+def test_map_paddle_response_null_confidence_fails_closed_to_zero():
+    """A provider block with an explicit null score must not crash the mapper."""
+    raw = {
+        "pages": [
+            {
+                "page_number": 1,
+                "blocks": [
+                    {
+                        "block_id": "B1",
+                        "text": "x",
+                        "confidence": None,
+                        "block_type": "TEXT",
+                    }
+                ],
+            }
+        ]
+    }
+    blocks = map_paddle_response(raw, [_page(width=1000, height=1400)])
+    assert blocks[0].confidence == 0.0
+
+
 def test_engine_wraps_blocks_into_ocrdocument(recorded_paddle_response):
     engine = PaddleOCREngine(
         runner=lambda pages: recorded_paddle_response, engine_version="fixture-v1"

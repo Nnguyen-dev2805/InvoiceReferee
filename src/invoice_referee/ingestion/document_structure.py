@@ -69,6 +69,7 @@ _SUMMARY_ALIASES: tuple[tuple[str, m.TableRowRole], ...] = (
     # Generic total alias is last so it never overrides a specific one.
     ("tổng cộng", m.TableRowRole.GRAND_TOTAL),
     ("tổng tiền", m.TableRowRole.GRAND_TOTAL),
+    ("total", m.TableRowRole.GRAND_TOTAL),
 )
 
 # --- section anchors (normalized substrings) ---------------------------------
@@ -142,14 +143,17 @@ def classify_table_row(cells: list[m.OCRBlock]) -> m.TableRowRole:
     if _looks_ordinal(texts):
         return m.TableRowRole.ORDINAL_HEADER
 
+    # DATA first: a real line item whose *description* happens to contain a
+    # summary word ("Dịch vụ tax finalization") must not be reclassified as a
+    # tax/shipping/discount total. Summary aliases are substring matches, so
+    # they cannot be trusted ahead of the stronger data-row shape.
+    if _looks_like_data_row(cells, normalized):
+        return m.TableRowRole.DATA
+
     # SUMMARY family: a specific label cell + at least one money cell elsewhere.
     summary_role = _match_summary_role(normalized)
     if summary_role is not None and any(_is_money(t) for t in texts):
         return summary_role
-
-    # DATA: non-empty description + quantity + (unit price or line total).
-    if _looks_like_data_row(cells, normalized):
-        return m.TableRowRole.DATA
 
     return m.TableRowRole.AMBIGUOUS
 
@@ -160,22 +164,37 @@ def _match_summary_role(normalized_cells: list[str]) -> Optional[m.TableRowRole]
     best_len = 0
     for n in normalized_cells:
         for alias, role in _SUMMARY_ALIASES:
+            # The bare English label must not match subtotal or item prose.
+            if alias == "total" and n != alias:
+                continue
             if alias in n and len(alias) > best_len:
                 best_role = role
                 best_len = len(alias)
     return best_role
 
 
+def _is_quantity(text: str) -> bool:
+    """A bare small integer (no thousand separator) is a quantity, not money."""
+    return bool(re.fullmatch(r"0?\d{1,3}", text.strip()))
+
+
+def _is_amount(text: str) -> bool:
+    """A money cell that is more than a bare quantity."""
+    return _is_money(text) and not _is_quantity(text)
+
+
 def _looks_like_data_row(cells: list[m.OCRBlock], normalized: list[str]) -> bool:
     # Heuristic without column mapping: a text description cell, a small-integer
-    # quantity cell, and at least one money cell.
+    # quantity cell, and at least one amount cell (unit price or line total).
+    # ``_is_amount`` excludes the bare quantity itself, so a summary row like
+    # "Chiết khấu | 0" has no amount cell and is not mistaken for a line item.
     has_description = any(
-        n and not _is_money(c.text) and not re.fullmatch(r"\d{1,3}", c.text.strip())
+        n and not _is_money(c.text) and not _is_quantity(c.text)
         for c, n in zip(cells, normalized)
     )
-    has_quantity = any(re.fullmatch(r"0?\d{1,3}", c.text.strip()) for c in cells)
-    money_cells = sum(1 for c in cells if _is_money(c.text))
-    return has_description and has_quantity and money_cells >= 1
+    has_quantity = any(_is_quantity(c.text) for c in cells)
+    has_amount = any(_is_amount(c.text) for c in cells)
+    return has_description and has_quantity and has_amount
 
 
 # --- section classification --------------------------------------------------
@@ -193,7 +212,10 @@ def _classify_sections(
     for block in document.blocks:
         if block.block_type != "TABLE_CELL":
             continue
-        key = (block.page_number, block.table_index, block.row_index)
+        # Same normalization as ``_group_table_rows``: a missing table_index is
+        # table 0. Without this the lookup key never matches and every table
+        # cell silently loses its ITEM_TABLE/SUMMARY section.
+        key = (block.page_number, block.table_index or 0, block.row_index)
         role = row_role_by_key.get(key)
         if role in (m.TableRowRole.SUBTOTAL, m.TableRowRole.TAX, m.TableRowRole.DISCOUNT,
                     m.TableRowRole.SHIPPING, m.TableRowRole.GRAND_TOTAL):

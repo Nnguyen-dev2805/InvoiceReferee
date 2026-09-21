@@ -155,6 +155,82 @@ def test_item_not_in_po_fails():
     assert r.policy_rule_id == "P03"
 
 
+def test_item_change_approval_must_bind_the_specific_unknown_item():
+    """A blanket ITEM_CHANGE approval must not cover an arbitrary unknown item."""
+    ev = _tc01_evidence()
+    ev["invoice"]["items"][0]["item_id"] = "ITEM-999"
+    ev["approvals"] = [
+        {"approval_id": "AP-1", "po_id": "PO-001", "approval_type": "ITEM_CHANGE",
+         "status": "APPROVED"},
+    ]
+    r = item_check.check_item(_tx(ev))
+    assert r.status is m.CheckStatus.FAIL
+
+
+def test_item_change_approval_bound_to_the_item_passes():
+    ev = _tc01_evidence()
+    ev["invoice"]["items"][0]["item_id"] = "ITEM-999"
+    ev["approvals"] = [
+        {"approval_id": "AP-1", "po_id": "PO-001", "approval_type": "ITEM_CHANGE",
+         "status": "APPROVED", "item_id": "ITEM-999"},
+    ]
+    r = item_check.check_item(_tx(ev))
+    assert r.status is m.CheckStatus.PASS
+
+
+def test_price_with_no_comparable_lines_is_unknown_not_pass():
+    """Zero comparisons means the price fact is unknown, never a vacuous pass."""
+    ev = _tc01_evidence()
+    ev["invoice"]["items"] = []
+    r = price_check.check_price(_tx(ev))
+    assert r.status is m.CheckStatus.UNKNOWN
+    assert r.policy_rule_id == "P06"
+
+
+def test_price_ignores_invoice_lines_absent_from_po():
+    ev = _tc01_evidence()
+    ev["invoice"]["items"] = [
+        {"item_id": "ITEM-999", "invoiced_quantity": 1, "unit_price": 1,
+         "line_total": 1, "description": "ghost"},
+    ]
+    r = price_check.check_price(_tx(ev))
+    assert r.status is m.CheckStatus.UNKNOWN
+
+
+def test_amount_change_approval_raises_the_approved_ceiling():
+    """An approved AMOUNT_CHANGE delta must be added to the PO ceiling."""
+    ev = _tc01_evidence()
+    ev["invoice"]["total_amount"] = 35_000_000
+    ev["approvals"] = [
+        {"approval_id": "AP-1", "po_id": "PO-001", "approval_type": "AMOUNT_CHANGE",
+         "status": "APPROVED", "approved_amount_delta": 5_000_000},
+    ]
+    r = amount_check.check_amount(_tx(ev))
+    assert r.status is m.CheckStatus.PASS
+
+
+def test_amount_change_delta_from_another_po_is_ignored():
+    ev = _tc01_evidence()
+    ev["invoice"]["total_amount"] = 35_000_000
+    ev["approvals"] = [
+        {"approval_id": "AP-1", "po_id": "PO-OTHER", "approval_type": "AMOUNT_CHANGE",
+         "status": "APPROVED", "approved_amount_delta": 5_000_000},
+    ]
+    r = amount_check.check_amount(_tx(ev))
+    assert r.status is m.CheckStatus.FAIL
+
+
+def test_amount_change_delta_without_approval_status_is_ignored():
+    ev = _tc01_evidence()
+    ev["invoice"]["total_amount"] = 35_000_000
+    ev["approvals"] = [
+        {"approval_id": "AP-1", "po_id": "PO-001", "approval_type": "AMOUNT_CHANGE",
+         "status": "PENDING", "approved_amount_delta": 5_000_000},
+    ]
+    r = amount_check.check_amount(_tx(ev))
+    assert r.status is m.CheckStatus.FAIL
+
+
 # --- Quantity (P05): current + cumulative per item ---------------------------
 
 
@@ -370,6 +446,36 @@ def test_duplicate_same_identity_fails_tc11():
     assert r.policy_rule_id == "P09"
 
 
+def test_incomplete_identity_is_unknown_not_a_weak_match():
+    """Without tax code + series the identity is unprovable; ask, don't pass."""
+    ev = _tc01_evidence()
+    del ev["invoice"]["invoice_series"]
+    del ev["invoice"]["vendor_tax_code"]
+    r = duplicate_check.check_duplicate(_tx(ev))
+    assert r.status is m.CheckStatus.UNKNOWN
+    assert r.policy_rule_id == "P09"
+
+
+def test_incomplete_identity_cannot_be_proven_duplicate_by_number_alone():
+    ev = _tc01_evidence()
+    del ev["invoice"]["invoice_series"]
+    del ev["invoice"]["vendor_tax_code"]
+    ev["prior_invoices"] = [
+        {
+            "invoice_id": "INV-OLD",
+            "invoice_number": ev["invoice"]["invoice_number"],
+            "invoice_type": "ORIGINAL",
+            "vendor_id": ev["invoice"]["vendor_id"],
+            "po_id": "PO-001",
+            "invoice_date": "2026-09-01",
+            "total_amount": 30_000_000,
+            "items": [],
+        }
+    ]
+    r = duplicate_check.check_duplicate(_tx(ev))
+    assert r.status is m.CheckStatus.UNKNOWN
+
+
 def test_adjustment_linked_to_original_is_not_duplicate():
     ev = _tc01_evidence()
     ev["invoice"]["invoice_type"] = "ADJUSTMENT"
@@ -393,6 +499,28 @@ def test_adjustment_linked_to_original_is_not_duplicate():
 
 
 # --- Payment (P10/P11) -------------------------------------------------------
+
+
+def test_payment_without_invoice_never_matches_an_unrelated_record():
+    """A missing invoice_id must not silently bind the first payment record."""
+    ev = _tc01_evidence()
+    ev["payment_history"] = [
+        {"payment_id": "PAY-9", "invoice_id": "SOME-OTHER-INVOICE",
+         "status": "UNPAID", "paid_amount": 0},
+    ]
+    r = payment_check.check_payment(_tx(ev))
+    assert r.status is m.CheckStatus.UNKNOWN
+
+
+def test_payment_with_null_ids_on_both_sides_is_unknown():
+    """None == None must not link a payment record to this invoice."""
+    ev = _tc01_evidence()
+    ev["invoice"]["invoice_id"] = None
+    ev["payment_history"] = [
+        {"payment_id": "PAY-9", "invoice_id": None, "status": "UNPAID", "paid_amount": 0},
+    ]
+    r = payment_check.check_payment(_tx(ev))
+    assert r.status is m.CheckStatus.UNKNOWN
 
 
 def test_payment_paid_fails_tc12():

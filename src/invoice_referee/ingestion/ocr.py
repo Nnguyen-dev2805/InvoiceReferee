@@ -106,7 +106,7 @@ def map_paddle_response(raw: Any, pages: list[m.DocumentPage]) -> list[m.OCRBloc
                     block_id=block["block_id"],
                     page_number=page_number,
                     text=block.get("text", ""),
-                    confidence=float(block.get("confidence", 0.0)),
+                    confidence=float(block.get("confidence") or 0.0),
                     bounding_box=box,
                     block_type=block.get("block_type", "TEXT"),
                     row_index=row_idx,

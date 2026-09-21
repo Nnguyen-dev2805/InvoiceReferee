@@ -130,13 +130,34 @@ def fuzzy_label_match(label_text: str, field_name: str) -> Optional[float]:
 # --- exact label matching ------------------------------------------------------
 
 
+def _alias_matches(alias: str, label: str) -> bool:
+    """True when ``alias`` identifies ``label``.
+
+    A single-word alias ("số", "ngày", "mst", "total") is too generic to match
+    as a substring: "Số tài khoản" (bank account) and "Số điện thoại" would
+    otherwise be read as the invoice number. Such an alias must equal the whole
+    label, or lead a value that is itself parseable in the alias's own domain —
+    e.g. the Vietnamese date form "Ngày 10 tháng 07 năm 2023", where "ngày" is
+    the label and the remainder is the value. "Ngày giao hàng" (delivery date)
+    still fails because its remainder is not a date. Multi-word aliases keep the
+    substring rule so "số hóa đơn" matches "số hóa đơn ký hiệu ...".
+    """
+    if alias == label:
+        return True
+    if " " in alias:
+        return alias in label
+    if label.startswith(alias + " "):
+        return _extract_date(label[len(alias):]) is not None
+    return False
+
+
 def _match_field(label: str) -> Optional[str]:
-    """Return the field whose longest alias substring matches ``label``."""
+    """Return the field whose longest alias matches ``label``."""
     best: Optional[str] = None
     best_len = 0
     for field_name, aliases in HEADER_ALIASES.items():
         for alias in aliases:
-            if alias in label and len(alias) > best_len:
+            if _alias_matches(alias, label) and len(alias) > best_len:
                 best = field_name
                 best_len = len(alias)
     return best
@@ -251,7 +272,11 @@ def _section_aware_candidates(document: m.OCRDocument, structure) -> dict[str, l
         if section is None or not block.text:
             continue
         text = block.text
-        label = normalize_label(text)
+        # Match on the label part only, so a value that happens to contain a
+        # date ("Ngày giao hàng: 13/09/2026") cannot make the whole line look
+        # like an invoice-date label.
+        parts = _split_label_value(text)
+        label = normalize_label(parts[0] if parts else text)
 
         # vendor_tax_code from the SELLER section only.
         if section == "SELLER" and _match_field(label) == "vendor_tax_code":
@@ -264,8 +289,10 @@ def _section_aware_candidates(document: m.OCRDocument, structure) -> dict[str, l
             ))
             continue
 
-        # invoice_date: a date-bearing block in HEADER or SIGNATURE.
-        if section in ("HEADER", "SIGNATURE") and "ngày" in label:
+        # invoice_date: a date-bearing block in HEADER or SIGNATURE. The bare
+        # "ngày" alias must not match a different date such as "Ngày giao hàng"
+        # (delivery date); only the invoice-date aliases qualify.
+        if section in ("HEADER", "SIGNATURE") and _match_field(label) == "invoice_date":
             normalized = _extract_date(text)
             if normalized is None and ":" in text:
                 normalized = _extract_date(text.split(":", 1)[1])
@@ -276,11 +303,6 @@ def _section_aware_candidates(document: m.OCRDocument, structure) -> dict[str, l
     return fields
 
 
-def _column_field_for_concept(concept: str) -> str:
-    """Map a column concept name back to the canonical field name."""
-    return concept
-
-
 def _exact_spatial_candidates(
     document: m.OCRDocument, structure
 ) -> dict[str, list[m.FieldCandidate]]:
@@ -288,7 +310,6 @@ def _exact_spatial_candidates(
     fields: dict[str, list[m.FieldCandidate]] = defaultdict(list)
     if structure is None:
         return fields
-    neighbors = structure.right_neighbor_by_block_id
     blocks_by_id = {b.block_id: b for b in document.blocks}
     for block in document.blocks:
         if block.block_type == "TABLE_CELL":
@@ -300,20 +321,28 @@ def _exact_spatial_candidates(
         field_name = _match_field(label)
         if field_name is None:
             continue
-        # Value is the first neighbor carrying a non-empty value.
-        for neighbor_id in neighbors.get(block.block_id, []):
+        # Inline values already have exact candidates; spatial binding is for
+        # labels without a value. Prefer valid right values before looking below.
+        parts = _split_label_value(block.text)
+        if parts and parts[1]:
+            continue
+        neighbors = (structure.right_neighbor_by_block_id.get(block.block_id, [])
+                     + structure.below_neighbor_by_block_id.get(block.block_id, []))
+        for neighbor_id in neighbors:
             neighbor = blocks_by_id.get(neighbor_id)
             if neighbor is None or not neighbor.text or neighbor.text.strip() == "":
                 continue
             value_text = neighbor.text.strip()
             normalized = normalize_candidate_value(field_name, value_text)
+            if normalized is None:
+                continue
             fields[field_name].append(_candidate(
                 field_name, value_text, normalized, neighbor,
                 extraction_method="EXACT_SPATIAL",
                 evidence_block_ids=[block.block_id, neighbor_id],
                 section_role=section,
             ))
-            break  # first valued right/below neighbor wins
+            break  # first normalizable right/below neighbor wins
     return fields
 
 
@@ -329,33 +358,36 @@ def _fuzzy_spatial_candidates(
         if block.block_type == "TABLE_CELL":
             continue
         text = block.text or ""
-        label = normalize_label(text)
+        parts = _split_label_value(text)
+        label = parts[0] if parts else text
         if not label:
             continue
         for field_name in HEADER_ALIASES:
-            score = fuzzy_label_match(text, field_name)
+            if _match_field(normalize_label(label)) == field_name:
+                continue  # exact extraction already owns this label
+            score = fuzzy_label_match(label, field_name)
             if score is None:
                 continue
             # Derive a value via label:value split or nearest value neighbor.
             value = None
             value_text = ""
-            parts = _split_label_value(text)
+            block_ids = [block.block_id]
             if parts:
                 _, value_text = parts
                 value = normalize_candidate_value(field_name, value_text)
             if value is None:
-                # Look one right neighbor for a value.
-                for neighbor_id in structure.right_neighbor_by_block_id.get(block.block_id, []):
+                neighbors = (structure.right_neighbor_by_block_id.get(block.block_id, [])
+                             + structure.below_neighbor_by_block_id.get(block.block_id, []))
+                for neighbor_id in neighbors:
                     neighbor = next((b for b in document.blocks if b.block_id == neighbor_id), None)
                     if neighbor and neighbor.text and neighbor.text.strip():
-                        value_text = neighbor.text.strip()
-                        value = normalize_candidate_value(field_name, value_text)
+                        neighbor_text = neighbor.text.strip()
+                        value = normalize_candidate_value(field_name, neighbor_text)
+                        if value is None:
+                            continue
+                        value_text = neighbor_text
                         block_ids = [block.block_id, neighbor_id]
                         break
-                else:
-                    block_ids = [block.block_id]
-            else:
-                block_ids = [block.block_id]
             candidate = _candidate(
                 field_name, value_text, value, block,
                 extraction_method="FUZZY_SPATIAL",

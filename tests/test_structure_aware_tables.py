@@ -166,6 +166,25 @@ def test_ambiguous_row_without_description_is_not_a_line_item():
 # --- summary extraction --------------------------------------------------------
 
 
+@pytest.mark.parametrize("label,role", [
+    ("Total", m.TableRowRole.GRAND_TOTAL),
+    ("Subtotal", m.TableRowRole.SUBTOTAL),
+    ("Total tax", m.TableRowRole.TAX),
+    ("Totally unrelated", m.TableRowRole.AMBIGUOUS),
+])
+def test_english_total_is_a_bounded_summary_label(label, role):
+    doc = _doc([_tdb(label, 9, 0), _tdb("9.000.000", 9, 1)])
+    structure = analyze_document_structure(doc)
+    assert structure.row_role_by_key[(1, 0, 9)] == role
+    table = extract_table_candidates(doc, structure)
+    if role == m.TableRowRole.GRAND_TOTAL:
+        total = table.field_candidates["total_amount"][0]
+        assert total.normalized_value == 9000000
+        assert total.evidence_block_ids == [b.block_id for b in doc.blocks]
+    else:
+        assert "total_amount" not in table.field_candidates
+
+
 def test_specific_summary_labels_map_to_distinct_fields():
     blocks = [
         _tdb("Mô tả", 0, 0), _tdb("Thành tiền", 0, 1),

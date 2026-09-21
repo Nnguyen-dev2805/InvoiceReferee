@@ -1,5 +1,6 @@
 """Headless smoke tests for the Streamlit app via AppTest."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -94,6 +95,74 @@ def test_document_mode_rejects_missing_upload_without_exception():
     next(b for b in at.button if b.label == "Process invoice").click().run()
     assert not at.exception
     assert any("Upload" in w.value for w in at.warning)
+
+
+def _audit_frame(at):
+    """The audit history table (identified by its Event ID column)."""
+    for frame in at.dataframe:
+        if "Event ID" in frame.value.columns:
+            return frame
+    raise AssertionError("audit history table did not render")
+
+
+def test_audit_history_uses_one_id_sequence():
+    """Review events and human-control events must not collide on AUD-nnnn."""
+    at = _fresh()
+    next(b for b in at.button if b.label == "Review").click().run()
+    assert not at.exception
+    # Record a human control so the shared store emits another event.
+    at.text_input(key="stop_reason").set_value("demo stop").run()
+    next(b for b in at.button if b.label == "Stop transaction").click().run()
+    assert not at.exception
+
+    ids = [row["Event ID"] for row in _audit_frame(at).value.to_dict("records")]
+    assert ids, "audit history should not be empty"
+    assert len(ids) == len(set(ids)), f"duplicate audit ids: {ids}"
+
+
+def test_audit_rows_keep_reconstruction_fields():
+    """The exported rows must carry enough to reconstruct each decision."""
+    from invoice_referee.audit.store import AuditStore
+    from invoice_referee.domain import models as m
+    from invoice_referee.services.reviewer import review
+
+    store = AuditStore()
+    result = review(_sample_evidence(), audit=store)
+
+    import app.streamlit_app as app_module
+
+    rows = app_module._audit_rows(result)
+    assert rows, "audit rows should not be empty"
+    for key in ("Event ID", "Actor", "Event", "Input Refs", "Details", "Time"):
+        assert key in rows[0], f"audit export is missing {key}"
+    # Every row must be JSON-serialisable (it is exported via json.dumps).
+    json.dumps(rows)
+    ids = [row["Event ID"] for row in rows]
+    assert len(ids) == len(set(ids)), f"duplicate audit ids: {ids}"
+
+
+def _sample_evidence():
+    import json as _json
+    from pathlib import Path as _Path
+
+    fixtures = _Path(__file__).resolve().parent / "fixtures"
+    return _json.loads((fixtures / "TC01.json").read_text(encoding="utf-8"))
+
+
+def test_override_shows_the_effective_decision():
+    """After an override the UI must show the new effective action, not just the original."""
+    at = _fresh()
+    next(b for b in at.button if b.label == "Review").click().run()
+    assert not at.exception
+    # TC01 is AUTO_PROCESS; overriding to ESCALATE changes the effective action.
+    at.selectbox(key="ovr_action").set_value("ESCALATE").run()
+    at.text_input(key="ovr_reason").set_value("finance approved manually").run()
+    next(b for b in at.button if b.label == "Override decision").click().run()
+    assert not at.exception
+    at.run()
+    blob = " ".join(w.value for w in at.warning)
+    assert "Effective decision" in blob
+    assert "ESCALATE" in blob
 
 
 def test_extraction_review_renders_line_item_controls():

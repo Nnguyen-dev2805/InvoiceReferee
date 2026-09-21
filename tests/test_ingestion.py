@@ -37,8 +37,39 @@ def test_money_none_stays_none():
 def test_money_unparseable_stays_none():
     assert norm.normalize_money("about 45M or 48M") is None
 
+def test_money_negative_is_unknown_not_a_negative_amount():
+    # A leading minus is not a readable VND amount; it must stay unknown so the
+    # invoice is flagged instead of crashing the domain contract.
+    assert norm.normalize_money("-30.000.000") is None
+    assert norm.normalize_money(-30_000_000) is None
+
+def test_money_ambiguous_decimal_group_is_unknown():
+    # A trailing group that is not exactly 3 digits cannot be a thousands
+    # separator, and VND has no minor unit, so the value is ambiguous.
+    assert norm.normalize_money("1.5") is None
+    assert norm.normalize_money("30,5") is None
+    assert norm.normalize_money("12.345.678,90") is None
+
+def test_money_thousands_groups_still_parse():
+    assert norm.normalize_money("1.500") == 1500
+    assert norm.normalize_money("30.000.000") == 30_000_000
+    assert norm.normalize_money("30,000,000") == 30_000_000
+    assert norm.normalize_money("30000000") == 30_000_000
+    assert norm.normalize_money("0") == 0
+
 
 # --- normalize_date ----------------------------------------------------------
+
+
+def test_vietnamese_long_dates_accept_only_explicit_accented_or_ascii_tokens():
+    for text in ("Ngay 14 thang 07 nam 2023", "Ngày 14 tháng 07 năm 2023",
+                 "ngay 14 tháng 07 nam 2023"):
+        assert norm.normalize_date(text) == "2023-07-14"
+    assert norm.normalize_date("10/07/2023") == "2023-07-10"
+    assert norm.normalize_date("07/14/2023") is None
+    assert norm.normalize_date("Ngay 32 thang 07 nam 2023") is None
+    assert norm.normalize_date("Ngay 14 thang O7 nam 2023") is None
+    assert norm.normalize_date("Ngay 14 thangg 07 nam 2023") is None
 
 
 def test_date_iso_passthrough():
@@ -289,4 +320,46 @@ def test_impossible_invoice_date_stays_unknown_and_flags_invoice():
     raw["invoice_date"] = "45/13/2026"  # impossible in any format
     invoice = norm.to_supplier_invoice(raw)
     assert invoice.invoice_date is None
+    assert invoice.flagged is True
+
+
+def test_date_with_trailing_time_still_normalizes():
+    # OCR often reads a timestamp next to a date label; the date part is known.
+    assert norm.normalize_date("13/09/2026 14:30") == "2026-09-13"
+    assert norm.normalize_date("2026-09-13 08:00:00") == "2026-09-13"
+
+
+def test_date_like_text_without_a_valid_date_stays_none():
+    assert norm.normalize_date("45/13/2026 14:30") is None
+    assert norm.normalize_date("no date here") is None
+
+
+def test_absent_currency_defaults_to_vnd_without_flagging():
+    # Sprint 1 is VND-only, so an absent currency block is routine, not uncertain.
+    raw = _invoice_raw()
+    invoice = norm.to_supplier_invoice(raw)
+    assert invoice.currency == "VND"
+    assert invoice.flagged is False
+
+
+def test_unreadable_currency_flags_invoice_instead_of_guessing_vnd():
+    raw = _invoice_raw()
+    raw["currency"] = "EUR"
+    invoice = norm.to_supplier_invoice(raw)
+    assert invoice.currency is None
+    assert invoice.flagged is True
+
+
+def test_absent_invoice_type_defaults_to_original_without_flagging():
+    raw = _invoice_raw()
+    del raw["invoice_type"]
+    invoice = norm.to_supplier_invoice(raw)
+    assert invoice.invoice_type is m.InvoiceType.ORIGINAL
+    assert invoice.flagged is False
+
+
+def test_unparseable_invoice_type_flags_invoice_instead_of_guessing_original():
+    raw = _invoice_raw()
+    raw["invoice_type"] = "CREDIT_NOTE"
+    invoice = norm.to_supplier_invoice(raw)
     assert invoice.flagged is True

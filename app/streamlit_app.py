@@ -45,7 +45,6 @@ except Exception:
 import streamlit as st
 
 from invoice_referee.domain import models as m
-from invoice_referee.transaction.builder import build_transaction
 from invoice_referee.services.reviewer import review
 from invoice_referee.audit.store import AuditStore
 from invoice_referee.agent.config import client_from_env
@@ -84,12 +83,19 @@ _CHECK_ICON = {
 
 
 def _run_review(evidence: dict, audit: AuditStore | None = None) -> None:
-    """Run a review and store result + a fresh human-control audit store in session."""
+    """Run a review and keep ONE audit store for review and human controls.
+
+    The reviewer adopts the store we pass in, so review events and later
+    human-control events share a single ``AUD-nnnn`` sequence. Creating a second
+    store here would restart the numbering and collide in the audit timeline.
+    """
     # Uses the configured LLM provider when a key is set, else deterministic fallback.
     client = client_from_env()
+    if audit is None:
+        audit = AuditStore()
     result = review(evidence, client=client, model=getattr(client, "model", None), audit=audit)
     st.session_state["result"] = result
-    st.session_state["human_audit"] = AuditStore(transaction_id=result.transaction.transaction_id)
+    st.session_state["human_audit"] = audit
 
 
 def _extract_document(uploaded, po_json: str, actor: str) -> None:
@@ -277,6 +283,12 @@ def _render_decision(result: m.ReviewResult) -> None:
     if d.policy_rule_ids:
         st.caption("Policy rules: " + ", ".join(d.policy_rule_ids))
 
+    # An override changes the effective action but keeps the agent decision in
+    # history; show the effective action so the reviewer sees the live state.
+    effective = result.transaction.effective_action
+    if effective is not None and effective is not d.action:
+        st.warning(f"**Effective decision (human override): {effective.value}**")
+
     a = result.agent_assessment
     if a is not None:
         if a.fallback_used:
@@ -293,22 +305,37 @@ def _render_decision(result: m.ReviewResult) -> None:
             st.write(a.explanation)
 
 
-def _render_audit(result: m.ReviewResult) -> None:
-    st.subheader("Audit History")
+def _audit_rows(result: m.ReviewResult) -> list[dict]:
+    """Audit history as display rows, keeping everything needed to reconstruct.
+
+    ``result.audit_events`` already contains the review events; the human store
+    is the same store the reviewer used, so its events are appended only when
+    they are not already present (a Stop/Override recorded after the review).
+    """
     events = list(result.audit_events)
+    seen = {e.event_id for e in events}
     human = st.session_state.get("human_audit")
     if human is not None:
-        events = events + list(human.events)
-    rows = [
+        events.extend(e for e in human.events if e.event_id not in seen)
+    return [
         {
+            "Event ID": e.event_id or "—",
             "Time": e.timestamp,
+            "Actor": e.actor,
             "Event": e.event_type,
             "Rule": e.rule_id or "—",
             "Result": e.result or "—",
             "Reason": e.reason or "",
+            "Input Refs": ", ".join(e.input_refs),
+            "Details": json.dumps(e.details, ensure_ascii=False) if e.details else "",
         }
         for e in events
     ]
+
+
+def _render_audit(result: m.ReviewResult) -> None:
+    st.subheader("Audit History")
+    rows = _audit_rows(result)
     st.dataframe(rows, use_container_width=True, hide_index=True)
     st.download_button(
         "Export audit JSON",
@@ -349,6 +376,8 @@ def _render_human_controls(result: m.ReviewResult) -> None:
                     overridden_action=m.DecisionAction(new_action), reason=ovr_reason.strip(),
                 )
                 st.success(f"Override recorded. Original {tx.decision.action.value} kept in history.")
+                # Re-render so the effective decision replaces the stale headline.
+                st.rerun()
                 st.rerun()
 
 

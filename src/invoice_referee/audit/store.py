@@ -23,8 +23,17 @@ def _now() -> str:
 class AuditStore:
     def __init__(self, transaction_id: Optional[str] = None):
         self.transaction_id = transaction_id
-        self.events: list[m.AuditEvent] = []
+        self._events: list[m.AuditEvent] = []
         self._seq = 0
+
+    @property
+    def events(self) -> tuple[m.AuditEvent, ...]:
+        """The append-only event history, exposed read-only.
+
+        Returning a tuple keeps the log append-only: a caller cannot clear,
+        pop, or reassign an entry without going through ``append``.
+        """
+        return tuple(self._events)
 
     # --- core append ---------------------------------------------------------
 
@@ -52,7 +61,7 @@ class AuditStore:
             reason=reason,
             details=dict(details or {}),
         )
-        self.events.append(event)
+        self._events.append(event)
         return event
 
     # --- typed helpers -------------------------------------------------------
@@ -128,6 +137,16 @@ class AuditStore:
                 "section_role": candidate.section_role,
                 "evidence_block_ids": list(candidate.evidence_block_ids),
                 "alternative_count": len(alternatives),
+                # Record the rejected values, not just how many there were, so a
+                # conflict can be reconstructed from the audit trail alone.
+                "alternatives": [
+                    {
+                        "value": alt.normalized_value,
+                        "method": alt.extraction_method,
+                        "evidence_block_ids": list(alt.evidence_block_ids),
+                    }
+                    for alt in alternatives
+                ],
                 "conflict": candidate.status is m.FieldStatus.CONFLICTING,
             },
         )

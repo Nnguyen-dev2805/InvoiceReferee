@@ -267,6 +267,18 @@ def test_check_result_construction():
     assert cr.evidence_refs == ["PO-001", "GR-001", "INV-001"]
 
 
+def test_check_result_rejects_float_money_in_expected_or_actual():
+    """Money is integer VND everywhere, including what a check reports."""
+    with pytest.raises((TypeError, ValueError)):
+        m.CheckResult(check_id="CHECK_AMOUNT", status=m.CheckStatus.FAIL, actual=30_000_000.5)
+    with pytest.raises((TypeError, ValueError)):
+        m.CheckResult(check_id="CHECK_AMOUNT", status=m.CheckStatus.FAIL, expected=1.5)
+    # int, str, list and None remain valid (payment/item checks use them).
+    m.CheckResult(check_id="CHECK_PAYMENT", status=m.CheckStatus.FAIL, actual="PAID")
+    m.CheckResult(check_id="CHECK_ITEM", status=m.CheckStatus.FAIL, actual=["ITEM-1"])
+    m.CheckResult(check_id="CHECK_AMOUNT", status=m.CheckStatus.UNKNOWN)
+
+
 def test_check_result_optional_fields_default():
     cr = m.CheckResult(check_id="CHECK_VENDOR", status=m.CheckStatus.PASS)
     assert cr.policy_rule_id is None

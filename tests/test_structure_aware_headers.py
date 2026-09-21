@@ -7,6 +7,8 @@ section role and spatial binding, with fuzzy matching that never confuses tax.
 
 from __future__ import annotations
 
+import pytest
+
 from invoice_referee.domain import models as m
 from invoice_referee.ingestion.invoice_fields import (
     extract_header_candidates,
@@ -17,6 +19,28 @@ from invoice_referee.ingestion.candidate_resolver import resolve_field_candidate
 
 
 # --- helpers -------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("text,field,expected", [
+    ("Date: 10/07/2023", "invoice_date", "2023-07-10"),
+    ("Ma so thue: 0110329220", "vendor_tax_code", "0110329220"),
+    ("Ngay 14 thang 07 nam 2023", "invoice_date", "2023-07-14"),
+])
+def test_explicit_english_and_unaccented_vietnamese_headers(text, field, expected):
+    from invoice_referee.ingestion.invoice_fields import extract_invoice_fields
+    result = extract_invoice_fields(document([text_block(text, "HEADER")]))
+    candidate = result.fields.get(field)
+    assert candidate is not None
+    assert candidate.normalized_value == expected
+    assert candidate.evidence_block_ids == ["HEADER"]
+    assert candidate.extraction_method != "FUZZY_SPATIAL"
+
+
+@pytest.mark.parametrize("label", ["Update", "Candidate", "Due date"])
+def test_bare_english_date_alias_does_not_match_other_labels(label):
+    from invoice_referee.ingestion.invoice_fields import extract_invoice_fields
+    result = extract_invoice_fields(document([text_block(f"{label}: 10/07/2023", "OTHER")]))
+    assert "invoice_date" not in result.fields
 
 
 def table_cell(text, *, table=0, row=0, col=0, block_id=None, page=1,
@@ -153,6 +177,45 @@ def test_fuzzy_label_handles_small_ocr_error_but_never_tax_as_total():
     assert fuzzy is not None
     assert fuzzy >= FUZZY_LABEL_THRESHOLD
     assert fuzzy_label_match("tổng tiền thuế", field_name="total_amount") is None
+
+
+@pytest.mark.parametrize("label,method", [
+    ("Amount due", "EXACT_SPATIAL"),
+    ("Amounl due", "FUZZY_SPATIAL"),
+])
+@pytest.mark.parametrize("right_value,expected,source", [
+    (None, 9000000, "BELOW"),
+    ("8.000.000", 8000000, "RIGHT"),
+    ("unreadable", 9000000, "BELOW"),
+])
+def test_spatial_binding_falls_below_only_when_right_does_not_resolve(
+    label, method, right_value, expected, source,
+):
+    from invoice_referee.ingestion.document_structure import analyze_document_structure
+    blocks = [
+        text_block(label, "LABEL", box=m.BoundingBox(0.05, 0.10, 0.25, 0.13)),
+        text_block("9.000.000", "BELOW", box=m.BoundingBox(0.05, 0.15, 0.25, 0.18)),
+    ]
+    if right_value is not None:
+        blocks.append(text_block(right_value, "RIGHT", box=m.BoundingBox(0.27, 0.10, 0.47, 0.13)))
+    doc = document(blocks)
+    candidates = extract_header_candidates(doc, analyze_document_structure(doc))
+    total = next(c for c in candidates.get("total_amount", []) if c.extraction_method == method)
+    assert total.normalized_value == expected
+    assert total.evidence_block_ids == ["LABEL", source]
+    if method == "FUZZY_SPATIAL":
+        assert total.status == m.FieldStatus.NEEDS_CONFIRMATION
+
+
+@pytest.mark.parametrize("value,expected", [("9.000.000", 9000000), ("9.OOO.OOO", None)])
+def test_inline_fuzzy_matching_only_repairs_label_not_value(value, expected):
+    from invoice_referee.ingestion.document_structure import analyze_document_structure
+    doc = document([text_block(f"Amounl due: {value}", "INLINE")])
+    candidates = extract_header_candidates(doc, analyze_document_structure(doc))
+    total = next(c for c in candidates.get("total_amount", []) if c.extraction_method == "FUZZY_SPATIAL")
+    assert total.normalized_value == expected
+    assert total.evidence_block_ids == ["INLINE"]
+    assert total.status == m.FieldStatus.NEEDS_CONFIRMATION
 
 
 def test_exact_key_value_block_extracts_and_marks_confirmed():

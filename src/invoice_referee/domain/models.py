@@ -272,6 +272,15 @@ class CheckResult:
     reason: Optional[str] = None
     evidence_refs: list[str] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        # ``expected``/``actual`` are free-form (ints, strings, lists) but money
+        # must stay integer VND. A float here means a check computed money with
+        # floating point, which invariant 7 forbids.
+        for name in ("expected", "actual"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or isinstance(value, float):
+                raise TypeError(f"CheckResult.{name} must not be a float or bool: {value!r}")
+
 
 @dataclass
 class EvidenceIssue:
@@ -364,7 +373,7 @@ class HumanStop:
 @dataclass
 class HumanOverride:
     actor: str
-    original_action: DecisionAction
+    original_action: Optional[DecisionAction]
     overridden_action: DecisionAction
     reason: str
     timestamp: Optional[str] = None
@@ -372,10 +381,13 @@ class HumanOverride:
 
     def __post_init__(self) -> None:
         # An override must resolve to one of the three user-facing actions.
-        # STOPPED is a workflow status, never a decision.
+        # STOPPED is a workflow status, never a decision. ``original_action``
+        # stays None when the transaction had no agent decision yet.
         if not isinstance(self.overridden_action, DecisionAction):
             self.overridden_action = DecisionAction(self.overridden_action)
-        if not isinstance(self.original_action, DecisionAction):
+        if self.original_action is not None and not isinstance(
+            self.original_action, DecisionAction
+        ):
             self.original_action = DecisionAction(self.original_action)
 
 
@@ -384,7 +396,7 @@ class HumanOverride:
 
 @dataclass
 class Transaction:
-    transaction_id: str
+    transaction_id: Optional[str]
     transaction_type: Optional[TransactionType]
     declared_transaction_type: Optional[str] = None
     po: Optional[PurchaseOrder] = None
@@ -587,6 +599,11 @@ class FieldCandidate:
     provider_confidence: Optional[float] = None
     mapping_score: Optional[float] = None
     section_role: Optional[str] = None
+    # Human-review lineage: who touched this field, why, and when. Recorded in
+    # structured form (not only inside ``warnings``) so a review is auditable.
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[str] = None
+    review_reason: Optional[str] = None
 
     def __post_init__(self) -> None:
         # Migration alias: legacy callers set only ``confidence``; new callers set

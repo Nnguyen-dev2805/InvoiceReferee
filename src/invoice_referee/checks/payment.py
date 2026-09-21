@@ -16,10 +16,17 @@ CHECK_ID = "CHECK_PAYMENT"
 
 
 def _record_for_invoice(tx: m.Transaction) -> Optional[m.PaymentRecord]:
-    if tx.invoice is None:
-        return tx.payment_history[0] if tx.payment_history else None
+    """The payment record bound to this invoice, or ``None``.
+
+    A record is only this invoice's when both sides carry a non-null
+    ``invoice_id`` and they are equal. Without that, a missing invoice or a
+    null id would match an unrelated record — and would never be safe to treat
+    as routine UNPAID.
+    """
+    if tx.invoice is None or tx.invoice.invoice_id is None:
+        return None
     for rec in tx.payment_history:
-        if rec.invoice_id == tx.invoice.invoice_id:
+        if rec.invoice_id is not None and rec.invoice_id == tx.invoice.invoice_id:
             return rec
     return None
 

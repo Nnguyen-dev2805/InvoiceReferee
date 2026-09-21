@@ -9,7 +9,8 @@ a fully reviewed extraction into the raw evidence dict the existing production
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from invoice_referee.domain import models as m
@@ -17,6 +18,10 @@ from invoice_referee.ingestion.extraction_validation import (
     CRITICAL_FIELDS,
     CRITICAL_LINE_FIELDS,
 )
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 # Statuses that mean a critical field cannot be trusted for confident processing.
 _UNTRUSTED = {
@@ -56,12 +61,18 @@ class FieldReview:
 def _apply_one(candidate: m.FieldCandidate, review: FieldReview, actor: str) -> None:
     if review.action == "CONFIRM":
         candidate.status = m.FieldStatus.CONFIRMED
+        candidate.reviewed_by = actor
+        candidate.reviewed_at = _now()
         return
 
     # Preserve the original machine candidate before overwriting.
     if candidate.original_normalized_value is None and candidate.original_raw_text is None:
         candidate.original_normalized_value = candidate.normalized_value
         candidate.original_raw_text = candidate.raw_text
+
+    candidate.reviewed_by = actor
+    candidate.reviewed_at = _now()
+    candidate.review_reason = review.reason or None
 
     if review.action == "CORRECT":
         candidate.normalized_value = review.value
@@ -115,20 +126,24 @@ def apply_field_reviews(
 
 
 def _all_critical_resolved(result: m.InvoiceExtractionResult) -> bool:
+    # A critical field with no candidate at all was never extracted and so was
+    # never confirmed by a human; it is unresolved, not silently acceptable.
     for name in CRITICAL_FIELDS:
         candidate = result.fields.get(name)
-        if candidate is not None and candidate.status not in _RESOLVED:
+        if candidate is None or candidate.status not in _RESOLVED:
             return False
     for line in result.line_items:
         for name in CRITICAL_LINE_FIELDS:
             candidate = line.get(name)
-            if candidate is not None and candidate.status not in _RESOLVED:
+            if candidate is None or candidate.status not in _RESOLVED:
                 return False
     return True
 
 
 def _is_untrusted(candidate: Optional[m.FieldCandidate]) -> bool:
-    return candidate is not None and candidate.status in _UNTRUSTED
+    # ``None`` means the field never produced a candidate, which is as
+    # untrustworthy as an explicitly MISSING one.
+    return candidate is None or candidate.status in _UNTRUSTED
 
 
 def reviewed_invoice_to_evidence(

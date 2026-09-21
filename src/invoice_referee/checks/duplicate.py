@@ -15,10 +15,18 @@ from invoice_referee.checks import _support as s
 CHECK_ID = "CHECK_DUPLICATE"
 
 
-def _identity(inv: m.SupplierInvoice) -> tuple:
+def _identity(inv: m.SupplierInvoice) -> Optional[tuple]:
+    """The strong identity tuple, or ``None`` when it cannot be established.
+
+    Duplicate identity prefers vendor_tax_code + invoice_series +
+    invoice_number. A missing component is not a licence to fall back to a
+    weaker key: amount and date alone never prove a duplicate, and a
+    vendor_id + number guess would both miss real duplicates and invent false
+    ones. An unprovable identity is UNKNOWN.
+    """
     if inv.vendor_tax_code and inv.invoice_series and inv.invoice_number:
         return ("strong", inv.vendor_tax_code, inv.invoice_series, inv.invoice_number)
-    return ("weak", inv.vendor_id, inv.invoice_number)
+    return None
 
 
 def check_duplicate(tx: m.Transaction) -> m.CheckResult:
@@ -52,6 +60,18 @@ def check_duplicate(tx: m.Transaction) -> m.CheckResult:
         )
 
     identity = _identity(inv)
+    if identity is None:
+        return m.CheckResult(
+            check_id=CHECK_ID,
+            status=m.CheckStatus.UNKNOWN,
+            policy_rule_id="P09",
+            reason=(
+                "Invoice identity is incomplete (needs vendor tax code, series "
+                "and number); a duplicate cannot be proven or ruled out"
+            ),
+            evidence_refs=s.evidence_refs(tx),
+        )
+
     for prior in tx.prior_invoices:
         if _identity(prior) == identity:
             return m.CheckResult(

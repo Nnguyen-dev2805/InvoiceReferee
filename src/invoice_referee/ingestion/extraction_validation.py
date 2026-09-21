@@ -18,15 +18,18 @@ from __future__ import annotations
 
 from invoice_referee.domain import models as m
 
+# Fields a human must confirm before OCR evidence may enter review().
+# ``currency`` and ``invoice_type`` are deliberately absent: Sprint 1 is
+# VND-only and treats an original invoice as the default, and OCR has no
+# extractor for either. A *supplied but unsupported* value for them is caught
+# by ``normalization.to_supplier_invoice``, which flags the invoice instead.
 CRITICAL_FIELDS = {
     "invoice_number",
     "invoice_series",
-    "invoice_type",
     "vendor_tax_code",
     "vendor_id",
     "po_id",
     "invoice_date",
-    "currency",
     "total_amount",
 }
 
@@ -112,8 +115,9 @@ def _validate_line_arithmetic(result: m.InvoiceExtractionResult) -> None:
         total = _value(line.get("line_total"))
         if qty is not None and price is not None and total is not None:
             if qty * price != total:
-                line["line_total"].warnings.append(
-                    f"line arithmetic mismatch: {qty} x {price} != {total}"
+                _warn_once(
+                    line["line_total"].warnings,
+                    f"line arithmetic mismatch: {qty} x {price} != {total}",
                 )
         if total is None:
             have_all_line_totals = False
@@ -122,13 +126,25 @@ def _validate_line_arithmetic(result: m.InvoiceExtractionResult) -> None:
 
     header_total = _value(result.fields.get("total_amount"))
     if header_total is not None and have_all_line_totals and line_total_sum != header_total:
-        result.warnings.append(
-            f"sum of line totals ({line_total_sum}) does not equal invoice total ({header_total})"
+        _warn_once(
+            result.warnings,
+            f"sum of line totals ({line_total_sum}) does not equal invoice total ({header_total})",
         )
 
 
 def _value(candidate):
     return candidate.normalized_value if candidate is not None else None
+
+
+def _warn_once(warnings: list[str], message: str) -> None:
+    """Append ``message`` unless already present.
+
+    ``validate_extraction`` runs more than once over the same result (inside
+    ``extract_invoice_fields`` and again in the extractor service), so a naive
+    append would duplicate every arithmetic warning.
+    """
+    if message not in warnings:
+        warnings.append(message)
 
 
 _SUMMARY_COMPONENT_FIELDS = ("subtotal_amount", "tax_amount", "discount_amount", "shipping_amount")
@@ -153,8 +169,9 @@ def _validate_summary_components(result: m.InvoiceExtractionResult) -> None:
     shipping = present["shipping_amount"]
     expected = subtotal + tax + shipping - discount
     if expected != header_total:
-        result.warnings.append(
+        _warn_once(
+            result.warnings,
             f"sum of components (subtotal {subtotal} + tax {tax} + shipping "
             f"{shipping} - discount {discount} = {expected}) does not equal "
-            f"invoice total ({header_total})"
+            f"invoice total ({header_total})",
         )

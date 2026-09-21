@@ -126,6 +126,32 @@ def test_record_override_preserves_original_decision():
     assert store.events[-1].details["original_action"] == "AUTO_PROCESS"
 
 
+def test_events_are_exposed_read_only():
+    """Audit history is append-only; callers must not be able to mutate it."""
+    store = AuditStore(transaction_id="TX-001")
+    store.append("TRANSACTION_CREATED")
+    with pytest.raises((AttributeError, TypeError)):
+        store.events.append("tampered")
+    with pytest.raises((AttributeError, TypeError)):
+        store.events.clear()
+
+
+def test_override_before_a_decision_is_recorded_does_not_crash():
+    """Overriding a transaction that has no agent decision yet must be allowed."""
+    store = AuditStore(transaction_id="TX-001")
+    tx = m.Transaction(transaction_id="TX-001", transaction_type=m.TransactionType.PO_GOODS_PURCHASE)
+    assert tx.decision is None
+
+    ovr = store.record_override(
+        tx, actor="a@example.com", overridden_action=m.DecisionAction.ESCALATE,
+        reason="manual finance approval required",
+    )
+
+    assert ovr.original_action is None
+    assert ovr.overridden_action is m.DecisionAction.ESCALATE
+    assert store.events[-1].details["original_action"] is None
+
+
 def test_override_rejects_stopped_as_action():
     store = AuditStore(transaction_id="TX-001")
     tx = m.Transaction(transaction_id="TX-001", transaction_type=m.TransactionType.PO_GOODS_PURCHASE)
@@ -214,6 +240,21 @@ def test_record_field_event_alternatives_default_to_empty():
     store = AuditStore(transaction_id="TX-OCR")
     ev = store.record_field_event("FIELD_EXTRACTED", _candidate(), actor="judge@demo")
     assert ev.details["alternative_count"] == 0
+    assert ev.details["alternatives"] == []
+
+
+def test_record_field_event_preserves_the_rejected_alternative_values():
+    """A conflict must be reconstructable, so the losing value is recorded."""
+    store = AuditStore(transaction_id="TX-OCR")
+    selected = _candidate(value=9_000_000, status=m.FieldStatus.CONFLICTING)
+    alt = _candidate(value=7_000_000)
+    alt.extraction_method = "EXACT_KEY_VALUE"
+    ev = store.record_field_event(
+        "FIELD_EXTRACTED", selected, actor="judge@demo", alternatives=[alt]
+    )
+    assert ev.details["alternatives"] == [
+        {"value": 7_000_000, "method": "EXACT_KEY_VALUE", "evidence_block_ids": ["BLK-001"]}
+    ]
 
 
 def test_record_extraction_reviewed_event():
