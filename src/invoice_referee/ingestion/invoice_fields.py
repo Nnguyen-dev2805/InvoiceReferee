@@ -53,9 +53,9 @@ DATE_FIELDS = {"invoice_date", "signature_date"}
 HEADER_ALIASES: dict[str, tuple[str, ...]] = {
     "invoice_series": ("mẫu số - ký hiệu", "ký hiệu", "serial no", "series"),
     "invoice_number": ("số hóa đơn", "invoice no", "invoice number", "số"),
-    "vendor_tax_code": ("mã số thuế", "tax code", "tax id", "mst"),
+    "vendor_tax_code": ("mã số thuế", "ma so thue", "tax code", "tax id", "mst"),
     "po_id": ("purchase order", "po number", "po no", "số po", "đơn hàng"),
-    "invoice_date": ("ngày hóa đơn", "invoice date", "ngày"),
+    "invoice_date": ("ngày hóa đơn", "ngay hoa don", "invoice date", "ngày", "ngay", "date"),
     "total_amount": ("tổng cộng thanh toán", "tổng thanh toán",
                      "total payment", "grand total", "amount due",
                      "tổng cộng", "total amount"),
@@ -175,7 +175,10 @@ def _split_label_value(text: str) -> Optional[tuple[str, str]]:
 # --- date extraction from arbitrary text ---------------------------------------
 
 
-_DATE_TOKEN = re.compile(r"\d{1,4}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}\s*tháng\s*\d{1,2}\s*năm\s*\d{4}")
+_DATE_TOKEN = re.compile(
+    r"\d{1,4}[/-]\d{1,2}[/-]\d{2,4}"
+    r"|\d{1,2}\s*(?:tháng|thang)\s*\d{1,2}\s*(?:năm|nam)\s*\d{4}"
+)
 
 
 def _extract_date(raw_text: str) -> Optional[str]:

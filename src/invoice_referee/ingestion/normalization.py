@@ -70,11 +70,14 @@ _DATE_INPUT_FORMATS = (
 )
 
 # Vietnamese long form: "Ngày 10 tháng 07 năm 2023" (day/month/year).
-# Allows optional leading "ngày" (already stripped as an alias label elsewhere)
-# and optional "ngày"/"tháng"/"năm" markers.
+# Allows an optional leading "ngày" and optional "ngày"/"tháng"/"năm" markers.
+# OCR frequently drops the Vietnamese tone marks, so the unaccented spellings
+# ("ngay", "thang", "nam") are accepted as explicit alternatives. This is a
+# bounded token list, not general diacritic folding: an unknown word still fails.
 _VI_DATE_RE = re.compile(
-    r"(?:ngày\s*)?(?P<day>\d{1,2})\s*(?:tháng\s*|/|-|\.)(?P<month>\d{1,2})"
-    r"\s*(?:năm\s*|/|-|\.)(?P<year>\d{4})"
+    r"(?:ngày\s*|ngay\s*)?(?P<day>\d{1,2})\s*"
+    r"(?:tháng\s*|thang\s*|/|-|\.)(?P<month>\d{1,2})\s*"
+    r"(?:năm\s*|nam\s*|/|-|\.)(?P<year>\d{4})"
 )
 
 

@@ -1,0 +1,426 @@
+{
+  "ST01": {
+    "family": "TABLE_FOOTER_TOTAL",
+    "recorded": "recorded/ST01.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 9000000,
+        "invoice_date": "2023-07-10",
+        "vendor_tax_code": "0110329220"
+      },
+      "line_item_count": 2,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      }
+    }
+  },
+  "ST02": {
+    "family": "TABLE_FOOTER_TOTAL",
+    "recorded": "recorded/ST02.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 18000000,
+        "invoice_date": "2023-07-10",
+        "vendor_tax_code": "0110329220"
+      },
+      "line_item_count": 2,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      }
+    }
+  },
+  "ST03": {
+    "family": "TOTAL_INSIDE_TABLE",
+    "recorded": "recorded/ST03.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 7000000,
+        "invoice_date": "2023-07-11"
+      },
+      "line_item_count": 2,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      }
+    }
+  },
+  "ST04": {
+    "family": "TOTAL_INSIDE_TABLE",
+    "recorded": "recorded/ST04.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 14000000,
+        "invoice_date": "2023-07-11"
+      },
+      "line_item_count": 2,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      }
+    }
+  },
+  "ST05": {
+    "family": "SUBTOTAL_TAX_TOTAL",
+    "recorded": "recorded/ST05.json",
+    "expected": {
+      "row_roles": {
+        "1:0:4": "SUBTOTAL",
+        "1:0:5": "TAX",
+        "1:0:6": "DISCOUNT",
+        "1:0:7": "SHIPPING",
+        "1:0:8": "GRAND_TOTAL"
+      },
+      "fields": {
+        "subtotal_amount": 8000000,
+        "tax_amount": 800000,
+        "discount_amount": 0,
+        "shipping_amount": 200000,
+        "total_amount": 9000000
+      },
+      "line_item_count": 1,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R8C0",
+          "T0R8C5"
+        ]
+      }
+    }
+  },
+  "ST06": {
+    "family": "SUBTOTAL_TAX_TOTAL",
+    "recorded": "recorded/ST06.json",
+    "expected": {
+      "row_roles": {
+        "1:0:4": "SUBTOTAL",
+        "1:0:5": "TAX",
+        "1:0:6": "DISCOUNT",
+        "1:0:7": "SHIPPING",
+        "1:0:8": "GRAND_TOTAL"
+      },
+      "fields": {
+        "subtotal_amount": 16000000,
+        "tax_amount": 1600000,
+        "discount_amount": 0,
+        "shipping_amount": 400000,
+        "total_amount": 18000000
+      },
+      "line_item_count": 1,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R8C0",
+          "T0R8C5"
+        ]
+      }
+    }
+  },
+  "ST07": {
+    "family": "LABEL_ABOVE_VALUE",
+    "recorded": "recorded/ST07.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 5000000,
+        "vendor_tax_code": "0110329220",
+        "invoice_date": "2023-07-10"
+      },
+      "line_item_count": 1,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      }
+    }
+  },
+  "ST08": {
+    "family": "LABEL_ABOVE_VALUE",
+    "recorded": "recorded/ST08.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 10000000,
+        "vendor_tax_code": "0110329220",
+        "invoice_date": "2023-07-10"
+      },
+      "line_item_count": 1,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      }
+    }
+  },
+  "ST09": {
+    "family": "MULTIPLE_TABLES",
+    "recorded": "recorded/ST09.json",
+    "expected": {
+      "row_roles": {
+        "1:1:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 8000000,
+        "invoice_date": "2023-07-12"
+      },
+      "line_item_count": 2,
+      "selected_evidence": {
+        "total_amount": [
+          "T1R9C0",
+          "T1R9C5"
+        ]
+      }
+    }
+  },
+  "ST10": {
+    "family": "MULTIPLE_TABLES",
+    "recorded": "recorded/ST10.json",
+    "expected": {
+      "row_roles": {
+        "1:1:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 16000000,
+        "invoice_date": "2023-07-12"
+      },
+      "line_item_count": 2,
+      "selected_evidence": {
+        "total_amount": [
+          "T1R9C0",
+          "T1R9C5"
+        ]
+      }
+    }
+  },
+  "ST11": {
+    "family": "MULTI_PAGE_INVOICE",
+    "recorded": "recorded/ST11.json",
+    "expected": {
+      "row_roles": {
+        "2:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 9000000,
+        "invoice_date": "2023-07-13"
+      },
+      "line_item_count": 2,
+      "selected_evidence": {
+        "total_amount": [
+          "P2T0R9C0",
+          "P2T0R9C5"
+        ]
+      }
+    }
+  },
+  "ST12": {
+    "family": "MULTI_PAGE_INVOICE",
+    "recorded": "recorded/ST12.json",
+    "expected": {
+      "row_roles": {
+        "2:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 18000000,
+        "invoice_date": "2023-07-13"
+      },
+      "line_item_count": 2,
+      "selected_evidence": {
+        "total_amount": [
+          "P2T0R9C0",
+          "P2T0R9C5"
+        ]
+      }
+    }
+  },
+  "ST13": {
+    "family": "SELLER_BUYER_DUPLICATE_LABELS",
+    "recorded": "recorded/ST13.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 6000000,
+        "vendor_tax_code": "0101234567"
+      },
+      "line_item_count": 1,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      },
+      "warning": "seller and buyer tax code"
+    }
+  },
+  "ST14": {
+    "family": "SELLER_BUYER_DUPLICATE_LABELS",
+    "recorded": "recorded/ST14.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 12000000,
+        "vendor_tax_code": "0101234567"
+      },
+      "line_item_count": 1,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      },
+      "warning": "seller and buyer tax code"
+    }
+  },
+  "ST15": {
+    "family": "DIFFERENT_HEADER_SIGNATURE_DATES",
+    "recorded": "recorded/ST15.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 6000000,
+        "invoice_date": "2023-07-10"
+      },
+      "line_item_count": 1,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      }
+    }
+  },
+  "ST16": {
+    "family": "DIFFERENT_HEADER_SIGNATURE_DATES",
+    "recorded": "recorded/ST16.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 12000000,
+        "invoice_date": "2023-07-10"
+      },
+      "line_item_count": 1,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      }
+    }
+  },
+  "ST17": {
+    "family": "ENGLISH_LABELS",
+    "recorded": "recorded/ST17.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 3000000,
+        "invoice_date": "2023-07-10",
+        "vendor_tax_code": "0110329220"
+      },
+      "line_item_count": 1,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      }
+    }
+  },
+  "ST18": {
+    "family": "ENGLISH_LABELS",
+    "recorded": "recorded/ST18.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 6000000,
+        "invoice_date": "2023-07-10",
+        "vendor_tax_code": "0110329220"
+      },
+      "line_item_count": 1,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      }
+    }
+  },
+  "ST19": {
+    "family": "OCR_CORRUPTED_LABELS",
+    "recorded": "recorded/ST19.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 4000000,
+        "invoice_date": "2023-07-14",
+        "vendor_tax_code": "0110329220"
+      },
+      "line_item_count": 1,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      }
+    }
+  },
+  "ST20": {
+    "family": "OCR_CORRUPTED_LABELS",
+    "recorded": "recorded/ST20.json",
+    "expected": {
+      "row_roles": {
+        "1:0:9": "GRAND_TOTAL"
+      },
+      "fields": {
+        "total_amount": 8000000,
+        "invoice_date": "2023-07-14",
+        "vendor_tax_code": "0110329220"
+      },
+      "line_item_count": 1,
+      "selected_evidence": {
+        "total_amount": [
+          "T0R9C0",
+          "T0R9C5"
+        ]
+      }
+    }
+  }
+}
