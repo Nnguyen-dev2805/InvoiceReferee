@@ -178,3 +178,23 @@ def test_call_api_posts_base64_and_requests_blocks():
     assert captured["payload"]["model"] == "ocr-4-1"
     assert doc.engine == MISTRAL_ENGINE_NAME
     assert any("0000123" in b.text for b in doc.blocks)
+
+
+def test_ocr4_table_cells_carry_table_index():
+    engine = MistralOCREngine(transcribe=lambda page: SAMPLE_PAGE_RESULT)
+    doc = engine.analyze([_page()])
+    cells = [b for b in doc.blocks if b.block_type == "TABLE_CELL"]
+    assert cells
+    # The single Mistral table is index 0; every expanded cell inherits it.
+    assert {b.table_index for b in cells} == {0}
+
+
+def test_parse_table_position_reads_mistral_cell_id():
+    from invoice_referee.ingestion.ocr import parse_table_position
+
+    # Real Mistral cell id after expansion: P{page}-M{table}-P{page}-T{t}R{row}C{col}.
+    assert parse_table_position("P1-M0-P1-T0R9C5") == (0, 9, 5)
+    # Header cell id uses H for the header row (column index after H).
+    assert parse_table_position("P1-T0H3")[0] == 0
+    # Non-table id yields no position.
+    assert parse_table_position("P1-BLK0004") == (None, None, None)

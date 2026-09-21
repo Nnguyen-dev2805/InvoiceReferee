@@ -482,6 +482,34 @@ class BoundingBox:
             raise ValueError("y coordinates must be normalized and ordered (0<=y1<=y2<=1)")
 
 
+class SectionRole(str, Enum):
+    """Coarse document region a block belongs to (structure-aware extraction)."""
+
+    HEADER = "HEADER"
+    SELLER = "SELLER"
+    BUYER = "BUYER"
+    ITEM_TABLE = "ITEM_TABLE"
+    SUMMARY = "SUMMARY"
+    SIGNATURE = "SIGNATURE"
+    FOOTER = "FOOTER"
+    UNKNOWN = "UNKNOWN"
+
+
+class TableRowRole(str, Enum):
+    """Role of a single table row inside an invoice item table."""
+
+    COLUMN_HEADER = "COLUMN_HEADER"
+    ORDINAL_HEADER = "ORDINAL_HEADER"
+    DATA = "DATA"
+    EMPTY = "EMPTY"
+    SUBTOTAL = "SUBTOTAL"
+    TAX = "TAX"
+    DISCOUNT = "DISCOUNT"
+    SHIPPING = "SHIPPING"
+    GRAND_TOTAL = "GRAND_TOTAL"
+    AMBIGUOUS = "AMBIGUOUS"
+
+
 @dataclass
 class OCRBlock:
     block_id: str
@@ -492,6 +520,8 @@ class OCRBlock:
     block_type: str  # TEXT | KEY_VALUE | TABLE_CELL
     row_index: Optional[int] = None
     column_index: Optional[int] = None
+    # Appended after row/column so legacy positional construction is preserved.
+    table_index: Optional[int] = None
 
 
 @dataclass
@@ -503,6 +533,29 @@ class OCRDocument:
     engine: str
     engine_version: str
     processing_ms: int
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass
+class DocumentStructure:
+    """Deterministic structural view of an ``OCRDocument``.
+
+    Derived from block positions, table indices, and reading order. It carries
+    no field values — only where meaning lives — so extractors can bind labels
+    to values using structure instead of one-block string heuristics.
+
+    ``row_role_by_key`` is keyed by ``(page_number, table_index, row_index)``.
+    """
+
+    section_by_block_id: dict[str, "SectionRole"] = field(default_factory=dict)
+    row_role_by_key: dict[tuple[int, int, int], "TableRowRole"] = field(
+        default_factory=dict
+    )
+    blocks_by_table_row: dict[tuple[int, int, int], list["OCRBlock"]] = field(
+        default_factory=dict
+    )
+    right_neighbor_by_block_id: dict[str, list[str]] = field(default_factory=dict)
+    below_neighbor_by_block_id: dict[str, list[str]] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
 
 
@@ -527,10 +580,28 @@ class FieldCandidate:
     warnings: list[str] = field(default_factory=list)
     original_raw_text: Optional[str] = None
     original_normalized_value: Any = None
+    # Structure-aware scoring, kept strictly separate and never combined:
+    #   provider_confidence -> OCR engine trust in the raw text;
+    #   mapping_score       -> how well a label matched a field concept;
+    #   section_role        -> document region the value came from.
+    provider_confidence: Optional[float] = None
+    mapping_score: Optional[float] = None
+    section_role: Optional[str] = None
 
     def __post_init__(self) -> None:
-        if self.confidence is not None and not (0.0 <= self.confidence <= 1.0):
-            raise ValueError("confidence must be within [0, 1] or None")
+        # Migration alias: legacy callers set only ``confidence``; new callers set
+        # only ``provider_confidence``. Keep the two mirrored, never combined.
+        if self.provider_confidence is None:
+            self.provider_confidence = self.confidence
+        if self.confidence is None:
+            self.confidence = self.provider_confidence
+        for name, value in (
+            ("confidence", self.confidence),
+            ("provider_confidence", self.provider_confidence),
+            ("mapping_score", self.mapping_score),
+        ):
+            if value is not None and not (0.0 <= value <= 1.0):
+                raise ValueError(f"{name} must be within [0, 1] or None")
 
 
 @dataclass
@@ -541,3 +612,9 @@ class InvoiceExtractionResult:
     line_items: list[dict[str, FieldCandidate]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     audit_events: list[AuditEvent] = field(default_factory=list)
+    # Every candidate produced per field (selected + alternatives), for audit
+    # and conflict review. Selected values still live in ``fields``.
+    field_candidates: dict[str, list[FieldCandidate]] = field(default_factory=dict)
+    line_item_candidate_sets: list[dict[str, list[FieldCandidate]]] = field(
+        default_factory=list
+    )

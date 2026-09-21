@@ -32,12 +32,37 @@ without the optional ``ocr`` extra.
 
 from __future__ import annotations
 
+import re
 import time
 from typing import Any, Optional, Protocol
 
 from invoice_referee.domain import models as m
 
 ENGINE_NAME = "paddleocr-pp-structure-v3"
+
+# Parse a table cell's identity from the tail of a block id. Matches the last
+# ``T<table>`` group followed by a header (``H<col>``) or data (``R<row>C<col>``)
+# marker, so composite Mistral ids like ``P1-M0-P1-T0R9C5`` resolve to (0, 9, 5).
+_TABLE_ID = re.compile(r"T(?P<table>\d+)(?:H(?P<hcol>\d+)|R(?P<row>\d+)(?:C(?P<col>\d+))?)$")
+
+
+def parse_table_position(block_id: str) -> tuple[Optional[int], Optional[int], Optional[int]]:
+    """Return ``(table_index, row_index, column_index)`` parsed from a block id.
+
+    A header cell id (``T0H3``) has no row index; its trailing number is the
+    column. Non-table ids yield ``(None, None, None)``. This is the compatibility
+    path only: provider-native row/column/table metadata always wins over it.
+    """
+    match = _TABLE_ID.search(block_id)
+    if not match:
+        return None, None, None
+    table = int(match.group("table"))
+    if match.group("hcol") is not None:
+        # Header row: row 0, column = the number after H.
+        return table, 0, int(match.group("hcol"))
+    row = int(match.group("row"))
+    col = int(match.group("col")) if match.group("col") is not None else None
+    return table, row, col
 
 
 class OCREngine(Protocol):
@@ -75,6 +100,7 @@ def map_paddle_response(raw: Any, pages: list[m.DocumentPage]) -> list[m.OCRBloc
         for block in page.get("blocks", []):
             poly = block.get("poly")
             box = _normalized_box(poly, width, height) if poly else m.BoundingBox(0.0, 0.0, 1.0, 1.0)
+            table_idx, row_idx, col_idx = _resolve_table_position(block)
             blocks.append(
                 m.OCRBlock(
                     block_id=block["block_id"],
@@ -83,11 +109,25 @@ def map_paddle_response(raw: Any, pages: list[m.DocumentPage]) -> list[m.OCRBloc
                     confidence=float(block.get("confidence", 0.0)),
                     bounding_box=box,
                     block_type=block.get("block_type", "TEXT"),
-                    row_index=block.get("row_index"),
-                    column_index=block.get("column_index"),
+                    row_index=row_idx,
+                    column_index=col_idx,
+                    table_index=table_idx,
                 )
             )
     return blocks
+
+
+def _resolve_table_position(block: dict) -> tuple[Optional[int], Optional[int], Optional[int]]:
+    """Provider-native row/column/table metadata wins; parse the id as fallback."""
+    parsed_table, parsed_row, parsed_col = parse_table_position(block.get("block_id", ""))
+    table_idx = block.get("table_index")
+    row_idx = block.get("row_index")
+    col_idx = block.get("column_index")
+    return (
+        table_idx if table_idx is not None else parsed_table,
+        row_idx if row_idx is not None else parsed_row,
+        col_idx if col_idx is not None else parsed_col,
+    )
 
 
 class PaddleOCREngine:
@@ -350,6 +390,9 @@ def blocks_from_mistral_page(page_result: dict, page_number: int) -> list[dict]:
                 cell["poly"] = poly
                 cell["confidence"] = conf
                 cell["block_id"] = f"P{page_number}-M{table_index}-{cell['block_id']}"
+                # The provider-native table index is the outer M counter; the
+                # inner markdown table index is always 0 per expanded block.
+                cell["table_index"] = table_index
                 out.append(cell)
             table_index += 1
             continue
@@ -385,6 +428,7 @@ def _map_mistral_response(raw_pages: list[dict], pages: list[m.DocumentPage]) ->
             poly = block.get("poly")
             box = _normalized_box(poly, width, height) if poly else m.BoundingBox(0.0, 0.0, 1.0, 1.0)
             conf = block.get("confidence")
+            table_idx, row_idx, col_idx = _resolve_table_position(block)
             blocks.append(
                 m.OCRBlock(
                     block_id=block["block_id"],
@@ -396,8 +440,9 @@ def _map_mistral_response(raw_pages: list[dict], pages: list[m.DocumentPage]) ->
                     confidence=0.0 if conf is None else float(conf),
                     bounding_box=box,
                     block_type=block.get("block_type", "TEXT"),
-                    row_index=block.get("row_index"),
-                    column_index=block.get("column_index"),
+                    row_index=row_idx,
+                    column_index=col_idx,
+                    table_index=table_idx,
                 )
             )
     return blocks

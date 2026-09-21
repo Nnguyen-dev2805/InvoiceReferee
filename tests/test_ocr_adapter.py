@@ -93,3 +93,12 @@ def test_coordinates_are_clamped_into_unit_range():
     box = blocks[0].bounding_box
     assert box.x1 == 0.0 and box.y1 == 0.0
     assert box.x2 == 1.0 and box.y2 == 1.0
+
+
+def test_map_paddle_response_preserves_table_index():
+    raw = {"pages": [{"page_number": 1, "blocks": [
+        {"block_id": "B1", "text": "9.000.000", "confidence": 0.9,
+         "block_type": "TABLE_CELL", "table_index": 1, "row_index": 9, "column_index": 5}
+    ]}]}
+    block = map_paddle_response(raw, [_page()])[0]
+    assert (block.table_index, block.row_index, block.column_index) == (1, 9, 5)
