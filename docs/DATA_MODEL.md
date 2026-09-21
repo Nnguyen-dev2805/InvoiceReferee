@@ -773,6 +773,8 @@ Mỗi module chỉ phụ thuộc schema đầu vào/đầu ra, không phụ thu�
 
 ## 21. Schema cần được xem là contract
 
+### 21.1. Business contract (16 object gốc)
+
 Trước khi bắt đầu code, team phải thống nhất và hạn chế thay đổi tùy tiện các object sau:
 
 1. `ExtractedDocument`
@@ -793,3 +795,30 @@ Trước khi bắt đầu code, team phải thống nhất và hạn chế thay 
 16. `HumanOverride`
 
 Nếu cần thay schema sau khi code đã được chia cho nhiều người, thay đổi phải được thông báo vì nó có thể phá interface giữa các module.
+
+### 21.2. Document-path contract (bổ sung ở Sprint 1)
+
+Đường OCR được chấp nhận bổ sung thêm các contract sau trong `domain/models.py`. Chúng độc lập với 16 object nghiệp vụ ở trên: business pipeline chỉ thấy evidence đã được con người xác nhận, không thấy các object này.
+
+**Line item của chứng từ:**
+
+- `POLineItem`, `ReceiptLineItem`, `InvoiceLineItem` — mỗi trường số là `Optional`; `__post_init__` chỉ validate khi giá trị khác `None`.
+- `EvidenceIssue` — vấn đề liên kết cấu trúc (PO sai trạng thái, GR sai PO, …), map sang `REQUEST_INFO`.
+
+**Tài liệu và bố cục:**
+
+- `UploadedDocument` — metadata file đã qua cổng validate; **không** chứa bytes trong audit.
+- `DocumentPage` — ảnh trang đã render, `native_text` là lớp text nhúng nếu có.
+- `BoundingBox` — `frozen`, toạ độ chuẩn hoá `0..1`, validate thứ tự và biên.
+- `OCRBlock` — đơn vị trung lập của provider: `block_id`, `page_number`, `text`, `confidence`, `bounding_box`, `block_type`, `row_index`, `column_index`, `table_index`.
+- `OCRDocument` — kết quả một lần chạy OCR + metadata engine.
+- `DocumentStructure` — `section_by_block_id`, `row_role_by_key`, `blocks_by_table_row`, `right_neighbor_by_block_id`, `below_neighbor_by_block_id`, `warnings`.
+
+**Trích xuất và xác nhận:**
+
+- `FieldCandidate` — một giá trị ứng viên kèm provenance (`page_number`, `bounding_box`, `evidence_block_ids`), method, hai loại điểm số tách biệt (`provider_confidence`, `mapping_score`), lineage sửa đổi của người (`original_*`, `reviewed_by`, `reviewed_at`, `review_reason`).
+- `InvoiceExtractionResult` — `status` (`ExtractionStatus`), `fields`, `line_items`, `field_candidates`, `line_item_candidate_sets`, `warnings`, `audit_events`.
+
+**Enum bổ sung:** `FieldStatus`, `ExtractionStatus`, `SectionRole`, `TableRowRole`.
+
+`InvoiceExtractionResult.status` chỉ đạt `REVIEWED` qua `pipeline.apply_field_reviews`, và chỉ khi mọi trường critical đã `CONFIRMED`/`CORRECTED`. Xem `ARCHITECTURE.md` § "Structure-aware extraction" cho luồng đầy đủ.

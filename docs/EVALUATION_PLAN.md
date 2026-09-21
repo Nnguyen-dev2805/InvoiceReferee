@@ -36,6 +36,43 @@ Ghi tối thiểu:
 - có dùng deterministic fallback hay không;
 - timestamp.
 
+### Document-path evaluation (Sprint 1)
+
+Đường OCR và structure-aware có bộ đo riêng, **không** trộn vào Core/Escalation ở trên — evidence trích xuất không được làm phồng suite nghiệp vụ.
+
+**`verify.ocr_harness` — 15 tài liệu ghi sẵn (OCR01–OCR15), không suy luận model:**
+
+| Metric | Giá trị đo được |
+|---|---|
+| field exact match | 100.0% |
+| action accuracy (qua production `review()`) | 100.0% |
+| false auto-confirms | 0 |
+| provenance coverage | 100.0% |
+
+**`verify.structure_harness` — 20 fixture ghi sẵn trên 10 family bố cục (ST01–ST20):**
+
+| Metric | Giá trị đo được |
+|---|---|
+| section accuracy | 100.0% |
+| row-role precision / recall | 100.0% / 100.0% |
+| line-item precision / recall | 100.0% / 100.0% |
+| field recall / precision | 100.0% / 100.0% |
+| binding accuracy | 100.0% |
+| normalized exact match | 100.0% |
+| provenance coverage | 100.0% |
+| conflict accuracy | 100.0% |
+| semantic fallback rate | 0.0% |
+| human review rate | 0.0% |
+| false auto-confirms | 0 |
+
+**Giới hạn đã biết của bộ đo này** (không được đọc như đảm bảo độ chính xác tổng quát):
+
+- family set dùng `TOTAL_INSIDE_TABLE` thay vì một family "total ngoài bảng" riêng;
+- line-item metric so **số lượng**, không so định danh/nội dung từng item;
+- row-role và field precision chỉ chấm trên các mục mà manifest **gán nhãn**, nên một row đúng nhưng không gán nhãn không bị phạt — nhưng cũng không được tính là bằng chứng;
+- `--live-file` là chẩn đoán thủ công, so ảnh thật với một case **tổng hợp** (ST01 mô phỏng theo `a.jpg`, không phải bản ghi byte-faithful của ảnh);
+- 20 fixture là 10 family × 2 variant; variant thứ hai khác variant thứ nhất ở giá trị tiền, không ở bố cục.
+
 ### LLM/Decision Guard evaluation
 
 LLM là một phần của normal review path nên phải được đánh giá riêng, nhưng output của LLM không được dùng làm ground truth cho phép tính hoặc business facts.

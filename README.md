@@ -156,7 +156,7 @@ HumanStop / HumanOverride
 
 ## Run & Verify
 
-> Các lệnh dưới đây đã được chạy end-to-end trên môi trường sạch (Python 3.12): `pytest` xanh và cả ba Verify suite pass.
+> Các lệnh dưới đây đã được chạy end-to-end trên môi trường sạch (Python 3.12): `pytest` xanh (509 passed, 0 failed) và cả ba bộ harness đều exit 0 — business Verify (core/escalation/all), `verify.ocr_harness` và `verify.structure_harness`.
 
 ### Requirements
 
@@ -293,6 +293,20 @@ python -m verify.ocr_harness
 RUN_OCR_RUNTIME=1 python -m verify.ocr_harness --live-ocr
 ```
 
+**Đánh giá structure-aware (20 fixture / 10 layout family):**
+
+```bash
+# Bộ recorded, không suy luận model:
+python -m verify.structure_harness
+# Chẩn đoán trên một file thật (cần OCR provider); không lưu bytes hay response:
+python -m verify.structure_harness --live-file a.jpg --expected-case ST01
+```
+
+`--live-file` là **chẩn đoán thủ công**: nó so một file thật với một case
+**tổng hợp** trong manifest (ST01 được mô phỏng theo `a.jpg`, không phải bản ghi
+byte-faithful của ảnh), nên `field recall` ở đó không phải độ chính xác của
+extractor trên ảnh thật.
+
 Trong UI, chọn nguồn **Invoice Document**, upload file, dán JSON PO/GR/payment,
 bấm *Process invoice*, xác nhận các field, rồi *Confirm extraction & Review*.
 
@@ -315,15 +329,18 @@ box và confidence thật (threshold tin cậy hoạt động đúng). Nếu res
 
 ## Current state
 
-Sprint 1 đã chạy end-to-end (JSON review + OCR document path). Trạng thái đã kiểm chứng:
+Sprint 1 đã chạy end-to-end (JSON review + OCR document path). Trạng thái đã kiểm chứng (chạy mới ở revision hiện tại):
 
-- `pytest` — **338 passed, 2 skipped** (2 skip là smoke OCR runtime, bật bằng `RUN_OCR_RUNTIME=1`).
+- `pytest` — **509 passed, 2 skipped, 0 failed** (2 skip là smoke OCR runtime, bật bằng `RUN_OCR_RUNTIME=1`).
 - `python -m verify.harness --suite core` → **4/4** (TC01 AUTO_PROCESS, TC07 REQUEST_INFO, TC13/TC14 ESCALATE).
 - `python -m verify.harness --suite escalation` → **5/5** (3 routine AUTO_PROCESS, TC07 REQUEST_INFO, TC13 ESCALATE).
 - `python -m verify.harness --suite all` → **9/9** (judge path một thao tác).
 - `python -m verify.ocr_harness` (recorded) → **15/15 tài liệu**: field exact-match 100%, action accuracy 100%, **false auto-confirm = 0**, provenance coverage 100%.
+- `python -m verify.structure_harness` (recorded) → **20 tài liệu / 10 layout family**: section accuracy 100%, field recall 100%, normalized exact match 100%, binding accuracy 100%, **false auto-confirm = 0**.
 - OCR e2e (7 kịch bản): OCR01 AUTO_PROCESS, OCR06 REQUEST_INFO (amount unknown), OCR07 AUTO_PROCESS (sửa PO), OCR08 REQUEST_INFO (quá số lượng), OCR09 ESCALATE (beyond authority), OCR10 REQUEST_INFO (sai PO), engine lỗi → `ExtractionError` (không phải quyết định).
-- Streamlit UI: sample + paste/upload JSON + **Invoice Document** qua đúng `review()`, hiển thị checks/decision/audit, Stop/Override, nút Run Full Verify (kiểm bằng Streamlit `AppTest`).
+- Streamlit UI: sample + paste/upload JSON + **Invoice Document** qua đúng `review()`, hiển thị checks/decision/audit, Stop/Override, nút Run Full Verify (kiểm bằng Streamlit `AppTest`). Sau Override, UI hiển thị **effective decision** bên cạnh quyết định gốc được giữ trong audit.
+
+Giới hạn đã biết của bộ đo structure (không đọc như đảm bảo độ chính xác tổng quát) được ghi ở `docs/EVALUATION_PLAN.md` § "Document-path evaluation".
 
 LLM Agent mặc định chạy **deterministic fallback** khi chưa cấu hình provider; Decision Guard luôn quyết định action cuối, nên decision là policy-correct dù có hay không có LLM. LLM mapper cho OCR **tắt mặc định** và luôn cần người xác nhận khi bật.
 

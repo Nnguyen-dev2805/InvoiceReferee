@@ -68,23 +68,39 @@ Kiến trúc Sprint 1 ưu tiên:
                   └────────────────────┘
 ```
 
-## 3. Suggested repository structure
+## 3. Repository structure as built
 
 ```text
 InvoiceReferee/
 ├── app/
-│   └── streamlit_app.py
+│   ├── streamlit_app.py            # UI + input; calls review() only
+│   ├── presentation.py             # sample/JSON input helpers, VND formatting
+│   └── extraction_presentation.py  # extraction review rows and alternatives
 ├── src/
 │   └── invoice_referee/
 │       ├── domain/
-│       │   └── models.py
+│       │   └── models.py           # contracts only; no orchestration
 │       ├── ingestion/
-│       │   ├── json_adapter.py
-│       │   └── normalization.py
+│       │   ├── json_adapter.py         # structured JSON -> ExtractedDocument
+│       │   ├── normalization.py        # raw -> canonical domain objects
+│       │   ├── file_validation.py      # magic bytes, size, page, encryption gates
+│       │   ├── document_router.py      # mime -> pdf/image renderer
+│       │   ├── pdf_renderer.py         # pymupdf rasterisation (lazy import)
+│       │   ├── image_preprocessing.py  # EXIF/skew/colour normalisation (lazy)
+│       │   ├── ocr.py                  # OCREngine protocol + adapters
+│       │   ├── ocr_config.py           # engine selection from env
+│       │   ├── document_structure.py   # sections, row roles, neighbours
+│       │   ├── invoice_fields.py       # deterministic candidate extraction
+│       │   ├── candidate_resolver.py   # explicit agreement/conflict resolution
+│       │   ├── extraction_validation.py# status cascade + arithmetic warnings
+│       │   ├── identity_resolution.py  # exact PO vendor/SKU mapping only
+│       │   ├── llm_mapper.py           # optional, grounded, off by default
+│       │   └── pipeline.py             # human confirmation -> canonical evidence
 │       ├── transaction/
 │       │   └── builder.py
 │       ├── checks/
 │       │   ├── engine.py
+│       │   ├── _support.py
 │       │   ├── vendor.py
 │       │   ├── item.py
 │       │   ├── quantity.py
@@ -98,6 +114,8 @@ InvoiceReferee/
 │       │   └── engine.py
 │       ├── agent/
 │       │   ├── llm_client.py
+│       │   ├── openai_client.py
+│       │   ├── config.py
 │       │   ├── prompts.py
 │       │   └── service.py
 │       ├── decision/
@@ -106,20 +124,18 @@ InvoiceReferee/
 │       ├── audit/
 │       │   └── store.py
 │       └── services/
-│           └── reviewer.py
+│           ├── reviewer.py          # the production review() path
+│           └── extractor.py         # OCR extraction orchestration only
 ├── verify/
-│   └── harness.py
+│   ├── harness.py                   # business Verify suites (core/escalation/all)
+│   ├── manifest.py                  # business expected labels
+│   ├── ocr_harness.py               # recorded-response OCR metrics
+│   └── structure_harness.py         # structure-generalization metrics
 ├── tests/
-│   ├── fixtures/
-│   ├── test_builder.py
-│   ├── test_checks.py
-│   ├── test_decision.py
-│   ├── test_audit.py
-│   └── test_verify.py
-├── docs/
-│   ├── BUILD_LOG.md
-│   └── Challenge_Brief_OrganizationAI_VN.docx.md
-└── README.md
+│   ├── fixtures/                    # TC01-TC17 business cases
+│   ├── fixtures_ocr/                # recorded OCR responses + manifest
+│   └── fixtures_structure/          # recorded block sets + structure manifest
+└── docs/
 ```
 
 ## 4. Module responsibilities
@@ -158,6 +174,33 @@ Contract trung gian này là `ExtractedDocument` trong `DATA_MODEL.md`. Vì vậ
 Nếu một field không đọc được hoặc extraction không chắc chắn, adapter phải giữ `null`/warning và source reference thay vì tự đoán. Critical parse warning phải còn nhìn thấy ở downstream để transaction không bị `AUTO_PROCESS` chỉ vì OCR/parse đã điền một giá trị thiếu căn cứ.
 
 Sprint 1 implementation bắt buộc hỗ trợ structured JSON end-to-end. XML/PDF/OCR là adapter mở rộng sau khi core ổn; chúng không được làm thay đổi schema downstream hay business checks.
+
+### Structure-aware extraction (document path)
+
+Đường OCR của Sprint 1 gồm hai tầng tách biệt rõ ràng:
+
+**`document_structure.py` — phân tích bố cục, không đọc giá trị.** Nhận `OCRDocument` và trả `DocumentStructure`: `section_by_block_id` (HEADER/SELLER/BUYER/ITEM_TABLE/SUMMARY/SIGNATURE/FOOTER), `row_role_by_key` (COLUMN_HEADER/DATA/SUBTOTAL/TAX/DISCOUNT/SHIPPING/GRAND_TOTAL/…), `blocks_by_table_row` và hai map láng giềng `right_neighbor_by_block_id` / `below_neighbor_by_block_id`. Module này **không** chuẩn hoá hay diễn giải giá trị; nó chỉ trả lời "ý nghĩa nằm ở đâu". Chỉ dùng `re`, `unicodedata` và standard library.
+
+**`invoice_fields.py` — trích xuất candidate, deterministic.** Sinh `FieldCandidate` từ nhiều nguồn, theo thứ tự ưu tiên cố định:
+
+| Nguồn | Method | Ghi chú |
+|---|---|---|
+| `label: value` một block | `EXACT_KEY_VALUE` | Tách theo `:`/`：`, so khớp nhãn |
+| Theo section (SELLER tax, HEADER/SIGNATURE date) | `SECTION_AWARE` | Loại nhiễu buyer/seller trùng nhãn |
+| Nhãn gắn giá trị qua láng giềng phải, rồi dưới | `EXACT_SPATIAL` | Cả hai block ID vào provenance |
+| Nhãn mờ (fuzzy ≥ 0.82) | `FUZZY_SPATIAL` | Luôn `NEEDS_CONFIRMATION` |
+| Bảng: dòng DATA → line item, dòng summary → tiền header | `TABLE_ITEM` / `TABLE_SUMMARY` | |
+| Giải mã ngữ nghĩa có căn cứ | `LLM_ASSISTED` | Mặc định TẮT; luôn cần người xác nhận |
+
+**Hai loại điểm số tách biệt, không bao giờ gộp:** `provider_confidence` là độ tin của OCR vào văn bản; `mapping_score` là độ khớp nhãn–khái niệm. Resolver sắp xếp theo **độ ưu tiên method**, không theo điểm số.
+
+**`candidate_resolver.py` — hợp nhất và xung đột tường minh.** Candidate cùng giá trị được gộp provenance; khác giá trị → `CONFLICTING` + warning, **không ghi đè im lặng**. `HUMAN` luôn có độ ưu tiên cao nhất.
+
+**`extraction_validation.py` — thác trạng thái fail-closed.** `MISSING` → `INVALID` → `CONFLICTING` → `NEEDS_CONFIRMATION` (method rủi ro, hoặc confidence dưới 0.90 critical / 0.80 non-critical, hoặc `None`) → `EXTRACTED`. Không sửa giá trị, chỉ gắn cảnh báo.
+
+**`pipeline.py` — cổng xác nhận của con người.** `apply_field_reviews` chỉ nâng lên `REVIEWED` khi **mọi** trường critical là `CONFIRMED`/`CORRECTED`; một trường critical vắng mặt hoàn toàn cũng là chưa giải quyết. Sửa đổi của người giữ nguyên `original_normalized_value`, `reviewed_by`, `reviewed_at`, `review_reason`. `MARK_UNKNOWN` đặt `None`, không bao giờ `0`/`""`.
+
+`extraction_metadata.field_provenance` mang method, page, block IDs và status của từng trường vào evidence cuối. Trường có giá trị mà không có `evidence_block_ids` bị coi là không đáng tin — ngoại lệ hợp lệ duy nhất là ánh xạ cấu trúc từ PO master (`PO_VENDOR_MASTER`, `PO_SKU_MAP`) và sửa đổi của người.
 
 ### Transaction Builder
 

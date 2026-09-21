@@ -10,26 +10,39 @@ Challenge: OrganizationAI — Challenge A, Escalation Referee.
 
 ## Current phase
 
-Sprint 1 MVP implemented end-to-end (Tasks 1–9 of the implementation plan).
+Sprint 1 implemented end-to-end: business review path (Tasks 1–9 of the
+implementation plan) plus the accepted structure-aware document path
+(Tasks 1–10 of the structure-aware plan).
 
-Verified state:
+Verified state (fresh run, this revision):
 
-- `pytest` — 181 passed (domain, ingestion, checks, policy/decision, agent, audit,
-  reviewer integration, verify harness, UI presentation, Streamlit app smoke).
+- `pytest` — **509 passed, 2 skipped, 0 failed**. The 2 skips are the OCR
+  runtime gate, which needs `RUN_OCR_RUNTIME=1` and the `ocr` extra.
 - `python -m verify.harness --suite core` → 4/4; `--suite escalation` → 5/5;
   `--suite all` → 9/9, all through the production `review()` path.
+- `python -m verify.ocr_harness` → 15 documents, field exact match 100%,
+  action accuracy 100%, 0 false auto-confirms, provenance coverage 100%.
+- `python -m verify.structure_harness` → 20 documents across 10 layout
+  families, section accuracy 100%, field recall 100%, normalized exact match
+  100%, binding accuracy 100%, 0 false auto-confirms.
 - Streamlit UI runs sample + paste/upload JSON, shows checks/decision/audit, and
-  exposes Stop/Override plus a one-click Run Full Verify.
+  exposes Stop/Override plus a one-click Run Full Verify. After an Override the
+  effective decision is shown alongside the preserved original.
 
-Completed planning artifacts (unchanged sources of truth):
+Document path (accepted Sprint 1 ingestion): file validation → render →
+preprocess → OCR behind an `OCREngine` protocol → structure analysis →
+deterministic candidate extraction → explicit conflict resolution → validation →
+mandatory human confirmation → canonical evidence → the same `review()` path.
+The OCR extra is optional and lazy-imported; the core JSON review runs without it.
 
-- challenge summary; product specification; synthetic Policy v0; data-model
-  contracts; decision flow; 17-case evaluation set; evaluation plan; architecture
-  and implementation plan.
+Implemented modules: `domain/`, `ingestion/` (JSON adapter, normalization, and the
+OCR/structure path), `transaction/`, `checks/` (8 checks), `policy/`, `agent/`
+(LLM boundary + fallback), `decision/` (guard + fallback questions), `audit/`,
+`services/reviewer.py`, `services/extractor.py`, `verify/` (business, OCR and
+structure harnesses), `app/`.
 
-Implemented modules: `domain/`, `ingestion/`, `transaction/`, `checks/` (8 checks),
-`policy/`, `agent/` (LLM boundary + fallback), `decision/` (guard + fallback
-questions), `audit/`, `services/reviewer.py`, `verify/harness.py`, `app/`.
+Known limitations are recorded in `EVALUATION_PLAN.md` § "Document-path
+evaluation" rather than being presented as resolved.
 
 ## AI tools used
 

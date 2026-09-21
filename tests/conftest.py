@@ -1,11 +1,63 @@
 """Shared test factories."""
 
 import copy
+import json
+from pathlib import Path
 
 import pytest
 
+from invoice_referee.domain import models as m
 from invoice_referee.transaction.builder import build_transaction
 from invoice_referee.checks import engine
+
+_FIXTURES_STRUCTURE = Path(__file__).parent / "fixtures_structure"
+
+
+def _load_a_jpg_document():
+    """Load the recorded provider-neutral block set captured from ``a.jpg``."""
+    with open(_FIXTURES_STRUCTURE / "a_jpg_blocks.json", encoding="utf-8") as fh:
+        raw = json.load(fh)
+    page = raw["pages"][0]
+    width = page["dimensions"]["width"]
+    height = page["dimensions"]["height"]
+    blocks = []
+    for b in page["blocks"]:
+        poly = b.get("poly")
+        if poly:
+            xs = [p[0] for p in poly]
+            ys = [p[1] for p in poly]
+            box = m.BoundingBox(
+                x1=min(xs) / width, y1=min(ys) / height,
+                x2=max(xs) / width, y2=max(ys) / height,
+            )
+        else:
+            box = m.BoundingBox(0.0, 0.0, 1.0, 1.0)
+        blocks.append(m.OCRBlock(
+            block_id=b["block_id"],
+            page_number=b.get("page_number", page["page_number"]),
+            text=b["text"],
+            confidence=float(b.get("confidence", 0.0)),
+            bounding_box=box,
+            block_type=b["block_type"],
+            row_index=b.get("row_index"),
+            column_index=b.get("column_index"),
+            table_index=b.get("table_index"),
+        ))
+    return m.OCRDocument(
+        document_id=raw["document_id"],
+        pages=[],
+        blocks=blocks,
+        full_text=" ".join(b.text for b in blocks if b.text),
+        engine=raw.get("engine", "mistral"),
+        engine_version=raw.get("engine_version", "ocr-4-1"),
+        processing_ms=0,
+    )
+
+
+@pytest.fixture
+def a_jpg_ocr_document():
+    """The recorded ``a.jpg`` block set as an ``OCRDocument``."""
+    return _load_a_jpg_document()
 
 _ROUTINE = {
     "transaction_id": "TX-01",

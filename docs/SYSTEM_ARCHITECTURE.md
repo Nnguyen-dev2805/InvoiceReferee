@@ -3,7 +3,7 @@
 > Tài liệu này mô tả **hệ thống đã được triển khai** trong Sprint 1, bám theo mã
 > nguồn thực tế trong `src/invoice_referee/`, `verify/` và `app/`. Nó bổ sung cho
 > `docs/ARCHITECTURE.md` (ranh giới module cấp thiết kế) bằng chi tiết luồng chạy,
-> chữ ký hàm, và các quyết định thực thi. Trạng thái xác minh: `pytest` 191 passed,
+> chữ ký hàm, và các quyết định thực thi. Trạng thái xác minh: `pytest` 509 passed,
 > Verify `all` 9/9.
 
 ---
@@ -55,7 +55,7 @@ Nguyên tắc trung tâm:
                                             │  AUDIT  audit/store.py     │
                                             │  append-only + Stop/Override│
                                             └────────────────────────────┘
-                        DOMAIN  domain/models.py  (16 contracts dùng chung mọi tầng)
+                        DOMAIN  domain/models.py  (business + document-path contracts)
 ```
 
 **Quy tắc phụ thuộc:** mỗi tầng chỉ phụ thuộc schema đầu vào/đầu ra trong
@@ -68,7 +68,7 @@ import bất kỳ module nghiệp vụ nào (chỉ chứa contract).
 
 | Module | Trách nhiệm | Entry point |
 | --- | --- | --- |
-| `domain/models.py` | 16 dataclass contract + enum; validate integer VND, tri-state scope | — |
+| `domain/models.py` | 16 business dataclass + document-path contracts + enum; validate integer VND, tri-state scope | — |
 | `ingestion/json_adapter.py` | Raw dict → `ExtractedDocument` (giữ `source_ref`, `parse_warnings`) | `extract_document()` |
 | `ingestion/normalization.py` | Chuẩn hoá money/date/id; unknown giữ `None` | `normalize_money/date/id`, `to_*()` |
 | `transaction/builder.py` | Gom evidence → `Transaction`; phân loại type tri-state | `build_transaction(evidence)` |
@@ -253,7 +253,12 @@ Human controls (thêm sau, không xoá lịch sử cũ): `STOPPED`, `OVERRIDDEN`
 
 ---
 
-## 9. Contract dữ liệu (16 dataclass trong `domain/models.py`)
+## 9. Contract dữ liệu (`domain/models.py`)
+
+16 business dataclass (xem `DATA_MODEL.md` §21.1) cộng với các contract của đường
+tài liệu (xem `DATA_MODEL.md` §21.2): line-item types, `UploadedDocument`,
+`DocumentPage`, `BoundingBox`, `OCRBlock`, `OCRDocument`, `DocumentStructure`,
+`FieldCandidate`, `InvoiceExtractionResult`.
 
 ```text
 ExtractedDocument                     ← ranh giới extraction
@@ -299,9 +304,12 @@ Kết quả hiện tại: **core 4/4 · escalation 5/5 · all 9/9**.
 
 | Hạng mục | Cách kiểm | Trạng thái |
 | --- | --- | --- |
-| Unit + integration + smoke | `pytest -q` | **191 passed** |
+| Unit + integration + smoke | `pytest -q` | **509 passed, 2 skipped** |
 | 17 documented cases | `verify/harness` parametrized | khớp manifest |
 | Core / Escalation / All | CLI + `tests/test_verify.py` | 4/4 · 5/5 · 9/9 |
+| OCR extraction (recorded) | `verify.ocr_harness` | 15 docs, action accuracy 100%, false auto-confirm 0 |
+| Structure-aware (recorded) | `verify.structure_harness` | 20 docs / 10 families, field recall 100%, exact match 100%, false auto-confirm 0 |
+| `a.jpg` end-to-end | `tests/test_a_jpg_structure_regression.py` | 2 items, total/date/tax đúng, provenance đủ |
 | Unseen input (không sửa code) | mutation 42M→AUTO, 75M→ESCALATE | pass |
 | LLM proposal không an toàn | `UnsafeClient` luôn AUTO_PROCESS | Guard vẫn ESCALATE/REQUEST_INFO |
 | Provider lỗi/timeout/JSON hỏng | fake clients | fallback + policy-correct |

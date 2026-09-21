@@ -161,6 +161,19 @@ REQUEST_INFO
 
 Không được chạy tiếp và giả định một giá trị.
 
+### Conflicting / broken evidence linkage
+
+Sau các kiểm tra hiện diện ở trên và **trước** khi xét tới các mismatch check thông thường, hệ thống xét `transaction.evidence_issues` — các vấn đề liên kết cấu trúc được phát hiện lúc build transaction:
+
+```text
+PO không ở trạng thái APPROVED          → REQUEST_INFO (P14)
+Invoice trỏ tới PO khác                 → REQUEST_INFO (P14)
+Goods Receipt trỏ tới PO khác           → REQUEST_INFO (P14)
+Goods Receipt không ở trạng thái RECEIVED → REQUEST_INFO (P14)
+```
+
+Nhánh này chạy **trước** bước quét unresolved checks, nên một vấn đề liên kết (ví dụ PO sai trạng thái) được nêu ra thay vì bị che bởi một mismatch check phía sau. Hiện tại `resolve_action` chỉ nêu issue **đầu tiên** trong danh sách; các issue còn lại vẫn nằm trong `transaction.evidence_issues` nhưng chưa được đưa vào `policy_rule_ids`.
+
 ---
 
 ## 7. Step 5 — Chạy deterministic checks
