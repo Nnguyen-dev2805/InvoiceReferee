@@ -14,6 +14,7 @@ import pymupdf  # noqa: E402
 from invoice_referee.domain import models as m  # noqa: E402
 from invoice_referee.services.extractor import extract_invoice, ExtractionError  # noqa: E402
 from invoice_referee.ingestion.file_validation import DocumentInputError  # noqa: E402
+from invoice_referee.agent.llm_client import LLMClient  # noqa: E402
 
 
 def _pdf_bytes(text: str = "Invoice") -> bytes:
@@ -120,3 +121,46 @@ def test_engine_failure_raises_extraction_error_not_business_decision():
             engine=FailingEngine(),
             actor="judge@demo",
         )
+
+
+class CountingLLMClient(LLMClient):
+    def __init__(self):
+        self.calls = 0
+
+    def complete(self, prompt: str) -> str:
+        self.calls += 1
+        return '{"mappings":[]}'
+
+
+def test_llm_mapping_flag_off_never_calls_the_client():
+    """enable_llm_mapping=False must make no semantic client call."""
+    client = CountingLLMClient()
+    result, _ = extract_invoice(
+        transaction_id="TX-001",
+        filename="invoice.pdf",
+        claimed_mime="application/pdf",
+        content=_pdf_bytes(),
+        po=_po(),
+        engine=FakeEngine(),
+        actor="judge@demo",
+        llm_client=client,
+        enable_llm_mapping=False,
+    )
+    assert client.calls == 0
+
+
+def test_llm_mapping_flag_on_and_even_with_empty_client_is_harmless():
+    """enable_llm_mapping with a client never throws; unresolved fields stay None."""
+    result, _ = extract_invoice(
+        transaction_id="TX-001",
+        filename="invoice.pdf",
+        claimed_mime="application/pdf",
+        content=_pdf_bytes(),
+        po=_po(),
+        engine=FakeEngine(),
+        actor="judge@demo",
+        llm_client=CountingLLMClient(),
+        enable_llm_mapping=True,
+    )
+    # total_amount is deterministically resolved; the mapping ran but added nothing.
+    assert result.fields["total_amount"].normalized_value == 30_000_000
