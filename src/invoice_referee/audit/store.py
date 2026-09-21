@@ -101,11 +101,15 @@ class AuditStore:
         *,
         actor: str = "InvoiceReferee",
         reason: Optional[str] = None,
+        alternatives: Optional[list[m.FieldCandidate]] = None,
     ) -> m.AuditEvent:
         """Record a field extraction/flag/confirm/correct event with provenance.
 
-        Raw document bytes are never included; only block IDs and field values.
+        Raw document bytes are never included; only block IDs, field values, and
+        method/scores. ``alternatives`` captures the non-selected candidates for
+        a conflict- or audit-aware record.
         """
+        alternatives = list(alternatives or [])
         return self.append(
             event_type,
             actor=actor,
@@ -118,7 +122,13 @@ class AuditStore:
                 "normalized_value": candidate.normalized_value,
                 "original_normalized_value": candidate.original_normalized_value,
                 "page_number": candidate.page_number,
-                "extraction_method": candidate.extraction_method,
+                "selected_method": candidate.extraction_method,
+                "provider_confidence": candidate.provider_confidence,
+                "mapping_score": candidate.mapping_score,
+                "section_role": candidate.section_role,
+                "evidence_block_ids": list(candidate.evidence_block_ids),
+                "alternative_count": len(alternatives),
+                "conflict": candidate.status is m.FieldStatus.CONFLICTING,
             },
         )
 

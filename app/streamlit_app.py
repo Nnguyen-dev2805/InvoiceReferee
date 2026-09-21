@@ -62,6 +62,12 @@ _MIME_BY_SUFFIX = {
     "jpeg": "image/jpeg",
 }
 
+
+def _stringify_rows(rows: list[dict]) -> list[dict]:
+    """Coerce every scalar cell to a string so Streamlit/pyarrow can render a
+    mixed-type (int money + str id) extraction in one dataframe column."""
+    return [{k: ("" if v is None else str(v)) for k, v in row.items()} for row in rows]
+
 st.set_page_config(page_title="InvoiceReferee", page_icon="🧾", layout="wide")
 
 _DECISION_STYLE = {
@@ -135,41 +141,69 @@ def _extract_document(uploaded, po_json: str, actor: str) -> None:
     st.session_state.pop("result", None)
 
 
+def _render_field_control(key: str, label: str, candidate: m.FieldCandidate,
+                          form_values: dict[str, dict]) -> None:
+    """Render the confirm/correct/mark-unknown control for one header or line field."""
+    c1, c2 = st.columns([1, 2])
+    action = c1.selectbox(label + " · " + (candidate.extraction_method or "—"),
+                          ["CONFIRM", "CORRECT", "MARK_UNKNOWN"],
+                          key=f"act_{key}")
+    value = c2.text_input(
+        f"{label} value (for Correct)",
+        value="" if candidate.normalized_value is None else str(candidate.normalized_value),
+        key=f"val_{key}",
+    )
+    reason = c2.text_input(f"{label} reason", key=f"rsn_{key}")
+    form_values[key] = {"action": action, "value": value, "reason": reason}
+
+
 def _render_extraction_review() -> None:
-    """Confirm/correct/mark-unknown extracted fields, then run business review."""
+    """Confirm/correct/mark-unknown extracted fields, then run business review.
+
+    Only proceeds to business review once ``apply_field_reviews`` reports the
+    extraction as ``REVIEWED`` (all critical header and line-item fields resolved).
+    While ``NEEDS_REVIEW`` the UI stays on extraction confirmation.
+    """
     from invoice_referee.ingestion.pipeline import (
         apply_field_reviews,
         reviewed_invoice_to_evidence,
-        FieldReview,
     )
 
     result: m.InvoiceExtractionResult = st.session_state["extraction_result"]
     st.subheader("Extracted fields — confirm before review")
     st.caption(
-        "Every critical field must be Confirmed, Corrected, or Marked unknown. "
-        "OCR extracts candidate facts only; the decision still comes from the "
-        "deterministic policy pipeline."
+        "Every critical field (header and line item) must be Confirmed, Corrected, "
+        "or Marked unknown. OCR extracts candidate facts only; the decision still "
+        "comes from the deterministic policy pipeline."
     )
-    st.dataframe(ep.field_rows(result), use_container_width=True, hide_index=True)
+    st.dataframe(_stringify_rows(ep.field_rows(result)), use_container_width=True, hide_index=True)
     if result.line_items:
-        st.dataframe(ep.line_item_rows(result), use_container_width=True, hide_index=True)
+        st.dataframe(_stringify_rows(ep.line_item_rows(result)), use_container_width=True, hide_index=True)
+
+    # Alternatives / conflicts expander for human review.
+    with st.expander("Conflicts and alternatives"):
+        for name in result.fields:
+            alts = ep.alternatives_for(result, name)
+            cand = result.fields[name]
+            header = f"{name} — {cand.status.value}"
+            if cand.status is m.FieldStatus.CONFLICTING:
+                header += " ⚠️ conflicting"
+            st.markdown(f"**{header}**")
+            if alts:
+                st.dataframe(_stringify_rows(alts), use_container_width=True, hide_index=True)
+            else:
+                st.caption("No alternative candidates.")
 
     with st.form("field_reviews"):
         form_values: dict[str, dict] = {}
+        st.markdown("**Header fields**")
         for name, candidate in result.fields.items():
-            c1, c2 = st.columns([1, 2])
-            action = c1.selectbox(
-                name,
-                ["CONFIRM", "CORRECT", "MARK_UNKNOWN"],
-                key=f"act_{name}",
-            )
-            value = c2.text_input(
-                f"{name} value (for Correct)",
-                value="" if candidate.normalized_value is None else str(candidate.normalized_value),
-                key=f"val_{name}",
-            )
-            reason = c2.text_input(f"{name} reason", key=f"rsn_{name}")
-            form_values[name] = {"action": action, "value": value, "reason": reason}
+            _render_field_control(name, name, candidate, form_values)
+        for index, line in enumerate(result.line_items):
+            st.markdown(f"**Line item #{index + 1}**")
+            for cell_name, candidate in line.items():
+                key = f"line_items[{index}].{cell_name}"
+                _render_field_control(key, key, candidate, form_values)
         submitted = st.form_submit_button("Confirm extraction & Review", type="primary")
 
     if submitted:
@@ -181,6 +215,12 @@ def _render_extraction_review() -> None:
             return
         audit: AuditStore = st.session_state["extraction_audit"]
         audit.record_extraction_reviewed(reviewed, actor="judge@demo")
+        if reviewed.status is not m.ExtractionStatus.REVIEWED:
+            st.error("Extraction is not fully reviewed yet. Confirm or mark "
+                     "every critical header and line-item field before continuing.")
+            st.session_state["extraction_result"] = reviewed
+            st.rerun()
+            return
         evidence = reviewed_invoice_to_evidence(reviewed, st.session_state["extraction_base_evidence"])
         _run_review(evidence, audit=audit)
         st.session_state.pop("extraction_result", None)

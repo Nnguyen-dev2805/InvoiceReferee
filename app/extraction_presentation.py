@@ -15,14 +15,20 @@ from invoice_referee.ingestion.pipeline import FieldReview
 
 
 def field_rows(result: m.InvoiceExtractionResult) -> list[dict]:
+    """Build header-field display rows with method, scores, section, and conflict info."""
     return [
         {
             "field": name,
             "value": candidate.normalized_value,
             "confidence": candidate.confidence,
+            "ocr_confidence": candidate.provider_confidence,
+            "mapping_score": candidate.mapping_score,
+            "section": candidate.section_role,
+            "method": candidate.extraction_method,
+            "alternatives": len(alternatives_for(result, name)),
+            "evidence": list(candidate.evidence_block_ids),
             "status": candidate.status.value,
             "page": candidate.page_number,
-            "method": candidate.extraction_method,
             "warnings": "; ".join(candidate.warnings),
         }
         for name, candidate in result.fields.items()
@@ -34,6 +40,34 @@ def line_item_rows(result: m.InvoiceExtractionResult) -> list[dict]:
         {name: candidate.normalized_value for name, candidate in line.items()}
         for line in result.line_items
     ]
+
+
+def alternatives_for(result: m.InvoiceExtractionResult, field_name: str) -> list[dict]:
+    """Return alternatives (non-selected candidates) for a field, for audit/review.
+
+    Each dict contains method, raw value, normalized value, and evidence block IDs.
+    The currently selected candidate is excluded.
+    """
+    candidates = result.field_candidates.get(field_name, [])
+    if not candidates:
+        return []
+    selected = result.fields.get(field_name)
+    selected_id = id(selected)
+    return [
+        {
+            "method": c.extraction_method,
+            "raw_value": c.raw_text,
+            "value": c.normalized_value,
+            "evidence": list(c.evidence_block_ids),
+        }
+        for c in candidates
+        if id(c) != selected_id and c.normalized_value is not None
+    ]
+
+
+def review_is_ready(result: m.InvoiceExtractionResult) -> bool:
+    """Whether extraction has been fully reviewed and may proceed to business review."""
+    return result.status is m.ExtractionStatus.REVIEWED
 
 
 def draw_candidate_overlay(page: m.DocumentPage, candidate: m.FieldCandidate) -> bytes:
