@@ -45,8 +45,24 @@ def test_date_iso_passthrough():
     assert norm.normalize_date("2026-09-13") == "2026-09-13"
 
 
-def test_date_invalid_stays_none():
-    assert norm.normalize_date("13/09/2026") is None
+def test_date_day_first_slash_is_normalized_to_iso():
+    # Vietnamese invoices are day-first: 13/09/2026 -> 2026-09-13.
+    assert norm.normalize_date("13/09/2026") == "2026-09-13"
+
+
+def test_date_day_first_dash_and_dot_normalized():
+    assert norm.normalize_date("13-09-2026") == "2026-09-13"
+    assert norm.normalize_date("13.09.2026") == "2026-09-13"
+
+
+def test_date_impossible_stays_none():
+    # Month 13 / day 32 are impossible in any supported format -> None.
+    assert norm.normalize_date("13/13/2026") is None
+    assert norm.normalize_date("32/01/2026") is None
+
+
+def test_date_unparseable_text_stays_none():
+    assert norm.normalize_date("khoảng tháng 9") is None
 
 
 def test_date_none_stays_none():
@@ -260,9 +276,17 @@ def test_missing_payment_amount_stays_unknown():
     assert rec.paid_amount is None
 
 
-def test_invalid_invoice_date_stays_unknown_and_flags_invoice():
+def test_day_first_invoice_date_is_normalized_not_flagged():
     raw = _invoice_raw()
-    raw["invoice_date"] = "13/09/2026"
+    raw["invoice_date"] = "13/09/2026"  # VN day-first
+    invoice = norm.to_supplier_invoice(raw)
+    assert invoice.invoice_date == "2026-09-13"
+    assert invoice.flagged is False
+
+
+def test_impossible_invoice_date_stays_unknown_and_flags_invoice():
+    raw = _invoice_raw()
+    raw["invoice_date"] = "45/13/2026"  # impossible in any format
     invoice = norm.to_supplier_invoice(raw)
     assert invoice.invoice_date is None
     assert invoice.flagged is True

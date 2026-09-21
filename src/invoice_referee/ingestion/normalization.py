@@ -45,17 +45,41 @@ def normalize_money(value: Any) -> Optional[int]:
     return None
 
 
+# Accepted input date formats, tried in order. ISO is the canonical output.
+# Vietnamese invoices are day-first (dd/mm/yyyy), so day precedes month for the
+# slash/dot/dash separated forms. SYNTHETIC assumption for the prototype: a
+# day-first locale. An out-of-range day/month (e.g. 13/13) fails all formats and
+# stays None rather than being guessed.
+_DATE_INPUT_FORMATS = (
+    "%Y-%m-%d",   # 2026-09-13  (ISO, canonical)
+    "%d/%m/%Y",   # 13/09/2026  (VN invoice, most common)
+    "%d-%m-%Y",   # 13-09-2026
+    "%d.%m.%Y",   # 13.09.2026
+    "%Y/%m/%d",   # 2026/09/13
+)
+
+
 def normalize_date(value: Any) -> Optional[str]:
-    """Return an ISO ``YYYY-MM-DD`` string, or ``None`` for unknown/other formats."""
+    """Return an ISO ``YYYY-MM-DD`` string, or ``None`` if unparseable.
+
+    Accepts ISO plus common day-first invoice formats (dd/mm/yyyy, dd-mm-yyyy,
+    dd.mm.yyyy) and normalizes them to ISO. Ambiguity note: a value like
+    ``03/04/2026`` is read day-first as 3 April 2026 (Vietnamese convention);
+    an impossible date (month > 12, day > 31) returns ``None``.
+    """
     if value is None:
         return None
-    if isinstance(value, str):
-        s = value.strip()
+    if not isinstance(value, str):
+        return None
+    s = value.strip()
+    if not s:
+        return None
+    for fmt in _DATE_INPUT_FORMATS:
         try:
-            datetime.strptime(s, "%Y-%m-%d")
+            parsed = datetime.strptime(s, fmt)
         except ValueError:
-            return None
-        return s
+            continue
+        return parsed.strftime("%Y-%m-%d")
     return None
 
 

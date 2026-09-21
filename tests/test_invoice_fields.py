@@ -61,8 +61,14 @@ def test_unreadable_money_stays_none_and_flags_missing():
     assert total.evidence_block_ids == ["B1"]
 
 
-def test_invalid_date_stays_none():
+def test_day_first_date_is_normalized_to_iso():
     doc = _doc([_block("B1", "Ngày hóa đơn: 13/09/2026")])
+    result = extract_invoice_fields(doc)
+    assert result.fields["invoice_date"].normalized_value == "2026-09-13"
+
+
+def test_impossible_date_stays_none():
+    doc = _doc([_block("B1", "Ngày hóa đơn: 45/13/2026")])
     result = extract_invoice_fields(doc)
     assert result.fields["invoice_date"].normalized_value is None
 
