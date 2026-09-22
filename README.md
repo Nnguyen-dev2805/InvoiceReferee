@@ -2,112 +2,58 @@
 
 **Tác tử kế toán kiểm tra hóa đơn, biên lai và chứng từ chi phí**
 
-InvoiceReferee hỗ trợ kế toán kiểm tra hóa đơn điện tử, hóa đơn/chứng từ do nhân viên chụp và các bằng chứng thanh toán liên quan. Hệ thống trích xuất dữ liệu, chuẩn hóa về một lược đồ chung, chạy các quy tắc nghiệp vụ, áp dụng chính sách nội bộ và trả về một trong ba hành động:
+## 1. Giới thiệu đề tài
 
-```text
-AUTO_PROCESS
-REQUEST_INFO
-ESCALATE
+🌐 [Web app](https://invoicereferee.streamlit.app/) · 📹 [Video demo](https://drive.google.com/file/d/1vS4_2GfvYMu049OI-aR-kNMfMuVZCX9r/view?usp=sharing)
+
+Trong công việc thống kê và ghi nhận hóa đơn, nhân viên kế toán thường phải xử lý một lượng lớn bill và chứng từ mỗi ngày. Bên cạnh việc kiểm tra số tiền, kế toán còn phải xác nhận nhiều yếu tố khác như chứng từ có rõ ràng, đầy đủ thông tin hay không, nội dung chi tiêu có hợp lý với mục đích được khai báo hay không. Đối với các trường hợp có thêm phiếu nhập kho, biên bản giao nhận hoặc các tài liệu liên quan, kế toán còn phải đối chiếu để xác định các chứng từ có thực sự mô tả cùng một giao dịch hay không.
+
+Trong thực tế, không ít bill có chất lượng kém, bị mờ, thiếu thông tin hoặc có dữ liệu không nhất quán giữa các chứng từ. Việc kiểm tra toàn bộ hồ sơ thủ công khiến thời gian xử lý kéo dài và tạo thêm nhiều công việc lặp lại cho kế toán.
+
+**InvoiceReferee** được xây dựng như một lớp kiểm tra đầu vào, hỗ trợ kế toán trước khi hồ sơ được xử lý chính thức. Hệ thống không thay thế kế toán trong việc ra quyết định, mà thực hiện bước kiểm tra và đối chiếu ban đầu.
+
+Nhân viên chỉ cần nộp bill, mô tả mục đích chi tiêu và các tài liệu hỗ trợ nếu có. InvoiceReferee sẽ kiểm tra chất lượng chứng từ, xác định các thông tin quan trọng đã được đọc và trích xuất đầy đủ hay chưa, đồng thời đối chiếu dữ liệu giữa bill và các tài liệu liên quan.
+
+Nếu chứng từ rõ ràng, thông tin cần thiết đầy đủ và các dữ liệu đối chiếu thống nhất, hệ thống trả về **PASS**, giúp kế toán có thể tiếp tục xử lý hồ sơ nhanh hơn.
+
+Ngược lại, nếu phát hiện chứng từ bị mờ hoặc không thể đọc chắc chắn, thiếu thông tin quan trọng, thiếu tài liệu hỗ trợ hoặc dữ liệu giữa các chứng từ không khớp, hệ thống sẽ **dừng quá trình kiểm tra và trả về lý do cụ thể**. Khi đó, kế toán hoặc nhân viên có thể kiểm tra và bổ sung thông tin trước khi hồ sơ được xử lý tiếp.
+
+## Tính năng chính
+
+- **Nhân viên** nộp hồ sơ chi phí: chứng từ chính (hóa đơn/bill/biên lai) kèm mô tả mục đích chi và tài liệu bổ sung (phiếu nhập kho, biên bản giao nhận...) nếu có.
+- Hệ thống tự động **OCR** (Mistral OCR), đánh giá **chất lượng đọc** của từng chứng từ, và **đối chiếu dữ liệu** giữa chứng từ chính với tài liệu bổ sung khi có nhiều nguồn.
+- **Kế toán** xem hàng đợi hồ sơ đã xử lý (`Đã pass` / `Cần xác minh`) kèm tóm tắt, lý do cụ thể và bằng chứng gốc — ảnh/PDF xem trực tiếp trong giao diện, không cần tải file.
+- **Verify**: chạy song song một bộ case mẫu qua đúng luồng xử lý thật, dùng để kiểm thử nhanh sau mỗi lần đổi code hoặc trước khi nộp bài.
+
+## Quyết định
+
+Hệ thống trả **PASS** khi chứng từ đọc được, đầy đủ thông tin cần thiết và các nguồn đối chiếu khớp nhau; trả **NEEDS_HUMAN** kèm lý do cụ thể khi thiếu thông tin, chữ không đọc chắc chắn, hoặc dữ liệu giữa các nguồn không khớp. Đây là bản rút gọn hiện tại của mô hình quyết định 3 nhánh (`AUTO_PROCESS` / `REQUEST_INFO` / `ESCALATE`, phân loại theo `OUTSIDE_POLICY` / `BEYOND_AUTHORITY` / `SUSPICIOUS`) mô tả trong `docs/POLICY.md` và `docs/CHALLENGE.md` — phần phân loại chi tiết đó chưa được triển khai.
+
+## Cài đặt và chạy
+
+```powershell
+pip install -r requirements.txt
+python -m streamlit run app/streamlit_app.py
 ```
 
-`AUTO_PROCESS` chỉ có nghĩa là chứng từ đã đủ căn cứ để chuyển sang bước nhập liệu hoặc kiểm tra thanh toán. Hệ thống không tự chuyển tiền và không thay thế quyền phê duyệt cuối cùng của con người.
+Tạo file `.env` ở thư mục gốc (tham khảo `.env.example`) với các key: `MISTRAL_API_KEY`, `KIMI_TOKEN`, `KIMI_SECRET`, `KIMI_BASE_URL`, `KIMI_MODEL`.
 
-## Phạm vi Sprint 1
+Mở `http://localhost:8501`, sidebar có 4 không gian làm việc:
 
-Sprint 1 tập trung vào việc kiểm tra chứng từ chi phí với hai nhóm đầu vào chính:
+- `Nhân viên` — nộp hồ sơ mới.
+- `Kế toán` — xem và xử lý hồ sơ đã nộp.
+- `Verify` — chạy hàng loạt case mẫu trong `data/testcase/JUDGEMENT/`.
+- `OCR kiểm thử` — xem chi tiết kết quả OCR thô (trang debug nội bộ).
 
-```text
-Hóa đơn điện tử / XML / PDF / ảnh
-Chứng từ nhân viên / biên lai / bằng chứng thanh toán
-Bằng chứng bổ sung: đơn đặt hàng, biên bản nhận hàng, đề nghị chi,
-                    dự án/khách hàng, lịch sử thanh toán
-        ↓
-Trích xuất + Chuẩn hóa
-        ↓
-Kiểm tra chính sách / Tính nhất quán / Thẩm quyền
-        ↓
-AUTO_PROCESS / REQUEST_INFO / ESCALATE
+## Kiểm thử
+
+```powershell
+python -m pytest -q
 ```
 
-Đơn đặt hàng (PO) và biên bản nhận hàng vẫn được hỗ trợ như **bằng chứng bổ sung** cho giao dịch mua hàng hóa, nhưng không còn là phạm vi duy nhất của sản phẩm.
+## Deploy
 
-## Bài toán nghiệp vụ
-
-Kế toán cần xử lý nhiều loại chứng từ:
-
-- hóa đơn điện tử có cấu trúc rõ ràng: mã số thuế, bên mua/bán, ngày lập, mẫu số, ký hiệu, số hóa đơn, hàng hóa/dịch vụ và thành tiền;
-- hóa đơn/chứng từ do nhân viên chụp: nhà hàng, taxi/Grab, khách sạn, văn phòng phẩm, in ấn, sửa chữa, chuyển khoản ngân hàng/ví điện tử;
-- dữ liệu nằm ngoài chứng từ: người chi, mục đích kinh doanh, khách hàng/dự án, đơn đặt hàng, bằng chứng nhận hàng/dịch vụ, lịch sử thanh toán và chính sách nội bộ.
-
-Tác tử phải biết khi nào đã đủ căn cứ, khi nào thiếu thông tin, khi nào vi phạm chính sách, khi nào vượt thẩm quyền và khi nào có dấu hiệu bất thường.
-
-## Ranh giới quyết định
-
-```text
-AUTO_PROCESS
-  Chứng từ đọc được, đầy đủ trường bắt buộc, số liệu nhất quán,
-  đúng công ty/chính sách, không trùng lặp, có bối cảnh kinh doanh
-  và nằm trong hạn mức tác tử được phép xử lý.
-
-REQUEST_INFO
-  Thiếu trường bắt buộc, OCR/ảnh mờ, thông tin mâu thuẫn,
-  chưa rõ mục đích kinh doanh/dự án/người chi, hóa đơn và khai báo khác nhau,
-  hoặc chưa đủ bằng chứng nhận hàng/dịch vụ.
-
-ESCALATE
-  Dữ kiện đã rõ nhưng nằm ngoài quy định, vượt thẩm quyền,
-  hoặc có bất thường/nghi vấn cần con người quyết định.
-```
-
-Để giữ Challenge A gọn, hành động hiển thị cho người dùng chỉ gồm ba nhãn trên. Bên trong `ESCALATE` phải phân biệt `OUTSIDE_POLICY`, `BEYOND_AUTHORITY` và `SUSPICIOUS`.
-
-## Luồng hệ thống
-
-```text
-Đầu vào thô (JSON/XML/PDF/Ảnh)
-  ↓
-Bộ chuyển đổi trích xuất
-  ↓
-Ánh xạ chứng từ chuẩn
-  ↓
-Chuẩn hóa trường dữ liệu + cảnh báo nguồn
-  ↓
-Tạo hồ sơ kiểm tra
-  ↓
-Kiểm tra trường bắt buộc / bối cảnh kinh doanh
-  ↓
-Chạy các phép kiểm tra tất định
-  ↓
-Áp dụng chính sách + ràng buộc thẩm quyền
-  ↓
-Đánh giá của tác tử LLM
-  ├── suy luận trên dữ kiện có cấu trúc
-  ├── đề xuất loại không chắc chắn/hành động
-  ├── tạo câu hỏi cụ thể
-  └── giải thích kết quả
-  ↓
-Bộ bảo vệ quyết định tất định
-  ↓
-Quyết định cuối cùng + nhật ký kiểm toán
-```
-
-LLM là thành phần hỗ trợ suy luận và giao tiếp trên dữ kiện có cấu trúc. Các phép so sánh tiền, số lượng, trùng lặp, trạng thái thanh toán, ngưỡng thẩm quyền và ánh xạ quy tắc vẫn do mã tất định xử lý.
-
-## Các phép kiểm tra cốt lõi
-
-1. Độ đầy đủ của trường bắt buộc theo loại chứng từ.
-2. Mã số thuế/tên bên mua có khớp với công ty hay không.
-3. Danh tính bên bán/nhà cung cấp và định danh hóa đơn.
-4. Tính hợp lệ của ngày và thời hạn nộp chứng từ.
-5. Tính nhất quán giữa dòng hàng, số lượng, đơn giá và thành tiền.
-6. Số tiền bằng chữ so với số tiền bằng số, nếu có.
-7. Trùng lặp hóa đơn, biên lai hoặc bằng chứng thanh toán.
-8. Mục đích kinh doanh, nhân viên, khách hàng/dự án.
-9. Tính nhất quán giữa biên lai, đề nghị chi và bằng chứng thanh toán.
-10. Kiểm tra danh mục theo chính sách: chi phí cá nhân, rượu bia, mặt hàng bị cấm, thiếu mục đích.
-11. Bằng chứng nhận hàng/dịch vụ khi được yêu cầu.
-12. Ngưỡng thẩm quyền.
-13. Cờ bất thường/nghi vấn.
+Ứng dụng chỉ cần host phần Streamlit UI — OCR và reasoning đều gọi API ngoài (Mistral, Kimi), không cần GPU riêng. Bản public: [invoicereferee.streamlit.app](https://invoicereferee.streamlit.app/) (Streamlit Community Cloud).
 
 ## Tài liệu
 
