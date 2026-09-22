@@ -30,6 +30,12 @@ ACCOUNTING_FIELD_LABELS = {
 TECHNICAL_MARKERS = ("candidate", "block", "page-", "confidence", "ocr", "ev-")
 
 
+def _join_reasons(messages: list[str]) -> str:
+    if len(messages) <= 1:
+        return "".join(messages)
+    return "\n".join(f"- {message}" for message in messages)
+
+
 def _case_title(case: StoredCase, result: dict[str, Any]) -> str:
     subject = case.subject or "Không có chủ đề"
     return f"{case.case_id} · {subject} · {result.get('decision', 'UNKNOWN')}"
@@ -120,10 +126,10 @@ def _accounting_reasoning(case: StoredCase, result: dict[str, Any]) -> str:
             if missing_evidence:
                 continue
         message = str(finding.get("message") or "").strip()
-        if message:
+        if message and message not in inventory_questions:
             inventory_questions.append(message)
     if inventory_questions:
-        return " ".join(inventory_questions)
+        return _join_reasons(inventory_questions)
 
     analysis = result.get("confidence_analysis") or {}
     assessments = analysis.get("block_assessments") or []
@@ -155,7 +161,8 @@ def _accounting_reasoning(case: StoredCase, result: dict[str, Any]) -> str:
         if question and not any(
             marker in question.lower() for marker in TECHNICAL_MARKERS
         ):
-            questions.append(question)
+            if question not in questions:
+                questions.append(question)
             continue
 
         candidate = candidates.get(assessment.get("candidate_id")) or {}
@@ -165,11 +172,11 @@ def _accounting_reasoning(case: StoredCase, result: dict[str, Any]) -> str:
             or "chứng từ"
         )
         field_text = _friendly_field_text(assessment.get("canonical_fields") or [])
-        questions.append(
-            f"Vui lòng kiểm tra {source_file} và xác nhận {field_text}."
-        )
+        fallback_question = f"Vui lòng kiểm tra {source_file} và xác nhận {field_text}."
+        if fallback_question not in questions:
+            questions.append(fallback_question)
 
-    return " ".join(questions) or (
+    return _join_reasons(questions) or (
         result.get("reasoning") or "Vui lòng kiểm tra lại chứng từ."
     )
 

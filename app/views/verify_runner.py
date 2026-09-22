@@ -142,22 +142,6 @@ def _render_detail(outcome: dict[str, Any], repository: LocalEvidenceRepository)
             icon=":material/help:",
         )
 
-    findings = [f for f in outcome.get("findings") or [] if f.get("status") in {"FAIL", "ERROR"}]
-    if findings:
-        st.markdown("**Rule không đạt**")
-        st.dataframe(
-            [
-                {
-                    "Rule": f.get("rule_id"),
-                    "Trạng thái": f.get("status"),
-                    "Kết quả": f.get("message"),
-                }
-                for f in findings
-            ],
-            hide_index=True,
-            width="stretch",
-        )
-
     if case is not None:
         render_evidence_preview(case, repository, key_prefix="verify", show_bbox_toggle=False)
 

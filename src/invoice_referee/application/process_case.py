@@ -705,11 +705,18 @@ class CaseProcessingService:
 
     @staticmethod
     def _finding_questions(findings: list[RuleFinding]) -> str:
-        return " ".join(
-            finding.message
-            for finding in findings
-            if finding.status in BLOCKING_FINDING_STATUSES
-        )
+        seen: set[str] = set()
+        messages: list[str] = []
+        for finding in findings:
+            if finding.status not in BLOCKING_FINDING_STATUSES:
+                continue
+            if finding.message in seen:
+                continue
+            seen.add(finding.message)
+            messages.append(finding.message)
+        if len(messages) <= 1:
+            return "".join(messages)
+        return "\n".join(f"- {message}" for message in messages)
 
     @staticmethod
     def _has_blocking_findings(findings: list[RuleFinding]) -> bool:
