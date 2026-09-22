@@ -23,7 +23,7 @@ class AppSettings:
 
     @property
     def testcase_root(self) -> Path:
-        return self.project_root / "data" / "testcase"
+        return self.project_root / "data" / "testcase" / "JUDGEMENT"
 
     @classmethod
     def from_environment(cls, project_root: Path) -> "AppSettings":

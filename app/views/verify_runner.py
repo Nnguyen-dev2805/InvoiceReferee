@@ -220,7 +220,8 @@ def render_verify(
             runnable[folder] = loaded
             _draw_row(placeholders[folder], folder.name, {"status": "PENDING"}, repository)
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    max_workers = min(len(runnable), 16) or 1
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_folder: dict[Future[dict[str, Any]], Path] = {
             executor.submit(_run_one, service, repository, claim, uploads): folder
             for folder, (claim, uploads) in runnable.items()

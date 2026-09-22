@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import fitz
+import pymupdf
 import streamlit as st
 
 from app.components.bbox_overlay import render_bbox_overlay
@@ -19,11 +19,11 @@ PDF_RENDER_DPI = 150
 def _render_pdf_first_page(path: Path) -> tuple[bytes, int] | None:
     """Rasterize page 1 of a PDF to PNG bytes; return None if it cannot be read."""
     try:
-        with fitz.open(path) as document:
+        with pymupdf.open(path) as document:
             if document.page_count == 0:
                 return None
             zoom = PDF_RENDER_DPI / 72
-            pixmap = document.load_page(0).get_pixmap(matrix=fitz.Matrix(zoom, zoom))
+            pixmap = document.load_page(0).get_pixmap(matrix=pymupdf.Matrix(zoom, zoom))
             return pixmap.tobytes("png"), document.page_count
     except Exception:  # noqa: BLE001 - a broken/encrypted PDF must not crash the page
         return None
