@@ -130,7 +130,7 @@ def _parse_analysis(
         try:
             return model_type.model_validate(parsed)
         except Exception as exc:
-            validation_errors.append(str(exc).splitlines()[0])
+            validation_errors.append(str(exc))
 
     detail = validation_errors[0] if validation_errors else "sai schema"
     raise ValueError(f"Kimi trả về JSON nhưng không đúng schema: {detail}")
@@ -220,12 +220,13 @@ class KimiReasoningAdapter:
         try:
             return _parse_analysis(response_text, model_type)
         except ValueError as exc:
+            first_validation_error = str(exc)
             diagnostics.append(
                 {
                     "attempt": 1,
                     "character_count": len(response_text),
                     "finish_reason": finish_reason,
-                    "error": str(exc),
+                    "error": first_validation_error,
                 }
             )
 
@@ -235,7 +236,15 @@ class KimiReasoningAdapter:
                 "role": "assistant",
                 "content": response_text[-MAX_REPAIR_CONTEXT_CHARS:],
             },
-            {"role": "user", "content": REPAIR_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    f"{REPAIR_PROMPT}\n\n"
+                    "Các lỗi schema cụ thể của kết quả trước:\n"
+                    f"{first_validation_error}\n\n"
+                    "Hãy sửa chính xác các lỗi trên và trả lại toàn bộ JSON."
+                ),
+            },
         ]
         repaired_text, repaired_finish_reason = self._complete(repair_messages)
         try:
