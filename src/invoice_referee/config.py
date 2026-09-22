@@ -17,6 +17,14 @@ class AppSettings:
     def submissions_root(self) -> Path:
         return self.data_root / "submissions"
 
+    @property
+    def verify_runs_root(self) -> Path:
+        return self.data_root / "verify_runs"
+
+    @property
+    def testcase_root(self) -> Path:
+        return self.project_root / "data" / "testcase"
+
     @classmethod
     def from_environment(cls, project_root: Path) -> "AppSettings":
         configured_data_root = os.getenv("INVOICE_REFEREE_DATA_DIR")

@@ -3,6 +3,7 @@ AGENTS.md
 .codegraph
 data/models/
 data/submissions/
+data/verify_runs/
 .pytest_cache/
 __pycache__/
 *.py[cod]
