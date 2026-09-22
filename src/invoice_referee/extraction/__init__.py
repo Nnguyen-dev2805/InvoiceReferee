@@ -15,6 +15,14 @@ from .ocr_quality import (
     collect_low_confidence_blocks,
     is_meaningful_ocr_word,
 )
+from .ocr_structure import (
+    bbox_from_any,
+    build_ocr_structure_document,
+    merge_ocr_structure_page,
+    normalize_paddle_ocr_page,
+    normalize_paddle_structure_page,
+)
+from .modal_ocr_structure import ModalOcrStructureAdapter
 
 __all__ = [
     "LOW_CONFIDENCE_THRESHOLD",
@@ -30,4 +38,10 @@ __all__ = [
     "extract_word_confidence_rows",
     "is_meaningful_ocr_word",
     "restructure_mistral_ocr",
+    "bbox_from_any",
+    "build_ocr_structure_document",
+    "merge_ocr_structure_page",
+    "normalize_paddle_ocr_page",
+    "normalize_paddle_structure_page",
+    "ModalOcrStructureAdapter",
 ]

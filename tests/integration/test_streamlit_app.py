@@ -188,3 +188,17 @@ def test_accounting_page_splits_processed_cases(tmp_path: Path, monkeypatch) -> 
     app.run()
     assert not (submissions_root / "CASE-ACCOUNTING-UI").exists()
     assert len(app.expander) == 0
+
+
+def test_sidebar_opens_ocr_structure_debug(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("INVOICE_REFEREE_DATA_DIR", str(tmp_path))
+    app_path = Path(__file__).parents[2] / "app" / "streamlit_app.py"
+
+    app = AppTest.from_file(str(app_path), default_timeout=10).run()
+    app.radio[0].set_value("OCR cấu trúc").run()
+
+    assert len(app.exception) == 0
+    assert len(app.get("file_uploader")) == 1
+    assert len(app.slider) == 1
+    assert app.slider[0].value == 0.85
+    assert any("Chọn một ảnh" in info.value for info in app.info)

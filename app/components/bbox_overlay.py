@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -114,5 +115,74 @@ def render_bbox_overlay(image_path: Path, page: dict[str, Any]) -> Image.Image:
             fill="white",
             font=font,
         )
+
+    return image
+
+
+def render_structure_overlay(image_bytes: bytes, page: dict[str, Any]) -> Image.Image:
+    """Draw merged OCR structure blocks on an uploaded image."""
+    with Image.open(BytesIO(image_bytes)) as source:
+        image = ImageOps.exif_transpose(source).convert("RGB")
+
+    dimensions = page.get("dimensions") or {}
+    page_width = dimensions.get("width")
+    page_height = dimensions.get("height")
+    if not isinstance(page_width, (int, float)) or page_width <= 0:
+        raise ValueError("Chiều rộng trang OCR không hợp lệ.")
+    if not isinstance(page_height, (int, float)) or page_height <= 0:
+        raise ValueError("Chiều cao trang OCR không hợp lệ.")
+
+    scale_x = image.width / page_width
+    scale_y = image.height / page_height
+    line_width = max(3, round(min(image.width, image.height) / 220))
+    font_size = max(14, round(image.width / 42))
+    try:
+        font = ImageFont.truetype("arial.ttf", font_size)
+    except OSError:
+        font = ImageFont.load_default(size=font_size)
+    draw = ImageDraw.Draw(image)
+
+    for number, block in enumerate(page.get("blocks") or [], start=1):
+        raw_bbox = block.get("bbox") or []
+        if len(raw_bbox) != 4 or not all(
+            isinstance(value, (int, float)) for value in raw_bbox
+        ):
+            continue
+        left, top, right, bottom = raw_bbox
+        box = (
+            max(0, min(image.width - 1, round(left * scale_x))),
+            max(0, min(image.height - 1, round(top * scale_y))),
+            max(0, min(image.width - 1, round(right * scale_x))),
+            max(0, min(image.height - 1, round(bottom * scale_y))),
+        )
+        if box[2] <= box[0] or box[3] <= box[1]:
+            continue
+
+        minimum = (block.get("confidence") or {}).get("minimum")
+        if not isinstance(minimum, (int, float)):
+            color = UNKNOWN_COLOR
+        elif minimum < 0.70:
+            color = LOW_COLOR
+        elif minimum < 0.85:
+            color = REVIEW_COLOR
+        else:
+            color = GOOD_COLOR
+
+        draw.rectangle(box, outline=color, width=line_width)
+        label = f"B{number:02d} {block.get('type', 'unknown')}"
+        text_box = draw.textbbox((0, 0), label, font=font)
+        label_width = text_box[2] - text_box[0] + 8
+        label_height = text_box[3] - text_box[1] + 6
+        label_top = max(0, box[1] - label_height)
+        draw.rectangle(
+            (
+                box[0],
+                label_top,
+                min(image.width - 1, box[0] + label_width),
+                min(image.height - 1, label_top + label_height),
+            ),
+            fill=color,
+        )
+        draw.text((box[0] + 4, label_top + 2), label, fill="white", font=font)
 
     return image

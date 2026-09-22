@@ -15,15 +15,25 @@ if str(SRC_ROOT) not in sys.path:
 
 load_dotenv(PROJECT_ROOT / ".env")
 
-from app.components.sidebar import ACCOUNTING_PAGE, EMPLOYEE_PAGE, render_sidebar
+from app.components.sidebar import (
+    ACCOUNTING_PAGE,
+    EMPLOYEE_PAGE,
+    OCR_STRUCTURE_PAGE,
+    render_sidebar,
+)
 from app.state.submission_state import initialize_submission_state
 from app.styles import APP_CSS
 from app.views.accounting_review import render_accounting_review
 from app.views.employee_submission import render_employee_submission
 from app.views.ocr_debug import render_ocr_debug
+from app.views.ocr_structure_debug import render_ocr_structure_debug
 from invoice_referee.application import CaseProcessingService, SubmitCaseService
 from invoice_referee.config import AppSettings
-from invoice_referee.extraction import KimiReasoningAdapter, MistralOcrAdapter
+from invoice_referee.extraction import (
+    KimiReasoningAdapter,
+    MistralOcrAdapter,
+    ModalOcrStructureAdapter,
+)
 from invoice_referee.storage import LocalCaseStore, LocalEvidenceRepository
 
 st.set_page_config(
@@ -81,6 +91,14 @@ def build_kimi_adapter() -> KimiReasoningAdapter | None:
     )
 
 
+@st.cache_resource
+def build_ocr_structure_adapter() -> ModalOcrStructureAdapter:
+    import os
+
+    environment_name = os.getenv("MODAL_ENVIRONMENT", "main").strip() or None
+    return ModalOcrStructureAdapter(environment_name=environment_name)
+
+
 settings = AppSettings.from_environment(PROJECT_ROOT)
 repository = LocalEvidenceRepository(settings.submissions_root)
 
@@ -95,5 +113,7 @@ if selected_page == EMPLOYEE_PAGE:
     )
 elif selected_page == ACCOUNTING_PAGE:
     render_accounting_review(repository)
+elif selected_page == OCR_STRUCTURE_PAGE:
+    render_ocr_structure_debug(build_ocr_structure_adapter())
 else:
     render_ocr_debug(repository)

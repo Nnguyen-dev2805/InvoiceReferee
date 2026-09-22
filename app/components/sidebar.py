@@ -6,6 +6,7 @@ import streamlit as st
 
 EMPLOYEE_PAGE = "Nhân viên"
 OCR_DEBUG_PAGE = "OCR kiểm thử"
+OCR_STRUCTURE_PAGE = "OCR cấu trúc"
 ACCOUNTING_PAGE = "Kế toán"
 
 
@@ -26,7 +27,7 @@ def render_sidebar() -> str:
         st.markdown('<div class="sidebar-label">Không gian làm việc</div>', unsafe_allow_html=True)
         selected_page = st.radio(
             "Không gian làm việc",
-            [EMPLOYEE_PAGE, ACCOUNTING_PAGE, OCR_DEBUG_PAGE],
+            [EMPLOYEE_PAGE, ACCOUNTING_PAGE, OCR_DEBUG_PAGE, OCR_STRUCTURE_PAGE],
             label_visibility="collapsed",
         )
         st.markdown('<div class="sidebar-spacer"></div>', unsafe_allow_html=True)

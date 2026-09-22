@@ -123,6 +123,7 @@ LLM là thành phần hỗ trợ suy luận và giao tiếp trên dữ kiện c�
 - `docs/EVALUATION_PLAN.md` - kiểm thử dữ liệu mới, phản hồi người dùng và đo lường.
 - `docs/CHALLENGE.md` - ánh xạ với Challenge A.
 - `docs/BUILD_LOG.md` - nhật ký phát triển.
+- `docs/PADDLEOCR_VL_MODAL.md` - tải và lưu PaddleOCR-VL weights trên Modal.
 
 ## Chạy và kiểm tra
 
