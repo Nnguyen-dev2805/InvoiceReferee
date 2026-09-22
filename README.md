@@ -51,6 +51,16 @@ Mở `http://localhost:8501`, sidebar có 4 không gian làm việc:
 python -m pytest -q
 ```
 
+## Công cụ hỗ trợ
+
+Chuyển kết quả OCR thô của Mistral (word/block rời rạc) thành cấu trúc phân cấp `page -> block -> words`, dùng khi cần xem lại hoặc debug dữ liệu OCR:
+
+```powershell
+python scripts/restructure_mistral_ocr.py data/output/page-metadata.json
+```
+
+Hồ sơ đã nộp được lưu cục bộ trong `data/submissions/{case_id}` (bị Git bỏ qua vì có thể chứa dữ liệu nhạy cảm).
+
 ## Deploy
 
 Ứng dụng chỉ cần host phần Streamlit UI — OCR và reasoning đều gọi API ngoài (Mistral, Kimi), không cần GPU riêng. Bản public: [invoicereferee.streamlit.app](https://invoicereferee.streamlit.app/) (Streamlit Community Cloud).
@@ -62,7 +72,7 @@ python -m pytest -q
 - `docs/POLICY.md` - policy thực thi v1 và ranh giới quyết định.
 - `docs/DATA_MODEL.md` - hợp đồng lược đồ giữa các mô-đun.
 - `docs/DECISION_FLOW.md` - luồng từ đầu vào đến quyết định.
-- `docs/AGENT_WORKFLOW.md` - workflow chi tiết, điều kiện và ranh giới giữa mã tất định, tool, LLM và con người.
+- `docs/AGENT_WORKFLOW.md` - workflow chi tiết, điều kiện và ranh giới giữa mã tất định, tool, LLM và con người (Confidence Gate, Cross-source Conflict Agent, các ngưỡng liên quan).
 - `docs/WORKFLOW_DIAGRAMS.md` - ba sơ đồ dễ đọc: Data Flow, Business Workflow và Agent Workflow.
 - `docs/TEST_CASES.md` - bộ kiểm thử tối thiểu 15 trường hợp.
 - `docs/ARCHITECTURE.md` - mô-đun, giao diện và phạm vi phụ trách.
@@ -70,109 +80,6 @@ python -m pytest -q
 - `docs/CHALLENGE.md` - ánh xạ với Challenge A.
 - `docs/BUILD_LOG.md` - nhật ký phát triển.
 
-## Chạy và kiểm tra
-
-### Giao diện nộp hồ sơ
-
-```powershell
-python -m streamlit run app/streamlit_app.py
-```
-
-Mở `http://localhost:8501`. Giao diện tiếp nhận hai nhóm dữ liệu:
-
-- chứng từ chính, có thể để trống;
-- business context dạng nội dung đề nghị và tài liệu bổ sung.
-
-Sidebar có ba không gian làm việc:
-
-- `Nhân viên`: gửi hồ sơ; Submit tự chạy Source Gate, OCR, Confidence Quality
-  Agent khi có candidate rồi đến policy kiểm kê;
-- `Kế toán`: xem hai hàng đợi `Đã pass` và `Cần xác minh` cùng reasoning;
-- `OCR kiểm thử`: chỉ xem evidence đã được Mistral OCR xử lý, gồm văn bản,
-  confidence theo từng từ, ảnh có bounding box, cấu trúc
-  `page -> block -> words` cùng JSON thô. Đây là trang debug tạm thời.
-
-Hồ sơ đã tiếp nhận được lưu cục bộ trong `data/submissions/{case_id}`. Thư mục
-này bị Git bỏ qua vì có thể chứa dữ liệu nhạy cảm. Kết quả OCR debug được lưu
-trong `data/submissions/{case_id}/ocr/{evidence_id}.json`; quyết định và
-reasoning được lưu trong `data/submissions/{case_id}/processing.json`.
-
-Confidence Gate mặc định gom các block có meaningful word dưới `0.85` theo
-từng evidence. Mỗi evidence có candidate được gửi trong **một lần gọi Kimi
-riêng**; payload chỉ chứa OCR text và candidate block của chính evidence đó,
-không chứa business context hoặc chứng từ khác. Confidence Quality Agent chỉ
-đánh giá chất lượng đọc, trả `requires_verification` và khuyến nghị `CONTINUE`
-hoặc `ASK_HUMAN`; nó không kiểm tra thiếu trường, policy hay xung đột đa nguồn.
-Với bill ăn uống, tên món sai vài ký tự không chặn nếu vẫn nhận diện chắc ý nghĩa.
-Có thể đổi ngưỡng bằng `OCR_WORD_REVIEW_THRESHOLD` trong `.env`.
-
-Code tạo Quality Gate riêng cho từng evidence. Thông tin chưa rõ thuộc field cần
-cho đối chiếu như MST người mua, tên hàng, số lượng, đơn vị, đơn giá, thành tiền,
-tổng tiền hoặc trạng thái nhận hàng sẽ dừng hồ sơ để kế toán xác nhận. Field chưa rõ nhưng nằm
-ngoài policy kiểm kê hiện tại, chẳng hạn thuế suất, được giữ thành cảnh báo và
-không bị Confidence Agent tự diễn giải thành quyết định nghiệp vụ.
-
-Chỉ khi hồ sơ có ít nhất một `SUPPORTING_DOCUMENT` và **tất cả evidence cần
-thiết đã CLEAR**, Cross-source Conflict Agent mới được gọi đúng một lần với JSON
-gồm OCR text và block context của toàn bộ bill/report. Business context chỉ giúp
-hiểu mục đích giao dịch, không được chuyển thành report hoặc nguồn kiểm kê. Agent
-trích xuất fact độc lập theo từng file, đề xuất ghép các dòng hàng cùng nghĩa,
-liệt kê phép so sánh và xung đột ngữ nghĩa; nó không được tự quyết định
-PASS/FAIL. Code kiểm tra coverage, `Decimal`, đơn vị, source references và các
-chênh lệch trước khi tạo kết quả cuối. Hồ sơ không có file hỗ trợ kết thúc sau
-Confidence Gate và không chạy policy kiểm kê.
-
-Với `n` evidence có block confidence thấp, số lần gọi Kimi là `n` khi không có
-file hỗ trợ, hoặc `n + 1` khi có file hỗ trợ: `n` lần Confidence độc lập và tối
-đa `1` lần Conflict. Evidence không có candidate sẽ không gọi Confidence. Mỗi
-lần gọi được retry đúng một lần nếu JSON sai schema;
-Conflict được gọi sửa thêm một lần nếu bỏ sót document. Bất kỳ Quality Gate nào
-bị chặn thì Conflict Agent không chạy. Xung đột số lượng, đơn giá, thành tiền,
-trạng thái nhận hàng hoặc xung đột ngữ nghĩa chuyển hồ sơ sang `NEEDS_HUMAN`
-với câu hỏi cụ thể cho kế toán.
-
-### Tái cấu trúc confidence OCR
-
-Chuyển danh sách word và block rời rạc của Mistral thành cấu trúc phân cấp
-`page -> block -> words`:
-
-```powershell
-python scripts/restructure_mistral_ocr.py data/output/page-metadata.json
-```
-
-Mặc định, kết quả được ghi vào
-`data/output/page-metadata.hierarchical.json`. Dùng `-o <đường-dẫn>` để chọn
-file đầu ra khác. Tool hỗ trợ cả JSON camelCase do Mistral xuất và JSON
-snake_case được lưu từ Python SDK.
-
-### Kiểm thử phần đã triển khai
-
-```powershell
-python -m pytest -q
-```
-
-### Verify mục tiêu
-
-Lệnh Verify dưới đây là hợp đồng của giai đoạn tiếp theo và chưa được triển khai:
-
-```bash
-python -m verify.harness --suite all
-```
-
-Bộ kiểm tra cốt lõi phải có ít nhất:
-
-```text
-TC01 → AUTO_PROCESS
-TC06 → REQUEST_INFO
-TC10 → ESCALATE
-TC11 → ESCALATE
-```
-
-Giao diện phải cho phép dán/tải lên JSON mới để kiểm thử đầu vào chưa từng thấy qua đúng luồng `review()` dùng trong sản phẩm. Kết quả hiển thị quyết định, loại không chắc chắn, quy tắc không đạt, câu hỏi/đối tượng cần trả lời, cảnh báo trích xuất và lịch sử kiểm toán.
-
 ## Trạng thái hiện tại
 
-Dự án đã có giao diện Streamlit tiếp nhận hồ sơ, OCR, Confidence Gate, policy
-đối chiếu hóa đơn với phiếu nhập kho/report, hàng đợi kế toán, lưu trữ cục bộ và
-audit cơ bản. Các policy nghiệp vụ còn lại, Decision Guard đầy đủ và Verify là
-các phần tiếp theo.
+Đã hoàn thành: nộp hồ sơ, OCR, Confidence Gate, Cross-source Conflict check, hàng đợi Kế toán, trang Verify, deploy public. Chưa triển khai: mô hình quyết định 3 nhánh đầy đủ (`AUTO_PROCESS`/`REQUEST_INFO`/`ESCALATE` với phân loại `OUTSIDE_POLICY`/`BEYOND_AUTHORITY`/`SUSPICIOUS`) và Decision Guard theo đúng `docs/POLICY.md`.
