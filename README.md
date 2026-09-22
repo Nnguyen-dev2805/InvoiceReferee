@@ -51,6 +51,20 @@ Mở `http://localhost:8501`, sidebar có 4 không gian làm việc:
 python -m pytest -q
 ```
 
+## Bộ case mẫu
+
+📁 [`data/testcase`](data/testcase) — toàn bộ case mẫu dùng để thử nghiệm hệ thống, mỗi case là 1 thư mục:
+
+```text
+data/testcase/<tên-case>/
+  content/
+    content.txt        # dòng 1 = chủ đề, các dòng còn lại = nội dung đề nghị
+    attach_file/         # tùy case — tài liệu bổ sung
+  evidence/               # chứng từ chính (hóa đơn/bill)
+```
+
+Thư mục con [`data/testcase/JUDGEMENT`](data/testcase/JUDGEMENT) là bộ case được chọn để chạy trong trang **Verify** của app.
+
 ## Công cụ hỗ trợ
 
 Chuyển kết quả OCR thô của Mistral (word/block rời rạc) thành cấu trúc phân cấp `page -> block -> words`, dùng khi cần xem lại hoặc debug dữ liệu OCR:
