@@ -59,6 +59,7 @@ TECHNICAL_QUESTION_MARKERS = (
 CONFLICT_REQUIRED_FIELDS = {
     "seller_name",
     "seller_tax_code",
+    "buyer_tax_code",
     "invoice_date",
     "invoice_number",
     "item_name",
@@ -277,6 +278,33 @@ class CaseProcessingService:
                 evidence_quality=evidence_quality,
             )
 
+        if not supporting:
+            findings = [
+                *confidence_findings,
+                RuleFinding(
+                    rule_id="CROSS_SOURCE_CHECK_NOT_APPLICABLE",
+                    status="PASS",
+                    message=(
+                        "Hồ sơ không có tài liệu hỗ trợ nên không cần đối chiếu "
+                        "kiểm kê nhiều nguồn."
+                    ),
+                ),
+            ]
+            return self._save_result(
+                case,
+                decision=ProcessingDecision.PASS,
+                summary="Chứng từ đã qua kiểm tra chất lượng OCR.",
+                reasoning=(
+                    "Không có tài liệu hỗ trợ đính kèm nên hồ sơ kết thúc sau "
+                    "bước kiểm tra độ rõ của chứng từ."
+                ),
+                findings=findings,
+                ocr_evidence_ids=ocr_evidence_ids,
+                low_confidence_candidates=low_confidence_candidates,
+                confidence_analysis=confidence_analysis,
+                evidence_quality=evidence_quality,
+            )
+
         if self.reasoning_adapter is None:
             return self._technical_failure(
                 case,
@@ -296,6 +324,7 @@ class CaseProcessingService:
             "business_context": {
                 "subject": case.subject,
                 "description": case.body,
+                "usage": "CONTEXT_ONLY_NOT_AN_INVENTORY_SOURCE",
             },
             "documents": [
                 {

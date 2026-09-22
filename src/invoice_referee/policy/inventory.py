@@ -18,7 +18,6 @@ from invoice_referee.domain import (
 
 PRIMARY_ROLE = "PRIMARY_DOCUMENT"
 SUPPORTING_ROLE = "SUPPORTING_DOCUMENT"
-EMPLOYEE_CLAIM = "EMPLOYEE_CLAIM"
 MAX_RELATED_DATE_GAP_DAYS = 7
 MONEY_TOLERANCE = Decimal("1")
 
@@ -33,6 +32,12 @@ UNIT_FACTORS: dict[str, tuple[str, Decimal]] = {
     "don vi": ("each", Decimal("1")),
     "unit": ("each", Decimal("1")),
 }
+
+
+def _is_context_only_ref(value: str) -> bool:
+    return value == "EMPLOYEE_CLAIM" or value.startswith(
+        ("EMPLOYEE_CLAIM:", "TEXT_REPORT:")
+    )
 
 
 def _plain_text(value: str | None) -> str:
@@ -71,8 +76,6 @@ def _document_label(
     evidence_id: str,
     document_names: dict[str, str],
 ) -> str:
-    if evidence_id == EMPLOYEE_CLAIM:
-        return "báo cáo của nhân viên"
     return document_names.get(evidence_id, evidence_id)
 
 
@@ -83,24 +86,6 @@ def _date_value(value: str | None) -> date | None:
         return date.fromisoformat(value)
     except ValueError:
         return None
-
-
-def _as_text_report_document(
-    analysis: InventoryAnalysis | ConflictAnalysis,
-) -> InventoryDocumentFacts | None:
-    report = analysis.text_report
-    if report is None or not report.is_inventory_report:
-        return None
-    return InventoryDocumentFacts(
-        evidence_id=EMPLOYEE_CLAIM,
-        document_type="TEXT_REPORT",
-        supplier_name=report.supplier_name,
-        supplier_tax_code=report.supplier_tax_code,
-        document_date=report.report_date,
-        receipt_status=report.receipt_status,
-        items=report.items,
-        source_refs=report.source_refs or [EMPLOYEE_CLAIM],
-    )
 
 
 def _transaction_findings(
@@ -392,7 +377,9 @@ def evaluate_inventory_consistency(
         ]
 
     for conflict in getattr(analysis, "potential_conflicts", []):
-        allowed_refs = expected_ids | {EMPLOYEE_CLAIM}
+        if any(_is_context_only_ref(ref) for ref in conflict.source_refs):
+            continue
+        allowed_refs = expected_ids
         invalid_refs = set(conflict.source_refs).difference(allowed_refs)
         if invalid_refs:
             findings.append(
@@ -425,10 +412,7 @@ def evaluate_inventory_consistency(
         for evidence_id, role in document_roles.items()
         if role == SUPPORTING_ROLE
     ]
-    text_report = _as_text_report_document(analysis)
     supporting_documents = [*formal_supporting_documents]
-    if text_report is not None:
-        supporting_documents.append(text_report)
 
     if not primary_documents or not supporting_documents:
         return [
@@ -437,7 +421,7 @@ def evaluate_inventory_consistency(
                 status="FAIL",
                 message=(
                     "Khoản mua hàng chưa có phiếu nhập kho, phiếu kiểm kê, biên "
-                    "bản giao nhận hoặc text report đủ rõ để đối chiếu."
+                    "bản giao nhận hoặc report đính kèm đủ rõ để đối chiếu."
                 ),
                 source_refs=sorted(expected_ids),
             )
@@ -457,11 +441,7 @@ def evaluate_inventory_consistency(
         for document in supporting_documents
         for item in document.items
     }
-    required_supporting_documents = (
-        formal_supporting_documents
-        if formal_supporting_documents
-        else ([text_report] if text_report is not None else [])
-    )
+    required_supporting_documents = formal_supporting_documents
     required_supporting_ids = {
         item.item_id
         for document in required_supporting_documents
@@ -480,8 +460,17 @@ def evaluate_inventory_consistency(
 
     matches: dict[str, list[str]] = {}
     used_supporting_ids: set[str] = set()
+    context_item_ids = {
+        item.item_id
+        for item in (analysis.text_report.items if analysis.text_report else [])
+    }
     for match in analysis.suggested_item_matches:
         if not match.semantic_match:
+            continue
+        if (
+            match.supporting_item_id in context_item_ids
+            or _is_context_only_ref(match.supporting_item_id)
+        ):
             continue
         if (
             match.primary_item_id not in primary_items

@@ -161,21 +161,25 @@ Với bill ăn uống, tên món sai vài ký tự không chặn nếu vẫn nh�
 Có thể đổi ngưỡng bằng `OCR_WORD_REVIEW_THRESHOLD` trong `.env`.
 
 Code tạo Quality Gate riêng cho từng evidence. Thông tin chưa rõ thuộc field cần
-cho đối chiếu như tên hàng, số lượng, đơn vị, đơn giá, thành tiền, tổng tiền hoặc
-trạng thái nhận hàng sẽ dừng hồ sơ để kế toán xác nhận. Field chưa rõ nhưng nằm
+cho đối chiếu như MST người mua, tên hàng, số lượng, đơn vị, đơn giá, thành tiền,
+tổng tiền hoặc trạng thái nhận hàng sẽ dừng hồ sơ để kế toán xác nhận. Field chưa rõ nhưng nằm
 ngoài policy kiểm kê hiện tại, chẳng hạn thuế suất, được giữ thành cảnh báo và
 không bị Confidence Agent tự diễn giải thành quyết định nghiệp vụ.
 
-Chỉ khi **tất cả evidence cần thiết đã CLEAR**, Cross-source Conflict Agent mới
-được gọi đúng một lần với JSON gồm business context, OCR text và block context
-của toàn bộ bill/report. Agent trích xuất fact độc lập theo từng nguồn, đề xuất
-ghép các dòng hàng cùng nghĩa, liệt kê phép so sánh và xung đột ngữ nghĩa; nó
-không được tự quyết định PASS/FAIL. Code kiểm tra coverage, `Decimal`, đơn vị,
-source references và các chênh lệch trước khi tạo kết quả cuối.
+Chỉ khi hồ sơ có ít nhất một `SUPPORTING_DOCUMENT` và **tất cả evidence cần
+thiết đã CLEAR**, Cross-source Conflict Agent mới được gọi đúng một lần với JSON
+gồm OCR text và block context của toàn bộ bill/report. Business context chỉ giúp
+hiểu mục đích giao dịch, không được chuyển thành report hoặc nguồn kiểm kê. Agent
+trích xuất fact độc lập theo từng file, đề xuất ghép các dòng hàng cùng nghĩa,
+liệt kê phép so sánh và xung đột ngữ nghĩa; nó không được tự quyết định
+PASS/FAIL. Code kiểm tra coverage, `Decimal`, đơn vị, source references và các
+chênh lệch trước khi tạo kết quả cuối. Hồ sơ không có file hỗ trợ kết thúc sau
+Confidence Gate và không chạy policy kiểm kê.
 
-Với `n` evidence có block confidence thấp, số lần gọi Kimi bình thường là `n + 1`:
-`n` lần Confidence độc lập và `1` lần Conflict. Evidence không có candidate sẽ
-không gọi Confidence. Mỗi lần gọi được retry đúng một lần nếu JSON sai schema;
+Với `n` evidence có block confidence thấp, số lần gọi Kimi là `n` khi không có
+file hỗ trợ, hoặc `n + 1` khi có file hỗ trợ: `n` lần Confidence độc lập và tối
+đa `1` lần Conflict. Evidence không có candidate sẽ không gọi Confidence. Mỗi
+lần gọi được retry đúng một lần nếu JSON sai schema;
 Conflict được gọi sửa thêm một lần nếu bỏ sót document. Bất kỳ Quality Gate nào
 bị chặn thì Conflict Agent không chạy. Xung đột số lượng, đơn giá, thành tiền,
 trạng thái nhận hàng hoặc xung đột ngữ nghĩa chuyển hồ sơ sang `NEEDS_HUMAN`

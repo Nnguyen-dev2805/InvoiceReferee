@@ -272,7 +272,7 @@ def test_missing_business_context_stops_before_ocr_and_agents(tmp_path: Path) ->
     assert agent.confidence_calls == []
 
 
-def test_complete_case_skips_confidence_agent_but_runs_conflict_agent(
+def test_primary_document_only_passes_quality_without_conflict_agent(
     tmp_path: Path,
 ) -> None:
     case_id, repository = _save_case(
@@ -288,8 +288,13 @@ def test_complete_case_skips_confidence_agent_but_runs_conflict_agent(
     assert result.decision == ProcessingDecision.PASS
     assert len(ocr.calls) == 1
     assert agent.confidence_calls == []
-    assert len(agent.conflict_calls) == 1
+    assert agent.conflict_calls == []
     assert result.confidence_analysis is None
+    assert result.conflict_analysis is None
+    assert any(
+        finding.rule_id == "CROSS_SOURCE_CHECK_NOT_APPLICABLE"
+        for finding in result.findings
+    )
 
 
 def test_non_critical_low_confidence_block_can_continue(tmp_path: Path) -> None:
@@ -306,7 +311,7 @@ def test_non_critical_low_confidence_block_can_continue(tmp_path: Path) -> None:
     assert result.decision == ProcessingDecision.PASS
     assert len(result.low_confidence_candidates) == 1
     assert len(agent.confidence_calls) == 1
-    assert len(agent.conflict_calls) == 1
+    assert agent.conflict_calls == []
     assert result.confidence_analysis is not None
 
 
@@ -352,7 +357,7 @@ def test_readable_critical_low_confidence_block_can_continue(tmp_path: Path) -> 
     result = CaseProcessingService(repository, ocr, agent).process_case(case_id)
 
     assert result.decision == ProcessingDecision.PASS
-    assert len(agent.conflict_calls) == 1
+    assert agent.conflict_calls == []
     assert any(
         item.rule_id == "OCR_CONFIDENCE_REVIEW" and item.status == "PASS"
         for item in result.findings
@@ -382,7 +387,7 @@ def test_semantically_readable_item_name_does_not_block_extraction(
         item.rule_id == "OCR_CONFIDENCE_REVIEW" and item.status == "PASS"
         for item in result.findings
     )
-    assert len(agent.conflict_calls) == 1
+    assert agent.conflict_calls == []
 
 
 def test_unassessed_low_confidence_block_fails_closed(tmp_path: Path) -> None:
@@ -435,6 +440,9 @@ def test_two_sources_run_independent_ocr_and_confidence_before_one_conflict_call
     assert len(agent.conflict_calls) == 1
     assert len(agent.conflict_calls[0]["documents"]) == 2
     assert "business_context" in agent.conflict_calls[0]
+    assert agent.conflict_calls[0]["business_context"]["usage"] == (
+        "CONTEXT_ONLY_NOT_AN_INVENTORY_SOURCE"
+    )
     assert len(result.low_confidence_candidates) == 2
 
 
@@ -600,3 +608,30 @@ def test_unclear_tax_rate_with_clear_zero_tax_does_not_block_inventory() -> None
     assert assessment.human_question is not None
     assert findings[0].rule_id == "OCR_NON_BLOCKING_QUALITY_WARNING"
     assert findings[0].status == "WARN"
+
+
+def test_unclear_buyer_tax_code_blocks_before_conflict() -> None:
+    candidate = {
+        "candidate_id": "EV-001:page-0-block-13",
+        "source_file": "unhappy3.png",
+        "content": "MST (Tax Code): 0317L_688",
+    }
+    assessment = BlockAssessment(
+        candidate_id=candidate["candidate_id"],
+        importance="CRITICAL",
+        quality_state="UNCERTAIN",
+        review_action="ASK_HUMAN",
+        requires_verification=True,
+        canonical_fields=["buyer_tax_code"],
+        observed_text="0317L_688",
+        reason="Mã số thuế người mua không đọc chắc chắn.",
+        human_question="Vui lòng xác nhận mã số thuế người mua.",
+    )
+
+    findings = CaseProcessingService._confidence_findings(
+        [candidate],
+        ConfidenceAnalysis(block_assessments=[assessment]),
+    )
+
+    assert findings[0].rule_id == "LOW_CONFIDENCE_ASK_HUMAN"
+    assert findings[0].status == "FAIL"

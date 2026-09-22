@@ -117,7 +117,7 @@ def test_unhappy_report_exposes_quantity_and_amount_conflicts() -> None:
     assert "92828283" in by_rule["INVENTORY_LINE_AMOUNT_MISMATCH"].message
 
 
-def test_text_received_full_does_not_invent_missing_quantity() -> None:
+def test_text_report_cannot_replace_an_attached_supporting_document() -> None:
     analysis = _analysis()
     analysis.document_facts = analysis.document_facts[:1]
     analysis.text_report = InventoryTextReport(
@@ -133,7 +133,8 @@ def test_text_received_full_does_not_invent_missing_quantity() -> None:
         {"EV-INVOICE": "mua_san.pdf"},
     )
 
-    assert any(item.rule_id == "INVENTORY_ITEMS_REQUIRED" for item in findings)
+    assert findings[0].rule_id == "INVENTORY_SOURCE_REQUIRED"
+    assert findings[0].status == "FAIL"
 
 
 def test_missing_supporting_report_requires_human_review() -> None:
@@ -186,7 +187,7 @@ def test_missing_document_facts_names_file_and_missing_fields() -> None:
     assert "số lượng" in findings[0].message
 
 
-def test_text_report_can_confirm_same_item_without_becoming_extra_stock_line() -> None:
+def test_text_report_mapping_is_ignored_when_attached_report_is_valid() -> None:
     analysis = _analysis()
     assert analysis.text_report is not None
     analysis.text_report.items = [
@@ -237,7 +238,7 @@ def test_unmapped_text_item_is_not_treated_as_extra_inventory_line() -> None:
     )
 
 
-def test_text_report_quantity_conflict_is_still_reported() -> None:
+def test_text_report_quantity_conflict_is_ignored() -> None:
     analysis = _analysis()
     assert analysis.text_report is not None
     analysis.text_report.items = [
@@ -260,12 +261,12 @@ def test_text_report_quantity_conflict_is_still_reported() -> None:
 
     findings = evaluate_inventory_consistency(analysis, ROLES, NAMES)
 
-    assert any(
+    assert not any(
         item.rule_id == "INVENTORY_QUANTITY_MISMATCH" for item in findings
     )
 
 
-def test_diesel_invoice_receipt_and_employee_text_are_one_inventory_item() -> None:
+def test_diesel_invoice_and_receipt_pass_while_employee_text_is_ignored() -> None:
     analysis = InventoryAnalysis(
         applicability="APPLICABLE",
         applicability_reason="Hóa đơn nhiên liệu có phiếu nhập kho.",
@@ -349,8 +350,8 @@ def test_semantic_conflict_proposed_by_agent_becomes_a_specific_human_question()
             PotentialConflict(
                 code="RECEIPT_STATUS",
                 field="receipt_status",
-                description="Phiếu ghi chờ nhận nhưng nhân viên báo đã nhận đủ.",
-                source_refs=["EV-REPORT", "EMPLOYEE_CLAIM"],
+                description="Hóa đơn và phiếu nhập kho có trạng thái không thống nhất.",
+                source_refs=["EV-INVOICE", "EV-REPORT"],
                 human_question=(
                     "Vui lòng xác nhận lô củ sắn đã được kho nhận đủ hay chưa."
                 ),
@@ -368,4 +369,27 @@ def test_semantic_conflict_proposed_by_agent_becomes_a_specific_human_question()
     assert conflict.status == "FAIL"
     assert conflict.message == (
         "Vui lòng xác nhận lô củ sắn đã được kho nhận đủ hay chưa."
+    )
+
+
+def test_semantic_conflict_from_employee_text_is_ignored() -> None:
+    base = _analysis()
+    analysis = ConflictAnalysis(
+        **base.model_dump(),
+        potential_conflicts=[
+            PotentialConflict(
+                code="EMPLOYEE_TEXT_CONFLICT",
+                field="receipt_status",
+                description="Text nhân viên khác phiếu nhập kho.",
+                source_refs=["EV-REPORT", "EMPLOYEE_CLAIM"],
+                human_question="Vui lòng xác nhận nội dung nhân viên khai báo.",
+            )
+        ],
+    )
+
+    findings = evaluate_inventory_consistency(analysis, ROLES, NAMES)
+
+    assert not any(
+        item.rule_id == "INVENTORY_SEMANTIC_CONFLICT_EMPLOYEE_TEXT_CONFLICT"
+        for item in findings
     )

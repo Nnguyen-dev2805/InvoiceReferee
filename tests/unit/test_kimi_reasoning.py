@@ -52,6 +52,24 @@ CONFLICT_JSON = """{
   "extraction_warnings": []
 }"""
 
+INVALID_CONFLICT_JSON = """{
+  "applicability": "APPLICABLE",
+  "applicability_reason": "Có hóa đơn và phiếu nhập kho.",
+  "document_facts": [],
+  "text_report": null,
+  "suggested_item_matches": [],
+  "comparisons": [],
+  "potential_conflicts": [
+    {
+      "conflict_id": "CONF-001",
+      "description": "Chưa rõ trạng thái nhận hàng.",
+      "source_refs": ["EV-REPORT"],
+      "human_question": "Lô hàng đã được nhận đủ chưa?"
+    }
+  ],
+  "extraction_warnings": []
+}"""
+
 
 def build_adapter(completions: FakeCompletions) -> KimiReasoningAdapter:
     client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
@@ -107,6 +125,20 @@ def test_adapter_retries_confidence_once_for_truncated_json() -> None:
     assert "không thể được hệ thống đọc" in completions.calls[1]["messages"][-1]["content"]
 
 
+def test_adapter_sends_specific_conflict_schema_errors_to_repair() -> None:
+    completions = FakeCompletions(INVALID_CONFLICT_JSON, CONFLICT_JSON)
+    adapter = build_adapter(completions)
+
+    result = adapter.analyze_conflict({"documents": []})
+
+    assert result.applicability == "NOT_APPLICABLE"
+    assert len(completions.calls) == 2
+    repair_prompt = completions.calls[1]["messages"][-1]["content"]
+    assert "potential_conflicts.0.code" in repair_prompt
+    assert "potential_conflicts.0.field" in repair_prompt
+    assert "Field required" in repair_prompt
+
+
 def test_adapter_fails_closed_after_two_invalid_responses() -> None:
     completions = FakeCompletions("không có JSON", "vẫn không có JSON")
     adapter = build_adapter(completions)
@@ -138,6 +170,14 @@ def test_conflict_agent_receives_all_sources_and_uses_dedicated_prompt() -> None
     assert "Cross-source Conflict Agent" in messages[0]["content"]
     assert "không kiểm tra confidence OCR" in messages[0]["content"]
     assert "document_facts" in messages[0]["content"]
+    assert "Luôn trả text_report=null" in messages[0]["content"]
+    assert "business_context chỉ" in messages[0]["content"]
+    assert "không phải chứng từ hay nguồn kiểm kê" in messages[0]["content"]
+    assert "Không dùng\n  EMPLOYEE_CLAIM" in messages[0]["content"]
+    assert "Không dùng conflict_id" in messages[0]["content"]
+    assert '"code":"RECEIPT_STATUS_CONFLICT"' in messages[0]["content"]
+    assert '"field":"receipt_status"' in messages[0]["content"]
+    assert "potential_conflicts=[]" in messages[0]["content"]
     assert '"EV-BILL"' in messages[1]["content"]
     assert '"EV-REPORT"' in messages[1]["content"]
     assert '"business_context"' in messages[1]["content"]
