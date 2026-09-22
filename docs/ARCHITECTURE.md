@@ -1,270 +1,196 @@
-# InvoiceReferee — Kiến trúc
+# InvoiceReferee — Current Architecture
 
-## 1. Mục tiêu
+## Scope
 
-Kiến trúc Sprint 1 ưu tiên:
+This document describes the modules and call paths present in the current
+checkout. It is not a target-state architecture.
 
-- kiểm tra xuyên suốt hóa đơn điện tử và chứng từ của nhân viên;
-- tách phần trích xuất khỏi quyết định nghiệp vụ;
-- dùng phép kiểm tra tất định cho tiền, số lượng, trùng lặp và ngưỡng;
-- có ranh giới quyết định rõ ràng;
-- có khả năng kiểm toán;
-- giao diện và Verify dùng chung luồng `review()` của sản phẩm;
-- các mô-đun độc lập để nhóm có thể phát triển song song.
+The application is a synchronous Streamlit process backed by the local
+filesystem. It uses Mistral for OCR and an OpenAI-compatible Kimi endpoint for
+structured reasoning.
 
-## 2. Kiến trúc tổng thể
+## Runtime composition
 
-```text
-                   ┌──────────────────────┐
-                   │  Bằng chứng thô      │
-                   │ JSON/XML/PDF/Ảnh     │
-                   └──────────┬───────────┘
-                              ↓
-                  ┌────────────────────┐
-                  │ Bộ trích xuất      │
-                  │ đọc / OCR / ánh xạ │
-                  └────────┬───────────┘
-                            ↓
-                  ┌────────────────────┐
-                  │ Chuẩn hóa          │
-                  │ CanonicalDocument  │
-                  └────────┬───────────┘
-                            ↓
-                  ┌────────────────────┐
-                  │ Tạo ReviewCase     │
-                  └────────┬───────────┘
-                            ↓
-                  ┌────────────────────┐
-                  │ Bộ máy kiểm tra    │
-                  │ quy tắc tất định   │
-                  └────────┬───────────┘
-                            ↓
-                  ┌────────────────────┐
-                  │ Ràng buộc chính sách│
-                  │ phạm vi + thẩm quyền│
-                  └────────┬───────────┘
-                            ↓
-                  ┌────────────────────┐
-                  │ Tác tử LLM         │
-                  │ đầu ra có cấu trúc │
-                  └────────┬───────────┘
-                            ↓
-                  ┌────────────────────┐
-                  │ Bảo vệ quyết định  │
-                  │ cổng tất định      │
-                  └────────┬───────────┘
-                            ↓
-          ┌─────────────────┼─────────────────┐
-          ↓                 ↓                 ↓
-    AUTO_PROCESS      REQUEST_INFO        ESCALATE
-          └─────────────────┼─────────────────┘
-                            ↓
-                  ┌────────────────────┐
-                  │ Kiểm toán + Kiểm soát│
-                  │ của con người      │
-                  └────────┬───────────┘
-                            ↓
-                  ┌────────────────────┐
-                  │ Giao diện / Verify │
-                  └────────────────────┘
-```
+`app/streamlit_app.py` is the composition root. It:
 
-## 3. Cấu trúc kho mã nguồn đề xuất
+1. loads `.env` and `AppSettings`;
+2. creates one `LocalCaseStore` and `LocalEvidenceRepository` over
+   `data/submissions` by default;
+3. creates `MistralOcrAdapter` only when `MISTRAL_API_KEY` exists;
+4. creates `KimiReasoningAdapter` only when all Kimi settings exist;
+5. injects the adapters into `CaseProcessingService`;
+6. injects processing into `SubmitCaseService`;
+7. routes the selected sidebar page to the employee, accounting, or OCR-debug
+   view.
+
+Streamlit resource caching keeps service and provider instances for the running
+application process.
+
+## End-to-end call path
 
 ```text
-InvoiceReferee/
-├── app/
-│   └── streamlit_app.py
-├── src/
-│   └── invoice_referee/
-│       ├── domain/
-│       │   └── models.py
-│       ├── ingestion/
-│       │   ├── json_adapter.py
-│       │   ├── xml_invoice_adapter.py
-│       │   ├── ocr_adapter.py
-│       │   └── normalization.py
-│       ├── review_case/
-│       │   └── builder.py
-│       ├── checks/
-│       │   ├── engine.py
-│       │   ├── required_fields.py
-│       │   ├── extraction_quality.py
-│       │   ├── identity.py
-│       │   ├── arithmetic.py
-│       │   ├── duplicate.py
-│       │   ├── context.py
-│       │   ├── evidence.py
-│       │   ├── policy_category.py
-│       │   ├── payment.py
-│       │   ├── authority.py
-│       │   └── anomaly.py
-│       ├── policy/
-│       │   ├── config.py
-│       │   └── engine.py
-│       ├── agent/
-│       │   ├── llm_client.py
-│       │   ├── prompts.py
-│       │   └── service.py
-│       ├── decision/
-│       │   ├── guard.py
-│       │   └── fallback_questions.py
-│       ├── audit/
-│       │   └── store.py
-│       └── services/
-│           └── reviewer.py
-├── verify/
-│   └── harness.py
-├── tests/
-│   ├── fixtures/
-│   ├── test_checks.py
-│   ├── test_decision.py
-│   ├── test_audit.py
-│   └── test_verify.py
-└── docs/
+app.components.submission_form.render_submission_form
+        ↓ ClaimDraft + UploadPayload[]
+SubmitCaseService.submit
+        ├── technical validation
+        ├── SHA-256 deduplication
+        └── LocalCaseStore.save_submission
+                ↓ persisted case
+CaseProcessingService.process_case
+        ├── LocalEvidenceRepository.get_case
+        ├── source gate
+        ├── MistralOcrAdapter.process per supported evidence
+        ├── restructure_mistral_ocr
+        ├── collect_low_confidence_blocks
+        ├── KimiReasoningAdapter.analyze_confidence per candidate-bearing evidence
+        ├── optional KimiReasoningAdapter.analyze_conflict across evidence
+        ├── evaluate_inventory_consistency
+        └── LocalEvidenceRepository.save_processing_result
+                ↓
+employee receipt + accounting queues + OCR debug
 ```
 
-## 4. Trách nhiệm của từng mô-đun
+There is no separate `review()` service or Verify entrypoint in the current
+checkout.
 
-### Miền nghiệp vụ
-
-Chứa các hợp đồng lược đồ trong `DATA_MODEL.md`: `ExtractedDocument`, `CanonicalDocument`, `EmployeeClaim`, `SupportingEvidence`, `ReviewCase`, `CheckResult`, `PolicyContext`, `AgentAssessment`, `Decision`, `ReviewResult`, dữ liệu kiểm toán và kiểm soát của con người.
-
-### Tiếp nhận dữ liệu
-
-Đọc nguồn thô và trả về `ExtractedDocument`.
-
-Các bộ chuyển đổi:
-
-- đầu vào JSON/API có cấu trúc;
-- XML hóa đơn điện tử;
-- PDF có văn bản;
-- OCR/thị giác cho PDF quét hoặc ảnh;
-- khai báo thủ công của nhân viên.
-
-Bộ chuyển đổi không kết luận quy tắc nghiệp vụ. Trường không chắc chắn phải giữ cảnh báo/độ tin cậy.
-
-### Bộ tạo `ReviewCase`
-
-Gộp các chứng từ, khai báo của nhân viên, hồ sơ công ty và bằng chứng bổ sung thành một `ReviewCase`.
-
-### Bộ máy kiểm tra
-
-Chạy các phép kiểm tra tất định:
-
-- trường bắt buộc;
-- chất lượng trích xuất;
-- danh tính công ty/nhà cung cấp;
-- ngày/thời hạn nộp;
-- số học;
-- trùng lặp;
-- bối cảnh kinh doanh;
-- tính nhất quán giữa đề nghị chi, thanh toán và bằng chứng bổ sung;
-- bằng chứng nhận hàng/dịch vụ;
-- danh mục chính sách;
-- trạng thái thanh toán;
-- ngưỡng thẩm quyền;
-- bất thường/nghi vấn;
-- mức độ sẵn sàng để xuất dữ liệu kế toán.
-
-Bộ máy kiểm tra không tạo quyết định cuối cùng.
-
-### Bộ máy chính sách
-
-Tạo `PolicyContext`: phạm vi, mã quy tắc, ngưỡng, các điểm không chắc chắn và cờ nghi vấn.
-
-### Tác tử LLM
-
-Nhận dữ kiện/phép kiểm tra/chính sách có cấu trúc, trả về `AgentAssessment` gồm giải thích, hành động đề xuất, phép kiểm tra chính, câu hỏi, đối tượng và tham chiếu.
-
-LLM không tính tiền, không sửa kết quả kiểm tra và không tạo chính sách mới.
-
-### Bộ bảo vệ quyết định
-
-Cổng tất định:
+## Repository structure
 
 ```text
-FACTUAL_UNKNOWN  → REQUEST_INFO
-OUTSIDE_POLICY   → ESCALATE
-BEYOND_AUTHORITY → ESCALATE
-SUSPICIOUS       → ESCALATE
-tất cả đều đạt   → AUTO_PROCESS
+app/
+├── streamlit_app.py              composition root
+├── components/
+│   ├── sidebar.py                page selection
+│   ├── submission_form.py        employee input
+│   └── bbox_overlay.py           OCR debug rendering
+├── state/submission_state.py     Streamlit form/receipt state
+└── views/
+    ├── employee_submission.py    submit experience
+    ├── accounting_review.py      PASS/NEEDS_HUMAN queues
+    └── ocr_debug.py              OCR diagnostics
+
+src/invoice_referee/
+├── config.py                     environment-backed local settings
+├── domain/
+│   ├── submission.py             claim, upload, evidence, receipt contracts
+│   ├── processing.py             OCR/conflict/result contracts
+│   └── errors.py                 submission validation error
+├── application/
+│   ├── submit_case.py            validation, dedupe, persistence, trigger
+│   └── process_case.py           processing orchestration and current status
+├── extraction/
+│   ├── mistral_ocr.py            provider adapter
+│   ├── kimi_reasoning.py         structured Kimi adapter and retry
+│   ├── conflict_reasoning.py     cross-source prompt contract
+│   ├── confidence.py             confidence normalization
+│   ├── ocr_quality.py            candidate collection
+│   └── word_block_mapper.py      page/block/word hierarchy
+├── policy/inventory.py           deterministic inventory checks
+└── storage/
+    ├── base.py                   submission-store protocol
+    ├── local_case_store.py       atomic case creation
+    └── local_evidence_repository.py  query/result/delete operations
 ```
 
-### Kho kiểm toán
+## Domain contracts
 
-Lưu sự kiện theo kiểu chỉ ghi nối tiếp. Sprint 1 có thể dùng bộ nhớ, phiên làm việc hoặc tệp JSON.
+### Submission side
 
-### Dịch vụ kiểm tra
+- `ClaimDraft`: recipient, subject, and body.
+- `UploadPayload`: original name, bytes, MIME type, and evidence role.
+- `EvidenceRecord`: persisted metadata including SHA-256 and relative path.
+- `SubmissionReceipt`: case identifier, status, counts, size, and warnings.
 
-Bộ điều phối duy nhất:
+### Processing side
 
-```text
-trích xuất → chuẩn hóa → tạo hồ sơ → kiểm tra → chính sách → LLM → bảo vệ → kiểm toán
-```
+- `RuleFinding`: rule ID, `PASS/WARN/FAIL/ERROR`, message, and source refs.
+- `BlockAssessment`: structured Kimi assessment of one low-confidence candidate.
+- `ConfidenceAnalysis`: document types and block assessments.
+- `InventoryAnalysis` / `ConflictAnalysis`: per-document facts, mappings,
+  comparisons, conflicts, and extraction warnings.
+- `CaseProcessingResult`: current `PASS/NEEDS_HUMAN` result plus supporting
+  evidence and diagnostics.
 
-Giao diện và Verify chỉ gọi dịch vụ này.
+Some fields remain for backward compatibility with older persisted
+`processing.json` files. They are not proof of an active production path.
 
-## 5. Giao diện cốt lõi
+## Provider boundaries
 
-```python
-extract(raw_evidence) -> list[ExtractedDocument]
-normalize(extracted) -> list[CanonicalDocument]
-build_review_case(documents, claim, evidence, company_profile) -> ReviewCase
-run_checks(review_case) -> list[CheckResult]
-build_policy_context(review_case, checks) -> PolicyContext
-assess(review_case, checks, policy_context) -> AgentAssessment
-guard(assessment, review_case, checks, policy_context) -> Decision
-review(input_payload) -> ReviewResult
-run_verify(case_ids) -> list[VerifyResult]
-```
+### Mistral OCR
 
-## 6. Xử lý lỗi
+`MistralOcrAdapter` sends one image as a base64 data URL or one PDF as a
+document URL. It requests word confidence and returns provider/model/timestamp
+metadata with the raw SDK response.
 
-```text
-JSON/XML sai định dạng
-→ INPUT_ERROR
+The adapter does not create a business decision.
 
-Hóa đơn hợp lệ về hình thức nhưng thiếu mã số thuế bên mua
-→ REQUEST_INFO
+### Kimi confidence analysis
 
-Mã số thuế bên mua thuộc công ty khác
-→ ESCALATE / OUTSIDE_POLICY
-```
+Each call contains one evidence's OCR text and low-confidence candidate blocks.
+It does not receive other documents or employee business context. The response
+must validate as `ConfidenceAnalysis`.
 
-Không biến lỗi kỹ thuật thành quyết định nghiệp vụ.
+### Kimi cross-source analysis
 
-## 7. Các tầng kiểm thử
+One call receives all OCR-readable documents after their quality gates pass.
+The prompt instructs the model to extract each document independently, preserve
+evidence IDs, keep employee text context-only, and avoid making the final
+decision. The response must validate as `ConflictAnalysis`.
 
-```text
-Kiểm thử đơn vị
-  → bộ phân tích / phép kiểm tra / quy tắc quyết định
+Both Kimi paths perform one bounded schema-repair attempt. Exhausted repair
+raises an error and processing fails closed.
 
-Kiểm thử tích hợp
-  → tải trọng đầu vào → ReviewResult
+## Deterministic policy boundary
 
-Kiểm thử Verify
-  → bộ Cốt lõi + Challenge A
+`evaluate_inventory_consistency` receives structured model output plus the
+actual evidence-role and filename maps. It validates and evaluates:
 
-Kiểm thử đầu vào mới
-  → dán/tải lên JSON mới qua dịch vụ kiểm tra
-```
+- exact evidence coverage and duplicate evidence IDs;
+- missing facts required for an applicable inventory comparison;
+- allowed source references;
+- supplier and date differences;
+- item mappings and unsupported extra lines;
+- decimal quantity, unit conversion, unit price, and line amount;
+- receipt status;
+- semantic conflicts tied to attached evidence.
 
-## 8. Phạm vi phụ trách của nhóm
+The policy returns `RuleFinding[]`. `CaseProcessingService` maps any `FAIL` or
+`ERROR` to `NEEDS_HUMAN`; otherwise it returns `PASS`.
 
-| Người | Phạm vi chính |
-| --- | --- |
-| 1 | `domain/`, `ingestion/`, `review_case/` |
-| 2 | `checks/`, dữ liệu mẫu, kiểm thử phép kiểm tra |
-| 3 | `policy/`, `decision/`, chất lượng câu hỏi |
-| 4 | `agent/`, `services/`, `audit/`, `app/`, tích hợp Verify |
+## Storage model
 
-## 9. Ngoài phạm vi
+`LocalCaseStore` writes into a temporary case directory and atomically renames
+it into place after all evidence, metadata, and initial audit events are ready.
+Stored filenames include generated evidence IDs and sanitized original names.
 
-- vi dịch vụ;
-- tuyến sự kiện;
-- cơ sở dữ liệu véc-tơ/RAG khi chính sách nhỏ và có cấu trúc;
-- tích hợp ERP đầy đủ;
-- kiểm toán phân tán cấp độ sản xuất;
-- bộ máy tuân thủ thuế đầy đủ;
-- thanh toán tự động.
+`LocalEvidenceRepository` resolves and validates case-relative paths, stores OCR
+results and the latest processing result, appends a basic processing event, and
+can permanently delete a complete case directory.
+
+The store is process-local filesystem state. It has no transaction isolation,
+user ownership, retention policy, or remote persistence contract.
+
+## Failure behavior
+
+The processor returns `NEEDS_HUMAN` for:
+
+- missing primary bill or business context;
+- missing OCR/Kimi configuration when that provider is needed;
+- unsupported or failed OCR evidence;
+- incomplete or invalid confidence assessment;
+- blocking low-confidence fields;
+- invalid/incomplete cross-source analysis;
+- deterministic inventory conflicts.
+
+Technical failures and business uncertainty are not yet represented separately.
+
+## Known architectural limits
+
+- The accepted upload formats are broader than the processing formats.
+- Primary-only `PASS` is based on OCR quality, not complete accounting policy.
+- There is no canonical normalized accounting document between OCR and policy.
+- The final status model has two values rather than Challenge A's three actions.
+- Audit events cannot fully reconstruct the processing input and reasoning.
+- Reprocessing overwrites the current result.
+- Permanent deletion removes audit history.
+- All Streamlit users share one unauthenticated local case store.
+- There is no Verify entrypoint or public-deployment proof.

@@ -1,75 +1,86 @@
-# InvoiceReferee — Nhật ký phát triển
+# InvoiceReferee — Build Log
 
-> Tài liệu này được chủ ý giữ gọn trong một trang. Hãy cập nhật bằng chứng thực tế trong suốt sprint; không tự tạo dữ liệu sử dụng hoặc kết quả.
+> Keep this document to one page for the competition submission. Record only
+> work and evidence that actually occurred.
 
-## Dự án
+## Project
 
-**InvoiceReferee — Tác tử kế toán kiểm tra hóa đơn, biên lai và chứng từ chi phí**
+InvoiceReferee is being developed for OrganizationAI Challenge A. The current
+prototype receives employee expense claims, runs OCR-quality checks, optionally
+compares a bill with supporting inventory evidence, and presents accounting
+review queues.
 
-Thử thách: OrganizationAI — Challenge A, Bộ điều phối chuyển tiếp.
+## Current stage
 
-## Giai đoạn hiện tại
+A working local vertical slice exists:
 
-Thiết kế và đặc tả trước khi viết mã.
+- Streamlit employee, accounting, and OCR-debug views;
+- local submission/evidence persistence;
+- Mistral OCR integration;
+- OCR word-confidence and bounding-box inspection;
+- Kimi confidence and cross-source structured analysis;
+- deterministic bill/report inventory checks;
+- `PASS/NEEDS_HUMAN` routing;
+- 60 local automated tests.
 
-Các tài liệu lập kế hoạch đã hoàn thành:
+The Challenge A decision taxonomy, Verify harness, Stop/Override, complete audit,
+and public-deployment proof are not implemented in the current checkout.
 
-- bản tóm tắt yêu cầu tác tử kế toán;
-- bản tóm tắt thử thách;
-- đặc tả sản phẩm;
-- Chính sách v0 giả lập;
-- hợp đồng mô hình dữ liệu;
-- luồng quyết định;
-- bộ đánh giá 17 trường hợp;
-- kế hoạch đánh giá đầu vào mới và kiểm chứng với người dùng thật;
-- kiến trúc và kế hoạch triển khai.
+## AI tools used
 
-## Công cụ AI đã sử dụng
+- **OpenAI Codex:** repository inspection, code/document consistency review, and
+  documentation restructuring.
+- **Mistral OCR:** runtime OCR provider for supported image/PDF evidence.
+- **Kimi-K3 through an OpenAI-compatible endpoint:** runtime structured analysis
+  for low-confidence OCR blocks and cross-source conflicts.
 
-Chỉ ghi các công cụ thực tế mà nhóm dùng trong quá trình triển khai.
+Provider-adapter tests use fake clients. Live-provider quality, cost, and latency
+must be reported separately after a fresh credentialed run.
 
-Việc sử dụng ở giai đoạn lập kế hoạch hiện tại:
+## Where AI helped
 
-- trợ lý lập trình AI được dùng để hỗ trợ tái cấu trúc đặc tả, trường hợp chính sách, hợp đồng lược đồ và kế hoạch triển khai.
+- turning raw OCR output into explicit confidence-review candidates;
+- extracting per-document facts for bill/report comparison;
+- proposing semantic conflicts while deterministic Python retains final control;
+- identifying drift between implemented code, old specifications, and competition
+  requirements;
+- reducing the documentation set to current product, architecture, testing, and
+  this build log.
 
-Trước khi nộp bài, thay phần này bằng tên công cụ/mô hình chính xác và mục đích sử dụng của từng công cụ.
+## Cost and rework caused by AI-assisted development
 
-## AI đã hỗ trợ ở đâu
+The repository accumulated broad target-state documents that described a
+different PO/GR workflow and capabilities not present in the merged runtime.
+Those documents created false confidence about the decision model, Verify,
+audit, and human controls. The corrective work was to inspect the actual call
+path, separate fresh verification from plans, and delete stale specifications.
 
-Các quan sát trong giai đoạn lập kế hoạch:
+Model output also requires schema validation and bounded repair. Fluent OCR or
+reasoning text is not treated as evidence that a business check passed.
 
-- chuyển yêu cầu kế toán rộng thành tài liệu hướng đến triển khai;
-- làm rõ khác biệt giữa thiếu dữ kiện, ngoài chính sách, vượt thẩm quyền và có nghi vấn;
-- mở rộng phạm vi từ kiểm tra hóa đơn chỉ dựa trên PO sang hóa đơn điện tử + chứng từ nhân viên + bằng chứng bổ sung;
-- chuẩn hóa giao diện để các mô-đun có thể được phát triển song song;
-- định nghĩa chuỗi phép kiểm tra tất định → bối cảnh chính sách → đánh giá của LLM → Bộ bảo vệ quyết định tất định.
+## Largest feature cut from the current slice
 
-## Chi phí/rủi ro do AI tạo ra
+The current slice does not attempt a complete accounting-policy engine. It
+implements OCR quality and bill/report inventory consistency first. Duplicate,
+payment, authority, broad expense-policy, suspicious-pattern, final Challenge A
+decision, and Verify capabilities remain outside the running slice.
 
-Các rủi ro nhóm phải chủ động kiểm tra khi triển khai:
+This cut kept one end-to-end path testable, but it also means `PASS` must not be
+presented as a complete accounting approval.
 
-- AI có thể diễn đạt quy tắc nghiệp vụ giả lập như chính sách thật của công ty;
-- AI có thể làm mờ ranh giới giữa `REQUEST_INFO` và `ESCALATE` nếu Bộ bảo vệ không nghiêm ngặt;
-- câu hỏi được tạo có thể trôi chảy nhưng quá chung chung;
-- đầu ra OCR/thị giác có thể trông đáng tin dù vẫn sai;
-- mã do AI tạo không được thay thế việc kiểm chứng bằng giả định.
+## Evidence and remaining work
 
-Mọi giá trị chính sách giả lập, đặc biệt ngưỡng thẩm quyền 50 triệu đồng và thời hạn nộp 30 ngày, phải được gắn nhãn là giả lập.
+Fresh local evidence on 2026-09-22:
 
-## Tính năng lớn nhất bị cắt
+- `60 passed in 0.93s`;
+- `pip check`: no broken requirements;
+- Verify command: unavailable because the `verify` package is absent.
 
-Sprint 1 chủ động cắt **tự động hóa thuế/kế toán đầy đủ và OCR cấp độ sản xuất**.
+Still required before claiming competition readiness:
 
-Sản phẩm tập trung vào một ranh giới kiểm tra có thể kiểm thử cho hóa đơn điện tử, chứng từ của nhân viên và bằng chứng bổ sung. Kiểm tra GTGT/TNDN, kê khai thuế, bút toán tự động, thanh toán tự động, tích hợp ERP và bộ máy phát hiện gian lận đầy đủ nằm ngoài Sprint 1.
-
-Lý do: cuộc thi đánh giá cao một ranh giới quyết định hoạt động được và có thể kiểm thử hơn một tập tính năng rộng nhưng thiếu tin cậy.
-
-## Bằng chứng cần bổ sung trước khi nộp
-
-- các commit thực tế và quyết định triển khai quan trọng;
-- công cụ/mô hình AI thực tế đã dùng;
-- một nơi cụ thể AI giúp tiết kiệm thời gian;
-- một nơi cụ thể AI gây làm lại hoặc phát sinh chi phí;
-- tính năng thực tế bị cắt nếu có thay đổi;
-- phản hồi người dùng và thay đổi sản phẩm tương ứng nếu có;
-- tác động tiêu cực/ngoài ý muốn phát hiện trong kiểm thử.
+- live-provider baseline evidence;
+- a public no-login deployment using safe demo data;
+- an executable Challenge Verify experience;
+- final human-control and audit behavior;
+- honest user feedback and one demonstrated product change if the team reaches
+  the stage where the competition requires real-user evidence.
