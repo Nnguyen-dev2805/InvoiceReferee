@@ -7,11 +7,9 @@ from typing import Any
 
 import streamlit as st
 
-from app.components.bbox_overlay import render_bbox_overlay
-from invoice_referee.extraction import restructure_mistral_ocr
+from app.components.evidence_preview import render_evidence_preview
 from invoice_referee.storage import LocalEvidenceRepository, StoredCase
 
-IMAGE_SUFFIXES = {".jpeg", ".jpg", ".png", ".webp"}
 DELETE_STATE_PREFIX = "accounting-confirm-delete-"
 ACCOUNTING_FIELD_LABELS = {
     "seller_name": "tên người bán",
@@ -30,6 +28,12 @@ ACCOUNTING_FIELD_LABELS = {
     "transaction_reference": "mã giao dịch",
 }
 TECHNICAL_MARKERS = ("candidate", "block", "page-", "confidence", "ocr", "ev-")
+
+
+def _join_reasons(messages: list[str]) -> str:
+    if len(messages) <= 1:
+        return "".join(messages)
+    return "\n".join(f"- {message}" for message in messages)
 
 
 def _case_title(case: StoredCase, result: dict[str, Any]) -> str:
@@ -122,10 +126,10 @@ def _accounting_reasoning(case: StoredCase, result: dict[str, Any]) -> str:
             if missing_evidence:
                 continue
         message = str(finding.get("message") or "").strip()
-        if message:
+        if message and message not in inventory_questions:
             inventory_questions.append(message)
     if inventory_questions:
-        return " ".join(inventory_questions)
+        return _join_reasons(inventory_questions)
 
     analysis = result.get("confidence_analysis") or {}
     assessments = analysis.get("block_assessments") or []
@@ -157,7 +161,8 @@ def _accounting_reasoning(case: StoredCase, result: dict[str, Any]) -> str:
         if question and not any(
             marker in question.lower() for marker in TECHNICAL_MARKERS
         ):
-            questions.append(question)
+            if question not in questions:
+                questions.append(question)
             continue
 
         candidate = candidates.get(assessment.get("candidate_id")) or {}
@@ -167,60 +172,13 @@ def _accounting_reasoning(case: StoredCase, result: dict[str, Any]) -> str:
             or "chứng từ"
         )
         field_text = _friendly_field_text(assessment.get("canonical_fields") or [])
-        questions.append(
-            f"Vui lòng kiểm tra {source_file} và xác nhận {field_text}."
-        )
+        fallback_question = f"Vui lòng kiểm tra {source_file} và xác nhận {field_text}."
+        if fallback_question not in questions:
+            questions.append(fallback_question)
 
-    return " ".join(questions) or (
+    return _join_reasons(questions) or (
         result.get("reasoning") or "Vui lòng kiểm tra lại chứng từ."
     )
-
-
-def _render_evidence(
-    case: StoredCase,
-    repository: LocalEvidenceRepository,
-) -> None:
-    if not case.evidence:
-        st.caption("Không có evidence đính kèm.")
-        return
-
-    st.markdown("**Evidence**")
-    show_bounding_boxes = st.toggle(
-        "Hiện bounding boxes",
-        value=False,
-        key=f"accounting-bbox-{case.case_id}",
-    )
-    columns = st.columns(min(3, len(case.evidence)))
-    for index, evidence in enumerate(case.evidence):
-        with columns[index % len(columns)]:
-            suffix = evidence.absolute_path.suffix.lower()
-            if suffix in IMAGE_SUFFIXES:
-                preview: Any = evidence.absolute_path
-                caption = evidence.original_name
-                if show_bounding_boxes:
-                    ocr_result = repository.load_ocr_result(evidence)
-                    try:
-                        if ocr_result:
-                            page = restructure_mistral_ocr(ocr_result)["pages"][0]
-                            preview = render_bbox_overlay(evidence.absolute_path, page)
-                            caption = f"{evidence.original_name} · OCR blocks"
-                    except (IndexError, OSError, TypeError, ValueError):
-                        st.warning("Không thể dựng bounding boxes cho ảnh này.")
-                st.image(
-                    preview,
-                    caption=caption,
-                    width="stretch",
-                )
-            else:
-                st.download_button(
-                    evidence.original_name,
-                    data=evidence.absolute_path.read_bytes(),
-                    file_name=evidence.original_name,
-                    mime=evidence.mime_type,
-                    icon=":material/download:",
-                    key=f"accounting-download-{case.case_id}-{evidence.evidence_id}",
-                    use_container_width=True,
-                )
 
 
 def _render_quality_review(result: dict[str, Any]) -> None:
@@ -455,56 +413,91 @@ def _render_delete_controls(
             st.rerun()
 
 
+def _render_overview_tab(case: StoredCase, result: dict[str, Any]) -> None:
+    st.markdown("**Business context**")
+    st.write(case.body or "Không có nội dung.")
+
+    summary_columns = st.columns(2)
+    summary_columns[0].metric("Kết quả xử lý", result.get("decision", "UNKNOWN"))
+    summary_columns[1].metric(
+        "Evidence đã OCR",
+        len(result.get("ocr_evidence_ids") or []),
+    )
+
+    st.markdown("**Tóm tắt cho kế toán**")
+    st.write(_accounting_summary(result))
+
+    reasoning = _accounting_reasoning(case, result)
+    st.markdown("**Nội dung cần xử lý**")
+    if result.get("decision") == "NEEDS_HUMAN":
+        st.warning(reasoning, icon=":material/help:")
+    else:
+        st.success(reasoning, icon=":material/check_circle:")
+
+    for error in result.get("processing_errors") or []:
+        st.warning(error)
+
+
+def _render_technical_tab(result: dict[str, Any]) -> None:
+    findings = result.get("findings") or []
+    if findings:
+        st.markdown("**Rule checks**")
+        st.dataframe(
+            [
+                {
+                    "Rule": finding.get("rule_id"),
+                    "Trạng thái": finding.get("status"),
+                    "Kết quả": finding.get("message"),
+                    "Nguồn": ", ".join(finding.get("source_refs") or []),
+                }
+                for finding in findings
+            ],
+            hide_index=True,
+            width="stretch",
+        )
+
+    _render_quality_review(result)
+    _render_inventory_review(result)
+
+    conflicts = ((result.get("kimi_analysis") or {}).get("conflicts") or [])
+    if conflicts:
+        st.markdown("**Dữ kiện mâu thuẫn**")
+        st.json(conflicts, expanded=True)
+
+
 def _render_case(
     case: StoredCase,
     result: dict[str, Any],
     repository: LocalEvidenceRepository,
 ) -> None:
     with st.expander(_case_title(case, result), expanded=True):
-        st.markdown("**Business context**")
-        st.write(case.body or "Không có nội dung.")
-
-        summary_columns = st.columns(2)
-        summary_columns[0].metric("Kết quả xử lý", result.get("decision", "UNKNOWN"))
-        summary_columns[1].metric(
-            "Evidence đã OCR",
-            len(result.get("ocr_evidence_ids") or []),
+        overview_tab, evidence_tab, technical_tab = st.tabs(
+            ["Tổng quan", "Evidence", "Chi tiết kỹ thuật"]
         )
+        with overview_tab:
+            _render_overview_tab(case, result)
+        with evidence_tab:
+            render_evidence_preview(case, repository, key_prefix="accounting")
+        with technical_tab:
+            _render_technical_tab(result)
 
-        st.markdown("**Tóm tắt cho kế toán**")
-        st.write(_accounting_summary(result))
-        st.markdown("**Nội dung cần xử lý**")
-        st.write(_accounting_reasoning(case, result))
-
-        findings = result.get("findings") or []
-        if findings:
-            st.markdown("**Rule checks**")
-            st.dataframe(
-                [
-                    {
-                        "Rule": finding.get("rule_id"),
-                        "Trạng thái": finding.get("status"),
-                        "Kết quả": finding.get("message"),
-                        "Nguồn": ", ".join(finding.get("source_refs") or []),
-                    }
-                    for finding in findings
-                ],
-                hide_index=True,
-                width="stretch",
-            )
-
-        _render_quality_review(result)
-        _render_inventory_review(result)
-
-        conflicts = ((result.get("kimi_analysis") or {}).get("conflicts") or [])
-        if conflicts:
-            st.markdown("**Dữ kiện mâu thuẫn**")
-            st.json(conflicts, expanded=True)
-
-        for error in result.get("processing_errors") or []:
-            st.warning(error)
-        _render_evidence(case, repository)
         _render_delete_controls(case, repository)
+
+
+def _render_queue_overview(items: list[tuple[StoredCase, dict[str, Any]]]) -> None:
+    st.dataframe(
+        [
+            {
+                "Mã hồ sơ": case.case_id,
+                "Chủ đề": case.subject,
+                "Nộp lúc": case.submitted_at.replace("T", " ")[:19],
+                "Tóm tắt": _accounting_summary(result),
+            }
+            for case, result in items
+        ],
+        hide_index=True,
+        width="stretch",
+    )
 
 
 def _render_queue(
@@ -516,6 +509,8 @@ def _render_queue(
     if not items:
         st.info("Chưa có hồ sơ trong nhóm này.")
         return
+
+    _render_queue_overview(items)
 
     item_by_case_id = {case.case_id: (case, result) for case, result in items}
     selected_case_id = st.selectbox(

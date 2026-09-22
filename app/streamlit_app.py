@@ -15,12 +15,18 @@ if str(SRC_ROOT) not in sys.path:
 
 load_dotenv(PROJECT_ROOT / ".env")
 
-from app.components.sidebar import ACCOUNTING_PAGE, EMPLOYEE_PAGE, render_sidebar
+from app.components.sidebar import (
+    ACCOUNTING_PAGE,
+    EMPLOYEE_PAGE,
+    VERIFY_PAGE,
+    render_sidebar,
+)
 from app.state.submission_state import initialize_submission_state
 from app.styles import APP_CSS
 from app.views.accounting_review import render_accounting_review
 from app.views.employee_submission import render_employee_submission
 from app.views.ocr_debug import render_ocr_debug
+from app.views.verify_runner import render_verify
 from invoice_referee.application import CaseProcessingService, SubmitCaseService
 from invoice_referee.config import AppSettings
 from invoice_referee.extraction import KimiReasoningAdapter, MistralOcrAdapter
@@ -51,6 +57,23 @@ def build_submission_service(
         word_confidence_threshold=word_confidence_threshold,
     )
     return SubmitCaseService(store, processor=processor)
+
+
+@st.cache_resource
+def build_verify_service(
+    verify_runs_root: str,
+    word_confidence_threshold: float,
+) -> tuple[SubmitCaseService, LocalEvidenceRepository]:
+    settings_root = Path(verify_runs_root)
+    store = LocalCaseStore(settings_root)
+    repository = LocalEvidenceRepository(settings_root)
+    processor = CaseProcessingService(
+        repository,
+        build_ocr_adapter(),
+        build_kimi_adapter(),
+        word_confidence_threshold=word_confidence_threshold,
+    )
+    return SubmitCaseService(store, processor=processor), repository
 
 
 @st.cache_resource
@@ -96,5 +119,16 @@ if selected_page == EMPLOYEE_PAGE:
     )
 elif selected_page == ACCOUNTING_PAGE:
     render_accounting_review(repository)
+elif selected_page == VERIFY_PAGE:
+    verify_service, verify_repository = build_verify_service(
+        str(settings.verify_runs_root),
+        settings.ocr_word_review_threshold,
+    )
+    render_verify(
+        verify_service,
+        verify_repository,
+        settings.testcase_root,
+        settings.verify_runs_root,
+    )
 else:
     render_ocr_debug(repository)

@@ -20,8 +20,9 @@ AGENTS.md
 .idea/
 .vscode/
 
-# macOS
+# macOS / Windows
 .DS_Store
+Thumbs.db
 
 # Log
 *.log
@@ -43,6 +44,7 @@ htmlcov/
 data/models/
 data/submissions/
 data/output/
+data/verify_runs/
 
 # Cong cu rieng (khong thuoc project)
 grgen/
