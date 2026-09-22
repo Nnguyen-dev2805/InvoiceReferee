@@ -1,6 +1,8 @@
 # InvoiceReferee
 
-**Tác tử kế toán kiểm tra hóa đơn, biên lai và chứng từ chi phí**
+InvoiceReferee is a Sprint 1 prototype for receiving employee expense claims,
+reading uploaded evidence, checking OCR quality, and comparing a primary bill
+with supporting inventory or receipt evidence.
 
 ## 1. Giới thiệu đề tài
 

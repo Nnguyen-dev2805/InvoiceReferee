@@ -111,8 +111,24 @@ def test_sidebar_opens_ocr_debug_for_submitted_image(
     monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
     app_path = Path(__file__).parents[2] / "app" / "streamlit_app.py"
 
-    app = AppTest.from_file(str(app_path), default_timeout=10).run()
-    app.radio[0].set_value("OCR kiểm thử").run()
+    # The OCR-debug page is hidden from navigation (see app/components/sidebar.py)
+    # but the view and its dispatch branch are retained. Drive the view directly
+    # so this coverage survives until the tool is re-enabled.
+    probe = tmp_path / "ocr_debug_probe.py"
+    probe.write_text(
+        "import sys\n"
+        "from pathlib import Path\n"
+        f"sys.path.insert(0, {str(Path(__file__).parents[2] / 'src')!r})\n"
+        f"sys.path.insert(0, {str(Path(__file__).parents[2])!r})\n"
+        "from invoice_referee.config import AppSettings\n"
+        "from invoice_referee.storage import LocalEvidenceRepository\n"
+        "from app.views.ocr_debug import render_ocr_debug\n"
+        "settings = AppSettings.from_environment("
+        f"{str(Path(__file__).parents[2])!r})\n"
+        "render_ocr_debug(LocalEvidenceRepository(settings.submissions_root))\n",
+        encoding="utf-8",
+    )
+    app = AppTest.from_file(str(probe), default_timeout=10).run()
 
     assert len(app.exception) == 0
     assert len(app.selectbox) == 2

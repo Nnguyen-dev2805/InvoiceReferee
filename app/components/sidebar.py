@@ -25,9 +25,12 @@ def render_sidebar() -> str:
             unsafe_allow_html=True,
         )
         st.markdown('<div class="sidebar-label">Không gian làm việc</div>', unsafe_allow_html=True)
+        # OCR_DEBUG_PAGE is temporarily hidden from the navigation. The view and
+        # its dispatch branch are kept so the tool can be re-enabled by adding
+        # OCR_DEBUG_PAGE back to this list.
         selected_page = st.radio(
             "Không gian làm việc",
-            [EMPLOYEE_PAGE, ACCOUNTING_PAGE, VERIFY_PAGE, OCR_DEBUG_PAGE],
+            [EMPLOYEE_PAGE, ACCOUNTING_PAGE, VERIFY_PAGE],
             label_visibility="collapsed",
         )
         st.markdown('<div class="sidebar-spacer"></div>', unsafe_allow_html=True)

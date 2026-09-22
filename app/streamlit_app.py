@@ -10,8 +10,13 @@ from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = PROJECT_ROOT / "src"
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
+# Streamlit Community Cloud runs `streamlit run app/streamlit_app.py` without
+# `python -m`, so the repository root is not on sys.path the way it is for a
+# local `python -m streamlit run`. Add both roots so `app` and `invoice_referee`
+# resolve from any working directory.
+for _root in (SRC_ROOT, PROJECT_ROOT):
+    if str(_root) not in sys.path:
+        sys.path.insert(0, str(_root))
 
 load_dotenv(PROJECT_ROOT / ".env")
 
@@ -83,7 +88,8 @@ def build_ocr_adapter() -> MistralOcrAdapter | None:
     api_key = os.getenv("MISTRAL_API_KEY", "").strip()
     if not api_key:
         return None
-    return MistralOcrAdapter(api_key=api_key)
+    model = os.getenv("MISTRAL_OCR_MODEL", "mistral-ocr-latest").strip()
+    return MistralOcrAdapter(api_key=api_key, model=model or "mistral-ocr-latest")
 
 
 @st.cache_resource

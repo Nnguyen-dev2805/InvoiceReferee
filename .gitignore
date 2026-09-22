@@ -1,17 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Moi truong ao
+.venv/
+venv/
+env/
+ENV/
+
+# Cong cu / IDE
+.claude
 .agents
 AGENTS.md
 .codegraph
-data/models/
-data/submissions/
-data/verify_runs/
+.idea/
+.vscode/
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+
+# Log
+*.log
+
+# Test / coverage
 .pytest_cache/
-__pycache__/
-*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Bien moi truong
 .env
 .env.*
 !.env.example
-.venv/
-.vscode/
-.DS_Store
-Thumbs.db
-*.log
+
+# Du lieu sinh ra khi chay
+data/models/
+data/submissions/
+data/output/
+data/verify_runs/
+
+# Cong cu rieng (khong thuoc project)
+grgen/
