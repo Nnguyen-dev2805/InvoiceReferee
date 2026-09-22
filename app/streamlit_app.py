@@ -60,7 +60,8 @@ def build_ocr_adapter() -> MistralOcrAdapter | None:
     api_key = os.getenv("MISTRAL_API_KEY", "").strip()
     if not api_key:
         return None
-    return MistralOcrAdapter(api_key=api_key)
+    model = os.getenv("MISTRAL_OCR_MODEL", "mistral-ocr-latest").strip()
+    return MistralOcrAdapter(api_key=api_key, model=model or "mistral-ocr-latest")
 
 
 @st.cache_resource
