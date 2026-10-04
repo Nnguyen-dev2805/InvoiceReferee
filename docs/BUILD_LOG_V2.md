@@ -73,3 +73,31 @@ evidence pointers; nothing planned is recorded as done.
   unusable currency; registry-less documents flagged not dropped.
 - Evidence: `docs/evidence/task-T03.md`.
 - Not done: storage, providers, pipeline, API, UI (downstream tasks).
+
+## T04 — SQLite history, evidence artifacts và atomic request lifecycle
+
+- Created `src/invoice_referee/storage/{schema.sql,repository,artifacts}.py`
+  (stdlib `sqlite3`, no ORM). Connection per transaction (`isolation_level=None`
+  + explicit `BEGIN IMMEDIATE`), FKs on, JSON payload columns; partial unique
+  index `one_current_payment_request ... WHERE status=CREATED`.
+- `Repository`: create/get/list case, snapshot, create_run, get_run,
+  request_stop, assert_run_current, finalize_run, get_payment_request,
+  apply_human_action, history, mark_interrupted_runs, record_stage,
+  record_policy_change, get_active_policy. Atomic artifact write (mkstemp +
+  fsync + os.replace), sanitized basenames, backend-assigned paths.
+- `finalize_run` atomic: stop flag, current-run, case_version and input_hash
+  checked under one write lock; idempotent (repeat returns stored run); CREATE
+  needs positive VND amount; identical request returns existing; changed
+  input/decision revokes/supersedes in the same transaction as the version bump.
+  Stop-before-finalize → STOPPED/zero request; finalize-before-stop →
+  ALREADY_COMPLETED. `policy_versions` persists activation across restart.
+- Intake validation (meaningful input, strict positive int, ext/mime, 12/15 MiB/
+  50 MiB limits, byte dedup); missing amount/purpose/bill = factual, not format.
+- Tests: `tests/integration/{support,test_repository}.py` (real SQLite +
+  threading.Barrier race). RED observed, then GREEN; full suite 176 → 178 passed.
+- Review round 1 (Critical/Important): `finalize_run` current-run guard (a
+  superseded run can no longer create/supersede a request); `create_run`
+  active-run guard (RUN_BUSY); dead const removed; stable STALE_VERSION code;
+  run_id identity comment; concurrency test asserts threads joined.
+- Evidence: `docs/evidence/task-T04.md`.
+- Not done: providers, pipeline, API, UI (downstream tasks).
