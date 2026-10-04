@@ -15,10 +15,11 @@ ENV/
 # Cong cu / IDE
 .claude
 .agents
-AGENTS.md
 .codegraph
 .idea/
 .vscode/
+AGENTS.md
+.freebuff
 
 # macOS / Windows
 .DS_Store
@@ -46,6 +47,14 @@ data/submissions/
 data/output/
 data/verify_runs/
 data/rebuild_backups/
+data/runs/
+data/artifacts/
+data/cases/
+data/ocr/
 
-# Cong cu rieng (khong thuoc project)
-grgen/
+# Rebuild tooling (task briefs/reports/snapshots)
+.superpowers/
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/

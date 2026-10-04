@@ -1,0 +1,14 @@
+{
+  "version": "demo-expense-v0.1-proposed",
+  "origin": "proposed",
+  "activation_id": null,
+  "active": false,
+  "currency": "VND",
+  "auto_approval_max": 2000000,
+  "standard_policy_max": 5000000,
+  "inventory_date_gap_days": 7,
+  "comparison_money_tolerance": "1",
+  "normalized_unit_price_tolerance": "0",
+  "word_review_threshold": "0.85",
+  "threshold_version": "demo-expense-v0.1-proposed"
+}
