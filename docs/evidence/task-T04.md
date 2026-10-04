@@ -12,12 +12,24 @@ boundary; no provider is called.
   → `ModuleNotFoundError: No module named 'invoice_referee.storage'`
   (1 collection error; expected — brief step 1 keeps the test RED until the
   repository/schema exist).
-- GREEN (T04 test file):
+- GREEN (T04 initial suite):
   `rtk proxy .venv/bin/python -m pytest tests/integration/test_repository.py -q`
   → 29 passed.
-- Full suite: `rtk proxy .venv/bin/python -m pytest tests/ -q` → 176 passed
+- Full suite (initial): `rtk proxy .venv/bin/python -m pytest tests/ -q` → 176 passed
   (147 unit from T01–T03 + 29 T04 integration).
+- GREEN (T04 complete suite after review round 1):
+  `rtk proxy .venv/bin/python -m pytest tests/integration/test_repository.py -q`
+  → 31 passed.
+- Full suite: `rtk proxy .venv/bin/python -m pytest tests/ -q` → 178 passed
+  (147 unit from T01–T03 + 31 T04 integration).
 - `rtk proxy .venv/bin/python -m pip check` → No broken requirements found.
+
+### Review round 1 (stop semantics & lifecycle integrity)
+
+- Bổ sung 2 bài kiểm tra tích hợp kiểm chứng tính toàn vẹn vòng đời và cờ dừng:
+  1. `test_mark_interrupted_runs_honors_acknowledged_stop`: xác nhận lượt chạy có cờ dừng (`STOP_REQUESTED`) được tôn trọng kết thúc ở trạng thái `STOPPED` khi ứng dụng khởi động lại, không bị ghi đè thành `FAILED`.
+  2. `test_stop_marks_case_workflow_stopped`: xác nhận `workflow_state` của hồ sơ chuyển chuẩn xác sang `STOPPED` sau khi yêu cầu dừng thành công.
+- Kết quả kiểm chứng tươi: 31/31 bài kiểm tra tích hợp đạt, 178/178 toàn bộ kho kiểm thử đạt mà không có bất kỳ hồi quy nào.
 
 ## Race orderings (both directions, no sleeps)
 
