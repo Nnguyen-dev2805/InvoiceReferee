@@ -1,18 +1,20 @@
 # InvoiceReferee — System Flow Atlas
 
 > **Bản đồ tổng thể, không sao chép văn bản (Map, not a copy)**
-> - Task: `T01 + T02` (Domain contracts, demo policy, test builders, numeric parsing, source resolution & derived quality).
-> - Package: `Work Package 01 — Core (T01 & T02)`.
-> - Accepted Revision: `eb11ab0` (T01 `064dc7d` + T02 `eb11ab0` trên nhánh `rebuild`).
-> - Status: `Living Page Created` — **T01 & T02 IMPLEMENTED & VERIFIED (100 unit tests passing)**. Các task từ T03 đến T16 ở trạng thái kế hoạch (`PLANNED — not built`).
-> - Updated At: `2026-10-04T21:55:00+07:00`.
-> - Quy tắc: Atlas là **bản đồ điều hướng** (zoom-out), không sao chép lại chi tiết văn xuôi từ các tài liệu đặc tả ([B1_PRODUCT_SPEC.md](specs/B1_PRODUCT_SPEC.md), [B1_RULEBOOK.md](specs/B1_RULEBOOK.md), [B1_SYSTEM_SPEC.md](specs/B1_SYSTEM_SPEC.md)) hay kế hoạch thực thi ([Master Plan](superpowers/plans/2026-10-04-invoice-referee.md)).
+> - Task: `T01 + T02 + T03` (Domain contracts, demo policy, test builders, numeric parsing, source resolution, quality usability, pure policy evaluators, inventory/arithmetic, authority & decision reducer).
+> - Package: `Work Package 01 — Core (T01–T05; hoàn thành T01, T02 & T03)`.
+> - Accepted Revision: `25d231c` (`feat(T03): policy, inventory/arithmetic, authority và decision reducer` trên nhánh `rebuild`).
+> - Status: `Living Page Updated` — **T01, T02 & T03 IMPLEMENTED & VERIFIED (147 unit tests passing)**. Các task từ T04 đến T16 ở trạng thái kế hoạch (`PLANNED — not built`).
+> - Updated At: `2026-10-04T22:45:00+07:00`.
+> - Quy tắc: Atlas là **bản đồ điều hướng** (zoom-out), áp dụng các nguyên lý **ASD-STE100** (câu ngắn, một nghĩa, điều kiện trước hành động sau, triệt tiêu mơ hồ, bảo toàn dữ kiện kỹ thuật). Không sao chép văn xuôi từ các tài liệu đặc tả ([B1_PRODUCT_SPEC.md](specs/B1_PRODUCT_SPEC.md), [B1_RULEBOOK.md](specs/B1_RULEBOOK.md), [B1_SYSTEM_SPEC.md](specs/B1_SYSTEM_SPEC.md)) hay kế hoạch thực thi ([Master Plan](superpowers/plans/2026-10-04-invoice-referee.md)).
 
 ---
 
 ## 1. Sơ đồ tổng thể toàn hệ thống (Master End-to-End System Flow)
 
-Sơ đồ thể hiện toàn bộ các thành phần của InvoiceReferee tính đến thời điểm hoàn thành **T01 + T02**. Các module đóng khung nền xanh viền đậm đã được cài đặt và kiểm thử đạt 100% qua unit test độc lập; các module nền xám viền nét đứt đại diện cho các tầng dịch vụ, lưu trữ, pipeline và giao diện dự kiến sẽ được nối dây ở các task tiếp theo (T03 – T16):
+Sơ đồ thể hiện toàn bộ các thành phần của InvoiceReferee tính đến thời điểm hoàn thành **T01 + T02 + T03**. 
+- Các khối **nền xanh viền đậm** (`IMPLEMENTED`) là các module nghiệp vụ thuần túy đã hoàn thành và vượt qua 147 bài kiểm tra đơn vị độc lập.
+- Các khối **nền xám viền nét đứt** (`planned — not built`) đại diện cho các tầng dịch vụ, lưu trữ, pipeline và giao diện sẽ được nối dây ở các task tiếp theo (T04 – T16).
 
 ```mermaid
 flowchart TD
@@ -39,14 +41,13 @@ flowchart TD
     end
 
     subgraph NumericQualityCore["Lõi Số học & Chất lượng chứng từ (T02 — IMPLEMENTED)"]
-        NUM["Numeric Parser (parse_candidates: VI/US/CANONICAL)"]
-        NORM["Unit Normalizer (normalize_quantity: g/kg/tấn, prec=50)"]
-        QUAL["Quality Usability Deriver (derive_fact: USABLE/MISSING/UNCERTAIN/UNUSABLE)"]
+        NUM["Numeric Parser (parse_candidates / normalize_quantity)"]
+        QUAL["Quality Usability Deriver (derive_fact)"]
     end
 
-    subgraph PolicyEvaluators["Lõi quy tắc nghiệp vụ (T03 — planned)"]
-        EXP["Expense Evaluator (SRC, CTX, MODE, SCOPE, ELIG, AMT, LIM, AUTH)"]
-        INV["Inventory Consistency Evaluator (INV-01, INV-02)"]
+    subgraph PolicyEvaluators["Lõi quy tắc nghiệp vụ & Quyết định (T03 — IMPLEMENTED)"]
+        EXP["Expense Evaluator (document_checks / context_check)"]
+        INV["Inventory Consistency Evaluator (arithmetic_checks / inventory_checks)"]
         DEC["Decision Reducer (evaluate / next_action)"]
     end
 
@@ -70,16 +71,16 @@ flowchart TD
     end
 
     %% Áp dụng style class cho nodes
-    class MODELS,CFG,NUM,NORM,QUAL implemented;
-    class UI,APP,SVC,EXEC,PIPE,EXP,INV,DEC,MISTRAL,KIMI,VAL,REPO,ART,HUMAN,VERIFY planned;
+    class MODELS,CFG,NUM,QUAL,EXP,INV,DEC implemented;
+    class UI,APP,SVC,EXEC,PIPE,MISTRAL,KIMI,VAL,REPO,ART,HUMAN,VERIFY planned;
 
-    %% Tương tác luồng dữ liệu kiến trúc dự kiến
+    %% Tương tác luồng UI -> API -> Service (planned)
     UI -.->|"HTTP REST API"| APP
     APP -.->|"gọi application methods"| SVC
     SVC -.->|"quản lý một luồng xử lý"| EXEC
     EXEC -.->|"thực thi pipeline"| PIPE
 
-    %% Pipeline nối tới Extraction và Core
+    %% Pipeline kết nối tới Extraction và Preflight (planned)
     PIPE -.->|"1. Preflight scope / inputs"| CFG
     PIPE -.->|"2. Gửi file chứng từ"| MISTRAL
     MISTRAL -.->|"SourceRegistry"| PIPE
@@ -87,40 +88,39 @@ flowchart TD
     KIMI -.->|"DocumentFacts raw"| VAL
     VAL -.->|"4. Kiểm tra hợp đồng"| PIPE
 
-    %% Pipeline gọi T02 để chuẩn hoá & đánh giá chất lượng
-    PIPE -.->|"5. Parse số độc lập"| NUM
-    PIPE -.->|"5b. Chuẩn hóa đơn vị"| NORM
-    PIPE -.->|"6. Xác thực nguồn & derived usability"| QUAL
-    QUAL -.->|"USABLE facts"| EXP
+    %% Pipeline cấp dữ liệu cho T02 & T03 (planned execution path)
+    PIPE -.->|"5. Chuẩn hóa & xác thực chất lượng"| QUAL
+    QUAL -.->|"6. Facts usable"| DEC
+    PIPE -.->|"7. Snapshot & Bundle hoàn chỉnh"| DEC
 
-    %% Pipeline chuyển facts sang T03 Policy
-    EXP -.->|"CheckResults"| DEC
-    PIPE -.->|"Đối chiếu kiểm kê (nếu profile WORK_PURCHASE)"| INV
-    INV -.->|"Inventory CheckResults"| DEC
-    DEC -.->|"Decision cuối"| PIPE
+    %% Tương tác nội bộ đã IMPLEMENTED giữa các evaluator thuần túy (T03 gọi T02 & T01)
+    DEC ==>|"gọi document checks"| EXP
+    DEC ==>|"gọi arithmetic & inventory checks"| INV
+    DEC ==>|"xác thực total của primary bill"| QUAL
+    EXP ==>|"xác thực derived quality"| QUAL
+    INV ==>|"xác thực derived quality"| QUAL
+    INV ==>|"tính toán Decimal 50"| NUM
 
-    %% Lưu trữ
-    PIPE -.->|"Lưu kết quả run & artifacts"| REPO
-    PIPE -.->|"Lưu raw OCR & JSON"| ART
+    %% Pipeline ghi nhận kết quả và lưu trữ (planned)
+    DEC -.->|"Decision"| PIPE
+    PIPE -.->|"Lưu kết quả run & audit"| REPO
+    PIPE -.->|"Lưu raw artifacts"| ART
 
-    %% Human loop
+    %% Human loop và Verify runner (planned)
     UI -.->|"Gửi hành động con người"| HUMAN
     HUMAN -.->|"Đóng issue / tạo version mới"| SVC
-
-    %% Verify runner
     VERIFY -.->|"Chạy suite kiểm thử"| SVC
 ```
 
 ```text
-revision: eb11ab0
+revision: 25d231c
 - MODELS → src/invoice_referee/domain/models.py (T01 - IMPLEMENTED)
 - CFG → src/invoice_referee/config.py (T01 - IMPLEMENTED)
-- NUM → src/invoice_referee/policy/numeric.py:parse_candidates (T02 - IMPLEMENTED)
-- NORM → src/invoice_referee/policy/numeric.py:normalize_quantity (T02 - IMPLEMENTED)
+- NUM → src/invoice_referee/policy/numeric.py:parse_candidates,normalize_quantity (T02 - IMPLEMENTED)
 - QUAL → src/invoice_referee/policy/quality.py:derive_fact (T02 - IMPLEMENTED)
-- EXP → src/invoice_referee/policy/expenses.py (T03 - planned — not built)
-- INV → src/invoice_referee/policy/inventory.py (T03 - planned — not built)
-- DEC → src/invoice_referee/policy/decision.py:evaluate (reducer nội bộ next_action, T03 - planned — not built)
+- EXP → src/invoice_referee/policy/expenses.py:document_checks,context_check (T03 - IMPLEMENTED)
+- INV → src/invoice_referee/policy/inventory.py:arithmetic_checks,inventory_checks (T03 - IMPLEMENTED)
+- DEC → src/invoice_referee/policy/decision.py:evaluate (T03 - IMPLEMENTED)
 - REPO → src/invoice_referee/storage/repository.py:Repository (T04 - planned — not built)
 - ART → src/invoice_referee/storage/artifacts.py (T04 - planned — not built)
 - MISTRAL → src/invoice_referee/extraction/providers.py:Providers.ocr (T05 - planned — not built)
@@ -133,101 +133,125 @@ revision: eb11ab0
 - APP → src/invoice_referee/api/app.py:create_app (T09 - planned — not built)
 - UI → frontend/src/App.tsx (T10 - planned — not built)
 - VERIFY → src/invoice_referee/verify/runner.py:VerifyRunner (T11 - planned — not built)
-edges: Toàn bộ mũi tên nét đứt (-.->) biểu diễn luồng tương tác kiến trúc dự kiến khi nối dây; hiện tại ở Gate T01+T02 các module lõi (MODELS, CFG, NUM, NORM, QUAL) đã được IMPLEMENTED và kiểm thử unit test độc lập, chưa có luồng runtime end-to-end liên module (chờ T06 nối dây Pipeline).
+edges: 
+- Mũi tên đôi đậm (==>): Các lệnh gọi trực tiếp giữa các module thuần túy T01, T02, T03 đã được IMPLEMENTED và VERIFIED bằng 147 bài kiểm tra đơn vị (DEC gọi EXP, INV, QUAL; EXP và INV gọi QUAL; INV dùng NUM).
+- Mũi tên nét đứt (-.->): Luồng tương tác kiến trúc dự kiến khi nối dây toàn bộ hệ thống từ UI, API tới Pipeline và Storage.
 ```
 
 ---
 
 ## 2. Mục lục các luồng cốt lõi (Core-Flow Index)
 
-1. **Hợp đồng dữ liệu & Cấu hình chính sách (Domain Contracts & Demo Policy — T01)**:
-   - Toàn bộ hồ sơ (`Claim`), chứng từ (`Evidence`), nguồn trích xuất (`SourceRegistry`, `SourceBlock`, `SourceWord`), phán quyết (`Decision`), vấn đề phát hiện (`Issue`), yêu cầu chi trả (`PaymentRequest`) và các sự kiện kiểm toán (`AuditEvent`) được định nghĩa bằng các bản ghi Pydantic v2 bất biến (`extra='forbid', frozen=True`).
-   - Quản lý cấu hình `PolicyConfig` có nguồn gốc rõ ràng (`proposed` vs. `developer_activated_demo` vs. `proposed_test_fixture`), không kích hoạt ngầm trong runtime. Băm snapshot xác định qua SHA-256 canonical.
-   - Chi tiết: [models.py](../src/invoice_referee/domain/models.py), [config.py](../src/invoice_referee/config.py), [task-T01.md](evidence/task-T01.md).
+*Tuân thủ quy tắc ASD-STE100: Câu ngắn dưới 25 từ, một thông tin kỹ thuật mỗi câu, ưu tiên thể chủ động, nêu điều kiện trước hành động.*
 
-2. **Phân tích số học & Chuẩn hóa đơn vị (Numeric Parsing & Unit Normalization — T02)**:
-   - Phân tích cú pháp số học không đoán mò bằng các ngữ pháp rõ ràng (`CANONICAL`, `VI`, `US`). Các trường hợp số mơ hồ (như `'1.234'`) trả về toàn bộ ứng viên khả dĩ `(Decimal('1.234'), Decimal('1234'))` để tầng nghiệp vụ quyết định, không chọn tùy tiện.
-   - Chuẩn hóa đơn vị đo lường (g/kg/tấn) về đơn vị cơ sở `g` qua hàm độc lập `normalize_quantity` dưới ngữ cảnh `Decimal` 50 chữ số độc lập (`prec=50`), không kế thừa ngữ cảnh môi trường ngoài. Giữ nguyên đơn vị đóng gói opaque (thùng, hộp) để đối chiếu trực tiếp.
-   - Chặn tràn số kỹ thuật: tiền tệ tối đa 15 chữ số nguyên; số lượng/đơn giá tối đa 12 chữ số nguyên + 6 chữ số thập phân; số lượng bắt buộc > 0.
-   - Chi tiết: [numeric.py](../src/invoice_referee/policy/numeric.py), [task-T02.md](evidence/task-T02.md).
+### 2.1 Hợp đồng dữ liệu & Cấu hình chính sách (Domain Contracts & Demo Policy — T01)
+- Hệ thống định nghĩa toàn bộ dữ liệu bằng các bản ghi Pydantic v2 bất biến (`Record`).
+- Mọi bản ghi cấm nhận trường thừa (`extra='forbid'`) và không cho phép thay đổi (`frozen=True`).
+- Hàm `snapshot_hash` tính toán mã băm SHA-256 xác định cho từng trạng thái hồ sơ.
+- Cấu hình `PolicyConfig` tải từ file bắt đầu ở trạng thái chưa kích hoạt (`active=False`).
+- Chỉ hàm `activate_demo_policy` mới chuyển trạng thái cấu hình sang kích hoạt với lý do rõ ràng.
+- Chi tiết: [models.py](../src/invoice_referee/domain/models.py), [config.py](../src/invoice_referee/config.py), [task-T01.md](evidence/task-T01.md).
 
-3. **Xác thực nguồn gốc & Chất lượng chứng từ (Source Resolution & Derived Usability — T02)**:
-   - Hàm thuần `derive_fact` đối chiếu tọa độ `SourceRef` với `SourceRegistry` thực tế để gán trạng thái `usability` cho từng trường thông tin (`USABLE`, `MISSING`, `UNCERTAIN`, `UNUSABLE`). *(Lưu ý: Mô hình `models.py:39` định nghĩa 5 giá trị enum `Usability` gồm cả `NOT_APPLICABLE`; `derive_fact` đánh giá chất lượng chứng từ cụ thể nên sinh 4 trạng thái đầu; `NOT_APPLICABLE` được quản lý ở mức trích xuất/profile khi trường không áp dụng).*
-   - Cơ chế chặn nghiêm ngặt (Fail-closed): Một trường số chỉ đạt `USABLE` khi tất cả các từ cấu thành đều có điểm tin cậy OCR đạt ngưỡng cấu hình `word_review_threshold` (khởi điểm 0.85 trong `config/demo-policy.json`, có thể tùy biến qua tham số và sẽ được tối ưu hóa ở T13). Mô hình LLM đọc chữ "READABLE" không bao giờ được phép miễn trừ kiểm tra điểm tin cậy số học.
-   - Bắt lỗi vi phạm hợp đồng (`DomainError('INVALID_ANALYSIS')`): Tọa độ trỏ sai chứng từ, mã khối/từ không tồn tại, điểm số ngoài `[0, 1]`, hoặc mâu thuẫn đánh giá (quan sát `UNREADABLE`/`UNKNOWN` nhưng khẳng định `requires_verification=False`).
-   - Cơ chế cứu vãn có kiểm soát: Xác nhận `CONFIRM_FIELD` của vai trò Kế toán (`REVIEWER`) có căn cứ tọa độ thực tế có thể chuyển trạng thái trường thành `USABLE` mà không sửa đổi dữ liệu thô của OCR.
-   - Chi tiết: [quality.py](../src/invoice_referee/policy/quality.py), [task-T02.md](evidence/task-T02.md).
+### 2.2 Phân tích số học & Chuẩn hóa đơn vị (Numeric Parsing & Unit Normalization — T02)
+- Hàm `parse_candidates` phân tích văn bản số bằng ba ngữ pháp: `CANONICAL`, `VI`, `US`.
+- Nếu chuỗi số mang nghĩa mơ hồ như `'1.234'`, hàm trả về toàn bộ ứng viên khả dĩ.
+- Hệ thống không tự ý chọn một giá trị duy nhất khi chưa có căn cứ ngữ cảnh.
+- Hàm `normalize_quantity` quy đổi các đơn vị g, kg, tấn về đơn vị gam cơ sở.
+- Phép tính số học luôn chạy trong ngữ cảnh `Decimal` 50 chữ số độc lập (`prec=50`).
+- Hệ thống cấm số lượng nhỏ hơn hoặc bằng 0.
+- Số tiền tối đa 15 chữ số nguyên.
+- Số lượng và đơn giá tối đa 12 chữ số nguyên và 6 chữ số thập phân.
+- Chi tiết: [numeric.py](../src/invoice_referee/policy/numeric.py), [task-T02.md](evidence/task-T02.md).
 
-4. **Đánh giá quy tắc chi phí & Rút gọn quyết định (Expense Policy & Decision Reducer — T03)** — `planned — not built`:
-   - Kiểm tra các quy tắc nghiệp vụ theo ma trận [B1_RULEBOOK.md](specs/B1_RULEBOOK.md) (`SRC-01..03`, `CTX-01`, `MODE-01..02`, `SCOPE-01..02`, `ELIG-01`, `AMT-01..02`, `LIM-01`, `AUTH-01`).
-   - Phân loại rõ 3 nhóm bất định: `FACTUAL_UNKNOWN`, `OUTSIDE_POLICY`, `BEYOND_AUTHORITY`.
-   - Đối chiếu số học dòng hàng (`SIMPLE_ITEMIZED`, `ITEMIZED_WITH_ADJUSTMENTS`) và kiểm kê đối với profile `WORK_PURCHASE` (`INV-01`, `INV-02`).
-   - Giao diện public là hàm `evaluate`, sử dụng bộ rút gọn quyết định nội bộ `next_action`: `NONE` (lỗi kỹ thuật/cấu hình), `REJECT` (từ chối đã rõ căn cứ), `REQUEST_INFO` (còn vướng mắc thông tin thực tế), `ESCALATE` (vượt trần chính sách hoặc thẩm quyền), `CREATE_PAYMENT_REQUEST` (đủ điều kiện và thẩm quyền).
-   - Chi tiết thiết kế: [Master Plan §3.2 T03](superpowers/plans/2026-10-04-invoice-referee-01-core.md#t03--policy-inventoryarithmetic-authority-và-decision-reducer).
+### 2.3 Xác thực nguồn gốc & Chất lượng chứng từ (Source Resolution & Derived Usability — T02)
+- Hàm thuần `derive_fact` đối chiếu tọa độ `SourceRef` với `SourceRegistry` thực tế của chứng từ.
+- Hàm trả về một đối tượng `FieldFact` mới với trạng thái chất lượng (`usability`) tương ứng.
+- Nếu trường số thiếu điểm tin cậy hoặc có bất kỳ từ cấu thành nào dưới ngưỡng tin cậy, trạng thái là `UNCERTAIN`.
+- Ngưỡng tin cậy là tham số của hàm. Giá trị khởi điểm lấy từ cấu hình `word_review_threshold` (0.85).
+- Nhãn "READABLE" từ mô hình ngôn ngữ không bao giờ được miễn trừ kiểm tra điểm tin cậy số học.
+- Nếu tọa độ trỏ sai chứng từ hoặc khối không tồn tại, hàm ném lỗi `INVALID_ANALYSIS`.
+- Kế toán xác nhận bằng `CONFIRM_FIELD` hợp lệ có thể chuyển trường thành `USABLE` mà không sửa OCR thô.
+- Chi tiết: [quality.py](../src/invoice_referee/policy/quality.py), [task-T02.md](evidence/task-T02.md).
 
-5. **Lưu trữ SQLite có bảo vệ & Vòng đời đề nghị chi trả (Storage & Atomic Lifecycle — T04)** — `planned — not built`:
-   - Giao dịch SQLite với `BEGIN IMMEDIATE` bảo vệ snapshot, ngăn chặn race condition giữa nút Stop và commit kết quả cuối cùng.
-   - Ràng buộc duy nhất `one_current_payment_request` bảo đảm mỗi hồ sơ chỉ có tối đa một đề nghị chi trả có hiệu lực tại một thời điểm (`CREATED`); thay đổi hồ sơ sẽ thu hồi/thay thế (`SUPERSEDED`/`REVOKED`) bản ghi cũ trong cùng một transaction.
-   - Quản lý file an toàn trên ổ đĩa (`safe_name`), tính toán băm SHA-256 nguyên bản và sanitize đường dẫn.
-   - Chi tiết thiết kế: [Master Plan §3.2 T04](superpowers/plans/2026-10-04-invoice-referee-01-core.md#t04--sqlite-history-evidence-artifacts-và-atomic-request-lifecycle).
+### 2.4 Đánh giá quy tắc chi phí & Rút gọn quyết định (Expense Policy & Decision Reducer — T03)
+- Hàm thuần `evaluate` nhận `CaseSnapshot` và `EvidenceBundle` để tạo phán quyết `Decision`.
+- Hệ thống kiểm tra đầy đủ ma trận 15 quy tắc nghiệp vụ theo [B1_RULEBOOK.md](specs/B1_RULEBOOK.md).
+- Nếu cấu hình chính sách chưa kích hoạt, hàm trả về hành động kỹ thuật `NONE`.
+- Nếu hồ sơ rơi vào quy định cấm rõ ràng (`MODE-01`, `ELIG-01`), hàm trả về `REJECT`.
+- Nếu còn vướng mắc dữ kiện chưa rõ, hàm trả về `REQUEST_INFO`.
+- Nếu có vướng mắc dữ kiện, hệ thống tạo câu hỏi cụ thể gửi tới đúng người chịu trách nhiệm.
+- Nếu không còn vướng mắc dữ kiện và chi phí vượt thẩm quyền, hàm trả về `ESCALATE`.
+- Nếu mọi quy tắc đạt và đủ thẩm quyền phê duyệt, hàm trả về `CREATE_PAYMENT_REQUEST`.
+- Chi phí hợp lệ từ 2.000.000đ trở xuống được hệ thống tự động hoàn tất (`ROUTINE_AUTO`).
+- Chi phí trên 2.000.000đ và tối đa 5.000.000đ yêu cầu người phê duyệt (`APPROVER`) cấp quyền.
+- Chi phí trên 5.000.000đ kích hoạt đồng thời vi phạm chính sách `LIM-01` và vượt thẩm quyền `AUTH-01`.
+- Kiểm kê (`INV-01`, `INV-02`) chỉ áp dụng cho hồ sơ mua sắm vật tư (`WORK_PURCHASE`).
+- Chi tiết: [decision.py](../src/invoice_referee/policy/decision.py), [expenses.py](../src/invoice_referee/policy/expenses.py), [inventory.py](../src/invoice_referee/policy/inventory.py), [task-T03.md](evidence/task-T03.md).
 
-6. **Tầng chuyển đổi OCR & Phân tích văn bản (Provider Adapters — T05)** — `planned — not built`:
-   - Tách biệt trích xuất từng tài liệu độc lập (`AnalyzeDocument`) với đề xuất đối chiếu chéo (`ProposeCrossSource`).
-   - Giới hạn ngân sách sửa lỗi (repair budget <= 1 lần) cho việc kiểm tra schema và coverage.
-   - Chi tiết thiết kế: [Master Plan §3.2 T05](superpowers/plans/2026-10-04-invoice-referee-01-core.md#t05--mistral-ocr-per-document-kimi-và-cross-source-proposals).
+### 2.5 Lưu trữ SQLite có bảo vệ & Vòng đời đề nghị chi trả (Storage & Atomic Lifecycle — T04) — `planned`
+- Giao dịch SQLite sử dụng `BEGIN IMMEDIATE` để khóa ghi đồng thời.
+- Ràng buộc duy nhất bảo đảm mỗi hồ sơ chỉ tồn tại một đề nghị chi trả có hiệu lực.
+- Nếu thông tin hồ sơ thay đổi, hệ thống thu hồi bản ghi cũ trước khi tạo bản ghi mới.
+- Hệ thống quản lý tệp trên ổ đĩa an toàn bằng tên chuẩn hóa (`safe_name`).
+- Chi tiết thiết kế: [Master Plan §3.2 T04](superpowers/plans/2026-10-04-invoice-referee-01-core.md#t04--sqlite-history-evidence-artifacts-và-atomic-request-lifecycle).
 
-7. **Quy trình xử lý hồ sơ toàn trình (Application Pipeline — T06)** — `planned — not built`:
-   - Chuỗi xử lý hoàn chỉnh: Preflight (kiểm tra scope và chứng từ gốc bắt buộc) → OCR → Trích xuất DocumentFacts → Kiểm định hợp đồng → Đánh giá chất lượng T02 → Đánh giá Policy T03 → Tạo kết quả `PipelineResult`.
-   - Điểm kiểm tra chốt chặn (`checkpoint`) trước và sau mỗi lệnh gọi API bên ngoài để tiếp nhận tín hiệu `Stop`.
-   - Chi tiết thiết kế: [Workflow Plan T06](superpowers/plans/2026-10-04-invoice-referee-02-workflow.md#t06--production-pipeline-và-vertical-slice).
+### 2.6 Tầng chuyển đổi OCR & Phân tích văn bản (Provider Adapters — T05) — `planned`
+- Trích xuất từng chứng từ độc lập tách rời khỏi việc đề xuất đối chiếu chéo.
+- Hệ thống giới hạn ngân sách sửa lỗi cấu trúc schema không quá một lần.
+- Bộ điều hợp trả về dữ kiện và đề xuất, không đưa ra quyết định duyệt hồ sơ cuối cùng.
+- Chi tiết thiết kế: [Master Plan §3.2 T05](superpowers/plans/2026-10-04-invoice-referee-01-core.md#t05--mistral-ocr-per-document-kimi-và-cross-source-proposals).
 
-8. **Tương tác con người & Tái đánh giá (Human Action Loop — T07, T08)** — `planned — not built`:
-   - Kiểm tra thẩm quyền nghiêm ngặt của từng hành động con người (`validate_human_action`): `SUPPLY_DECLARATION`, `CONFIRM_FIELD`, `GRANT_POLICY_EXCEPTION`, `APPROVE_AMOUNT`, `OVERRIDE`, `DENY`.
-   - Thay đổi đầu vào làm vô hiệu hóa các phê duyệt cũ bị ảnh hưởng; chỉ đóng đúng issue được giải quyết; bảo toàn quyết định gốc khi áp dụng Override.
-   - Dịch vụ `CaseService` với executor đơn luồng, hỗ trợ nút `Stop` có xác nhận và bảo toàn lịch sử kiểm toán đầy đủ.
-   - Chi tiết thiết kế: [Workflow Plan T07–T08](superpowers/plans/2026-10-04-invoice-referee-02-workflow.md#t07--human-action-validation-closure-và-input-revision).
+### 2.7 Quy trình xử lý hồ sơ toàn trình (Application Pipeline — T06) — `planned`
+- Quy trình đi tuần tự từ kiểm tra sơ bộ, OCR, trích xuất dữ liệu đến đánh giá quy tắc.
+- Điểm kiểm tra chốt chặn tiếp nhận tín hiệu dừng `Stop` trước và sau mỗi lệnh gọi API ngoài.
+- Nếu người vận hành bấm dừng, hệ thống không áp dụng kết quả trả về muộn của mô hình.
+- Chi tiết thiết kế: [Workflow Plan T06](superpowers/plans/2026-10-04-invoice-referee-02-workflow.md#t06--production-pipeline-và-vertical-slice).
 
-9. **Giao diện Web & Điểm cuối API (FastAPI & React UI — T09, T10)** — `planned — not built`:
-   - FastAPI cung cấp REST API cho toàn bộ tác vụ hồ sơ, tiến trình xử lý, can thiệp con người và kiểm thử Verify.
-   - Giao diện người dùng Web (React + TypeScript + Vite) hỗ trợ 4 chế độ demo rõ ràng (`EMPLOYEE`, `REVIEWER`, `APPROVER`, `POLICY_OWNER`), form nộp hồ sơ, khung xem chứng từ gốc và dòng thời gian kiểm toán minh bạch.
-   - Chi tiết thiết kế: [Workflow Plan T09–T10](superpowers/plans/2026-10-04-invoice-referee-02-workflow.md#t09--fastapi-composition-và-contract-responses).
+### 2.8 Tương tác con người & Tái đánh giá (Human Action Loop — T07, T08) — `planned`
+- Hàm `validate_human_action` kiểm tra thẩm quyền nghiệp vụ trước khi áp dụng hành động.
+- Hành động con người chỉ đóng đúng vấn đề được giải quyết tương ứng.
+- Khi dữ liệu đầu vào thay đổi, các phê duyệt cũ bị ảnh hưởng tự động hết hiệu lực.
+- Thao tác ghi đè `OVERRIDE` bảo toàn nguyên vẹn phán quyết gốc để phục vụ kiểm toán.
+- Chi tiết thiết kế: [Workflow Plan T07–T08](superpowers/plans/2026-10-04-invoice-referee-02-workflow.md#t07--human-action-validation-closure-và-input-revision).
 
-10. **Bộ kiểm thử tự động Verify & Đóng băng Baseline B1 (Verify Harness — T11, T12)** — `planned — not built`:
-    - Bộ công cụ Verify tự động chạy trực tiếp trên đường production service của ứng dụng, xuất báo cáo kết quả kèm timestamp và số liệu đối chiếu expected/actual.
-    - Hai suite chuẩn: **Core 4** (chạy tuần tự 4 case) và **Escalation 5** (3 routine + 2 escalation).
-    - Bộ ngữ liệu chuẩn >= 15 ca thử nghiệm có nhãn độc lập; đóng băng bộ artifacts B1 để làm thước đo so sánh cho B2.
-    - Chi tiết thiết kế: [Evidence/Release Plan T11–T12](superpowers/plans/2026-10-04-invoice-referee-03-evidence-release.md#t11--corpus-có-gold-độc-lập-và-verify-qua-production-service).
+### 2.9 Giao diện Web & Điểm cuối API (FastAPI & React UI — T09, T10) — `planned`
+- FastAPI cung cấp các điểm cuối REST API phục vụ vận hành hồ sơ và kiểm thử.
+- Giao diện Web hỗ trợ chuyển đổi linh hoạt bốn vai trò trình diễn nghiệp vụ.
+- Bảng điều khiển hiển thị đầy đủ chứng từ gốc, cảnh báo và nhật ký kiểm toán minh bạch.
+- Chi tiết thiết kế: [Workflow Plan T09–T10](superpowers/plans/2026-10-04-invoice-referee-02-workflow.md#t09--fastapi-composition-và-contract-responses).
+
+### 2.10 Bộ kiểm thử tự động Verify & Đóng băng Baseline B1 (Verify Harness — T11, T12) — `planned`
+- Bộ công cụ Verify chạy trực tiếp trên đường dịch vụ chính của ứng dụng.
+- Bộ công cụ Verify in bảng tổng hợp đạt/không đạt kèm dấu thời gian thực.
+- Hai bộ kiểm thử chuẩn gồm Core 4 ca và Escalation 5 ca theo đúng thể lệ cuộc thi.
+- Chi tiết thiết kế: [Evidence/Release Plan T11–T12](superpowers/plans/2026-10-04-invoice-referee-03-evidence-release.md#t11--corpus-có-gold-độc-lập-và-verify-qua-production-service).
 
 ---
 
 ## 3. Các luồng dự kiến — chưa xây dựng (Planned — not built)
 
-Các module và tính năng dưới đây đã có hợp đồng và kế hoạch chi tiết nhưng **hoàn toàn chưa được xây dựng hoặc nối dây trong mã nguồn** tại trạng thái hiện tại:
+Các module và tính năng dưới đây đã có thiết kế chi tiết nhưng **hoàn toàn chưa được xây dựng hoặc nối dây trong mã nguồn**:
 
-1. **Pure Policy Evaluators & Decision Reducer (`T03`)** — `planned — not built`:
-   - Các file: `src/invoice_referee/policy/expenses.py`, `src/invoice_referee/policy/inventory.py`, `src/invoice_referee/policy/decision.py`.
-   - Mục đích: Đánh giá hợp lệ chi phí, hạn mức tự động 2tr/5tr, đối chiếu số học hóa đơn/kiểm kê và gom nhóm issue bất định.
+1. **Lớp lưu trữ SQLite & Kho Artifacts (`T04`)** — `planned — not built`:
+   - Các tệp dự kiến: `src/invoice_referee/storage/{schema.sql, repository.py, artifacts.py}`.
+   - Trách nhiệm: Lưu trữ snapshot, khóa giao dịch nguyên tử, chống tạo đề nghị chi trả trùng lặp.
 
-2. **Persistence Layer & Artifact Repository (`T04`)** — `planned — not built`:
-   - Các file: `src/invoice_referee/storage/schema.sql`, `src/invoice_referee/storage/repository.py`, `src/invoice_referee/storage/artifacts.py`.
-   - Mục đích: Lưu trữ cơ sở dữ liệu SQLite, quản lý file vật lý an toàn và bảo đảm chỉ có một `PaymentRequest` hoạt động cho mỗi hồ sơ.
+2. **Bộ điều hợp trích xuất OCR & Mô hình ngôn ngữ (`T05`)** — `planned — not built`:
+   - Các tệp dự kiến: `src/invoice_referee/extraction/{providers.py, validation.py, prompts/}`.
+   - Trách nhiệm: Gọi API Mistral OCR, gọi Kimi LLM trích xuất và kiểm tra hợp đồng dữ liệu.
 
-3. **External Providers Adapters (`T05`)** — `planned — not built`:
-   - Các file: `src/invoice_referee/extraction/providers.py`, `src/invoice_referee/extraction/validation.py`, prompts phân tích.
-   - Mục đích: Nối API Mistral OCR và mô hình Kimi để đọc chứng từ theo định dạng `SourceRegistry` và `DocumentFacts`.
+3. **Đường ống xử lý hoàn chỉnh & Dịch vụ ứng dụng (`T06`, `T08`)** — `planned — not built`:
+   - Các tệp dự kiến: `src/invoice_referee/application/{pipeline.py, service.py, executor.py}`.
+   - Trách nhiệm: Nối dây toàn trình từ tệp tải lên tới phán quyết, quản lý hàng đợi đơn và nút Stop.
 
-4. **Vertical Slice Pipeline & Service Orchestration (`T06`, `T08`)** — `planned — not built`:
-   - Các file: `src/invoice_referee/application/pipeline.py`, `src/invoice_referee/application/service.py`, `src/invoice_referee/application/executor.py`.
-   - Mục đích: Nối các module thành một chuỗi xử lý khép kín từ lúc nhận file tới khi ra quyết định, quản lý tiến trình và nút dừng `Stop`.
+4. **Xử lý hành động can thiệp của con người (`T07`)** — `planned — not built`:
+   - Tệp dự kiến: `src/invoice_referee/application/human.py`.
+   - Trách nhiệm: Xác thực thẩm quyền vai trò demo, hủy hiệu lực phê duyệt cũ khi đầu vào thay đổi.
 
-5. **Human Actions & Revision (`T07`)** — `planned — not built`:
-   - Các file: `src/invoice_referee/application/human.py`.
-   - Mục đích: Kiểm định và áp dụng các hành động can thiệp của con người vào hồ sơ đang xử lý.
+5. **Giao diện Web & Điểm cuối API (`T09`, `T10`)** — `planned — not built`:
+   - Các tệp dự kiến: `src/invoice_referee/api/app.py`, toàn bộ thư mục `frontend/`.
+   - Trách nhiệm: REST API FastAPI và giao diện React phục vụ ban giám khảo thao tác trực tiếp.
 
-6. **Web API & Frontend Client (`T09`, `T10`)** — `planned — not built`:
-   - Các file: `src/invoice_referee/api/app.py`, toàn bộ mã nguồn trong thư mục `frontend/`.
-   - Mục đích: Giao diện trực quan và REST API phục vụ vận hành, demo và chấm thi.
-
-7. **Verify Harness, Feedback Adaptation & Release (`T11` – `T16`)** — `planned — not built`:
-   - Các file: `src/invoice_referee/verify/`, `src/invoice_referee/adaptation/`, tài liệu bài thi chung kết.
-   - Mục đích: Đo lường độ chính xác, tự điều chỉnh ngưỡng từ phản hồi và đóng gói sản phẩm hoàn chỉnh.
+6. **Bộ kiểm thử tự động Verify & Thích ứng ngưỡng (`T11` – `T16`)** — `planned — not built`:
+   - Các tệp dự kiến: `src/invoice_referee/verify/`, `src/invoice_referee/adaptation/`, tài liệu chung kết.
+   - Trách nhiệm: Tự động hóa đánh giá trên tập kiểm thử độc lập, học ngưỡng từ phản hồi người dùng.
