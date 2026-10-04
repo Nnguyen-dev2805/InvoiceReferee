@@ -50,3 +50,26 @@ evidence pointers; nothing planned is recorded as done.
   full 88 → 100 passed.
 - Evidence: `docs/evidence/task-T02.md`.
 - Not done: policy/decision evaluators, storage, providers, pipeline, API, UI.
+
+## T03 — Policy, inventory/arithmetic, authority và decision reducer
+
+- Created `src/invoice_referee/policy/{expenses,inventory,decision}.py` (pure
+  evaluators; no provider/SQLite/UI imports).
+- Full rule matrix (Rulebook §3): SRC-01/02/03, CTX-01, MODE-01/02, SCOPE-01/02,
+  ELIG-01, AMT-01/02, LIM-01, AUTH-01, INV-01/02 (inventory only WORK_PURCHASE).
+  Inclusive thresholds: ≤2,000,000 ROUTINE_AUTO; >2m–≤5m BEYOND_AUTHORITY;
+  >5m BOTH LIM-01 + AUTH-01 (separate authorizations). Accepted amount never
+  raised/clipped/dropped; undetermined → no request.
+- Arithmetic templates TOTAL_ONLY / SIMPLE_ITEMIZED (ROUND_HALF_UP per line,
+  tolerance 1đ) / ITEMIZED_WITH_ADJUSTMENTS (UNKNOWN unless all terms present);
+  consistency and arithmetic are separate checks; duplicate item IDs rejected
+  before aggregation; unit-price exact on normalized basis. Reducer priority per
+  Rulebook §6; N/A ≠ whole-case eligible; missing matrix check → technical.
+- Tests: `tests/unit/test_expense_decisions.py`, `test_inventory_arithmetic.py`.
+  RED observed, then GREEN; full suite 142 → 147 passed after review round 1.
+- Review round 1 (Critical/Important): consume `MappingProposal.conflicts`
+  (INV-02 non-PASS); aggregate matrix rules per rule_id (worst-status-wins) for
+  multi-document bundles; SRC-01 split from non-BILL primary; SCOPE-02 UNKNOWN on
+  unusable currency; registry-less documents flagged not dropped.
+- Evidence: `docs/evidence/task-T03.md`.
+- Not done: storage, providers, pipeline, API, UI (downstream tasks).
