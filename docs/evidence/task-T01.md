@@ -1,8 +1,7 @@
 # T01 evidence — Domain contracts, demo policy và test builders
 
 - **Task:** T01 (contract ledger lock; master plan §3)
-- **Branch:** `rebuild` (no commits — work left in the working tree per Global
-  Constraints and AGENTS.md)
+- **Branch:** `rebuild` — committed at `064dc7d` (`feat(T01): domain contracts, demo policy và test builders`).
 - **Mode:** PIPELINE_FAKE_OR_REPLAY not applicable — T01 is a pure-contract task
   (no providers, no pipeline). Evidence is a focused unit suite on real records.
 - **Timestamp:** 2026-10-04T14:04:55Z

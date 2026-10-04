@@ -1,8 +1,7 @@
 # T02 evidence — Numeric parsing, source resolution và derived quality
 
 - **Task:** T02 (master plan §3.2 T02 row; §1–§2 Global Constraints)
-- **Branch:** `rebuild` — all work left **uncommitted** in the working tree
-  (no stage/commit/push; AGENTS.md and plan Global Constraints). No SHAs.
+- **Branch:** `rebuild` — committed at `eb11ab0` (`feat(T02): numeric parsing, source resolution và derived quality`).
 - **Mode:** pure-evaluator unit suite. No providers, no pipeline, no storage —
   `PIPELINE_FAKE_OR_REPLAY` / `LIVE_END_TO_END` are not applicable to T02.
 - **Timestamp:** 2026-10-04T14:29:25Z
