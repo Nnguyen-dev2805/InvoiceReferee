@@ -45,6 +45,7 @@ data/models/
 data/submissions/
 data/output/
 data/verify_runs/
+data/rebuild_backups/
 
 # Cong cu rieng (khong thuoc project)
 grgen/
