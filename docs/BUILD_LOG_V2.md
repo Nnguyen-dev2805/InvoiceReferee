@@ -229,3 +229,23 @@ evidence pointers; nothing planned is recorded as done.
   fake-mode doc note; sanitized echoed `original_name`.
 - Evidence: fake-provider wiring only; live quality/deployment unproven (T15).
 - Not done: UI, Verify, deployment (downstream tasks).
+
+## T10 — React product surfaces, human forms và controls
+
+- Created the `frontend/` React 18 + TypeScript + Vite workspace. `types.ts`
+  mirrors the real FastAPI DTOs and ledger enums (checked against
+  `create_runtime_app()` OpenAPI + `model_fields`); `api.ts` exports `createCase`,
+  `getCase`, `startRun`, `getRun`, `sendAction`, `stopRun` (+ list/evidence/
+  history/payment/policy) and `ApiError{code,message,status}`.
+- `CaseForm` (submit → create → run → poll), `CaseDetail` (decision/issues/
+  evidence, Stop pending→STOPPED, request-vs-transfer distinction), `HumanActions`
+  (owner-scoped kinds, required reason, amount as text→integer), `VerifyPanel`
+  (shell only, no simulated PASS). `App` polls 1000ms only while in flight and
+  clears the timer on unmount/terminal.
+- Flat Design tokens (teal/orange), semantic colors, visible focus, ≥44px touch
+  targets, reduced-motion, responsive grid. No emoji icons (inline SVG).
+- Tests: `CaseDetail.test.tsx` (3), `HumanActions.test.tsx` (2). RED observed
+  (component missing), then GREEN 5/5; `tsc --noEmit` + `vite build` clean;
+  API integration still 27 passed.
+- Evidence: component tests + build only; browser/manual paths owed to T15.
+- Not done: Verify wiring (T11), deployment (T15).
