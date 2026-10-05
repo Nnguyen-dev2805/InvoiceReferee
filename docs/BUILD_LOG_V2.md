@@ -205,3 +205,27 @@ evidence pointers; nothing planned is recorded as done.
   stamping it; stage_evidence unlink wraps the whole write; `_futures` pruned.
 - Evidence: fake/synthetic; live quality/remote cancellation unproven (T15).
 - Not done: API, UI (downstream tasks).
+
+## T09 — FastAPI composition và contract responses
+
+- Created `src/invoice_referee/api/{__init__,app}.py`: `create_app(service)`
+  (tests inject a service) and `create_runtime_app()` (composition root builds
+  repo/providers/policy/service ONCE). Routes: POST/GET `/cases`; POST
+  `/cases/{id}/runs`; GET `/runs/{id}`; POST `/cases/{id}/actions`; POST
+  `/runs/{id}/stop`; GET `/cases/{id}/history`, `/payment-request`,
+  `/evidence/{id}` (owned only); GET `/policy`, POST `/policy/activate`;
+  GET `/health`. No decision logic in routes. No Verify routes (T11).
+- `PROVIDER_MODE` explicit fake/live, no silent fallback (invalid/missing →
+  RuntimeError). Multipart intake (`claim_json` + files + roles) with strict
+  Claim + storage limits, never `stored_path`; ADD_EVIDENCE → `add_evidence`.
+  Error envelope `{code,message}` with the ledger DomainError→HTTP mapping;
+  execution-started failures live in the RunRecord, not HTTP. Policy activation
+  (POLICY_OWNER + reason) persists config+event; runtime starts INACTIVE.
+- Tests: `tests/integration/test_api.py` (real TestClient + T08 `runtime`
+  fixture). RED observed, then GREEN; full suite 342 → 369 passed.
+- Review round 1: malformed/non-JSON action body → 422 envelope (was 500);
+  removed the `CaseService.repo` leak (narrow read-only service methods);
+  `_http_error` preserves status; `ActionBody.payload` default_factory;
+  fake-mode doc note; sanitized echoed `original_name`.
+- Evidence: fake-provider wiring only; live quality/deployment unproven (T15).
+- Not done: UI, Verify, deployment (downstream tasks).

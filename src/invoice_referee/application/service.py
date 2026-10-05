@@ -51,6 +51,7 @@ from invoice_referee.application.executor import RunExecutor
 from invoice_referee.application.human import validate_human_action
 from invoice_referee.application.pipeline import process
 from invoice_referee.domain.models import (
+    AuditEvent,
     CaseRecord,
     CaseSnapshot,
     Claim,
@@ -59,6 +60,7 @@ from invoice_referee.domain.models import (
     DomainError,
     EvidenceBundle,
     HumanAction,
+    PaymentRequest,
     PipelineResult,
     PolicyActor,
     PolicyConfig,
@@ -110,6 +112,27 @@ class CaseService:
     def policy(self) -> PolicyConfig:
         """The active policy config the next run will use."""
         return self._policy
+
+    # --- read-only projections (T09 API routes) -------------------------------
+    # Narrow read accessors so the API never receives the mutable Repository (a
+    # route could otherwise bypass ``_ensure_open`` and mutate state). These only
+    # read; every mutation still goes through a service method.
+
+    def get_case(self, case_id: str) -> CaseRecord:
+        """Read one case (projection). Raises ``NOT_FOUND`` when absent."""
+        return self._repo.get_case(case_id)
+
+    def list_cases(self) -> list[CaseRecord]:
+        """Read all local cases (no tenancy)."""
+        return self._repo.list_cases()
+
+    def case_history(self, case_id: str) -> list[AuditEvent]:
+        """Read the audit timeline for a case."""
+        return self._repo.history(case_id)
+
+    def payment_request(self, case_id: str) -> PaymentRequest | None:
+        """Read the current (CREATED) payment request, if any."""
+        return self._repo.get_payment_request(case_id)
 
     # --- intake ---------------------------------------------------------------
 
