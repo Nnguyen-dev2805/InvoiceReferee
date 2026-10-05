@@ -101,3 +101,28 @@ evidence pointers; nothing planned is recorded as done.
   run_id identity comment; concurrency test asserts threads joined.
 - Evidence: `docs/evidence/task-T04.md`.
 - Not done: providers, pipeline, API, UI (downstream tasks).
+
+## T05 — Mistral OCR, per-document Kimi và cross-source proposals
+
+- Created `src/invoice_referee/extraction/{providers,validation}.py` + prompts
+  `{analyze-v1,cross-source-v1,repair-v1}.txt`. `Providers`/`LiveProviders`/
+  `FakeProviders` (same signatures, `.calls`, subclassable), `registry_from_ocr`,
+  `validate_document`. Thin `httpx` transport (no extra SDK); finite 60s timeout,
+  retries disabled.
+- One SHARED repair budget per invocation (malformed→schema-invalid→stop after
+  2nd with INVALID_ANALYSIS; no 3rd call); cross-source gets one extra. Repair
+  count/reason recorded. No fabricated scores: missing word score → None →
+  UNCERTAIN. No prose/label/case-ID leakage; one evidence per analyze.
+- Verified official Mistral OCR exposes native per-word confidence
+  (`confidence_scores_granularity="word"`), so the B1 quality gate is
+  provider-feasible — but real adequacy on Vietnamese receipts is unmeasured.
+  Live smoke deferred to T15 under explicit spend authorization.
+- Tests: `tests/unit/test_provider_contracts.py` (fake transports only). RED
+  observed, then GREEN; full suite 178 → 226 passed.
+- Review rounds 1–2: threshold_version into the analyze request hash; repair
+  count/reason recorded; `uncovered_item_regions` populated from OCR tables so
+  the TOTAL_ONLY anti-waiver guard is live; malformed OCR page → PROVIDER_FAILED;
+  coverage reconciliation relaxed to direction-only (valid itemized output is no
+  longer rejected on opaque label mismatch).
+- Evidence: `docs/evidence/provider-contract.md`, `docs/evidence/task-T05.md`.
+- Not done: pipeline, API, UI (downstream); live provider quality (T15).
