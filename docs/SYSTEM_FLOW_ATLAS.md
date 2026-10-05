@@ -1,20 +1,20 @@
 # InvoiceReferee — System Flow Atlas
 
 > **Bản đồ tổng thể, không sao chép văn bản (Map, not a copy)**
-> - Task: `T01 + T02 + T03 + T04 + T05` (Domain contracts, demo policy, test builders, numeric parsing, source resolution, quality usability, pure policy evaluators, inventory/arithmetic, authority, decision reducer, SQLite history, evidence artifacts, atomic request lifecycle, Mistral OCR, per-document Kimi & cross-source proposals).
-> - Package: `Work Package 01 — Core (T01–T05; hoàn thành toàn bộ Work Package 01)`.
-> - Accepted Revision: `e5eadd2` (`feat(T05): Mistral OCR, per-document Kimi và cross-source proposals` trên nhánh `rebuild`).
-> - Status: `Living Page Updated` — **T01, T02, T03, T04 & T05 IMPLEMENTED & VERIFIED (226 unit & integration tests passing)**. Các task từ T06 đến T16 ở trạng thái kế hoạch (`PLANNED — not built`).
-> - Updated At: `2026-10-05T07:45:00+07:00`.
+> - Task: `T01 + T02 + T03 + T04 + T05 + T06` (Domain contracts, demo policy, test builders, numeric parsing, source resolution, quality usability, pure policy evaluators, inventory/arithmetic, authority, decision reducer, SQLite history, evidence artifacts, atomic request lifecycle, Mistral OCR, per-document Kimi, cross-source proposals, production pipeline & vertical slice).
+> - Package: `Work Package 01 — Core (hoàn thành) & Work Package 02 — Workflow (bắt đầu T06)`.
+> - Accepted Revision: `33b8590` (`feat(T06): production pipeline và vertical slice` trên nhánh `rebuild`).
+> - Status: `Living Page Updated` — **T01–T06 IMPLEMENTED & VERIFIED (247 unit & integration tests passing)**. Các task từ T07 đến T16 ở trạng thái kế hoạch (`PLANNED — not built`).
+> - Updated At: `2026-10-05T08:20:00+07:00`.
 > - Quy tắc: Atlas là **bản đồ điều hướng** (zoom-out), áp dụng các nguyên lý **ASD-STE100** (câu ngắn, một nghĩa, điều kiện trước hành động sau, triệt tiêu mơ hồ, bảo toàn dữ kiện kỹ thuật). Không sao chép văn xuôi từ các tài liệu đặc tả ([B1_PRODUCT_SPEC.md](specs/B1_PRODUCT_SPEC.md), [B1_RULEBOOK.md](specs/B1_RULEBOOK.md), [B1_SYSTEM_SPEC.md](specs/B1_SYSTEM_SPEC.md)) hay kế hoạch thực thi ([Master Plan](superpowers/plans/2026-10-04-invoice-referee.md)).
 
 ---
 
 ## 1. Sơ đồ tổng thể toàn hệ thống (Master End-to-End System Flow)
 
-Sơ đồ thể hiện toàn bộ các thành phần của InvoiceReferee tính đến thời điểm hoàn thành **T01 + T02 + T03 + T04 + T05** (hoàn tất Work Package 01 — Core). 
-- Các khối **nền xanh viền đậm** (`IMPLEMENTED`) là các module nghiệp vụ thuần túy, tầng lưu trữ và tầng trích xuất đã hoàn thành và vượt qua 226 bài kiểm tra độc lập.
-- Các khối **nền xám viền nét đứt** (`planned — not built`) đại diện cho các tầng dịch vụ ứng dụng, pipeline, tương tác con người và giao diện sẽ được nối dây ở các task tiếp theo (T06 – T16).
+Sơ đồ thể hiện toàn bộ các thành phần của InvoiceReferee tính đến thời điểm hoàn thành **T01–T06** (mở lát cắt dọc toàn trình từ chứng từ đến quyết định). 
+- Các khối **nền xanh viền đậm** (`IMPLEMENTED`) là các module nghiệp vụ thuần túy, tầng lưu trữ, tầng trích xuất và tầng đường ống đã hoàn thành và vượt qua 247 bài kiểm tra độc lập.
+- Các khối **nền xám viền nét đứt** (`planned — not built`) đại diện cho các tầng dịch vụ ứng dụng, tương tác con người, API và giao diện sẽ được nối dây ở các task tiếp theo (T07 – T16).
 
 ```mermaid
 flowchart TD
@@ -29,7 +29,7 @@ flowchart TD
         APP["FastAPI app (invoice_referee.api.app:create_app)"]
     end
 
-    subgraph AppService["Tầng dịch vụ ứng dụng & Điều phối (T06, T08 — planned)"]
+    subgraph AppService["Tầng dịch vụ ứng dụng & Điều phối (T06 — IMPLEMENTED, T08 — planned)"]
         SVC["CaseService (submit / start_run / act / stop)"]
         EXEC["One-run Executor (threading / Stop signal)"]
         PIPE["Pipeline (process / preflight)"]
@@ -71,8 +71,8 @@ flowchart TD
     end
 
     %% Áp dụng style class cho nodes
-    class MODELS,CFG,NUM,QUAL,EXP,INV,DEC,REPO,ART,MISTRAL,KIMI,VAL implemented;
-    class UI,APP,SVC,EXEC,PIPE,HUMAN,VERIFY planned;
+    class MODELS,CFG,NUM,QUAL,EXP,INV,DEC,REPO,ART,MISTRAL,KIMI,VAL,PIPE implemented;
+    class UI,APP,SVC,EXEC,HUMAN,VERIFY planned;
 
     %% Tương tác luồng UI -> API -> Service (planned)
     UI -.->|"HTTP REST API"| APP
@@ -80,18 +80,17 @@ flowchart TD
     SVC -.->|"quản lý một luồng xử lý"| EXEC
     EXEC -.->|"thực thi pipeline"| PIPE
 
-    %% Pipeline kết nối tới Extraction và Preflight (planned)
-    PIPE -.->|"1. Preflight scope / inputs"| CFG
-    PIPE -.->|"2. Gửi file chứng từ"| MISTRAL
-    MISTRAL -.->|"SourceRegistry (registry_from_ocr)"| PIPE
-    PIPE -.->|"3. Analyze document facts"| KIMI
-    VAL -.->|"4. DocumentFacts hoàn chỉnh"| PIPE
+    %% Pipeline điều phối các tầng trích xuất và quy tắc (T06 IMPLEMENTED)
+    PIPE -.->|"1. đọc PolicyConfig trong snapshot (preflight)"| CFG
+    PIPE ==>|"2. trích xuất OCR (ocr)"| MISTRAL
+    MISTRAL ==>|"SourceRegistry (registry_from_ocr)"| PIPE
+    PIPE ==>|"3. phân tích chứng từ (analyze)"| KIMI
+    KIMI ==>|"kiểm tra hợp đồng (validate_document)"| VAL
+    VAL ==>|"chuẩn hóa chất lượng (derive_fact)"| QUAL
+    PIPE ==>|"tái chuẩn hóa ngưỡng active (derive_fact)"| QUAL
+    PIPE ==>|"4. đánh giá quy tắc (evaluate)"| DEC
 
-    %% Pipeline cấp dữ liệu cho T02 & T03 (planned execution path)
-    QUAL -.->|"5. Facts usable"| DEC
-    PIPE -.->|"6. Snapshot & Bundle hoàn chỉnh"| DEC
-
-    %% Tương tác nội bộ đã IMPLEMENTED giữa các evaluator, lưu trữ và trích xuất
+    %% Tương tác nội bộ đã IMPLEMENTED giữa các evaluator và lưu trữ
     DEC ==>|"gọi document checks"| EXP
     DEC ==>|"gọi arithmetic & inventory checks"| INV
     DEC ==>|"xác thực total của primary bill"| QUAL
@@ -99,13 +98,10 @@ flowchart TD
     INV ==>|"xác thực derived quality"| QUAL
     INV ==>|"tính toán Decimal 50"| NUM
     REPO ==>|"ghi tệp đính kèm an toàn (put_artifact)"| ART
-    KIMI ==>|"kiểm tra hợp đồng (validate_document)"| VAL
-    VAL ==>|"chuẩn hóa chất lượng (derive_fact)"| QUAL
 
-    %% Pipeline ghi nhận kết quả và lưu trữ (planned)
-    DEC -.->|"Decision"| PIPE
-    PIPE -.->|"Lưu kết quả run & audit"| REPO
-    PIPE -.->|"Lưu raw artifacts"| ART
+    %% Dịch vụ ghi nhận kết quả và lưu trữ (T08 planned)
+    SVC -.->|"Lưu kết quả run & audit (finalize_run)"| REPO
+    PIPE -.->|"Lưu raw artifacts (artifact_writer)"| ART
 
     %% Human loop và Verify runner (planned)
     UI -.->|"Gửi hành động con người"| HUMAN
@@ -114,7 +110,7 @@ flowchart TD
 ```
 
 ```text
-revision: e5eadd2
+revision: 33b8590
 - MODELS → src/invoice_referee/domain/models.py (T01 - IMPLEMENTED)
 - CFG → src/invoice_referee/config.py (T01 - IMPLEMENTED)
 - NUM → src/invoice_referee/policy/numeric.py:parse_candidates,normalize_quantity (T02 - IMPLEMENTED)
@@ -127,7 +123,7 @@ revision: e5eadd2
 - MISTRAL → src/invoice_referee/extraction/providers.py:Providers.ocr,registry_from_ocr (T05 - IMPLEMENTED)
 - KIMI → src/invoice_referee/extraction/providers.py:Providers.analyze,Providers.cross_source (T05 - IMPLEMENTED)
 - VAL → src/invoice_referee/extraction/validation.py:validate_document,is_applicable (T05 - IMPLEMENTED)
-- PIPE → src/invoice_referee/application/pipeline.py:process (T06 - planned — not built)
+- PIPE → src/invoice_referee/application/pipeline.py:process,preflight (T06 - IMPLEMENTED)
 - HUMAN → src/invoice_referee/application/human.py:validate_human_action (T07 - planned — not built)
 - SVC → src/invoice_referee/application/service.py:CaseService (T08 - planned — not built)
 - EXEC → src/invoice_referee/application/executor.py (T08 - planned — not built)
@@ -135,8 +131,8 @@ revision: e5eadd2
 - UI → frontend/src/App.tsx (T10 - planned — not built)
 - VERIFY → src/invoice_referee/verify/runner.py:VerifyRunner (T11 - planned — not built)
 edges: 
-- Mũi tên đôi đậm (==>): Các lệnh gọi trực tiếp giữa các module thuần túy, tầng lưu trữ và tầng trích xuất T01–T05 đã được IMPLEMENTED và VERIFIED bằng 226 bài kiểm tra (DEC gọi EXP, INV, QUAL; EXP và INV gọi QUAL; INV dùng NUM; REPO gọi ART; KIMI gọi VAL; VAL gọi QUAL).
-- Mũi tên nét đứt (-.->): Luồng tương tác kiến trúc dự kiến khi nối dây toàn bộ hệ thống từ UI, API tới Pipeline và Storage.
+- Mũi tên đôi đậm (==>): Các lệnh gọi trực tiếp giữa các module thuần túy, tầng lưu trữ, tầng trích xuất và tầng đường ống T01–T06 đã được IMPLEMENTED và VERIFIED bằng 247 bài kiểm tra (PIPE gọi MISTRAL, KIMI, QUAL và DEC; DEC gọi EXP, INV, QUAL; EXP và INV gọi QUAL; INV dùng NUM; REPO gọi ART; KIMI gọi VAL; VAL gọi QUAL).
+- Mũi tên nét đứt (-.->): Luồng tương tác kiến trúc dự kiến khi nối dây toàn bộ hệ thống từ UI, API tới Service và Storage (hoặc phụ thuộc dữ liệu tĩnh như PIPE đọc cấu hình chính sách từ snapshot).
 ```
 
 ---
@@ -229,11 +225,21 @@ edges:
 - Hàm `validate_document` tính toán lại chất lượng dữ kiện bằng hàm thuần `derive_fact` thay vì tin tưởng mô hình.
 - Chi tiết: [providers.py](../src/invoice_referee/extraction/providers.py), [validation.py](../src/invoice_referee/extraction/validation.py), [task-T05.md](evidence/task-T05.md), [provider-contract.md](evidence/provider-contract.md).
 
-### 2.7 Quy trình xử lý hồ sơ toàn trình (Application Pipeline — T06) — `planned`
-- Quy trình đi tuần tự từ kiểm tra sơ bộ, OCR, trích xuất dữ liệu đến đánh giá quy tắc.
-- Điểm kiểm tra chốt chặn tiếp nhận tín hiệu dừng `Stop` trước và sau mỗi lệnh gọi API ngoài.
-- Nếu người vận hành bấm dừng, hệ thống không áp dụng kết quả trả về muộn của mô hình.
-- Chi tiết thiết kế: [Workflow Plan T06](superpowers/plans/2026-10-04-invoice-referee-02-workflow.md#t06--production-pipeline-và-vertical-slice).
+### 2.7 Quy trình xử lý hồ sơ toàn trình (Application Pipeline — T06)
+- Hàm `process` điều phối quy trình xử lý toàn trình từ kiểm tra sơ bộ đến đánh giá quyết định.
+- Hàm `preflight` xử lý sớm các trường hợp không cần gọi bộ điều hợp ngoài.
+- Nếu cấu hình chính sách chưa kích hoạt, hàm `preflight` trả về mã kỹ thuật `CONFIG_NOT_ACTIVE`.
+- Nếu người dùng khai báo chi cá nhân hoặc công ty thanh toán, hệ thống trả về `REJECT` trước khi gọi bộ điều hợp ngoài.
+- Nếu hồ sơ thiếu hóa đơn chính hoặc có nhiều hóa đơn chính, hệ thống trả về `REQUEST_INFO`.
+- Quy trình đường ống không bao giờ tự tạo đề nghị chi trả hoặc ghi vào cơ sở dữ liệu.
+- Điểm kiểm tra chốt chặn tiếp nhận tín hiệu dừng trước và sau mỗi lệnh gọi dịch vụ ngoài.
+- Nếu người vận hành bấm dừng, ngoại lệ `StoppedRun` được lan truyền để chuyển trạng thái sang `STOPPED`.
+- Hệ thống loại bỏ hoàn toàn kết quả muộn sau khi dừng và không áp dụng kết quả đó.
+- Hệ thống tái chuẩn hóa chất lượng dữ kiện bằng ngưỡng tin cậy của chính sách đang kích hoạt.
+- Mã nguồn quyết định tính áp dụng của các phép kiểm tra và ngăn chặn miễn trừ trái phép.
+- Quy trình chỉ kích hoạt đối chiếu chéo khi hồ sơ thuộc nhóm mua sắm vật tư (`WORK_PURCHASE`).
+- Hàm `process` trả về kết quả `PipelineResult` gồm phán quyết, chứng từ, thời gian và số lượt gọi.
+- Chi tiết: [pipeline.py](../src/invoice_referee/application/pipeline.py), [test_pipeline.py](../tests/integration/test_pipeline.py), [task-T06.md](evidence/task-T06.md), [BUILD_LOG_V2.md](BUILD_LOG_V2.md).
 
 ### 2.8 Tương tác con người & Tái đánh giá (Human Action Loop — T07, T08) — `planned`
 - Hàm `validate_human_action` kiểm tra thẩm quyền nghiệp vụ trước khi áp dụng hành động.
@@ -260,13 +266,13 @@ edges:
 
 Các module và tính năng dưới đây đã có thiết kế chi tiết nhưng **hoàn toàn chưa được xây dựng hoặc nối dây trong mã nguồn**:
 
-1. **Đường ống xử lý hoàn chỉnh & Dịch vụ ứng dụng (`T06`, `T08`)** — `planned — not built`:
-   - Các tệp dự kiến: `src/invoice_referee/application/{pipeline.py, service.py, executor.py}`.
-   - Trách nhiệm: Nối dây toàn trình từ tệp tải lên tới phán quyết, quản lý hàng đợi đơn và nút Stop.
-
-2. **Xử lý hành động can thiệp của con người (`T07`)** — `planned — not built`:
+1. **Xử lý hành động can thiệp của con người (`T07`)** — `planned — not built`:
    - Tệp dự kiến: `src/invoice_referee/application/human.py`.
    - Trách nhiệm: Xác thực thẩm quyền vai trò demo, hủy hiệu lực phê duyệt cũ khi đầu vào thay đổi.
+
+2. **Dịch vụ phiên & Quản lý thực thi (`T08`)** — `planned — not built`:
+   - Các tệp dự kiến: `src/invoice_referee/application/{service.py, executor.py}`.
+   - Trách nhiệm: Dịch vụ ứng dụng `CaseService`, điều phối một lượt chạy đơn luồng và xử lý nút Stop.
 
 3. **Giao diện Web & Điểm cuối API (`T09`, `T10`)** — `planned — not built`:
    - Các tệp dự kiến: `src/invoice_referee/api/app.py`, toàn bộ thư mục `frontend/`.
