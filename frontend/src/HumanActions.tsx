@@ -17,6 +17,15 @@ const MODE_KINDS: Record<DemoMode, HumanActionKind[]> = {
   POLICY_OWNER: ['GRANT_POLICY_EXCEPTION', 'APPROVE_AMOUNT', 'DENY'],
 };
 
+const MODE_LABEL: Record<DemoMode, string> = {
+  EMPLOYEE: 'Nhân viên',
+  REVIEWER: 'Kế toán / Reviewer',
+  APPROVER: 'Người phê duyệt',
+  POLICY_OWNER: 'Chủ sở hữu policy',
+};
+
+const MODE_ORDER: DemoMode[] = ['EMPLOYEE', 'REVIEWER', 'APPROVER', 'POLICY_OWNER'];
+
 const KIND_LABEL: Record<HumanActionKind, string> = {
   SUPPLY_DECLARATION: 'Bổ sung khai báo',
   ADD_EVIDENCE: 'Bổ sung chứng từ',
@@ -31,9 +40,13 @@ const KIND_LABEL: Record<HumanActionKind, string> = {
 };
 
 export function HumanActions({ caseRecord, decision, onAction }: HumanActionsProps) {
-  const ownerMode = decision.issues[0]?.owner_mode ?? 'EMPLOYEE';
-  const kinds = MODE_KINDS[ownerMode];
   const openIssue = decision.issues.find((issue) => issue.status === 'OPEN') ?? decision.issues[0];
+  const issueOwner = openIssue?.owner_mode;
+  // Default to the role the backend assigned to the issue, but let the operator
+  // switch roles for the demo (Product §5: one person may act in several modes).
+  // The backend still enforces role/scope, so a wrong choice is rejected.
+  const [mode, setMode] = useState<DemoMode>(issueOwner ?? 'EMPLOYEE');
+  const kinds = MODE_KINDS[mode];
 
   const [kind, setKind] = useState<HumanActionKind>(kinds[0]);
   const [reason, setReason] = useState('');
@@ -42,9 +55,14 @@ export function HumanActions({ caseRecord, decision, onAction }: HumanActionsPro
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function changeMode(next: DemoMode) {
+    setMode(next);
+    setKind(MODE_KINDS[next][0]); // the current kind may not exist for the new role
+    setError(null);
+  }
+
   const needsAmount = kind === 'APPROVE_AMOUNT' || kind === 'GRANT_POLICY_EXCEPTION';
   const needsField = kind === 'CONFIRM_FIELD' || kind === 'PROPOSE_CORRECTION';
-  const issueOwner = openIssue?.owner_mode;
 
   const payload = useMemo<Record<string, unknown>>(() => {
     if (needsAmount) {
@@ -81,7 +99,7 @@ export function HumanActions({ caseRecord, decision, onAction }: HumanActionsPro
       await onAction({
         case_version: caseRecord.case_version,
         issue_id: openIssue?.id ?? null,
-        mode: ownerMode,
+        mode,
         kind,
         payload,
         reason: reason.trim(),
@@ -99,8 +117,9 @@ export function HumanActions({ caseRecord, decision, onAction }: HumanActionsPro
     <section className="panel" aria-labelledby="actions-heading">
       <h2 id="actions-heading">Xử lý hồ sơ</h2>
       <p className="muted">
-        Chế độ demo: <strong>{ownerMode}</strong>
-        {issueOwner && issueOwner !== ownerMode && ` (vấn đề thuộc ${issueOwner})`}
+        Đăng nhập demo — một người có thể chuyển vai trò. Hệ thống vẫn kiểm tra
+        quyền của từng hành động.
+        {issueOwner && issueOwner !== mode && ` Vấn đề hiện thuộc ${MODE_LABEL[issueOwner]}.`}
       </p>
 
       {decision.accepted_amount_vnd !== null && (
@@ -108,6 +127,21 @@ export function HumanActions({ caseRecord, decision, onAction }: HumanActionsPro
       )}
 
       <form onSubmit={submit} noValidate>
+        <div className="field">
+          <label htmlFor="action-mode">Vai trò (demo)</label>
+          <select
+            id="action-mode"
+            value={mode}
+            onChange={(event) => changeMode(event.target.value as DemoMode)}
+          >
+            {MODE_ORDER.map((option) => (
+              <option key={option} value={option}>
+                {MODE_LABEL[option]}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="field">
           <label htmlFor="action-kind">Hành động</label>
           <select
