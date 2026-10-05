@@ -1,27 +1,27 @@
 # InvoiceReferee — System Flow Atlas
 
 > **Bản đồ tổng thể, không sao chép văn bản (Map, not a copy)**
-> - Task: `T01 + T02 + T03 + T04 + T05 + T06 + T07 + T08 + T09` (Domain contracts, demo policy, test builders, numeric parsing, source resolution, quality usability, pure policy evaluators, inventory/arithmetic, authority, decision reducer, SQLite history, evidence artifacts, atomic request lifecycle, Mistral OCR, per-document Kimi, cross-source proposals, production pipeline & vertical slice, human action validation, closure & input revision, one-process executor, atomic action, Stop/Override, CaseService, FastAPI composition & contract responses).
-> - Package: `Work Package 01 — Core (hoàn thành) & Work Package 02 — Workflow (T06–T09 hoàn thành; T10 planned)`.
-> - Accepted Revision: `4a1c470` (`feat(T09): FastAPI composition và contract responses` trên nhánh `rebuild`).
-> - Status: `Living Page Updated` — **T01–T09 IMPLEMENTED & VERIFIED (369 unit & integration tests passing)**. Các task từ T10 đến T16 ở trạng thái kế hoạch (`PLANNED — not built`).
-> - Updated At: `2026-10-05T12:10:00+07:00`.
+> - Task: `T01 + T02 + T03 + T04 + T05 + T06 + T07 + T08 + T09 + T10` (Domain contracts, demo policy, test builders, numeric parsing, source resolution, quality usability, pure policy evaluators, inventory/arithmetic, authority, decision reducer, SQLite history, evidence artifacts, atomic request lifecycle, Mistral OCR, per-document Kimi, cross-source proposals, production pipeline & vertical slice, human action validation, closure & input revision, one-process executor, atomic action, Stop/Override, CaseService, FastAPI composition & contract responses, React product surfaces, human forms & controls).
+> - Package: `Work Package 01 — Core (hoàn thành) & Work Package 02 — Workflow (hoàn thành)`.
+> - Accepted Revision: `aaed9d2` (`feat(T10): React product surfaces, human forms và controls` trên nhánh `rebuild`).
+> - Status: `Living Page Updated` — **T01–T10 IMPLEMENTED & VERIFIED (369 backend unit/integration tests + 5 frontend tests passing, clean Vite build)**. Các task từ T11 đến T16 ở trạng thái kế hoạch (`PLANNED — not built`).
+> - Updated At: `2026-10-05T12:28:00+07:00`.
 > - Quy tắc: Atlas là **bản đồ điều hướng** (zoom-out), áp dụng các nguyên lý **ASD-STE100** (câu ngắn, một nghĩa, điều kiện trước hành động sau, triệt tiêu mơ hồ, bảo toàn dữ kiện kỹ thuật). Không sao chép văn xuôi từ các tài liệu đặc tả ([B1_PRODUCT_SPEC.md](specs/B1_PRODUCT_SPEC.md), [B1_RULEBOOK.md](specs/B1_RULEBOOK.md), [B1_SYSTEM_SPEC.md](specs/B1_SYSTEM_SPEC.md)) hay kế hoạch thực thi ([Master Plan](superpowers/plans/2026-10-04-invoice-referee.md)).
 
 ---
 
 ## 1. Sơ đồ tổng thể toàn hệ thống (Master End-to-End System Flow)
 
-Sơ đồ thể hiện toàn bộ các thành phần của InvoiceReferee tính đến thời điểm hoàn thành **T01–T09** (hoàn thành T06–T09 của tầng Workflow và mở điểm cuối API REST phục vụ tích hợp). 
-- Các khối **nền xanh viền đậm** (`IMPLEMENTED`) là các module nghiệp vụ thuần túy, tầng lưu trữ, tầng trích xuất, tầng đường ống, bộ xác thực hành động con người, tầng dịch vụ ứng dụng và tầng API FastAPI đã hoàn thành và vượt qua 369 bài kiểm tra độc lập.
-- Các khối **nền xám viền nét đứt** (`planned — not built`) đại diện cho giao diện Web React và bộ kiểm thử tự động Verify sẽ được nối dây ở các task tiếp theo (T10 – T16).
+Sơ đồ thể hiện toàn bộ các thành phần của InvoiceReferee tính đến thời điểm hoàn thành **T01–T10** (hoàn tất toàn bộ tầng Workflow, điểm cuối API REST và giao diện người dùng Web React). 
+- Các khối **nền xanh viền đậm** (`IMPLEMENTED`) là các module nghiệp vụ thuần túy, tầng lưu trữ, tầng trích xuất, tầng đường ống, bộ xác thực hành động con người, tầng dịch vụ ứng dụng, tầng API FastAPI và giao diện Web React đã hoàn thành và vượt qua 369 bài kiểm tra backend, 5 bài kiểm tra frontend component.
+- Các khối **nền xám viền nét đứt** (`planned — not built`) đại diện cho bộ kiểm thử tự động Verify sẽ được nối dây ở các task tiếp theo (T11 – T16).
 
 ```mermaid
 flowchart TD
     classDef implemented fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
     classDef planned fill:#f9f9f9,stroke:#9e9e9e,stroke-width:1px,stroke-dasharray: 5 5;
 
-    subgraph UIClient["Giao diện người dùng (T10 — planned)"]
+    subgraph UIClient["Giao diện người dùng (T10 — IMPLEMENTED)"]
         UI["Web UI (React / Vite / TypeScript)"]
     end
 
@@ -71,11 +71,11 @@ flowchart TD
     end
 
     %% Áp dụng style class cho nodes
-    class MODELS,CFG,NUM,QUAL,EXP,INV,DEC,REPO,ART,MISTRAL,KIMI,VAL,PIPE,HUMAN,SVC,EXEC,APP implemented;
-    class UI,VERIFY planned;
+    class MODELS,CFG,NUM,QUAL,EXP,INV,DEC,REPO,ART,MISTRAL,KIMI,VAL,PIPE,HUMAN,SVC,EXEC,APP,UI implemented;
+    class VERIFY planned;
 
-    %% Tương tác luồng UI -> API -> Service (T10 planned, T09 IMPLEMENTED)
-    UI -.->|"HTTP REST API"| APP
+    %% Tương tác luồng UI -> API -> Service (T10, T09 IMPLEMENTED)
+    UI ==>|"HTTP REST API (frontend/src/api.ts)"| APP
     APP ==>|"gọi application methods (submit / start_run / act / stop)"| SVC
 
     %% Dịch vụ ứng dụng điều phối thực thi và đường ống (T08 IMPLEMENTED)
@@ -110,7 +110,7 @@ flowchart TD
 ```
 
 ```text
-revision: 4a1c470
+revision: aaed9d2
 - MODELS → src/invoice_referee/domain/models.py (T01 - IMPLEMENTED)
 - CFG → src/invoice_referee/config.py (T01 - IMPLEMENTED)
 - NUM → src/invoice_referee/policy/numeric.py:parse_candidates,normalize_quantity (T02 - IMPLEMENTED)
@@ -128,11 +128,11 @@ revision: 4a1c470
 - SVC → src/invoice_referee/application/service.py:CaseService (T08 - IMPLEMENTED)
 - EXEC → src/invoice_referee/application/executor.py:RunExecutor (T08 - IMPLEMENTED)
 - APP → src/invoice_referee/api/app.py:create_app,create_runtime_app (T09 - IMPLEMENTED)
-- UI → frontend/src/App.tsx (T10 - planned — not built)
+- UI → frontend/src/App.tsx,CaseForm,CaseDetail,HumanActions,VerifyPanel (T10 - IMPLEMENTED)
 - VERIFY → src/invoice_referee/verify/runner.py:VerifyRunner (T11 - planned — not built)
 edges: 
-- Mũi tên đôi đậm (==>): Các lệnh gọi trực tiếp giữa các module nghiệp vụ thuần túy, tầng lưu trữ, tầng trích xuất, tầng đường ống, tầng dịch vụ điều phối và tầng điểm cuối API T01–T09 đã được IMPLEMENTED và VERIFIED bằng 369 bài kiểm tra (APP gọi SVC; SVC điều phối EXEC, HUMAN, REPO và ART; EXEC chạy PIPE ngầm và gọi REPO.finalize_run; PIPE gọi MISTRAL, KIMI, QUAL và DEC; DEC gọi EXP, INV, QUAL; EXP và INV gọi QUAL; INV dùng NUM; REPO gọi ART; KIMI gọi VAL; VAL gọi QUAL).
-- Mũi tên nét đứt (-.->): Luồng tương tác kiến trúc dự kiến khi nối dây từ UI tới API (T10), hoặc kiểm thử Verify (T11), và phụ thuộc dữ liệu tĩnh như PIPE đọc cấu hình chính sách từ snapshot.
+- Mũi tên đôi đậm (==>): Các lệnh gọi trực tiếp giữa giao diện người dùng, tầng API, tầng dịch vụ điều phối, tầng đường ống, tầng trích xuất, tầng quy tắc nghiệp vụ và tầng lưu trữ T01–T10 đã được IMPLEMENTED và VERIFIED bằng 369 bài kiểm tra backend, 5 bài kiểm tra frontend component và bản build TypeScript/Vite sạch (UI gọi API qua frontend/src/api.ts; APP gọi SVC; SVC điều phối EXEC, HUMAN, REPO và ART; EXEC chạy PIPE ngầm và gọi REPO.finalize_run; PIPE gọi MISTRAL, KIMI, QUAL và DEC; DEC gọi EXP, INV, QUAL; EXP và INV gọi QUAL; INV dùng NUM; REPO gọi ART; KIMI gọi VAL; VAL gọi QUAL). Tích hợp trọn vẹn UI↔API qua trình duyệt thật thuộc T15; các test hiện chứng minh hai đầu đường biên riêng biệt.
+- Mũi tên nét đứt (-.->): Luồng tương tác kiến trúc dự kiến của bộ kiểm thử tự động Verify (T11), và phụ thuộc dữ liệu tĩnh như PIPE đọc cấu hình chính sách từ snapshot.
 ```
 
 ---
@@ -295,10 +295,20 @@ edges:
 - Điểm cuối kiểm tra sức khỏe (`/api/health`) báo cáo trạng thái sẵn sàng mà không để lộ thông tin bảo mật.
 - Chi tiết: [app.py](../src/invoice_referee/api/app.py), [test_api.py](../tests/integration/test_api.py), [task-T09.md](evidence/task-T09.md), [BUILD_LOG_V2.md](BUILD_LOG_V2.md).
 
-### 2.11 Giao diện người dùng Web (React Frontend — T10) — `planned`
-- Giao diện Web hỗ trợ chuyển đổi linh hoạt bốn vai trò trình diễn nghiệp vụ.
-- Bảng điều khiển hiển thị đầy đủ chứng từ gốc, cảnh báo và nhật ký kiểm toán minh bạch.
-- Chi tiết thiết kế: [Workflow Plan T10](superpowers/plans/2026-10-04-invoice-referee-02-workflow.md#t10--react-product-surfaces-human-forms-và-controls).
+### 2.11 Giao diện người dùng Web & Biểu mẫu can thiệp (React Frontend — T10)
+- Ứng dụng giao diện Web xây dựng trên nền tảng React 18, TypeScript và Vite.
+- Tệp `types.ts` ánh xạ chuẩn xác các kiểu DTO và danh mục hằng số từ OpenAPI của backend.
+- Tệp `api.ts` cung cấp đầy đủ các hàm gọi API tương ứng với các điểm cuối của FastAPI.
+- Biểu mẫu `CaseForm` tiếp nhận dữ liệu tờ khai, tải lên chứng từ và kích hoạt lượt chạy.
+- Bảng hiển thị `CaseDetail` thể hiện phán quyết, vấn đề cần giải quyết và danh sách chứng từ gốc.
+- Giao diện phân biệt rõ ràng giữa trạng thái đề nghị chi trả và trạng thái đã chuyển tiền.
+- Nút dừng `Stop` cập nhật tức thời trạng thái chờ dừng trước khi chuyển sang dừng hoàn tất.
+- Khối `HumanActions` hiển thị các hành động tương ứng với vai trò và bắt buộc nhập lý do.
+- Thao tác phê duyệt tiền mặt yêu cầu nhập số tiền dưới dạng văn bản và chuyển đổi thành số nguyên.
+- Khung giao diện kiểm thử `VerifyPanel` là vỏ bọc chờ nối dây và không hiển thị kết quả giả lập.
+- Ứng dụng thực hiện truy vấn định kỳ một giây một lần khi có lượt chạy và tự dọn dẹp bộ đếm.
+- Thiết kế giao diện phẳng tuân thủ màu sắc ngữ nghĩa, vùng chạm tối thiểu và khả năng tiếp cận.
+- Chi tiết: [App.tsx](../frontend/src/App.tsx), [CaseForm.tsx](../frontend/src/CaseForm.tsx), [CaseDetail.tsx](../frontend/src/CaseDetail.tsx), [HumanActions.tsx](../frontend/src/HumanActions.tsx), [VerifyPanel.tsx](../frontend/src/VerifyPanel.tsx), [api.ts](../frontend/src/api.ts), [task-T10.md](evidence/task-T10.md), [BUILD_LOG_V2.md](BUILD_LOG_V2.md).
 
 ### 2.12 Bộ kiểm thử tự động Verify & Đóng băng Baseline B1 (Verify Harness — T11, T12) — `planned`
 - Bộ công cụ Verify chạy trực tiếp trên đường dịch vụ chính của ứng dụng.
@@ -312,10 +322,6 @@ edges:
 
 Các module và tính năng dưới đây đã có thiết kế chi tiết nhưng **hoàn toàn chưa được xây dựng hoặc nối dây trong mã nguồn**:
 
-1. **Giao diện Web React (`T10`)** — `planned — not built`:
-   - Các tệp dự kiến: toàn bộ thư mục `frontend/`.
-   - Trách nhiệm: Giao diện React phục vụ ban giám khảo thao tác trực tiếp và chuyển đổi 4 vai trò.
-
-2. **Bộ kiểm thử tự động Verify & Thích ứng ngưỡng (`T11` – `T16`)** — `planned — not built`:
+1. **Bộ kiểm thử tự động Verify & Thích ứng ngưỡng (`T11` – `T16`)** — `planned — not built`:
    - Các tệp dự kiến: `src/invoice_referee/verify/`, `src/invoice_referee/adaptation/`, tài liệu chung kết.
    - Trách nhiệm: Tự động hóa đánh giá trên tập kiểm thử độc lập, học ngưỡng từ phản hồi người dùng.
