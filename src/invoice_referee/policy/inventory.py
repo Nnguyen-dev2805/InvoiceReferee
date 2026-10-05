@@ -84,9 +84,7 @@ def _document_arithmetic(
         )
         return 'UNKNOWN' if needs else 'NOT_APPLICABLE'
     if doc.template == 'ITEMIZED_WITH_ADJUSTMENTS':
-        if any(name not in doc.fields for name in _ADJUSTMENT_TERMS):
-            return 'UNKNOWN'  # a missing term must not default to 0
-        return 'UNKNOWN'  # subtotal/tax/fees/discount basis not modeled in T03 inputs
+        return _adjustments_arithmetic(doc, registry, policy, confirmations)
 
     # SIMPLE_ITEMIZED
     tolerance = Decimal(policy.comparison_money_tolerance)
@@ -114,6 +112,62 @@ def _document_arithmetic(
     if total is None:
         return 'UNKNOWN'
     if abs(line_total - total) > tolerance:
+        return 'FAIL'
+    return 'PASS'
+
+
+def _adjustments_arithmetic(
+    doc: DocumentFacts, registry: SourceRegistry, policy: PolicyConfig, confirmations=None
+) -> str:
+    """AMT-02 for ITEMIZED_WITH_ADJUSTMENTS: total == subtotal + tax + fees - discount.
+
+    Only terms the model DECLARED present on the document are summed. A declared
+    term that is present but not usable is UNKNOWN (never default 0); an undeclared
+    term contributes 0. Requiring a declaration is what distinguishes a genuinely
+    absent adjustment line from one the model silently dropped.
+    """
+    tolerance = Decimal(policy.comparison_money_tolerance)
+    declared = set(doc.declared_adjustment_terms)
+    if not declared:
+        return 'UNKNOWN'  # adjustments template with no declared term: no basis
+
+    subtotal = _derive_value(
+        doc.fields.get('subtotal'), registry, policy,
+        _confirmation_for(confirmations, doc.evidence_id, 'subtotal'))
+    total = _derive_value(
+        doc.fields.get('total'), registry, policy,
+        _confirmation_for(confirmations, doc.evidence_id, 'total'))
+    if subtotal is None or total is None:
+        return 'UNKNOWN'
+
+    # Independent breakdown check when item line amounts are usable.
+    if doc.items:
+        line_total = Decimal('0')
+        for item in doc.items:
+            line = _derive_value(
+                item.line_amount, registry, policy,
+                _confirmation_for(confirmations, doc.evidence_id, 'line_amount', item.id))
+            if line is None:
+                line_total = None
+                break
+            line_total += line
+        if line_total is not None and abs(line_total - subtotal) > tolerance:
+            return 'FAIL'
+
+    adjustment = Decimal('0')
+    for name in ('tax', 'fees', 'discount'):
+        if name not in declared:
+            continue  # undeclared term contributes 0
+        value = _derive_value(
+            doc.fields.get(name), registry, policy,
+            _confirmation_for(confirmations, doc.evidence_id, name))
+        if value is None:
+            return 'UNKNOWN'  # declared present but unusable: never default 0
+        adjustment += value if name != 'discount' else -value
+
+    with localcontext(DECIMAL_CONTEXT):
+        expected = subtotal + adjustment
+    if abs(expected - total) > tolerance:
         return 'FAIL'
     return 'PASS'
 

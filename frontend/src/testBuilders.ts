@@ -103,7 +103,6 @@ export function caseRecord(): CaseRecord {
       purpose_type: 'BUSINESS',
       purpose: 'Công tác Hà Nội',
       trip: 'HN 01-02/10',
-      attendees: [],
       requested_amount_vnd: 1_200_000,
       payer_type: 'PERSONAL',
       received_full: null,

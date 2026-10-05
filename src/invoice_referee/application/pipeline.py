@@ -228,8 +228,9 @@ def process(
             _store(artifact_writer, artifacts, f'{evidence.id}-ocr.json',
                    json.dumps(raw.payload, ensure_ascii=False).encode('utf-8'))
             registry = _source_registry(providers, evidence, raw)
+            original_registry_json = registry.model_dump_json()
             _store(artifact_writer, artifacts, f'{evidence.id}-registry.json',
-                   registry.model_dump_json().encode('utf-8'))
+                   original_registry_json.encode('utf-8'))
             registries[evidence.id] = registry
 
             request = AnalysisRequest(
@@ -239,6 +240,12 @@ def process(
             )
             document = run_stage(
                 f'analyze:{evidence.id}', lambda r=request: providers.analyze(r))
+            # Compact decoding may add exact, code-owned word spans. Preserve
+            # the original registry artifact and the enriched one for replay.
+            field_registry_json = registry.model_dump_json()
+            if field_registry_json != original_registry_json:
+                _store(artifact_writer, artifacts, f'{evidence.id}-field-registry.json',
+                       field_registry_json.encode('utf-8'))
             _store(artifact_writer, artifacts, f'{evidence.id}-document.json',
                    document.model_dump_json().encode('utf-8'))
 

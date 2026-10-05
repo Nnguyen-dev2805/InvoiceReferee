@@ -79,7 +79,6 @@ class Claim(Record):
     purpose_type: PurposeType
     purpose: str
     trip: str
-    attendees: list[str] = Field(default_factory=list)
     requested_amount_vnd: StrictInt | None = Field(
         default=None, gt=0, le=999_999_999_999_999
     )
@@ -201,6 +200,10 @@ class DocumentFacts(Record):
     fields: dict[str, FieldFact] = Field(default_factory=dict)
     items: list[ItemFacts] = Field(default_factory=list)
     covered_item_regions: list[str] = Field(default_factory=list)
+    # Adjustment terms the model DECLARED present on the document (subset of
+    # subtotal/tax/fees/discount). An undeclared term contributes 0 to the
+    # ITEMIZED_WITH_ADJUSTMENTS identity; a declared-but-unusable term is UNKNOWN.
+    declared_adjustment_terms: list[str] = Field(default_factory=list)
 
 
 class MappingProposal(Record):

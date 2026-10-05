@@ -509,6 +509,10 @@ def create_runtime_app() -> FastAPI:
 
     ``PROVIDER_MODE=fake`` wires an EMPTY ``FakeProviders`` (no fixtures): it
     proves the composition path only and is NOT an evaluable runtime.
+
+    Startup auto-activates the proposed demo policy when none is active (see
+    ``_ensure_active_policy``), so a fresh runtime is immediately able to process
+    a submitted case without a manual activation step.
     """
     # Load the repo `.env` before reading any config so an operator can start a
     # live runtime from the file (an explicit export still wins).
@@ -517,9 +521,30 @@ def create_runtime_app() -> FastAPI:
     data_root = Path(os.environ.get('DATA_ROOT', 'data'))
     repo = Repository(data_root / 'cases.sqlite', data_root / 'artifacts')
     providers = _build_providers(mode)
-    policy = load_policy(_POLICY_PATH)  # proposed/inactive; explicit activation later
+    policy = load_policy(_POLICY_PATH)  # proposed/inactive; auto-activated below
     service = CaseService(repo, providers, policy)
+    _ensure_active_policy(service)
     return create_app(service, provider_mode=mode)
+
+
+# Audited reason recorded when startup activates the proposed demo policy.
+_AUTO_ACTIVATION_REASON = 'Tự động kích hoạt policy demo khi khởi động runtime.'
+
+
+def _ensure_active_policy(service: CaseService) -> None:
+    """Activate the proposed demo policy at startup when none is active.
+
+    The developer requested that a fresh runtime always be ready to process, so
+    startup activates the demo policy explicitly — recorded with a reason and a
+    fresh ``activation_id`` through the normal ``set_policy`` path, so the audit
+    trail and versioning are preserved. An already-active persisted policy is
+    left untouched (idempotent across restarts).
+    """
+    if service.policy.active:
+        return
+    service.set_policy(
+        activate_demo_policy(service.policy, _AUTO_ACTIVATION_REASON),
+        actor_mode='POLICY_OWNER', reason=_AUTO_ACTIVATION_REASON)
 
 
 __all__ = ['HTTP_CODES', 'create_app', 'create_runtime_app']

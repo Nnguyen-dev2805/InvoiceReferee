@@ -58,12 +58,12 @@ có source/quality/context đầy đủ và điều kiện còn lại hợp lệ
 | ID | Tình huống | Expected cốt lõi |
 | --- | --- | --- |
 | TC01 | TRAVEL 1.200.000đ, PERSONAL, đủ purpose/bill | CREATE_PAYMENT_REQUEST; ROUTINE_AUTO; amount 1.200.000; một request |
-| TC02 | CLIENT_MEAL 1.800.000đ, đầy đủ attendees/purpose | Routine amount 1.800.000; không đòi report kho |
+| TC02 | CLIENT_MEAL 1.800.000đ, đầy đủ purpose | Routine amount 1.800.000; không đòi report kho |
 | TC03 | WORK_PURCHASE 900.000đ; bill/receipt khớp, nhận đủ | Routine amount 900.000; inventory checks thật sự chạy |
 | TC04 | Claim có nội dung nhưng không primary bill | REQUEST_INFO; FACTUAL_UNKNOWN; EMPLOYEE; zero request |
 | TC05 | Original image có total rõ nhưng OCR/quality chưa đủ căn cứ; cần reviewer xem ảnh | REQUEST_INFO; FACTUAL_UNKNOWN; REVIEWER; zero request trước confirmation |
 | TC06 | Bill 1.280.000đ, requested 1.480.000đ, chưa có căn cứ phần chênh | FACTUAL_UNKNOWN/AMT-01; hỏi EMPLOYEE về 200.000đ; không tự chọn min/max |
-| TC07 | CLIENT_MEAL có bill rõ nhưng thiếu attendees | REQUEST_INFO tới EMPLOYEE, nêu thông tin thiếu; không hỏi lại field đã rõ |
+| TC07 | TRAVEL có bill rõ nhưng thiếu khai báo chuyến đi | REQUEST_INFO tới EMPLOYEE, nêu thông tin thiếu; không hỏi lại field đã rõ |
 | TC08 | OTHER: chi phí không thuộc catalog B1 | ESCALATE; OUTSIDE_POLICY; POLICY_OWNER phân loại/deny, chưa tạo request |
 | TC09 | Khai báo xác định PERSONAL_PURPOSE, không chi cho công việc | REJECT ELIG-01; zero request; không dùng tên hàng làm căn cứ duy nhất |
 | TC10 | Case hợp lệ đúng 2.000.000đ | Routine auto; inclusive boundary, một request |

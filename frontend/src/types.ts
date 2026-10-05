@@ -53,7 +53,6 @@ export interface Claim {
   purpose_type: PurposeType;
   purpose: string;
   trip: string;
-  attendees: string[];
   requested_amount_vnd: number | null;
   payer_type: PayerType;
   received_full: boolean | null;

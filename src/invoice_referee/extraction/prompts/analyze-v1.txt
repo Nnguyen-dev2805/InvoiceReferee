@@ -1,54 +1,39 @@
-Bạn phân tích MỘT chứng từ duy nhất và trả về MỘT JSON object đúng schema `document-facts-v1`.
-Chỉ trả về JSON object, KHÔNG kèm văn bản, KHÔNG bọc trong ```json```.
+Phân tích MỘT chứng từ. Chỉ trả JSON minified theo compact-document-v1,
+không markdown, giải thích hay lặp metadata. Không sửa chữ số để phép tính khớp.
 
-Chỉ dùng nội dung có trong `source_registry`. Không dùng kiến thức ngoài, không suy
-đoán giá trị không có trong nguồn. Trường bắt buộc không có trong nguồn → FieldFact
-với `usability` = "MISSING", `raw_value` = "" — KHÔNG bịa giá trị.
+Input markdown giữ layout; sources là catalog {id,text,tokens:[{id,text}]}.
+tokens là các từ nguồn thật trong dòng. Ưu tiên cite token id cụ thể cho chữ số;
+nếu cùng giá trị lặp trong một dòng, dùng token id để phân biệt cột. Có thể cite
+dòng khi chuỗi raw xác định một span duy nhất, không đoán block/page.
+Chỉ trích dữ kiện hiện
+trong nguồn và cite id từ sources. Không tự tạo page/block/locator/evidence_id.
+Code sẽ resolve refs, chuẩn hóa và kiểm quality; bạn không quyết định approve.
 
-## Cấu trúc JSON BẮT BUỘC (đúng tên field, không thêm/bớt)
-
+Schema chính xác:
 {
-  "evidence_id": "<đúng evidence_id trong source_registry>",
-  "kind": "BILL" | "GOODS_RECEIPT" | "CREDIT_NOTE" | "UNKNOWN",
-  "template": "TOTAL_ONLY" | "SIMPLE_ITEMIZED" | "ITEMIZED_WITH_ADJUSTMENTS" | "UNKNOWN",
-  "fields": {
-    "merchant": <FieldFact>, "date": <FieldFact>, "currency": <FieldFact>,
-    "total": <FieldFact>
-  },
-  "items": [ <ItemFacts>, ... ],
-  "covered_item_regions": ["<region id đã cover>", ...]
+ "kind":"BILL|GOODS_RECEIPT|CREDIT_NOTE|UNKNOWN",
+ "template":"TOTAL_ONLY|SIMPLE_ITEMIZED|ITEMIZED_WITH_ADJUSTMENTS|UNKNOWN",
+ "fields":{"merchant":FieldOrNull,"date":FieldOrNull,"currency":FieldOrNull,"total":FieldOrNull},
+ "items":[{"name":FieldOrNull,"quantity":FieldOrNull,"unit":FieldOrNull,"unit_price":FieldOrNull,"line_amount":FieldOrNull}],
+ "covered_item_regions":["id từ item_regions"],
+ "adjustment_terms":["subtotal","tax","fees","discount"]
 }
+Các chuỗi có dấu | là lựa chọn enum, không phải literal có dấu |.
+FieldOrNull = null nếu không có dữ kiện; hoặc object chính xác:
+{"raw":"giá trị nguyên văn","src":["id từ sources"],"reading":"READABLE|UNREADABLE|UNKNOWN","verify":false}
+Không thêm key. raw luôn là string, không phải số chuẩn hóa. src không trùng.
+Không sinh normalized_value/usability/normalization_trace/observations/refs/id item.
+reading UNKNOWN/UNREADABLE phải verify=true; không đọc rõ thì giữ uncertainty.
 
-`FieldFact` =
-{
-  "field": "<tên field>",
-  "raw_value": "<chuỗi đúng như trong nguồn>",
-  "normalized_value": "<giá trị đã chuẩn hoá>",
-  "refs": [ {"evidence_id": "...", "page_index": 0, "block_id": "...", "locator": "...", "raw_value": "..."} ],
-  "source_kind": "DOCUMENT",
-  "observations": [ {"field": "<tên field>", "reading": "READABLE"|"UNREADABLE"|"UNKNOWN", "requires_verification": false, "refs": [...]} ],
-  "usability": "USABLE"|"MISSING"|"UNCERTAIN"|"UNUSABLE"|"NOT_APPLICABLE",
-  "normalization_trace": ["raw -> normalized"]
-}
-
-`ItemFacts` =
-{
-  "id": "<id duy nhất trong document>",
-  "name": <FieldFact>, "quantity": <FieldFact>, "unit": <FieldFact>,
-  "unit_price": <FieldFact>, "line_amount": <FieldFact>
-}
-
-## Quy tắc
-- `evidence_id` ở cấp document và trong mọi `refs` phải khớp `source_registry`.
-- `refs`: `page_index`/`block_id`/`locator` phải tồn tại trong `source_registry`;
-  `raw_value` của ref phải khớp CHÍNH XÁC văn bản tại locus đó.
-- Mọi item trong chứng từ phải được liệt kê đầy đủ trong `items`; `id` duy nhất,
-  không thêm ID lạ, không bỏ sót dòng.
-- `template` là ĐỀ XUẤT: chỉ chọn "TOTAL_ONLY" khi chứng từ thực sự không có
-  breakdown. Nếu nguồn có item region/quantity/unit price chưa cover thì KHÔNG được
-  khai "TOTAL_ONLY"; chọn "SIMPLE_ITEMIZED" và liệt kê items.
-- `covered_item_regions`: liệt kê các region id bạn thực sự đã cover bằng items.
-- `observations`: đúng `field`; `requires_verification` = true nếu chữ số chưa đủ
-  căn cứ; KHÔNG đặt false cho observation UNREADABLE/UNKNOWN.
-- Không quyết định approve/reject; không thêm `final_status`, `authority`, hay bất
-  kỳ field ngoài schema (schema là `additionalProperties: false`).
+Giữ đầy đủ từng dòng hàng, không gộp/bỏ dòng. src cho từng field phải chứa giá
+trị raw đó. Unit không in thì null, không suy đoán kg/cái từ tên hàng.
+TOTAL_ONLY chỉ khi không có breakdown/table. Có dòng hàng và không adjustments:
+SIMPLE_ITEMIZED. Có thuế/phí/discount cộng/trừ: ITEMIZED_WITH_ADJUSTMENTS,
+fields thêm subtotal/tax/fees/discount khi thực sự có nguồn; thiếu thì null,
+không default 0. adjustment_terms liệt kê CHÍNH XÁC các dòng điều chỉnh in trên
+bill (ví dụ có "Tiền hàng" và "Thuế GTGT" thì ["subtotal","tax"]); rỗng nếu bill
+không có dòng điều chỉnh nào. Không khai term không in trên bill. Nếu chưa xác
+định basis/template thì UNKNOWN.
+covered_item_regions phải cover tất cả item_regions với itemized template;
+chỉ dùng id input. required_fields không có trong nguồn phải null.
+Thông tin payer chỉ trích khi nguồn nói rõ, không suy người trả từ tên khách/MST.

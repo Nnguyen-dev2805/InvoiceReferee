@@ -23,7 +23,7 @@ multi-user/tenant, enterprise auth, distributed jobs hoặc crash recovery engin
 | Profile | Điều kiện thông tin/evidence tối thiểu |
 | --- | --- |
 | Công tác/đi lại | Mục đích/chuyến đi, số đề nghị, khai báo phương thức chi trả; bill có merchant, ngày và tổng tiền đọc được |
-| Tiếp khách | Mục đích công việc, khách hàng/người tham dự, số đề nghị và phương thức chi trả; bill có merchant, ngày và tổng tiền đọc được |
+| Tiếp khách | Mục đích công việc, số đề nghị và phương thức chi trả; bill có merchant, ngày và tổng tiền đọc được |
 | Mua vật dụng/vật tư | Mục đích công việc, số đề nghị, phương thức chi trả; tangible purchase cần bill và nguồn giao nhận/nhận đủ, đủ dòng hàng/lượng/đơn vị để đối chiếu |
 
 Profile quyết định field/evidence nào cần dùng. Không yêu cầu report kho cho

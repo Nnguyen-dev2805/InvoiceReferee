@@ -14,7 +14,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1001000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -57,7 +56,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1002000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -100,7 +98,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1003000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -143,7 +140,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1004000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -186,7 +182,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1005000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -229,7 +224,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1006000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -272,7 +266,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1200000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -321,7 +314,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1200000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -370,7 +362,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1200000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -419,7 +410,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1200000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -468,7 +458,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1200000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -517,7 +506,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1200000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -566,7 +554,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 6000000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -617,7 +604,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 6000000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -668,7 +654,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 6000000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -719,7 +704,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 6000000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -770,7 +754,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 2500000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -819,7 +802,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 2500000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -868,7 +850,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 2500000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -917,7 +898,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 2500000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -957,5 +937,5 @@
       }
     }
   ],
-  "sha256": "af6520bbfd87b03ff43fc2e1a2e28d10f3affeec2d2d16eb57fae94a4e27dd59"
+  "sha256": "43065fb3a2b4099e363d8f51619e44245f50993794da52fa41d4f626a62057c7"
 }

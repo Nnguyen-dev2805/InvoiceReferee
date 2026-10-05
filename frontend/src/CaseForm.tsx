@@ -7,7 +7,6 @@ export interface CaseFormValues {
   purpose_type: PurposeType;
   purpose: string;
   trip: string;
-  attendees: string;
   payer_type: PayerType;
   amountText: string;
   files: { file: File; role: EvidenceRole }[];
@@ -27,7 +26,6 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
   const [purposeType, setPurposeType] = useState<PurposeType>('BUSINESS');
   const [purpose, setPurpose] = useState('');
   const [trip, setTrip] = useState('');
-  const [attendees, setAttendees] = useState('');
   const [payer, setPayer] = useState<PayerType>('PERSONAL');
   const [amountText, setAmountText] = useState('');
   const [files, setFiles] = useState<{ file: File; role: EvidenceRole }[]>([]);
@@ -44,9 +42,6 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
       next.amount = 'Số tiền phải là số nguyên dương (VND).';
     }
     if (!purpose.trim()) next.purpose = 'Cần nêu mục đích công việc.';
-    if (profile === 'CLIENT_MEAL' && !attendees.trim()) {
-      next.attendees = 'Tiếp khách cần nêu người tham dự.';
-    }
     if (files.length === 0) next.files = 'Cần đính kèm ít nhất một chứng từ.';
     setErrors(next);
     return Object.keys(next).length === 0 ? { amount } : null;
@@ -67,7 +62,6 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
           purpose_type: purposeType,
           purpose: purpose.trim(),
           trip: trip.trim(),
-          attendees: attendees ? attendees.split(',').map((a) => a.trim()).filter(Boolean) : [],
           requested_amount_vnd: valid.amount,
           payer_type: payer,
           received_full: profile === 'WORK_PURCHASE' ? true : null,
@@ -136,19 +130,6 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
           <label htmlFor="trip">Chuyến đi / ghi chú</label>
           <input id="trip" value={trip} onChange={(e) => setTrip(e.target.value)} />
         </div>
-
-        {profile === 'CLIENT_MEAL' && (
-          <div className="field">
-            <label htmlFor="attendees">Người tham dự (phẩy phân cách)</label>
-            <input
-              id="attendees"
-              value={attendees}
-              onChange={(e) => setAttendees(e.target.value)}
-              aria-invalid={errors.attendees ? true : undefined}
-            />
-            {errors.attendees && <p className="field-error" role="alert">{errors.attendees}</p>}
-          </div>
-        )}
 
         <div className="field">
           <label htmlFor="payer">Người đã trả</label>

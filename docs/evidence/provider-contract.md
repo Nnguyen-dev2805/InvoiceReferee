@@ -82,15 +82,31 @@ is not fabricated.
 
 ## Transport decision
 
-A **thin `httpx` transport** is used for both APIs (one client, `httpx` is
+A **thin `httpx` transport** is used for both APIs (`httpx` is
 already a project dependency) instead of the official `mistralai` SDK. Reason:
 the SDK (3.0.0) pulls `httpx2`, `jsonpath-python`, `python-dateutil` and
 `opentelemetry-semantic-conventions` for a single JSON endpoint; the OCR API is
 a plain JSON POST. Per AGENTS.md "prefer stdlib/native/existing dependencies
-before adding new ones". Timeouts are finite (60 s/call) and
-`httpx.HTTPTransport(retries=0)` disables retries so the repair budget is not
-multiplied. `mistralai` remains installable on Python ≥3.10 if a later task
+before adding new ones". The current worker-safe adapter owns a request-scoped
+AsyncClient and enforces `asyncio.timeout` around HTTP I/O. Default per-call
+timeout is 60s, configurable through `LLM_TIMEOUT`; transport retries remain
+disabled. Cancellation closes local I/O, not a guarantee of remote cancellation.
+`mistralai` remains installable on Python ≥3.10 if a later task
 wants the SDK.
+
+### Local compact wire update — 05/10
+
+Model-facing analysis uses `compact-document-v1`: raw/src/reading/verify instead
+of full `FieldFact` objects. Domain/API `DocumentFacts` stays unchanged. Code
+owns source metadata/word scores/normalization and applies existing validators;
+raw values from absent or ambiguous sources cannot become financial approval.
+Repair keeps the original contract and prior invalid response; one shared
+repair per analysis invocation. Chat requests now include `max_tokens` from
+`LLM_MAX_OUTPUT_TOKENS` (default 8192), and length/overflow responses fail closed.
+This is verified with injected clients; current provider acceptance of the new
+wire/budget and post-change live latency are not established by those tests.
+The original official-document verification above is historical evidence, not
+proof that every later adapter change has been exercised live.
 
 ## Configuration (`pyproject.toml`, `.env.example`)
 

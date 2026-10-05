@@ -235,11 +235,11 @@ def resolved_bundle(amount: str = '1200000', *, profile: str = 'TRAVEL') -> Evid
 def routine_snapshot(amount: int = 1_200_000, profile: str = 'TRAVEL') -> CaseSnapshot:
     """Declared input plus the required Evidence IDs for the given profile."""
     if profile == 'WORK_PURCHASE':
-        purpose, trip, attendees, received_full = 'Mua vật tư demo', '', [], True
+        purpose, trip, received_full = 'Mua vật tư demo', '', True
     elif profile == 'CLIENT_MEAL':
-        purpose, trip, attendees, received_full = 'Tiếp khách demo', '', ['Khách A'], None
+        purpose, trip, received_full = 'Tiếp khách demo', '', None
     else:
-        purpose, trip, attendees, received_full = 'Công tác demo', 'Chuyến công tác demo', [], None
+        purpose, trip, received_full = 'Công tác demo', 'Chuyến công tác demo', None
 
     claim = Claim(
         employee_id='emp-demo',
@@ -247,7 +247,6 @@ def routine_snapshot(amount: int = 1_200_000, profile: str = 'TRAVEL') -> CaseSn
         purpose_type='BUSINESS',
         purpose=purpose,
         trip=trip,
-        attendees=attendees,
         requested_amount_vnd=amount,
         payer_type='PERSONAL',
         received_full=received_full,

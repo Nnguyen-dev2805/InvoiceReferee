@@ -53,6 +53,40 @@ checkpoint("before:evaluate") -> evaluate(snapshot, bundle) -> checkpoint("befor
 captures every `StageIdentity`, `provider_calls`, `repair_calls`, and
 `stage_durations_ms`.
 
+## Compact model boundary (05/10)
+
+`AnalyzeDocument` uses model-facing `compact-document-v1`. The model returns
+raw strings, source IDs, reading/verification flags and complete item rows;
+it does not emit the full domain `FieldFact` boilerplate. `extraction/compact.py`
+resolves request-local source IDs, derives normalization and reconstructs the
+unchanged `DocumentFacts` contract before `validate_document`/policy evaluation.
+Missing values stay missing; ambiguous numbers/dates stay uncertain.
+
+The model sees source text and native token IDs without scores or metadata.
+Code derives unique contiguous scopes from existing word IDs, preserving their
+text/scores; repeated/ambiguous values require token-specific refs or remain
+uncertain. Word/span locators are code-owned metadata. When enriched, a separate
+`*-field-registry.json` artifact is kept alongside the original registry for replay.
+Known qty/price/amount markdown rows have explicit no-drop/no-merge coverage
+guards, including when native table-region metadata is absent. Other layouts
+retain the existing validator's coverage limits; this is not universal OCR proof.
+
+Analyze and repair keep the same schema; repair retains the prior invalid output
+and a bounded error summary. Existing repair-count budgets remain. Chat requests
+have configurable `LLM_MAX_OUTPUT_TOKENS` (default 8192); truncation or reported
+budget overflow is technical failure, never partial approval or another repair.
+Large documents may require a deliberate budget increase.
+
+The default transport uses request-scoped HTTPX AsyncClient behind a synchronous
+worker interface, with `asyncio.timeout` enforcing a wall-clock deadline even in
+the worker thread. Clients close on cancellation. This cancels local HTTP I/O;
+it does not prove remote inference was cancelled. `LLM_TIMEOUT` still selects
+the per-request bound, not a whole-case deadline across multiple calls.
+
+These changes are verified locally with injected transports/offline data.
+Live model output size, latency and compact-schema compliance require a new
+authorized live run; the previous 10-minute test is not a benchmark of this code.
+
 ## Key design rulings (recorded at T06)
 
 - **Re-derive at the active threshold.** T05's `validate_document` derives

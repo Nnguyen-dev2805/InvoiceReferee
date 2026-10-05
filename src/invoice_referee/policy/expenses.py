@@ -11,7 +11,7 @@ Rule IDs and reactions are the Rulebook §3 matrix:
 - SRC-01 no required primary bill -> FACTUAL_UNKNOWN
 - SRC-02 required field missing/uncertain/unusable -> FACTUAL_UNKNOWN
 - SRC-03 duplicate/foreign IDs or contract contradiction -> technical invalid
-- CTX-01 purpose/attendees/trip missing for profile -> FACTUAL_UNKNOWN
+- CTX-01 purpose/trip missing for profile -> FACTUAL_UNKNOWN
 - MODE-01 declared COMPANY/ADVANCE/VENDOR -> REJECT (out of B1 scope)
 - MODE-02 payer UNKNOWN / contradictory -> FACTUAL_UNKNOWN
 - SCOPE-01 profile OTHER / not in catalog -> OUTSIDE_POLICY
@@ -38,7 +38,7 @@ from invoice_referee.domain.models import (
 )
 from invoice_referee.policy.quality import derive_fact
 
-# Required primary fields per profile (Rulebook §2). Purpose/attendees/trip are
+# Required primary fields per profile (Rulebook §2). Purpose/trip are
 # declarations, not invoice facts.
 _HEADER_FIELDS = ('merchant', 'date', 'total', 'currency')
 
@@ -167,15 +167,13 @@ def document_checks(
 
 
 def context_check(snapshot_claim, policy: PolicyConfig) -> CheckResult:
-    """CTX-01: profile-required purpose/attendees/trip declarations present."""
+    """CTX-01: profile-required purpose/trip declarations present."""
     profile = snapshot_claim.profile
     missing: list[str] = []
     if not snapshot_claim.purpose.strip():
         missing.append('purpose')
     if snapshot_claim.purpose_type == 'UNKNOWN':
         missing.append('purpose_type')
-    if profile == 'CLIENT_MEAL' and not snapshot_claim.attendees:
-        missing.append('attendees')
     if profile == 'TRAVEL' and not snapshot_claim.trip.strip():
         missing.append('trip')
     if missing:

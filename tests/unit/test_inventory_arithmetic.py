@@ -80,12 +80,16 @@ def _make_doc(
     items: list[dict] | None = None,
     covered: list[str] | None = None,
     uncovered_regions: list[str] | None = None,
+    adjustments: dict[str, str] | None = None,
+    declared_adjustment_terms: list[str] | None = None,
 ):
     """Build one document + registry whose facts resolve with score 0.99."""
     header: dict[str, tuple[FieldFact, SourceWord]] = {}
     fields: dict[str, FieldFact] = {}
-    for name, raw in (('merchant', merchant), ('date', date),
-                      ('currency', currency), ('total', total)):
+    header_fields = [('merchant', merchant), ('date', date),
+                     ('currency', currency), ('total', total)]
+    header_fields += list((adjustments or {}).items())
+    for name, raw in header_fields:
         f, w = _fact(name, raw, evidence_id, 'b-h', name, f'w-h-{name}')
         fields[name] = f
         header[name] = (f, w)
@@ -115,6 +119,7 @@ def _make_doc(
     doc = DocumentFacts(
         evidence_id=evidence_id, kind=kind, template=template, fields=fields,
         items=item_records, covered_item_regions=list(covered or []),
+        declared_adjustment_terms=list(declared_adjustment_terms or []),
     )
     return doc, registry
 
@@ -213,11 +218,76 @@ def test_total_only_with_item_facts_cannot_skip_arithmetic():
 # --- ITEMIZED_WITH_ADJUSTMENTS --------------------------------------------------
 
 def test_adjustments_template_missing_term_is_unknown_not_default_zero():
-    # discount term absent -> must not default to 0; arithmetic UNKNOWN.
+    # No declared adjustment term -> nothing to compare; arithmetic UNKNOWN.
     doc, reg = _make_doc('e-primary', template='ITEMIZED_WITH_ADJUSTMENTS', total='900000')
     bundle = _bundle((doc, reg))
     decision = evaluate(routine_snapshot(900_000), bundle)
     assert _check(decision, 'AMT-02').status == 'UNKNOWN'
+
+
+def test_adjustments_subtotal_plus_tax_identity_passes():
+    # subtotal 800000 + tax 100000 = total 900000 (no fees/discount on the bill).
+    doc, reg = _make_doc(
+        'e-primary', template='ITEMIZED_WITH_ADJUSTMENTS', total='900000',
+        adjustments={'subtotal': '800000', 'tax': '100000'},
+        declared_adjustment_terms=['subtotal', 'tax'],
+        items=[_item('i1', qty='1', unit='cái', price='800000', line='800000')])
+    bundle = _bundle((doc, reg))
+    decision = evaluate(routine_snapshot(900_000), bundle)
+    assert _check(decision, 'AMT-02').status == 'PASS'
+
+
+def test_adjustments_identity_mismatch_fails_and_blocks():
+    # subtotal 800000 + tax 100000 = 900000 != total 950000.
+    doc, reg = _make_doc(
+        'e-primary', template='ITEMIZED_WITH_ADJUSTMENTS', total='950000',
+        adjustments={'subtotal': '800000', 'tax': '100000'},
+        declared_adjustment_terms=['subtotal', 'tax'])
+    bundle = _bundle((doc, reg))
+    decision = evaluate(routine_snapshot(950_000), bundle)
+    assert _check(decision, 'AMT-02').status == 'FAIL'
+    assert any('AMT-02' in i.blockers for i in decision.issues)
+    assert decision.action == 'REQUEST_INFO'  # FAIL can never create a request
+
+
+def test_adjustments_declared_term_present_but_unusable_is_unknown():
+    # tax declared present but its word score is below threshold -> UNKNOWN, not 0.
+    doc, reg = _make_doc(
+        'e-primary', template='ITEMIZED_WITH_ADJUSTMENTS', total='900000',
+        adjustments={'subtotal': '800000', 'tax': '100000'},
+        declared_adjustment_terms=['subtotal', 'tax'])
+    block = next(b for b in reg.blocks if b.block_id == 'b-h')
+    block = block.model_copy(update={'words': [
+        w.model_copy(update={'score': '0.10'}) if w.id == 'w-h-tax' else w
+        for w in block.words]})
+    reg = reg.model_copy(update={'blocks': [
+        block if b.block_id == 'b-h' else b for b in reg.blocks]})
+    bundle = _bundle((doc, reg))
+    decision = evaluate(routine_snapshot(900_000), bundle)
+    assert _check(decision, 'AMT-02').status == 'UNKNOWN'
+
+
+def test_adjustments_discount_reduces_total():
+    # subtotal 800000 + tax 100000 - discount 50000 = 850000.
+    doc, reg = _make_doc(
+        'e-primary', template='ITEMIZED_WITH_ADJUSTMENTS', total='850000',
+        adjustments={'subtotal': '800000', 'tax': '100000', 'discount': '50000'},
+        declared_adjustment_terms=['subtotal', 'tax', 'discount'])
+    bundle = _bundle((doc, reg))
+    decision = evaluate(routine_snapshot(850_000), bundle)
+    assert _check(decision, 'AMT-02').status == 'PASS'
+
+
+def test_adjustments_item_sum_must_match_subtotal():
+    # items sum to 700000 but subtotal says 800000 -> breakdown FAIL.
+    doc, reg = _make_doc(
+        'e-primary', template='ITEMIZED_WITH_ADJUSTMENTS', total='900000',
+        adjustments={'subtotal': '800000', 'tax': '100000'},
+        declared_adjustment_terms=['subtotal', 'tax'],
+        items=[_item('i1', qty='1', unit='cái', price='700000', line='700000')])
+    bundle = _bundle((doc, reg))
+    decision = evaluate(routine_snapshot(900_000), bundle)
+    assert _check(decision, 'AMT-02').status == 'FAIL'
 
 
 # --- Units and price basis ------------------------------------------------------

@@ -11,6 +11,7 @@ native OCR word scores (never fabricated), payload/prose boundary, applicability
 decided by code, and missing-score → UNCERTAIN.
 """
 from datetime import datetime, timezone
+import json
 
 import pytest
 
@@ -62,7 +63,16 @@ def _document(template='SIMPLE_ITEMIZED', *, amount='1200000'):
 
 
 def _valid_document_json() -> str:
-    return _document().model_dump_json()
+    # Hand-built model wire fixture; domain builders/validators stay unchanged.
+    def fact(raw, source):
+        return {'raw':raw,'src':[source],'reading':'READABLE','verify':False}
+    return json.dumps({'kind':'BILL','template':'SIMPLE_ITEMIZED',
+        'fields':{'merchant':fact('Nhà cung cấp Demo','r1'),
+                  'date':fact('2026-10-01','r2'),'currency':fact('VND','r3'),
+                  'total':fact('1200000','r4')},
+        'items':[{'name':fact('Vật tư demo','r5'),'quantity':fact('1','r6'),
+                  'unit':fact('kg','r7'),'unit_price':fact('1200000','r8'),
+                  'line_amount':fact('1200000','r9')}], 'covered_item_regions':[]},ensure_ascii=False)
 
 
 def _missing_fact(field: str) -> FieldFact:
@@ -400,14 +410,39 @@ def test_analysis_payload_has_only_registry_scope():
     request = _request()
     payload = analysis_payload(request)
     assert set(payload) == {
-        'evidence_id', 'role', 'source_registry', 'required_fields',
-        'threshold_version', 'schema_version',
+        'evidence_id', 'role', 'markdown', 'sources', 'item_regions',
+        'required_fields', 'threshold_version', 'schema_version',
     }
     assert payload['threshold_version'] == request.threshold_version
     dumped = str(payload)
     assert 'case-demo' not in dumped          # no case ID
     assert 'Công tác demo' not in dumped      # no employee prose / purpose
     assert 'emp-demo' not in dumped           # no employee identity
+
+
+def test_analysis_payload_sends_source_text_not_word_scores():
+    """The model cites request-local IDs; code keeps scores and ref metadata."""
+    request = _request()
+    payload = analysis_payload(request)
+    # lines map every locator to its text; no per-word score objects leak through.
+    assert payload['sources'], 'expected a non-empty source catalog'
+    assert all(isinstance(entry['text'], str) for entry in payload['sources'])
+    assert 'score' not in dumped_keys(payload)
+    assert payload['markdown']
+
+
+def dumped_keys(obj):
+    """Collect every dict key anywhere in a nested payload."""
+    keys = set()
+    stack = [obj]
+    while stack:
+        cur = stack.pop()
+        if isinstance(cur, dict):
+            keys.update(cur)
+            stack.extend(cur.values())
+        elif isinstance(cur, list):
+            stack.extend(cur)
+    return keys
 
 
 def test_cross_source_payload_has_only_facts():

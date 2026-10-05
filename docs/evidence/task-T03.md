@@ -25,6 +25,9 @@ deployment, or real-user acceptance.
 
 ## Scope note
 
-`ITEMIZED_WITH_ADJUSTMENTS` returns UNKNOWN when adjustment terms are absent (no
-default-0) — fail-safe; the `subtotal + tax + fees − discount` formula is not
-wired because T03 inputs carry no structured adjustment basis.
+`ITEMIZED_WITH_ADJUSTMENTS` compares `total` with `subtotal + tax + fees −
+discount` using only the adjustment terms the model DECLARED present on the
+document. A declared-present term that is unusable is UNKNOWN (no default-0); an
+undeclared term contributes 0; a template that declares no term is UNKNOWN. When
+item line amounts are usable, `sum(line_amount)` is also checked against
+`subtotal`. The rulebook §4 wording was updated to match this B2 behaviour.

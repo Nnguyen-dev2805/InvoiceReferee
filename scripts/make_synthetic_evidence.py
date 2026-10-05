@@ -116,11 +116,11 @@ def _itemized_doc(evidence_id: str, amount: str, *, kind: str,
 
 def _claim(profile: str, amount: int | None, *, purpose_type: str = 'BUSINESS',
            purpose: str = 'Cong tac demo', trip: str = 'Chuyen cong tac demo',
-           attendees: list[str] | None = None, payer: str = 'PERSONAL',
+           payer: str = 'PERSONAL',
            received_full: bool | None = None) -> Claim:
     return Claim(
         employee_id='emp-demo', profile=profile, purpose_type=purpose_type,
-        purpose=purpose, trip=trip, attendees=attendees or [],
+        purpose=purpose, trip=trip,
         requested_amount_vnd=amount, payer_type=payer, received_full=received_full,
     )
 
@@ -183,8 +183,8 @@ def build_development() -> list[VerifyCase]:
 
     # TC02 CLIENT_MEAL 1.8m
     doc, reg = _header_doc('e-primary', '1800000')
-    add('TC02', 'CLIENT_MEAL 1.800.000đ đủ attendees', _claim(
-        'CLIENT_MEAL', 1_800_000, purpose='Tiep khach', attendees=['Khach A']),
+    add('TC02', 'CLIENT_MEAL 1.800.000đ đủ khai báo', _claim(
+        'CLIENT_MEAL', 1_800_000, purpose='Tiep khach'),
         [('PRIMARY_BILL', 1_800_000)],
         {'document': doc.model_dump(mode='json'), 'registry': reg.model_dump(mode='json')},
         _expected('CREATE_PAYMENT_REQUEST', basis='ROUTINE_AUTO', amount=1_800_000,
@@ -226,14 +226,14 @@ def build_development() -> list[VerifyCase]:
         _expected('REQUEST_INFO', classes=['FACTUAL_UNKNOWN'], owners=['EMPLOYEE'],
                   rules=['AMT-01'], reason='Chênh 200.000đ chưa có căn cứ; không chọn min/max'))
 
-    # TC07 CLIENT_MEAL thiếu attendees -> CTX-01
+    # TC07 TRAVEL thiếu trip -> CTX-01
     doc, reg = _header_doc('e-primary', '1800000')
-    add('TC07', 'CLIENT_MEAL có bill nhưng thiếu attendees', _claim(
-        'CLIENT_MEAL', 1_800_000, purpose='Tiep khach', attendees=[]),
+    add('TC07', 'TRAVEL có bill nhưng thiếu khai báo chuyến đi', _claim(
+        'TRAVEL', 1_800_000, purpose='Cong tac', trip=''),
         [('PRIMARY_BILL', 1_800_000)],
         {'document': doc.model_dump(mode='json'), 'registry': reg.model_dump(mode='json')},
         _expected('REQUEST_INFO', classes=['FACTUAL_UNKNOWN'], owners=['EMPLOYEE'],
-                  rules=['CTX-01'], reason='Thiếu người tham dự'))
+                  rules=['CTX-01'], reason='Thiếu khai báo chuyến đi'))
 
     # TC08 OTHER -> SCOPE-01 OUTSIDE_POLICY POLICY_OWNER
     doc, reg = _header_doc('e-primary', '1200000')

@@ -23,12 +23,14 @@ response is a technical ``INVALID_ANALYSIS``.
 from __future__ import annotations
 
 import base64
+import asyncio
 import hashlib
 import json
 import os
 import signal
 import threading
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -55,6 +57,9 @@ from invoice_referee.extraction.validation import (
     shared_repair_allowed,
     validate_document,
 )
+from invoice_referee.extraction.compact import (
+    SCHEMA_VERSION as COMPACT_SCHEMA_VERSION, model_sources, parse_compact_document,
+)
 
 # --- Verified provider identities (docs/evidence/provider-contract.md) ---------
 # Defaults verified 2026-10-05; overridable via environment (see LiveProviders).
@@ -64,8 +69,8 @@ MISTRAL_BASE_URL = 'https://api.mistral.ai/v1'
 KIMI_MODEL = 'kimi-k2.6'
 KIMI_BASE_URL = 'https://api.moonshot.ai/v1'
 
-ANALYZE_PROMPT_VERSION = 'analyze-v1'
-ANALYZE_SCHEMA_VERSION = 'document-facts-v1'
+ANALYZE_PROMPT_VERSION = 'analyze-v2-compact'
+ANALYZE_SCHEMA_VERSION = COMPACT_SCHEMA_VERSION
 CROSS_PROMPT_VERSION = 'cross-source-v1'
 CROSS_SCHEMA_VERSION = 'mapping-proposal-v1'
 
@@ -127,17 +132,13 @@ def _timeout_from_env(default: float) -> float:
 # --- Public payload builders (serialized per-document request, no prose) -------
 
 def analysis_payload(request: AnalysisRequest) -> dict[str, Any]:
-    """Payload for AnalyzeDocument: ONE evidence's registry + role + hints only.
-
-    Never carries employee prose, expected labels, case IDs or other documents.
-    ``threshold_version`` is included so a B2 threshold change alters the hashed
-    analyze request (ledger §3.1: threshold/registry/role/hints are part of the
-    hashed request).
-    """
+    """One source document; model cites opaque IDs, code owns refs and scores."""
     return {
         'evidence_id': request.evidence.id,
         'role': request.evidence.role,
-        'source_registry': request.registry.model_dump(mode='json'),
+        'markdown': '\n'.join(block.text for block in request.registry.blocks),
+        'sources': model_sources(request),
+        'item_regions': list(request.registry.uncovered_item_regions),
         'required_fields': request.required_fields,
         'threshold_version': request.threshold_version,
         'schema_version': ANALYZE_SCHEMA_VERSION,
@@ -341,6 +342,7 @@ class FakeProviders(Providers):
         self.repair_calls = 0
         self.repair_reasons: list[str] = []
 
+
     def ocr(self, evidence: Evidence) -> RawOcr:
         self.calls.append(f'ocr:{evidence.id}')
         self.identities.append(
@@ -416,6 +418,7 @@ class LiveProviders(Providers):
         chat_client: Any | None = None,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         prompt_dir: Path = PROMPT_DIR,
+        max_output_tokens: int | None = None,
     ) -> None:
         # Credentials come from the environment when not passed explicitly, so the
         # composition root can start a live runtime from a `.env` file. Mistral uses
@@ -447,6 +450,13 @@ class LiveProviders(Providers):
             else _timeout_from_env(DEFAULT_TIMEOUT_SECONDS)
         )
         self._prompt_dir = Path(prompt_dir)
+        raw_budget = max_output_tokens if max_output_tokens is not None else os.environ.get('LLM_MAX_OUTPUT_TOKENS', '8192')
+        try:
+            self._max_output_tokens = int(raw_budget)
+        except (TypeError, ValueError):
+            raise DomainError('CONFIG_NOT_ACTIVE', 'LLM_MAX_OUTPUT_TOKENS phải là integer dương.') from None
+        if isinstance(raw_budget, (bool, float)) or self._max_output_tokens <= 0:
+            raise DomainError('CONFIG_NOT_ACTIVE', 'LLM_MAX_OUTPUT_TOKENS phải là integer dương.')
         self.identities: list[StageIdentity] = []
         # Token usage per Kimi invocation; a missing count is None, never 0.
         self.usages: list[dict[str, int | None]] = []
@@ -542,19 +552,27 @@ class LiveProviders(Providers):
         budget = REPAIR_BUDGET + extra_budget
         repair_count = 0
         current_prompt = prompt
+        previous_content = None
         base_prompt_version = (
             ANALYZE_PROMPT_VERSION if stage == 'analyze' else CROSS_PROMPT_VERSION
         )
         while True:
-            self._record_identity(stage, {'prompt': current_prompt, 'payload': payload},
+            self._record_identity(stage, {'prompt': current_prompt, 'payload': payload,
+                                         'previous_content': previous_content,
+                                         'max_output_tokens': self._max_output_tokens},
                                   base_prompt_version, schema_version,
                                   self.kimi_model, 'kimi')
-            content, _usage = self._chat(client, current_prompt, payload)
+            content, _usage = self._chat(client, current_prompt, payload, previous_content)
             try:
                 return parse(content)
             except (DomainError, ValidationError, ValueError) as exc:
                 # DomainError carries ``message``; ValidationError/ValueError do not.
-                reason = getattr(exc, 'message', None) or str(exc)
+                if isinstance(exc, ValidationError):
+                    errors = exc.errors(include_url=False, include_input=False)
+                    detail = '; '.join(f'{".".join(map(str, e["loc"]))}: {e["msg"]}' for e in errors[:5])
+                    reason = f'{len(errors)} schema errors: {detail}'
+                else:
+                    reason = getattr(exc, 'message', None) or str(exc)
                 allowed = (
                     shared_repair_allowed(repair_count)
                     if extra_budget == 0
@@ -567,18 +585,26 @@ class LiveProviders(Providers):
                 repair_count += 1
                 self.repair_calls += 1
                 self.repair_reasons.append(f'{stage}: {reason}')
-                current_prompt = self._repair_prompt(reason)
+                previous_content = content
+                current_prompt = prompt + '\n\n' + self._repair_prompt(reason)
 
-    def _chat(self, client: Any, prompt: str, payload: dict[str, Any]) -> tuple[str, Any]:
+    def _chat(self, client: Any, prompt: str, payload: dict[str, Any],
+              previous_content: str | None = None) -> tuple[str, Any]:
         messages = [
             {'role': 'system', 'content': prompt},
             {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False, sort_keys=True)},
         ]
+        if previous_content is not None:
+            messages.extend([
+                {'role': 'assistant', 'content': previous_content},
+                {'role': 'user', 'content': 'Sửa đúng lỗi nêu trong system; giữ nguyên schema và dữ kiện nguồn.'},
+            ])
         body = {
             'model': self.kimi_model,
             'messages': messages,
             'response_format': {'type': 'json_object'},
             'temperature': 0,
+            'max_tokens': self._max_output_tokens,
         }
         try:
             with _finite_timeout(self._timeout):
@@ -597,6 +623,12 @@ class LiveProviders(Providers):
             raise DomainError('INVALID_ANALYSIS', 'Chat trả về nội dung không phải chuỗi.')
         usage = _usage_dict(data.get('usage'))
         self.usages.append(usage)
+        finish_reason = data['choices'][0].get('finish_reason')
+        completion_tokens = usage.get('completion_tokens')
+        if finish_reason in ('length', 'max_tokens') or (
+            isinstance(completion_tokens, int) and completion_tokens > self._max_output_tokens
+        ):
+            raise DomainError('INVALID_ANALYSIS', 'Chat output exceeds token budget or is truncated; no repair.')
         return content, usage
 
     def _require_chat_client(self) -> Any:
@@ -644,9 +676,7 @@ def _redact_document(document: dict[str, Any]) -> dict[str, Any]:
 # --- Parsing helpers (used by LiveProviders and mirrored by fakes) -------------
 
 def _parse_document(text: str, request: AnalysisRequest) -> DocumentFacts:
-    data = json.loads(text)
-    doc = DocumentFacts.model_validate(data)
-    return validate_document(doc, request)
+    return parse_compact_document(text, request)
 
 
 def _parse_mapping(text: str, bundle: EvidenceBundle) -> MappingProposal:
@@ -682,15 +712,48 @@ def _validate_mapping(proposal: MappingProposal, bundle: EvidenceBundle) -> None
 # --- Thin client / transport helpers -------------------------------------------
 
 def _http_client(api_key: str, base_url: str, timeout_seconds: float) -> Any:
-    """Thin httpx client: finite timeout, no retries (budget is not multiplied)."""
-    import httpx
+    return _DeadlineClient(api_key, base_url, timeout_seconds)
 
-    return httpx.Client(
-        base_url=base_url,
-        headers={'Authorization': f'Bearer {api_key}'},
-        timeout=timeout_seconds,
-        transport=httpx.HTTPTransport(retries=0),
-    )
+
+class _DeadlineClient:
+    """Sync adapter for worker callers; cancel HTTP I/O on a wall-clock deadline.
+
+    Each request owns/closes its async client. This cancels local I/O, not a
+    guarantee that the remote provider stopped generating.
+    """
+    def __init__(self, api_key: str, base_url: str, timeout_seconds: float):
+        self._api_key = api_key
+        self._base_url = base_url
+        self._timeout = timeout_seconds
+
+    def post(self, path, *, json):
+        import httpx
+
+        async def send():
+            async with asyncio.timeout(self._timeout):
+                async with httpx.AsyncClient(
+                    base_url=self._base_url, headers={'Authorization': f'Bearer {self._api_key}'},
+                    timeout=self._timeout, transport=httpx.AsyncHTTPTransport(retries=0),
+                ) as client:
+                    return await client.post(path, json=json)
+
+        # ``asyncio.run`` shuts down the default executor on exit, which JOINS the
+        # resolver thread: a slow DNS lookup would extend the caller's deadline far
+        # past ``self._timeout`` (probe: 20ms deadline, 446ms return). Drive a loop
+        # we own with an executor we shut down without waiting, so cancellation
+        # returns on time; the client still closes inside ``send`` on cancellation.
+        loop = asyncio.new_event_loop()
+        executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='invoice-referee-http')
+        loop.set_default_executor(executor)
+        try:
+            return loop.run_until_complete(send())
+        finally:
+            executor.shutdown(wait=False)
+            loop.close()
+
+    def close(self):
+        # Request-scoped clients close inside send(), including on cancellation.
+        pass
 
 
 def _transport_message(stage: str, exc: Exception) -> str:

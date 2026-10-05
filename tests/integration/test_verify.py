@@ -7,6 +7,7 @@ actual decision produced by the same production path the UI uses.
 from __future__ import annotations
 
 from pathlib import Path
+import time
 
 import pytest
 
@@ -73,10 +74,12 @@ def test_verify_api_uses_the_same_case_service(verify_service, core_manifest, tm
     started = client.post('/api/verify-runs', json={'suite': 'core', 'mode': 'replay'})
     assert started.status_code == 202
     job_id = started.json()['id']
-    for _ in range(200):
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
         body = client.get(f'/api/verify-runs/{job_id}').json()
         if body['status'] in ('SUCCEEDED', 'FAILED'):
             break
+        time.sleep(0.01)  # Yield to the background worker; don't assume a poll count is elapsed time.
     assert body['status'] == 'SUCCEEDED'
     assert body['completed_count'] == 4
     assert body['report']['metrics']['verdicts']['pass'] == 4

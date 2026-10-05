@@ -24,7 +24,7 @@ cải tiến có version và cùng input/ground truth, không phải mặc đị
 | Record | Fields cốt lõi | Invariant |
 | --- | --- | --- |
 | Case | id, case_version, Claim, current_run_id, workflow_state | Thay input tạo version; không sửa history trước |
-| Claim | employee_id, profile/OTHER, purpose_type/purpose, attendees/trip, requested_amount_vnd, payer_type | Khai báo được lưu riêng với chứng từ; amount thiếu khác amount invalid |
+| Claim | employee_id, profile/OTHER, purpose_type/purpose, trip, requested_amount_vnd, payer_type | Khai báo được lưu riêng với chứng từ; amount thiếu khác amount invalid |
 | Evidence | id, case_id, role, original_name, stored_path, sha256, mime, size | Path backend cấp; không lấy path client tùy ý; cùng bytes không thành hai nguồn độc lập |
 | SourceRef | evidence_id, page_index, block_id, span/locator, raw_value | Resolve trong registry thật; phải thuộc evidence/run đang xét |
 | FieldFact | field, normalized_value, raw_value, refs, source_kind, observations, usability | Model proposal khác derived usability; value có source và normalization trace |

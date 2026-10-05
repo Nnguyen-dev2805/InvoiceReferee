@@ -61,8 +61,10 @@ evidence pointers; nothing planned is recorded as done.
   >5m BOTH LIM-01 + AUTH-01 (separate authorizations). Accepted amount never
   raised/clipped/dropped; undetermined → no request.
 - Arithmetic templates TOTAL_ONLY / SIMPLE_ITEMIZED (ROUND_HALF_UP per line,
-  tolerance 1đ) / ITEMIZED_WITH_ADJUSTMENTS (UNKNOWN unless all terms present);
-  consistency and arithmetic are separate checks; duplicate item IDs rejected
+  tolerance 1đ) / ITEMIZED_WITH_ADJUSTMENTS (total = subtotal + tax + fees −
+  discount over the terms the model DECLARED present; a declared-but-unusable
+  term is UNKNOWN, never 0); consistency and arithmetic are separate checks;
+  duplicate item IDs rejected
   before aggregation; unit-price exact on normalized basis. Reducer priority per
   Rulebook §6; N/A ≠ whole-case eligible; missing matrix check → technical.
 - Tests: `tests/unit/test_expense_decisions.py`, `test_inventory_arithmetic.py`.

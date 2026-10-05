@@ -91,7 +91,7 @@ _CLASSIFY_TARGETS = {'TRAVEL', 'CLIENT_MEAL', 'WORK_PURCHASE'}
 # A field path names an evidence and either its total or an item sub-field.
 _ITEM_SUBFIELDS = {'quantity', 'unit', 'unit_price', 'line_amount', 'name'}
 _CLAIM_FIELDS = {
-    'employee_id', 'profile', 'purpose_type', 'purpose', 'trip', 'attendees',
+    'employee_id', 'profile', 'purpose_type', 'purpose', 'trip',
     'requested_amount_vnd', 'payer_type', 'received_full',
 }
 

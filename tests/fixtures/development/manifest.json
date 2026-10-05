@@ -14,7 +14,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1200000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -49,7 +48,7 @@
     },
     {
       "id": "TC02",
-      "description": "CLIENT_MEAL 1.800.000đ đủ attendees",
+      "description": "CLIENT_MEAL 1.800.000đ đủ khai báo",
       "provenance": "synthetic",
       "claim": {
         "employee_id": "emp-demo",
@@ -57,9 +56,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Tiep khach",
         "trip": "Chuyen cong tac demo",
-        "attendees": [
-          "Khach A"
-        ],
         "requested_amount_vnd": 1800000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -102,7 +98,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Mua vat tu",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 900000,
         "payer_type": "PERSONAL",
         "received_full": true
@@ -156,7 +151,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1200000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -195,7 +189,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1200000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -244,7 +237,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1480000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -285,15 +277,14 @@
     },
     {
       "id": "TC07",
-      "description": "CLIENT_MEAL có bill nhưng thiếu attendees",
+      "description": "TRAVEL có bill nhưng thiếu khai báo chuyến đi",
       "provenance": "synthetic",
       "claim": {
         "employee_id": "emp-demo",
-        "profile": "CLIENT_MEAL",
+        "profile": "TRAVEL",
         "purpose_type": "BUSINESS",
-        "purpose": "Tiep khach",
-        "trip": "Chuyen cong tac demo",
-        "attendees": [],
+        "purpose": "Cong tac",
+        "trip": "",
         "requested_amount_vnd": 1800000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -323,7 +314,7 @@
         ],
         "amount_vnd": null,
         "request_count": 0,
-        "reason": "Thiếu người tham dự"
+        "reason": "Thiếu khai báo chuyến đi"
       },
       "reference_date": "2026-10-01",
       "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC07.json",
@@ -342,7 +333,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1200000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -391,7 +381,6 @@
         "purpose_type": "PERSONAL",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 1200000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -436,7 +425,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 2000000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -479,7 +467,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 2000001,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -528,7 +515,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 5000000,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -577,7 +563,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Cong tac demo",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 5000001,
         "payer_type": "PERSONAL",
         "received_full": null
@@ -628,7 +613,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Mua vat tu",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 900000,
         "payer_type": "PERSONAL",
         "received_full": true
@@ -685,7 +669,6 @@
         "purpose_type": "BUSINESS",
         "purpose": "Mua vat tu",
         "trip": "Chuyen cong tac demo",
-        "attendees": [],
         "requested_amount_vnd": 900000,
         "payer_type": "PERSONAL",
         "received_full": true
@@ -719,5 +702,5 @@
       }
     }
   ],
-  "sha256": "a3392f824f41e9e73329608b5815529acfa5d1d972ff4d11c25cb3c46450441f"
+  "sha256": "fd49c5d555c2c91702506191354bf53c579926aa99c77a57eaac05872f362cd1"
 }

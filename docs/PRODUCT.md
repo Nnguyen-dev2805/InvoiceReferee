@@ -23,7 +23,7 @@ does not transfer money.
 | Profile | Required evidence | Supporting checks |
 | --- | --- | --- |
 | TRAVEL | Primary bill (merchant, date, total, currency) | Amount vs verified bill; context declaration |
-| CLIENT_MEAL | Primary bill + attendees | As TRAVEL, plus attendee declaration |
+| CLIENT_MEAL | Primary bill | As TRAVEL, plus purpose declaration |
 | WORK_PURCHASE | Primary bill + goods receipt + received-full | Item mapping, quantity/unit, dates, supplier |
 
 `OTHER` is outside the B1 catalog (policy owner classifies or rejects).

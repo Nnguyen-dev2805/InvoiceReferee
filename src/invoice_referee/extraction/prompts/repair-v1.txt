@@ -4,8 +4,9 @@ Hãy trả lời lại đúng schema đã yêu cầu. Chỉ trả về JSON obje
 văn bản ngoài JSON, không đổi các dữ kiện nguồn đã có.
 
 Yêu cầu bắt buộc nhắc lại:
-- `refs` phải trỏ đúng locus có trong `source_registry`.
-- `evidence_id` của mọi fact phải đúng chứng từ đang phân tích.
+- Giữ nguyên schema của system prompt ở trên; không chuyển sang facts/value/confidence.
+- Với compact-document-v1, src chỉ dùng id từ sources; không tự tạo metadata refs.
+- Với cross-source mapping, giữ đúng schema mapping và refs nguồn đã cho.
 - ID item/assessment phải duy nhất; không bỏ sót item; không thêm ID lạ.
 - Field bắt buộc thiếu thì để `usability` = "MISSING" với `raw_value` = "" — không bịa.
 - Không khai `requires_verification` = false cho observation UNREADABLE/UNKNOWN.

@@ -281,6 +281,27 @@ def test_runtime_app_requires_explicit_provider_mode(monkeypatch):
         create_runtime_app()
 
 
+def test_runtime_app_auto_activates_policy_on_fresh_store(monkeypatch, tmp_path):
+    # A fresh runtime must be ready to process without a manual activation step.
+    monkeypatch.setattr('invoice_referee.api.app.load_repo_env', lambda *a, **k: {})
+    monkeypatch.setenv('PROVIDER_MODE', 'fake')
+    monkeypatch.setenv('DATA_ROOT', str(tmp_path))
+    app = create_runtime_app()
+    policy = app.state.service.policy
+    assert policy.active is True
+    assert policy.activation_id is not None
+
+
+def test_runtime_app_startup_activation_is_idempotent(monkeypatch, tmp_path):
+    # A second startup over an already-active store must not create a new activation.
+    monkeypatch.setattr('invoice_referee.api.app.load_repo_env', lambda *a, **k: {})
+    monkeypatch.setenv('PROVIDER_MODE', 'fake')
+    monkeypatch.setenv('DATA_ROOT', str(tmp_path))
+    first = create_runtime_app().state.service.policy.activation_id
+    second = create_runtime_app().state.service.policy.activation_id
+    assert first == second
+
+
 def test_busy_run_is_409(runtime):
     client = TestClient(create_app(runtime.service))
     first = client.post(f'/api/cases/{runtime.case_id}/runs')

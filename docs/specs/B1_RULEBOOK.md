@@ -33,14 +33,14 @@ fixture profile active chỉ cho test, ghi rõ giả định từ proposal.
 | Profile | Khai báo cần có | Primary fields cần usable | Supporting/check áp dụng |
 | --- | --- | --- | --- |
 | TRAVEL | Employee, amount, PERSONAL payer, purpose/chuyến đi | Merchant, document date, total, currency | Không bắt report kho; đối chiếu amount và payment declaration nếu có nguồn liên quan |
-| CLIENT_MEAL | Như trên, thêm khách hàng/người tham dự | Merchant, date, total, currency | Không bắt report kho; thiếu attendees/purpose hỏi employee |
+| CLIENT_MEAL | Như trên, thêm mục đích tiếp khách | Merchant, date, total, currency | Không bắt report kho; thiếu purpose hỏi employee |
 | WORK_PURCHASE | Như trên, purpose và tình trạng nhận hàng | Merchant, date, total, currency; items cần cho đối chiếu | Tangible purchase luôn cần formal receipt/nhận đủ; item mapping/quantity/unit cần usable |
 
-Merchant/date/total cần nguồn của primary document. Payer/purpose/attendees
+Merchant/date/total cần nguồn của primary document. Payer/purpose
 là khai báo có loại nguồn riêng theo policy mô phỏng, không phải facts từ
 invoice. Supporting có mặt không tự chứng minh mọi thông tin đã đủ.
 
-Purpose type BUSINESS và text purpose không rỗng, cùng attendees/trip fields
+Purpose type BUSINESS và text purpose không rỗng, cùng trip field
 cần thiết, là khai báo mà policy mô phỏng sử dụng; không tự chứng minh mục
 đích thực ngoài đời. Purpose type PERSONAL xác định known refusal; UNKNOWN
 hoặc declaration mâu thuẫn cần làm rõ. Không gọi một chuỗi đủ dài là proof.
@@ -55,7 +55,7 @@ thật sự áp dụng. Không nói B1 xác minh tax compliance khi chỉ trích
 | SRC-01 | Không có primary bill bắt buộc | FACTUAL_UNKNOWN; hỏi employee bổ sung |
 | SRC-02 | Required field missing/uncertain/unusable | FACTUAL_UNKNOWN; hỏi đúng người có thể cung cấp/xác minh |
 | SRC-03 | Document/item IDs trùng, refs không tồn tại hoặc output model mâu thuẫn contract | Technical invalid-analysis result; không approve; không đổ thành vi phạm của employee |
-| CTX-01 | Purpose/attendees cần cho profile còn thiếu | FACTUAL_UNKNOWN; hỏi employee |
+| CTX-01 | Purpose/trip cần cho profile còn thiếu | FACTUAL_UNKNOWN; hỏi employee |
 | MODE-01 | Khai báo xác định COMPANY/ADVANCE/VENDOR thay vì PERSONAL | Luồng khác B1; REJECT với lý do scope, không hoàn trả lại một khoản company-paid |
 | MODE-02 | Payer UNKNOWN hoặc evidence mâu thuẫn payer declaration | FACTUAL_UNKNOWN; không tự kết luận người nộp đã trả |
 | SCOPE-01 | OTHER/profile không nằm trong catalog | OUTSIDE_POLICY; policy owner phân loại vào profile đã có hoặc từ chối; không tự mở profile mới |
@@ -84,9 +84,14 @@ Các template áp dụng được khai báo trong extraction contract:
   breakdown không áp dụng, không phát sinh các term số 0 để giả chứng minh.
 - SIMPLE_ITEMIZED: line amount là quantity × unit price, làm tròn về đồng
   bằng ROUND_HALF_UP ở từng dòng; phép so có tolerance 1đ.
-- ITEMIZED_WITH_ADJUSTMENTS: chỉ so nếu có đủ subtotal/tax/discount/fee,
-  amount basis và vị trí từng term. Total = subtotal + tax + fees - discount,
-  không tự tính thuế suất hoặc khấu trừ thuế. Term không rõ không default 0.
+- ITEMIZED_WITH_ADJUSTMENTS: so total với subtotal + tax + fees - discount
+  trong tolerance 1đ, chỉ dùng các term mà model **khai báo có mặt trên bill**.
+  Bắt buộc subtotal và total usable. Một term khai báo có mặt nhưng không
+  đọc được/không usable → UNKNOWN (không default 0). Một term **không khai báo
+  có mặt** đóng góp 0. Template adjustments nhưng không khai báo term nào →
+  UNKNOWN. Ngoài ra nếu cộng được line amount thì đối chiếu
+  sum(line amount) = subtotal (tolerance 1đ). Không tự tính thuế suất hoặc
+  khấu trừ thuế; term không rõ không default 0.
 
 Nếu template/basis không xác định được, check phụ thuộc tạo unknown issue.
 Khi không có đủ dữ kiện cấu trúc, không kết luận sai số học từ phép tính giả.
