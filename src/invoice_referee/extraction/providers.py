@@ -79,6 +79,24 @@ def _env_default(name: str, default: str) -> str:
     return value if value else default
 
 
+def _kimi_api_key_from_env() -> str | None:
+    """Kimi credential from the environment.
+
+    Prefers a single ``KIMI_API_KEY`` (used as a Bearer token). Falls back to the
+    B0 ``KIMI_TOKEN`` + ``KIMI_SECRET`` pair, combined as ``token.secret`` (the
+    OpenAI-compatible form B0 used). Returns ``None`` when neither is present, so
+    the provider reports ``CONFIG_NOT_ACTIVE`` instead of sending a bogus header.
+    """
+    api_key = os.environ.get('KIMI_API_KEY')
+    if api_key:
+        return api_key
+    token = os.environ.get('KIMI_TOKEN')
+    secret = os.environ.get('KIMI_SECRET')
+    if token and secret:
+        return f'{token}.{secret}'
+    return None
+
+
 # --- Public payload builders (serialized per-document request, no prose) -------
 
 def analysis_payload(request: AnalysisRequest) -> dict[str, Any]:
@@ -372,8 +390,19 @@ class LiveProviders(Providers):
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         prompt_dir: Path = PROMPT_DIR,
     ) -> None:
-        self._mistral_api_key = mistral_api_key
-        self._kimi_api_key = kimi_api_key
+        # Credentials come from the environment when not passed explicitly, so the
+        # composition root can start a live runtime from a `.env` file. Mistral uses
+        # MISTRAL_API_KEY. Kimi accepts either a single KIMI_API_KEY (Bearer) or the
+        # B0 token+secret pair, combined as "token.secret" (OpenAI-compatible).
+        # An explicit argument (including ``None`` from a caller that wants no key)
+        # wins over the environment so tests can force a missing-key path.
+        self._mistral_api_key = (
+            mistral_api_key if mistral_api_key is not None
+            else _env_default('MISTRAL_API_KEY', '') or None
+        )
+        self._kimi_api_key = (
+            kimi_api_key if kimi_api_key is not None else _kimi_api_key_from_env()
+        )
         # Model/base-url values come from the environment (pinned defaults), so
         # the values advertised in .env.example are actually read. The composition
         # root may also pass them explicitly (T06).

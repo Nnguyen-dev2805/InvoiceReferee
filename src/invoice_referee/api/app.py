@@ -56,6 +56,7 @@ from invoice_referee.domain.models import (
     StopReply,
     Upload,
 )
+from invoice_referee.env import load_repo_env
 from invoice_referee.extraction.providers import FakeProviders, LiveProviders, Providers
 from invoice_referee.storage.repository import Repository
 from invoice_referee.verify.jobs import VerifyJobs
@@ -509,6 +510,9 @@ def create_runtime_app() -> FastAPI:
     ``PROVIDER_MODE=fake`` wires an EMPTY ``FakeProviders`` (no fixtures): it
     proves the composition path only and is NOT an evaluable runtime.
     """
+    # Load the repo `.env` before reading any config so an operator can start a
+    # live runtime from the file (an explicit export still wins).
+    load_repo_env()
     mode = _provider_mode()
     data_root = Path(os.environ.get('DATA_ROOT', 'data'))
     repo = Repository(data_root / 'cases.sqlite', data_root / 'artifacts')
