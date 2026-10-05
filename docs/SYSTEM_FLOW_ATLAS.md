@@ -1,20 +1,20 @@
 # InvoiceReferee — System Flow Atlas
 
 > **Bản đồ tổng thể, không sao chép văn bản (Map, not a copy)**
-> - Task: `T01 + T02 + T03 + T04 + T05 + T06 + T07 + T08` (Domain contracts, demo policy, test builders, numeric parsing, source resolution, quality usability, pure policy evaluators, inventory/arithmetic, authority, decision reducer, SQLite history, evidence artifacts, atomic request lifecycle, Mistral OCR, per-document Kimi, cross-source proposals, production pipeline & vertical slice, human action validation, closure & input revision, one-process executor, atomic action, Stop/Override & CaseService).
-> - Package: `Work Package 01 — Core (hoàn thành) & Work Package 02 — Workflow (T06–T08 hoàn thành)`.
-> - Accepted Revision: `1ff1af9` (`feat(T08): one-process executor, atomic action và Stop/Override` trên nhánh `rebuild`).
-> - Status: `Living Page Updated` — **T01–T08 IMPLEMENTED & VERIFIED (342 unit & integration tests passing)**. Các task từ T09 đến T16 ở trạng thái kế hoạch (`PLANNED — not built`).
-> - Updated At: `2026-10-05T10:55:00+07:00`.
+> - Task: `T01 + T02 + T03 + T04 + T05 + T06 + T07 + T08 + T09` (Domain contracts, demo policy, test builders, numeric parsing, source resolution, quality usability, pure policy evaluators, inventory/arithmetic, authority, decision reducer, SQLite history, evidence artifacts, atomic request lifecycle, Mistral OCR, per-document Kimi, cross-source proposals, production pipeline & vertical slice, human action validation, closure & input revision, one-process executor, atomic action, Stop/Override, CaseService, FastAPI composition & contract responses).
+> - Package: `Work Package 01 — Core (hoàn thành) & Work Package 02 — Workflow (T06–T09 hoàn thành; T10 planned)`.
+> - Accepted Revision: `4a1c470` (`feat(T09): FastAPI composition và contract responses` trên nhánh `rebuild`).
+> - Status: `Living Page Updated` — **T01–T09 IMPLEMENTED & VERIFIED (369 unit & integration tests passing)**. Các task từ T10 đến T16 ở trạng thái kế hoạch (`PLANNED — not built`).
+> - Updated At: `2026-10-05T12:10:00+07:00`.
 > - Quy tắc: Atlas là **bản đồ điều hướng** (zoom-out), áp dụng các nguyên lý **ASD-STE100** (câu ngắn, một nghĩa, điều kiện trước hành động sau, triệt tiêu mơ hồ, bảo toàn dữ kiện kỹ thuật). Không sao chép văn xuôi từ các tài liệu đặc tả ([B1_PRODUCT_SPEC.md](specs/B1_PRODUCT_SPEC.md), [B1_RULEBOOK.md](specs/B1_RULEBOOK.md), [B1_SYSTEM_SPEC.md](specs/B1_SYSTEM_SPEC.md)) hay kế hoạch thực thi ([Master Plan](superpowers/plans/2026-10-04-invoice-referee.md)).
 
 ---
 
 ## 1. Sơ đồ tổng thể toàn hệ thống (Master End-to-End System Flow)
 
-Sơ đồ thể hiện toàn bộ các thành phần của InvoiceReferee tính đến thời điểm hoàn thành **T01–T08** (hoàn tất toàn bộ tầng Workflow từ dịch vụ ứng dụng, luồng thực thi nền, đường ống đến lưu trữ và can thiệp của con người). 
-- Các khối **nền xanh viền đậm** (`IMPLEMENTED`) là các module nghiệp vụ thuần túy, tầng lưu trữ, tầng trích xuất, tầng đường ống, bộ xác thực hành động con người và tầng dịch vụ ứng dụng đã hoàn thành và vượt qua 342 bài kiểm tra độc lập.
-- Các khối **nền xám viền nét đứt** (`planned — not built`) đại diện cho tầng API FastAPI, giao diện Web React và bộ kiểm thử tự động Verify sẽ được nối dây ở các task tiếp theo (T09 – T16).
+Sơ đồ thể hiện toàn bộ các thành phần của InvoiceReferee tính đến thời điểm hoàn thành **T01–T09** (hoàn thành T06–T09 của tầng Workflow và mở điểm cuối API REST phục vụ tích hợp). 
+- Các khối **nền xanh viền đậm** (`IMPLEMENTED`) là các module nghiệp vụ thuần túy, tầng lưu trữ, tầng trích xuất, tầng đường ống, bộ xác thực hành động con người, tầng dịch vụ ứng dụng và tầng API FastAPI đã hoàn thành và vượt qua 369 bài kiểm tra độc lập.
+- Các khối **nền xám viền nét đứt** (`planned — not built`) đại diện cho giao diện Web React và bộ kiểm thử tự động Verify sẽ được nối dây ở các task tiếp theo (T10 – T16).
 
 ```mermaid
 flowchart TD
@@ -25,8 +25,8 @@ flowchart TD
         UI["Web UI (React / Vite / TypeScript)"]
     end
 
-    subgraph WebEndpoint["HTTP Endpoint (T09 — planned)"]
-        APP["FastAPI app (invoice_referee.api.app:create_app)"]
+    subgraph WebEndpoint["HTTP Endpoint (T09 — IMPLEMENTED)"]
+        APP["FastAPI app (create_app / create_runtime_app)"]
     end
 
     subgraph AppService["Tầng dịch vụ ứng dụng & Điều phối (T06, T08 — IMPLEMENTED)"]
@@ -71,12 +71,12 @@ flowchart TD
     end
 
     %% Áp dụng style class cho nodes
-    class MODELS,CFG,NUM,QUAL,EXP,INV,DEC,REPO,ART,MISTRAL,KIMI,VAL,PIPE,HUMAN,SVC,EXEC implemented;
-    class UI,APP,VERIFY planned;
+    class MODELS,CFG,NUM,QUAL,EXP,INV,DEC,REPO,ART,MISTRAL,KIMI,VAL,PIPE,HUMAN,SVC,EXEC,APP implemented;
+    class UI,VERIFY planned;
 
-    %% Tương tác luồng UI -> API -> Service (T09, T10 planned)
+    %% Tương tác luồng UI -> API -> Service (T10 planned, T09 IMPLEMENTED)
     UI -.->|"HTTP REST API"| APP
-    APP -.->|"gọi application methods"| SVC
+    APP ==>|"gọi application methods (submit / start_run / act / stop)"| SVC
 
     %% Dịch vụ ứng dụng điều phối thực thi và đường ống (T08 IMPLEMENTED)
     SVC ==>|"1. kiểm soát một lượt chạy (acquire / submit)"| EXEC
@@ -110,7 +110,7 @@ flowchart TD
 ```
 
 ```text
-revision: 1ff1af9
+revision: 4a1c470
 - MODELS → src/invoice_referee/domain/models.py (T01 - IMPLEMENTED)
 - CFG → src/invoice_referee/config.py (T01 - IMPLEMENTED)
 - NUM → src/invoice_referee/policy/numeric.py:parse_candidates,normalize_quantity (T02 - IMPLEMENTED)
@@ -127,12 +127,12 @@ revision: 1ff1af9
 - HUMAN → src/invoice_referee/application/human.py:validate_human_action,authorization_matches (T07 - IMPLEMENTED)
 - SVC → src/invoice_referee/application/service.py:CaseService (T08 - IMPLEMENTED)
 - EXEC → src/invoice_referee/application/executor.py:RunExecutor (T08 - IMPLEMENTED)
-- APP → src/invoice_referee/api/app.py:create_app (T09 - planned — not built)
+- APP → src/invoice_referee/api/app.py:create_app,create_runtime_app (T09 - IMPLEMENTED)
 - UI → frontend/src/App.tsx (T10 - planned — not built)
 - VERIFY → src/invoice_referee/verify/runner.py:VerifyRunner (T11 - planned — not built)
 edges: 
-- Mũi tên đôi đậm (==>): Các lệnh gọi trực tiếp giữa các module nghiệp vụ thuần túy, tầng lưu trữ, tầng trích xuất, tầng đường ống và tầng dịch vụ điều phối T01–T08 đã được IMPLEMENTED và VERIFIED bằng 342 bài kiểm tra (SVC điều phối EXEC, HUMAN, REPO và ART; EXEC chạy PIPE ngầm và gọi REPO.finalize_run; PIPE gọi MISTRAL, KIMI, QUAL và DEC; DEC gọi EXP, INV, QUAL; EXP và INV gọi QUAL; INV dùng NUM; REPO gọi ART; KIMI gọi VAL; VAL gọi QUAL).
-- Mũi tên nét đứt (-.->): Luồng tương tác kiến trúc dự kiến khi nối dây từ UI và API tới Service (T09, T10), hoặc kiểm thử Verify (T11), và phụ thuộc dữ liệu tĩnh như PIPE đọc cấu hình chính sách từ snapshot.
+- Mũi tên đôi đậm (==>): Các lệnh gọi trực tiếp giữa các module nghiệp vụ thuần túy, tầng lưu trữ, tầng trích xuất, tầng đường ống, tầng dịch vụ điều phối và tầng điểm cuối API T01–T09 đã được IMPLEMENTED và VERIFIED bằng 369 bài kiểm tra (APP gọi SVC; SVC điều phối EXEC, HUMAN, REPO và ART; EXEC chạy PIPE ngầm và gọi REPO.finalize_run; PIPE gọi MISTRAL, KIMI, QUAL và DEC; DEC gọi EXP, INV, QUAL; EXP và INV gọi QUAL; INV dùng NUM; REPO gọi ART; KIMI gọi VAL; VAL gọi QUAL).
+- Mũi tên nét đứt (-.->): Luồng tương tác kiến trúc dự kiến khi nối dây từ UI tới API (T10), hoặc kiểm thử Verify (T11), và phụ thuộc dữ liệu tĩnh như PIPE đọc cấu hình chính sách từ snapshot.
 ```
 
 ---
@@ -280,13 +280,27 @@ edges:
 - Toàn bộ các trường giới hạn tiền tệ và cấu hình chính sách được bảo vệ tuyệt đối trước tác nhân hệ thống.
 - Chi tiết: [service.py](../src/invoice_referee/application/service.py), [executor.py](../src/invoice_referee/application/executor.py), [test_execution_controls.py](../tests/integration/test_execution_controls.py), [test_human_closure.py](../tests/integration/test_human_closure.py), [task-T08.md](evidence/task-T08.md), [BUILD_LOG_V2.md](BUILD_LOG_V2.md).
 
-### 2.10 Giao diện Web & Điểm cuối API (FastAPI & React UI — T09, T10) — `planned`
-- FastAPI cung cấp các điểm cuối REST API phục vụ vận hành hồ sơ và kiểm thử.
+### 2.10 Điểm cuối API & Điểm kết hợp ứng dụng (FastAPI Endpoints & Composition Root — T09)
+- Hàm `create_app` khởi tạo ứng dụng FastAPI từ dịch vụ `CaseService` được cung cấp.
+- Hàm `create_runtime_app` là điểm kết hợp ứng dụng xây dựng kho lưu trữ, bộ điều hợp và dịch vụ một lần duy nhất.
+- Điểm kết hợp ứng dụng yêu cầu biến môi trường `PROVIDER_MODE` rõ ràng là `fake` hoặc `live`.
+- Nếu biến `PROVIDER_MODE` thiếu hoặc sai giá trị, ứng dụng dừng khởi động ngay lập tức.
+- Ứng dụng khởi đầu ở trạng thái chính sách chưa kích hoạt (`active=False`, `origin='proposed'`).
+- Toàn bộ các điểm cuối API không chứa logic đánh giá hoặc ra quyết định nghiệp vụ.
+- Điểm cuối tiếp nhận hồ sơ xử lý dữ liệu đa phần gồm tờ khai, tệp chứng từ và vai trò.
+- Hệ thống từ chối các trường lạ trong khai báo và cấm nhận đường dẫn lưu trữ nội bộ (`stored_path`).
+- Toàn bộ lỗi nghiệp vụ được chuyển đổi nhất quán sang phong bì lỗi chuẩn gồm mã lỗi và thông điệp.
+- Nếu nhà cung cấp lỗi sau khi phiên chạy được chấp nhận, hệ thống ghi nhận lỗi vào bản ghi lượt chạy.
+- Kích hoạt chính sách yêu cầu vai trò chủ chính sách (`POLICY_OWNER`) và lý do kích hoạt không được để trống.
+- Điểm cuối kiểm tra sức khỏe (`/api/health`) báo cáo trạng thái sẵn sàng mà không để lộ thông tin bảo mật.
+- Chi tiết: [app.py](../src/invoice_referee/api/app.py), [test_api.py](../tests/integration/test_api.py), [task-T09.md](evidence/task-T09.md), [BUILD_LOG_V2.md](BUILD_LOG_V2.md).
+
+### 2.11 Giao diện người dùng Web (React Frontend — T10) — `planned`
 - Giao diện Web hỗ trợ chuyển đổi linh hoạt bốn vai trò trình diễn nghiệp vụ.
 - Bảng điều khiển hiển thị đầy đủ chứng từ gốc, cảnh báo và nhật ký kiểm toán minh bạch.
-- Chi tiết thiết kế: [Workflow Plan T09–T10](superpowers/plans/2026-10-04-invoice-referee-02-workflow.md#t09--fastapi-composition-và-contract-responses).
+- Chi tiết thiết kế: [Workflow Plan T10](superpowers/plans/2026-10-04-invoice-referee-02-workflow.md#t10--react-product-surfaces-human-forms-và-controls).
 
-### 2.11 Bộ kiểm thử tự động Verify & Đóng băng Baseline B1 (Verify Harness — T11, T12) — `planned`
+### 2.12 Bộ kiểm thử tự động Verify & Đóng băng Baseline B1 (Verify Harness — T11, T12) — `planned`
 - Bộ công cụ Verify chạy trực tiếp trên đường dịch vụ chính của ứng dụng.
 - Bộ công cụ Verify in bảng tổng hợp đạt/không đạt kèm dấu thời gian thực.
 - Hai bộ kiểm thử chuẩn gồm Core 4 ca và Escalation 5 ca theo đúng thể lệ cuộc thi.
@@ -298,9 +312,9 @@ edges:
 
 Các module và tính năng dưới đây đã có thiết kế chi tiết nhưng **hoàn toàn chưa được xây dựng hoặc nối dây trong mã nguồn**:
 
-1. **Giao diện Web & Điểm cuối API (`T09`, `T10`)** — `planned — not built`:
-   - Các tệp dự kiến: `src/invoice_referee/api/app.py`, toàn bộ thư mục `frontend/`.
-   - Trách nhiệm: REST API FastAPI và giao diện React phục vụ ban giám khảo thao tác trực tiếp.
+1. **Giao diện Web React (`T10`)** — `planned — not built`:
+   - Các tệp dự kiến: toàn bộ thư mục `frontend/`.
+   - Trách nhiệm: Giao diện React phục vụ ban giám khảo thao tác trực tiếp và chuyển đổi 4 vai trò.
 
 2. **Bộ kiểm thử tự động Verify & Thích ứng ngưỡng (`T11` – `T16`)** — `planned — not built`:
    - Các tệp dự kiến: `src/invoice_referee/verify/`, `src/invoice_referee/adaptation/`, tài liệu chung kết.

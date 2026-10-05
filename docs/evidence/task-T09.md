@@ -11,11 +11,14 @@ fixture is reused; providers are NOT re-declared.
 - RED (before implementation):
   `rtk proxy .venv/bin/python -m pytest tests/integration/test_api.py -q`
   → `ModuleNotFoundError: No module named 'invoice_referee.api'` (feature missing).
-- GREEN (T09 focus):
+- GREEN (T09 focus, initial):
   `rtk proxy .venv/bin/python -m pytest tests/integration/test_api.py -q`
   → 23 passed.
-- Full suite: `rtk proxy .venv/bin/python -m pytest tests/ -q` → 365 passed
+- Full suite (initial): `rtk proxy .venv/bin/python -m pytest tests/ -q` → 365 passed
   (re-run 3× → 365 each time, no flakiness).
+- GREEN (T09 focus, after review round): 27 passed.
+- Full suite: `rtk proxy .venv/bin/python -m pytest tests/ -q` → 369 passed
+  (fresh verification: 27 API focus + 369 total, consistent across reruns).
 - Composition root (real factory):
   `PROVIDER_MODE=fake DATA_ROOT=<tmp> python -c "create_runtime_app()"` → builds;
   `/api/health` → `{status: ok, ready: false, provider_mode: fake}`;
