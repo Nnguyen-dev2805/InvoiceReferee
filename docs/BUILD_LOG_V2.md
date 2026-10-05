@@ -126,3 +126,30 @@ evidence pointers; nothing planned is recorded as done.
   longer rejected on opaque label mismatch).
 - Evidence: `docs/evidence/provider-contract.md`, `docs/evidence/task-T05.md`.
 - Not done: pipeline, API, UI (downstream); live provider quality (T15).
+
+## T06 — Production pipeline và vertical slice
+
+- Created `src/invoice_referee/application/{__init__,pipeline}.py`. `process()`
+  runs preflight → OCR → registry → AnalyzeDocument → validate_document →
+  re-derive at the ACTIVE policy threshold → cross-source (WORK_PURCHASE) →
+  `evaluate`, returning a `PipelineResult` (decision, bundle, artifacts,
+  identities, durations, call counts). `preflight()` short-circuits no-provider
+  cases (config inactive, grounded refusal, missing/multi primary) and returns
+  None when providers must run.
+- No payment request is inserted in the pipeline (T08/finalize_run writes).
+  Checkpoints before/after each SDK call and before apply/evaluate/return;
+  `StoppedRun` propagates (STOPPED, not FAILED) and late output is diagnostic
+  only. Technical vs business errors are separated; identities (incl. repairs)
+  and call counts captured. `is_applicable` is wired so applicability is
+  code-decided.
+- Tests: `tests/integration/test_pipeline.py` (FakeProviders). RED observed,
+  then GREEN; full suite 226 → 247 passed. Vertical slice: TRAVEL 1.2m → CREATE;
+  missing primary → REQUEST_INFO; 2.000.001 → ESCALATE approver; company-paid/
+  PERSONAL → REJECT (no provider calls); inactive/timeout/invalid schema →
+  technical NONE; WORK_PURCHASE inventory + unique-name code join.
+- Review round 1: code-side unique normalized-name 1:1 mapping; MODE-02 check
+  replaced not duplicated; identities captured by index (repairs retained);
+  header fields require USABLE; cross-source gated on item usability.
+- Created `docs/PRODUCT.md`, `docs/ARCHITECTURE.md` (actual pipeline/wiring).
+- Evidence: fake-pipeline only; live OCR/Kimi quality unproven (T15).
+- Not done: human actions, executor/Stop, API, UI (downstream tasks).
