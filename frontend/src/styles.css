@@ -526,3 +526,65 @@ button:focus-visible {
 .audit-kind {
   font-weight: 600;
 }
+
+/* --- Role inbox (Mức 3) ---------------------------------------------------- */
+
+.role-select {
+  max-width: 320px;
+}
+
+.inbox-section {
+  margin-top: var(--space-4);
+}
+
+.inbox-section h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 0.95rem;
+}
+
+.case-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.case-item {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.case-item:hover,
+.case-item:focus-visible {
+  background: var(--color-muted);
+}
+
+.case-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.case-badge {
+  flex: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  background: #ffedd5;
+  color: #9a3412;
+}

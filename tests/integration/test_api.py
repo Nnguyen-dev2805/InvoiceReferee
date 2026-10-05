@@ -105,6 +105,28 @@ def test_create_case_multipart_and_redacts_stored_path(runtime):
     assert listed.status_code == 200
     assert any(case['id'] == body['id'] for case in listed.json())
     assert all('stored_path' not in ev for case in listed.json() for ev in case['evidence'])
+    # A DRAFT case has no run yet -> no role owns it.
+    assert next(c for c in listed.json() if c['id'] == body['id'])['open_owner_modes'] == []
+
+
+def test_case_list_reports_open_owner_modes_for_role_inbox(tmp_path):
+    # An unusable-quality case opens REVIEWER-owned issues. The list DTO must
+    # expose every owner with open work so the role inbox can filter without
+    # recomputing the decision.
+    from tests.integration.conftest import build_runtime
+
+    rt = build_runtime(tmp_path, score=None)
+    try:
+        client = TestClient(create_app(rt.service))
+        started = client.post(f'/api/cases/{rt.case_id}/runs')
+        assert started.status_code == 202
+        rt.release.set()
+        rt.service.wait(started.json()['id'], timeout_seconds=5)
+        case = next(c for c in client.get('/api/cases').json() if c['id'] == rt.case_id)
+        assert 'REVIEWER' in case['open_owner_modes']
+        assert set(case['open_owner_modes']) <= {'EMPLOYEE', 'REVIEWER', 'APPROVER', 'POLICY_OWNER'}
+    finally:
+        rt.close()
 
 
 def test_empty_form_does_not_create_case(runtime):

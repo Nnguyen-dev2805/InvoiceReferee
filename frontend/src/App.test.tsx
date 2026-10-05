@@ -9,6 +9,7 @@ vi.mock('./api', () => ({
   getCase: vi.fn(),
   getRun: vi.fn(),
   getPaymentRequest: vi.fn(),
+  listCases: vi.fn(),
   createCase: vi.fn(),
   startRun: vi.fn(),
   sendAction: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('./api', () => ({
 
 import * as api from './api';
 import { App } from './App';
+import { caseRecord, needsInfoRun } from './testBuilders';
 
 const inactivePolicy = {
   version: 'demo-expense-v0.1-proposed',
@@ -38,6 +40,8 @@ const inactivePolicy = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // App loads the case list on mount; default to empty unless a test overrides it.
+  (api.listCases as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 });
 
 it('shows a policy activation control before any run when policy is inactive', async () => {
@@ -61,4 +65,25 @@ it('hides the activation control once the policy is active', async () => {
   render(<App />);
   await screen.findByText(/đã kích hoạt/);
   expect(screen.queryByText('Policy demo chưa được kích hoạt.')).toBeNull();
+});
+
+it('filters the inbox by the selected role', async () => {
+  (api.getPolicy as ReturnType<typeof vi.fn>).mockResolvedValue({ ...inactivePolicy, active: true });
+  const reviewCase = caseRecord({ id: 'case-r', open_owner_modes: ['REVIEWER'] });
+  (api.listCases as ReturnType<typeof vi.fn>).mockResolvedValue([reviewCase]);
+  (api.getRun as ReturnType<typeof vi.fn>).mockResolvedValue(needsInfoRun());
+  render(<App />);
+  // Default role EMPLOYEE: the REVIEWER case is not in "Việc của tôi".
+  expect(await screen.findByRole('heading', { name: /hộp thư việc — nhân viên/i })).toBeTruthy();
+  await userEvent.selectOptions(screen.getByLabelText(/vai trò/i), 'REVIEWER');
+  expect(await screen.findByRole('heading', { name: /hộp thư việc — kế toán/i })).toBeTruthy();
+  expect(screen.getByText('Công tác Hà Nội')).toBeTruthy();
+});
+
+it('hides the submit form for non-employee roles', async () => {
+  (api.getPolicy as ReturnType<typeof vi.fn>).mockResolvedValue({ ...inactivePolicy, active: true });
+  render(<App />);
+  expect(await screen.findByRole('heading', { name: /nộp hồ sơ hoàn ứng/i })).toBeTruthy();
+  await userEvent.selectOptions(screen.getByLabelText(/vai trò/i), 'APPROVER');
+  expect(screen.queryByRole('heading', { name: /nộp hồ sơ hoàn ứng/i })).toBeNull();
 });

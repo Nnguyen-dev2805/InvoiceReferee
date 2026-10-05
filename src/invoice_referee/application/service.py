@@ -151,6 +151,14 @@ class CaseService:
         """Read all local cases (no tenancy)."""
         return self._repo.list_cases()
 
+    def open_issue_owners(self) -> dict[str, list[str]]:
+        """Per case, the owner modes with an OPEN issue in the current run.
+
+        Feeds the role inbox; it only reads persisted issue ownership and never
+        recomputes a decision.
+        """
+        return self._repo.open_issue_owners()
+
     def case_history(self, case_id: str) -> list[AuditEvent]:
         """Read the audit timeline for a case."""
         return self._repo.history(case_id)

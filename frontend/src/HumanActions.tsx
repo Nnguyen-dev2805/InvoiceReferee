@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { CaseRecord, Decision, DemoMode, HumanAction, HumanActionKind } from './types';
-import { formatVnd } from './format';
+import { formatVnd, MODE_LABEL, MODE_ORDER } from './format';
 
 interface HumanActionsProps {
   caseRecord: CaseRecord;
@@ -16,15 +16,6 @@ const MODE_KINDS: Record<DemoMode, HumanActionKind[]> = {
   APPROVER: ['APPROVE_AMOUNT', 'DENY'],
   POLICY_OWNER: ['GRANT_POLICY_EXCEPTION', 'APPROVE_AMOUNT', 'DENY'],
 };
-
-const MODE_LABEL: Record<DemoMode, string> = {
-  EMPLOYEE: 'Nhân viên',
-  REVIEWER: 'Kế toán / Reviewer',
-  APPROVER: 'Người phê duyệt',
-  POLICY_OWNER: 'Chủ sở hữu policy',
-};
-
-const MODE_ORDER: DemoMode[] = ['EMPLOYEE', 'REVIEWER', 'APPROVER', 'POLICY_OWNER'];
 
 const KIND_LABEL: Record<HumanActionKind, string> = {
   SUPPLY_DECLARATION: 'Bổ sung khai báo',

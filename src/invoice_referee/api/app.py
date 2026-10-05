@@ -135,7 +135,7 @@ def _evidence_dto(evidence: Evidence) -> dict:
     }
 
 
-def _case_dto(case: CaseRecord) -> dict:
+def _case_dto(case: CaseRecord, owners_map: dict[str, list[str]] | None = None) -> dict:
     return {
         'id': case.id,
         'case_version': case.case_version,
@@ -143,6 +143,8 @@ def _case_dto(case: CaseRecord) -> dict:
         'current_run_id': case.current_run_id,
         'workflow_state': case.workflow_state,
         'evidence': [_evidence_dto(e) for e in case.evidence],
+        # Owner modes with an OPEN issue in the case's current run (role inbox).
+        'open_owner_modes': (owners_map or {}).get(case.id, []),
     }
 
 
@@ -319,11 +321,12 @@ def create_app(service: CaseService, *, provider_mode: str = 'fake') -> FastAPI:
 
     @app.get('/api/cases')
     async def list_cases() -> list[dict]:
-        return [_case_dto(case) for case in service.list_cases()]
+        owners = service.open_issue_owners()
+        return [_case_dto(case, owners) for case in service.list_cases()]
 
     @app.get('/api/cases/{case_id}')
     async def get_case(case_id: str) -> dict:
-        return _case_dto(service.get_case(case_id))
+        return _case_dto(service.get_case(case_id), service.open_issue_owners())
 
     # --- runs ---
 

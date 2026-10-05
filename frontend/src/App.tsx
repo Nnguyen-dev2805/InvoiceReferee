@@ -4,6 +4,7 @@ import { ApiError } from './api';
 import type {
   AuditEvent,
   CaseRecord,
+  DemoMode,
   HumanAction,
   PaymentRequest,
   PolicyDto,
@@ -14,12 +15,16 @@ import { CaseForm } from './CaseForm';
 import { AlertIcon } from './icons';
 import { CaseDetail } from './CaseDetail';
 import { HumanActions } from './HumanActions';
+import { Inbox } from './Inbox';
 import { VerifyPanel } from './VerifyPanel';
-import { runInFlight } from './format';
+import { MODE_LABEL, MODE_ORDER, runInFlight } from './format';
 
 const POLL_MS = 1000;
 
 export function App() {
+  const [role, setRole] = useState<DemoMode>('EMPLOYEE');
+  const [cases, setCases] = useState<CaseRecord[]>([]);
+  const [runsByCase, setRunsByCase] = useState<Record<string, RunRecord>>({});
   const [caseRecord, setCaseRecord] = useState<CaseRecord | null>(null);
   const [run, setRun] = useState<RunRecord | null>(null);
   const [payment, setPayment] = useState<PaymentRequest | null>(null);
@@ -28,9 +33,28 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
+  // Load the case list plus the current run of each case, so the inbox can show
+  // role ownership and "processing" state without recomputing any decision.
+  const loadCases = useCallback(async () => {
+    const list = await api.listCases();
+    const runs: Record<string, RunRecord> = {};
+    await Promise.all(
+      list
+        .filter((c) => c.current_run_id)
+        .map(async (c) => {
+          runs[c.id] = await api.getRun(c.current_run_id as string);
+        }),
+    );
+    setCases(list);
+    setRunsByCase(runs);
+  }, []);
+
   useEffect(() => {
     api.getPolicy().then(setPolicy).catch(() => setPolicy(null));
-  }, []);
+    loadCases().catch((err) =>
+      setError(err instanceof Error ? err.message : 'Không tải được danh sách hồ sơ.'),
+    );
+  }, [loadCases]);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current !== null) {
@@ -53,13 +77,17 @@ export function App() {
             setPayment(await api.getPaymentRequest(latest.case_id));
             setHistory(await api.getHistory(latest.case_id));
           }
-          if (runInFlight(latest.status)) pollRun(runId);
+          if (runInFlight(latest.status)) {
+            pollRun(runId);
+          } else {
+            await loadCases(); // run finished: refresh role ownership in the inbox
+          }
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Không tải được trạng thái.');
         }
       }, POLL_MS);
     },
-    [stopPolling],
+    [stopPolling, loadCases],
   );
 
   useEffect(() => stopPolling, [stopPolling]);
@@ -75,6 +103,15 @@ export function App() {
     }
   }
 
+  async function openCase(caseId: string) {
+    setError(null);
+    try {
+      await refresh(await api.getCase(caseId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không mở được hồ sơ.');
+    }
+  }
+
   async function handleCreated(record: CaseRecord) {
     setError(null);
     try {
@@ -82,6 +119,7 @@ export function App() {
       setCaseRecord(record);
       setRun(started);
       pollRun(started.id);
+      await loadCases();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Không chạy được hồ sơ.');
     }
@@ -103,10 +141,19 @@ export function App() {
     setError(null);
     const updated = await api.sendAction(caseRecord.id, action);
     await refresh(updated);
+    await loadCases();
   }
 
   async function handleActivatePolicy(reason: string) {
     setPolicy(await api.activatePolicy(reason));
+  }
+
+  function closeCase() {
+    stopPolling();
+    setCaseRecord(null);
+    setRun(null);
+    setPayment(null);
+    setHistory([]);
   }
 
   return (
@@ -116,6 +163,20 @@ export function App() {
         <p className="muted">
           Hồ sơ hoàn ứng chi phí công ty — hệ thống tự xử lý thường quy và hỏi người khi cần.
         </p>
+        <div className="field role-select">
+          <label htmlFor="role">Vai trò (demo)</label>
+          <select
+            id="role"
+            value={role}
+            onChange={(event) => setRole(event.target.value as DemoMode)}
+          >
+            {MODE_ORDER.map((option) => (
+              <option key={option} value={option}>
+                {MODE_LABEL[option]}
+              </option>
+            ))}
+          </select>
+        </div>
         {policy && (
           <p className="policy-line">
             Policy demo <strong>{policy.version}</strong> ·{' '}
@@ -140,10 +201,22 @@ export function App() {
 
       <main className="grid">
         <div className="col">
-          {!caseRecord && <CaseForm onCreate={api.createCase} onCreated={handleCreated} />}
+          {/* Only the employee submits cases; the other roles work the queue. */}
+          {role === 'EMPLOYEE' && !caseRecord && (
+            <CaseForm onCreate={api.createCase} onCreated={handleCreated} />
+          )}
+          <Inbox
+            cases={cases}
+            role={role}
+            runsByCase={runsByCase}
+            onOpen={openCase}
+          />
+        </div>
+
+        <div className="col">
           {caseRecord && (
             <section className="panel" aria-labelledby="claim-heading">
-              <h2 id="claim-heading">Hồ sơ đang xử lý</h2>
+              <h2 id="claim-heading">Hồ sơ đang xem</h2>
               <dl className="claim">
                 <dt>Nhân viên</dt><dd>{caseRecord.claim.employee_id}</dd>
                 <dt>Loại chi phí</dt><dd>{caseRecord.claim.profile}</dd>
@@ -151,24 +224,12 @@ export function App() {
                 <dt>Số đề nghị</dt>
                 <dd>{new Intl.NumberFormat('vi-VN').format(caseRecord.claim.requested_amount_vnd ?? 0)}₫</dd>
               </dl>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => {
-                  stopPolling();
-                  setCaseRecord(null);
-                  setRun(null);
-                  setPayment(null);
-                  setHistory([]);
-                }}
-              >
-                Nộp hồ sơ khác
+              <button type="button" className="btn btn-ghost" onClick={closeCase}>
+                Đóng hồ sơ
               </button>
             </section>
           )}
-        </div>
 
-        <div className="col">
           {run && (
             <CaseDetail
               run={run}

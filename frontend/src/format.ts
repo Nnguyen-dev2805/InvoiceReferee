@@ -1,6 +1,6 @@
 // Display helpers. These format values for humans; they never decide business
 // meaning (that lives in the backend decision).
-import type { DecisionAction, ExecutionStatus, IssueClass, WorkflowState } from './types';
+import type { Decision, DecisionAction, DemoMode, ExecutionStatus, Issue, IssueClass, WorkflowState } from './types';
 
 const VND = new Intl.NumberFormat('vi-VN');
 
@@ -45,6 +45,23 @@ export const RUN_STATUS_LABEL: Record<ExecutionStatus, string> = {
 
 export function runInFlight(status: ExecutionStatus): boolean {
   return status === 'QUEUED' || status === 'RUNNING' || status === 'STOP_REQUESTED';
+}
+
+// --- Demo roles (single source of truth for the role selector + inbox) ---------
+
+export const MODE_ORDER: DemoMode[] = ['EMPLOYEE', 'REVIEWER', 'APPROVER', 'POLICY_OWNER'];
+
+export const MODE_LABEL: Record<DemoMode, string> = {
+  EMPLOYEE: 'Nhân viên',
+  REVIEWER: 'Kế toán / Reviewer',
+  APPROVER: 'Người phê duyệt',
+  POLICY_OWNER: 'Chủ sở hữu policy',
+};
+
+/** Open issues a role must act on. Presentation only — the backend enforces scope. */
+export function openIssuesForRole(decision: Decision | null | undefined, mode: DemoMode): Issue[] {
+  if (!decision) return [];
+  return decision.issues.filter((issue) => issue.status === 'OPEN' && issue.owner_mode === mode);
 }
 
 // --- Stage labels (what the pipeline is doing right now) -----------------------

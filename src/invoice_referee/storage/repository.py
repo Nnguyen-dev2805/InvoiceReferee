@@ -419,6 +419,26 @@ class Repository:
         rows = self._read('SELECT * FROM cases ORDER BY created_at, id')
         return [self._case_from_row(row) for row in rows]
 
+    def open_issue_owners(self) -> dict[str, list[str]]:
+        """Per case, the owner modes that still have an OPEN issue (current run only).
+
+        Reads the persisted ``issues`` rows for each case's CURRENT run, so an
+        issue re-reported by a superseded run never leaks. One query; the result
+        is the inbox's role filter, not a recomputation of the decision.
+        """
+        rows = self._read(
+            'SELECT i.case_id AS case_id, i.owner_mode AS owner_mode FROM issues i '
+            'JOIN cases c ON c.current_run_id = i.run_id '
+            'WHERE i.status = ? ORDER BY i.case_id, i.owner_mode',
+            ('OPEN',),
+        )
+        owners: dict[str, list[str]] = {}
+        for row in rows:
+            modes = owners.setdefault(row['case_id'], [])
+            if row['owner_mode'] not in modes:
+                modes.append(row['owner_mode'])
+        return owners
+
     def _case_from_row(self, row: sqlite3.Row) -> CaseRecord:
         evidence = [
             self._evidence_from_row(e)

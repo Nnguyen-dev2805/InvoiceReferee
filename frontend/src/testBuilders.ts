@@ -93,7 +93,7 @@ export function auditEvent(overrides: Partial<AuditEvent> = {}): AuditEvent {
   };
 }
 
-export function caseRecord(): CaseRecord {
+export function caseRecord(overrides: Partial<CaseRecord> = {}): CaseRecord {
   return {
     id: 'case-1',
     case_version: 1,
@@ -110,5 +110,7 @@ export function caseRecord(): CaseRecord {
     current_run_id: 'run-1',
     workflow_state: 'REVIEWING',
     evidence: [],
+    open_owner_modes: [],
+    ...overrides,
   };
 }

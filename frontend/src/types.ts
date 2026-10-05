@@ -75,6 +75,8 @@ export interface CaseRecord {
   current_run_id: string | null;
   workflow_state: WorkflowState;
   evidence: EvidenceDto[];
+  // Owner modes with an OPEN issue in the current run (role inbox filter).
+  open_owner_modes: DemoMode[];
 }
 
 export interface SourceRef {
