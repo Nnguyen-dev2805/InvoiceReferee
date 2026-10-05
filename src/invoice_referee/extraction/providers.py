@@ -108,6 +108,22 @@ def _chat_base_url_from_env() -> str:
     return os.environ.get('LLM_BASE_URL') or os.environ.get('KIMI_BASE_URL') or KIMI_BASE_URL
 
 
+def _timeout_from_env(default: float) -> float:
+    """Per-call timeout from ``LLM_TIMEOUT`` (seconds); a bad value keeps the default.
+
+    A reasoning model can take minutes on a real analyze call, so this must be
+    tunable without a code change. Rejects non-positive / unparseable values.
+    """
+    raw = os.environ.get('LLM_TIMEOUT')
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
 # --- Public payload builders (serialized per-document request, no prose) -------
 
 def analysis_payload(request: AnalysisRequest) -> dict[str, Any]:
@@ -424,7 +440,12 @@ class LiveProviders(Providers):
         self._kimi_base_url = kimi_base_url or _chat_base_url_from_env()
         self._ocr_client = ocr_client
         self._chat_client = chat_client
-        self._timeout = timeout_seconds
+        # An explicit timeout argument wins; otherwise LLM_TIMEOUT (seconds) is
+        # read so a slow reasoning model can be accommodated without a code change.
+        self._timeout = (
+            timeout_seconds if timeout_seconds != DEFAULT_TIMEOUT_SECONDS
+            else _timeout_from_env(DEFAULT_TIMEOUT_SECONDS)
+        )
         self._prompt_dir = Path(prompt_dir)
         self.identities: list[StageIdentity] = []
         # Token usage per Kimi invocation; a missing count is None, never 0.
