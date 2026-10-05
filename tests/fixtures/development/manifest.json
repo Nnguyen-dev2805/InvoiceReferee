@@ -1,0 +1,723 @@
+{
+  "version": "b1-development-v1",
+  "suite": "development",
+  "mode": "PIPELINE_FAKE_OR_REPLAY",
+  "policy_version": "demo-expense-v0.1-proposed",
+  "cases": [
+    {
+      "id": "TC01",
+      "description": "TRAVEL 1.200.000đ đủ purpose/bill",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/TC01-primary_bill.pdf",
+          "sha256": "1f8679ca1cd387d40116fac96c4669d7a3b6d10f129702eeaea2b8f0fe2cb2e9",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": 1200000,
+        "request_count": 1,
+        "reason": "Hồ sơ thường quy trong quyền tự động"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC01.json",
+      "replay_artifacts": {
+        "document": "ocr/TC01-document.json",
+        "registry": "ocr/TC01-registry.json"
+      }
+    },
+    {
+      "id": "TC02",
+      "description": "CLIENT_MEAL 1.800.000đ đủ attendees",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "CLIENT_MEAL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Tiep khach",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [
+          "Khach A"
+        ],
+        "requested_amount_vnd": 1800000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/TC02-primary_bill.pdf",
+          "sha256": "104aafe22b0e64470c1252b5dc55adcf5b7be18b003857432b7a25dc05d77dcb",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": 1800000,
+        "request_count": 1,
+        "reason": "Tiếp khách đủ điều kiện, không cần report kho"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC02.json",
+      "replay_artifacts": {
+        "document": "ocr/TC02-document.json",
+        "registry": "ocr/TC02-registry.json"
+      }
+    },
+    {
+      "id": "TC03",
+      "description": "WORK_PURCHASE 900.000đ bill/receipt khớp",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "WORK_PURCHASE",
+        "purpose_type": "BUSINESS",
+        "purpose": "Mua vat tu",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 900000,
+        "payer_type": "PERSONAL",
+        "received_full": true
+      },
+      "uploads": [
+        {
+          "path": "documents/TC03-primary_bill.pdf",
+          "sha256": "2050499bb1d280b767bc6922bc2a203decfb1ccbdf538203e56c49001e94ceea",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        },
+        {
+          "path": "documents/TC03-goods_receipt.pdf",
+          "sha256": "5e5652af07162c9265f2b9c4423ee91ae06ac87e9a380fddf28a9e73dd837a33",
+          "role": "GOODS_RECEIPT",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [
+          "INV-01",
+          "INV-02"
+        ],
+        "amount_vnd": 900000,
+        "request_count": 1,
+        "reason": "Inventory checks chạy, khớp"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC03.json",
+      "replay_artifacts": {
+        "document": "ocr/TC03-document.json",
+        "registry": "ocr/TC03-registry.json",
+        "receipt_document": "ocr/TC03-receipt_document.json",
+        "receipt_registry": "ocr/TC03-receipt_registry.json"
+      }
+    },
+    {
+      "id": "TC04",
+      "description": "Claim có nội dung nhưng thiếu primary bill",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "EMPLOYEE"
+        ],
+        "required_rules": [
+          "SRC-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": "Thiếu primary bill bắt buộc"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC04.json",
+      "replay_artifacts": {}
+    },
+    {
+      "id": "TC05",
+      "description": "Bill total rõ nhưng OCR/quality chưa đủ căn cứ",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/TC05-primary_bill.pdf",
+          "sha256": "01bc5c58770c374e93a95a0a06f86d7fd50435be87bfd9cafcdfe2141ce371b5",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "REVIEWER"
+        ],
+        "required_rules": [
+          "SRC-02"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": "Quality chưa đủ căn cứ; reviewer xem ảnh gốc"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC05.json",
+      "replay_artifacts": {
+        "document": "ocr/TC05-document.json",
+        "registry": "ocr/TC05-registry.json"
+      }
+    },
+    {
+      "id": "TC06",
+      "description": "Bill 1.280.000đ, requested 1.480.000đ",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1480000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/TC06-primary_bill.pdf",
+          "sha256": "33425812b46952be254472aff8abd827775f581bcb8ce50da22be1499d4dd4dc",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "EMPLOYEE"
+        ],
+        "required_rules": [
+          "AMT-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": "Chênh 200.000đ chưa có căn cứ; không chọn min/max"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC06.json",
+      "replay_artifacts": {
+        "document": "ocr/TC06-document.json",
+        "registry": "ocr/TC06-registry.json"
+      }
+    },
+    {
+      "id": "TC07",
+      "description": "CLIENT_MEAL có bill nhưng thiếu attendees",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "CLIENT_MEAL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Tiep khach",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1800000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/TC07-primary_bill.pdf",
+          "sha256": "4ba60f6e7b8ec9080fcdbc3049bc43a64a6421218a6f4229075152430f45c044",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "EMPLOYEE"
+        ],
+        "required_rules": [
+          "CTX-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": "Thiếu người tham dự"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC07.json",
+      "replay_artifacts": {
+        "document": "ocr/TC07-document.json",
+        "registry": "ocr/TC07-registry.json"
+      }
+    },
+    {
+      "id": "TC08",
+      "description": "OTHER: chi phí ngoài catalog",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "OTHER",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/TC08-primary_bill.pdf",
+          "sha256": "4a966ec7ffb7f4646d1bab7bf952c73dae451a6b8744fe67aa242b685ac492d5",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "OUTSIDE_POLICY"
+        ],
+        "owners": [
+          "POLICY_OWNER"
+        ],
+        "required_rules": [
+          "SCOPE-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": "Ngoài catalog B1"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC08.json",
+      "replay_artifacts": {
+        "document": "ocr/TC08-document.json",
+        "registry": "ocr/TC08-registry.json"
+      }
+    },
+    {
+      "id": "TC09",
+      "description": "Khai báo PERSONAL, không chi cho công việc",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "PERSONAL",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/TC09-primary_bill.pdf",
+          "sha256": "af50f0692844f2f2786ab707b317b1091ae8cd01aec31fad19004e64102d2827",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REJECT",
+        "completion_basis": null,
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [
+          "ELIG-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": "Known refusal: chi cá nhân không phục vụ công việc"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC09.json",
+      "replay_artifacts": {
+        "document": "ocr/TC09-document.json",
+        "registry": "ocr/TC09-registry.json"
+      }
+    },
+    {
+      "id": "TC10",
+      "description": "Case hợp lệ đúng 2.000.000đ",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 2000000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/TC10-primary_bill.pdf",
+          "sha256": "facd98eda719042550e5b050e27e54016c7e2b1c239ea03a3f7490841a473ffa",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": 2000000,
+        "request_count": 1,
+        "reason": "Biên inclusive 2.000.000"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC10.json",
+      "replay_artifacts": {
+        "document": "ocr/TC10-document.json",
+        "registry": "ocr/TC10-registry.json"
+      }
+    },
+    {
+      "id": "TC11",
+      "description": "Case hợp lệ 2.000.001đ",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 2000001,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/TC11-primary_bill.pdf",
+          "sha256": "6e3a6bd816eb4f728bd410b14ddda7f70bdddb85995922f155f470fa3ea44f05",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "APPROVER"
+        ],
+        "required_rules": [
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": "Vượt quyền tự động, cần approver"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC11.json",
+      "replay_artifacts": {
+        "document": "ocr/TC11-document.json",
+        "registry": "ocr/TC11-registry.json"
+      }
+    },
+    {
+      "id": "TC12",
+      "description": "Case hợp lệ đúng 5.000.000đ",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 5000000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/TC12-primary_bill.pdf",
+          "sha256": "cf5fe6f6396365e7f91545387a23a1821eac1130d6c01c4e5d06c583d42f92ad",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "APPROVER"
+        ],
+        "required_rules": [
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": "Đúng policy max, không ngoài policy"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC12.json",
+      "replay_artifacts": {
+        "document": "ocr/TC12-document.json",
+        "registry": "ocr/TC12-registry.json"
+      }
+    },
+    {
+      "id": "TC13",
+      "description": "Case hợp lệ 5.000.001đ",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 5000001,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/TC13-primary_bill.pdf",
+          "sha256": "5afe512bfabda5f339d747f77c1dbba4c056216a2b67887828bb698886717f85",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "OUTSIDE_POLICY",
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "POLICY_OWNER"
+        ],
+        "required_rules": [
+          "LIM-01",
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": "Vượt policy + vượt quyền, cần policy owner"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC13.json",
+      "replay_artifacts": {
+        "document": "ocr/TC13-document.json",
+        "registry": "ocr/TC13-registry.json"
+      }
+    },
+    {
+      "id": "TC14",
+      "description": "Bill quantity 10, receipt 8",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "WORK_PURCHASE",
+        "purpose_type": "BUSINESS",
+        "purpose": "Mua vat tu",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 900000,
+        "payer_type": "PERSONAL",
+        "received_full": true
+      },
+      "uploads": [
+        {
+          "path": "documents/TC14-primary_bill.pdf",
+          "sha256": "9ebd996bb6abf38610a1dc0c66e95f223a45def12ae9be09928bc6f3aab59e0d",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        },
+        {
+          "path": "documents/TC14-goods_receipt.pdf",
+          "sha256": "9bc357438c12eb5f99f7db276e6bb12166bf60d1b7f9bb1e51521ff34b31140f",
+          "role": "GOODS_RECEIPT",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "REVIEWER"
+        ],
+        "required_rules": [
+          "INV-02"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": "Số lượng bill/receipt conflict; reviewer đối chiếu nguồn"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC14.json",
+      "replay_artifacts": {
+        "document": "ocr/TC14-document.json",
+        "registry": "ocr/TC14-registry.json",
+        "receipt_document": "ocr/TC14-receipt_document.json",
+        "receipt_registry": "ocr/TC14-receipt_registry.json"
+      }
+    },
+    {
+      "id": "TC15",
+      "description": "Model trả item ID trùng",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "WORK_PURCHASE",
+        "purpose_type": "BUSINESS",
+        "purpose": "Mua vat tu",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 900000,
+        "payer_type": "PERSONAL",
+        "received_full": true
+      },
+      "uploads": [
+        {
+          "path": "documents/TC15-primary_bill.pdf",
+          "sha256": "e563da612e96f007678483c3e1fca801e94e66b8f65f23d220f4fef8d9eba862",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "FAILED",
+        "action": "NONE",
+        "completion_basis": null,
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": "Duplicate item IDs -> technical invalid"
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC15.json",
+      "replay_artifacts": {
+        "document": "ocr/TC15-document.json",
+        "registry": "ocr/TC15-registry.json"
+      }
+    }
+  ],
+  "sha256": "a3392f824f41e9e73329608b5815529acfa5d1d972ff4d11c25cb3c46450441f"
+}

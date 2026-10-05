@@ -1,0 +1,1 @@
+{"execution_status": "SUCCEEDED", "action": "CREATE_PAYMENT_REQUEST", "completion_basis": "ROUTINE_AUTO", "issue_classes": [], "owners": [], "required_rules": ["INV-01", "INV-02"], "amount_vnd": 900000, "request_count": 1, "reason": "Inventory checks chạy, khớp"}

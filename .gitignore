@@ -46,6 +46,7 @@ data/models/
 data/submissions/
 data/output/
 data/verify_runs/
+data/verify/
 data/rebuild_backups/
 data/runs/
 data/artifacts/

@@ -8,6 +8,7 @@ import type {
   PolicyDto,
   RunRecord,
   StopReply,
+  VerifyJob,
 } from './types';
 
 export class ApiError extends Error {
@@ -106,4 +107,16 @@ export function activatePolicy(reason: string): Promise<PolicyDto> {
     headers: JSON_HEADERS,
     body: JSON.stringify({ mode: 'POLICY_OWNER', reason }),
   });
+}
+
+export function startVerifyRun(suite: string, mode = 'replay'): Promise<VerifyJob> {
+  return request<VerifyJob>('/api/verify-runs', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ suite, mode }),
+  });
+}
+
+export function getVerifyRun(id: string): Promise<VerifyJob> {
+  return request<VerifyJob>(`/api/verify-runs/${encodeURIComponent(id)}`);
 }

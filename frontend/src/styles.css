@@ -411,3 +411,26 @@ button:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+.verify-result {
+  margin-top: var(--space-4);
+}
+
+.verify-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.verify-table caption {
+  text-align: left;
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
+.verify-table th,
+.verify-table td {
+  text-align: left;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}

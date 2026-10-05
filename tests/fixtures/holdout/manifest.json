@@ -1,0 +1,961 @@
+{
+  "version": "b1-holdout-v1",
+  "suite": "holdout",
+  "mode": "PIPELINE_FAKE_OR_REPLAY",
+  "policy_version": "demo-expense-v0.1-proposed",
+  "cases": [
+    {
+      "id": "HLD01",
+      "description": "holdout HLD01",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1001000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD01-primary_bill.pdf",
+          "sha256": "199e083e8643850fe6a948a8c957b00df26edf9e43cda8630c7ada6c2244e32c",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": 1001000,
+        "request_count": 1,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD01.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD01-document.json",
+        "registry": "ocr/HLD01-registry.json"
+      }
+    },
+    {
+      "id": "HLD02",
+      "description": "holdout HLD02",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1002000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD02-primary_bill.pdf",
+          "sha256": "afa836edef3b570fbb81b28e427f090af8cfc92b3d6561039172a04c4b10e6f6",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": 1002000,
+        "request_count": 1,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD02.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD02-document.json",
+        "registry": "ocr/HLD02-registry.json"
+      }
+    },
+    {
+      "id": "HLD03",
+      "description": "holdout HLD03",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1003000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD03-primary_bill.pdf",
+          "sha256": "a877ccf632bc6423d8040c46a46d13930b6a20bc32b16bb7df8a674ad7ee0267",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": 1003000,
+        "request_count": 1,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD03.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD03-document.json",
+        "registry": "ocr/HLD03-registry.json"
+      }
+    },
+    {
+      "id": "HLD04",
+      "description": "holdout HLD04",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1004000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD04-primary_bill.pdf",
+          "sha256": "b69153316a308f195b15c18b945ce7cabb9ab00145bf0f5c248af61f0de77e62",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": 1004000,
+        "request_count": 1,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD04.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD04-document.json",
+        "registry": "ocr/HLD04-registry.json"
+      }
+    },
+    {
+      "id": "HLD05",
+      "description": "holdout HLD05",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1005000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD05-primary_bill.pdf",
+          "sha256": "b93dee476dfafe7551dc9411f4d47575e26096cc4f5724d54a93c847002e55a8",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": 1005000,
+        "request_count": 1,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD05.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD05-document.json",
+        "registry": "ocr/HLD05-registry.json"
+      }
+    },
+    {
+      "id": "HLD06",
+      "description": "holdout HLD06",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1006000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD06-primary_bill.pdf",
+          "sha256": "8e499db03e5895c5d4a2d99917ce5495d704979e34060c7718cc5b104e662362",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": 1006000,
+        "request_count": 1,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD06.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD06-document.json",
+        "registry": "ocr/HLD06-registry.json"
+      }
+    },
+    {
+      "id": "HLD07",
+      "description": "holdout HLD07",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD07-primary_bill.pdf",
+          "sha256": "545f7765e53159e82171e63a0f467325cd2b29a3749210fedfb975fabff4a81d",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "EMPLOYEE"
+        ],
+        "required_rules": [
+          "AMT-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD07.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD07-document.json",
+        "registry": "ocr/HLD07-registry.json"
+      }
+    },
+    {
+      "id": "HLD08",
+      "description": "holdout HLD08",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD08-primary_bill.pdf",
+          "sha256": "289897e753917f7e1faa864bd6026893712c1041e82faf781d2419710adbf148",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "EMPLOYEE"
+        ],
+        "required_rules": [
+          "AMT-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD08.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD08-document.json",
+        "registry": "ocr/HLD08-registry.json"
+      }
+    },
+    {
+      "id": "HLD09",
+      "description": "holdout HLD09",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD09-primary_bill.pdf",
+          "sha256": "e2f446ee7e96664543641c3d30e28d2c586286b944443c561012baa4221644a9",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "EMPLOYEE"
+        ],
+        "required_rules": [
+          "AMT-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD09.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD09-document.json",
+        "registry": "ocr/HLD09-registry.json"
+      }
+    },
+    {
+      "id": "HLD10",
+      "description": "holdout HLD10",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD10-primary_bill.pdf",
+          "sha256": "f42066b4650e8e31b7a9fb33cfbede37d3934cf4ccc125c4e678fda7a56184c3",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "EMPLOYEE"
+        ],
+        "required_rules": [
+          "AMT-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD10.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD10-document.json",
+        "registry": "ocr/HLD10-registry.json"
+      }
+    },
+    {
+      "id": "HLD11",
+      "description": "holdout HLD11",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD11-primary_bill.pdf",
+          "sha256": "f2db0c15037247803b9cbbe4c6f6b8d7086f0af5a0ab79b729f4c3690108b145",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "EMPLOYEE"
+        ],
+        "required_rules": [
+          "AMT-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD11.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD11-document.json",
+        "registry": "ocr/HLD11-registry.json"
+      }
+    },
+    {
+      "id": "HLD12",
+      "description": "holdout HLD12",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD12-primary_bill.pdf",
+          "sha256": "bdceb199ff271b0d0eeb0fafb48b820a543f9a4ae9c0faa4c938a43068e5a96f",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "EMPLOYEE"
+        ],
+        "required_rules": [
+          "AMT-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD12.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD12-document.json",
+        "registry": "ocr/HLD12-registry.json"
+      }
+    },
+    {
+      "id": "HLD13",
+      "description": "holdout HLD13",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 6000000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD13-primary_bill.pdf",
+          "sha256": "a7261081cd8548aa2ca0998abc6fec3d55b26800b0ede71edf65f0bf2ceb7a32",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "OUTSIDE_POLICY",
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "POLICY_OWNER"
+        ],
+        "required_rules": [
+          "LIM-01",
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD13.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD13-document.json",
+        "registry": "ocr/HLD13-registry.json"
+      }
+    },
+    {
+      "id": "HLD14",
+      "description": "holdout HLD14",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 6000000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD14-primary_bill.pdf",
+          "sha256": "6e9d3eb2512486c8d8959eb55b3904332bac8140a7c30a1a33055dc06aba596f",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "OUTSIDE_POLICY",
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "POLICY_OWNER"
+        ],
+        "required_rules": [
+          "LIM-01",
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD14.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD14-document.json",
+        "registry": "ocr/HLD14-registry.json"
+      }
+    },
+    {
+      "id": "HLD15",
+      "description": "holdout HLD15",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 6000000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD15-primary_bill.pdf",
+          "sha256": "25f8313f18a17b6e088fd3cdb4c2089cc53c9c4c7b118a4c12a99f6a1423b6ef",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "OUTSIDE_POLICY",
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "POLICY_OWNER"
+        ],
+        "required_rules": [
+          "LIM-01",
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD15.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD15-document.json",
+        "registry": "ocr/HLD15-registry.json"
+      }
+    },
+    {
+      "id": "HLD16",
+      "description": "holdout HLD16",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 6000000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD16-primary_bill.pdf",
+          "sha256": "31d9a53ba17cb50b1ab389e2b7402370df31bc003b663ce6fdde62bad140ea2d",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "OUTSIDE_POLICY",
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "POLICY_OWNER"
+        ],
+        "required_rules": [
+          "LIM-01",
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD16.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD16-document.json",
+        "registry": "ocr/HLD16-registry.json"
+      }
+    },
+    {
+      "id": "HLD17",
+      "description": "holdout HLD17",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 2500000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD17-primary_bill.pdf",
+          "sha256": "7381cd212e40efda8a1d73afb5714ec790dabf8be3345f2aae399e63ca946aad",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "APPROVER"
+        ],
+        "required_rules": [
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD17.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD17-document.json",
+        "registry": "ocr/HLD17-registry.json"
+      }
+    },
+    {
+      "id": "HLD18",
+      "description": "holdout HLD18",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 2500000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD18-primary_bill.pdf",
+          "sha256": "68dd591f67bbbb0cf048f3eda3f297d7276d638f807ca114407b32b55cfcd932",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "APPROVER"
+        ],
+        "required_rules": [
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD18.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD18-document.json",
+        "registry": "ocr/HLD18-registry.json"
+      }
+    },
+    {
+      "id": "HLD19",
+      "description": "holdout HLD19",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 2500000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD19-primary_bill.pdf",
+          "sha256": "64f1283e0e46c0e24e43645e60db9aa619e0a88c0b56f6eead644622d517df98",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "APPROVER"
+        ],
+        "required_rules": [
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD19.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD19-document.json",
+        "registry": "ocr/HLD19-registry.json"
+      }
+    },
+    {
+      "id": "HLD20",
+      "description": "holdout HLD20",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 2500000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/HLD20-primary_bill.pdf",
+          "sha256": "79c2efcf20b013c9d45f068b5b7d3282db7a465f0943a8be62baa5b026670148",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "APPROVER"
+        ],
+        "required_rules": [
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/holdout/gold/HLD20.json",
+      "replay_artifacts": {
+        "document": "ocr/HLD20-document.json",
+        "registry": "ocr/HLD20-registry.json"
+      }
+    }
+  ],
+  "sha256": "af6520bbfd87b03ff43fc2e1a2e28d10f3affeec2d2d16eb57fae94a4e27dd59"
+}

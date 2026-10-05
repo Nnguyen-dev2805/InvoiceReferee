@@ -1,0 +1,577 @@
+{
+  "version": "b1-calibration-v1",
+  "suite": "calibration",
+  "mode": "PIPELINE_FAKE_OR_REPLAY",
+  "policy_version": "demo-expense-v0.1-proposed",
+  "cases": [
+    {
+      "id": "CAL01",
+      "description": "calibration CAL01",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1001000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/CAL01-primary_bill.pdf",
+          "sha256": "a20aaf4ecde5baf424d6de3a1fd57817c878463608041b83d307df9b95829803",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": 1001000,
+        "request_count": 1,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/calibration/gold/CAL01.json",
+      "replay_artifacts": {
+        "document": "ocr/CAL01-document.json",
+        "registry": "ocr/CAL01-registry.json"
+      }
+    },
+    {
+      "id": "CAL02",
+      "description": "calibration CAL02",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1002000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/CAL02-primary_bill.pdf",
+          "sha256": "a7ec77157097bc23eea6f48b7b87c40e4cd9a975a44bb7aa5f7d375ee9142be8",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": 1002000,
+        "request_count": 1,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/calibration/gold/CAL02.json",
+      "replay_artifacts": {
+        "document": "ocr/CAL02-document.json",
+        "registry": "ocr/CAL02-registry.json"
+      }
+    },
+    {
+      "id": "CAL03",
+      "description": "calibration CAL03",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1003000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/CAL03-primary_bill.pdf",
+          "sha256": "5cae90ab431bd6649105db79e72c66052ffd8dc87f94a7573b2033150b006e1b",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": 1003000,
+        "request_count": 1,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/calibration/gold/CAL03.json",
+      "replay_artifacts": {
+        "document": "ocr/CAL03-document.json",
+        "registry": "ocr/CAL03-registry.json"
+      }
+    },
+    {
+      "id": "CAL04",
+      "description": "calibration CAL04",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1004000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/CAL04-primary_bill.pdf",
+          "sha256": "426c8adeb549747bea31f59de8bd2c43cf7597169f5743190da18e29892785ec",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "CREATE_PAYMENT_REQUEST",
+        "completion_basis": "ROUTINE_AUTO",
+        "issue_classes": [],
+        "owners": [],
+        "required_rules": [],
+        "amount_vnd": 1004000,
+        "request_count": 1,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/calibration/gold/CAL04.json",
+      "replay_artifacts": {
+        "document": "ocr/CAL04-document.json",
+        "registry": "ocr/CAL04-registry.json"
+      }
+    },
+    {
+      "id": "CAL05",
+      "description": "calibration CAL05",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/CAL05-primary_bill.pdf",
+          "sha256": "8c4b8acb6abea865fb290d4036907906dc6cdd0c68a4db2f617dd58818b83d9a",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "EMPLOYEE"
+        ],
+        "required_rules": [
+          "AMT-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/calibration/gold/CAL05.json",
+      "replay_artifacts": {
+        "document": "ocr/CAL05-document.json",
+        "registry": "ocr/CAL05-registry.json"
+      }
+    },
+    {
+      "id": "CAL06",
+      "description": "calibration CAL06",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/CAL06-primary_bill.pdf",
+          "sha256": "13ab19b6cccfa0e667cdf113076adc0cdedb472b59949adc80876a2505d7782d",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "EMPLOYEE"
+        ],
+        "required_rules": [
+          "AMT-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/calibration/gold/CAL06.json",
+      "replay_artifacts": {
+        "document": "ocr/CAL06-document.json",
+        "registry": "ocr/CAL06-registry.json"
+      }
+    },
+    {
+      "id": "CAL07",
+      "description": "calibration CAL07",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/CAL07-primary_bill.pdf",
+          "sha256": "05665237bc49030889bf35b64fba388f9094ff88d1f4b78ea52487fbe31856e3",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "EMPLOYEE"
+        ],
+        "required_rules": [
+          "AMT-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/calibration/gold/CAL07.json",
+      "replay_artifacts": {
+        "document": "ocr/CAL07-document.json",
+        "registry": "ocr/CAL07-registry.json"
+      }
+    },
+    {
+      "id": "CAL08",
+      "description": "calibration CAL08",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 1200000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/CAL08-primary_bill.pdf",
+          "sha256": "bae515d5eedec9caaaffc0af12173d62e4936b834bee8f4f853cc7653a3d2e01",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "REQUEST_INFO",
+        "completion_basis": null,
+        "issue_classes": [
+          "FACTUAL_UNKNOWN"
+        ],
+        "owners": [
+          "EMPLOYEE"
+        ],
+        "required_rules": [
+          "AMT-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/calibration/gold/CAL08.json",
+      "replay_artifacts": {
+        "document": "ocr/CAL08-document.json",
+        "registry": "ocr/CAL08-registry.json"
+      }
+    },
+    {
+      "id": "CAL09",
+      "description": "calibration CAL09",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 6000000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/CAL09-primary_bill.pdf",
+          "sha256": "c2762bb0730c00218c16fbfbb91baa2c7f7a3ed9924e7b2b67fe0b56000d9a59",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "OUTSIDE_POLICY",
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "POLICY_OWNER"
+        ],
+        "required_rules": [
+          "LIM-01",
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/calibration/gold/CAL09.json",
+      "replay_artifacts": {
+        "document": "ocr/CAL09-document.json",
+        "registry": "ocr/CAL09-registry.json"
+      }
+    },
+    {
+      "id": "CAL10",
+      "description": "calibration CAL10",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 6000000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/CAL10-primary_bill.pdf",
+          "sha256": "6549e39a9610fa971389f4d898a64f3699514e72bdc09acc7cf1f843668e7d00",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "OUTSIDE_POLICY",
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "POLICY_OWNER"
+        ],
+        "required_rules": [
+          "LIM-01",
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/calibration/gold/CAL10.json",
+      "replay_artifacts": {
+        "document": "ocr/CAL10-document.json",
+        "registry": "ocr/CAL10-registry.json"
+      }
+    },
+    {
+      "id": "CAL11",
+      "description": "calibration CAL11",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 2500000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/CAL11-primary_bill.pdf",
+          "sha256": "1ad0657285091469cf2f0d2e1015467a95c657d7558dd68754b5a47ef71dd238",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "APPROVER"
+        ],
+        "required_rules": [
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/calibration/gold/CAL11.json",
+      "replay_artifacts": {
+        "document": "ocr/CAL11-document.json",
+        "registry": "ocr/CAL11-registry.json"
+      }
+    },
+    {
+      "id": "CAL12",
+      "description": "calibration CAL12",
+      "provenance": "synthetic",
+      "claim": {
+        "employee_id": "emp-demo",
+        "profile": "TRAVEL",
+        "purpose_type": "BUSINESS",
+        "purpose": "Cong tac demo",
+        "trip": "Chuyen cong tac demo",
+        "attendees": [],
+        "requested_amount_vnd": 2500000,
+        "payer_type": "PERSONAL",
+        "received_full": null
+      },
+      "uploads": [
+        {
+          "path": "documents/CAL12-primary_bill.pdf",
+          "sha256": "06a3285dc590f947e623b62f2a4c6d40b7db957080baf6613fd5674708bd6d52",
+          "role": "PRIMARY_BILL",
+          "mime": "application/pdf"
+        }
+      ],
+      "mode": "PIPELINE_FAKE_OR_REPLAY",
+      "policy_version": "demo-expense-v0.1-proposed",
+      "expected": {
+        "execution_status": "SUCCEEDED",
+        "action": "ESCALATE",
+        "completion_basis": null,
+        "issue_classes": [
+          "BEYOND_AUTHORITY"
+        ],
+        "owners": [
+          "APPROVER"
+        ],
+        "required_rules": [
+          "AUTH-01"
+        ],
+        "amount_vnd": null,
+        "request_count": 0,
+        "reason": ""
+      },
+      "reference_date": "2026-10-01",
+      "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/calibration/gold/CAL12.json",
+      "replay_artifacts": {
+        "document": "ocr/CAL12-document.json",
+        "registry": "ocr/CAL12-registry.json"
+      }
+    }
+  ],
+  "sha256": "4812e38851cf5712a5e1a203130e65dca99f7341046c7d8baed2c94c820c638d"
+}

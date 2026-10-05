@@ -204,3 +204,29 @@ export interface HumanAction {
   payload: Record<string, unknown>;
   reason: string;
 }
+
+export interface VerifyResult {
+  case_id: string;
+  run_id: string | null;
+  verdict: 'PASS' | 'FAIL' | 'INCONCLUSIVE';
+  mode: string;
+  elapsed_ms: number;
+  expected: { action: string; owners: string[]; reason: string };
+  actual: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface VerifyReport {
+  id: string;
+  mode: string;
+  results: VerifyResult[];
+  metrics: Record<string, unknown>;
+}
+
+export interface VerifyJob {
+  id: string;
+  status: ExecutionStatus;
+  completed_count: number;
+  total_count: number;
+  report: VerifyReport | null;
+}

@@ -105,6 +105,8 @@ class CaseService:
         # the worker has RELEASED the slot (deterministic "run over" semantics).
         self._futures: dict[str, Future] = {}
         self._closed = False
+        # Owner id of a Verify suite holding a reservation (T11); None when free.
+        self._reserved_by: str | None = None
 
     # --- properties -----------------------------------------------------------
 
@@ -112,6 +114,29 @@ class CaseService:
     def policy(self) -> PolicyConfig:
         """The active policy config the next run will use."""
         return self._policy
+
+    @property
+    def providers(self) -> Providers:
+        """The provider boundary (T11 Verify swaps artifacts through this).
+
+        Read-only projection: a caller may adjust a replay provider's per-case
+        artifacts, but must not replace the provider stack mid-process.
+        """
+        return self._providers
+
+    # --- Verify reservation (T11) ---------------------------------------------
+    # A Verify suite holds a reservation for its whole run so an interactive
+    # run/action/policy update cannot interleave between its cases. The suite
+    # passes its owner id to ``start_run``; a different owner is refused busy.
+
+    def reserve(self, owner_id: str) -> None:
+        if self._reserved_by is not None and self._reserved_by != owner_id:
+            raise DomainError('RUN_BUSY', 'Đang có phiên Verify giữ chỗ xử lý.')
+        self._reserved_by = owner_id
+
+    def release_reservation(self, owner_id: str) -> None:
+        if self._reserved_by == owner_id:
+            self._reserved_by = None
 
     # --- read-only projections (T09 API routes) -------------------------------
     # Narrow read accessors so the API never receives the mutable Repository (a
@@ -145,6 +170,10 @@ class CaseService:
     def start_run(self, case_id: str, *, owner_id: str | None = None) -> RunRecord:
         """Capture the snapshot/policy, persist the run, and start the worker."""
         self._ensure_open()
+        # A Verify suite holds the slot for its whole run; an interactive caller
+        # (a different owner) is refused while the reservation is active.
+        if self._reserved_by is not None and owner_id != self._reserved_by:
+            raise DomainError('RUN_BUSY', 'Đang có phiên Verify giữ chỗ xử lý.')
         self._executor.acquire()
         submitted = False
         try:
@@ -252,6 +281,8 @@ class CaseService:
     ) -> None:
         """Persist a policy change (idle only) and update the active config."""
         self._ensure_open()
+        if self._reserved_by is not None:
+            raise DomainError('RUN_BUSY', 'Đang có phiên Verify giữ chỗ xử lý.')
         self._executor.acquire()
         try:
             effective = self._system_threshold(policy) if actor_mode == 'SYSTEM' else policy
@@ -331,6 +362,8 @@ class CaseService:
 
     def _require_idle(self, case_id: str) -> None:
         """Reject a mutation while the case still has an in-flight run."""
+        if self._reserved_by is not None:
+            raise DomainError('RUN_BUSY', 'Đang có phiên Verify giữ chỗ xử lý.')
         case = self._repo.get_case(case_id)
         if case.current_run_id is not None:
             current = self._repo.get_run(case.current_run_id)

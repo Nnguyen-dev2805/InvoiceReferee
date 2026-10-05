@@ -249,3 +249,23 @@ evidence pointers; nothing planned is recorded as done.
   API integration still 27 passed.
 - Evidence: component tests + build only; browser/manual paths owed to T15.
 - Not done: Verify wiring (T11), deployment (T15).
+
+## T11 — Corpus gold độc lập và Verify qua production service
+
+- Created `src/invoice_referee/verify/{manifest,replay,runner,metrics,jobs,__main__}.py`
+  and `scripts/make_synthetic_evidence.py`. The runner drives the real
+  `CaseService.submit/start_run/wait` (same path as the UI); `ReplayProviders`
+  supplies frozen OCR/document/registry artifacts keyed by ROLE and remapped to the
+  real evidence ids — replay never looks up an outcome by case id/filename. No
+  second evaluator; expected labels live only in the manifest/runner.
+- Corpus: development 15 (TC01–TC15), calibration 12 (4/4/2/2), holdout 20 (6/6/4/4),
+  each with Claim + synthetic upload + replay artifacts + gold. Manifest hash
+  excludes itself and is verified on load.
+- `CaseService.reserve`/`release_reservation`: a Verify suite holds the slot for the
+  whole run; interactive run/action/policy update is refused (RUN_BUSY). API adds
+  `POST/GET /api/verify-runs`; frontend `VerifyPanel` runs core/escalation/all and
+  shows expected/actual/verdict. API and runner share the SAME `CaseService` (spy test).
+- Results: core 4/4 PASS, escalation 5/5 PASS, all 15/15 PASS; full backend 373
+  passed; frontend 5 passed + build clean. Live mode → INCONCLUSIVE (not wired; T15).
+- Evidence: replay/fake only; live provider quality unproven (T15).
+- Not done: freeze B1 (T12), adaptation/holdout B2 (T13), users (T14), deploy (T15).

@@ -1,0 +1,1 @@
+{"execution_status": "SUCCEEDED", "action": "ESCALATE", "completion_basis": null, "issue_classes": ["BEYOND_AUTHORITY"], "owners": ["APPROVER"], "required_rules": ["AUTH-01"], "amount_vnd": null, "request_count": 0, "reason": "Vượt quyền tự động, cần approver"}

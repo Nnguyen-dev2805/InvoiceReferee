@@ -1,0 +1,1 @@
+{"execution_status": "SUCCEEDED", "action": "ESCALATE", "completion_basis": null, "issue_classes": ["OUTSIDE_POLICY"], "owners": ["POLICY_OWNER"], "required_rules": ["SCOPE-01"], "amount_vnd": null, "request_count": 0, "reason": "Ngoài catalog B1"}

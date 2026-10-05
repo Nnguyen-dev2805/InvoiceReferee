@@ -58,6 +58,8 @@ from invoice_referee.domain.models import (
 )
 from invoice_referee.extraction.providers import FakeProviders, LiveProviders, Providers
 from invoice_referee.storage.repository import Repository
+from invoice_referee.verify.jobs import VerifyJobs
+from invoice_referee.verify.manifest import load_manifest
 
 # DomainError.code -> HTTP status (brief step 2). A code outside this set is a
 # server-side contract gap, not a client error; default to 422 (input-shaped).
@@ -97,6 +99,14 @@ class PolicyActivationBody(BaseModel):
 
     mode: str
     reason: str
+
+
+class VerifyRunBody(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    suite: str  # core | escalation | all
+    mode: str = 'replay'  # replay | live
+    manifest: str | None = None  # path to a manifest; default = dev corpus
 
 
 # --- DTO mapping ---------------------------------------------------------------
@@ -374,7 +384,43 @@ def create_app(service: CaseService, *, provider_mode: str = 'fake') -> FastAPI:
         service.set_policy(policy, actor_mode='POLICY_OWNER', reason=body.reason)
         return _policy_dto(service.policy)
 
+    # --- verify (T11) ---------------------------------------------------------
+    # The suite runs in a background thread that drives the same CaseService; the
+    # provider execution stays on the service's single executor. A report is only
+    # returned once the run actually finished — never fabricated.
+
+    jobs = VerifyJobs(service, Path(os.environ.get('DATA_ROOT', 'data')) / 'verify')
+
+    @app.post('/api/verify-runs', status_code=202)
+    async def start_verify(body: VerifyRunBody) -> dict:
+        if body.suite not in ('core', 'escalation', 'all'):
+            raise _invalid("suite phải là 'core', 'escalation' hoặc 'all'.")
+        if body.mode not in ('replay', 'live'):
+            raise _invalid("mode phải là 'replay' hoặc 'live'.")
+        manifest = _load_suite(body)
+        job = jobs.start(manifest)
+        return job.model_dump(mode='json')
+
+    @app.get('/api/verify-runs/{job_id}')
+    async def get_verify(job_id: str) -> dict:
+        return jobs.get(job_id).model_dump(mode='json')
+
     return app
+
+
+def _load_suite(body: VerifyRunBody):
+    """Load + select the manifest for a verify request (no outcome by filename)."""
+    root = Path(__file__).resolve().parents[3]
+    default = root / 'tests' / 'fixtures' / 'development' / 'manifest.json'
+    manifest = load_manifest(Path(body.manifest) if body.manifest else default)
+    from invoice_referee.verify.__main__ import SUITES
+
+    ids = SUITES[body.suite]
+    cases = manifest.cases if ids is None else [c for c in manifest.cases if c.id in ids]
+    selected = manifest.model_copy(update={'cases': cases, 'suite': body.suite})
+    if body.mode == 'live':
+        selected = selected.model_copy(update={'mode': 'LIVE_END_TO_END'})
+    return selected.model_copy(update={'sha256': selected.content_hash()})
 
 
 async def _human_action(service: CaseService, case_id: str, request: Request) -> dict:
