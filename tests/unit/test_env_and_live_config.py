@@ -73,6 +73,30 @@ def test_live_providers_no_kimi_key_is_none(monkeypatch):
     assert LiveProviders()._kimi_api_key is None
 
 
+def test_live_providers_prefer_llm_env(monkeypatch):
+    """Provider-agnostic: LLM_* win over KIMI_* so the endpoint is swappable."""
+    monkeypatch.setenv('LLM_API_KEY', 'xkiro-key')
+    monkeypatch.setenv('LLM_MODEL', 'qwen/qwen3.8-max:free')
+    monkeypatch.setenv('LLM_BASE_URL', 'https://api.xkiro.com/v1')
+    monkeypatch.setenv('KIMI_API_KEY', 'kimi-key')
+    monkeypatch.setenv('KIMI_MODEL', 'kimi-k2.6')
+    monkeypatch.setenv('KIMI_BASE_URL', 'https://api.moonshot.ai/v1')
+    providers = LiveProviders()
+    assert providers._kimi_api_key == 'xkiro-key'
+    assert providers.kimi_model == 'qwen/qwen3.8-max:free'
+    assert providers._kimi_base_url == 'https://api.xkiro.com/v1'
+
+
+def test_live_providers_fall_back_to_kimi_env(monkeypatch):
+    for name in ('LLM_API_KEY', 'LLM_MODEL', 'LLM_BASE_URL'):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv('KIMI_API_KEY', 'kimi-key')
+    monkeypatch.setenv('KIMI_MODEL', 'kimi-k3')
+    providers = LiveProviders()
+    assert providers._kimi_api_key == 'kimi-key'
+    assert providers.kimi_model == 'kimi-k3'
+
+
 def test_explicit_key_argument_wins_over_env(monkeypatch):
     monkeypatch.setenv('MISTRAL_API_KEY', 'from-env')
     assert LiveProviders(mistral_api_key='explicit')._mistral_api_key == 'explicit'

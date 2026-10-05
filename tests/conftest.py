@@ -25,6 +25,10 @@ _ENV_VARS = (
     'KIMI_SECRET',
     'KIMI_MODEL',
     'KIMI_BASE_URL',
+    'LLM_API_KEY',
+    'LLM_MODEL',
+    'LLM_BASE_URL',
+    'LLM_TIMEOUT',
     'OCR_WORD_REVIEW_THRESHOLD',
 )
 

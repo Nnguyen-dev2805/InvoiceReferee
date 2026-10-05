@@ -271,6 +271,8 @@ def test_health_reports_mode_without_secrets(runtime):
 # --- Composition root ----------------------------------------------------------
 
 def test_runtime_app_requires_explicit_provider_mode(monkeypatch):
+    # Isolate from the developer's real `.env` so the test exercises "no mode set".
+    monkeypatch.setattr('invoice_referee.api.app.load_repo_env', lambda *a, **k: {})
     monkeypatch.delenv('PROVIDER_MODE', raising=False)
     with pytest.raises(RuntimeError):
         create_runtime_app()

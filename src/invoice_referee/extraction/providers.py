@@ -79,15 +79,16 @@ def _env_default(name: str, default: str) -> str:
     return value if value else default
 
 
-def _kimi_api_key_from_env() -> str | None:
-    """Kimi credential from the environment.
+def _chat_api_key_from_env() -> str | None:
+    """Credential for the chat/reasoning provider, from the environment.
 
-    Prefers a single ``KIMI_API_KEY`` (used as a Bearer token). Falls back to the
-    B0 ``KIMI_TOKEN`` + ``KIMI_SECRET`` pair, combined as ``token.secret`` (the
-    OpenAI-compatible form B0 used). Returns ``None`` when neither is present, so
-    the provider reports ``CONFIG_NOT_ACTIVE`` instead of sending a bogus header.
+    Provider-agnostic: ``LLM_API_KEY`` is preferred (works with any
+    OpenAI-compatible endpoint such as xKiro), falling back to ``KIMI_API_KEY``
+    or the B0 ``KIMI_TOKEN`` + ``KIMI_SECRET`` pair (combined ``token.secret``).
+    Returns ``None`` when none is set, so the provider reports
+    ``CONFIG_NOT_ACTIVE`` instead of sending a bogus header.
     """
-    api_key = os.environ.get('KIMI_API_KEY')
+    api_key = os.environ.get('LLM_API_KEY') or os.environ.get('KIMI_API_KEY')
     if api_key:
         return api_key
     token = os.environ.get('KIMI_TOKEN')
@@ -95,6 +96,16 @@ def _kimi_api_key_from_env() -> str | None:
     if token and secret:
         return f'{token}.{secret}'
     return None
+
+
+def _chat_model_from_env() -> str:
+    """Chat model id from the environment (``LLM_MODEL`` then ``KIMI_MODEL``)."""
+    return os.environ.get('LLM_MODEL') or os.environ.get('KIMI_MODEL') or KIMI_MODEL
+
+
+def _chat_base_url_from_env() -> str:
+    """Chat endpoint base URL from the environment (``LLM_BASE_URL`` then ``KIMI_BASE_URL``)."""
+    return os.environ.get('LLM_BASE_URL') or os.environ.get('KIMI_BASE_URL') or KIMI_BASE_URL
 
 
 # --- Public payload builders (serialized per-document request, no prose) -------
@@ -401,15 +412,16 @@ class LiveProviders(Providers):
             else _env_default('MISTRAL_API_KEY', '') or None
         )
         self._kimi_api_key = (
-            kimi_api_key if kimi_api_key is not None else _kimi_api_key_from_env()
+            kimi_api_key if kimi_api_key is not None else _chat_api_key_from_env()
         )
         # Model/base-url values come from the environment (pinned defaults), so
-        # the values advertised in .env.example are actually read. The composition
-        # root may also pass them explicitly (T06).
+        # the values advertised in .env.example are actually read. The chat
+        # provider is provider-agnostic: ``LLM_MODEL``/``LLM_BASE_URL`` are
+        # preferred, then the ``KIMI_*`` names, then the verified defaults.
         self.mistral_model = mistral_model or _env_default('MISTRAL_OCR_MODEL', MISTRAL_OCR_MODEL)
-        self.kimi_model = kimi_model or _env_default('KIMI_MODEL', KIMI_MODEL)
+        self.kimi_model = kimi_model or _chat_model_from_env()
         self._mistral_base_url = mistral_base_url or _env_default('MISTRAL_BASE_URL', MISTRAL_BASE_URL)
-        self._kimi_base_url = kimi_base_url or _env_default('KIMI_BASE_URL', KIMI_BASE_URL)
+        self._kimi_base_url = kimi_base_url or _chat_base_url_from_env()
         self._ocr_client = ocr_client
         self._chat_client = chat_client
         self._timeout = timeout_seconds
@@ -455,7 +467,7 @@ class LiveProviders(Providers):
         except DomainError:
             raise
         except Exception as exc:  # noqa: BLE001 — any transport failure is technical
-            raise DomainError('PROVIDER_FAILED', f'OCR transport lỗi: {type(exc).__name__}')
+            raise DomainError('PROVIDER_FAILED', _transport_message('OCR', exc))
 
     def _require_ocr_client(self) -> Any:
         if not self._mistral_api_key:
@@ -555,20 +567,23 @@ class LiveProviders(Providers):
         except DomainError:
             raise
         except Exception as exc:  # noqa: BLE001
-            raise DomainError('PROVIDER_FAILED', f'Kimi transport lỗi: {type(exc).__name__}')
+            raise DomainError('PROVIDER_FAILED', _transport_message('chat', exc))
         try:
             content = data['choices'][0]['message']['content']
         except (KeyError, IndexError, TypeError) as exc:
-            raise DomainError('INVALID_ANALYSIS', 'Kimi response thiếu choices/message.') from exc
+            raise DomainError('INVALID_ANALYSIS', 'Chat response thiếu choices/message.') from exc
         if not isinstance(content, str):
-            raise DomainError('INVALID_ANALYSIS', 'Kimi trả về nội dung không phải chuỗi.')
+            raise DomainError('INVALID_ANALYSIS', 'Chat trả về nội dung không phải chuỗi.')
         usage = _usage_dict(data.get('usage'))
         self.usages.append(usage)
         return content, usage
 
     def _require_chat_client(self) -> Any:
         if not self._kimi_api_key:
-            raise DomainError('CONFIG_NOT_ACTIVE', 'KIMI_API_KEY chưa được cấu hình.')
+            raise DomainError(
+                'CONFIG_NOT_ACTIVE',
+                'LLM_API_KEY/KIMI_API_KEY chưa được cấu hình cho chat provider.',
+            )
         return _http_client(self._kimi_api_key, self._kimi_base_url, self._timeout)
 
     # --- Prompt / identity helpers ---
@@ -655,6 +670,30 @@ def _http_client(api_key: str, base_url: str, timeout_seconds: float) -> Any:
         timeout=timeout_seconds,
         transport=httpx.HTTPTransport(retries=0),
     )
+
+
+def _transport_message(stage: str, exc: Exception) -> str:
+    """A diagnosable transport error: HTTP status + a short, redacted body.
+
+    A bare ``PROVIDER_FAILED: HTTPStatusError`` hides whether the failure was a
+    401 (bad key), 400 (bad request/model) or 503 (upstream down) — which made a
+    live outage indistinguishable from a code bug. Include the status code and a
+    truncated response body; the Authorization header is never part of the body.
+    """
+    status = getattr(getattr(exc, 'response', None), 'status_code', None)
+    body = ''
+    response = getattr(exc, 'response', None)
+    if response is not None:
+        try:
+            body = (response.text or '').strip().replace('\n', ' ')[:300]
+        except Exception:  # noqa: BLE001 — never fail while reporting a failure
+            body = ''
+    detail = f'{type(exc).__name__}'
+    if status is not None:
+        detail = f'HTTP {status}'
+    if body:
+        detail = f'{detail}: {body}'
+    return f'{stage} transport lỗi ({detail})'
 
 
 def _document_chunk(evidence: Evidence) -> dict[str, Any]:
