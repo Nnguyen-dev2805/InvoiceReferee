@@ -180,7 +180,7 @@ export function App() {
               history={history}
             />
           )}
-          {run?.result && run.result.decision.issues.length > 0 && caseRecord && (
+          {run?.result && caseRecord && (
             <HumanActions
               caseRecord={caseRecord}
               decision={run.result.decision}

@@ -121,6 +121,12 @@ export function HumanActions({ caseRecord, decision, onAction }: HumanActionsPro
         quyền của từng hành động.
         {issueOwner && issueOwner !== mode && ` Vấn đề hiện thuộc ${MODE_LABEL[issueOwner]}.`}
       </p>
+      {!openIssue && (
+        <p className="muted">
+          Hồ sơ hiện không có câu hỏi mở. Chỉ nên dùng hành động khi có vấn đề cần
+          xử lý; hành động không hợp lệ sẽ bị hệ thống từ chối.
+        </p>
+      )}
 
       {decision.accepted_amount_vnd !== null && (
         <p className="muted">Số tiền đang xem xét: {formatVnd(decision.accepted_amount_vnd)}</p>
