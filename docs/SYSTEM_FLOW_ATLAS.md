@@ -1,20 +1,20 @@
 # InvoiceReferee — System Flow Atlas
 
 > **Bản đồ tổng thể, không sao chép văn bản (Map, not a copy)**
-> - Task: `T01 + T02 + T03 + T04` (Domain contracts, demo policy, test builders, numeric parsing, source resolution, quality usability, pure policy evaluators, inventory/arithmetic, authority, decision reducer, SQLite history, evidence artifacts & atomic request lifecycle).
-> - Package: `Work Package 01 — Core (T01–T05; hoàn thành T01, T02, T03 & T04)`.
-> - Accepted Revision: `19a3c9a` (`feat(T04): SQLite history, evidence artifacts và atomic request lifecycle` trên nhánh `rebuild`).
-> - Status: `Living Page Updated` — **T01, T02, T03 & T04 IMPLEMENTED & VERIFIED (178 unit & integration tests passing)**. Các task từ T05 đến T16 ở trạng thái kế hoạch (`PLANNED — not built`).
-> - Updated At: `2026-10-04T23:15:00+07:00`.
+> - Task: `T01 + T02 + T03 + T04 + T05` (Domain contracts, demo policy, test builders, numeric parsing, source resolution, quality usability, pure policy evaluators, inventory/arithmetic, authority, decision reducer, SQLite history, evidence artifacts, atomic request lifecycle, Mistral OCR, per-document Kimi & cross-source proposals).
+> - Package: `Work Package 01 — Core (T01–T05; hoàn thành toàn bộ Work Package 01)`.
+> - Accepted Revision: `e5eadd2` (`feat(T05): Mistral OCR, per-document Kimi và cross-source proposals` trên nhánh `rebuild`).
+> - Status: `Living Page Updated` — **T01, T02, T03, T04 & T05 IMPLEMENTED & VERIFIED (226 unit & integration tests passing)**. Các task từ T06 đến T16 ở trạng thái kế hoạch (`PLANNED — not built`).
+> - Updated At: `2026-10-05T07:45:00+07:00`.
 > - Quy tắc: Atlas là **bản đồ điều hướng** (zoom-out), áp dụng các nguyên lý **ASD-STE100** (câu ngắn, một nghĩa, điều kiện trước hành động sau, triệt tiêu mơ hồ, bảo toàn dữ kiện kỹ thuật). Không sao chép văn xuôi từ các tài liệu đặc tả ([B1_PRODUCT_SPEC.md](specs/B1_PRODUCT_SPEC.md), [B1_RULEBOOK.md](specs/B1_RULEBOOK.md), [B1_SYSTEM_SPEC.md](specs/B1_SYSTEM_SPEC.md)) hay kế hoạch thực thi ([Master Plan](superpowers/plans/2026-10-04-invoice-referee.md)).
 
 ---
 
 ## 1. Sơ đồ tổng thể toàn hệ thống (Master End-to-End System Flow)
 
-Sơ đồ thể hiện toàn bộ các thành phần của InvoiceReferee tính đến thời điểm hoàn thành **T01 + T02 + T03 + T04**. 
-- Các khối **nền xanh viền đậm** (`IMPLEMENTED`) là các module nghiệp vụ thuần túy và tầng lưu trữ đã hoàn thành và vượt qua 178 bài kiểm tra đơn vị và tích hợp độc lập.
-- Các khối **nền xám viền nét đứt** (`planned — not built`) đại diện cho các tầng dịch vụ, trích xuất, pipeline và giao diện sẽ được nối dây ở các task tiếp theo (T05 – T16).
+Sơ đồ thể hiện toàn bộ các thành phần của InvoiceReferee tính đến thời điểm hoàn thành **T01 + T02 + T03 + T04 + T05** (hoàn tất Work Package 01 — Core). 
+- Các khối **nền xanh viền đậm** (`IMPLEMENTED`) là các module nghiệp vụ thuần túy, tầng lưu trữ và tầng trích xuất đã hoàn thành và vượt qua 226 bài kiểm tra độc lập.
+- Các khối **nền xám viền nét đứt** (`planned — not built`) đại diện cho các tầng dịch vụ ứng dụng, pipeline, tương tác con người và giao diện sẽ được nối dây ở các task tiếp theo (T06 – T16).
 
 ```mermaid
 flowchart TD
@@ -51,7 +51,7 @@ flowchart TD
         DEC["Decision Reducer (evaluate / next_action)"]
     end
 
-    subgraph ExtractionTier["Tầng trích xuất & OCR (T05 — planned)"]
+    subgraph ExtractionTier["Tầng trích xuất & OCR (T05 — IMPLEMENTED)"]
         MISTRAL["Mistral OCR Adapter (registry_from_ocr)"]
         KIMI["Kimi LLM Adapter (AnalyzeDocument / ProposeCrossSource)"]
         VAL["Contract Validator (validate_document)"]
@@ -71,8 +71,8 @@ flowchart TD
     end
 
     %% Áp dụng style class cho nodes
-    class MODELS,CFG,NUM,QUAL,EXP,INV,DEC,REPO,ART implemented;
-    class UI,APP,SVC,EXEC,PIPE,MISTRAL,KIMI,VAL,HUMAN,VERIFY planned;
+    class MODELS,CFG,NUM,QUAL,EXP,INV,DEC,REPO,ART,MISTRAL,KIMI,VAL implemented;
+    class UI,APP,SVC,EXEC,PIPE,HUMAN,VERIFY planned;
 
     %% Tương tác luồng UI -> API -> Service (planned)
     UI -.->|"HTTP REST API"| APP
@@ -83,17 +83,15 @@ flowchart TD
     %% Pipeline kết nối tới Extraction và Preflight (planned)
     PIPE -.->|"1. Preflight scope / inputs"| CFG
     PIPE -.->|"2. Gửi file chứng từ"| MISTRAL
-    MISTRAL -.->|"SourceRegistry"| PIPE
+    MISTRAL -.->|"SourceRegistry (registry_from_ocr)"| PIPE
     PIPE -.->|"3. Analyze document facts"| KIMI
-    KIMI -.->|"DocumentFacts raw"| VAL
-    VAL -.->|"4. Kiểm tra hợp đồng"| PIPE
+    VAL -.->|"4. DocumentFacts hoàn chỉnh"| PIPE
 
     %% Pipeline cấp dữ liệu cho T02 & T03 (planned execution path)
-    PIPE -.->|"5. Chuẩn hóa & xác thực chất lượng"| QUAL
-    QUAL -.->|"6. Facts usable"| DEC
-    PIPE -.->|"7. Snapshot & Bundle hoàn chỉnh"| DEC
+    QUAL -.->|"5. Facts usable"| DEC
+    PIPE -.->|"6. Snapshot & Bundle hoàn chỉnh"| DEC
 
-    %% Tương tác nội bộ đã IMPLEMENTED giữa các evaluator thuần túy (T03 gọi T02 & T01)
+    %% Tương tác nội bộ đã IMPLEMENTED giữa các evaluator, lưu trữ và trích xuất
     DEC ==>|"gọi document checks"| EXP
     DEC ==>|"gọi arithmetic & inventory checks"| INV
     DEC ==>|"xác thực total của primary bill"| QUAL
@@ -101,6 +99,8 @@ flowchart TD
     INV ==>|"xác thực derived quality"| QUAL
     INV ==>|"tính toán Decimal 50"| NUM
     REPO ==>|"ghi tệp đính kèm an toàn (put_artifact)"| ART
+    KIMI ==>|"kiểm tra hợp đồng (validate_document)"| VAL
+    VAL ==>|"chuẩn hóa chất lượng (derive_fact)"| QUAL
 
     %% Pipeline ghi nhận kết quả và lưu trữ (planned)
     DEC -.->|"Decision"| PIPE
@@ -114,7 +114,7 @@ flowchart TD
 ```
 
 ```text
-revision: 19a3c9a
+revision: e5eadd2
 - MODELS → src/invoice_referee/domain/models.py (T01 - IMPLEMENTED)
 - CFG → src/invoice_referee/config.py (T01 - IMPLEMENTED)
 - NUM → src/invoice_referee/policy/numeric.py:parse_candidates,normalize_quantity (T02 - IMPLEMENTED)
@@ -124,9 +124,9 @@ revision: 19a3c9a
 - DEC → src/invoice_referee/policy/decision.py:evaluate (T03 - IMPLEMENTED)
 - REPO → src/invoice_referee/storage/repository.py:Repository (T04 - IMPLEMENTED)
 - ART → src/invoice_referee/storage/artifacts.py:put_artifact,safe_name (T04 - IMPLEMENTED)
-- MISTRAL → src/invoice_referee/extraction/providers.py:Providers.ocr (T05 - planned — not built)
-- KIMI → src/invoice_referee/extraction/providers.py:Providers.analyze (T05 - planned — not built)
-- VAL → src/invoice_referee/extraction/validation.py:validate_document (T05 - planned — not built)
+- MISTRAL → src/invoice_referee/extraction/providers.py:Providers.ocr,registry_from_ocr (T05 - IMPLEMENTED)
+- KIMI → src/invoice_referee/extraction/providers.py:Providers.analyze,Providers.cross_source (T05 - IMPLEMENTED)
+- VAL → src/invoice_referee/extraction/validation.py:validate_document,is_applicable (T05 - IMPLEMENTED)
 - PIPE → src/invoice_referee/application/pipeline.py:process (T06 - planned — not built)
 - HUMAN → src/invoice_referee/application/human.py:validate_human_action (T07 - planned — not built)
 - SVC → src/invoice_referee/application/service.py:CaseService (T08 - planned — not built)
@@ -135,7 +135,7 @@ revision: 19a3c9a
 - UI → frontend/src/App.tsx (T10 - planned — not built)
 - VERIFY → src/invoice_referee/verify/runner.py:VerifyRunner (T11 - planned — not built)
 edges: 
-- Mũi tên đôi đậm (==>): Các lệnh gọi trực tiếp giữa các module thuần túy và tầng lưu trữ T01–T04 đã được IMPLEMENTED và VERIFIED bằng 178 bài kiểm tra (DEC gọi EXP, INV, QUAL; EXP và INV gọi QUAL; INV dùng NUM; REPO gọi ART).
+- Mũi tên đôi đậm (==>): Các lệnh gọi trực tiếp giữa các module thuần túy, tầng lưu trữ và tầng trích xuất T01–T05 đã được IMPLEMENTED và VERIFIED bằng 226 bài kiểm tra (DEC gọi EXP, INV, QUAL; EXP và INV gọi QUAL; INV dùng NUM; REPO gọi ART; KIMI gọi VAL; VAL gọi QUAL).
 - Mũi tên nét đứt (-.->): Luồng tương tác kiến trúc dự kiến khi nối dây toàn bộ hệ thống từ UI, API tới Pipeline và Storage.
 ```
 
@@ -210,11 +210,24 @@ edges:
 - Hệ thống không tự động chạy lại bất kỳ lượt chạy nào bị gián đoạn.
 - Chi tiết: [repository.py](../src/invoice_referee/storage/repository.py), [artifacts.py](../src/invoice_referee/storage/artifacts.py), [schema.sql](../src/invoice_referee/storage/schema.sql), [task-T04.md](evidence/task-T04.md).
 
-### 2.6 Tầng chuyển đổi OCR & Phân tích văn bản (Provider Adapters — T05) — `planned`
-- Trích xuất từng chứng từ độc lập tách rời khỏi việc đề xuất đối chiếu chéo.
-- Hệ thống giới hạn ngân sách sửa lỗi cấu trúc schema không quá một lần.
-- Bộ điều hợp trả về dữ kiện và đề xuất, không đưa ra quyết định duyệt hồ sơ cuối cùng.
-- Chi tiết thiết kế: [Master Plan §3.2 T05](superpowers/plans/2026-10-04-invoice-referee-01-core.md#t05--mistral-ocr-per-document-kimi-và-cross-source-proposals).
+### 2.6 Tầng chuyển đổi OCR & Phân tích văn bản (Provider Adapters — T05)
+- Bộ điều hợp `Providers` cung cấp ba giao diện: `ocr`, `analyze`, và `cross_source`.
+- Lớp `LiveProviders` gọi trực tiếp API Mistral OCR và API Kimi LLM qua thư viện `httpx`.
+- Mọi lệnh gọi API ngoài đặt thời gian chờ mặc định 60 giây.
+- Thư viện `httpx` không tự thử lại khi lỗi truyền thông.
+- Nếu thiếu khóa API trong cấu hình, hệ thống ném lỗi `CONFIG_NOT_ACTIVE`.
+- Hàm `registry_from_ocr` trích xuất điểm tin cậy từng từ (`word_confidence_scores`) trực tiếp từ Mistral OCR.
+- Nếu chứng từ thiếu điểm tin cậy từng từ, hệ thống giữ giá trị `None` thay vì tự tạo điểm số.
+- Hàm `analysis_payload` chỉ gửi dữ liệu chứng từ cần thiết và không bao giờ gửi văn bản của nhân viên.
+- Hệ thống giới hạn một lần sửa lỗi chung (`REPAIR_BUDGET = 1`) cho mỗi lượt gọi phân tích chứng từ.
+- Nếu mô hình phản hồi sai cấu trúc lần thứ hai, hệ thống dừng lại với lỗi `INVALID_ANALYSIS`.
+- Lượt gọi đề xuất đối chiếu chéo được cấp thêm một lần sửa lỗi trước khi báo lỗi kỹ thuật.
+- Nếu chứng từ vi phạm quyền sở hữu hoặc trùng lặp mã dòng hàng, hàm `validate_document` ném lỗi `INVALID_ANALYSIS`.
+- Nếu OCR phát hiện bảng biểu, hồ sơ khai báo mẫu `TOTAL_ONLY` bị từ chối để chống bỏ qua chi tiết.
+- Mã nguồn quyết định tính áp dụng của các phép kiểm tra (`is_applicable`) thay vì dựa vào mô hình.
+- Nếu quan sát chất lượng ghi nhận không đọc được nhưng tuyên bố không cần xác minh, hàm `validate_document` ném lỗi `INVALID_ANALYSIS`.
+- Hàm `validate_document` tính toán lại chất lượng dữ kiện bằng hàm thuần `derive_fact` thay vì tin tưởng mô hình.
+- Chi tiết: [providers.py](../src/invoice_referee/extraction/providers.py), [validation.py](../src/invoice_referee/extraction/validation.py), [task-T05.md](evidence/task-T05.md), [provider-contract.md](evidence/provider-contract.md).
 
 ### 2.7 Quy trình xử lý hồ sơ toàn trình (Application Pipeline — T06) — `planned`
 - Quy trình đi tuần tự từ kiểm tra sơ bộ, OCR, trích xuất dữ liệu đến đánh giá quy tắc.
@@ -247,22 +260,18 @@ edges:
 
 Các module và tính năng dưới đây đã có thiết kế chi tiết nhưng **hoàn toàn chưa được xây dựng hoặc nối dây trong mã nguồn**:
 
-1. **Bộ điều hợp trích xuất OCR & Mô hình ngôn ngữ (`T05`)** — `planned — not built`:
-   - Các tệp dự kiến: `src/invoice_referee/extraction/{providers.py, validation.py, prompts/}`.
-   - Trách nhiệm: Gọi API Mistral OCR, gọi Kimi LLM trích xuất và kiểm tra hợp đồng dữ liệu.
-
-2. **Đường ống xử lý hoàn chỉnh & Dịch vụ ứng dụng (`T06`, `T08`)** — `planned — not built`:
+1. **Đường ống xử lý hoàn chỉnh & Dịch vụ ứng dụng (`T06`, `T08`)** — `planned — not built`:
    - Các tệp dự kiến: `src/invoice_referee/application/{pipeline.py, service.py, executor.py}`.
    - Trách nhiệm: Nối dây toàn trình từ tệp tải lên tới phán quyết, quản lý hàng đợi đơn và nút Stop.
 
-3. **Xử lý hành động can thiệp của con người (`T07`)** — `planned — not built`:
+2. **Xử lý hành động can thiệp của con người (`T07`)** — `planned — not built`:
    - Tệp dự kiến: `src/invoice_referee/application/human.py`.
    - Trách nhiệm: Xác thực thẩm quyền vai trò demo, hủy hiệu lực phê duyệt cũ khi đầu vào thay đổi.
 
-4. **Giao diện Web & Điểm cuối API (`T09`, `T10`)** — `planned — not built`:
+3. **Giao diện Web & Điểm cuối API (`T09`, `T10`)** — `planned — not built`:
    - Các tệp dự kiến: `src/invoice_referee/api/app.py`, toàn bộ thư mục `frontend/`.
    - Trách nhiệm: REST API FastAPI và giao diện React phục vụ ban giám khảo thao tác trực tiếp.
 
-5. **Bộ kiểm thử tự động Verify & Thích ứng ngưỡng (`T11` – `T16`)** — `planned — not built`:
+4. **Bộ kiểm thử tự động Verify & Thích ứng ngưỡng (`T11` – `T16`)** — `planned — not built`:
    - Các tệp dự kiến: `src/invoice_referee/verify/`, `src/invoice_referee/adaptation/`, tài liệu chung kết.
    - Trách nhiệm: Tự động hóa đánh giá trên tập kiểm thử độc lập, học ngưỡng từ phản hồi người dùng.
