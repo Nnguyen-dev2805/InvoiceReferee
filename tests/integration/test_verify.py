@@ -26,7 +26,7 @@ MANIFEST = ROOT / 'tests' / 'fixtures' / 'development' / 'manifest.json'
 def verify_service(tmp_path):
     repo = Repository(tmp_path / 'verify.sqlite', tmp_path / 'artifacts')
     service = CaseService(repo, ReplayProviders(), repo.get_active_policy() or _policy())
-    service.set_policy(activate_demo_policy(service.policy, 'test'), actor_mode='POLICY_OWNER', reason='test')
+    service.activate_policy(activate_demo_policy(service.policy, 'test'), reason='test')
     yield service
     service.close()
 

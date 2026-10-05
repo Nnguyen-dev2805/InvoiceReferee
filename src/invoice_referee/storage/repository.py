@@ -72,19 +72,18 @@ MAX_CASE_BYTES = 50 * 1024 * 1024
 DATA_REVISING = {
     'SUPPLY_DECLARATION', 'ADD_EVIDENCE', 'CONFIRM_FIELD', 'CONFIRM_MAPPING',
 }
-AUTHORIZATION_KINDS = {'GRANT_POLICY_EXCEPTION', 'APPROVE_AMOUNT'}
+AUTHORIZATION_KINDS = {'APPROVE_AMOUNT'}
 # Only these demo modes may stand behind each authorization kind (Rulebook §5):
-# a reviewer/employee mode can never authorize an amount or an exception, even
-# if a malformed action row were ever inserted.
+# a reviewer/employee mode can never authorize an amount, even if a malformed
+# action row were ever inserted.
 _AUTHORIZATION_MODES = {
-    'GRANT_POLICY_EXCEPTION': {'POLICY_OWNER'},
-    'APPROVE_AMOUNT': {'APPROVER', 'POLICY_OWNER'},
+    'APPROVE_AMOUNT': {'APPROVER'},
 }
 # OVERRIDE wraps exactly one operation (System §7). Classification and
 # confirmations change effective data; DENY rejects; the authorization operations
 # only change active action IDs.
 _OVERRIDE_DATA_REVISING = {'CONFIRM_FIELD', 'CONFIRM_MAPPING', 'CLASSIFY_PROFILE'}
-_OVERRIDE_AUTHORIZATION = {'GRANT_POLICY_EXCEPTION', 'APPROVE_AMOUNT'}
+_OVERRIDE_AUTHORIZATION = {'APPROVE_AMOUNT'}
 # A PROPOSE_CORRECTION is recorded as history but is NOT yet an effective input
 # of the current version (Rulebook §5): it is excluded from BOTH the hashed
 # ``confirmations`` and ``active_action_ids`` until a reviewer confirmation makes
@@ -935,11 +934,11 @@ class Repository:
     def _authorizations(case: CaseRecord, actions: list[HumanAction]) -> list[Authorization]:
         """In-force authorizations for the CURRENT case version.
 
-        A GRANT_POLICY_EXCEPTION/APPROVE_AMOUNT action (or an OVERRIDE wrapping
-        one) becomes an ``Authorization`` bound to the action's case_version,
-        policy_version, profile, purpose and amount. A data revision bumps
-        ``case_version``, so an authorization from an earlier version simply
-        stops being collected here — the affected approval loses force.
+        An APPROVE_AMOUNT action (or an OVERRIDE wrapping one) becomes an
+        ``Authorization`` bound to the action's case_version, policy_version,
+        profile, purpose and amount. A data revision bumps ``case_version``, so an
+        authorization from an earlier version simply stops being collected here —
+        the affected approval loses force.
         """
         authorizations: list[Authorization] = []
         for action in actions:
@@ -951,7 +950,7 @@ class Repository:
             try:
                 authorizations.append(Authorization(
                     action_id=action.id,
-                    kind='POLICY_EXCEPTION' if kind == 'GRANT_POLICY_EXCEPTION' else 'AMOUNT_APPROVAL',
+                    kind='AMOUNT_APPROVAL',
                     case_version=action.case_version,
                     policy_version=payload['policy_version'],
                     profile=payload['profile'],
@@ -1095,8 +1094,8 @@ class Repository:
     def record_policy_change(
         self, policy: PolicyConfig, actor_mode: PolicyActor, reason: str
     ) -> None:
-        if actor_mode not in ('POLICY_OWNER', 'SYSTEM'):
-            raise _invalid('actor_mode phải là POLICY_OWNER hoặc SYSTEM.')
+        if actor_mode != 'SYSTEM':
+            raise _invalid('actor_mode phải là SYSTEM.')
         if not reason or not reason.strip():
             raise _invalid('Cần lý do cho thay đổi policy.')
         if not policy.active:

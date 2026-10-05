@@ -30,8 +30,8 @@ from pydantic import (
 Profile = Literal['TRAVEL', 'CLIENT_MEAL', 'WORK_PURCHASE', 'OTHER']
 PurposeType = Literal['BUSINESS', 'PERSONAL', 'UNKNOWN']
 PayerType = Literal['PERSONAL', 'COMPANY', 'ADVANCE', 'VENDOR', 'UNKNOWN']
-DemoMode = Literal['EMPLOYEE', 'REVIEWER', 'APPROVER', 'POLICY_OWNER']
-PolicyActor = Literal['POLICY_OWNER', 'SYSTEM']
+DemoMode = Literal['EMPLOYEE', 'REVIEWER', 'APPROVER']
+PolicyActor = Literal['SYSTEM']
 
 EvidenceRole = Literal['PRIMARY_BILL', 'GOODS_RECEIPT', 'CONTEXT']
 Reading = Literal['READABLE', 'UNREADABLE', 'UNKNOWN']
@@ -44,7 +44,7 @@ DocumentTemplate = Literal[
 CheckStatus = Literal['PASS', 'FAIL', 'UNKNOWN', 'NOT_APPLICABLE']
 IssueClass = Literal['FACTUAL_UNKNOWN', 'OUTSIDE_POLICY', 'BEYOND_AUTHORITY']
 IssueStatus = Literal['OPEN', 'RESOLVED', 'DENIED']
-AuthorizationKind = Literal['POLICY_EXCEPTION', 'AMOUNT_APPROVAL']
+AuthorizationKind = Literal['AMOUNT_APPROVAL']
 DecisionAction = Literal[
     'CREATE_PAYMENT_REQUEST', 'REQUEST_INFO', 'ESCALATE', 'REJECT', 'NONE'
 ]
@@ -58,7 +58,7 @@ WorkflowState = Literal[
 ]
 HumanActionKind = Literal[
     'SUPPLY_DECLARATION', 'ADD_EVIDENCE', 'PROPOSE_CORRECTION', 'CONFIRM_FIELD',
-    'CONFIRM_MAPPING', 'GRANT_POLICY_EXCEPTION', 'APPROVE_AMOUNT', 'DENY',
+    'CONFIRM_MAPPING', 'APPROVE_AMOUNT', 'DENY',
     'STOP', 'OVERRIDE',
 ]
 PaymentRequestStatus = Literal['CREATED', 'SUPERSEDED', 'REVOKED']
@@ -93,7 +93,6 @@ class PolicyConfig(Record):
     active: bool
     currency: str
     auto_approval_max: int = Field(ge=0)
-    standard_policy_max: int = Field(ge=0)
     inventory_date_gap_days: int = Field(ge=0)
     comparison_money_tolerance: str
     normalized_unit_price_tolerance: str

@@ -54,11 +54,11 @@ def main(argv: list[str] | None = None) -> int:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     repo = Repository(db_path, out_root / 'artifacts')
     service = CaseService(repo, ReplayProviders(), repo.get_active_policy() or _inactive_policy())
-    # Activate the proposed demo policy for the replay run (explicit, recorded).
+    # Activate the proposed demo policy for the replay run (recorded as SYSTEM).
     from invoice_referee.config import activate_demo_policy
 
-    service.set_policy(activate_demo_policy(service.policy, 'Verify replay corpus'),
-                       actor_mode='POLICY_OWNER', reason='Verify replay corpus')
+    service.activate_policy(activate_demo_policy(service.policy, 'Verify replay corpus'),
+                            reason='Verify replay corpus')
     try:
         report = VerifyRunner(service, out_root / 'runs').run(selected)
     finally:

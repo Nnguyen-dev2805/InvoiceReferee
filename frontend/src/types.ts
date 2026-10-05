@@ -9,7 +9,7 @@ export type Profile = 'TRAVEL' | 'CLIENT_MEAL' | 'WORK_PURCHASE' | 'OTHER';
 export type PurposeType = 'BUSINESS' | 'PERSONAL' | 'UNKNOWN';
 export type PayerType = 'PERSONAL' | 'COMPANY' | 'ADVANCE' | 'VENDOR' | 'UNKNOWN';
 export type EvidenceRole = 'PRIMARY_BILL' | 'GOODS_RECEIPT' | 'CONTEXT';
-export type DemoMode = 'EMPLOYEE' | 'REVIEWER' | 'APPROVER' | 'POLICY_OWNER';
+export type DemoMode = 'EMPLOYEE' | 'REVIEWER' | 'APPROVER';
 export type ExecutionStatus =
   | 'QUEUED'
   | 'RUNNING'
@@ -41,7 +41,6 @@ export type HumanActionKind =
   | 'PROPOSE_CORRECTION'
   | 'CONFIRM_FIELD'
   | 'CONFIRM_MAPPING'
-  | 'GRANT_POLICY_EXCEPTION'
   | 'APPROVE_AMOUNT'
   | 'DENY'
   | 'STOP'
@@ -189,7 +188,6 @@ export interface PolicyDto {
   active: boolean;
   currency: string;
   auto_approval_max: number;
-  standard_policy_max: number;
   inventory_date_gap_days: number;
   comparison_money_tolerance: string;
   normalized_unit_price_tolerance: string;

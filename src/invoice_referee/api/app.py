@@ -17,9 +17,9 @@ Design rulings (recorded at T09):
   A missing/invalid value is a clear startup error; there is NO live->fake
   fallback (a live deployment that cannot reach its provider must fail loudly,
   never silently serve fake results).
-- **Runtime starts INACTIVE.** ``create_runtime_app`` loads the proposed demo
-  policy file (``active=false``); activation is an explicit POLICY_OWNER action
-  through ``POST /policy/activate`` (System §8, Global Constraints).
+- **Runtime auto-activates the demo policy.** ``create_runtime_app`` loads the
+  proposed demo policy file (``active=false``) and activates it at startup with
+  its full parameters, recorded as SYSTEM with a reason (System §8).
 - **No secrets / no absolute artifact paths.** Evidence DTOs omit
   ``stored_path``; run artifacts are reduced to basenames. Health never echoes
   credentials.
@@ -93,13 +93,6 @@ class ActionBody(BaseModel):
     reason: str
     issue_id: str | None = None
     case_version: int | None = None
-
-
-class PolicyActivationBody(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-
-    mode: str
-    reason: str
 
 
 class VerifyRunBody(BaseModel):
@@ -190,7 +183,6 @@ def _policy_dto(policy: PolicyConfig) -> dict:
         'active': policy.active,
         'currency': policy.currency,
         'auto_approval_max': policy.auto_approval_max,
-        'standard_policy_max': policy.standard_policy_max,
         'inventory_date_gap_days': policy.inventory_date_gap_days,
         'comparison_money_tolerance': policy.comparison_money_tolerance,
         'normalized_unit_price_tolerance': policy.normalized_unit_price_tolerance,
@@ -378,16 +370,6 @@ def create_app(service: CaseService, *, provider_mode: str = 'fake') -> FastAPI:
     async def get_policy() -> dict:
         return _policy_dto(service.policy)
 
-    @app.post('/api/policy/activate')
-    async def activate_policy(body: PolicyActivationBody) -> dict:
-        if body.mode != 'POLICY_OWNER':
-            raise DomainError('INVALID_ACTION', 'Chỉ POLICY_OWNER được kích hoạt policy demo.')
-        if not body.reason or not body.reason.strip():
-            raise _invalid('Cần lý do để kích hoạt policy demo.')
-        policy = activate_demo_policy(service.policy, body.reason)
-        service.set_policy(policy, actor_mode='POLICY_OWNER', reason=body.reason)
-        return _policy_dto(service.policy)
-
     # --- verify (T11) ---------------------------------------------------------
     # The suite runs in a background thread that drives the same CaseService; the
     # provider execution stays on the service's single executor. A report is only
@@ -537,17 +519,17 @@ _AUTO_ACTIVATION_REASON = 'Tự động kích hoạt policy demo khi khởi đ�
 def _ensure_active_policy(service: CaseService) -> None:
     """Activate the proposed demo policy at startup when none is active.
 
-    The developer requested that a fresh runtime always be ready to process, so
-    startup activates the demo policy explicitly — recorded with a reason and a
-    fresh ``activation_id`` through the normal ``set_policy`` path, so the audit
-    trail and versioning are preserved. An already-active persisted policy is
-    left untouched (idempotent across restarts).
+    A fresh runtime must be immediately able to process, so startup activates the
+    demo policy with its full proposed parameters — recorded as SYSTEM with a
+    reason and a fresh ``activation_id``, so the audit trail and versioning are
+    preserved. An already-active persisted policy is left untouched (idempotent
+    across restarts).
     """
     if service.policy.active:
         return
-    service.set_policy(
+    service.activate_policy(
         activate_demo_policy(service.policy, _AUTO_ACTIVATION_REASON),
-        actor_mode='POLICY_OWNER', reason=_AUTO_ACTIVATION_REASON)
+        reason=_AUTO_ACTIVATION_REASON)
 
 
 __all__ = ['HTTP_CODES', 'create_app', 'create_runtime_app']

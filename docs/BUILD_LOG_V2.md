@@ -56,9 +56,9 @@ evidence pointers; nothing planned is recorded as done.
 - Created `src/invoice_referee/policy/{expenses,inventory,decision}.py` (pure
   evaluators; no provider/SQLite/UI imports).
 - Full rule matrix (Rulebook §3): SRC-01/02/03, CTX-01, MODE-01/02, SCOPE-01/02,
-  ELIG-01, AMT-01/02, LIM-01, AUTH-01, INV-01/02 (inventory only WORK_PURCHASE).
-  Inclusive thresholds: ≤2,000,000 ROUTINE_AUTO; >2m–≤5m BEYOND_AUTHORITY;
-  >5m BOTH LIM-01 + AUTH-01 (separate authorizations). Accepted amount never
+  ELIG-01, AMT-01/02, AUTH-01, INV-01/02 (inventory only WORK_PURCHASE).
+  Inclusive threshold: ≤2,000,000 ROUTINE_AUTO; >2m BEYOND_AUTHORITY (AUTH-01,
+  APPROVER; one explicit amount approval). Accepted amount never
   raised/clipped/dropped; undetermined → no request.
 - Arithmetic templates TOTAL_ONLY / SIMPLE_ITEMIZED (ROUND_HALF_UP per line,
   tolerance 1đ) / ITEMIZED_WITH_ADJUSTMENTS (total = subtotal + tax + fees −
@@ -161,8 +161,8 @@ evidence pointers; nothing planned is recorded as done.
 - Created `src/invoice_referee/application/human.py`
   (`validate_human_action(action, snapshot, decision) -> HumanAction` +
   `authorization_matches`). Discriminated payload validation with extra keys
-  rejected; role/scope per kind (EMPLOYEE/REVIEWER/APPROVER/POLICY_OWNER, 5m
-  boundary); no approve-all; confirmation effective only for the named
+  rejected; role/scope per kind (EMPLOYEE/REVIEWER/APPROVER);
+  no approve-all; confirmation effective only for the named
   field/source/case-version; OVERRIDE re-checks the wrapped operation's keyset.
   Authorization bound to case_version + policy_version + profile + purpose +
   amount. Pure (no SQLite/providers/UI).
@@ -222,7 +222,8 @@ evidence pointers; nothing planned is recorded as done.
   Claim + storage limits, never `stored_path`; ADD_EVIDENCE → `add_evidence`.
   Error envelope `{code,message}` with the ledger DomainError→HTTP mapping;
   execution-started failures live in the RunRecord, not HTTP. Policy activation
-  (POLICY_OWNER + reason) persists config+event; runtime starts INACTIVE.
+  (SYSTEM + reason) persists config+event; runtime auto-activates the demo policy
+  at startup.
 - Tests: `tests/integration/test_api.py` (real TestClient + T08 `runtime`
   fixture). RED observed, then GREEN; full suite 342 → 369 passed.
 - Review round 1: malformed/non-JSON action body → 422 envelope (was 500);

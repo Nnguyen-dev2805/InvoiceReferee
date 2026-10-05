@@ -393,14 +393,12 @@
         "action": "ESCALATE",
         "completion_basis": null,
         "issue_classes": [
-          "OUTSIDE_POLICY",
           "BEYOND_AUTHORITY"
         ],
         "owners": [
-          "POLICY_OWNER"
+          "APPROVER"
         ],
         "required_rules": [
-          "LIM-01",
           "AUTH-01"
         ],
         "amount_vnd": null,
@@ -443,14 +441,12 @@
         "action": "ESCALATE",
         "completion_basis": null,
         "issue_classes": [
-          "OUTSIDE_POLICY",
           "BEYOND_AUTHORITY"
         ],
         "owners": [
-          "POLICY_OWNER"
+          "APPROVER"
         ],
         "required_rules": [
-          "LIM-01",
           "AUTH-01"
         ],
         "amount_vnd": null,
@@ -561,5 +557,5 @@
       }
     }
   ],
-  "sha256": "60db316a3df654faf420fa0574bea7d31a8b6a4965ecce4e3b53587f6abcd33f"
+  "sha256": "af92497e79ab7f4edd355899f99712cdcbcc25ef1db5dff444e1f58332fef829"
 }

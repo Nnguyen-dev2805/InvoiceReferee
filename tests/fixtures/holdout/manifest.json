@@ -573,14 +573,12 @@
         "action": "ESCALATE",
         "completion_basis": null,
         "issue_classes": [
-          "OUTSIDE_POLICY",
           "BEYOND_AUTHORITY"
         ],
         "owners": [
-          "POLICY_OWNER"
+          "APPROVER"
         ],
         "required_rules": [
-          "LIM-01",
           "AUTH-01"
         ],
         "amount_vnd": null,
@@ -623,14 +621,12 @@
         "action": "ESCALATE",
         "completion_basis": null,
         "issue_classes": [
-          "OUTSIDE_POLICY",
           "BEYOND_AUTHORITY"
         ],
         "owners": [
-          "POLICY_OWNER"
+          "APPROVER"
         ],
         "required_rules": [
-          "LIM-01",
           "AUTH-01"
         ],
         "amount_vnd": null,
@@ -673,14 +669,12 @@
         "action": "ESCALATE",
         "completion_basis": null,
         "issue_classes": [
-          "OUTSIDE_POLICY",
           "BEYOND_AUTHORITY"
         ],
         "owners": [
-          "POLICY_OWNER"
+          "APPROVER"
         ],
         "required_rules": [
-          "LIM-01",
           "AUTH-01"
         ],
         "amount_vnd": null,
@@ -723,14 +717,12 @@
         "action": "ESCALATE",
         "completion_basis": null,
         "issue_classes": [
-          "OUTSIDE_POLICY",
           "BEYOND_AUTHORITY"
         ],
         "owners": [
-          "POLICY_OWNER"
+          "APPROVER"
         ],
         "required_rules": [
-          "LIM-01",
           "AUTH-01"
         ],
         "amount_vnd": null,
@@ -937,5 +929,5 @@
       }
     }
   ],
-  "sha256": "43065fb3a2b4099e363d8f51619e44245f50993794da52fa41d4f626a62057c7"
+  "sha256": "57ab4e94afa89c5475d1a52d48cf035f1b85eeee5428d5665e3d549eba26e8b0"
 }

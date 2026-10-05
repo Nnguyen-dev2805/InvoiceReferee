@@ -43,9 +43,7 @@ Những con số dưới đây chỉ nhằm có một bản đề xuất có th�
 | --- | --- |
 | Currency | VND; số tiền chi trả là integer đồng, không dùng float |
 | Quyền tự động | Accepted amount <= 2.000.000đ/case nếu mọi điều kiện áp dụng đều đạt |
-| Giới hạn policy thông thường | Eligible expense <= 5.000.000đ/case |
-| Vượt quyền, trong policy | Trên 2.000.000đ tới 5.000.000đ: cần approver, không hỏi lại OCR nếu dữ kiện đã rõ |
-| Vượt policy thông thường | Trên 5.000.000đ: cần policy owner xét ngoại lệ cho đúng case; approval quyền thấp không đủ |
+| Vượt quyền tự động | Trên 2.000.000đ: cần approver duyệt đúng số tiền, không hỏi lại OCR nếu dữ kiện đã rõ |
 | Tiền cá nhân đã chi | Là workflow B1; company-paid/advance/vendor-payment được xác định là luồng khác, không tự hoàn trả lại cùng khoản |
 | Thiếu chứng từ bắt buộc | Tạo yêu cầu bổ sung; B1 chưa dùng affidavit tự khai như chứng từ thay thế mặc định |
 | Chưa rõ giá trị cần dùng hoặc có conflict | Chưa tạo payment request; giải quyết factual issue trước |
@@ -83,9 +81,9 @@ Arithmetic/rounding và unit-price basis được đề xuất cụ thể trong
   correction. Một khai báo không tự trở thành phê duyệt ngoại lệ.
 - Accounting/reviewer: kiểm tra nguồn, xác nhận correction có căn cứ; lưu lại
   source và lý do khi field được xác nhận.
-- Approver: duyệt hoặc từ chối trong quyền theo rulebook.
-- Policy owner: xét ngoài-policy/exception được phép, với phạm vi một case;
-  thay policy là hành động riêng có version, không tự suy từ việc approve.
+- Approver: duyệt hoặc từ chối amount (kể cả vượt auto_approval_max); phân loại
+  case OTHER vào catalog; deny issue thuộc thẩm quyền. Thay policy là hành động
+  riêng có version, không tự suy từ việc approve.
 
 Một người có thể chuyển các chế độ để demo; không giả định đó là identity
 doanh nghiệp đã được xác thực. Không dùng role mô phỏng như bằng chứng đã
@@ -145,7 +143,7 @@ spec kỹ thuật/plan. Tài liệu này chưa chứng minh acceptance đã đ�
 ## 9. Điều còn cần chốt và bước tiếp theo
 
 Điểm cần người phát triển review đầu tiên: ba profile, required evidence,
-hai ngưỡng 2.000.000đ/5.000.000đ và quyền reviewer/approver/policy owner. Đây
+ngưỡng auto_approval_max 2.000.000đ và quyền reviewer/approver. Đây
 là một đề xuất concrete để sửa, không phải giới hạn đã được giao cho hệ thống.
 
 Các bản nháp [System/Data](B1_SYSTEM_SPEC.md), [Rulebook](B1_RULEBOOK.md) và

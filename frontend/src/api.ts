@@ -101,14 +101,6 @@ export function getPolicy(): Promise<PolicyDto> {
   return request<PolicyDto>('/api/policy');
 }
 
-export function activatePolicy(reason: string): Promise<PolicyDto> {
-  return request<PolicyDto>('/api/policy/activate', {
-    method: 'POST',
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ mode: 'POLICY_OWNER', reason }),
-  });
-}
-
 export function startVerifyRun(suite: string, mode = 'replay'): Promise<VerifyJob> {
   return request<VerifyJob>('/api/verify-runs', {
     method: 'POST',

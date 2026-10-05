@@ -235,12 +235,12 @@ def build_development() -> list[VerifyCase]:
         _expected('REQUEST_INFO', classes=['FACTUAL_UNKNOWN'], owners=['EMPLOYEE'],
                   rules=['CTX-01'], reason='Thiếu khai báo chuyến đi'))
 
-    # TC08 OTHER -> SCOPE-01 OUTSIDE_POLICY POLICY_OWNER
+    # TC08 OTHER -> SCOPE-01 OUTSIDE_POLICY APPROVER
     doc, reg = _header_doc('e-primary', '1200000')
     add('TC08', 'OTHER: chi phí ngoài catalog', _claim('OTHER', 1_200_000),
         [('PRIMARY_BILL', 1_200_000)],
         {'document': doc.model_dump(mode='json'), 'registry': reg.model_dump(mode='json')},
-        _expected('ESCALATE', classes=['OUTSIDE_POLICY'], owners=['POLICY_OWNER'],
+        _expected('ESCALATE', classes=['OUTSIDE_POLICY'], owners=['APPROVER'],
                   rules=['SCOPE-01'], reason='Ngoài catalog B1'))
 
     # TC09 PERSONAL purpose -> ELIG-01 REJECT
@@ -268,22 +268,21 @@ def build_development() -> list[VerifyCase]:
         _expected('ESCALATE', classes=['BEYOND_AUTHORITY'], owners=['APPROVER'],
                   rules=['AUTH-01'], reason='Vượt quyền tự động, cần approver'))
 
-    # TC12 exactly 5.000.000 -> APPROVER, not outside policy
+    # TC12 exactly 2.000.000 auto vs 2.000.001 authority (inclusive boundary)
     doc, reg = _header_doc('e-primary', '5000000')
-    add('TC12', 'Case hợp lệ đúng 5.000.000đ', _claim('TRAVEL', 5_000_000),
+    add('TC12', 'Case hợp lệ 5.000.000đ', _claim('TRAVEL', 5_000_000),
         [('PRIMARY_BILL', 5_000_000)],
         {'document': doc.model_dump(mode='json'), 'registry': reg.model_dump(mode='json')},
         _expected('ESCALATE', classes=['BEYOND_AUTHORITY'], owners=['APPROVER'],
-                  rules=['AUTH-01'], reason='Đúng policy max, không ngoài policy'))
+                  rules=['AUTH-01'], reason='Vượt auto limit, cần approver'))
 
-    # TC13 5.000.001 -> LIM-01 + AUTH-01 POLICY_OWNER
+    # TC13 5.000.001 -> AUTH-01 only (no separate 5M policy tier), APPROVER
     doc, reg = _header_doc('e-primary', '5000001')
     add('TC13', 'Case hợp lệ 5.000.001đ', _claim('TRAVEL', 5_000_001),
         [('PRIMARY_BILL', 5_000_001)],
         {'document': doc.model_dump(mode='json'), 'registry': reg.model_dump(mode='json')},
-        _expected('ESCALATE', classes=['OUTSIDE_POLICY', 'BEYOND_AUTHORITY'],
-                  owners=['POLICY_OWNER'], rules=['LIM-01', 'AUTH-01'],
-                  reason='Vượt policy + vượt quyền, cần policy owner'))
+        _expected('ESCALATE', classes=['BEYOND_AUTHORITY'], owners=['APPROVER'],
+                  rules=['AUTH-01'], reason='Vượt quyền tự động, cần approver'))
 
     # TC14 quantity conflict bill 10 vs receipt 8 -> INV-02
     pd, pr = _itemized_doc('e-primary', '900000', kind='BILL', quantity='10', unit='kg',
@@ -362,8 +361,8 @@ def _outside_ci(cid, folder):
     amount = 6_000_000
     doc, reg = _header_doc('e-primary', str(amount))
     return _finish(cid, folder, amount, doc, reg,
-                   _expected('ESCALATE', classes=['OUTSIDE_POLICY', 'BEYOND_AUTHORITY'],
-                             owners=['POLICY_OWNER'], rules=['LIM-01', 'AUTH-01']))
+                   _expected('ESCALATE', classes=['BEYOND_AUTHORITY'],
+                             owners=['APPROVER'], rules=['AUTH-01']))
 
 
 def _authority_ci(cid, folder):

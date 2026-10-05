@@ -37,7 +37,7 @@ from invoice_referee.policy.quality import confirmation_index, derive_fact
 _RULE_MATRIX = (
     'SRC-01', 'SRC-02', 'SRC-03', 'CTX-01', 'MODE-01', 'MODE-02',
     'SCOPE-01', 'SCOPE-02', 'ELIG-01', 'AMT-01', 'AMT-02',
-    'LIM-01', 'AUTH-01', 'INV-01', 'INV-02',
+    'AUTH-01', 'INV-01', 'INV-02',
 )
 
 _REFUSAL_PAYERS = ('COMPANY', 'ADVANCE', 'VENDOR')
@@ -102,13 +102,6 @@ def _authorization_applies(
         and auth.profile == snapshot.claim.profile
         and auth.purpose == snapshot.claim.purpose
         and auth.amount_vnd == accepted
-    )
-
-
-def _closed_by_exception(snapshot: CaseSnapshot, accepted: int) -> bool:
-    return any(
-        a.kind == 'POLICY_EXCEPTION' and _authorization_applies(a, snapshot, accepted)
-        for a in snapshot.authorizations
     )
 
 
@@ -244,7 +237,7 @@ def evaluate(
             rule_id='SCOPE-01', status='FAIL', dependencies=['profile'], refs=[],
             reason='Profile ngoài catalog B1.', issue_ids=['SCOPE-01:case']))
         issues.append(_policy_issue(
-            'SCOPE-01', owner='POLICY_OWNER',
+            'SCOPE-01', owner='APPROVER',
             question='Profile này chưa nằm trong catalog; cần phân loại hoặc từ chối.'))
     else:
         checks.append(CheckResult(
@@ -288,7 +281,7 @@ def evaluate(
                 question='Primary bill thiếu/không dùng được trường bắt buộc; cần đọc lại nguồn.'))
         if check.status in ('FAIL', 'UNKNOWN') and check.rule_id == 'SCOPE-02':
             issues.append(_policy_issue(
-                'SCOPE-02', owner='POLICY_OWNER',
+                'SCOPE-02', owner='APPROVER',
                 question='Loại tiền/document cần FX hoặc credit-note chưa được B1 hỗ trợ.'))
 
     # --- MODE-02 payer unknown/contradictory ----------------------------------
@@ -364,14 +357,11 @@ def evaluate(
                 'INV-02', owner='REVIEWER',
                 question='Đối chiếu inventory có conflict/thiếu căn cứ; cần xác minh nguồn.'))
 
-    # --- Policy limit and authority (LIM-01/AUTH-01) --------------------------
+    # --- Authority (AUTH-01) --------------------------------------------------
     if accepted is not None:
         checks.extend(_policy_authority_checks(snapshot, accepted, issues))
     else:
-        # Amount not determined: keep LIM/AUTH as UNKNOWN (not PASS).
-        checks.append(CheckResult(
-            rule_id='LIM-01', status='UNKNOWN', dependencies=['accepted_amount_vnd'],
-            refs=[], reason='Chưa xác định accepted amount.', issue_ids=[]))
+        # Amount not determined: keep AUTH as UNKNOWN (not PASS).
         checks.append(CheckResult(
             rule_id='AUTH-01', status='UNKNOWN', dependencies=['accepted_amount_vnd'],
             refs=[], reason='Chưa xác định accepted amount.', issue_ids=[]))
@@ -420,26 +410,6 @@ def _policy_authority_checks(
     policy = snapshot.policy
     checks: list[CheckResult] = []
 
-    # LIM-01: over standard policy max (inclusive).
-    if accepted > policy.standard_policy_max:
-        closed = _closed_by_exception(snapshot, accepted)
-        if closed:
-            checks.append(CheckResult(
-                rule_id='LIM-01', status='PASS', dependencies=['accepted_amount_vnd'], refs=[],
-                reason='Policy exception hợp lệ đóng LIM-01.', issue_ids=[]))
-        else:
-            checks.append(CheckResult(
-                rule_id='LIM-01', status='FAIL', dependencies=['accepted_amount_vnd'], refs=[],
-                reason='Vượt standard_policy_max; cần case-specific exception.',
-                issue_ids=['LIM-01:case']))
-            issues.append(_policy_issue(
-                'LIM-01', owner='POLICY_OWNER',
-                question=f'Khoản {_vnd(accepted)}đ vượt hạn mức policy thông thường; cần exception cho đúng case.'))
-    else:
-        checks.append(CheckResult(
-            rule_id='LIM-01', status='PASS', dependencies=['accepted_amount_vnd'], refs=[],
-            reason='Trong standard policy.', issue_ids=[]))
-
     # AUTH-01: over auto approval max (inclusive).
     if accepted > policy.auto_approval_max:
         closed = _closed_by_amount_approval(snapshot, accepted)
@@ -448,13 +418,12 @@ def _policy_authority_checks(
                 rule_id='AUTH-01', status='PASS', dependencies=['accepted_amount_vnd'], refs=[],
                 reason='Có amount approval hợp lệ.', issue_ids=[]))
         else:
-            owner = 'POLICY_OWNER' if accepted > policy.standard_policy_max else 'APPROVER'
             checks.append(CheckResult(
                 rule_id='AUTH-01', status='FAIL', dependencies=['accepted_amount_vnd'], refs=[],
                 reason='Vượt auto_approval_max; cần explicit amount approval.',
                 issue_ids=['AUTH-01:case']))
             issues.append(_authority_issue(
-                'AUTH-01', owner=owner,
+                'AUTH-01', owner='APPROVER',
                 question=f'Khoản {_vnd(accepted)}đ vượt quyền tự động; cần approval đúng số tiền.'))
     else:
         checks.append(CheckResult(

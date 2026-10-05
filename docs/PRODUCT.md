@@ -10,11 +10,11 @@
 An operator submits a reimbursement claim plus evidence. The system verifies the
 applicable rules, and then either **creates a payment request** for an eligible
 routine case, or **asks the right person a concrete question** (employee,
-reviewer, approver, or policy owner). Human answers lead to a reevaluation with
+reviewer, or approver). Human answers lead to a reevaluation with
 traceable decisions.
 
 There is **one app for one operator**, with demo role selection (EMPLOYEE,
-REVIEWER, APPROVER, POLICY_OWNER). Demo roles are **not** authenticated company
+REVIEWER, APPROVER). Demo roles are **not** authenticated company
 identity. `CREATED` is **not** `PAID`: the product creates a payment request, it
 does not transfer money.
 
@@ -26,7 +26,7 @@ does not transfer money.
 | CLIENT_MEAL | Primary bill | As TRAVEL, plus purpose declaration |
 | WORK_PURCHASE | Primary bill + goods receipt + received-full | Item mapping, quantity/unit, dates, supplier |
 
-`OTHER` is outside the B1 catalog (policy owner classifies or rejects).
+`OTHER` is outside the B1 catalog (approver classifies or rejects).
 
 ## Decision actions (IMPLEMENTED — pure reducer)
 

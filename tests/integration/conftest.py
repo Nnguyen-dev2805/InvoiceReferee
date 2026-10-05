@@ -87,7 +87,7 @@ def build_runtime(
     policy = activate_demo_policy(demo_policy(active=False), 'fixture activation')
     # Persist the fixture activation so the service's persisted-active-policy path
     # and set_policy(idle) are exercised (startup uses persisted config if present).
-    repo.record_policy_change(policy, actor_mode='POLICY_OWNER', reason='fixture activation')
+    repo.record_policy_change(policy, actor_mode='SYSTEM', reason='fixture activation')
     service = CaseService(repo, providers, policy)
     return Runtime(service, repo, providers, case.id, entered, release)
 

@@ -30,10 +30,11 @@ Design rulings (recorded at T08; System §6–§8, Rulebook §5/§6):
   FAILED/NONE with a technical event.
 - **Startup** marks an in-flight run interrupted (no auto-rerun) and uses the
   persisted active config when present, else the (inactive) file config.
-- **set_policy** is idle-only. ``actor_mode=SYSTEM`` may change ONLY the active
-  config's ``word_review_threshold``/``threshold_version``; a human POLICY_OWNER
-  activation is a distinct actor. The audit event distinguishes automatic
-  adaptation (``automatic=True``) from human approval.
+- **set_policy** is idle-only and ``SYSTEM``-only: it may change ONLY the active
+  config's ``word_review_threshold``/``threshold_version`` (B2 adaptation).
+  **activate_policy** is the separate one-shot path that moves a proposed config
+  to active with its full parameters (used by startup auto-activation). Both are
+  recorded as SYSTEM with a reason.
 - **Deep confirmation checks** (T07 owns the shape/ownership; the bundle lives
   here): CONFIRM_FIELD refs must resolve in the owning registry and the confirmed
   fact must exist; CONFIRM_MAPPING pairs must resolve to real item IDs, cover
@@ -81,7 +82,7 @@ _TERMINAL = {'STOPPED', 'SUCCEEDED', 'FAILED'}
 # Protected config fields a SYSTEM threshold update may never touch.
 _SYSTEM_PROTECTED = (
     'version', 'origin', 'activation_id', 'active', 'currency',
-    'auto_approval_max', 'standard_policy_max', 'inventory_date_gap_days',
+    'auto_approval_max', 'inventory_date_gap_days',
     'comparison_money_tolerance', 'normalized_unit_price_tolerance',
 )
 
@@ -287,15 +288,38 @@ class CaseService:
     def set_policy(
         self, policy: PolicyConfig, *, actor_mode: PolicyActor, reason: str
     ) -> None:
-        """Persist a policy change (idle only) and update the active config."""
+        """Persist a threshold-only SYSTEM policy change (idle only).
+
+        ``SYSTEM`` may change ONLY the active word-review threshold / version; a
+        change to any protected parameter (limits, tolerances, dates) is refused
+        (B2 feedback adaptation must not relax company limits or authority).
+        """
         self._ensure_open()
         if self._reserved_by is not None:
             raise DomainError('RUN_BUSY', 'Đang có phiên Verify giữ chỗ xử lý.')
         self._executor.acquire()
         try:
-            effective = self._system_threshold(policy) if actor_mode == 'SYSTEM' else policy
+            effective = self._system_threshold(policy)
             self._repo.record_policy_change(effective, actor_mode=actor_mode, reason=reason)
             self._policy = effective
+        finally:
+            self._executor.release()
+
+    def activate_policy(self, policy: PolicyConfig, *, reason: str) -> None:
+        """Activate a proposed demo policy (idle only), recorded as SYSTEM.
+
+        This is the one path allowed to move a proposed/inactive config to active
+        with the full proposed parameters (the startup auto-activation uses it).
+        It is NOT the threshold-only adaptation path — ``set_policy`` remains the
+        guarded SYSTEM adapter.
+        """
+        self._ensure_open()
+        if self._reserved_by is not None:
+            raise DomainError('RUN_BUSY', 'Đang có phiên Verify giữ chỗ xử lý.')
+        self._executor.acquire()
+        try:
+            self._repo.record_policy_change(policy, actor_mode='SYSTEM', reason=reason)
+            self._policy = policy
         finally:
             self._executor.release()
 

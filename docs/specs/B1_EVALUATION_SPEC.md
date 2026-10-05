@@ -64,12 +64,12 @@ có source/quality/context đầy đủ và điều kiện còn lại hợp lệ
 | TC05 | Original image có total rõ nhưng OCR/quality chưa đủ căn cứ; cần reviewer xem ảnh | REQUEST_INFO; FACTUAL_UNKNOWN; REVIEWER; zero request trước confirmation |
 | TC06 | Bill 1.280.000đ, requested 1.480.000đ, chưa có căn cứ phần chênh | FACTUAL_UNKNOWN/AMT-01; hỏi EMPLOYEE về 200.000đ; không tự chọn min/max |
 | TC07 | TRAVEL có bill rõ nhưng thiếu khai báo chuyến đi | REQUEST_INFO tới EMPLOYEE, nêu thông tin thiếu; không hỏi lại field đã rõ |
-| TC08 | OTHER: chi phí không thuộc catalog B1 | ESCALATE; OUTSIDE_POLICY; POLICY_OWNER phân loại/deny, chưa tạo request |
+| TC08 | OTHER: chi phí không thuộc catalog B1 | ESCALATE; OUTSIDE_POLICY; APPROVER phân loại/deny, chưa tạo request |
 | TC09 | Khai báo xác định PERSONAL_PURPOSE, không chi cho công việc | REJECT ELIG-01; zero request; không dùng tên hàng làm căn cứ duy nhất |
 | TC10 | Case hợp lệ đúng 2.000.000đ | Routine auto; inclusive boundary, một request |
-| TC11 | Case hợp lệ 2.000.001đ trong standard policy | ESCALATE; BEYOND_AUTHORITY; APPROVER; zero request trước approval |
-| TC12 | Case hợp lệ đúng 5.000.000đ | APPROVER; không gán outside policy chỉ vì bằng policy max |
-| TC13 | Case hợp lệ về dữ kiện, amount 5.000.001đ | OUTSIDE_POLICY + BEYOND_AUTHORITY; POLICY_OWNER; grant exception riêng chưa đóng amount approval |
+| TC11 | Case hợp lệ 2.000.001đ | ESCALATE; BEYOND_AUTHORITY; APPROVER; zero request trước approval |
+| TC12 | Case hợp lệ đúng 5.000.000đ | APPROVER; amount approval riêng trước khi tạo request |
+| TC13 | Case hợp lệ về dữ kiện, amount 5.000.001đ | BEYOND_AUTHORITY; APPROVER; amount approval riêng chưa đóng |
 | TC14 | Bill quantity 10, receipt 8; chưa giải quyết conflict | FACTUAL_UNKNOWN/INV-02; refs hai nguồn, zero request |
 | TC15 | Model trả ID thừa/trùng hoặc source không tồn tại sau bounded repair | Technical FAILED/NONE, zero request; không gán lỗi model thành policy violation |
 

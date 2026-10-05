@@ -51,8 +51,7 @@ Căn cứ: [decision.py](../src/invoice_referee/policy/decision.py), L186–414;
 | --- | --- |
 | EMPLOYEE | Nộp khai báo/evidence; backend có actions bổ sung và đề xuất correction |
 | REVIEWER | Xác minh field/mapping từ nguồn; không có quyền bỏ hard gates bằng một câu approve |
-| APPROVER | Duyệt amount trong phạm vi authority theo policy demo |
-| POLICY_OWNER | Phân loại/deny, cấp exception hoặc amount approval theo scope |
+| APPROVER | Duyệt amount (kể cả vượt auto_approval_max), phân loại/deny theo scope |
 
 Đây là **một operator với modes mô phỏng**, không phải các nhân sự đã xác thực
 trong một công ty. Frontend đang dùng employee ID `demo-employee` và lấy mode

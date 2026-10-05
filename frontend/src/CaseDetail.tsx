@@ -15,8 +15,6 @@ interface CaseDetailProps {
   onStop: () => Promise<StopReply>;
   caseRecord?: CaseRecord;
   paymentRequest?: PaymentRequest | null;
-  policyActive?: boolean;
-  onActivatePolicy?: (reason: string) => Promise<void>;
   history?: AuditEvent[];
 }
 
@@ -27,8 +25,6 @@ export function CaseDetail({
   onStop,
   caseRecord,
   paymentRequest,
-  policyActive = true,
-  onActivatePolicy,
   history,
 }: CaseDetailProps) {
   const [stopState, setStopState] = useState<StopState>('idle');
@@ -66,10 +62,6 @@ export function CaseDetail({
         isFlight={runInFlight(run.status)}
         isDone={run.status === 'SUCCEEDED'}
       />
-
-      {!policyActive && onActivatePolicy && (
-        <PolicyNotice onActivatePolicy={onActivatePolicy} />
-      )}
 
       {run.status === 'FAILED' && (
         <div className="notice notice-error" role="alert">
@@ -316,50 +308,6 @@ function DecisionSummary({ decision }: { decision: NonNullable<RunRecord['result
           ))}
         </ul>
       )}
-    </div>
-  );
-}
-
-function PolicyNotice({ onActivatePolicy }: { onActivatePolicy: (reason: string) => Promise<void> }) {
-  const [reason, setReason] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function submit() {
-    if (!reason.trim()) {
-      setError('Cần lý do để kích hoạt policy demo.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await onActivatePolicy(reason);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kích hoạt thất bại.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="notice notice-warn">
-      <AlertIcon />
-      <div>
-        <strong>Policy demo chưa được kích hoạt.</strong>
-        <p>Hệ thống sẽ không tự xử lý cho tới khi policy được kích hoạt tường minh.</p>
-        <div className="field">
-          <label htmlFor="policy-reason">Lý do kích hoạt</label>
-          <input
-            id="policy-reason"
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-          />
-          {error && <p className="field-error" role="alert">{error}</p>}
-        </div>
-        <button type="button" className="btn" onClick={submit} disabled={busy}>
-          {busy ? 'Đang kích hoạt…' : 'Kích hoạt policy demo'}
-        </button>
-      </div>
     </div>
   );
 }

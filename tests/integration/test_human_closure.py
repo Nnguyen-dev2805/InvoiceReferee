@@ -362,7 +362,6 @@ def test_set_policy_system_changes_only_threshold(runtime):
     assert active.activation_id == base.activation_id
     assert active.version == base.version
     assert active.auto_approval_max == base.auto_approval_max
-    assert active.standard_policy_max == base.standard_policy_max
     assert runtime.service.policy.word_review_threshold == '0.75'
     event = [e for e in runtime.repo.history(runtime.case_id) or [] if e.kind == 'POLICY_CHANGE']
     # Policy events are case-global (case_id None); assert via a full read.
@@ -381,15 +380,14 @@ def test_set_policy_system_cannot_change_limits(runtime):
     assert runtime.repo.get_active_policy().auto_approval_max == base.auto_approval_max
 
 
-def test_set_policy_policy_owner_activation(runtime):
+def test_activate_policy_switches_active_config(runtime):
     base = runtime.service.policy
-    new = base.model_copy(update={'activation_id': 'act-owner-2', 'origin': 'developer_activated_demo'})
-    runtime.service.set_policy(new, actor_mode='POLICY_OWNER', reason='Kích hoạt lại demo')
-    assert runtime.repo.get_active_policy().activation_id == 'act-owner-2'
-    assert runtime.service.policy.activation_id == 'act-owner-2'
+    new = base.model_copy(update={'activation_id': 'act-2', 'origin': 'developer_activated_demo'})
+    runtime.service.activate_policy(new, reason='Kích hoạt lại demo')
+    assert runtime.repo.get_active_policy().activation_id == 'act-2'
+    assert runtime.service.policy.activation_id == 'act-2'
     row = runtime.repo._read("SELECT payload_json FROM events WHERE kind='POLICY_CHANGE' ORDER BY rowid DESC LIMIT 1")
-    assert 'POLICY_OWNER' in row[0]['payload_json']
-    assert '"automatic": false' in row[0]['payload_json']
+    assert 'SYSTEM' in row[0]['payload_json']
 
 
 # --- ADD_EVIDENCE: atomic linkage + consistent version bump ---------------------

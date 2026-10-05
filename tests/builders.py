@@ -56,7 +56,6 @@ def demo_policy(*, active: bool = True) -> PolicyConfig:
         active=active,
         currency='VND',
         auto_approval_max=2_000_000,
-        standard_policy_max=5_000_000,
         inventory_date_gap_days=7,
         comparison_money_tolerance='1',
         normalized_unit_price_tolerance='0',

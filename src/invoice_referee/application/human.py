@@ -13,17 +13,15 @@ Design rulings (recorded at T07):
   (extra keys rejected, e.g. no ``approve_all`` boolean) and a required subset.
   A confirmation is effective only for the field/source/case-version it names.
 - **Role/scope is enforced here.** EMPLOYEE cannot approve/waive; REVIEWER
-  confirms fields/mappings; APPROVER approves amounts up to the standard policy
-  max; POLICY_OWNER grants a scoped exception and (only with a matching
-  exception) approves an amount above the standard max. Demo modes are not
-  enterprise identity, but the backend still checks the business meaning.
-- **Approvals/exceptions bind to case_version, policy_version, profile, purpose
-  and amount** (``authorization_matches``). A mismatched authorization never
+  confirms fields/mappings; APPROVER approves amounts (any amount above the
+  automatic limit) and classifies OTHER cases. Demo modes are not enterprise
+  identity, but the backend still checks the business meaning.
+- **Approvals bind to case_version, policy_version, profile, purpose and
+  amount** (``authorization_matches``). A mismatched authorization never
   authorizes.
 - **Declarations/evidence/confirmed facts change effective data** (repository
-  bumps case_version and invalidates authorizations); approval/exception only
-  changes active action IDs (input hash). This module validates; the repository
-  applies.
+  bumps case_version and invalidates authorizations); approval only changes
+  active action IDs (input hash). This module validates; the repository applies.
 - **No approve-all boolean, no raw-OCR edit.** A REVIEWER confirmation must name
   owned refs; it adds a HumanConfirmedFact, it does not rewrite OCR.
 - **Partial allocation** is not supported in B1: a correction over only part of a
@@ -62,10 +60,6 @@ _SCHEMA: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     'PROPOSE_CORRECTION': (frozenset({'field', 'value'}), frozenset({'field', 'value', 'refs'})),
     'CONFIRM_FIELD': (frozenset({'field', 'value', 'refs'}), frozenset({'field', 'value', 'refs'})),
     'CONFIRM_MAPPING': (frozenset({'pairs', 'refs'}), frozenset({'pairs', 'refs'})),
-    'GRANT_POLICY_EXCEPTION': (
-        frozenset({'amount_vnd', 'profile', 'purpose', 'policy_version'}),
-        frozenset({'amount_vnd', 'profile', 'purpose', 'policy_version'}),
-    ),
     'APPROVE_AMOUNT': (
         frozenset({'amount_vnd', 'profile', 'purpose', 'policy_version'}),
         frozenset({'amount_vnd', 'profile', 'purpose', 'policy_version'}),
@@ -81,7 +75,7 @@ _SCHEMA: dict[str, tuple[frozenset[str], frozenset[str]]] = {
 # OVERRIDE is a wrapper around exactly these operations (System §7).
 _OVERRIDE_OPERATIONS = {
     'CONFIRM_FIELD', 'CONFIRM_MAPPING', 'CLASSIFY_PROFILE',
-    'GRANT_POLICY_EXCEPTION', 'APPROVE_AMOUNT', 'DENY',
+    'APPROVE_AMOUNT', 'DENY',
 }
 
 # CLASSIFY_PROFILE only reclassifies an OTHER case into a supported catalog
@@ -206,10 +200,10 @@ def _handle_supply_declaration(action, snapshot, decision) -> None:
     unknown = set(changes) - _CLAIM_FIELDS
     if unknown:
         raise _invalid(f'Khai báo có trường không thuộc Claim: {sorted(unknown)}.')
-    # Profile classification is not an employee declaration: only a POLICY_OWNER
+    # Profile classification is not an employee declaration: only an APPROVER
     # OVERRIDE classify may move OTHER into a supported catalog profile.
     if 'profile' in changes and changes['profile'] != snapshot.claim.profile:
-        raise _invalid('Phân loại profile chỉ do POLICY_OWNER thực hiện bằng OVERRIDE classify.')
+        raise _invalid('Phân loại profile chỉ do APPROVER thực hiện bằng OVERRIDE classify.')
     # Type-check the changed fields against the Claim contract HERE, so a
     # malformed value surfaces as INVALID_ACTION (not a raw pydantic error at
     # apply time). Only the changed fields are overridden; the rest stay valid.
@@ -279,29 +273,9 @@ def _handle_confirm_mapping(action, snapshot, decision) -> None:
     _require_owned_refs(action, snapshot, _refs(action.payload))
 
 
-def _handle_grant_exception(action, snapshot, decision) -> None:
-    _require_mode(action, 'POLICY_OWNER')
-    _authorization_payload(action, snapshot)
-    # A policy exception closes LIM-01 only; it grants no FX/scope capability.
-
-
 def _handle_approve_amount(action, snapshot, decision) -> None:
-    _require_mode(action, 'APPROVER', 'POLICY_OWNER')
-    amount, profile, purpose, policy_version = _authorization_payload(action, snapshot)
-    if action.mode == 'APPROVER':
-        if amount > snapshot.policy.standard_policy_max:
-            raise _invalid(
-                'APPROVER chỉ duyệt trong standard policy; vượt hạn mức cần POLICY_OWNER.'
-            )
-        return
-    # POLICY_OWNER may approve above the standard max only with a matching,
-    # in-force exception for the exact amount/scope.
-    if amount > snapshot.policy.standard_policy_max:
-        if not any(
-            auth.kind == 'POLICY_EXCEPTION' and authorization_matches(auth, snapshot, amount)
-            for auth in snapshot.authorizations
-        ):
-            raise _invalid('Vượt standard policy cần exception khớp đúng amount/scope trước.')
+    _require_mode(action, 'APPROVER')
+    _authorization_payload(action, snapshot)
 
 
 def _authorization_payload(action, snapshot) -> tuple[int, str, str, str]:
@@ -345,10 +319,10 @@ def _handle_override(action, snapshot, decision) -> None:
             raise _invalid(f'Override DENY cần mode {issue.owner_mode}; nhận {action.mode}.')
         return
     if operation == 'CLASSIFY_PROFILE':
-        _require_mode(action, 'POLICY_OWNER')
+        _require_mode(action, 'APPROVER')
         _validate_classify(values, snapshot)
         return
-    # CONFIRM_FIELD / CONFIRM_MAPPING / GRANT_POLICY_EXCEPTION / APPROVE_AMOUNT:
+    # CONFIRM_FIELD / CONFIRM_MAPPING / APPROVE_AMOUNT:
     # validate the underlying role/scope against the synthesized inner action,
     # which keeps the WRAPPER's mode (so the wrapper must satisfy the role).
     handler = _HANDLERS.get(operation)
@@ -459,7 +433,6 @@ _HANDLERS = {
     'PROPOSE_CORRECTION': _handle_propose_correction,
     'CONFIRM_FIELD': _handle_confirm_field,
     'CONFIRM_MAPPING': _handle_confirm_mapping,
-    'GRANT_POLICY_EXCEPTION': _handle_grant_exception,
     'APPROVE_AMOUNT': _handle_approve_amount,
     'DENY': _handle_deny,
     'OVERRIDE': _handle_override,

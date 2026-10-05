@@ -329,7 +329,7 @@ def test_policy_activation_survives_restart(tmp_path):
     from tests.builders import demo_policy
     policy = demo_policy()
     assert repo.get_active_policy() is None
-    repo.record_policy_change(policy, actor_mode='POLICY_OWNER', reason='Kích hoạt demo')
+    repo.record_policy_change(policy, actor_mode='SYSTEM', reason='Kích hoạt demo')
     reopened = Repository(tmp_path / 'cases.sqlite', tmp_path / 'artifacts')
     assert reopened.get_active_policy().version == policy.version
 
@@ -346,7 +346,7 @@ def test_inactive_policy_is_not_activated(tmp_path):
     repo = Repository(tmp_path / 'cases.sqlite', tmp_path / 'artifacts')
     proposed = demo_policy(active=False)
     with pytest.raises(DomainError):
-        repo.record_policy_change(proposed, actor_mode='POLICY_OWNER', reason='kích hoạt')
+        repo.record_policy_change(proposed, actor_mode='SYSTEM', reason='kích hoạt')
     assert repo.get_active_policy() is None
 
 
@@ -354,9 +354,9 @@ def test_activating_new_policy_deactivates_old(tmp_path):
     repo = Repository(tmp_path / 'cases.sqlite', tmp_path / 'artifacts')
     from invoice_referee.config import activate_demo_policy
     old = activate_demo_policy(demo_policy(active=False), 'kích hoạt lần 1')
-    repo.record_policy_change(old, actor_mode='POLICY_OWNER', reason='kích hoạt lần 1')
+    repo.record_policy_change(old, actor_mode='SYSTEM', reason='kích hoạt lần 1')
     new = activate_demo_policy(old, 'kích hoạt lần 2')
-    repo.record_policy_change(new, actor_mode='POLICY_OWNER', reason='kích hoạt lần 2')
+    repo.record_policy_change(new, actor_mode='SYSTEM', reason='kích hoạt lần 2')
     active = repo.get_active_policy()
     assert active.activation_id == new.activation_id
     # Exactly one active row may exist.

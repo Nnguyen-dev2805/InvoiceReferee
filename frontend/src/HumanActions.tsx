@@ -16,7 +16,6 @@ const MODE_KINDS: Record<DemoMode, HumanActionKind[]> = {
   EMPLOYEE: ['SUPPLY_DECLARATION', 'ADD_EVIDENCE', 'PROPOSE_CORRECTION'],
   REVIEWER: ['CONFIRM_FIELD', 'CONFIRM_MAPPING'],
   APPROVER: ['APPROVE_AMOUNT', 'DENY'],
-  POLICY_OWNER: ['GRANT_POLICY_EXCEPTION', 'APPROVE_AMOUNT', 'DENY'],
 };
 
 const KIND_LABEL: Record<HumanActionKind, string> = {
@@ -25,7 +24,6 @@ const KIND_LABEL: Record<HumanActionKind, string> = {
   PROPOSE_CORRECTION: 'Đề xuất chỉnh sửa',
   CONFIRM_FIELD: 'Xác nhận dữ kiện',
   CONFIRM_MAPPING: 'Xác nhận đối chiếu dòng hàng',
-  GRANT_POLICY_EXCEPTION: 'Cấp ngoại lệ policy',
   APPROVE_AMOUNT: 'Duyệt số tiền',
   DENY: 'Từ chối',
   STOP: 'Dừng',
@@ -68,7 +66,7 @@ export function HumanActions({
     onRoleChange?.(next);
   }
 
-  const needsAmount = kind === 'APPROVE_AMOUNT' || kind === 'GRANT_POLICY_EXCEPTION';
+  const needsAmount = kind === 'APPROVE_AMOUNT';
   const needsField = kind === 'CONFIRM_FIELD' || kind === 'PROPOSE_CORRECTION';
 
   const payload = useMemo<Record<string, unknown>>(() => {

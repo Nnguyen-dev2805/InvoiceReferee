@@ -18,7 +18,6 @@ case; case cần cách phân bổ đó được chuyển để tách/làm rõ, k
 | --- | --- | --- |
 | currency | VND | Chưa thực hiện FX conversion |
 | auto_approval_max | 2.000.000đ | Giới hạn quyền tự động, inclusive |
-| standard_policy_max | 5.000.000đ | Giới hạn policy thông thường, inclusive |
 | inventory_date_gap_days | 7 | Giữ giả định B0 để đối chiếu bill/receipt; không phải luật chung |
 | comparison_money_tolerance | 1đ | Tolerance line amount/totals có cùng nghĩa, không áp cho unit price khác basis |
 | normalized_unit_price_tolerance | 0 | Unit price quy về cùng basis phải khớp chính xác trong supported decimal domain |
@@ -58,18 +57,17 @@ thật sự áp dụng. Không nói B1 xác minh tax compliance khi chỉ trích
 | CTX-01 | Purpose/trip cần cho profile còn thiếu | FACTUAL_UNKNOWN; hỏi employee |
 | MODE-01 | Khai báo xác định COMPANY/ADVANCE/VENDOR thay vì PERSONAL | Luồng khác B1; REJECT với lý do scope, không hoàn trả lại một khoản company-paid |
 | MODE-02 | Payer UNKNOWN hoặc evidence mâu thuẫn payer declaration | FACTUAL_UNKNOWN; không tự kết luận người nộp đã trả |
-| SCOPE-01 | OTHER/profile không nằm trong catalog | OUTSIDE_POLICY; policy owner phân loại vào profile đã có hoặc từ chối; không tự mở profile mới |
+| SCOPE-01 | OTHER/profile không nằm trong catalog | OUTSIDE_POLICY; approver phân loại vào profile đã có hoặc từ chối; không tự mở profile mới |
 | SCOPE-02 | Currency/document kind cần FX/refund/credit-note logic chưa có | OUTSIDE_POLICY scope issue; không đổi loại tiền/dấu bằng override tùy ý |
 | ELIG-01 | Khai báo xác định đây là chi cá nhân không phục vụ công việc | REJECT; ghi rule/căn cứ; không suy mục đích chỉ từ một tên hàng |
 | AMT-01 | Requested amount không khớp verified bill/allocated amount | FACTUAL_UNKNOWN; hỏi phần chênh và căn cứ; không tự chọn min/max |
 | AMT-02 | Arithmetic có mâu thuẫn ở phép kiểm tra áp dụng | FACTUAL_UNKNOWN; không tạo request chỉ vì hai nguồn cùng sai |
 | INV-01 | Profile có nhận hàng nhưng thiếu formal receipt hoặc chưa rõ nhận đủ | FACTUAL_UNKNOWN; bổ sung/xác nhận có nguồn |
 | INV-02 | Mapping, quantity, units, dates hoặc supplier cần so có conflict | FACTUAL_UNKNOWN; không lấy employee text thay inventory evidence |
-| LIM-01 | Eligible expense vượt standard_policy_max | OUTSIDE_POLICY; cần case-specific policy exception |
 | AUTH-01 | Accepted amount vượt auto_approval_max | BEYOND_AUTHORITY; cần explicit amount approval |
 
 Các scope limitations SCOPE-01/02 chỉ được đóng khi input được làm rõ thành
-workflow mà B1 thực sự hỗ trợ hoặc case bị từ chối. Policy owner không thể
+workflow mà B1 thực sự hỗ trợ hoặc case bị từ chối. Approver không thể
 approve một capability chưa có chỉ bằng một lý do tự do.
 
 ## 4. Kiểm tra số và arithmetic
@@ -113,13 +111,12 @@ Nếu chưa xác định được số cuối, tiếp tục hỏi; chưa tạo r
 | Vai trò demo | Hành động được dùng trong B1 |
 | --- | --- |
 | EMPLOYEE | Bổ sung declaration/evidence, đề xuất correction; không approve/waive |
-| REVIEWER | Xác nhận field khi xem được nguồn hoặc yêu cầu nguồn tốt hơn; không tự grant policy exception |
-| APPROVER | Approve/deny amount trong standard policy, tối đa 5.000.000đ theo proposal |
-| POLICY_OWNER | Grant/deny exception scoped đúng case; approve amount theo exception đã cấp bằng action riêng |
+| REVIEWER | Xác nhận field khi xem được nguồn hoặc yêu cầu nguồn tốt hơn; không tự approve amount |
+| APPROVER | Approve/deny amount vượt auto_approval_max (mọi số tiền, không trần riêng); phân loại case OTHER; deny issue thuộc thẩm quyền |
 
-Vượt 5 triệu có thể có cả LIM-01 và AUTH-01. Grant exception chỉ đóng LIM-01;
-amount approval là action riêng. Policy owner được approve số tiền trong
-đúng exception amount/scope, không có quyền ngầm tạo scope không được B1 hỗ trợ.
+Vượt auto_approval_max là BEYOND_AUTHORITY (AUTH-01), đóng bằng một explicit
+amount approval đúng amount/scope. Approver được approve số tiền bất kỳ,
+không có quyền ngầm tạo scope không được B1 hỗ trợ.
 Raw evidence unusable/contract invalid không được miễn bởi amount approval.
 
 Một confirmation chỉ có hiệu lực với field/source/case version nêu trong

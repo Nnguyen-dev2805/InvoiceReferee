@@ -65,13 +65,12 @@ export function runInFlight(status: ExecutionStatus): boolean {
 
 // --- Demo roles (single source of truth for the role selector + inbox) ---------
 
-export const MODE_ORDER: DemoMode[] = ['EMPLOYEE', 'REVIEWER', 'APPROVER', 'POLICY_OWNER'];
+export const MODE_ORDER: DemoMode[] = ['EMPLOYEE', 'REVIEWER', 'APPROVER'];
 
 export const MODE_LABEL: Record<DemoMode, string> = {
   EMPLOYEE: 'Nhân viên',
   REVIEWER: 'Kế toán / Reviewer',
   APPROVER: 'Người phê duyệt',
-  POLICY_OWNER: 'Chủ sở hữu policy',
 };
 
 /** Open issues a role must act on. Presentation only — the backend enforces scope. */

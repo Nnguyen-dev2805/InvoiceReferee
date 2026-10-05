@@ -355,7 +355,7 @@
           "OUTSIDE_POLICY"
         ],
         "owners": [
-          "POLICY_OWNER"
+          "APPROVER"
         ],
         "required_rules": [
           "SCOPE-01"
@@ -507,7 +507,7 @@
     },
     {
       "id": "TC12",
-      "description": "Case hợp lệ đúng 5.000.000đ",
+      "description": "Case hợp lệ 5.000.000đ",
       "provenance": "synthetic",
       "claim": {
         "employee_id": "emp-demo",
@@ -544,7 +544,7 @@
         ],
         "amount_vnd": null,
         "request_count": 0,
-        "reason": "Đúng policy max, không ngoài policy"
+        "reason": "Vượt auto limit, cần approver"
       },
       "reference_date": "2026-10-01",
       "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC12.json",
@@ -582,19 +582,17 @@
         "action": "ESCALATE",
         "completion_basis": null,
         "issue_classes": [
-          "OUTSIDE_POLICY",
           "BEYOND_AUTHORITY"
         ],
         "owners": [
-          "POLICY_OWNER"
+          "APPROVER"
         ],
         "required_rules": [
-          "LIM-01",
           "AUTH-01"
         ],
         "amount_vnd": null,
         "request_count": 0,
-        "reason": "Vượt policy + vượt quyền, cần policy owner"
+        "reason": "Vượt quyền tự động, cần approver"
       },
       "reference_date": "2026-10-01",
       "raw_ground_truth_path": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/tests/fixtures/development/gold/TC13.json",
@@ -702,5 +700,5 @@
       }
     }
   ],
-  "sha256": "fd49c5d555c2c91702506191354bf53c579926aa99c77a57eaac05872f362cd1"
+  "sha256": "0945584c2530a3baeb6b89a0b6c94a522e11749a4345b79222920f1f7e3f83ba"
 }

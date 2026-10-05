@@ -13,7 +13,7 @@ state/history; filesystem lưu evidence, OCR, model responses và reports.
 Một app, một người thao tác, một case đang chạy là đủ.
 
 Không có tenant/auth doanh nghiệp, broker, distributed jobs, crash recovery
-engine hoặc bank payment. Các mode EMPLOYEE/REVIEWER/APPROVER/POLICY_OWNER là
+engine hoặc bank payment. Các mode EMPLOYEE/REVIEWER/APPROVER là
 vai trò demo, được công bố; backend vẫn kiểm tra action đúng nghĩa nghiệp vụ.
 
 B0 main là tham chiếu; B1 là baseline mới sau nghiệm thu. B2 là các thử nghiệm

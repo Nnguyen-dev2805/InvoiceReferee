@@ -3,7 +3,7 @@
 Pure evaluators: no provider calls, no storage, no UI, no testcase IDs/filenames.
 ``document_checks`` covers the document-level rules SRC-02, SRC-03 and SCOPE-02;
 ``context_check`` covers CTX-01. The case-level rules (SRC-01, MODE-01/02,
-SCOPE-01, ELIG-01, AMT-01/02, LIM-01, AUTH-01, INV-01/02) are assembled by
+SCOPE-01, ELIG-01, AMT-01/02, AUTH-01, INV-01/02) are assembled by
 ``decision.evaluate``, which is the single entry point.
 
 Rule IDs and reactions are the Rulebook §3 matrix:
@@ -19,10 +19,9 @@ Rule IDs and reactions are the Rulebook §3 matrix:
 - ELIG-01 declared personal, not for work -> REJECT
 - AMT-01 requested amount != verified bill -> FACTUAL_UNKNOWN
 - AMT-02 arithmetic contradiction -> FACTUAL_UNKNOWN (see ``inventory`` for math)
-- LIM-01 eligible expense over standard_policy_max -> OUTSIDE_POLICY
 - AUTH-01 accepted amount over auto_approval_max -> BEYOND_AUTHORITY
 
-All thresholds are inclusive. A case can carry both LIM-01 and AUTH-01.
+All thresholds are inclusive.
 """
 from __future__ import annotations
 

@@ -124,7 +124,7 @@ def test_case_list_reports_open_owner_modes_for_role_inbox(tmp_path):
         rt.service.wait(started.json()['id'], timeout_seconds=5)
         case = next(c for c in client.get('/api/cases').json() if c['id'] == rt.case_id)
         assert 'REVIEWER' in case['open_owner_modes']
-        assert set(case['open_owner_modes']) <= {'EMPLOYEE', 'REVIEWER', 'APPROVER', 'POLICY_OWNER'}
+        assert set(case['open_owner_modes']) <= {'EMPLOYEE', 'REVIEWER', 'APPROVER'}
     finally:
         rt.close()
 
@@ -250,31 +250,13 @@ def test_payment_request_route_null_when_absent(runtime):
 
 # --- Policy activation ---------------------------------------------------------
 
-def test_policy_activation_requires_owner_and_persists(tmp_path):
-    repo, service = _fresh_service(tmp_path, active=False)
+def test_no_manual_policy_activation_route(tmp_path):
+    # Manual activation was removed; the runtime auto-activates at startup.
+    repo, service = _fresh_service(tmp_path, active=True)
     client = TestClient(create_app(service))
-    assert client.get('/api/policy').json()['active'] is False
-    assert client.get('/api/health').json()['ready'] is False
-
-    wrong = client.post('/api/policy/activate', json={'mode': 'SYSTEM', 'reason': 'x'})
-    assert wrong.status_code == 422
-    assert wrong.json()['code'] == 'INVALID_ACTION'
-
-    blank = client.post('/api/policy/activate', json={'mode': 'POLICY_OWNER', 'reason': '  '})
-    assert blank.status_code == 422
-
-    ok = client.post(
-        '/api/policy/activate',
-        json={'mode': 'POLICY_OWNER', 'reason': 'Kích hoạt demo policy'},
-    )
-    assert ok.status_code == 200
-    body = ok.json()
-    assert body['active'] is True
-    assert body['origin'] == 'developer_activated_demo'
-    assert body['activation_id']
-    assert body['auto_approval_max'] == 2_000_000
-    assert client.get('/api/health').json()['ready'] is True
-    assert repo.get_active_policy() is not None
+    assert client.get('/api/policy').json()['active'] is True
+    response = client.post('/api/policy/activate', json={'mode': 'SYSTEM', 'reason': 'x'})
+    assert response.status_code in (404, 405)
     service.close()
 
 
@@ -470,7 +452,7 @@ def test_openapi_exposes_required_paths(runtime):
         '/api/runs/{run_id}', '/api/cases/{case_id}/actions', '/api/runs/{run_id}/stop',
         '/api/cases/{case_id}/history', '/api/cases/{case_id}/payment-request',
         '/api/cases/{case_id}/evidence/{evidence_id}', '/api/policy',
-        '/api/policy/activate', '/api/health',
+        '/api/health',
     ):
         assert path in paths, path
     # Deterministic schema hash is recorded in the T09 evidence doc.

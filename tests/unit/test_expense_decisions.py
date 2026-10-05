@@ -7,8 +7,8 @@ evaluator is called to derive a gold answer), so a failure means the
 contract/rule is wrong.
 
 Coverage follows the T03 brief step 1 (authority boundaries, amount conflict,
-inventory N/A) and step 5 (both issues over 5m, exception-only, exact approval,
-known PERSONAL refusal, disabled config).
+inventory N/A) and step 5 (authority-only over 5m, exact approval, known PERSONAL
+refusal, disabled config).
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from tests.builders import demo_policy, resolved_bundle, routine_snapshot
 REQUIRED_RULES = {
     'SRC-01', 'SRC-02', 'SRC-03', 'CTX-01', 'MODE-01', 'MODE-02',
     'SCOPE-01', 'SCOPE-02', 'ELIG-01', 'AMT-01', 'AMT-02',
-    'LIM-01', 'AUTH-01', 'INV-01', 'INV-02',
+    'AUTH-01', 'INV-01', 'INV-02',
 }
 
 
@@ -89,39 +89,25 @@ def test_auto_approval_max_is_inclusive_at_two_million():
     assert decision.issues == []
 
 
-def test_standard_policy_max_is_inclusive_at_five_million():
-    decision = evaluate(routine_snapshot(5_000_000), resolved_bundle('5000000'))
-    assert not any(i.issue_class == 'OUTSIDE_POLICY' for i in decision.issues)
-    assert any(i.issue_class == 'BEYOND_AUTHORITY' for i in decision.issues)
-
-
-def test_above_standard_policy_carries_both_issues():
-    decision = evaluate(routine_snapshot(5_000_001), resolved_bundle('5000001'))
-    classes = {i.issue_class for i in decision.issues}
-    assert 'OUTSIDE_POLICY' in classes
-    assert 'BEYOND_AUTHORITY' in classes
-    assert decision.action == 'ESCALATE'
-    owners = {i.owner_mode for i in decision.issues}
-    assert owners == {'POLICY_OWNER'}
-
-
-def test_beyond_authority_within_policy_routes_to_approver():
+def test_beyond_authority_routes_to_approver_at_any_amount():
+    # The single authority rule: over auto_approval_max is owned by APPROVER,
+    # whatever the amount (no separate 5M policy-limit tier).
     decision = evaluate(routine_snapshot(3_000_000), resolved_bundle('3000000'))
     issue = next(i for i in decision.issues if i.issue_class == 'BEYOND_AUTHORITY')
     assert issue.owner_mode == 'APPROVER'
     assert decision.action == 'ESCALATE'
 
 
-# --- Step 5: authorizations, refusals and config -------------------------------
-
-def test_policy_exception_alone_does_not_close_authority():
-    snap = routine_snapshot(5_000_001)
-    snap = _with_auth(snap, _auth(snap, kind='POLICY_EXCEPTION', amount=5_000_001, mode='POLICY_OWNER'))
-    decision = evaluate(snap, resolved_bundle('5000001'))
-    assert not any(i.issue_class == 'OUTSIDE_POLICY' for i in decision.issues)
-    assert any(i.issue_class == 'BEYOND_AUTHORITY' for i in decision.issues)
+def test_above_five_million_is_authority_only_not_outside_policy():
+    decision = evaluate(routine_snapshot(5_000_001), resolved_bundle('5000001'))
+    classes = {i.issue_class for i in decision.issues}
+    assert classes == {'BEYOND_AUTHORITY'}
     assert decision.action == 'ESCALATE'
+    owners = {i.owner_mode for i in decision.issues}
+    assert owners == {'APPROVER'}
 
+
+# --- Step 5: authorizations, refusals and config -------------------------------
 
 def test_amount_approval_exact_enables_human_authorized_request():
     snap = routine_snapshot(2_000_001)
@@ -188,16 +174,10 @@ def test_every_rule_in_the_matrix_is_reported():
 
 # --- Reducer anchor (applied after full coverage validation) -------------------
 
-def test_exception_and_amount_approval_together_authorize_over_five_million():
+def test_amount_approval_authorizes_over_five_million():
     snap = routine_snapshot(5_000_001)
-    exception = _auth(snap, kind='POLICY_EXCEPTION', amount=5_000_001, mode='POLICY_OWNER',
-                      action_id='a-exc')
-    approval = _auth(snap, kind='AMOUNT_APPROVAL', amount=5_000_001, mode='POLICY_OWNER',
-                     action_id='a-app')
-    snap = snap.model_copy(update={
-        'authorizations': [exception, approval],
-        'active_action_ids': ['a-exc', 'a-app'],
-    })
+    approval = _auth(snap, kind='AMOUNT_APPROVAL', amount=5_000_001, mode='APPROVER')
+    snap = _with_auth(snap, approval)
     decision = evaluate(snap, resolved_bundle('5000001'))
     assert decision.action == 'CREATE_PAYMENT_REQUEST'
     assert decision.completion_basis == 'HUMAN_AUTHORIZED'
@@ -209,7 +189,7 @@ def test_other_profile_is_outside_policy_scope():
     decision = evaluate(snap, resolved_bundle('1200000'))
     assert decision.action == 'ESCALATE'
     issue = next(i for i in decision.issues if i.issue_class == 'OUTSIDE_POLICY')
-    assert issue.owner_mode == 'POLICY_OWNER'
+    assert issue.owner_mode == 'APPROVER'
     assert any(c.rule_id == 'SCOPE-01' and c.status == 'FAIL' for c in decision.checks)
 
 

@@ -43,15 +43,6 @@ def _auth_payload(snapshot, amount: int, *, profile=None, purpose=None, policy_v
     }
 
 
-def _matching_exception(snapshot, amount: int) -> Authorization:
-    return Authorization(
-        action_id='a-exc', kind='POLICY_EXCEPTION', case_version=snapshot.case_version,
-        policy_version=snapshot.policy.version, profile=snapshot.claim.profile,
-        purpose=snapshot.claim.purpose, amount_vnd=amount, mode='POLICY_OWNER',
-        reason='Exception demo',
-    )
-
-
 def _issue(*, id='SRC-02:case', owner='REVIEWER', issue_class='FACTUAL_UNKNOWN'):
     return Issue(id=id, stable_key=id, issue_class=issue_class, owner_mode=owner,
                  question='?', refs=[], blockers=[], status='OPEN')
@@ -75,14 +66,6 @@ def test_employee_cannot_approve_amount():
     assert exc.value.code == 'INVALID_ACTION'
 
 
-def test_reviewer_cannot_grant_policy_exception():
-    snapshot, decision = _travel()
-    action = human_action(snapshot, kind='GRANT_POLICY_EXCEPTION', mode='REVIEWER',
-                          payload=_auth_payload(snapshot, AMOUNT))
-    with pytest.raises(DomainError):
-        validate_human_action(action, snapshot, decision)
-
-
 def test_employee_cannot_confirm_field():
     snapshot, decision = _travel()
     evidence_id = snapshot.evidence[0].id
@@ -94,15 +77,6 @@ def test_employee_cannot_confirm_field():
         validate_human_action(action, snapshot, decision)
 
 
-def test_approver_cannot_approve_above_standard_max():
-    snapshot, decision = _travel(5_000_001)
-    action = human_action(snapshot, kind='APPROVE_AMOUNT', mode='APPROVER',
-                          payload=_auth_payload(snapshot, 5_000_001))
-    with pytest.raises(DomainError) as exc:
-        validate_human_action(action, snapshot, decision)
-    assert exc.value.code == 'INVALID_ACTION'
-
-
 def test_approver_can_approve_within_standard_policy():
     snapshot, decision = _travel()
     action = human_action(snapshot, kind='APPROVE_AMOUNT', mode='APPROVER',
@@ -110,33 +84,13 @@ def test_approver_can_approve_within_standard_policy():
     assert validate_human_action(action, snapshot, decision) is action
 
 
-def test_approver_can_approve_at_exactly_standard_max():
-    # The standard policy limit is inclusive (Rulebook §1): 5,000,000 is allowed.
-    snapshot, decision = _travel(5_000_000)
-    action = human_action(snapshot, kind='APPROVE_AMOUNT', mode='APPROVER',
-                          payload=_auth_payload(snapshot, 5_000_000))
-    assert validate_human_action(action, snapshot, decision) is action
-
-
-def test_policy_owner_approves_at_exactly_standard_max_without_exception():
-    snapshot, decision = _travel(5_000_000)
-    action = human_action(snapshot, kind='APPROVE_AMOUNT', mode='POLICY_OWNER',
-                          payload=_auth_payload(snapshot, 5_000_000))
-    assert validate_human_action(action, snapshot, decision) is action
-
-
-def test_policy_owner_above_standard_needs_matching_exception():
+def test_approver_can_approve_above_five_million():
+    # No separate 5M policy tier: APPROVER may approve any amount over the
+    # automatic limit (the reducer still requires the exact-amount authorization).
     snapshot, decision = _travel(5_000_001)
-    action = human_action(snapshot, kind='APPROVE_AMOUNT', mode='POLICY_OWNER',
+    action = human_action(snapshot, kind='APPROVE_AMOUNT', mode='APPROVER',
                           payload=_auth_payload(snapshot, 5_000_001))
-    with pytest.raises(DomainError):
-        validate_human_action(action, snapshot, decision)
-
-    with_exc = snapshot.model_copy(update={
-        'authorizations': [_matching_exception(snapshot, 5_000_001)],
-        'active_action_ids': ['a-exc'],
-    })
-    assert validate_human_action(action, with_exc, decision) is action
+    assert validate_human_action(action, snapshot, decision) is action
 
 
 def test_approval_authorization_must_match_scope():
@@ -369,7 +323,7 @@ def test_deny_unknown_issue_is_rejected():
 
 def test_override_rejects_unknown_operation():
     snapshot, decision = _travel()
-    action = human_action(snapshot, kind='OVERRIDE', mode='POLICY_OWNER',
+    action = human_action(snapshot, kind='OVERRIDE', mode='APPROVER',
                           payload={'operation': 'MAGIC', 'values': {}})
     with pytest.raises(DomainError):
         validate_human_action(action, snapshot, decision)
@@ -401,18 +355,18 @@ def test_override_wrapped_payload_keyset_is_enforced():
     assert exc.value.code == 'INVALID_ACTION'
 
 
-def test_override_classify_requires_policy_owner_and_other_profile():
+def test_override_classify_requires_approver_and_other_profile():
     other = routine_snapshot(1_200_000, profile='OTHER')
     decision = evaluate(other, resolved_bundle('1200000', profile='OTHER'))
-    action = human_action(other, kind='OVERRIDE', mode='POLICY_OWNER',
+    action = human_action(other, kind='OVERRIDE', mode='APPROVER',
                           payload={'operation': 'CLASSIFY_PROFILE', 'values': {'profile': 'TRAVEL'}})
     assert validate_human_action(action, other, decision) is action
 
-    not_owner = human_action(other, kind='OVERRIDE', mode='REVIEWER',
-                             payload={'operation': 'CLASSIFY_PROFILE',
-                                      'values': {'profile': 'TRAVEL'}})
+    not_approver = human_action(other, kind='OVERRIDE', mode='REVIEWER',
+                                payload={'operation': 'CLASSIFY_PROFILE',
+                                         'values': {'profile': 'TRAVEL'}})
     with pytest.raises(DomainError):
-        validate_human_action(not_owner, other, decision)
+        validate_human_action(not_approver, other, decision)
 
 
 @pytest.mark.parametrize('operation, values', [
@@ -422,7 +376,7 @@ def test_override_classify_requires_policy_owner_and_other_profile():
 def test_override_rejects_extra_keys_in_wrapped_operation(operation, values):
     other = routine_snapshot(1_200_000, profile='OTHER')
     decision = _decision_with(_issue(id='SRC-02:case', owner='EMPLOYEE'))
-    mode = 'POLICY_OWNER' if operation == 'CLASSIFY_PROFILE' else 'EMPLOYEE'
+    mode = 'APPROVER' if operation == 'CLASSIFY_PROFILE' else 'EMPLOYEE'
     action = human_action(other, kind='OVERRIDE', mode=mode,
                           payload={'operation': operation, 'values': values})
     with pytest.raises(DomainError) as exc:
@@ -432,7 +386,7 @@ def test_override_rejects_extra_keys_in_wrapped_operation(operation, values):
 
 
 def test_override_wrapped_authorization_role_rejected():
-    """OVERRIDE wrapping APPROVE_AMOUNT must satisfy the APPROVER/POLICY_OWNER role."""
+    """OVERRIDE wrapping APPROVE_AMOUNT must satisfy the APPROVER role."""
     snapshot, decision = _travel(2_000_001)
     action = human_action(snapshot, kind='OVERRIDE', mode='REVIEWER', payload={
         'operation': 'APPROVE_AMOUNT',
@@ -456,7 +410,12 @@ def test_stop_requires_a_run_id():
 
 def test_authorization_matches_requires_exact_scope():
     snapshot, _ = _travel(5_000_001)
-    auth = _matching_exception(snapshot, 5_000_001)
+    auth = Authorization(
+        action_id='a-app', kind='AMOUNT_APPROVAL', case_version=snapshot.case_version,
+        policy_version=snapshot.policy.version, profile=snapshot.claim.profile,
+        purpose=snapshot.claim.purpose, amount_vnd=5_000_001, mode='APPROVER',
+        reason='Duyệt demo',
+    )
     assert authorization_matches(auth, snapshot, 5_000_001)
     assert not authorization_matches(auth, snapshot, 5_000_000)
     stale = snapshot.model_copy(update={'case_version': snapshot.case_version + 1})
@@ -579,7 +538,7 @@ def test_override_classify_moves_other_to_supported(tmp_path):
 
     snapshot = repo.snapshot(case.id, demo_policy())
     assert snapshot.claim.profile == 'OTHER'
-    action = human_action(snapshot, kind='OVERRIDE', mode='POLICY_OWNER', payload={
+    action = human_action(snapshot, kind='OVERRIDE', mode='APPROVER', payload={
         'operation': 'CLASSIFY_PROFILE', 'values': {'profile': 'TRAVEL'},
     })
     updated = repo.apply_human_action(action)
@@ -589,41 +548,16 @@ def test_override_classify_moves_other_to_supported(tmp_path):
 
 # --- Human sequences at repository/evaluation scope (brief step 3) -------------
 
-def test_exception_alone_does_not_authorize_over_five_million(tmp_path):
+def test_approval_over_five_million_creates_human_request(tmp_path):
     repo = Repository(tmp_path / 'c.sqlite', tmp_path / 'a')
     amount = 5_000_001
     case, bundle = seed_case(repo, amount=amount)
     from tests.builders import demo_policy
 
     snapshot = repo.snapshot(case.id, demo_policy())
-    grant = human_action(snapshot, kind='GRANT_POLICY_EXCEPTION', mode='POLICY_OWNER',
-                         payload=_auth_payload(snapshot, amount))
-    validate_human_action(grant, snapshot, evaluate(snapshot, bundle))
-    repo.apply_human_action(grant)
-
-    after_exception = repo.snapshot(case.id, demo_policy())
-    decision = evaluate(after_exception, bundle)
-    # The exception closes LIM-01 only; AUTH-01 still requires a separate approval.
-    assert decision.action == 'ESCALATE'
-    assert any(c.rule_id == 'LIM-01' and c.status == 'PASS' for c in decision.checks)
-    assert any(c.rule_id == 'AUTH-01' and c.status == 'FAIL' for c in decision.checks)
-
-
-def test_approval_over_five_million_with_exception_creates_human_request(tmp_path):
-    repo = Repository(tmp_path / 'c.sqlite', tmp_path / 'a')
-    amount = 5_000_001
-    case, bundle = seed_case(repo, amount=amount)
-    from tests.builders import demo_policy
-
-    snapshot = repo.snapshot(case.id, demo_policy())
-    repo.apply_human_action(human_action(
-        snapshot, kind='GRANT_POLICY_EXCEPTION', mode='POLICY_OWNER',
-        payload=_auth_payload(snapshot, amount)))
-
-    after_exception = repo.snapshot(case.id, demo_policy())
-    approve = human_action(after_exception, kind='APPROVE_AMOUNT', mode='POLICY_OWNER',
-                           payload=_auth_payload(after_exception, amount))
-    validate_human_action(approve, after_exception, evaluate(after_exception, bundle))
+    approve = human_action(snapshot, kind='APPROVE_AMOUNT', mode='APPROVER',
+                           payload=_auth_payload(snapshot, amount))
+    validate_human_action(approve, snapshot, evaluate(snapshot, bundle))
     repo.apply_human_action(approve)
 
     final = repo.snapshot(case.id, demo_policy())

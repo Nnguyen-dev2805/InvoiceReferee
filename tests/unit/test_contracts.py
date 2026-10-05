@@ -151,7 +151,6 @@ def test_config_file_encodes_proposed_demo_values():
     policy = load_policy(CONFIG_PATH)
     assert policy.currency == 'VND'
     assert policy.auto_approval_max == 2_000_000
-    assert policy.standard_policy_max == 5_000_000
     assert policy.inventory_date_gap_days == 7
     assert policy.comparison_money_tolerance == '1'
     assert policy.normalized_unit_price_tolerance == '0'
