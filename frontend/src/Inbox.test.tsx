@@ -61,3 +61,19 @@ it('opens the selected case', async () => {
   await userEvent.click(screen.getByRole('button', { name: /công tác hà nội/i }));
   expect(onOpen).toHaveBeenCalledWith('case-r');
 });
+
+it('highlights the selected case with active state and aria-current', () => {
+  const reviewCase = caseRecord({ id: 'case-r', open_owner_modes: ['REVIEWER'] });
+  const { container } = render(
+    <Inbox
+      cases={[reviewCase]}
+      role="REVIEWER"
+      runsByCase={{ 'case-r': needsInfoRun() }}
+      onOpen={vi.fn()}
+      selectedCaseId="case-r"
+    />,
+  );
+  const activeBtn = container.querySelector('.case-item-active');
+  expect(activeBtn).toBeTruthy();
+  expect(activeBtn?.getAttribute('aria-current')).toBe('true');
+});

@@ -1,11 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CaseRecord, Decision, DemoMode, HumanAction, HumanActionKind } from './types';
-import { formatVnd, MODE_LABEL, MODE_ORDER } from './format';
+import { formatCurrencyInput, formatVnd, MODE_LABEL, MODE_ORDER } from './format';
 
 interface HumanActionsProps {
   caseRecord: CaseRecord;
   decision: Decision;
   onAction: (action: HumanAction) => Promise<void>;
+  currentRole?: DemoMode;
+  onRoleChange?: (mode: DemoMode) => void;
 }
 
 // Which action kinds each demo mode may perform. This mirrors the backend's
@@ -30,26 +32,40 @@ const KIND_LABEL: Record<HumanActionKind, string> = {
   OVERRIDE: 'Ghi đè',
 };
 
-export function HumanActions({ caseRecord, decision, onAction }: HumanActionsProps) {
+export function HumanActions({
+  caseRecord,
+  decision,
+  onAction,
+  currentRole,
+  onRoleChange,
+}: HumanActionsProps) {
   const openIssue = decision.issues.find((issue) => issue.status === 'OPEN') ?? decision.issues[0];
   const issueOwner = openIssue?.owner_mode;
-  // Default to the role the backend assigned to the issue, but let the operator
-  // switch roles for the demo (Product §5: one person may act in several modes).
-  // The backend still enforces role/scope, so a wrong choice is rejected.
-  const [mode, setMode] = useState<DemoMode>(issueOwner ?? 'EMPLOYEE');
-  const kinds = MODE_KINDS[mode];
+  // Default to current selected role if given, or the role the backend assigned to the issue.
+  const [mode, setMode] = useState<DemoMode>(currentRole ?? issueOwner ?? 'EMPLOYEE');
 
+  // Keep in sync with parent role if parent updates it
+  useEffect(() => {
+    if (currentRole && currentRole !== mode) {
+      setMode(currentRole);
+      setKind(MODE_KINDS[currentRole][0]);
+    }
+  }, [currentRole]);
+
+  const kinds = MODE_KINDS[mode];
   const [kind, setKind] = useState<HumanActionKind>(kinds[0]);
   const [reason, setReason] = useState('');
   const [value, setValue] = useState('');
   const [field, setField] = useState('total');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
 
   function changeMode(next: DemoMode) {
     setMode(next);
     setKind(MODE_KINDS[next][0]); // the current kind may not exist for the new role
     setError(null);
+    onRoleChange?.(next);
   }
 
   const needsAmount = kind === 'APPROVE_AMOUNT' || kind === 'GRANT_POLICY_EXCEPTION';
@@ -75,12 +91,14 @@ export function HumanActions({ caseRecord, decision, onAction }: HumanActionsPro
     event.preventDefault();
     if (!reason.trim()) {
       setError('Cần lý do để thực hiện hành động.');
+      setTimeout(() => errorRef.current?.focus(), 50);
       return;
     }
     if (needsAmount) {
       const amount = payload.amount_vnd;
       if (typeof amount !== 'number' || !Number.isSafeInteger(amount) || amount <= 0) {
         setError('Số tiền phải là số nguyên dương (VND).');
+        setTimeout(() => errorRef.current?.focus(), 50);
         return;
       }
     }
@@ -99,6 +117,7 @@ export function HumanActions({ caseRecord, decision, onAction }: HumanActionsPro
       setValue('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gửi hành động thất bại.');
+      setTimeout(() => errorRef.current?.focus(), 50);
     } finally {
       setBusy(false);
     }
@@ -161,11 +180,12 @@ export function HumanActions({ caseRecord, decision, onAction }: HumanActionsPro
               id="action-amount"
               inputMode="numeric"
               value={value}
-              onChange={(event) => setValue(event.target.value)}
+              onChange={(event) => setValue(formatCurrencyInput(event.target.value))}
               aria-describedby="action-amount-help"
+              placeholder="0"
             />
             <p id="action-amount-help" className="helper">
-              Nhập số nguyên đồng, ví dụ 2000000.
+              Nhập số nguyên đồng, ví dụ 2.000.000₫.
             </p>
           </div>
         )}
@@ -208,9 +228,17 @@ export function HumanActions({ caseRecord, decision, onAction }: HumanActionsPro
         </div>
 
         {error && (
-          <p className="field-error" role="alert">
-            {error}
-          </p>
+          <div
+            ref={errorRef}
+            tabIndex={-1}
+            className="notice notice-error"
+            role="alert"
+            style={{ marginBottom: 'var(--space-3)' }}
+          >
+            <p className="field-error" style={{ margin: 0 }}>
+              {error}
+            </p>
+          </div>
         )}
 
         <button type="submit" className="btn btn-primary" disabled={busy}>

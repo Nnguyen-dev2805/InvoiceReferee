@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { CaseRecord, EvidenceRole, PayerType, Profile, PurposeType } from './types';
 import { ApiError } from './api';
+import { formatCurrencyInput } from './format';
 
 export interface CaseFormValues {
   profile: Profile;
@@ -31,6 +32,8 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
   const [files, setFiles] = useState<{ file: File; role: EvidenceRole }[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
 
   function validate(): { amount: number } | null {
     const next: Record<string, string> = {};
@@ -44,7 +47,11 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
     if (!purpose.trim()) next.purpose = 'Cần nêu mục đích công việc.';
     if (files.length === 0) next.files = 'Cần đính kèm ít nhất một chứng từ.';
     setErrors(next);
-    return Object.keys(next).length === 0 ? { amount } : null;
+    if (Object.keys(next).length > 0) {
+      setTimeout(() => errorSummaryRef.current?.focus(), 50);
+      return null;
+    }
+    return { amount };
   }
 
   async function submit(event: React.FormEvent) {
@@ -74,20 +81,48 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
     } catch (error) {
       const message = error instanceof ApiError ? error.message : 'Tạo hồ sơ thất bại.';
       setErrors({ form: message });
+      setTimeout(() => errorSummaryRef.current?.focus(), 50);
     } finally {
       setBusy(false);
     }
   }
 
-  function addFile(file: File | undefined) {
-    if (!file) return;
-    setFiles((prev) => [...prev, { file, role: 'PRIMARY_BILL' }]);
+  function addFiles(fileList: FileList | null | undefined) {
+    if (!fileList || fileList.length === 0) return;
+    const newItems: { file: File; role: EvidenceRole }[] = [];
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      if (file) {
+        newItems.push({ file, role: 'PRIMARY_BILL' });
+      }
+    }
+    setFiles((prev) => [...prev, ...newItems]);
   }
 
   return (
     <section className="panel" aria-labelledby="form-heading">
       <h2 id="form-heading">Nộp hồ sơ hoàn ứng</h2>
       <form onSubmit={submit} noValidate>
+        {Object.keys(errors).length > 0 && (
+          <div
+            ref={errorSummaryRef}
+            tabIndex={-1}
+            className="notice notice-error error-summary"
+            role="alert"
+            aria-labelledby="error-summary-heading"
+          >
+            <div>
+              <strong id="error-summary-heading">Thông tin chưa hợp lệ ({Object.keys(errors).length})</strong>
+              <ul className="error-summary-list">
+                {errors.purpose && <li><a href="#purpose">{errors.purpose}</a></li>}
+                {errors.amount && <li><a href="#amount">{errors.amount}</a></li>}
+                {errors.files && <li><a href="#files">{errors.files}</a></li>}
+                {errors.form && <li>{errors.form}</li>}
+              </ul>
+            </div>
+          </div>
+        )}
+
         <div className="field">
           <label htmlFor="profile">Loại chi phí</label>
           <select id="profile" value={profile} onChange={(e) => setProfile(e.target.value as Profile)}>
@@ -148,11 +183,12 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
             id="amount"
             inputMode="numeric"
             value={amountText}
-            onChange={(e) => setAmountText(e.target.value)}
+            onChange={(e) => setAmountText(formatCurrencyInput(e.target.value))}
             aria-invalid={errors.amount ? true : undefined}
             aria-describedby={errors.amount ? 'amount-error' : 'amount-help'}
+            placeholder="0"
           />
-          <p id="amount-help" className="helper">Nhập số nguyên đồng, ví dụ 1200000.</p>
+          <p id="amount-help" className="helper">Nhập số nguyên đồng, ví dụ 1.200.000₫.</p>
           {errors.amount && <p id="amount-error" className="field-error" role="alert">{errors.amount}</p>}
         </div>
 
@@ -160,15 +196,37 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
           <legend>
             Chứng từ <span aria-hidden="true">*</span>
           </legend>
-          <input
-            id="files"
-            type="file"
-            multiple
-            onChange={(e) => {
-              addFile(e.target.files?.[0]);
-              e.target.value = '';
+          <div
+            className={`dropzone ${isDragging ? 'dropzone-active' : ''}`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
             }}
-          />
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              addFiles(e.dataTransfer.files);
+            }}
+          >
+            <label htmlFor="files" className="visually-hidden">
+              Tải lên chứng từ
+            </label>
+            <input
+              id="files"
+              type="file"
+              multiple
+              accept=".pdf,.png,.jpg,.jpeg,.webp"
+              aria-label="Chứng từ"
+              onChange={(e) => {
+                addFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+            <p className="helper" style={{ margin: 'var(--space-1) 0 0' }}>
+              Hỗ trợ chọn hoặc kéo thả nhiều file cùng lúc (PDF, PNG, JPG, WEBP).
+            </p>
+          </div>
           <ul className="file-list">
             {files.map((entry, index) => (
               <li key={index}>

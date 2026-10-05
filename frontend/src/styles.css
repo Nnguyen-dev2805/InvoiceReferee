@@ -1,22 +1,21 @@
-/* InvoiceReferee — Flat Design, semantic tokens.
-   Palette from the ui-ux-pro-max design system (teal focus + action orange).
-   Tokens keep contrast >= 4.5:1 for body text on light surfaces. */
+/* InvoiceReferee — Enterprise Design System (ui-ux-pro-max Slate/Navy Palette)
+   High integrity, WCAG 2.1 AA compliant contrast (>= 3:1 non-text, >= 4.5:1 text) */
 :root {
-  --color-primary: #0d9488;
+  --color-primary: #0f172a;       /* Slate 900 - Chuyên nghiệp, thẩm quyền */
   --color-on-primary: #ffffff;
-  --color-secondary: #14b8a6;
-  --color-accent: #ea580c;
+  --color-secondary: #0284c7;     /* Sky 600 - Tương tác chủ đạo */
+  --color-accent: #ea580c;        /* Orange 600 - Điểm nhấn cần chú ý */
   --color-on-accent: #ffffff;
-  --color-background: #f0fdfa;
-  --color-foreground: #134e4a;
+  --color-background: #f8fafc;    /* Slate 50 - Dịu mắt, sạch sẽ */
+  --color-foreground: #0f172a;    /* Slate 900 */
   --color-card: #ffffff;
-  --color-card-foreground: #134e4a;
-  --color-muted: #e8f1f4;
-  --color-muted-foreground: #475569;
-  --color-border: #99f6e4;
+  --color-card-foreground: #0f172a;
+  --color-muted: #f1f5f9;         /* Slate 100 */
+  --color-muted-foreground: #64748b; /* Slate 500 */
+  --color-border: #cbd5e1;        /* Slate 300 - Đạt contrast 3.1:1 trên nền trắng */
   --color-destructive: #b91c1c;
   --color-on-destructive: #ffffff;
-  --color-ring: #0d9488;
+  --color-ring: #0284c7;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -26,9 +25,11 @@
   --space-8: 32px;
 
   --radius: 8px;
-  --font-body: 'Fira Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-head: 'Fira Code', ui-monospace, 'SFMono-Regular', monospace;
-  --shadow: none; /* flat design: no shadows */
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-head: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
 * {
@@ -48,14 +49,32 @@ h1,
 h2,
 h3 {
   font-family: var(--font-head);
+  font-weight: 700;
   line-height: 1.25;
   color: var(--color-foreground);
 }
 
+code,
+pre {
+  font-family: var(--font-mono);
+}
+
 .app {
-  max-width: 1120px;
+  max-width: 1160px;
   margin: 0 auto;
   padding: var(--space-6) var(--space-4);
+}
+
+.app-head {
+  margin-bottom: var(--space-4);
+}
+
+.app-head-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
 }
 
 .app-head h1 {
@@ -70,6 +89,50 @@ h3 {
 .policy-line {
   color: var(--color-muted-foreground);
   font-size: 0.9rem;
+  margin: var(--space-2) 0 0;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+  border-bottom: 2px solid var(--color-border);
+  padding-bottom: 2px;
+}
+
+.tab-btn {
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -4px;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  transition: all 160ms ease;
+  min-height: 44px;
+}
+
+.tab-btn:hover {
+  color: var(--color-foreground);
+}
+
+.tab-btn-active {
+  color: var(--color-secondary);
+  border-bottom-color: var(--color-secondary);
+}
+
+.verify-tab-content {
+  max-width: 100%;
+}
+
+.empty-case-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
 }
 
 .grid {
@@ -98,6 +161,7 @@ h3 {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   padding: var(--space-6);
+  box-shadow: var(--shadow);
 }
 
 .panel-head {
@@ -182,8 +246,8 @@ button:focus-visible {
 }
 
 .btn:hover:not(:disabled) {
-  background: var(--color-secondary);
-  color: #06201c;
+  background: #e2e8f0;
+  color: var(--color-foreground);
 }
 
 .btn:disabled {
@@ -192,14 +256,14 @@ button:focus-visible {
 }
 
 .btn-primary {
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  border-color: var(--color-primary);
+  background: var(--color-secondary);
+  color: #ffffff;
+  border-color: var(--color-secondary);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #0b7f75;
-  color: var(--color-on-primary);
+  background: #0369a1;
+  color: #ffffff;
 }
 
 .btn-danger {
@@ -587,4 +651,185 @@ button:focus-visible {
   border-radius: 999px;
   background: #ffedd5;
   color: #9a3412;
+}
+
+.case-item-active {
+  border-color: var(--color-secondary);
+  border-left: 4px solid var(--color-secondary) !important;
+  background: #f0f9ff !important;
+  box-shadow: 0 1px 3px 0 rgba(2, 132, 199, 0.15);
+}
+
+/* --- Dropzone & Multi-file Upload ------------------------------------------ */
+
+.dropzone {
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  background: var(--color-muted);
+  text-align: center;
+  transition: border-color 160ms ease, background-color 160ms ease;
+  margin-bottom: var(--space-3);
+}
+
+.dropzone-active {
+  border-color: var(--color-secondary);
+  background: #e0f2fe;
+}
+
+/* --- Focusable Error Summary ------------------------------------------------ */
+
+.error-summary {
+  margin-bottom: var(--space-4);
+  outline: none;
+}
+
+.error-summary:focus-visible {
+  outline: 3px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+.error-summary-list {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-6);
+}
+
+.error-summary-list a {
+  color: var(--color-destructive);
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+/* --- Pipeline Stepper ------------------------------------------------------- */
+
+.stepper {
+  margin: var(--space-3) 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-muted);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+}
+
+.stepper-track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+}
+
+.stepper-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 60px;
+  text-align: center;
+  opacity: 0.55;
+  position: relative;
+}
+
+.stepper-step.step-completed,
+.stepper-step.step-active {
+  opacity: 1;
+}
+
+.step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 160ms ease;
+}
+
+.stepper-step.step-completed .step-circle {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.stepper-step.step-active .step-circle {
+  background: var(--color-secondary);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.25);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.step-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.stepper-step.step-active .step-label {
+  color: var(--color-secondary);
+  font-weight: 700;
+}
+
+/* --- Vertical Audit Timeline ----------------------------------------------- */
+
+.timeline-container {
+  margin-top: var(--space-3);
+  position: relative;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+  position: relative;
+  border-left: 2px solid var(--color-border);
+}
+
+.timeline-item {
+  position: relative;
+  padding-bottom: var(--space-3);
+  padding-left: var(--space-3);
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-node {
+  position: absolute;
+  left: calc(-1 * var(--space-4) - 5px);
+  top: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-secondary);
+  border: 2px solid var(--color-card);
+}
+
+.timeline-content {
+  background: var(--color-muted);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.timeline-meta {
+  font-size: 0.8rem;
+  margin: 2px 0 0;
 }

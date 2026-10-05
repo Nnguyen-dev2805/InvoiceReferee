@@ -9,6 +9,22 @@ export function formatVnd(amount: number | null | undefined): string {
   return `${VND.format(amount)}₫`;
 }
 
+/** Format raw numeric string with Vietnamese thousands separators while user types */
+export function formatCurrencyInput(raw: string): string {
+  const digits = raw.replace(/[^\d]/g, '');
+  if (!digits) return '';
+  const num = Number(digits);
+  if (!Number.isSafeInteger(num) || num <= 0) return digits;
+  return VND.format(num);
+}
+
+/** Parse formatted currency string into safe integer VND */
+export function parseCurrencyInput(formatted: string): number {
+  const digits = formatted.replace(/[^\d]/g, '');
+  const num = Number(digits);
+  return Number.isSafeInteger(num) && num > 0 ? num : 0;
+}
+
 export const ACTION_LABEL: Record<DecisionAction, string> = {
   CREATE_PAYMENT_REQUEST: 'Tạo đề nghị chi trả',
   REQUEST_INFO: 'Cần bổ sung thông tin',

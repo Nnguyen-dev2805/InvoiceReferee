@@ -61,11 +61,11 @@ export function CaseDetail({
         </span>
       </header>
 
-      {runInFlight(run.status) && stageLabel(run.stage) && (
-        <p className="stage-line" role="status">
-          Bước hiện tại: <strong>{stageLabel(run.stage)}</strong>
-        </p>
-      )}
+      <PipelineStepper
+        stage={run.stage}
+        isFlight={runInFlight(run.status)}
+        isDone={run.status === 'SUCCEEDED'}
+      />
 
       {!policyActive && onActivatePolicy && (
         <PolicyNotice onActivatePolicy={onActivatePolicy} />
@@ -180,6 +180,59 @@ export function CaseDetail({
   );
 }
 
+// --- Pipeline Stepper ---------------------------------------------------------
+
+const PIPELINE_STEPS = ['Tiếp nhận', 'Đọc OCR', 'Đối chiếu', 'Quy định', 'Quyết định'];
+
+function getPipelineStepIndex(stage: string | null | undefined, isDone: boolean): number {
+  if (isDone) return 4;
+  if (!stage) return 0;
+  if (stage === 'created' || stage === 'intake') return 0;
+  if (stage.startsWith('ocr')) return 1;
+  if (stage.startsWith('analyze') || stage.startsWith('apply') || stage === 'cross_source') return 2;
+  if (stage === 'policy' || stage.includes('evaluate')) return 3;
+  if (stage === 'finalized') return 4;
+  return 2;
+}
+
+function PipelineStepper({
+  stage,
+  isFlight,
+  isDone,
+}: {
+  stage: string | null | undefined;
+  isFlight: boolean;
+  isDone: boolean;
+}) {
+  const currentStep = getPipelineStepIndex(stage, isDone);
+  return (
+    <div className="stepper" role="region" aria-label="Tiến trình xử lý hồ sơ">
+      <div className="stepper-track">
+        {PIPELINE_STEPS.map((label, idx) => {
+          const isCompleted = isDone || idx < currentStep;
+          const isActive = !isDone && idx === currentStep;
+          return (
+            <div
+              key={label}
+              className={`stepper-step ${isCompleted ? 'step-completed' : ''} ${isActive ? 'step-active' : ''}`}
+            >
+              <div className="step-circle" aria-hidden="true">
+                {isCompleted ? '✓' : idx + 1}
+              </div>
+              <span className="step-label">{label}</span>
+            </div>
+          );
+        })}
+      </div>
+      {isFlight && stageLabel(stage) && (
+        <p className="stage-line" role="status">
+          Bước hiện tại: <strong>{stageLabel(stage)}</strong>
+        </p>
+      )}
+    </div>
+  );
+}
+
 // --- Source references (provenance of a fact/issue/check) ----------------------
 
 const EVENT_KIND_LABEL: Record<string, string> = {
@@ -212,16 +265,29 @@ function AuditTimeline({ events }: { events: AuditEvent[] }) {
   return (
     <details className="audit" open>
       <summary>Nhật ký kiểm toán ({events.length})</summary>
-      <ol className="audit-list">
-        {ordered.map((event) => (
-          <li key={event.id}>
-            <time dateTime={event.timestamp}>{new Date(event.timestamp).toLocaleString('vi-VN')}</time>
-            <span className="audit-kind">{EVENT_KIND_LABEL[event.kind] ?? event.kind}</span>
-            {event.stage && <span className="muted"> · {stageLabel(event.stage) ?? event.stage}</span>}
-            {event.reason && <span className="audit-reason"> — {event.reason}</span>}
-          </li>
-        ))}
-      </ol>
+      <div className="timeline-container">
+        <ol className="timeline">
+          {ordered.map((event) => (
+            <li key={event.id} className="timeline-item">
+              <span className="timeline-node" aria-hidden="true" />
+              <div className="timeline-content">
+                <div className="timeline-header">
+                  <span className="audit-kind">{EVENT_KIND_LABEL[event.kind] ?? event.kind}</span>
+                  <time dateTime={event.timestamp}>
+                    {new Date(event.timestamp).toLocaleString('vi-VN')}
+                  </time>
+                </div>
+                {event.stage && (
+                  <p className="muted timeline-meta">{stageLabel(event.stage) ?? event.stage}</p>
+                )}
+                {event.reason && (
+                  <p className="audit-reason timeline-meta">{event.reason}</p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
     </details>
   );
 }

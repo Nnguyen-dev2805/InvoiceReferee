@@ -6,6 +6,7 @@ interface InboxProps {
   role: DemoMode;
   runsByCase: Record<string, RunRecord>;
   onOpen: (caseId: string) => void;
+  selectedCaseId?: string | null;
 }
 
 // A case is "processing" until its current run produced a decision. While it has
@@ -21,7 +22,7 @@ function caseTitle(caseRecord: CaseRecord): string {
   return claim.purpose?.trim() || claim.profile;
 }
 
-export function Inbox({ cases, role, runsByCase, onOpen }: InboxProps) {
+export function Inbox({ cases, role, runsByCase, onOpen, selectedCaseId }: InboxProps) {
   const processing = cases.filter((c) => isProcessing(c, runsByCase[c.id]));
   const forRole = cases.filter(
     (c) => !isProcessing(c, runsByCase[c.id]) && c.open_owner_modes.includes(role),
@@ -44,9 +45,15 @@ export function Inbox({ cases, role, runsByCase, onOpen }: InboxProps) {
             {forRole.map((c) => {
               const run = runsByCase[c.id];
               const action = run?.result?.decision.action;
+              const isSelected = c.id === selectedCaseId;
               return (
                 <li key={c.id}>
-                  <button type="button" className="case-item" onClick={() => onOpen(c.id)}>
+                  <button
+                    type="button"
+                    className={`case-item ${isSelected ? 'case-item-active' : ''}`}
+                    onClick={() => onOpen(c.id)}
+                    aria-current={isSelected ? 'true' : undefined}
+                  >
                     <span className="case-item-head">
                       <strong>{caseTitle(c)}</strong>
                       <span className="case-badge">{c.open_owner_modes.length} việc</span>
@@ -69,19 +76,27 @@ export function Inbox({ cases, role, runsByCase, onOpen }: InboxProps) {
           <p className="muted">Không có hồ sơ nào đang chạy.</p>
         ) : (
           <ul className="case-list">
-            {processing.map((c) => (
-              <li key={c.id}>
-                <button type="button" className="case-item" onClick={() => onOpen(c.id)}>
-                  <span className="case-item-head">
-                    <strong>{caseTitle(c)}</strong>
-                    <span className="status status-running">Đang xử lý</span>
-                  </span>
-                  <span className="muted">
-                    {c.claim.profile} · {formatVnd(c.claim.requested_amount_vnd)}
-                  </span>
-                </button>
-              </li>
-            ))}
+            {processing.map((c) => {
+              const isSelected = c.id === selectedCaseId;
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    className={`case-item ${isSelected ? 'case-item-active' : ''}`}
+                    onClick={() => onOpen(c.id)}
+                    aria-current={isSelected ? 'true' : undefined}
+                  >
+                    <span className="case-item-head">
+                      <strong>{caseTitle(c)}</strong>
+                      <span className="status status-running">Đang xử lý</span>
+                    </span>
+                    <span className="muted">
+                      {c.claim.profile} · {formatVnd(c.claim.requested_amount_vnd)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

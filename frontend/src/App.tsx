@@ -148,6 +148,8 @@ export function App() {
     setPolicy(await api.activatePolicy(reason));
   }
 
+  const [tab, setTab] = useState<'cases' | 'verify'>('cases');
+
   function closeCase() {
     stopPolling();
     setCaseRecord(null);
@@ -159,23 +161,27 @@ export function App() {
   return (
     <div className="app">
       <header className="app-head">
-        <h1>InvoiceReferee</h1>
-        <p className="muted">
-          Hồ sơ hoàn ứng chi phí công ty — hệ thống tự xử lý thường quy và hỏi người khi cần.
-        </p>
-        <div className="field role-select">
-          <label htmlFor="role">Vai trò (demo)</label>
-          <select
-            id="role"
-            value={role}
-            onChange={(event) => setRole(event.target.value as DemoMode)}
-          >
-            {MODE_ORDER.map((option) => (
-              <option key={option} value={option}>
-                {MODE_LABEL[option]}
-              </option>
-            ))}
-          </select>
+        <div className="app-head-top">
+          <div>
+            <h1>InvoiceReferee</h1>
+            <p className="muted">
+              Hồ sơ hoàn ứng chi phí công ty — hệ thống tự xử lý thường quy và hỏi người khi cần.
+            </p>
+          </div>
+          <div className="field role-select">
+            <label htmlFor="role">Vai trò (demo)</label>
+            <select
+              id="role"
+              value={role}
+              onChange={(event) => setRole(event.target.value as DemoMode)}
+            >
+              {MODE_ORDER.map((option) => (
+                <option key={option} value={option}>
+                  {MODE_LABEL[option]}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         {policy && (
           <p className="policy-line">
@@ -199,58 +205,94 @@ export function App() {
         </div>
       )}
 
-      <main className="grid">
-        <div className="col">
-          {/* Only the employee submits cases; the other roles work the queue. */}
-          {role === 'EMPLOYEE' && !caseRecord && (
-            <CaseForm onCreate={api.createCase} onCreated={handleCreated} />
-          )}
-          <Inbox
-            cases={cases}
-            role={role}
-            runsByCase={runsByCase}
-            onOpen={openCase}
-          />
-        </div>
+      <nav className="tabs" aria-label="Điều hướng phân hệ">
+        <button
+          type="button"
+          className={`tab-btn ${tab === 'cases' ? 'tab-btn-active' : ''}`}
+          onClick={() => setTab('cases')}
+          aria-selected={tab === 'cases'}
+          role="tab"
+        >
+          Xử lý hồ sơ
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${tab === 'verify' ? 'tab-btn-active' : ''}`}
+          onClick={() => setTab('verify')}
+          aria-selected={tab === 'verify'}
+          role="tab"
+        >
+          Kiểm thử hệ thống (Verify)
+        </button>
+      </nav>
 
-        <div className="col">
-          {caseRecord && (
-            <section className="panel" aria-labelledby="claim-heading">
-              <h2 id="claim-heading">Hồ sơ đang xem</h2>
-              <dl className="claim">
-                <dt>Nhân viên</dt><dd>{caseRecord.claim.employee_id}</dd>
-                <dt>Loại chi phí</dt><dd>{caseRecord.claim.profile}</dd>
-                <dt>Mục đích</dt><dd>{caseRecord.claim.purpose}</dd>
-                <dt>Số đề nghị</dt>
-                <dd>{new Intl.NumberFormat('vi-VN').format(caseRecord.claim.requested_amount_vnd ?? 0)}₫</dd>
-              </dl>
-              <button type="button" className="btn btn-ghost" onClick={closeCase}>
-                Đóng hồ sơ
-              </button>
-            </section>
-          )}
+      {tab === 'cases' ? (
+        <main className="grid">
+          <div className="col">
+            {/* Only the employee submits cases; the other roles work the queue. */}
+            {role === 'EMPLOYEE' && !caseRecord && (
+              <CaseForm onCreate={api.createCase} onCreated={handleCreated} />
+            )}
+            <Inbox
+              cases={cases}
+              role={role}
+              runsByCase={runsByCase}
+              onOpen={openCase}
+              selectedCaseId={caseRecord?.id}
+            />
+          </div>
 
-          {run && (
-            <CaseDetail
-              run={run}
-              onStop={handleStop}
-              caseRecord={caseRecord ?? undefined}
-              paymentRequest={payment}
-              policyActive={policy?.active ?? true}
-              onActivatePolicy={handleActivatePolicy}
-              history={history}
-            />
-          )}
-          {run?.result && caseRecord && (
-            <HumanActions
-              caseRecord={caseRecord}
-              decision={run.result.decision}
-              onAction={handleAction}
-            />
-          )}
+          <div className="col">
+            {caseRecord && (
+              <section className="panel" aria-labelledby="claim-heading">
+                <h2 id="claim-heading">Hồ sơ đang xem</h2>
+                <dl className="claim">
+                  <dt>Nhân viên</dt><dd>{caseRecord.claim.employee_id}</dd>
+                  <dt>Loại chi phí</dt><dd>{caseRecord.claim.profile}</dd>
+                  <dt>Mục đích</dt><dd>{caseRecord.claim.purpose}</dd>
+                  <dt>Số đề nghị</dt>
+                  <dd>{new Intl.NumberFormat('vi-VN').format(caseRecord.claim.requested_amount_vnd ?? 0)}₫</dd>
+                </dl>
+                <button type="button" className="btn btn-ghost" onClick={closeCase}>
+                  Đóng hồ sơ
+                </button>
+              </section>
+            )}
+
+            {run && (
+              <CaseDetail
+                run={run}
+                onStop={handleStop}
+                caseRecord={caseRecord ?? undefined}
+                paymentRequest={payment}
+                policyActive={policy?.active ?? true}
+                onActivatePolicy={handleActivatePolicy}
+                history={history}
+              />
+            )}
+            {run?.result && caseRecord && (
+              <HumanActions
+                caseRecord={caseRecord}
+                decision={run.result.decision}
+                onAction={handleAction}
+                currentRole={role}
+                onRoleChange={setRole}
+              />
+            )}
+            {!caseRecord && !run && (
+              <section className="panel empty-case-panel">
+                <p className="muted" style={{ margin: 0, textAlign: 'center', padding: 'var(--space-6) 0' }}>
+                  Chọn một hồ sơ từ hộp thư để xem chi tiết và thực hiện phê duyệt.
+                </p>
+              </section>
+            )}
+          </div>
+        </main>
+      ) : (
+        <main className="verify-tab-content">
           <VerifyPanel />
-        </div>
-      </main>
+        </main>
+      )}
     </div>
   );
 }
