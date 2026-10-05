@@ -1,20 +1,20 @@
 # InvoiceReferee — System Flow Atlas
 
 > **Bản đồ tổng thể, không sao chép văn bản (Map, not a copy)**
-> - Task: `T01 + T02 + T03 + T04 + T05 + T06 + T07 + T08 + T09 + T10` (Domain contracts, demo policy, test builders, numeric parsing, source resolution, quality usability, pure policy evaluators, inventory/arithmetic, authority, decision reducer, SQLite history, evidence artifacts, atomic request lifecycle, Mistral OCR, per-document Kimi, cross-source proposals, production pipeline & vertical slice, human action validation, closure & input revision, one-process executor, atomic action, Stop/Override, CaseService, FastAPI composition & contract responses, React product surfaces, human forms & controls).
-> - Package: `Work Package 01 — Core (hoàn thành) & Work Package 02 — Workflow (hoàn thành)`.
-> - Accepted Revision: `aaed9d2` (`feat(T10): React product surfaces, human forms và controls` trên nhánh `rebuild`).
-> - Status: `Living Page Updated` — **T01–T10 IMPLEMENTED & VERIFIED (369 backend unit/integration tests + 5 frontend tests passing, clean Vite build)**. Các task từ T11 đến T16 ở trạng thái kế hoạch (`PLANNED — not built`).
-> - Updated At: `2026-10-05T12:28:00+07:00`.
+> - Task: `T01 + T02 + T03 + T04 + T05 + T06 + T07 + T08 + T09 + T10 + T11` (Domain contracts, demo policy, test builders, numeric parsing, source resolution, quality usability, pure policy evaluators, inventory/arithmetic, authority, decision reducer, SQLite history, evidence artifacts, atomic request lifecycle, Mistral OCR, per-document Kimi, cross-source proposals, production pipeline & vertical slice, human action validation, closure & input revision, one-process executor, atomic action, Stop/Override, CaseService, FastAPI composition & contract responses, React product surfaces, human forms & controls, Verify harness & independent gold corpus).
+> - Package: `Work Package 01 — Core (hoàn thành) & Work Package 02 — Workflow (hoàn thành) & Work Package 03 — Evidence & Release (đang thực hiện: T11 hoàn thành)`.
+> - Accepted Revision: `5d65708` (`feat(T11): corpus gold độc lập và Verify qua production service` trên nhánh `rebuild`).
+> - Status: `Living Page Updated` — **T01–T11 IMPLEMENTED & VERIFIED (373 backend unit/integration tests + 5 frontend tests passing, clean Vite build, Verify core 4/4, escalation 5/5, all 15/15 PASS)**. Các task từ T12 đến T16 ở trạng thái kế hoạch (`PLANNED — not built`).
+> - Updated At: `2026-10-05T13:05:00+07:00`.
 > - Quy tắc: Atlas là **bản đồ điều hướng** (zoom-out), áp dụng các nguyên lý **ASD-STE100** (câu ngắn, một nghĩa, điều kiện trước hành động sau, triệt tiêu mơ hồ, bảo toàn dữ kiện kỹ thuật). Không sao chép văn xuôi từ các tài liệu đặc tả ([B1_PRODUCT_SPEC.md](specs/B1_PRODUCT_SPEC.md), [B1_RULEBOOK.md](specs/B1_RULEBOOK.md), [B1_SYSTEM_SPEC.md](specs/B1_SYSTEM_SPEC.md)) hay kế hoạch thực thi ([Master Plan](superpowers/plans/2026-10-04-invoice-referee.md)).
 
 ---
 
 ## 1. Sơ đồ tổng thể toàn hệ thống (Master End-to-End System Flow)
 
-Sơ đồ thể hiện toàn bộ các thành phần của InvoiceReferee tính đến thời điểm hoàn thành **T01–T10** (hoàn tất toàn bộ tầng Workflow, điểm cuối API REST và giao diện người dùng Web React). 
-- Các khối **nền xanh viền đậm** (`IMPLEMENTED`) là các module nghiệp vụ thuần túy, tầng lưu trữ, tầng trích xuất, tầng đường ống, bộ xác thực hành động con người, tầng dịch vụ ứng dụng, tầng API FastAPI và giao diện Web React đã hoàn thành và vượt qua 369 bài kiểm tra backend, 5 bài kiểm tra frontend component.
-- Các khối **nền xám viền nét đứt** (`planned — not built`) đại diện cho bộ kiểm thử tự động Verify sẽ được nối dây ở các task tiếp theo (T11 – T16).
+Sơ đồ thể hiện toàn bộ các thành phần của InvoiceReferee tính đến thời điểm hoàn thành **T01–T11** (hoàn tất toàn bộ tầng Workflow, API REST, Web React và bộ kiểm thử tự động Verify chạy qua production service). 
+- Các khối **nền xanh viền đậm** (`IMPLEMENTED`) là các module nghiệp vụ thuần túy, tầng lưu trữ, tầng trích xuất, tầng đường ống, bộ xác thực hành động con người, tầng dịch vụ ứng dụng, tầng API FastAPI, giao diện Web React và bộ kiểm thử tự động Verify đã hoàn thành và vượt qua 373 bài kiểm tra backend, 5 bài kiểm tra frontend component.
+- Các khối **nền xám viền nét đứt** (`planned — not built`) đại diện cho các tính năng đóng băng B1 và thích ứng ngưỡng sẽ được thực hiện ở các task tiếp theo (T12 – T16).
 
 ```mermaid
 flowchart TD
@@ -66,17 +66,17 @@ flowchart TD
         HUMAN["validate_human_action (SUPPLY / CONFIRM / APPROVE / OVERRIDE)"]
     end
 
-    subgraph VerifyTier["Kiểm thử tự động Verify & Đo lường (T11 — planned)"]
-        VERIFY["VerifyRunner (Core 4 / Escalation 5)"]
+    subgraph VerifyTier["Kiểm thử tự động Verify & Đo lường (T11 — IMPLEMENTED)"]
+        VERIFY["VerifyRunner (Core 4 / Escalation 5 / All 15)"]
     end
 
     %% Áp dụng style class cho nodes
-    class MODELS,CFG,NUM,QUAL,EXP,INV,DEC,REPO,ART,MISTRAL,KIMI,VAL,PIPE,HUMAN,SVC,EXEC,APP,UI implemented;
-    class VERIFY planned;
+    class MODELS,CFG,NUM,QUAL,EXP,INV,DEC,REPO,ART,MISTRAL,KIMI,VAL,PIPE,HUMAN,SVC,EXEC,APP,UI,VERIFY implemented;
 
     %% Tương tác luồng UI -> API -> Service (T10, T09 IMPLEMENTED)
     UI ==>|"HTTP REST API (frontend/src/api.ts)"| APP
     APP ==>|"gọi application methods (submit / start_run / act / stop)"| SVC
+    APP ==>|"khởi chạy kiểm thử ngầm (VerifyJobs)"| VERIFY
 
     %% Dịch vụ ứng dụng điều phối thực thi và đường ống (T08 IMPLEMENTED)
     SVC ==>|"1. kiểm soát một lượt chạy (acquire / submit)"| EXEC
@@ -106,11 +106,11 @@ flowchart TD
     SVC ==>|"xác thực thẩm quyền (validate_human_action)"| HUMAN
     SVC ==>|"tạo hồ sơ, phiên chạy & áp dụng hành động"| REPO
     EXEC ==>|"hoàn tất lượt chạy (finalize_run)"| REPO
-    VERIFY -.->|"Chạy suite kiểm thử"| SVC
+    VERIFY ==>|"chạy qua CaseService (submit / start_run / wait)"| SVC
 ```
 
 ```text
-revision: aaed9d2
+revision: 5d65708
 - MODELS → src/invoice_referee/domain/models.py (T01 - IMPLEMENTED)
 - CFG → src/invoice_referee/config.py (T01 - IMPLEMENTED)
 - NUM → src/invoice_referee/policy/numeric.py:parse_candidates,normalize_quantity (T02 - IMPLEMENTED)
@@ -129,10 +129,10 @@ revision: aaed9d2
 - EXEC → src/invoice_referee/application/executor.py:RunExecutor (T08 - IMPLEMENTED)
 - APP → src/invoice_referee/api/app.py:create_app,create_runtime_app (T09 - IMPLEMENTED)
 - UI → frontend/src/App.tsx,CaseForm,CaseDetail,HumanActions,VerifyPanel (T10 - IMPLEMENTED)
-- VERIFY → src/invoice_referee/verify/runner.py:VerifyRunner (T11 - planned — not built)
+- VERIFY → src/invoice_referee/verify/runner.py:VerifyRunner,jobs.py:VerifyJobs (T11 - IMPLEMENTED)
 edges: 
-- Mũi tên đôi đậm (==>): Các lệnh gọi trực tiếp giữa giao diện người dùng, tầng API, tầng dịch vụ điều phối, tầng đường ống, tầng trích xuất, tầng quy tắc nghiệp vụ và tầng lưu trữ T01–T10 đã được IMPLEMENTED và VERIFIED bằng 369 bài kiểm tra backend, 5 bài kiểm tra frontend component và bản build TypeScript/Vite sạch (UI gọi API qua frontend/src/api.ts; APP gọi SVC; SVC điều phối EXEC, HUMAN, REPO và ART; EXEC chạy PIPE ngầm và gọi REPO.finalize_run; PIPE gọi MISTRAL, KIMI, QUAL và DEC; DEC gọi EXP, INV, QUAL; EXP và INV gọi QUAL; INV dùng NUM; REPO gọi ART; KIMI gọi VAL; VAL gọi QUAL). Tích hợp trọn vẹn UI↔API qua trình duyệt thật thuộc T15; các test hiện chứng minh hai đầu đường biên riêng biệt.
-- Mũi tên nét đứt (-.->): Luồng tương tác kiến trúc dự kiến của bộ kiểm thử tự động Verify (T11), và phụ thuộc dữ liệu tĩnh như PIPE đọc cấu hình chính sách từ snapshot.
+- Mũi tên đôi đậm (==>): Các lệnh gọi trực tiếp giữa giao diện người dùng, tầng API, tầng dịch vụ điều phối, tầng đường ống, tầng trích xuất, tầng quy tắc nghiệp vụ, tầng lưu trữ và bộ kiểm thử tự động Verify T01–T11 đã được IMPLEMENTED và VERIFIED bằng 373 bài kiểm tra backend (255 unit + 118 integration), 5 bài kiểm tra frontend component và bản build TypeScript/Vite sạch (UI gọi API qua frontend/src/api.ts; APP gọi SVC và VERIFY; SVC điều phối EXEC, HUMAN, REPO và ART; EXEC chạy PIPE ngầm và gọi REPO.finalize_run; PIPE gọi MISTRAL, KIMI, QUAL và DEC; DEC gọi EXP, INV, QUAL; EXP và INV gọi QUAL; INV dùng NUM; REPO gọi ART; KIMI gọi VAL; VAL gọi QUAL; VERIFY chạy qua SVC.submit/start_run/wait). Tích hợp trọn vẹn UI↔API qua trình duyệt thật và gọi provider thật thuộc T15; các test hiện chứng minh qua ranh giới giả lập và replay.
+- Mũi tên nét đứt (-.->): Phụ thuộc dữ liệu tĩnh như PIPE đọc cấu hình chính sách từ snapshot.
 ```
 
 ---
@@ -310,11 +310,22 @@ edges:
 - Thiết kế giao diện phẳng tuân thủ màu sắc ngữ nghĩa, vùng chạm tối thiểu và khả năng tiếp cận.
 - Chi tiết: [App.tsx](../frontend/src/App.tsx), [CaseForm.tsx](../frontend/src/CaseForm.tsx), [CaseDetail.tsx](../frontend/src/CaseDetail.tsx), [HumanActions.tsx](../frontend/src/HumanActions.tsx), [VerifyPanel.tsx](../frontend/src/VerifyPanel.tsx), [api.ts](../frontend/src/api.ts), [task-T10.md](evidence/task-T10.md), [BUILD_LOG_V2.md](BUILD_LOG_V2.md).
 
-### 2.12 Bộ kiểm thử tự động Verify & Đóng băng Baseline B1 (Verify Harness — T11, T12) — `planned`
-- Bộ công cụ Verify chạy trực tiếp trên đường dịch vụ chính của ứng dụng.
-- Bộ công cụ Verify in bảng tổng hợp đạt/không đạt kèm dấu thời gian thực.
-- Hai bộ kiểm thử chuẩn gồm Core 4 ca và Escalation 5 ca theo đúng thể lệ cuộc thi.
-- Chi tiết thiết kế: [Evidence/Release Plan T11–T12](superpowers/plans/2026-10-04-invoice-referee-03-evidence-release.md#t11--corpus-có-gold-độc-lập-và-verify-qua-production-service).
+### 2.12 Bộ kiểm thử tự động Verify & Đo lường chỉ số (Verify Harness & Metrics — T11)
+- Bộ chạy `VerifyRunner` thực thi trực tiếp trên cùng một đối tượng `CaseService` với giao diện người dùng.
+- Bộ chạy gọi các phương thức sản xuất gồm nộp hồ sơ `submit`, khởi chạy `start_run` và chờ hoàn tất `wait`.
+- Nhãn kết quả kỳ vọng chỉ nằm trong tệp kê khai `manifest.json` và không bao giờ xuất hiện trong mã nguồn ứng dụng.
+- Bộ cung cấp `ReplayProviders` tải dữ liệu trích xuất đóng băng theo vai trò chứng từ và ánh xạ sang định danh thực tế.
+- Cơ chế phát lại không tra cứu kết quả theo mã hồ sơ hay tên tệp dữ liệu.
+- Hệ thống xác định kết luận `PASS` khi phán quyết nghiệp vụ thực tế khớp chính xác với kỳ vọng.
+- Nếu ca kiểm thử có kết quả yêu cầu bổ sung thông tin hoặc chuyển cấp duyệt đúng kỳ vọng, kết luận là `PASS`.
+- Nếu chế độ chạy là `LIVE_END_TO_END`, bộ chạy trả về kết luận `INCONCLUSIVE` do chưa cấp quyền chi tiêu.
+- Phiên kiểm thử giữ chỗ xử lý bằng hàm `reserve` và từ chối các phiên chạy tương tác bằng mã lỗi `RUN_BUSY`.
+- Đối tượng `VerifyJobs` điều phối tiến trình kiểm thử trong một luồng ngầm độc lập.
+- Hàm `summarize` tính toán các chỉ số an toàn và tự động hóa dưới dạng phân số gồm đủ tử số và mẫu số.
+- Nếu mẫu số của chỉ số bằng không, hệ thống trả về giá trị rỗng thay vì làm tròn về không.
+- Bộ kiểm thử đạt kết quả 4/4 ca `core`, 5/5 ca `escalation` và 15/15 ca phát triển trên đường ống phát lại.
+- Bảng `VerifyPanel` trên giao diện Web cho phép chọn bộ kiểm thử và hiển thị bảng kết quả chi tiết từng ca.
+- Chi tiết: [runner.py](../src/invoice_referee/verify/runner.py), [manifest.py](../src/invoice_referee/verify/manifest.py), [replay.py](../src/invoice_referee/verify/replay.py), [jobs.py](../src/invoice_referee/verify/jobs.py), [metrics.py](../src/invoice_referee/verify/metrics.py), [test_verify.py](../tests/integration/test_verify.py), [task-T11.md](evidence/task-T11.md), [BUILD_LOG_V2.md](BUILD_LOG_V2.md).
 
 ---
 
@@ -322,6 +333,6 @@ edges:
 
 Các module và tính năng dưới đây đã có thiết kế chi tiết nhưng **hoàn toàn chưa được xây dựng hoặc nối dây trong mã nguồn**:
 
-1. **Bộ kiểm thử tự động Verify & Thích ứng ngưỡng (`T11` – `T16`)** — `planned — not built`:
-   - Các tệp dự kiến: `src/invoice_referee/verify/`, `src/invoice_referee/adaptation/`, tài liệu chung kết.
-   - Trách nhiệm: Tự động hóa đánh giá trên tập kiểm thử độc lập, học ngưỡng từ phản hồi người dùng.
+1. **Đóng băng Baseline B1 & Thích ứng ngưỡng (`T12` – `T16`)** — `planned — not built`:
+   - Các tệp dự kiến: `src/invoice_referee/adaptation/`, tài liệu đóng băng B1 và báo cáo đo lường.
+   - Trách nhiệm: Đóng băng phiên bản B1 làm mốc so sánh, tối ưu hóa ngưỡng từ phản hồi thực tế và kiểm thử với người dùng thật.
