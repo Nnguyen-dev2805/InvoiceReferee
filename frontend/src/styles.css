@@ -434,3 +434,95 @@ button:focus-visible {
   padding: var(--space-2);
   border-bottom: 1px solid var(--color-border);
 }
+
+.stage-line {
+  margin: var(--space-2) 0 var(--space-3);
+  font-size: 0.9rem;
+  color: var(--color-muted-foreground);
+}
+
+.source-refs {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  font-size: 0.8rem;
+}
+
+.source-refs li {
+  overflow-wrap: anywhere;
+  color: var(--color-muted-foreground);
+}
+
+.source-refs code {
+  background: var(--color-muted);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.checks {
+  margin: var(--space-3) 0;
+  font-size: 0.85rem;
+}
+
+.checks ul {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+}
+
+.check {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.check-rule {
+  font-family: var(--font-head);
+  font-weight: 600;
+}
+
+.check-status {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.check-pass .check-status { color: #065f46; }
+.check-fail .check-status { color: var(--color-destructive); }
+.check-unknown .check-status { color: #92400e; }
+.check-not_applicable .check-status { color: var(--color-muted-foreground); }
+
+.check-reason {
+  color: var(--color-muted-foreground);
+}
+
+.audit {
+  margin: var(--space-4) 0;
+  font-size: 0.85rem;
+}
+
+.audit-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+}
+
+.audit-list li {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.audit-list time {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted-foreground);
+}
+
+.audit-kind {
+  font-weight: 600;
+}

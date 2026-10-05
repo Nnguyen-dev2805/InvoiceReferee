@@ -1,7 +1,7 @@
 // Synthetic fixtures for component tests. These build ledger-shaped records
 // directly (no API call) so a test failure means the component is wrong, not
 // that the fixture mirrored the backend.
-import type { CaseRecord, Decision, Issue, RunRecord } from './types';
+import type { AuditEvent, CaseRecord, Decision, Issue, RunRecord } from './types';
 
 export function routineDecision(): Decision {
   return {
@@ -75,6 +75,22 @@ export function needsInfoRun(): RunRecord {
     ? { ...run.result, decision: infoDecision() }
     : null;
   return run;
+}
+
+export function auditEvent(overrides: Partial<AuditEvent> = {}): AuditEvent {
+  return {
+    id: 'evt-1',
+    case_id: 'case-1',
+    run_id: 'run-1',
+    case_version: 1,
+    timestamp: '2026-10-05T00:00:00+00:00',
+    kind: 'CASE_CREATED',
+    stage: 'created',
+    reason: '',
+    refs: [],
+    payload: {},
+    ...overrides,
+  };
 }
 
 export function caseRecord(): CaseRecord {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from './api';
 import { ApiError } from './api';
 import type {
+  AuditEvent,
   CaseRecord,
   HumanAction,
   PaymentRequest,
@@ -23,6 +24,7 @@ export function App() {
   const [run, setRun] = useState<RunRecord | null>(null);
   const [payment, setPayment] = useState<PaymentRequest | null>(null);
   const [policy, setPolicy] = useState<PolicyDto | null>(null);
+  const [history, setHistory] = useState<AuditEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
@@ -49,6 +51,7 @@ export function App() {
             const record = await api.getCase(latest.case_id);
             setCaseRecord(record);
             setPayment(await api.getPaymentRequest(latest.case_id));
+            setHistory(await api.getHistory(latest.case_id));
           }
           if (runInFlight(latest.status)) pollRun(runId);
         } catch (err) {
@@ -64,6 +67,7 @@ export function App() {
   async function refresh(record: CaseRecord) {
     setCaseRecord(record);
     setPayment(await api.getPaymentRequest(record.id));
+    setHistory(await api.getHistory(record.id));
     if (record.current_run_id) {
       const latest = await api.getRun(record.current_run_id);
       setRun(latest);
@@ -155,6 +159,7 @@ export function App() {
                   setCaseRecord(null);
                   setRun(null);
                   setPayment(null);
+                  setHistory([]);
                 }}
               >
                 Nộp hồ sơ khác
@@ -172,6 +177,7 @@ export function App() {
               paymentRequest={payment}
               policyActive={policy?.active ?? true}
               onActivatePolicy={handleActivatePolicy}
+              history={history}
             />
           )}
           {run?.result && run.result.decision.issues.length > 0 && caseRecord && (

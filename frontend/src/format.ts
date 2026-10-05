@@ -46,3 +46,25 @@ export const RUN_STATUS_LABEL: Record<ExecutionStatus, string> = {
 export function runInFlight(status: ExecutionStatus): boolean {
   return status === 'QUEUED' || status === 'RUNNING' || status === 'STOP_REQUESTED';
 }
+
+// --- Stage labels (what the pipeline is doing right now) -----------------------
+
+const STAGE_LABEL: Record<string, string> = {
+  created: 'Đã tạo hồ sơ',
+  intake: 'Tiếp nhận hồ sơ',
+  finalized: 'Đã hoàn tất',
+  policy: 'Áp policy',
+  'before:evaluate': 'Đang tổng hợp quyết định',
+  'before:return': 'Đang trả kết quả',
+  'cross_source': 'Đang đối chiếu nguồn',
+};
+
+/** Turn a raw run stage like `analyze:ev-...:before` into a human label. */
+export function stageLabel(stage: string | null | undefined): string | null {
+  if (!stage) return null;
+  if (STAGE_LABEL[stage]) return STAGE_LABEL[stage];
+  const [head, , phase] = stage.split(':');
+  const verb: Record<string, string> = { ocr: 'Đang đọc chứng từ', analyze: 'Đang trích xuất dữ kiện', apply: 'Đang áp dụng dữ kiện' };
+  if (verb[head]) return phase === 'before' ? `${verb[head]}…` : `${verb[head]} — xong`;
+  return stage;
+}
