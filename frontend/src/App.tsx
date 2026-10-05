@@ -10,6 +10,7 @@ import type {
   StopReply,
 } from './types';
 import { CaseForm } from './CaseForm';
+import { AlertIcon } from './icons';
 import { CaseDetail } from './CaseDetail';
 import { HumanActions } from './HumanActions';
 import { VerifyPanel } from './VerifyPanel';
@@ -120,6 +121,13 @@ export function App() {
         )}
       </header>
 
+      {/* The policy must be activated before ANY run can process. Surface the
+          control here so it is reachable before the first submission — the
+          system refuses to auto-process on an inactive policy by design. */}
+      {policy && !policy.active && (
+        <PolicyActivationBanner onActivate={handleActivatePolicy} />
+      )}
+
       {error && (
         <div className="notice notice-error" role="alert">
           <span>{error}</span>
@@ -176,6 +184,55 @@ export function App() {
           <VerifyPanel />
         </div>
       </main>
+    </div>
+  );
+}
+
+function PolicyActivationBanner({ onActivate }: { onActivate: (reason: string) => Promise<void> }) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!reason.trim()) {
+      setError('Cần lý do để kích hoạt policy demo.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await onActivate(reason.trim());
+      setReason('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kích hoạt thất bại.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="notice notice-warn" role="alert">
+      <AlertIcon />
+      <form onSubmit={submit} className="policy-activate">
+        <strong>Policy demo chưa được kích hoạt.</strong>
+        <p>
+          Hệ thống <em>không tự xử lý</em> hồ sơ cho tới khi policy được kích hoạt
+          tường minh (đây là thiết kế an toàn, không phải lỗi). Hãy kích hoạt trước khi nộp.
+        </p>
+        <div className="field">
+          <label htmlFor="policy-reason-top">Lý do kích hoạt</label>
+          <input
+            id="policy-reason-top"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </div>
+        {error && <p className="field-error" role="alert">{error}</p>}
+        <button type="submit" className="btn btn-primary" disabled={busy}>
+          {busy ? 'Đang kích hoạt…' : 'Kích hoạt policy demo'}
+        </button>
+      </form>
     </div>
   );
 }
