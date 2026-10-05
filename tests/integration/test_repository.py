@@ -454,3 +454,68 @@ def test_approval_does_not_change_case_version(tmp_path):
     rebuilt = repo.snapshot(case.id, demo_policy())
     assert rebuilt.active_action_ids == [action.id]
     assert rebuilt.authorizations[0].amount_vnd == 1_200_000
+
+
+# --- Schema version guard (no migration framework) ----------------------------
+
+def test_schema_version_is_stamped_on_open(tmp_path):
+    repo = Repository(tmp_path / 'cases.sqlite', tmp_path / 'artifacts')
+    from invoice_referee.storage.repository import SCHEMA_VERSION
+    row = repo._read_one("SELECT value FROM schema_meta WHERE key = 'version'")
+    assert row['value'] == SCHEMA_VERSION
+
+
+def test_incompatible_schema_version_is_refused(tmp_path):
+    db = tmp_path / 'cases.sqlite'
+    repo = Repository(db, tmp_path / 'artifacts')
+    with repo._write() as conn:
+        conn.execute("UPDATE schema_meta SET value = '1' WHERE key = 'version'")
+    with pytest.raises(DomainError) as exc:
+        Repository(db, tmp_path / 'artifacts')
+    assert exc.value.code == 'INVALID_INPUT'
+    assert 'schema' in exc.value.message.lower()
+
+
+def test_legacy_db_without_schema_meta_is_refused(tmp_path):
+    """A pre-change DB (old global issues(id) PK, no schema_meta) must be refused.
+
+    Regression for the finding that a missing schema_meta row was silently
+    stamped v2 while keeping the incompatible DDL, so the second run died with
+    ``UNIQUE constraint failed: issues.id``. The guard must inspect the ACTUAL
+    schema, not default on a missing row.
+    """
+    import sqlite3
+
+    db = tmp_path / 'legacy.sqlite'
+    conn = sqlite3.connect(str(db))
+    conn.executescript(
+        """
+        CREATE TABLE cases (id TEXT PRIMARY KEY, case_version INTEGER NOT NULL,
+          workflow_state TEXT NOT NULL, current_run_id TEXT, input_hash TEXT NOT NULL DEFAULT '',
+          claim_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+        CREATE TABLE runs (id TEXT PRIMARY KEY, case_id TEXT NOT NULL, input_hash TEXT NOT NULL,
+          case_version INTEGER NOT NULL, status TEXT NOT NULL, stop_requested INTEGER NOT NULL DEFAULT 0,
+          stage TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT, policy_version TEXT NOT NULL,
+          threshold_version TEXT NOT NULL, identities_json TEXT NOT NULL DEFAULT '[]', result_json TEXT);
+        -- The OLD global-PK shape this change replaced:
+        CREATE TABLE issues (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, case_id TEXT NOT NULL,
+          stable_key TEXT NOT NULL, issue_class TEXT NOT NULL, owner_mode TEXT NOT NULL,
+          status TEXT NOT NULL, payload_json TEXT NOT NULL);
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(DomainError) as exc:
+        Repository(db, tmp_path / 'artifacts')
+    assert exc.value.code == 'INVALID_INPUT'
+    assert str(db) in exc.value.message
+    # The legacy DB must NOT have been stamped (never silently upgraded).
+    check = sqlite3.connect(str(db))
+    try:
+        tables = {r[0] for r in check.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert 'schema_meta' not in tables
+        pk_cols = [r[1] for r in check.execute('PRAGMA table_info(issues)') if r[5]]
+        assert pk_cols == ['id']  # old global PK retained, not silently changed
+    finally:
+        check.close()

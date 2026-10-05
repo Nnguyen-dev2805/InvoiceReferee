@@ -177,3 +177,31 @@ evidence pointers; nothing planned is recorded as done.
 - Scope: T07 is validator/repository; end-to-end service closure is T08.
 - Evidence: fake/synthetic; live quality unproven (T15).
 - Not done: executor/Stop, API, UI (downstream tasks).
+
+## T08 — One-process executor, atomic action và Stop/Override
+
+- Created `src/invoice_referee/application/{service,executor}.py`: `CaseService`
+  (submit, start_run, get_run, act, add_evidence, stop, wait, set_policy, close)
+  over one `ThreadPoolExecutor(max_workers=1)` with a one-permit semaphore. `wait`
+  never flips status on timeout. Persisted Stop flag + STOP_REQUESTED event
+  written before ack; no late business action; `StoppedRun` → STOPPED; repeat Stop
+  idempotent; completed run → ALREADY_COMPLETED. `set_policy` idle-only; SYSTEM
+  actor may change only `word_review_threshold`/`threshold_version`.
+- Wired the carry-forwards: `create_run` active set includes `STOP_REQUESTED`;
+  STOP routed via `Repository.request_stop`; CONFIRM_FIELD path reconciled with
+  `quality._confirmation_matches` and confirmations threaded through `process()`;
+  T08-owned deep ref/coverage/unit checks (`_deep_confirm_field`/
+  `_deep_confirm_mapping`); `stage_evidence` all-or-nothing ADD_EVIDENCE.
+- Modified `policy/{decision,expenses,inventory,quality}.py` and
+  `application/pipeline.py` to thread `confirmations` (no-op when absent);
+  `storage/repository.py` + `schema.sql` (`issues` PK → `(run_id,id)`,
+  `schema_meta` version guard).
+- Tests: `tests/integration/{conftest,test_execution_controls,test_human_closure}.py`
+  (barrier-driven ordering, persisted invariants, no hung workers). RED observed,
+  then GREEN; full suite 306 → 342 passed.
+- Review rounds 1–2: DENY/OVERRIDE-DENY no longer leaks the executor slot
+  (service would otherwise brick with RUN_BUSY); schema guard classifies a DB by
+  actual DDL (fresh/current/legacy) and refuses a legacy DB instead of silently
+  stamping it; stage_evidence unlink wraps the whole write; `_futures` pruned.
+- Evidence: fake/synthetic; live quality/remote cancellation unproven (T15).
+- Not done: API, UI (downstream tasks).

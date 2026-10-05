@@ -4,6 +4,14 @@
 -- schema change.
 PRAGMA foreign_keys = ON;
 
+-- Schema identity. There is no migration framework; a structural change is a
+-- version bump and the repository asserts it on open, telling the operator to
+-- recreate the local DB rather than silently running on an incompatible one.
+CREATE TABLE IF NOT EXISTS schema_meta (
+  key    TEXT PRIMARY KEY,
+  value  TEXT NOT NULL
+);
+
 -- Structured state/history ---------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS cases (
@@ -47,14 +55,17 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 
 CREATE TABLE IF NOT EXISTS issues (
-  id            TEXT PRIMARY KEY,
+  id            TEXT NOT NULL,
   run_id        TEXT NOT NULL REFERENCES runs(id),
   case_id       TEXT NOT NULL REFERENCES cases(id),
   stable_key    TEXT NOT NULL,
   issue_class   TEXT NOT NULL,
   owner_mode    TEXT NOT NULL,
   status        TEXT NOT NULL,
-  payload_json  TEXT NOT NULL
+  payload_json  TEXT NOT NULL,
+  -- An issue id is the stable key of ONE run's decision; the same stable key
+  -- recurs across runs (a rerun re-reports it), so identity is (run_id, id).
+  PRIMARY KEY (run_id, id)
 );
 
 CREATE TABLE IF NOT EXISTS human_actions (

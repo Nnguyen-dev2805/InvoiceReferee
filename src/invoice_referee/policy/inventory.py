@@ -38,12 +38,12 @@ _ADJUSTMENT_TERMS = ('subtotal', 'tax', 'fees', 'discount')
 
 
 def _derive_value(
-    fact, registry: SourceRegistry, policy: PolicyConfig
+    fact, registry: SourceRegistry, policy: PolicyConfig, confirmation=None
 ) -> Decimal | None:
     if fact is None:
         return None
     threshold = Decimal(policy.word_review_threshold)
-    derived = derive_fact(fact, registry, True, threshold, None)
+    derived = derive_fact(fact, registry, True, threshold, confirmation)
     if derived.usability != 'USABLE':
         return None
     try:
@@ -59,8 +59,16 @@ def _line_amount(quantity: Decimal, price: Decimal) -> Decimal:
         return (quantity * price).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
 
 
+def _confirmation_for(confirmations, evidence_id: str, subfield: str, item_id: str | None = None):
+    if not confirmations:
+        return None
+    if item_id is None:
+        return confirmations.get(f'{evidence_id}.fields.{subfield}')
+    return confirmations.get(f'{evidence_id}.items.{item_id}.{subfield}')
+
+
 def _document_arithmetic(
-    doc: DocumentFacts, registry: SourceRegistry, policy: PolicyConfig
+    doc: DocumentFacts, registry: SourceRegistry, policy: PolicyConfig, confirmations=None
 ) -> str:
     """Return one of PASS / FAIL / UNKNOWN / NOT_APPLICABLE for AMT-02."""
     if doc.template == 'UNKNOWN':
@@ -86,15 +94,23 @@ def _document_arithmetic(
         return 'UNKNOWN'
     line_total = Decimal('0')
     for item in doc.items:
-        quantity = _derive_value(item.quantity, registry, policy)
-        price = _derive_value(item.unit_price, registry, policy)
-        line = _derive_value(item.line_amount, registry, policy)
+        quantity = _derive_value(
+            item.quantity, registry, policy,
+            _confirmation_for(confirmations, doc.evidence_id, 'quantity', item.id))
+        price = _derive_value(
+            item.unit_price, registry, policy,
+            _confirmation_for(confirmations, doc.evidence_id, 'unit_price', item.id))
+        line = _derive_value(
+            item.line_amount, registry, policy,
+            _confirmation_for(confirmations, doc.evidence_id, 'line_amount', item.id))
         if quantity is None or price is None or line is None:
             return 'UNKNOWN'
         if abs(_line_amount(quantity, price) - line) > tolerance:
             return 'FAIL'
         line_total += line
-    total = _derive_value(doc.fields.get('total'), registry, policy)
+    total = _derive_value(
+        doc.fields.get('total'), registry, policy,
+        _confirmation_for(confirmations, doc.evidence_id, 'total'))
     if total is None:
         return 'UNKNOWN'
     if abs(line_total - total) > tolerance:
@@ -102,7 +118,9 @@ def _document_arithmetic(
     return 'PASS'
 
 
-def arithmetic_checks(bundle: EvidenceBundle, policy: PolicyConfig) -> list[CheckResult]:
+def arithmetic_checks(
+    bundle: EvidenceBundle, policy: PolicyConfig, confirmations=None
+) -> list[CheckResult]:
     """AMT-02 across all documents (worst status wins); independent of INV-02."""
     statuses: list[str] = []
     refs = []
@@ -111,7 +129,7 @@ def arithmetic_checks(bundle: EvidenceBundle, policy: PolicyConfig) -> list[Chec
         if registry is None:
             statuses.append('UNKNOWN')
             continue
-        statuses.append(_document_arithmetic(doc, registry, policy))
+        statuses.append(_document_arithmetic(doc, registry, policy, confirmations))
     if any(s == 'FAIL' for s in statuses):
         status = 'FAIL'
         reason = 'Arithmetic có mâu thuẫn ở phép kiểm áp dụng.'
@@ -144,7 +162,7 @@ def _items_by_id(doc: DocumentFacts) -> dict[str, ItemFacts]:
 
 
 def _consistency_status(
-    bundle: EvidenceBundle, policy: PolicyConfig
+    bundle: EvidenceBundle, policy: PolicyConfig, confirmations=None
 ) -> tuple[str, list[str]]:
     """INV-02 status plus machine-readable conflict reasons."""
     primary = next((d for d in bundle.documents if d.kind == 'BILL'), None)
@@ -194,7 +212,7 @@ def _consistency_status(
         seen_primary.add(pid)
         seen_receipt.add(rid)
         status, detail = _compare_items(
-            primary_items[pid], receipt_items[rid], preg, rreg, policy)
+            primary_items[pid], receipt_items[rid], preg, rreg, policy, confirmations)
         if status == 'FAIL':
             conflicts.append(detail)
         elif status == 'UNKNOWN':
@@ -219,13 +237,24 @@ def _compare_items(
     preg: SourceRegistry,
     rreg: SourceRegistry,
     policy: PolicyConfig,
+    confirmations=None,
 ) -> tuple[str, str]:
     p_unit_name = str(p_item.unit.normalized_value)
     r_unit_name = str(r_item.unit.normalized_value)
-    p_price = _derive_value(p_item.unit_price, preg, policy)
-    r_price = _derive_value(r_item.unit_price, rreg, policy)
-    p_qty = _derive_value(p_item.quantity, preg, policy)
-    r_qty = _derive_value(r_item.quantity, rreg, policy)
+    p_evidence = preg.evidence_id
+    r_evidence = rreg.evidence_id
+    p_price = _derive_value(
+        p_item.unit_price, preg, policy,
+        _confirmation_for(confirmations, p_evidence, 'unit_price', p_item.id))
+    r_price = _derive_value(
+        r_item.unit_price, rreg, policy,
+        _confirmation_for(confirmations, r_evidence, 'unit_price', r_item.id))
+    p_qty = _derive_value(
+        p_item.quantity, preg, policy,
+        _confirmation_for(confirmations, p_evidence, 'quantity', p_item.id))
+    r_qty = _derive_value(
+        r_item.quantity, rreg, policy,
+        _confirmation_for(confirmations, r_evidence, 'quantity', r_item.id))
     if None in (p_price, r_price, p_qty, r_qty):
         return 'UNKNOWN', f'unusable item numeric for {p_item.id}/{r_item.id}'
 
@@ -285,6 +314,7 @@ def inventory_checks(
     *,
     profile: str | None = None,
     received_full: bool | None = None,
+    confirmations=None,
 ) -> list[CheckResult]:
     """INV-01/INV-02; NOT_APPLICABLE when the profile needs no goods receipt.
 
@@ -326,7 +356,7 @@ def inventory_checks(
             refs=[], reason='Có receipt và xác nhận nhận đủ.', issue_ids=[]))
 
     # INV-02: mapping/quantity/units/dates/supplier consistency.
-    status, details = _consistency_status(bundle, policy)
+    status, details = _consistency_status(bundle, policy, confirmations)
     supplier_status, supplier_detail = _supplier_date_status(bundle, policy)
     if supplier_status == 'FAIL':
         status = 'FAIL'

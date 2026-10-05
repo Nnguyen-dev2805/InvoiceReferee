@@ -56,15 +56,16 @@ def _derive(
     registry: SourceRegistry,
     policy: PolicyConfig,
     numeric: bool,
+    confirmation=None,
 ) -> FieldFact | None:
     if fact is None:
         return None
     threshold = Decimal(policy.word_review_threshold)
-    return derive_fact(fact, registry, numeric, threshold, None)
+    return derive_fact(fact, registry, numeric, threshold, confirmation)
 
 
 def _src_checks(
-    doc: DocumentFacts, registry: SourceRegistry, policy: PolicyConfig
+    doc: DocumentFacts, registry: SourceRegistry, policy: PolicyConfig, confirmations=None
 ) -> list[CheckResult]:
     checks: list[CheckResult] = []
 
@@ -90,7 +91,9 @@ def _src_checks(
     required = list(_HEADER_FIELDS)
     missing: list[str] = []
     for name in required:
-        derived = _derive(doc.fields.get(name), registry, policy, numeric=name == 'total')
+        fact = doc.fields.get(name)
+        confirmation = confirmations.get(f'{doc.evidence_id}.fields.{name}') if confirmations else None
+        derived = _derive(fact, registry, policy, numeric=name == 'total', confirmation=confirmation)
         if derived is None or derived.usability != 'USABLE':
             missing.append(name)
     if missing:
@@ -109,13 +112,14 @@ def _src_checks(
 
 
 def _currency_status(
-    doc: DocumentFacts, registry: SourceRegistry, policy: PolicyConfig
+    doc: DocumentFacts, registry: SourceRegistry, policy: PolicyConfig, confirmations=None
 ) -> tuple[str, list[SourceRef]]:
     """SCOPE-02 currency leg: PASS / FAIL / UNKNOWN (never PASS when unusable)."""
     fact = doc.fields.get('currency')
     if fact is None:
         return 'UNKNOWN', []
-    derived = _derive(fact, registry, policy, numeric=False)
+    confirmation = confirmations.get(f'{doc.evidence_id}.fields.currency') if confirmations else None
+    derived = _derive(fact, registry, policy, numeric=False, confirmation=confirmation)
     refs = _fact_refs(fact)
     if derived is None or derived.usability != 'USABLE':
         return 'UNKNOWN', refs
@@ -125,7 +129,7 @@ def _currency_status(
 
 
 def document_checks(
-    doc: DocumentFacts, registry: SourceRegistry, policy: PolicyConfig
+    doc: DocumentFacts, registry: SourceRegistry, policy: PolicyConfig, confirmations=None
 ) -> list[CheckResult]:
     """Per-document source checks (SRC-02/SRC-03) and SCOPE-02.
 
@@ -134,14 +138,14 @@ def document_checks(
     treats them as a technical invalid-analysis result.
     """
     checks: list[CheckResult] = []
-    src_checks = _src_checks(doc, registry, policy)
+    src_checks = _src_checks(doc, registry, policy, confirmations)
     checks.extend(src_checks)
     if any(c.rule_id == 'SRC-03' and c.status == 'FAIL' for c in src_checks):
         return checks  # contract invalid; do not fabricate further results
 
     # SCOPE-02: credit-note/foreign currency is out of B1 scope. An unknown kind
     # or an unusable currency fact cannot be a scope PASS.
-    currency_status, refs = _currency_status(doc, registry, policy)
+    currency_status, refs = _currency_status(doc, registry, policy, confirmations)
     if doc.kind == 'CREDIT_NOTE':
         status = 'FAIL'
         reason = 'Credit-note cần logic refund chưa được B1 hỗ trợ.'

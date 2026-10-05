@@ -57,6 +57,11 @@ from invoice_referee.storage.artifacts import put_artifact, safe_name
 
 SCHEMA_PATH = Path(__file__).with_name('schema.sql')
 
+# Bump when a structural change makes an older local DB incompatible. There is no
+# migration framework; the repository asserts this on open so a dev DB created by
+# an older schema fails LOUDLY instead of silently corrupting a later run.
+SCHEMA_VERSION = '2'
+
 ALLOWED_MIME = {'application/pdf', 'image/jpeg', 'image/png', 'image/webp'}
 ALLOWED_EXT = {'.pdf', '.jpg', '.jpeg', '.png', '.webp'}
 MAX_FILES = 12
@@ -110,9 +115,75 @@ class Repository:
         self._artifact_root.mkdir(parents=True, exist_ok=True)
         conn = self._connect()
         try:
+            state = self._schema_state(conn)
+            if state == 'legacy':
+                raise DomainError(
+                    'INVALID_INPUT',
+                    f'Local DB {self._db_path} dùng schema cũ (không có schema_meta hoặc '
+                    f'version khác v{SCHEMA_VERSION}). Xoá file DB (hoặc cả data/) và khởi '
+                    'động lại để tạo store mới; không có migration tự động.',
+                )
             conn.executescript(SCHEMA_PATH.read_text(encoding='utf-8'))
+            if state == 'fresh':
+                self._stamp_schema_version(conn)
         finally:
             conn.close()
+
+    # Tables that only the application schema creates. Their presence means the DB
+    # is NOT fresh, so a missing/incompatible ``schema_meta`` is a legacy DB.
+    _APP_TABLES = frozenset({
+        'cases', 'evidence', 'runs', 'issues', 'human_actions', 'decisions',
+        'payment_requests', 'events', 'policy_versions',
+    })
+
+    def _schema_state(self, conn: sqlite3.Connection) -> str:
+        """Classify the DB by its ACTUAL schema: ``fresh`` / ``current`` / ``legacy``.
+
+        Detection inspects ``sqlite_master``/``PRAGMA table_info`` rather than
+        trusting a missing ``schema_meta`` row: ``schema_meta`` is new, so a
+        pre-change dev DB lacks it while keeping the OLD global ``issues(id)`` PK —
+        defaulting to a stamp would silently run on that incompatible DDL and fail
+        on the second run. Rules:
+
+        - no app tables yet -> ``fresh`` (create schema + stamp);
+        - app tables exist and ``schema_meta.version`` == current AND the critical
+          structural change is actually applied -> ``current``;
+        - otherwise (missing ``schema_meta``, version mismatch, or the old
+          ``issues`` PK) -> ``legacy`` (refuse; never stamp).
+        """
+        tables = {
+            row['name'] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+        if not (tables & self._APP_TABLES):
+            return 'fresh'
+        if self._schema_meta_version(conn) != SCHEMA_VERSION:
+            return 'legacy'
+        # Version matches, but verify the structural change really landed: the
+        # ``issues`` PK must be composite (run_id, id), not the old global id.
+        if 'issues' in tables and not self._issues_pk_is_composite(conn):
+            return 'legacy'
+        return 'current'
+
+    @staticmethod
+    def _schema_meta_version(conn: sqlite3.Connection) -> str | None:
+        try:
+            row = conn.execute("SELECT value FROM schema_meta WHERE key = 'version'").fetchone()
+        except sqlite3.OperationalError:  # schema_meta table does not exist yet
+            return None
+        return row['value'] if row is not None else None
+
+    @staticmethod
+    def _issues_pk_is_composite(conn: sqlite3.Connection) -> bool:
+        """True when ``issues`` has a composite PK (>=2 pk columns)."""
+        rows = conn.execute('PRAGMA table_info(issues)').fetchall()
+        return sum(1 for row in rows if row['pk']) >= 2
+
+    @staticmethod
+    def _stamp_schema_version(conn: sqlite3.Connection) -> None:
+        conn.execute(
+            "INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('version', ?)",
+            (SCHEMA_VERSION,),
+        )
 
     # --- connection helpers ---------------------------------------------------
 
@@ -184,10 +255,16 @@ class Repository:
         if amount is not None and (isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0):
             raise _invalid('Số tiền đề nghị phải là số nguyên dương VND.')
 
-        if len(uploads) > MAX_FILES:
+        self._validate_upload_limits(uploads)
+
+    def _validate_upload_limits(
+        self, uploads: list[Upload], *, existing_count: int = 0, existing_bytes: int = 0
+    ) -> None:
+        """Validate uploads against the file/case limits, CUMULATIVE with existing."""
+        if existing_count + len(uploads) > MAX_FILES:
             raise _invalid(f'Quá {MAX_FILES} tệp cho một hồ sơ.')
 
-        total = 0
+        total = existing_bytes
         for upload in uploads:
             name = self._safe_upload_name(upload.original_name)
             if Path(name).suffix.lower() not in ALLOWED_EXT:
@@ -266,6 +343,72 @@ class Repository:
             raise
         return self.get_case(case_id)
 
+    def stage_evidence(self, case_id: str, uploads: list[Upload]) -> list[Evidence]:
+        """Attach uploads to an existing case, all-or-nothing.
+
+        Bytes are written first (under the case's ``evidence`` dir), then the
+        ``evidence`` rows are inserted in ONE transaction. Identical bytes already
+        stored for the case are skipped (same bytes are not a new source). On ANY
+        failure — including a COMMIT failure after the ``with`` body — the newly
+        written artifacts are removed, so no orphan file survives a rolled-back
+        transaction. ``ADD_EVIDENCE`` uses this; the case_version bump stays with
+        ``apply_human_action``.
+        """
+        written: list[Path] = []
+        try:
+            with self._write() as conn:
+                case = conn.execute('SELECT * FROM cases WHERE id = ?', (case_id,)).fetchone()
+                if case is None:
+                    raise DomainError('NOT_FOUND', f'Không tìm thấy hồ sơ {case_id}.')
+
+                existing = conn.execute(
+                    'SELECT COUNT(*) AS n, COALESCE(SUM(size), 0) AS b FROM evidence WHERE case_id = ?',
+                    (case_id,),
+                ).fetchone()
+                self._validate_upload_limits(
+                    uploads, existing_count=existing['n'], existing_bytes=existing['b']
+                )
+
+                seen = {
+                    row['sha256'] for row in conn.execute(
+                        'SELECT sha256 FROM evidence WHERE case_id = ?', (case_id,)
+                    )
+                }
+                now = _now()
+                rows: list[Evidence] = []
+                for upload in uploads:
+                    data = bytes(upload.content)
+                    digest = hashlib.sha256(data).hexdigest()
+                    if digest in seen:
+                        continue
+                    seen.add(digest)
+                    name = self._safe_upload_name(upload.original_name)
+                    path = put_artifact(
+                        self._artifact_root, case_id, 'evidence', name, upload.content)
+                    written.append(path)
+                    evidence = Evidence(
+                        id=f'ev-{uuid.uuid4().hex}', case_id=case_id, role=upload.role,
+                        original_name=upload.original_name, stored_path=str(path),
+                        sha256=digest, mime=upload.mime, size=len(data),
+                    )
+                    conn.execute(
+                        'INSERT INTO evidence (id, case_id, role, original_name, stored_path, '
+                        'sha256, mime, size, created_at) VALUES (?,?,?,?,?,?,?,?,?)',
+                        (evidence.id, evidence.case_id, evidence.role, evidence.original_name,
+                         evidence.stored_path, evidence.sha256, evidence.mime, evidence.size, now),
+                    )
+                    rows.append(evidence)
+            return rows
+        except BaseException:
+            # Covers both an in-body failure and a COMMIT failure: the write lock
+            # is released before this runs, so the unlink is safe.
+            for path in written:
+                try:
+                    path.unlink()
+                except FileNotFoundError:
+                    pass
+            raise
+
     def get_case(self, case_id: str) -> CaseRecord:
         row = self._read_one('SELECT * FROM cases WHERE id = ?', (case_id,))
         if row is None:
@@ -336,7 +479,8 @@ class Repository:
             # replacement. A second active run would let a superseded result
             # reach finalization, so reject it here.
             active = conn.execute(
-                "SELECT id FROM runs WHERE case_id = ? AND status IN ('QUEUED','RUNNING') LIMIT 1",
+                "SELECT id FROM runs WHERE case_id = ? AND status IN "
+                "('QUEUED','RUNNING','STOP_REQUESTED') LIMIT 1",
                 (snapshot.case_id,),
             ).fetchone()
             if active is not None:
@@ -574,6 +718,55 @@ class Repository:
             'ESCALATE': 'WAITING_APPROVAL',
             'REJECT': 'REJECTED',
         }.get(decision.action, 'REVIEWING')
+
+    def finalize_technical(self, run_id: str, *, code: str, reason: str) -> RunRecord:
+        """End a run FAILED on an infrastructure error (never a business verdict).
+
+        The executor calls this when ``process`` raises something other than a
+        ``StoppedRun`` (an unexpected bug, a persistence failure, ...). It never
+        inserts a payment request and never fabricates a decision; the run is
+        terminal and carries a technical diagnostic event. Idempotent: an
+        already-terminal run is returned unchanged.
+        """
+        with self._write() as conn:
+            run = conn.execute('SELECT * FROM runs WHERE id = ?', (run_id,)).fetchone()
+            if run is None:
+                raise DomainError('NOT_FOUND', f'Không tìm thấy run {run_id}.')
+            if run['status'] in _TERMINAL_RUN:
+                return self._run_from_row(run)
+            now = _now()
+            # An acknowledged Stop takes precedence: the operator asked to stop, so
+            # the run ends STOPPED even if a technical error also occurred. The
+            # stop guard is never bypassed by an infrastructure failure.
+            if run['stop_requested'] or run['status'] == 'STOP_REQUESTED':
+                conn.execute(
+                    'UPDATE runs SET status = ?, finished_at = ?, stage = ? WHERE id = ?',
+                    ('STOPPED', now, 'stopped', run_id),
+                )
+                conn.execute(
+                    "UPDATE cases SET workflow_state = 'STOPPED', updated_at = ? WHERE id = ?",
+                    (now, run['case_id']),
+                )
+                self._insert_event(
+                    conn, case_id=run['case_id'], run_id=run_id, case_version=run['case_version'],
+                    kind='RUN_STOPPED', stage='stop',
+                    reason='Run dừng theo yêu cầu; lỗi kỹ thuật sau đó không áp dụng kết quả.',
+                )
+                return self._run_from_row(
+                    conn.execute('SELECT * FROM runs WHERE id = ?', (run_id,)).fetchone()
+                )
+            conn.execute(
+                'UPDATE runs SET status = ?, finished_at = ?, stage = ? WHERE id = ?',
+                ('FAILED', now, 'technical', run_id),
+            )
+            self._insert_event(
+                conn, case_id=run['case_id'], run_id=run_id, case_version=run['case_version'],
+                kind='RUN_TECHNICAL_FAILED', stage='technical', reason=reason,
+                payload={'code': code},
+            )
+            return self._run_from_row(
+                conn.execute('SELECT * FROM runs WHERE id = ?', (run_id,)).fetchone()
+            )
 
     def _ensure_payment_request(
         self, conn: sqlite3.Connection, case: sqlite3.Row, run: sqlite3.Row, decision

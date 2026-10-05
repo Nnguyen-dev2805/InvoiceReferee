@@ -165,8 +165,17 @@ def process(
     providers: Providers,
     checkpoint: Checkpoint,
     artifact_writer: ArtifactWriter,
+    confirmations=None,
 ) -> PipelineResult:
-    """Run the full pipeline for one snapshot. Never inserts a payment request."""
+    """Run the full pipeline for one snapshot. Never inserts a payment request.
+
+    ``confirmations`` defaults to ``snapshot.confirmations``; the effective
+    REVIEWER CONFIRM_FIELD actions are passed to the pure ``evaluate`` so a
+    reviewer confirmation can make an already-present fact USABLE. Confirmations
+    never create a fact and never waive arithmetic/coverage hard gates.
+    """
+    if confirmations is None:
+        confirmations = snapshot.confirmations
     durations: dict[str, int] = {}
     artifacts: list[str] = []
     identities: list[StageIdentity] = []
@@ -250,7 +259,7 @@ def process(
         return finish(_technical(exc.code), EvidenceBundle(documents=documents, registries=registries))
 
     checkpoint('before:evaluate')
-    decision = evaluate(snapshot, bundle)
+    decision = evaluate(snapshot, bundle, confirmations)
     if context_issues and decision.action != 'NONE':
         decision = _merge_context_issues(decision, context_issues)
     return finish(decision, bundle)

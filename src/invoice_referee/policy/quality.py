@@ -151,6 +151,45 @@ def _contradicts_quality(observations: Sequence[QualityObservation]) -> bool:
     )
 
 
+def confirmation_index(confirmations: Sequence[HumanAction] | None) -> dict[str, HumanAction]:
+    """Map a canonical field path -> its REVIEWER CONFIRM_FIELD action.
+
+    The confirmation ``payload['field']`` is the canonical path
+    ``<evidence_id>.fields.<name>`` or ``<evidence_id>.items.<item_id>.<subfield>``
+    (T07 validates that shape). Keying by the FULL path lets the evaluators look up
+    the exact fact they are deriving, so an item sub-field shared by two items is
+    never conflated. Non-CONFIRM_FIELD / non-REVIEWER entries are ignored.
+    """
+    index: dict[str, HumanAction] = {}
+    for confirmation in confirmations or ():
+        effective = _as_confirm_field(confirmation)
+        if effective is None:
+            continue
+        field = effective.payload.get('field')
+        if isinstance(field, str):
+            index[field] = effective
+    return index
+
+
+def _as_confirm_field(action: HumanAction) -> HumanAction | None:
+    """Return an equivalent CONFIRM_FIELD action, unwrapping OVERRIDE if needed.
+
+    An OVERRIDE wrapping CONFIRM_FIELD (System §7) is an effective confirmation
+    just like a direct one; it is normalized here so the evaluators see one shape.
+    """
+    if action.kind == 'CONFIRM_FIELD' and action.mode == 'REVIEWER':
+        return action
+    if (
+        action.kind == 'OVERRIDE'
+        and action.mode == 'REVIEWER'
+        and action.payload.get('operation') == 'CONFIRM_FIELD'
+    ):
+        values = action.payload.get('values')
+        if isinstance(values, dict):
+            return action.model_copy(update={'kind': 'CONFIRM_FIELD', 'payload': dict(values)})
+    return None
+
+
 def _confirmation_matches(
     fact: FieldFact, confirmation: HumanAction | None, registry: SourceRegistry
 ) -> bool:
@@ -160,7 +199,17 @@ def _confirmation_matches(
     if confirmation.kind != 'CONFIRM_FIELD' or confirmation.mode != 'REVIEWER':
         return False
     payload = confirmation.payload
-    if payload.get('field') != fact.field:
+    # DELIBERATE (T08 ruling), pinned by tests: a confirmation may name EITHER the
+    # bare fact field (legacy/T02 builder spelling, e.g. ``'total'``) OR the
+    # canonical path ``<evidence_id>.fields.<name>`` /
+    # ``<evidence_id>.items.<item_id>.<subfield>`` (T07 shape). The evaluator has
+    # already scoped the confirmation to THIS exact fact (via ``confirmation_index``
+    # on the full path, or by being handed it directly for a single fact), so
+    # matching the trailing segment is unambiguous here.
+    field_name = payload.get('field')
+    if field_name != fact.field and (
+        not isinstance(field_name, str) or field_name.split('.')[-1] != fact.field
+    ):
         return False
     if str(payload.get('value')) != fact.raw_value:
         return False

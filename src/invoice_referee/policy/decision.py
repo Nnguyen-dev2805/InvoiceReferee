@@ -31,7 +31,7 @@ from invoice_referee.domain.models import (
 from invoice_referee.policy.expenses import context_check, document_checks
 from invoice_referee.policy.inventory import arithmetic_checks, inventory_checks
 from invoice_referee.policy.numeric import DECIMAL_CONTEXT
-from invoice_referee.policy.quality import derive_fact
+from invoice_referee.policy.quality import confirmation_index, derive_fact
 
 # The exact Rulebook §3 matrix. Every rule must be reported exactly once.
 _RULE_MATRIX = (
@@ -153,7 +153,7 @@ def _merge_checks(existing: CheckResult, incoming: CheckResult) -> CheckResult:
 
 
 def _merge_documents(
-    snapshot: CaseSnapshot, bundle: EvidenceBundle
+    snapshot: CaseSnapshot, bundle: EvidenceBundle, confirmations=None
 ) -> list[CheckResult]:
     """Document-level checks aggregated by rule_id (each rule appears once).
 
@@ -174,7 +174,7 @@ def _merge_documents(
                 for rule in _DOC_RULES
             ]
         else:
-            doc_checks = document_checks(doc, registry, snapshot.policy)
+            doc_checks = document_checks(doc, registry, snapshot.policy, confirmations)
         for check in doc_checks:
             if check.rule_id in merged:
                 merged[check.rule_id] = _merge_checks(merged[check.rule_id], check)
@@ -183,8 +183,20 @@ def _merge_documents(
     return list(merged.values())
 
 
-def evaluate(snapshot: CaseSnapshot, bundle: EvidenceBundle) -> Decision:
-    """Evaluate a case snapshot + evidence bundle into a pure ``Decision``."""
+def evaluate(
+    snapshot: CaseSnapshot, bundle: EvidenceBundle, confirmations=None
+) -> Decision:
+    """Evaluate a case snapshot + evidence bundle into a pure ``Decision``.
+
+    ``confirmations`` is the list of effective REVIEWER ``CONFIRM_FIELD`` actions
+    from the snapshot; when omitted it defaults to ``snapshot.confirmations`` so
+    the service/Verify path automatically honors a reviewer confirmation without
+    a second evaluation path. A confirmation can only make an already-present fact
+    USABLE; it never creates a fact or waives arithmetic/coverage hard gates.
+    """
+    if confirmations is None:
+        confirmations = snapshot.confirmations
+    confirmation_map = confirmation_index(confirmations)
     checks: list[CheckResult] = []
     issues: list[Issue] = []
 
@@ -258,7 +270,7 @@ def evaluate(snapshot: CaseSnapshot, bundle: EvidenceBundle) -> Decision:
             reason='Có khai báo primary bill.', issue_ids=[]))
 
     # --- Per-document source/scope checks (aggregated by rule_id) -------------
-    doc_checks = _merge_documents(snapshot, bundle)
+    doc_checks = _merge_documents(snapshot, bundle, confirmation_map)
     checks.extend(doc_checks)
     # When no document (or no registry) exists, document-level rules are still
     # reported so the matrix stays complete; these are UNKNOWN (never PASS,
@@ -301,7 +313,7 @@ def evaluate(snapshot: CaseSnapshot, bundle: EvidenceBundle) -> Decision:
             question='Thiếu khai báo context cần cho profile: ' + ', '.join(ctx.dependencies)))
 
     # --- Arithmetic (AMT-02), independent of consistency ----------------------
-    checks.extend(arithmetic_checks(bundle, snapshot.policy))
+    checks.extend(arithmetic_checks(bundle, snapshot.policy, confirmation_map))
     amt02 = next(c for c in checks if c.rule_id == 'AMT-02')
     if amt02.status == 'FAIL':
         issues.append(_open_factual(
@@ -314,7 +326,7 @@ def evaluate(snapshot: CaseSnapshot, bundle: EvidenceBundle) -> Decision:
 
     # --- Accepted amount and AMT-01 -------------------------------------------
     requested = claim.requested_amount_vnd
-    verified_total = _verified_total(snapshot, bundle)
+    verified_total = _verified_total(snapshot, bundle, confirmation_map)
     accepted: int | None = None
     if requested is not None and verified_total is not None:
         if requested == verified_total:
@@ -340,7 +352,8 @@ def evaluate(snapshot: CaseSnapshot, bundle: EvidenceBundle) -> Decision:
     # --- Inventory (INV-01/02) ------------------------------------------------
     checks.extend(inventory_checks(
         bundle, snapshot.policy,
-        profile=claim.profile, received_full=claim.received_full))
+        profile=claim.profile, received_full=claim.received_full,
+        confirmations=confirmation_map))
     for check in checks:
         if check.rule_id == 'INV-01' and check.status == 'FAIL':
             issues.append(_open_factual(
@@ -450,7 +463,9 @@ def _policy_authority_checks(
     return checks
 
 
-def _verified_total(snapshot: CaseSnapshot, bundle: EvidenceBundle) -> int | None:
+def _verified_total(
+    snapshot: CaseSnapshot, bundle: EvidenceBundle, confirmation_map=None
+) -> int | None:
     """Verified primary-bill total as an integer đồng when a usable total exists.
 
     Only the primary BILL total is authoritative for AMT-01; a goods-receipt
@@ -463,7 +478,10 @@ def _verified_total(snapshot: CaseSnapshot, bundle: EvidenceBundle) -> int | Non
         fact = doc.fields.get('total')
         if registry is None or fact is None:
             continue
-        derived = derive_fact(fact, registry, True, threshold, None)
+        confirmation = (
+            confirmation_map.get(f'{doc.evidence_id}.fields.total') if confirmation_map else None
+        )
+        derived = derive_fact(fact, registry, True, threshold, confirmation)
         if derived.usability != 'USABLE':
             continue
         try:

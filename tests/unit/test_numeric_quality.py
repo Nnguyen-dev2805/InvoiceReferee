@@ -414,3 +414,20 @@ def test_confirmation_without_refs_is_not_usable():
     derived = derive_fact(fact, _make_registry(scores=(None,)), True, THRESHOLD,
                           _confirmation(fact, refs=[]))
     assert derived.usability == 'UNCERTAIN'
+
+
+def test_confirmation_field_spelling_both_accepted():
+    """Pin the DELIBERATE T08 spelling rule for CONFIRM_FIELD.
+
+    Both the bare fact field ('total') and the canonical path
+    ('e-primary.fields.total') are accepted; a DIFFERENT trailing field is not.
+    """
+    fact = _make_fact(field='total')
+    for spelling in ('total', 'e-primary.fields.total'):
+        derived = derive_fact(fact, _make_registry(scores=(None,)), True, THRESHOLD,
+                              _confirmation(fact, value='1200000').model_copy(
+                                  update={'payload': {**_confirmation(fact).payload, 'field': spelling}}))
+        assert derived.usability == 'USABLE', spelling
+    wrong = _confirmation(fact).model_copy(
+        update={'payload': {**_confirmation(fact).payload, 'field': 'e-primary.fields.merchant'}})
+    assert derive_fact(fact, _make_registry(scores=(None,)), True, THRESHOLD, wrong).usability == 'UNCERTAIN'
