@@ -153,3 +153,27 @@ evidence pointers; nothing planned is recorded as done.
 - Created `docs/PRODUCT.md`, `docs/ARCHITECTURE.md` (actual pipeline/wiring).
 - Evidence: fake-pipeline only; live OCR/Kimi quality unproven (T15).
 - Not done: human actions, executor/Stop, API, UI (downstream tasks).
+
+## T07 — Human action validation, closure và input revision
+
+- Created `src/invoice_referee/application/human.py`
+  (`validate_human_action(action, snapshot, decision) -> HumanAction` +
+  `authorization_matches`). Discriminated payload validation with extra keys
+  rejected; role/scope per kind (EMPLOYEE/REVIEWER/APPROVER/POLICY_OWNER, 5m
+  boundary); no approve-all; confirmation effective only for the named
+  field/source/case-version; OVERRIDE re-checks the wrapped operation's keyset.
+  Authorization bound to case_version + policy_version + profile + purpose +
+  amount. Pure (no SQLite/providers/UI).
+- Modified `src/invoice_referee/storage/repository.py`: `apply_human_action` in
+  ONE transaction (append action/event, version bump when data changes, revoke
+  affected request, keep old run); `snapshot()` active-ID closure excludes
+  `PROPOSE_CORRECTION` from both `confirmations` (hashed) and `active_action_ids`.
+- Tests: `tests/unit/test_human_actions.py` (validator + repo scope). RED
+  observed, then GREEN; full suite 287 → 306 passed.
+- Review round 1: OVERRIDE keyset for all ops; deep ref/coverage/unit checks
+  documented as T08-owned (not claimed); canonical-string-only numeric
+  confirmations; declaration value type-check → INVALID_ACTION; proposal no
+  longer changes the recomputed hash; added coverage tests.
+- Scope: T07 is validator/repository; end-to-end service closure is T08.
+- Evidence: fake/synthetic; live quality unproven (T15).
+- Not done: executor/Stop, API, UI (downstream tasks).

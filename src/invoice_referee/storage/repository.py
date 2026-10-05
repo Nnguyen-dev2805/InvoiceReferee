@@ -68,6 +68,23 @@ DATA_REVISING = {
     'SUPPLY_DECLARATION', 'ADD_EVIDENCE', 'CONFIRM_FIELD', 'CONFIRM_MAPPING',
 }
 AUTHORIZATION_KINDS = {'GRANT_POLICY_EXCEPTION', 'APPROVE_AMOUNT'}
+# Only these demo modes may stand behind each authorization kind (Rulebook §5):
+# a reviewer/employee mode can never authorize an amount or an exception, even
+# if a malformed action row were ever inserted.
+_AUTHORIZATION_MODES = {
+    'GRANT_POLICY_EXCEPTION': {'POLICY_OWNER'},
+    'APPROVE_AMOUNT': {'APPROVER', 'POLICY_OWNER'},
+}
+# OVERRIDE wraps exactly one operation (System §7). Classification and
+# confirmations change effective data; DENY rejects; the authorization operations
+# only change active action IDs.
+_OVERRIDE_DATA_REVISING = {'CONFIRM_FIELD', 'CONFIRM_MAPPING', 'CLASSIFY_PROFILE'}
+_OVERRIDE_AUTHORIZATION = {'GRANT_POLICY_EXCEPTION', 'APPROVE_AMOUNT'}
+# A PROPOSE_CORRECTION is recorded as history but is NOT yet an effective input
+# of the current version (Rulebook §5): it is excluded from BOTH the hashed
+# ``confirmations`` and ``active_action_ids`` until a reviewer confirmation makes
+# it a fact. Other current-version actions stay effective.
+_NON_EFFECTIVE_KINDS = {'PROPOSE_CORRECTION'}
 _TERMINAL_RUN = {'STOPPED', 'SUCCEEDED', 'FAILED'}
 
 
@@ -283,13 +300,27 @@ class Repository:
         case = self.get_case(case_id)
         actions = self._list_actions(case_id)
         authorizations = self._authorizations(case, actions)
-        active_ids = [a.id for a in actions if a.case_version == case.case_version]
+        effective = self._effective_actions(case, actions)
         snap = CaseSnapshot(
             case_id=case.id, case_version=case.case_version, claim=case.claim,
             evidence=case.evidence, policy=policy, authorizations=authorizations,
-            confirmations=actions, active_action_ids=active_ids, input_hash='',
+            confirmations=effective, active_action_ids=[a.id for a in effective], input_hash='',
         )
         return snap.model_copy(update={'input_hash': snapshot_hash(snap)})
+
+    @staticmethod
+    def _effective_actions(case: CaseRecord, actions: list[HumanAction]) -> list[HumanAction]:
+        """Current-version actions that are EFFECTIVE inputs of the snapshot.
+
+        A PROPOSE_CORRECTION is excluded: it is only a proposal (not yet a fact)
+        until a reviewer confirmation records it, so it must not change the
+        snapshot hash. This single set feeds both ``confirmations`` (hashed) and
+        ``active_action_ids`` (the ``evaluate`` authorization gate).
+        """
+        return [
+            a for a in actions
+            if a.case_version == case.case_version and a.kind not in _NON_EFFECTIVE_KINDS
+        ]
 
     # --- runs -----------------------------------------------------------------
 
@@ -689,15 +720,25 @@ class Repository:
 
     @staticmethod
     def _authorizations(case: CaseRecord, actions: list[HumanAction]) -> list[Authorization]:
+        """In-force authorizations for the CURRENT case version.
+
+        A GRANT_POLICY_EXCEPTION/APPROVE_AMOUNT action (or an OVERRIDE wrapping
+        one) becomes an ``Authorization`` bound to the action's case_version,
+        policy_version, profile, purpose and amount. A data revision bumps
+        ``case_version``, so an authorization from an earlier version simply
+        stops being collected here — the affected approval loses force.
+        """
         authorizations: list[Authorization] = []
         for action in actions:
-            if action.kind not in AUTHORIZATION_KINDS or action.case_version != case.case_version:
+            if action.case_version != case.case_version:
                 continue
-            payload = action.payload
+            kind, payload = Repository._authorization_source(action)
+            if kind is None or action.mode not in _AUTHORIZATION_MODES[kind]:
+                continue
             try:
                 authorizations.append(Authorization(
                     action_id=action.id,
-                    kind='POLICY_EXCEPTION' if action.kind == 'GRANT_POLICY_EXCEPTION' else 'AMOUNT_APPROVAL',
+                    kind='POLICY_EXCEPTION' if kind == 'GRANT_POLICY_EXCEPTION' else 'AMOUNT_APPROVAL',
                     case_version=action.case_version,
                     policy_version=payload['policy_version'],
                     profile=payload['profile'],
@@ -711,6 +752,23 @@ class Repository:
                 continue
         return authorizations
 
+    @staticmethod
+    def _authorization_source(action: HumanAction) -> tuple[str | None, dict]:
+        """The authorization kind + payload an action carries (or ``None``).
+
+        OVERRIDE wraps an operation under ``payload['values']``; the wrapper's
+        original run/decision are preserved in history and the wrapped
+        authorization is recorded with the wrapper action's id.
+        """
+        if action.kind in AUTHORIZATION_KINDS:
+            return action.kind, action.payload
+        if action.kind == 'OVERRIDE':
+            operation = action.payload.get('operation')
+            values = action.payload.get('values')
+            if operation in _OVERRIDE_AUTHORIZATION and isinstance(values, dict):
+                return operation, values
+        return None, {}
+
     def apply_human_action(self, action: HumanAction) -> CaseRecord:
         now = _now()
         with self._write() as conn:
@@ -720,42 +778,68 @@ class Repository:
             if action.case_version != case['case_version']:
                 raise DomainError('STALE_VERSION', 'Hành động gắn với case_version cũ.')
 
-            conn.execute(
-                'INSERT INTO human_actions (id, case_id, case_version, issue_id, mode, kind, reason, '
-                'payload_json, created_at) VALUES (?,?,?,?,?,?,?,?,?)',
-                (action.id, action.case_id, action.case_version, action.issue_id, action.mode,
-                 action.kind, action.reason, json.dumps(action.payload), action.created_at.isoformat()),
-            )
-            self._insert_event(
-                conn, case_id=action.case_id, run_id=case['current_run_id'],
-                case_version=case['case_version'], kind=f'HUMAN_ACTION:{action.kind}', stage='human',
-                reason=action.reason, payload={'mode': action.mode, 'issue_id': action.issue_id},
-            )
-
             new_version = case['case_version']
             workflow = case['workflow_state']
             dirty = False
             revoke = False
+            operation = None
 
             if action.kind in DATA_REVISING:
                 new_version += 1
                 dirty = True
                 revoke = True
-                if action.kind == 'SUPPLY_DECLARATION':
-                    changes = action.payload.get('changes', {})
-                    merged = {**Claim.model_validate_json(case['claim_json']).model_dump(), **changes}
-                    claim = Claim.model_validate(merged)
-                    conn.execute('UPDATE cases SET claim_json = ? WHERE id = ?',
-                                 (claim.model_dump_json(), action.case_id))
             elif action.kind == 'DENY':
                 workflow = 'REJECTED'
                 dirty = True
                 revoke = True
-            elif action.kind in AUTHORIZATION_KINDS or action.kind == 'OVERRIDE':
+            elif action.kind in AUTHORIZATION_KINDS:
                 # Approvals do not change the data version, but active action IDs
                 # (and thus the snapshot hash) change, so the hash must be redone.
                 dirty = True
+            elif action.kind == 'OVERRIDE':
+                # The wrapper is recorded for audit; the wrapped operation decides
+                # whether this is a data revision, a rejection or an authorization.
+                dirty = True
+                operation = action.payload.get('operation')
+                if operation in _OVERRIDE_DATA_REVISING:
+                    new_version += 1
+                    revoke = True
+                elif operation == 'DENY':
+                    workflow = 'REJECTED'
+                    revoke = True
             # PROPOSE_CORRECTION records a proposal only — not an effective fact.
+
+            # A data-revising action is recorded at the version it CREATES, so it
+            # pins that new version's effective inputs. Non-revising actions keep
+            # the current version (which is the action's own case_version).
+            effective_version = new_version
+
+            # Apply the claim/profile changes that this action carries.
+            if action.kind == 'SUPPLY_DECLARATION':
+                changes = action.payload.get('changes', {})
+                merged = {**Claim.model_validate_json(case['claim_json']).model_dump(), **changes}
+                claim = Claim.model_validate(merged)
+                conn.execute('UPDATE cases SET claim_json = ? WHERE id = ?',
+                             (claim.model_dump_json(), action.case_id))
+            elif action.kind == 'OVERRIDE' and operation == 'CLASSIFY_PROFILE':
+                values = action.payload.get('values') or {}
+                merged = {**Claim.model_validate_json(case['claim_json']).model_dump(),
+                          'profile': values.get('profile')}
+                claim = Claim.model_validate(merged)
+                conn.execute('UPDATE cases SET claim_json = ? WHERE id = ?',
+                             (claim.model_dump_json(), action.case_id))
+
+            conn.execute(
+                'INSERT INTO human_actions (id, case_id, case_version, issue_id, mode, kind, reason, '
+                'payload_json, created_at) VALUES (?,?,?,?,?,?,?,?,?)',
+                (action.id, action.case_id, effective_version, action.issue_id, action.mode,
+                 action.kind, action.reason, json.dumps(action.payload), action.created_at.isoformat()),
+            )
+            self._insert_event(
+                conn, case_id=action.case_id, run_id=case['current_run_id'],
+                case_version=effective_version, kind=f'HUMAN_ACTION:{action.kind}', stage='human',
+                reason=action.reason, payload={'mode': action.mode, 'issue_id': action.issue_id},
+            )
 
             if revoke:
                 conn.execute(
