@@ -663,18 +663,55 @@ button:focus-visible {
 /* --- Dropzone & Multi-file Upload ------------------------------------------ */
 
 .dropzone {
+  position: relative;
   border: 2px dashed var(--color-border);
   border-radius: var(--radius);
   padding: var(--space-4);
   background: var(--color-muted);
   text-align: center;
-  transition: border-color 160ms ease, background-color 160ms ease;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
   margin-bottom: var(--space-3);
+  cursor: pointer;
+}
+
+.dropzone:hover {
+  border-color: var(--color-secondary);
+  background: #f0f9ff;
 }
 
 .dropzone-active {
-  border-color: var(--color-secondary);
+  border-color: var(--color-primary);
   background: #e0f2fe;
+  transform: scale(1.01);
+}
+
+.dropzone-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.dropzone-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  pointer-events: none;
+}
+
+.dropzone-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.dropzone-text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-foreground);
 }
 
 /* --- Focusable Error Summary ------------------------------------------------ */
@@ -1203,4 +1240,85 @@ button:focus-visible {
   color: var(--color-muted-foreground);
   font-style: italic;
 }
+
+/* --- Header Role Segmented Switcher ---------------------------------------- */
+
+.role-switcher-container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.role-switcher-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+  white-space: nowrap;
+}
+
+.role-segmented-control {
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 9999px; /* Pill shape */
+  padding: 3px;
+  gap: 3px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+}
+
+.role-segmented-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 16px;
+  border: none;
+  background: transparent;
+  color: var(--color-muted-foreground);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.role-segmented-btn:hover {
+  color: var(--color-foreground);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.role-segmented-btn-active {
+  background: #1e3a8a !important; /* Navy */
+  color: #ffffff !important;
+  font-weight: 600;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.16);
+}
+
+.role-btn-text {
+  line-height: 1.2;
+}
+
+@media (max-width: 640px) {
+  .role-switcher-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+    width: 100%;
+  }
+
+  .role-segmented-control {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .role-segmented-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+}
+
 

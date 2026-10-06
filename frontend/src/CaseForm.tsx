@@ -22,6 +22,27 @@ const PROFILES: Profile[] = ['TRAVEL', 'CLIENT_MEAL', 'WORK_PURCHASE', 'OTHER'];
 const PAYERS: PayerType[] = ['PERSONAL', 'COMPANY', 'ADVANCE', 'VENDOR', 'UNKNOWN'];
 const ROLES: EvidenceRole[] = ['PRIMARY_BILL', 'GOODS_RECEIPT', 'CONTEXT'];
 
+const PROFILE_LABELS: Record<Profile, string> = {
+  TRAVEL: 'Công tác / Đi lại (TRAVEL)',
+  CLIENT_MEAL: 'Tiếp khách / Ăn uống (CLIENT_MEAL)',
+  WORK_PURCHASE: 'Mua sắm công việc (WORK_PURCHASE)',
+  OTHER: 'Chi phí khác (OTHER)',
+};
+
+const PAYER_LABELS: Record<PayerType, string> = {
+  PERSONAL: 'Cá nhân chi trả trước (PERSONAL)',
+  COMPANY: 'Công ty chi trực tiếp (COMPANY)',
+  ADVANCE: 'Tạm ứng công ty (ADVANCE)',
+  VENDOR: 'Nhà cung cấp xuất nợ (VENDOR)',
+  UNKNOWN: 'Chưa xác định (UNKNOWN)',
+};
+
+const ROLE_LABELS: Record<EvidenceRole, string> = {
+  PRIMARY_BILL: 'Hoá đơn chính (PRIMARY_BILL)',
+  GOODS_RECEIPT: 'Phiếu giao / Biên bản (GOODS_RECEIPT)',
+  CONTEXT: 'Tài liệu bối cảnh (CONTEXT)',
+};
+
 export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
   const [profile, setProfile] = useState<Profile>('TRAVEL');
   const [purposeType, setPurposeType] = useState<PurposeType>('BUSINESS');
@@ -127,7 +148,7 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
           <label htmlFor="profile">Loại chi phí</label>
           <select id="profile" value={profile} onChange={(e) => setProfile(e.target.value as Profile)}>
             {PROFILES.map((p) => (
-              <option key={p} value={p}>{p}</option>
+              <option key={p} value={p}>{PROFILE_LABELS[p]}</option>
             ))}
           </select>
         </div>
@@ -139,9 +160,9 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
             value={purposeType}
             onChange={(e) => setPurposeType(e.target.value as PurposeType)}
           >
-            <option value="BUSINESS">Công việc</option>
-            <option value="PERSONAL">Cá nhân</option>
-            <option value="UNKNOWN">Chưa rõ</option>
+            <option value="BUSINESS">Công việc (BUSINESS)</option>
+            <option value="PERSONAL">Cá nhân (PERSONAL)</option>
+            <option value="UNKNOWN">Chưa xác định (UNKNOWN)</option>
           </select>
         </div>
 
@@ -170,7 +191,7 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
           <label htmlFor="payer">Người đã trả</label>
           <select id="payer" value={payer} onChange={(e) => setPayer(e.target.value as PayerType)}>
             {PAYERS.map((p) => (
-              <option key={p} value={p}>{p}</option>
+              <option key={p} value={p}>{PAYER_LABELS[p]}</option>
             ))}
           </select>
         </div>
@@ -186,7 +207,7 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
             onChange={(e) => setAmountText(formatCurrencyInput(e.target.value))}
             aria-invalid={errors.amount ? true : undefined}
             aria-describedby={errors.amount ? 'amount-error' : 'amount-help'}
-            placeholder="0"
+            placeholder="Ví dụ: 1.500.000"
           />
           <p id="amount-help" className="helper">Nhập số nguyên đồng, ví dụ 1.200.000₫.</p>
           {errors.amount && <p id="amount-error" className="field-error" role="alert">{errors.amount}</p>}
@@ -209,23 +230,27 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
               addFiles(e.dataTransfer.files);
             }}
           >
-            <label htmlFor="files" className="visually-hidden">
-              Tải lên chứng từ
-            </label>
             <input
               id="files"
               type="file"
               multiple
               accept=".pdf,.png,.jpg,.jpeg,.webp"
               aria-label="Chứng từ"
+              className="dropzone-input"
               onChange={(e) => {
                 addFiles(e.target.files);
                 e.target.value = '';
               }}
             />
-            <p className="helper" style={{ margin: 'var(--space-1) 0 0' }}>
-              Hỗ trợ chọn hoặc kéo thả nhiều file cùng lúc (PDF, PNG, JPG, WEBP).
-            </p>
+            <div className="dropzone-inner">
+              <span className="dropzone-icon" aria-hidden="true">📁</span>
+              <p className="dropzone-text">
+                <strong>Nhấn để chọn tệp</strong> hoặc kéo thả tệp vào đây
+              </p>
+              <p className="helper" style={{ margin: 'var(--space-1) 0 0' }}>
+                Hỗ trợ PDF, PNG, JPG, WEBP (nhiều tệp cùng lúc)
+              </p>
+            </div>
           </div>
           <ul className="file-list">
             {files.map((entry, index) => (
@@ -246,7 +271,7 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
                   }
                 >
                   {ROLES.map((r) => (
-                    <option key={r} value={r}>{r}</option>
+                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                   ))}
                 </select>
                 <button

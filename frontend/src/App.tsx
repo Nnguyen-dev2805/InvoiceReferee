@@ -7,7 +7,6 @@ import type {
   DemoMode,
   HumanAction,
   PaymentRequest,
-  PolicyDto,
   RunRecord,
   StopReply,
 } from './types';
@@ -29,7 +28,6 @@ function AppContent() {
   const [caseRecord, setCaseRecord] = useState<CaseRecord | null>(null);
   const [run, setRun] = useState<RunRecord | null>(null);
   const [payment, setPayment] = useState<PaymentRequest | null>(null);
-  const [policy, setPolicy] = useState<PolicyDto | null>(null);
   const [history, setHistory] = useState<AuditEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
@@ -52,7 +50,7 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    api.getPolicy().then(setPolicy).catch(() => setPolicy(null));
+    void api.getPolicy().catch(() => {});
     loadCases().catch((err) =>
       setError(err instanceof Error ? err.message : 'Không tải được danh sách hồ sơ.'),
     );
@@ -170,28 +168,46 @@ function AppContent() {
               Hồ sơ hoàn ứng chi phí công ty — hệ thống tự xử lý thường quy và hỏi người khi cần.
             </p>
           </div>
-          <div className="field role-select">
-            <label htmlFor="role">Vai trò (demo)</label>
-            <select
-              id="role"
-              value={role}
-              onChange={(event) => setRole(event.target.value as DemoMode)}
-            >
+          <div className="role-switcher-container">
+            <span className="role-switcher-label">Góc nhìn:</span>
+            <div className="role-segmented-control" role="radiogroup" aria-label="Chuyển đổi góc nhìn">
               {MODE_ORDER.map((option) => (
-                <option key={option} value={option}>
-                  {MODE_LABEL[option]}
-                </option>
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={role === option}
+                  className={`role-segmented-btn ${role === option ? 'role-segmented-btn-active' : ''}`}
+                  onClick={() => setRole(option)}
+                >
+                  <span className="role-btn-text">
+                    {option === 'EMPLOYEE'
+                      ? 'Nhân viên'
+                      : option === 'REVIEWER'
+                      ? 'Kế toán'
+                      : 'Người duyệt'}
+                  </span>
+                </button>
               ))}
-            </select>
+            </div>
+
+            {/* Accessible select retained for test automation and screen readers */}
+            <div className="visually-hidden">
+              <label htmlFor="role">Vai trò (demo)</label>
+              <select
+                id="role"
+                value={role}
+                onChange={(event) => setRole(event.target.value as DemoMode)}
+              >
+                {MODE_ORDER.map((option) => (
+                  <option key={option} value={option}>
+                    {MODE_LABEL[option]}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
-        {policy && (
-          <p className="policy-line">
-            Policy demo <strong>{policy.version}</strong> ·{' '}
-            {policy.active ? 'đã kích hoạt' : 'chưa kích hoạt'} · hạn mức tự động{' '}
-            {new Intl.NumberFormat('vi-VN').format(policy.auto_approval_max)}₫
-          </p>
-        )}
       </header>
 
       {error && (
@@ -226,10 +242,6 @@ function AppContent() {
           <KpiSummary cases={cases} role={role} runsByCase={runsByCase} />
           <main className="grid">
             <div className="col">
-              {/* Only the employee submits cases; the other roles work the queue. */}
-              {role === 'EMPLOYEE' && !caseRecord && (
-                <CaseForm onCreate={api.createCase} onCreated={handleCreated} />
-              )}
               <Inbox
                 cases={cases}
                 role={role}
@@ -259,7 +271,7 @@ function AppContent() {
                     </dd>
                   </dl>
                   <button type="button" className="btn btn-ghost" onClick={closeCase}>
-                    Đóng hồ sơ
+                    {role === 'EMPLOYEE' ? 'Đóng hồ sơ / Nộp hồ sơ mới' : 'Đóng hồ sơ'}
                   </button>
                 </section>
               )}
@@ -283,14 +295,20 @@ function AppContent() {
                 />
               )}
               {!caseRecord && !run && (
-                <section className="panel empty-case-panel">
-                  <p
-                    className="muted"
-                    style={{ margin: 0, textAlign: 'center', padding: 'var(--space-6) 0' }}
-                  >
-                    Chọn một hồ sơ từ hộp thư để xem chi tiết và thực hiện phê duyệt.
-                  </p>
-                </section>
+                <>
+                  {role === 'EMPLOYEE' ? (
+                    <CaseForm onCreate={api.createCase} onCreated={handleCreated} />
+                  ) : (
+                    <section className="panel empty-case-panel">
+                      <p
+                        className="muted"
+                        style={{ margin: 0, textAlign: 'center', padding: 'var(--space-6) 0' }}
+                      >
+                        Chọn một hồ sơ từ hộp thư để xem chi tiết và thực hiện phê duyệt.
+                      </p>
+                    </section>
+                  )}
+                </>
               )}
             </div>
           </main>
