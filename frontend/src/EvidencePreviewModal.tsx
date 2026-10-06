@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { EvidenceDto, EvidenceRole } from './types';
 import { getEvidenceContentUrl } from './api';
 
@@ -21,6 +21,12 @@ export function EvidencePreviewModal({
   caseId,
   onClose,
 }: EvidencePreviewModalProps) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [evidence?.id]);
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -34,7 +40,8 @@ export function EvidencePreviewModal({
 
   if (!isOpen || !evidence) return null;
 
-  const contentUrl = getEvidenceContentUrl(caseId, evidence.id);
+  const contentUrl = getEvidenceContentUrl(caseId, evidence.id, false);
+  const downloadUrl = getEvidenceContentUrl(caseId, evidence.id, true);
   const isImage = evidence.mime.startsWith('image/');
   const isPdf = evidence.mime === 'application/pdf';
   const roleText = ROLE_LABEL_MAP[evidence.role] || evidence.role;
@@ -80,12 +87,21 @@ export function EvidencePreviewModal({
         <div className="modal-body preview-modal-body">
           {isImage ? (
             <div className="preview-media-wrapper">
-              <img
-                src={contentUrl}
-                alt={evidence.original_name}
-                className="preview-image"
-                loading="lazy"
-              />
+              {hasError ? (
+                <div className="preview-unsupported">
+                  <p>Không thể hiển thị ảnh xem trước trực tiếp.</p>
+                  <p className="muted" style={{ margin: 'var(--space-1) 0 0', fontSize: '0.85rem' }}>
+                    Vui lòng bấm nút "Tải về tệp gốc" bên dưới để mở tệp.
+                  </p>
+                </div>
+              ) : (
+                <img
+                  src={contentUrl}
+                  alt={evidence.original_name}
+                  className="preview-image"
+                  onError={() => setHasError(true)}
+                />
+              )}
             </div>
           ) : isPdf ? (
             <div className="preview-media-wrapper">
@@ -104,7 +120,7 @@ export function EvidencePreviewModal({
 
         <div className="modal-footer">
           <a
-            href={contentUrl}
+            href={downloadUrl}
             target="_blank"
             rel="noopener noreferrer"
             download={evidence.original_name}

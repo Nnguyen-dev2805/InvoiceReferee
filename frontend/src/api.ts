@@ -97,8 +97,9 @@ export function getPaymentRequest(id: string): Promise<PaymentRequest | null> {
   return request<PaymentRequest | null>(`/api/cases/${encodeURIComponent(id)}/payment-request`);
 }
 
-export function getEvidenceContentUrl(caseId: string, evidenceId: string): string {
-  return `/api/cases/${encodeURIComponent(caseId)}/evidence/${encodeURIComponent(evidenceId)}/content`;
+export function getEvidenceContentUrl(caseId: string, evidenceId: string, download = false): string {
+  const base = `/api/cases/${encodeURIComponent(caseId)}/evidence/${encodeURIComponent(evidenceId)}/content`;
+  return download ? `${base}?download=true` : base;
 }
 
 export function getPolicy(): Promise<PolicyDto> {

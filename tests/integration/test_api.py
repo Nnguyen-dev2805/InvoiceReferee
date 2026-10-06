@@ -457,6 +457,11 @@ def test_evidence_content_streams_file(runtime):
     assert resp.status_code == 200
     assert resp.content == content_bytes
     assert 'application/pdf' in resp.headers.get('content-type', '')
+    assert 'inline' in resp.headers.get('content-disposition', '')
+
+    download_resp = client.get(f'/api/cases/{case_id}/evidence/{ev_id}/content?download=true')
+    assert download_resp.status_code == 200
+    assert 'attachment' in download_resp.headers.get('content-disposition', '')
 
     not_found = client.get(f'/api/cases/{case_id}/evidence/ev-nonexistent/content')
     assert not_found.status_code == 404

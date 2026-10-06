@@ -132,7 +132,7 @@ export function CaseDetail({
                     <span>Xem</span>
                   </button>
                   <a
-                    href={getEvidenceContentUrl(caseRecord.id, item.id)}
+                    href={getEvidenceContentUrl(caseRecord.id, item.id, true)}
                     target="_blank"
                     rel="noopener noreferrer"
                     download={item.original_name}

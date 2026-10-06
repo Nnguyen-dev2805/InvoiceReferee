@@ -365,7 +365,11 @@ def create_app(service: CaseService, *, provider_mode: str = 'fake') -> FastAPI:
         return _evidence_dto(owned)
 
     @app.get('/api/cases/{case_id}/evidence/{evidence_id}/content')
-    async def evidence_content(case_id: str, evidence_id: str) -> FileResponse:
+    async def evidence_content(
+        case_id: str,
+        evidence_id: str,
+        download: bool = False,
+    ) -> FileResponse:
         case = service.get_case(case_id)
         owned = next((e for e in case.evidence if e.id == evidence_id), None)
         if owned is None:
@@ -377,6 +381,7 @@ def create_app(service: CaseService, *, provider_mode: str = 'fake') -> FastAPI:
             str(stored_path),
             media_type=owned.mime,
             filename=_display_name(owned.original_name),
+            content_disposition_type='attachment' if download else 'inline',
         )
 
     # --- policy ---
