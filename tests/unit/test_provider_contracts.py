@@ -41,7 +41,7 @@ from invoice_referee.extraction.validation import (
 )
 from tests.builders import document_facts, resolved_bundle, routine_snapshot, text_registry
 
-EVIDENCE_ID = 'e-1'
+EVIDENCE_ID = 'e-primary'
 
 
 # --- Local helpers -------------------------------------------------------------

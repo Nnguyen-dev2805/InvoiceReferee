@@ -215,12 +215,28 @@ def _items_by_id(doc: DocumentFacts) -> dict[str, ItemFacts]:
     return result
 
 
+def _resolve_role_document(
+    bundle: EvidenceBundle, roles: dict[str, str] | None, role: str
+) -> DocumentFacts | None:
+    """The document DECLARED with ``role``, resolved by the code-owned role.
+
+    ``roles`` maps ``evidence_id -> role`` from the snapshot. A mislabeled model
+    ``kind`` cannot move a document into another role's slot. When ``roles`` is
+    ``None`` (a direct evaluator call with no snapshot) the model ``kind`` is used
+    as a fallback, matching the pre-existing behaviour for those unit tests.
+    """
+    if roles is not None:
+        return next((d for d in bundle.documents if roles.get(d.evidence_id) == role), None)
+    kind = 'BILL' if role == 'PRIMARY_BILL' else 'GOODS_RECEIPT'
+    return next((d for d in bundle.documents if d.kind == kind), None)
+
+
 def _consistency_status(
-    bundle: EvidenceBundle, policy: PolicyConfig, confirmations=None
+    bundle: EvidenceBundle, policy: PolicyConfig, confirmations=None, roles=None
 ) -> tuple[str, list[str]]:
     """INV-02 status plus machine-readable conflict reasons."""
-    primary = next((d for d in bundle.documents if d.kind == 'BILL'), None)
-    receipt = next((d for d in bundle.documents if d.kind == 'GOODS_RECEIPT'), None)
+    primary = _resolve_role_document(bundle, roles, 'PRIMARY_BILL')
+    receipt = _resolve_role_document(bundle, roles, 'GOODS_RECEIPT')
     if primary is None or receipt is None:
         return 'UNKNOWN', ['missing primary or receipt document']
     if bundle.mapping is None:
@@ -334,9 +350,11 @@ def _normalize_qty(qty: Decimal, unit: str) -> tuple[Decimal, str]:
         return qty * Decimal(factor), base
 
 
-def _supplier_date_status(bundle: EvidenceBundle, policy: PolicyConfig) -> tuple[str, str]:
-    primary = next((d for d in bundle.documents if d.kind == 'BILL'), None)
-    receipt = next((d for d in bundle.documents if d.kind == 'GOODS_RECEIPT'), None)
+def _supplier_date_status(
+    bundle: EvidenceBundle, policy: PolicyConfig, roles=None
+) -> tuple[str, str]:
+    primary = _resolve_role_document(bundle, roles, 'PRIMARY_BILL')
+    receipt = _resolve_role_document(bundle, roles, 'GOODS_RECEIPT')
     if primary is None or receipt is None:
         return 'UNKNOWN', 'missing document'
     p_merchant = primary.fields.get('merchant')
@@ -369,13 +387,16 @@ def inventory_checks(
     profile: str | None = None,
     received_full: bool | None = None,
     confirmations=None,
+    roles: dict[str, str] | None = None,
 ) -> list[CheckResult]:
     """INV-01/INV-02; NOT_APPLICABLE when the profile needs no goods receipt.
 
     ``profile``/``received_full`` are optional so the evaluator can pass the
     declaration; a two-argument call infers applicability from the bundle.
+    ``roles`` maps ``evidence_id -> role`` (code-owned); when given, primary and
+    receipt are resolved by DECLARED role, never by the model's ``kind``.
     """
-    has_receipt = any(d.kind == 'GOODS_RECEIPT' for d in bundle.documents)
+    has_receipt = _resolve_role_document(bundle, roles, 'GOODS_RECEIPT') is not None
     if profile is not None:
         requires = profile in _PROFILE_REQUIRES_RECEIPT
     else:
@@ -410,8 +431,8 @@ def inventory_checks(
             refs=[], reason='Có receipt và xác nhận nhận đủ.', issue_ids=[]))
 
     # INV-02: mapping/quantity/units/dates/supplier consistency.
-    status, details = _consistency_status(bundle, policy, confirmations)
-    supplier_status, supplier_detail = _supplier_date_status(bundle, policy)
+    status, details = _consistency_status(bundle, policy, confirmations, roles)
+    supplier_status, supplier_detail = _supplier_date_status(bundle, policy, roles)
     if supplier_status == 'FAIL':
         status = 'FAIL'
         details = [*details, supplier_detail]

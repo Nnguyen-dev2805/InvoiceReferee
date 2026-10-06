@@ -346,7 +346,8 @@ def evaluate(
     checks.extend(inventory_checks(
         bundle, snapshot.policy,
         profile=claim.profile, received_full=claim.received_full,
-        confirmations=confirmation_map))
+        confirmations=confirmation_map,
+        roles={e.id: e.role for e in snapshot.evidence}))
     for check in checks:
         if check.rule_id == 'INV-01' and check.status == 'FAIL':
             issues.append(_open_factual(
@@ -432,17 +433,27 @@ def _policy_authority_checks(
     return checks
 
 
+def primary_evidence_ids(snapshot: CaseSnapshot) -> set[str]:
+    """CODE-owned evidence ids declared as the primary bill (``role``), never model kind."""
+    return {e.id for e in snapshot.evidence if e.role == 'PRIMARY_BILL'}
+
+
 def _verified_total(
     snapshot: CaseSnapshot, bundle: EvidenceBundle, confirmation_map=None
 ) -> int | None:
     """Verified primary-bill total as an integer đồng when a usable total exists.
 
-    Only the primary BILL total is authoritative for AMT-01; a goods-receipt
-    total is inventory evidence, not the requested expense amount.
+    Only the document whose ``evidence_id`` is a DECLARED ``PRIMARY_BILL`` is
+    authoritative for AMT-01 — resolved by the code-owned ``role``, never the
+    model-produced ``kind``. A secondary document is inventory/context evidence and
+    can never supply the requested expense amount, so a mislabeled ``kind`` cannot
+    redirect the payment to the wrong source.
     """
     threshold = Decimal(snapshot.policy.word_review_threshold)
-    ordered = sorted(bundle.documents, key=lambda d: 0 if d.kind == 'BILL' else 1)
-    for doc in ordered:
+    primary_ids = primary_evidence_ids(snapshot)
+    for doc in bundle.documents:
+        if doc.evidence_id not in primary_ids:
+            continue
         registry = bundle.registries.get(doc.evidence_id)
         fact = doc.fields.get('total')
         if registry is None or fact is None:

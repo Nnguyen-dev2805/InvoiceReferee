@@ -252,7 +252,28 @@ function AppContent() {
             </div>
 
             <div className="col">
-              {caseRecord && (
+              {run ? (
+                <CaseDetail
+                  run={run}
+                  onStop={handleStop}
+                  caseRecord={caseRecord ?? undefined}
+                  paymentRequest={payment}
+                  history={history}
+                  onClose={closeCase}
+                  currentRole={role}
+                  actionSlot={
+                    run?.result && caseRecord ? (
+                      <HumanActions
+                        caseRecord={caseRecord}
+                        decision={run.result.decision}
+                        onAction={handleAction}
+                        currentRole={role}
+                        onRoleChange={setRole}
+                      />
+                    ) : null
+                  }
+                />
+              ) : caseRecord ? (
                 <section className="panel" aria-labelledby="claim-heading">
                   <h2 id="claim-heading">Hồ sơ đang xem</h2>
                   <dl className="claim">
@@ -274,27 +295,7 @@ function AppContent() {
                     {role === 'EMPLOYEE' ? 'Đóng hồ sơ / Nộp hồ sơ mới' : 'Đóng hồ sơ'}
                   </button>
                 </section>
-              )}
-
-              {run && (
-                <CaseDetail
-                  run={run}
-                  onStop={handleStop}
-                  caseRecord={caseRecord ?? undefined}
-                  paymentRequest={payment}
-                  history={history}
-                />
-              )}
-              {run?.result && caseRecord && (
-                <HumanActions
-                  caseRecord={caseRecord}
-                  decision={run.result.decision}
-                  onAction={handleAction}
-                  currentRole={role}
-                  onRoleChange={setRole}
-                />
-              )}
-              {!caseRecord && !run && (
+              ) : (
                 <>
                   {role === 'EMPLOYEE' ? (
                     <CaseForm onCreate={api.createCase} onCreated={handleCreated} />

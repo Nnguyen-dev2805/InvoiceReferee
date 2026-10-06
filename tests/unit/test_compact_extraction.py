@@ -13,8 +13,9 @@ from tests.builders import routine_snapshot, text_registry
 
 
 def request(*, score='0.99', amount='1200000'):
-    return AnalysisRequest(evidence=routine_snapshot().evidence[0],
-        registry=text_registry(evidence_id='e-1', score=score, amount=amount),
+    ev = routine_snapshot().evidence[0]
+    return AnalysisRequest(evidence=ev,
+        registry=text_registry(evidence_id=ev.id, score=score, amount=amount),
         required_fields=['merchant','date','currency','total'], threshold_version='test-085')
 
 
@@ -55,7 +56,7 @@ def test_compact_output_builds_domain_fact_and_owned_source():
     assert total.normalized_value=='1200000'
     assert total.usability=='USABLE'
     assert total.source_kind=='DOCUMENT'
-    assert total.refs[0].evidence_id=='e-1'
+    assert total.refs[0].evidence_id=='e-primary'
     assert (total.refs[0].page_index,total.refs[0].block_id)==(0,'b-1')
     assert total.refs[0].raw_value=='1200000'
     assert total.normalization_trace
@@ -126,7 +127,7 @@ def test_unknown_refs_and_quality_bypass_output_fail_closed(mutation):
 def table_request():
     req=request()
     rows=[('row1','| Item A | 2 | 100 | 200 |'),('row2','| Item B | 3 | 100 | 300 |')]
-    block=SourceBlock(evidence_id='e-1',page_index=0,block_id='table',
+    block=SourceBlock(evidence_id='e-primary',page_index=0,block_id='table',
         text='| Name | SL | ĐG | TT |\n|---|---|---|---|\n'+ '\n'.join(v for _,v in rows),
         words=[SourceWord(id=f'{k}-{i}',text=cell.strip(),score='0.99')
                for k,v in rows for i,cell in enumerate(v.strip('|').split('|'))],
@@ -235,7 +236,7 @@ def test_compact_source_values_remain_subject_to_arithmetic_gate():
     value=wire(template='SIMPLE_ITEMIZED');value['covered_item_regions']=['table']
     value['items']=[line('Item A','r5'),line('Item B','r6','3','300')]
     result=analyze(value,req)
-    decision=evaluate(routine_snapshot(),EvidenceBundle(documents=[result],registries={'e-1':req.registry}))
+    decision=evaluate(routine_snapshot(),EvidenceBundle(documents=[result],registries={req.evidence.id:req.registry}))
     # Two lines total 500, requested/primary total 1200000: cannot auto-approve.
     assert decision.action=='REQUEST_INFO'
     assert any(c.rule_id=='AMT-02' and c.status=='FAIL' for c in decision.checks)
@@ -295,7 +296,7 @@ def test_source_digits_are_not_concatenated_into_a_new_number(source):
 
 def test_low_quality_or_out_of_scope_numeric_hint_cannot_resolve_total_locale():
     req=request(amount='1.234')
-    block=SourceBlock(evidence_id='e-1',page_index=0,block_id='hint',text='1,2',
+    block=SourceBlock(evidence_id='e-primary',page_index=0,block_id='hint',text='1,2',
         words=[SourceWord(id='hint-word',text='1,2',score='0.01')],locators={'hint':['hint-word']})
     req=req.model_copy(update={'registry':req.registry.model_copy(update={'blocks':[*req.registry.blocks,block]})})
     value=wire(amount='1.234')

@@ -122,22 +122,42 @@ export function HumanActions({
   }
 
   return (
-    <section className="panel" aria-labelledby="actions-heading">
-      <h2 id="actions-heading">Xử lý hồ sơ</h2>
-      <p className="muted">
-        Đăng nhập demo — một người có thể chuyển vai trò. Hệ thống vẫn kiểm tra
-        quyền của từng hành động.
-        {issueOwner && issueOwner !== mode && ` Vấn đề hiện thuộc ${MODE_LABEL[issueOwner]}.`}
-      </p>
+    <section className="action-card" aria-labelledby="actions-heading">
+      <div className="action-card-header">
+        <h3 id="actions-heading" style={{ margin: 0 }}>Xử lý hồ sơ</h3>
+        {decision.accepted_amount_vnd !== null && (
+          <span className="muted" style={{ fontSize: '0.85rem' }}>
+            Số tiền đang xem xét: <strong>{formatVnd(decision.accepted_amount_vnd)}</strong>
+          </span>
+        )}
+      </div>
+
+      {issueOwner && issueOwner !== mode ? (
+        <div className="notice notice-warn role-hint-notice" role="alert">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+            <span>
+              Vấn đề hiện thuộc thẩm quyền của <strong>{MODE_LABEL[issueOwner]}</strong>.
+            </span>
+            <button
+              type="button"
+              className="btn btn-sm btn-secondary"
+              onClick={() => changeMode(issueOwner)}
+            >
+              Chuyển sang góc nhìn {MODE_LABEL[issueOwner]}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="muted" style={{ margin: 'var(--space-2) 0 var(--space-3)', fontSize: '0.85rem' }}>
+          Đăng nhập demo — một người có thể chuyển vai trò. Hệ thống vẫn kiểm tra quyền của từng hành động.
+        </p>
+      )}
+
       {!openIssue && (
         <p className="muted">
           Hồ sơ hiện không có câu hỏi mở. Chỉ nên dùng hành động khi có vấn đề cần
           xử lý; hành động không hợp lệ sẽ bị hệ thống từ chối.
         </p>
-      )}
-
-      {decision.accepted_amount_vnd !== null && (
-        <p className="muted">Số tiền đang xem xét: {formatVnd(decision.accepted_amount_vnd)}</p>
       )}
 
       <form onSubmit={submit} noValidate>

@@ -166,6 +166,55 @@ def test_over_auto_limit_escalates_to_approver(tmp_path):
     assert auth.owner_mode == 'APPROVER'
 
 
+def test_misclassified_kind_does_not_create_request_end_to_end(tmp_path):
+    # End-to-end through the real CaseService + SQLite: the CODE-owned PRIMARY_BILL
+    # (e-primary, 1.000.000) is mislabeled GOODS_RECEIPT by the model while a
+    # secondary (e-secondary, 1.200.000) is mislabeled BILL. No payment request may
+    # be persisted, and the decision must not adopt the secondary amount.
+    from invoice_referee.application.service import CaseService
+    from invoice_referee.config import activate_demo_policy
+    from invoice_referee.storage.repository import Repository
+    from tests.builders import two_source_snapshot
+
+    repo = Repository(tmp_path / 'cases.sqlite', tmp_path / 'artifacts')
+    snapshot = two_source_snapshot(1_200_000, roles=('PRIMARY_BILL', 'GOODS_RECEIPT'))
+    ids = [ev.id for ev in snapshot.evidence]  # e-primary, e-receipt
+    docs = {
+        ids[0]: document_facts('1000000', evidence_id=ids[0]).model_copy(
+            update={'kind': 'GOODS_RECEIPT'}),
+        ids[1]: document_facts('1200000', evidence_id=ids[1]).model_copy(
+            update={'kind': 'BILL'}),
+    }
+    regs = {
+        ids[0]: text_registry(evidence_id=ids[0], amount='1000000'),
+        ids[1]: text_registry(evidence_id=ids[1], amount='1200000'),
+    }
+    # Seed the case through the real intake path with the mis-classified ids.
+    from invoice_referee.domain.models import Upload
+
+    uploads = [
+        Upload(original_name=f'{ev.role.lower()}.pdf', mime='application/pdf',
+               content=f'%PDF-1.4 {ev.role}'.encode(), role=ev.role)
+        for ev in snapshot.evidence
+    ]
+    case = repo.create_case(snapshot.claim, uploads)
+    role_to_real = {ev.role: ev.id for ev in case.evidence}
+    logical = {ids[0]: role_to_real['PRIMARY_BILL'], ids[1]: role_to_real['GOODS_RECEIPT']}
+    providers = FakeProviders(
+        documents={logical[k]: v for k, v in docs.items()},
+        registries={logical[k]: v for k, v in regs.items()},
+    )
+    policy = activate_demo_policy(demo_policy(active=False), 'fixture')
+    service = CaseService(repo, providers, policy)
+    try:
+        run = service.start_run(case.id)
+        ended = service.wait(run.id, timeout_seconds=5)
+        assert ended.result.decision.action != 'CREATE_PAYMENT_REQUEST'
+        assert repo.get_payment_request(case.id) is None
+    finally:
+        service.close()
+
+
 def test_active_threshold_re_derivation(tmp_path):
     # Word score 0.80 sits below the B1 fixed 0.85 but above a 0.75 policy.
     snapshot = _primary_snapshot()

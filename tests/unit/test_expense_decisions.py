@@ -218,6 +218,30 @@ def test_credit_note_is_scope_issue():
     assert any(c.rule_id == 'SCOPE-02' and c.status == 'FAIL' for c in decision.checks)
 
 
+def test_misclassified_kind_cannot_approve_from_the_wrong_source():
+    # CODE says e-1 is PRIMARY_BILL (1.000.000) and e-2 is a secondary (1.200.000);
+    # the MODEL mislabels kinds: e-1 -> GOODS_RECEIPT, e-2 -> BILL. The authoritative
+    # total must follow the code-owned ROLE, so the system must NOT create a payment
+    # request from the secondary document.
+    from invoice_referee.domain.models import EvidenceBundle
+
+    from tests.builders import document_facts, text_registry, two_source_snapshot
+
+    snap = two_source_snapshot(1_200_000)
+    primary = document_facts('1000000', evidence_id='e-1').model_copy(
+        update={'kind': 'GOODS_RECEIPT'})
+    secondary = document_facts('1200000', evidence_id='e-2').model_copy(
+        update={'kind': 'BILL'})
+    bundle = EvidenceBundle(
+        documents=[primary, secondary],
+        registries={'e-1': text_registry(evidence_id='e-1', amount='1000000'),
+                    'e-2': text_registry(evidence_id='e-2', amount='1200000')},
+    )
+    decision = evaluate(snap, bundle)
+    assert decision.action != 'CREATE_PAYMENT_REQUEST'
+    assert decision.accepted_amount_vnd is None
+
+
 def test_unknown_payer_requests_info_not_assume_employee_paid():
     snap = _with_claim(routine_snapshot(1_200_000), payer_type='UNKNOWN')
     decision = evaluate(snap, resolved_bundle('1200000'))

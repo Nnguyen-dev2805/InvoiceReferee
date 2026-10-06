@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AuditEvent, CaseRecord, EvidenceDto, PaymentRequest, RunRecord, SourceRef, StopReply } from './types';
+import type { AuditEvent, CaseRecord, DemoMode, EvidenceDto, PaymentRequest, RunRecord, SourceRef, StopReply } from './types';
 import {
   ACTION_LABEL,
   ISSUE_CLASS_LABEL,
@@ -18,6 +18,9 @@ interface CaseDetailProps {
   caseRecord?: CaseRecord;
   paymentRequest?: PaymentRequest | null;
   history?: AuditEvent[];
+  onClose?: () => void;
+  currentRole?: DemoMode;
+  actionSlot?: React.ReactNode;
 }
 
 type StopState = 'idle' | 'pending' | 'stopped' | 'completed';
@@ -28,6 +31,9 @@ export function CaseDetail({
   caseRecord,
   paymentRequest,
   history,
+  onClose,
+  currentRole,
+  actionSlot,
 }: CaseDetailProps) {
   const [stopState, setStopState] = useState<StopState>('idle');
   const [stopError, setStopError] = useState<string | null>(null);
@@ -53,11 +59,45 @@ export function CaseDetail({
 
   return (
     <section className="panel" aria-labelledby="detail-heading">
-      <header className="panel-head">
-        <h2 id="detail-heading">Hồ sơ {run.case_id}</h2>
-        <span className={`status status-${run.status.toLowerCase()}`}>
-          {RUN_STATUS_LABEL[run.status]}
-        </span>
+      <header className="case-detail-header">
+        <div className="case-detail-header-main">
+          <div className="case-detail-title-row">
+            <h2 id="detail-heading">
+              {caseRecord?.claim.purpose ? caseRecord.claim.purpose : `Hồ sơ ${run.case_id}`}
+            </h2>
+            <span className={`status status-${run.status.toLowerCase()}`}>
+              {RUN_STATUS_LABEL[run.status]}
+            </span>
+          </div>
+          {caseRecord && (
+            <div className="case-detail-meta-bar">
+              <span>
+                Người nộp: <strong>{caseRecord.claim.employee_id}</strong>
+              </span>
+              <span className="meta-dot">·</span>
+              <span>
+                Loại: <strong>{caseRecord.claim.profile}</strong>
+              </span>
+              <span className="meta-dot">·</span>
+              <span>
+                Số đề nghị:{' '}
+                <strong className="meta-amount">
+                  {new Intl.NumberFormat('vi-VN').format(caseRecord.claim.requested_amount_vnd ?? 0)}₫
+                </strong>
+              </span>
+            </div>
+          )}
+        </div>
+        {onClose && (
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost close-case-btn"
+            onClick={onClose}
+            aria-label="Đóng hồ sơ"
+          >
+            {currentRole === 'EMPLOYEE' ? '✕ Đóng / Nộp mới' : '✕ Đóng'}
+          </button>
+        )}
       </header>
 
       <PipelineStepper
@@ -94,21 +134,7 @@ export function CaseDetail({
         </div>
       )}
 
-      {decision && decision.checks.length > 0 && (
-        <details className="checks">
-          <summary>Kiểm tra đã chạy ({decision.checks.length})</summary>
-          <ul>
-            {decision.checks.map((check) => (
-              <li key={check.rule_id} className={`check check-${check.status.toLowerCase()}`}>
-                <span className="check-rule">{check.rule_id}</span>
-                <span className="check-status">{check.status}</span>
-                <span className="check-reason">{check.reason}</span>
-                <SourceRefs refs={check.refs} />
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      {actionSlot}
 
       {caseRecord && caseRecord.evidence.length > 0 && (
         <div className="evidence">
@@ -154,6 +180,24 @@ export function CaseDetail({
             onClose={() => setSelectedEvidence(null)}
           />
         </div>
+      )}
+
+      {decision && decision.checks.length > 0 && (
+        <details className="checks">
+          <summary>Kiểm tra đã chạy ({decision.checks.length})</summary>
+          <div className="checks-scroll-container">
+            <ul>
+              {decision.checks.map((check) => (
+                <li key={check.rule_id} className={`check check-${check.status.toLowerCase()}`}>
+                  <span className="check-rule">{check.rule_id}</span>
+                  <span className="check-status">{check.status}</span>
+                  <span className="check-reason">{check.reason}</span>
+                  <SourceRefs refs={check.refs} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </details>
       )}
 
       {decision?.action === 'CREATE_PAYMENT_REQUEST' && (
@@ -291,7 +335,7 @@ function AuditTimeline({ events }: { events: AuditEvent[] }) {
   // Newest first for a readable audit trail.
   const ordered = [...events].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
   return (
-    <details className="audit" open>
+    <details className="audit">
       <summary>Nhật ký kiểm toán ({events.length})</summary>
       <div className="timeline-container">
         <ol className="timeline">

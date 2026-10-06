@@ -254,9 +254,12 @@ def routine_snapshot(amount: int = 1_200_000, profile: str = 'TRAVEL') -> CaseSn
     roles = ['PRIMARY_BILL']
     if profile == 'WORK_PURCHASE':
         roles.append('GOODS_RECEIPT')
+    # Evidence ids match ``resolved_bundle``/``text_registry`` logical ids so a
+    # snapshot + its bundle align on ``evidence_id`` (role-resolved downstream).
+    id_by_role = {'PRIMARY_BILL': 'e-primary', 'GOODS_RECEIPT': 'e-receipt'}
     evidence = [
         Evidence(
-            id=f'e-{i}',
+            id=id_by_role.get(role, f'e-{i}'),
             case_id='case-demo',
             role=role,
             original_name=f'{role.lower()}.pdf',
@@ -278,6 +281,37 @@ def routine_snapshot(amount: int = 1_200_000, profile: str = 'TRAVEL') -> CaseSn
         confirmations=[],
         active_action_ids=[],
         input_hash='',
+    )
+    from invoice_referee.config import snapshot_hash
+
+    return snapshot.model_copy(update={'input_hash': snapshot_hash(snapshot)})
+
+
+def two_source_snapshot(
+    amount: int = 1_200_000, *, roles: tuple[str, str] = ('PRIMARY_BILL', 'GOODS_RECEIPT')
+) -> CaseSnapshot:
+    """TRAVEL-ish snapshot with TWO declared evidence, roles given explicitly.
+
+    Lets a test set each evidence's CODE-owned ``role`` independently of the
+    model-produced document ``kind`` (the mis-classification scenario).
+    """
+    claim = Claim(
+        employee_id='emp-demo', profile='TRAVEL', purpose_type='BUSINESS',
+        purpose='Công tác demo', trip='Chuyến công tác demo',
+        requested_amount_vnd=amount, payer_type='PERSONAL', received_full=None,
+    )
+    evidence = [
+        Evidence(
+            id=f'e-{i}', case_id='case-demo', role=role,
+            original_name=f'{role.lower()}.pdf', stored_path=f'data/case-demo/{role.lower()}.pdf',
+            sha256=f'{i:064d}', mime='application/pdf', size=1024,
+        )
+        for i, role in enumerate(roles, start=1)
+    ]
+    snapshot = CaseSnapshot(
+        case_id='case-demo', case_version=1, claim=claim, evidence=evidence,
+        policy=demo_policy(), authorizations=[], confirmations=[],
+        active_action_ids=[], input_hash='',
     )
     from invoice_referee.config import snapshot_hash
 
