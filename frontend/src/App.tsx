@@ -16,11 +16,13 @@ import { CaseDetail } from './CaseDetail';
 import { HumanActions } from './HumanActions';
 import { Inbox } from './Inbox';
 import { VerifyPanel } from './VerifyPanel';
+import { KpiSummary } from './KpiSummary';
+import { ToastProvider, useToast } from './Toast';
 import { MODE_LABEL, MODE_ORDER, runInFlight } from './format';
 
 const POLL_MS = 1000;
 
-export function App() {
+function AppContent() {
   const [role, setRole] = useState<DemoMode>('EMPLOYEE');
   const [cases, setCases] = useState<CaseRecord[]>([]);
   const [runsByCase, setRunsByCase] = useState<Record<string, RunRecord>>({});
@@ -31,6 +33,7 @@ export function App() {
   const [history, setHistory] = useState<AuditEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
+  const toast = useToast();
 
   // Load the case list plus the current run of each case, so the inbox can show
   // role ownership and "processing" state without recomputing any decision.
@@ -80,13 +83,14 @@ export function App() {
             pollRun(runId);
           } else {
             await loadCases(); // run finished: refresh role ownership in the inbox
+            toast.info(`Hồ sơ đã hoàn tất lượt xử lý (${latest.status}).`);
           }
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Không tải được trạng thái.');
         }
       }, POLL_MS);
     },
-    [stopPolling, loadCases],
+    [stopPolling, loadCases, toast],
   );
 
   useEffect(() => stopPolling, [stopPolling]);
@@ -117,6 +121,7 @@ export function App() {
       const started = await api.startRun(record.id);
       setCaseRecord(record);
       setRun(started);
+      toast.success('Nộp hồ sơ thành công! Bắt đầu kiểm tra dữ kiện…');
       pollRun(started.id);
       await loadCases();
     } catch (err) {
@@ -131,6 +136,7 @@ export function App() {
       const latest = await api.getRun(run.id);
       setRun(latest);
       if (caseRecord) setCaseRecord(await api.getCase(caseRecord.id));
+      toast.info('Đã dừng lượt xử lý hồ sơ.');
     }
     return reply;
   }
@@ -139,6 +145,7 @@ export function App() {
     if (!caseRecord) return;
     setError(null);
     const updated = await api.sendAction(caseRecord.id, action);
+    toast.success('Đã gửi phản hồi ý kiến xử lý.');
     await refresh(updated);
     await loadCases();
   }
@@ -215,70 +222,92 @@ export function App() {
       </nav>
 
       {tab === 'cases' ? (
-        <main className="grid">
-          <div className="col">
-            {/* Only the employee submits cases; the other roles work the queue. */}
-            {role === 'EMPLOYEE' && !caseRecord && (
-              <CaseForm onCreate={api.createCase} onCreated={handleCreated} />
-            )}
-            <Inbox
-              cases={cases}
-              role={role}
-              runsByCase={runsByCase}
-              onOpen={openCase}
-              selectedCaseId={caseRecord?.id}
-            />
-          </div>
-
-          <div className="col">
-            {caseRecord && (
-              <section className="panel" aria-labelledby="claim-heading">
-                <h2 id="claim-heading">Hồ sơ đang xem</h2>
-                <dl className="claim">
-                  <dt>Nhân viên</dt><dd>{caseRecord.claim.employee_id}</dd>
-                  <dt>Loại chi phí</dt><dd>{caseRecord.claim.profile}</dd>
-                  <dt>Mục đích</dt><dd>{caseRecord.claim.purpose}</dd>
-                  <dt>Số đề nghị</dt>
-                  <dd>{new Intl.NumberFormat('vi-VN').format(caseRecord.claim.requested_amount_vnd ?? 0)}₫</dd>
-                </dl>
-                <button type="button" className="btn btn-ghost" onClick={closeCase}>
-                  Đóng hồ sơ
-                </button>
-              </section>
-            )}
-
-            {run && (
-              <CaseDetail
-                run={run}
-                onStop={handleStop}
-                caseRecord={caseRecord ?? undefined}
-                paymentRequest={payment}
-                history={history}
+        <>
+          <KpiSummary cases={cases} role={role} runsByCase={runsByCase} />
+          <main className="grid">
+            <div className="col">
+              {/* Only the employee submits cases; the other roles work the queue. */}
+              {role === 'EMPLOYEE' && !caseRecord && (
+                <CaseForm onCreate={api.createCase} onCreated={handleCreated} />
+              )}
+              <Inbox
+                cases={cases}
+                role={role}
+                runsByCase={runsByCase}
+                onOpen={openCase}
+                selectedCaseId={caseRecord?.id}
               />
-            )}
-            {run?.result && caseRecord && (
-              <HumanActions
-                caseRecord={caseRecord}
-                decision={run.result.decision}
-                onAction={handleAction}
-                currentRole={role}
-                onRoleChange={setRole}
-              />
-            )}
-            {!caseRecord && !run && (
-              <section className="panel empty-case-panel">
-                <p className="muted" style={{ margin: 0, textAlign: 'center', padding: 'var(--space-6) 0' }}>
-                  Chọn một hồ sơ từ hộp thư để xem chi tiết và thực hiện phê duyệt.
-                </p>
-              </section>
-            )}
-          </div>
-        </main>
+            </div>
+
+            <div className="col">
+              {caseRecord && (
+                <section className="panel" aria-labelledby="claim-heading">
+                  <h2 id="claim-heading">Hồ sơ đang xem</h2>
+                  <dl className="claim">
+                    <dt>Nhân viên</dt>
+                    <dd>{caseRecord.claim.employee_id}</dd>
+                    <dt>Loại chi phí</dt>
+                    <dd>{caseRecord.claim.profile}</dd>
+                    <dt>Mục đích</dt>
+                    <dd>{caseRecord.claim.purpose}</dd>
+                    <dt>Số đề nghị</dt>
+                    <dd>
+                      {new Intl.NumberFormat('vi-VN').format(
+                        caseRecord.claim.requested_amount_vnd ?? 0,
+                      )}
+                      ₫
+                    </dd>
+                  </dl>
+                  <button type="button" className="btn btn-ghost" onClick={closeCase}>
+                    Đóng hồ sơ
+                  </button>
+                </section>
+              )}
+
+              {run && (
+                <CaseDetail
+                  run={run}
+                  onStop={handleStop}
+                  caseRecord={caseRecord ?? undefined}
+                  paymentRequest={payment}
+                  history={history}
+                />
+              )}
+              {run?.result && caseRecord && (
+                <HumanActions
+                  caseRecord={caseRecord}
+                  decision={run.result.decision}
+                  onAction={handleAction}
+                  currentRole={role}
+                  onRoleChange={setRole}
+                />
+              )}
+              {!caseRecord && !run && (
+                <section className="panel empty-case-panel">
+                  <p
+                    className="muted"
+                    style={{ margin: 0, textAlign: 'center', padding: 'var(--space-6) 0' }}
+                  >
+                    Chọn một hồ sơ từ hộp thư để xem chi tiết và thực hiện phê duyệt.
+                  </p>
+                </section>
+              )}
+            </div>
+          </main>
+        </>
       ) : (
         <main className="verify-tab-content">
           <VerifyPanel />
         </main>
       )}
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
   );
 }

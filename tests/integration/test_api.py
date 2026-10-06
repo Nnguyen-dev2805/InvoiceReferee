@@ -443,6 +443,25 @@ def test_evidence_original_name_is_sanitized(runtime):
     assert '/' not in name and '\\' not in name and name == 'evil.pdf'
 
 
+def test_evidence_content_streams_file(runtime):
+    client = TestClient(create_app(runtime.service))
+    content_bytes = _pdf('my-bill')
+    data = {'claim_json': json.dumps(_claim()), 'roles': json.dumps(['PRIMARY_BILL'])}
+    files = [('files', ('my-bill.pdf', content_bytes, 'application/pdf'))]
+    created = client.post('/api/cases', data=data, files=files)
+    assert created.status_code == 201
+    case_id = created.json()['id']
+    ev_id = created.json()['evidence'][0]['id']
+
+    resp = client.get(f'/api/cases/{case_id}/evidence/{ev_id}/content')
+    assert resp.status_code == 200
+    assert resp.content == content_bytes
+    assert 'application/pdf' in resp.headers.get('content-type', '')
+
+    not_found = client.get(f'/api/cases/{case_id}/evidence/ev-nonexistent/content')
+    assert not_found.status_code == 404
+
+
 def test_openapi_exposes_required_paths(runtime):
     client = TestClient(create_app(runtime.service))
     schema = client.get('/openapi.json').json()
@@ -451,10 +470,13 @@ def test_openapi_exposes_required_paths(runtime):
         '/api/cases', '/api/cases/{case_id}', '/api/cases/{case_id}/runs',
         '/api/runs/{run_id}', '/api/cases/{case_id}/actions', '/api/runs/{run_id}/stop',
         '/api/cases/{case_id}/history', '/api/cases/{case_id}/payment-request',
-        '/api/cases/{case_id}/evidence/{evidence_id}', '/api/policy',
+        '/api/cases/{case_id}/evidence/{evidence_id}',
+        '/api/cases/{case_id}/evidence/{evidence_id}/content',
+        '/api/policy',
         '/api/health',
     ):
         assert path in paths, path
     # Deterministic schema hash is recorded in the T09 evidence doc.
     canonical = json.dumps(schema, sort_keys=True, separators=(',', ':')).encode('utf-8')
     assert len(hashlib.sha256(canonical).hexdigest()) == 64
+

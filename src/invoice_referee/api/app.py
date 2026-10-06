@@ -36,7 +36,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Form, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -363,6 +363,21 @@ def create_app(service: CaseService, *, provider_mode: str = 'fake') -> FastAPI:
         if owned is None:
             raise DomainError('NOT_FOUND', f'Không tìm thấy chứng từ {evidence_id} trong hồ sơ.')
         return _evidence_dto(owned)
+
+    @app.get('/api/cases/{case_id}/evidence/{evidence_id}/content')
+    async def evidence_content(case_id: str, evidence_id: str) -> FileResponse:
+        case = service.get_case(case_id)
+        owned = next((e for e in case.evidence if e.id == evidence_id), None)
+        if owned is None:
+            raise DomainError('NOT_FOUND', f'Không tìm thấy chứng từ {evidence_id} trong hồ sơ.')
+        stored_path = Path(owned.stored_path)
+        if not stored_path.is_file():
+            raise DomainError('NOT_FOUND', 'Tệp chứng từ không tồn tại trên hệ thống lưu trữ.')
+        return FileResponse(
+            str(stored_path),
+            media_type=owned.mime,
+            filename=_display_name(owned.original_name),
+        )
 
     # --- policy ---
 

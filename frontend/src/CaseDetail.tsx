@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AuditEvent, CaseRecord, PaymentRequest, RunRecord, SourceRef, StopReply } from './types';
+import type { AuditEvent, CaseRecord, EvidenceDto, PaymentRequest, RunRecord, SourceRef, StopReply } from './types';
 import {
   ACTION_LABEL,
   ISSUE_CLASS_LABEL,
@@ -9,6 +9,8 @@ import {
   stageLabel,
 } from './format';
 import { AlertIcon, CheckCircleIcon, MoneyIcon, QuestionIcon, StopIcon } from './icons';
+import { getEvidenceContentUrl } from './api';
+import { EvidencePreviewModal } from './EvidencePreviewModal';
 
 interface CaseDetailProps {
   run: RunRecord;
@@ -29,6 +31,7 @@ export function CaseDetail({
 }: CaseDetailProps) {
   const [stopState, setStopState] = useState<StopState>('idle');
   const [stopError, setStopError] = useState<string | null>(null);
+  const [selectedEvidence, setSelectedEvidence] = useState<EvidenceDto | null>(null);
   const decision = run.result?.decision;
   const canStop = runInFlight(run.status) && stopState === 'idle';
 
@@ -109,14 +112,45 @@ export function CaseDetail({
 
       {caseRecord && caseRecord.evidence.length > 0 && (
         <div className="evidence">
-          <h3>Chứng từ</h3>
-          <ul>
+          <h3>Chứng từ ({caseRecord.evidence.length})</h3>
+          <ul className="evidence-list">
             {caseRecord.evidence.map((item) => (
-              <li key={item.id}>
-                {item.original_name} · {item.role} · {Math.ceil(item.size / 1024)} KB
+              <li key={item.id} className="evidence-item">
+                <div className="evidence-info">
+                  <span className="evidence-name">{item.original_name}</span> ·{' '}
+                  <span className="evidence-role">{item.role}</span> ·{' '}
+                  <span className="evidence-size">{Math.ceil(item.size / 1024)} KB</span>
+                </div>
+                <div className="evidence-actions">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => setSelectedEvidence(item)}
+                    aria-label={`Xem trước ${item.original_name}`}
+                  >
+                    👁 Xem
+                  </button>
+                  <a
+                    href={getEvidenceContentUrl(caseRecord.id, item.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download={item.original_name}
+                    className="btn btn-sm btn-ghost"
+                    title="Tải về"
+                  >
+                    ⬇
+                  </a>
+                </div>
               </li>
             ))}
           </ul>
+
+          <EvidencePreviewModal
+            isOpen={selectedEvidence !== null}
+            evidence={selectedEvidence}
+            caseId={caseRecord.id}
+            onClose={() => setSelectedEvidence(null)}
+          />
         </div>
       )}
 
