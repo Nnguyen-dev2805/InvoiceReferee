@@ -3,6 +3,7 @@ import * as api from './api';
 import type { VerifyJob } from './types';
 import { runInFlight } from './format';
 import { useToast } from './Toast';
+import { SpinnerIcon } from './icons';
 
 type Suite = 'core' | 'escalation' | 'all';
 type VerdictFilter = 'ALL' | 'FAILED' | 'PASS';
@@ -104,8 +105,14 @@ export function VerifyPanel() {
             onClick={() => run(suite)}
             disabled={busy}
           >
-            {busy && activeSuite === suite ? '⏳ Đang chạy… ' : 'Chạy '}
-            {suite === 'all' ? 'tất cả' : suite}
+            {busy && activeSuite === suite ? (
+              <>
+                <SpinnerIcon size={14} />
+                <span>Đang chạy…</span>
+              </>
+            ) : (
+              `Chạy ${suite === 'all' ? 'tất cả' : suite}`
+            )}
           </button>
         ))}
       </div>

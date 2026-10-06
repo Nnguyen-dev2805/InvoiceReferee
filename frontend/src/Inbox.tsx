@@ -1,5 +1,6 @@
 import type { CaseRecord, DemoMode, RunRecord } from './types';
 import { ACTION_LABEL, MODE_LABEL, formatVnd, runInFlight } from './format';
+import { CheckCircleIcon } from './icons';
 
 interface InboxProps {
   cases: CaseRecord[];
@@ -39,7 +40,12 @@ export function Inbox({ cases, role, runsByCase, onOpen, selectedCaseId }: Inbox
       <div className="inbox-section">
         <h3>Việc của tôi</h3>
         {forRole.length === 0 ? (
-          <p className="muted">Không có việc cần xử lý cho vai trò này.</p>
+          <div className="inbox-empty-card">
+            <span className="inbox-empty-icon" aria-hidden="true">
+              <CheckCircleIcon size={16} />
+            </span>
+            <p className="inbox-empty-text">Không có việc cần xử lý cho vai trò này.</p>
+          </div>
         ) : (
           <ul className="case-list">
             {forRole.map((c) => {
@@ -73,7 +79,9 @@ export function Inbox({ cases, role, runsByCase, onOpen, selectedCaseId }: Inbox
       <div className="inbox-section">
         <h3>Đang xử lý</h3>
         {processing.length === 0 ? (
-          <p className="muted">Không có hồ sơ nào đang chạy.</p>
+          <div className="inbox-empty-card">
+            <p className="inbox-empty-text">Không có hồ sơ nào đang chạy.</p>
+          </div>
         ) : (
           <ul className="case-list">
             {processing.map((c) => {

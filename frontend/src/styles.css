@@ -704,8 +704,17 @@ button:focus-visible {
 }
 
 .dropzone-icon {
-  font-size: 1.8rem;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-secondary);
+  margin-bottom: var(--space-1);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.dropzone:hover .dropzone-icon {
+  transform: translateY(-2px);
+  color: #0369a1;
 }
 
 .dropzone-text {
@@ -713,6 +722,42 @@ button:focus-visible {
   font-size: 0.9rem;
   color: var(--color-foreground);
 }
+
+.inbox-empty-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-muted);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-muted-foreground);
+  font-size: 0.875rem;
+}
+
+.inbox-empty-icon {
+  display: inline-flex;
+  color: #059669;
+  flex-shrink: 0;
+}
+
+.inbox-empty-text {
+  margin: 0;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin-animation {
+  animation: spin 0.8s linear infinite;
+}
+
 
 /* --- Focusable Error Summary ------------------------------------------------ */
 

@@ -8,7 +8,7 @@ import {
   runInFlight,
   stageLabel,
 } from './format';
-import { AlertIcon, CheckCircleIcon, MoneyIcon, QuestionIcon, StopIcon } from './icons';
+import { AlertIcon, CheckCircleIcon, DownloadIcon, EyeIcon, MoneyIcon, QuestionIcon, StopIcon } from './icons';
 import { getEvidenceContentUrl } from './api';
 import { EvidencePreviewModal } from './EvidencePreviewModal';
 
@@ -128,7 +128,8 @@ export function CaseDetail({
                     onClick={() => setSelectedEvidence(item)}
                     aria-label={`Xem trước ${item.original_name}`}
                   >
-                    👁 Xem
+                    <EyeIcon size={14} />
+                    <span>Xem</span>
                   </button>
                   <a
                     href={getEvidenceContentUrl(caseRecord.id, item.id)}
@@ -137,8 +138,9 @@ export function CaseDetail({
                     download={item.original_name}
                     className="btn btn-sm btn-ghost"
                     title="Tải về"
+                    aria-label={`Tải về ${item.original_name}`}
                   >
-                    ⬇
+                    <DownloadIcon size={14} />
                   </a>
                 </div>
               </li>

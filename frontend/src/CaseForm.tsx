@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import type { CaseRecord, EvidenceRole, PayerType, Profile, PurposeType } from './types';
 import { ApiError } from './api';
 import { formatCurrencyInput } from './format';
+import { SpinnerIcon, UploadCloudIcon } from './icons';
 
 export interface CaseFormValues {
   profile: Profile;
@@ -243,7 +244,9 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
               }}
             />
             <div className="dropzone-inner">
-              <span className="dropzone-icon" aria-hidden="true">📁</span>
+              <span className="dropzone-icon" aria-hidden="true">
+                <UploadCloudIcon size={32} />
+              </span>
               <p className="dropzone-text">
                 <strong>Nhấn để chọn tệp</strong> hoặc kéo thả tệp vào đây
               </p>
@@ -290,7 +293,14 @@ export function CaseForm({ onCreate, onCreated }: CaseFormProps) {
         {errors.form && <p className="field-error" role="alert">{errors.form}</p>}
 
         <button type="submit" className="btn btn-primary" disabled={busy}>
-          {busy ? 'Đang nộp…' : 'Nộp hồ sơ'}
+          {busy ? (
+            <>
+              <SpinnerIcon size={16} />
+              <span>Đang nộp…</span>
+            </>
+          ) : (
+            'Nộp hồ sơ'
+          )}
         </button>
       </form>
     </section>
