@@ -19,6 +19,7 @@ ENV/
 .idea/
 .vscode/
 .freebuff
+AGENTS.md
 
 # macOS / Windows
 .DS_Store
