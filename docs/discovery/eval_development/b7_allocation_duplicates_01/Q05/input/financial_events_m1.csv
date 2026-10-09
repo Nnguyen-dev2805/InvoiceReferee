@@ -1,0 +1,3 @@
+source_record_ref,event_ref,event_type,event_date,payer,payee,related_employee,work_ref,amount_vnd,currency,raw_status,business_ref,receipt_source
+FIN-DEP-05,TX-DEP-05,COMPANY_TO_VENDOR,2026-10-04,ORG-DEMO-01,VENDOR-HOTEL-05,NV-DEMO-05,CT-DEMO-05,2000000,VND,SETTLED,BOOK-HOTEL-05,expense_and_payment_sources.md#company-deposit-receipt
+FIN-ADV-05,TX-ADV-05,ADVANCE_TO_EMPLOYEE,2026-10-04,ORG-DEMO-01,NV-DEMO-05,NV-DEMO-05,CT-DEMO-05,1000000,VND,SETTLED,DEC-PRE-05,expense_and_payment_sources.md#advance-receipt

@@ -1,0 +1,45 @@
+{
+  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+  "phase": "INITIAL",
+  "requires_extra_resolution": true,
+  "issue_type": "FACT_UNCERTAINTY_CRITICAL_AMOUNT_UNOBSERVABLE",
+  "original_mode": "SYNTHETIC_RASTER_WITH_OPAQUE_TOTAL",
+  "B_vnd": 8000000,
+  "known_expense_subtotal_excluding_hotel_vnd": 5000000,
+  "known_employee_paid_subtotal_excluding_hotel_vnd": 2000000,
+  "hotel_amount_vnd": null,
+  "T_final_vnd": null,
+  "E_final_vnd": null,
+  "A_vnd": 2000000,
+  "RA_vnd": 0,
+  "P_vnd": 0,
+  "RP_vnd": 0,
+  "S_final_vnd": null,
+  "amount_region_pixels": [
+    80,
+    750,
+    1160,
+    900
+  ],
+  "image_size_pixels": [
+    1240,
+    1500
+  ],
+  "allowed_owner_roles": [
+    "EMPLOYEE_OR_EXPENSE_SOURCE_OWNER"
+  ],
+  "question_semantics_example": "Tổng tiền INV-HOTEL-001 bịche trongảnh nguồn, không cóamount/unitprice/receiptamountkhác đủ để xácđịnh. Vui lòng cungcấp bản rõ hoặc alternative sourcephùhợp cho số tiền đúnginvoice/payment. Document còn đọcđược cácfactkhác không khiếnamount đủquality; không lấy dựtoán5 trừ2 để suyhotel3.",
+  "high_document_readability_waives_amount_gate": false,
+  "source_confidence_fabrication_allowed": false,
+  "known_subtotal_net_zero_allows_close": false,
+  "financial_approval_allowed": false,
+  "request_creation_allowed": false,
+  "bank_execution_allowed": false,
+  "close_allowed": false,
+  "evidence_refs": [
+    "input/hotel_receipt.png",
+    "input/employee_claim.md",
+    "input/expense_and_payment_sources.md#hotel-invoice",
+    "input/expense_and_payment_sources.md#hotel-payment"
+  ]
+}

@@ -1,0 +1,5 @@
+# Nguồn giả lập — Company scope đủ cho case
+
+SourceCOV-05, issuerORG-DEMO-01, uploader/ownerACC-DEMO-01, từ03/10 đến08/10/2026 18:00 +07:00, đúngNV-DEMO-05/CT-DEMO-05 và hồsơ/chứngtừ/phầnnghĩavụ liênquan. Kếtoán trongthếgiới giảlập quan sát đủbank/card/cash, registerrequests/approvals/attempts/historyclaims cùngreceiptrelatedside; không dùngrole thaysource. Employee-sidepayment/refundscope đọcriêng.
+
+Companydirect2triệu đãnhận tại vendor cho bookingBOOK-HOTEL-05; employee-balance3 đọc sourcephíaemployee riêng. Không companydirect thêm để suy đủ5 hoặc nhậnadvance3. Ledger có2 events đúngloại, không cùng2events đều làadvance. [Ledger](financial_events_m1.csv) liệtkê toàn eventscompany phùhợpscope, rawstatusSETTLED cầnreceipt cóparties/outcome đúng. Không ứngkhác, hoànchi/P, RA/RP companythựcnhận, vendorrefundcompany, pending/requestactive, overpay/wrongrecipient/duplicateclaim hoặc nghĩa vụ unresolved khác. Quyếtđịnhtrướccôngviệc/authority còn hiệu lực, chưasettlementdecision/receiptchi thêm; không Stop/sửa/hủy. Sourceexpense/employeeclaims đủ cho scopechi phí. Absence cócăn cứ phạmvi/owner, khôngzeroevents giả; không dùng cho phạmvi khác/nguồnsau mốc.

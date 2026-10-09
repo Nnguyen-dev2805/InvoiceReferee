@@ -1,0 +1,45 @@
+{
+  "status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+  "phase": "INITIAL",
+  "as_of_money": "2026-10-08T18:00:00+07:00",
+  "requires_extra_resolution": true,
+  "issue_type": "FACT_UNCERTAINTY_ADVANCE_RECEIPT",
+  "unresolved_field": "A",
+  "allowed_owner_roles": [
+    "ACCOUNTANT",
+    "EMPLOYEE_RECEIVER"
+  ],
+  "question_semantics_example": "Sự kiện TX-ADV-001 theo DEC-PRE-DEMO-01 đã tới NV-DEMO-01 bao nhiêu trước08/10 18:00? Hãy cung cấp receipt phía nhận/outcome liên quan; approval2triệu và source lệnhSUBMITTED hiện chưa xác định thực nhận.",
+  "known_partial_facts_vnd": {
+    "B": 8000000,
+    "T": 8000000,
+    "employee_paid_known": 5000000,
+    "A": null,
+    "RA": 0,
+    "P": 0,
+    "RP": 0
+  },
+  "E_vnd": 5000000,
+  "S_vnd": null,
+  "report_finalized": false,
+  "financial_approval_allowed": false,
+  "request_creation_allowed": false,
+  "bank_execution_allowed": false,
+  "close_allowed": false,
+  "fraud_conclusion_allowed": false,
+  "partial_checks_allowed": true,
+  "partial_payment_authorized_by_known_subtotal": false,
+  "forbidden_inferences": [
+    "missing_as_zero",
+    "approval_as_receipt",
+    "assume_employee_paid_remaining",
+    "role_overrides_conflicting_source",
+    "confident_final_amount_from_flagged_fact"
+  ],
+  "evidence_refs": [
+    "input/payment_attempts.md#advance-attempt",
+    "input/financial_events_m1.csv",
+    "input/authority_and_pretrip.md#pretrip-decision",
+    "input/coverage_m1.md#company-scope"
+  ]
+}

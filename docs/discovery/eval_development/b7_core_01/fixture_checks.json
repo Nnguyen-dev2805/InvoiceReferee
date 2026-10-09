@@ -1,0 +1,55 @@
+{
+  "verification_mode": "DOCUMENT_FIXTURE_SANITY_ONLY",
+  "checks": [
+    "input/expected separation",
+    "source and policy hashes",
+    "local refs/anchors",
+    "positive actual event amounts",
+    "source receipt/invoice amount consistency",
+    "cash attestation amount consistency",
+    "manual literal arithmetic",
+    "no fake zero-advance event in Q02"
+  ],
+  "case_results": [
+    {
+      "case": "Q01",
+      "T": 8000000,
+      "E": 5000000,
+      "A": 2000000,
+      "P": 0,
+      "S": 3000000,
+      "close_allowed": false
+    },
+    {
+      "case": "Q02",
+      "T": 8000000,
+      "E": 5000000,
+      "A": 0,
+      "P": 0,
+      "S": 5000000,
+      "close_allowed": false
+    },
+    {
+      "case": "Q03",
+      "T": 6300000,
+      "E": 3300000,
+      "A": 4000000,
+      "P": 0,
+      "S": -700000,
+      "close_allowed": false
+    },
+    {
+      "case": "Q04",
+      "T": 8000000,
+      "E": 5000000,
+      "A": 2000000,
+      "P": 3000000,
+      "S": 0,
+      "close_allowed": true
+    }
+  ],
+  "independent_gold_adjudication": false,
+  "application_tests_run": false,
+  "pipeline_run": false,
+  "ocr_run": false
+}

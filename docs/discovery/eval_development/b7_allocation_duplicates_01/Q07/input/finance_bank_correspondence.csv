@@ -1,0 +1,3 @@
+company_register_ref,company_event_ref,bank_namespace,bank_ref,booking_ref,related_employee,work_ref,amount_vnd,bank_source
+REGISTER-X01,TX-AIR-001,BANK-DEMO-A,BNK-A44,BOOK-DEMO-01,NV-DEMO-01,CT-DEMO-01,3000000,bank_statement_excerpt.md#current-bank-row
+REGISTER-X99,TX-AIR-OTHER-99,BANK-DEMO-A,BNK-A45,BOOK-OTHER-99,NV-DEMO-99,CT-DEMO-99,3000000,bank_statement_excerpt.md#other-bank-row

@@ -1,0 +1,28 @@
+{
+  "mode": "DOCUMENT_FIXTURE_SANITY_ONLY",
+  "case_checks": [
+    {
+      "case": "Q13",
+      "reason": "OUTSIDE_POLICY",
+      "before_final_S": null,
+      "T": 9000000,
+      "B": 8000000,
+      "all_accepted_S": 4000000,
+      "partial_accepted_S": 3000000,
+      "raw_T_preserved": 9000000,
+      "close_allowed": false
+    },
+    {
+      "case": "Q14",
+      "reason": "BEYOND_AUTHORITY",
+      "within_budget": true,
+      "calculated_S": 3000000,
+      "new_delegation_is_payment_approval": false,
+      "close_allowed": false
+    }
+  ],
+  "phase_inputs_and_expected_separated": true,
+  "policy_snapshots_and_earlier_packets_unchanged": true,
+  "pipeline_run": false,
+  "independent_gold_adjudication": false
+}

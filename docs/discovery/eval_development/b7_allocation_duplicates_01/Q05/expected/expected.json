@@ -1,0 +1,46 @@
+{
+  "T_vnd": 5000000,
+  "B_vnd": 5000000,
+  "company_direct_vnd": 2000000,
+  "employee_actual_paid_vnd": 3000000,
+  "E_vnd": 3000000,
+  "A_vnd": 1000000,
+  "RA_vnd": 0,
+  "P_vnd": 0,
+  "RP_vnd": 0,
+  "S_vnd": 2000000,
+  "invoice_total_vnd": 5000000,
+  "expense_count": 1,
+  "payer_allocations": [
+    {
+      "payer": "ORG-DEMO-01",
+      "amount_vnd": 2000000,
+      "source": "input/expense_and_payment_sources.md#company-deposit-receipt"
+    },
+    {
+      "payer": "NV-DEMO-05",
+      "amount_vnd": 3000000,
+      "source": "input/expense_and_payment_sources.md#employee-balance-receipt"
+    }
+  ],
+  "company_direct_subtracted_twice": false,
+  "deduct_advance_as_new_expense": false,
+  "evidence_refs": [
+    "input/authority_and_pretrip.md#authority",
+    "input/authority_and_pretrip.md#pretrip-decision",
+    "input/expense_and_payment_sources.md#hotel-invoice",
+    "input/expense_and_payment_sources.md#company-deposit-receipt",
+    "input/expense_and_payment_sources.md#employee-balance-receipt",
+    "input/expense_and_payment_sources.md#advance-receipt",
+    "input/coverage_m1.md"
+  ],
+  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+  "job": "B7",
+  "requires_extra_resolution": false,
+  "report_ready": true,
+  "settlement_approved": false,
+  "request_creation_allowed": false,
+  "bank_execution_allowed": false,
+  "close_allowed": false,
+  "as_of_money": "2026-10-08T18:00:00+07:00"
+}

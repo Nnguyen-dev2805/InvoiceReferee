@@ -1,0 +1,44 @@
+{
+  "mode": "DOCUMENT_FIXTURE_SANITY_ONLY",
+  "initial_unknown_and_followup_checks": [
+    {
+      "case": "Q09",
+      "initial_S": null,
+      "selected_followup_S": 3000000,
+      "mode": "ASSISTED",
+      "close_allowed": false
+    },
+    {
+      "case": "Q10",
+      "initial_S": null,
+      "selected_followup_S": 3000000,
+      "mode": "ASSISTED",
+      "close_allowed": false
+    },
+    {
+      "case": "Q11",
+      "initial_S": null,
+      "selected_followup_S": 3000000,
+      "mode": "ASSISTED",
+      "close_allowed": false
+    },
+    {
+      "case": "Q12",
+      "initial_S": null,
+      "selected_followup_S": 3000000,
+      "mode": "ASSISTED",
+      "close_allowed": false
+    }
+  ],
+  "checks": [
+    "phase separation and refs/hashes",
+    "policy snapshots unchanged",
+    "initial critical evidence removals and bounded statements",
+    "unknown not zero",
+    "assisted recheck values and action/close boundaries",
+    "money_as_of distinct from knowledge_update",
+    "core inputs/expected unchanged"
+  ],
+  "pipeline_run": false,
+  "independent_gold_adjudication": false
+}

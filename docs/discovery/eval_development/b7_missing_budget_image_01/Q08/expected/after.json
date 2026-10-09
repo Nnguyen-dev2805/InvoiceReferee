@@ -1,0 +1,26 @@
+{
+  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+  "phase": "AFTER_SELECTED_CLEAR_SOURCE",
+  "requires_extra_resolution": false,
+  "hotel_amount_vnd": 3000000,
+  "T_vnd": 8000000,
+  "E_vnd": 5000000,
+  "A_vnd": 2000000,
+  "RA_vnd": 0,
+  "P_vnd": 0,
+  "RP_vnd": 0,
+  "S_vnd": 3000000,
+  "report_ready": true,
+  "lifecycle_mode": "ASSISTED",
+  "first_pass_routine": false,
+  "settlement_approved": false,
+  "request_creation_allowed": false,
+  "bank_execution_allowed": false,
+  "close_allowed": false,
+  "source_added": [
+    "followup/hotel_receipt_clear.png",
+    "followup/clear_source_note.md"
+  ],
+  "as_of_money": "2026-10-08T18:00:00+07:00",
+  "knowledge_updated_at": "2026-10-09T09:00:00+07:00"
+}

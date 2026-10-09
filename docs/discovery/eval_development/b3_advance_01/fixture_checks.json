@@ -1,0 +1,52 @@
+{
+  "mode": "DOCUMENT_FIXTURE_SANITY_ONLY",
+  "B3_checks": [
+    {
+      "case": "A01",
+      "initial_report_complete": true,
+      "extra_resolution": false,
+      "issue": null,
+      "advance_approved": false,
+      "future_receipt_required_before_check": false
+    },
+    {
+      "case": "A02",
+      "initial_report_complete": true,
+      "extra_resolution": false,
+      "issue": null,
+      "advance_approved": false,
+      "future_receipt_required_before_check": false
+    },
+    {
+      "case": "A03",
+      "initial_report_complete": false,
+      "extra_resolution": true,
+      "issue": "FACT_CONFLICT_ESTIMATE_SUM",
+      "advance_approved": false,
+      "future_receipt_required_before_check": false
+    },
+    {
+      "case": "A04",
+      "initial_report_complete": false,
+      "extra_resolution": true,
+      "issue": "FACT_UNCERTAINTY_PRIOR_ADVANCE_HISTORY",
+      "advance_approved": false,
+      "future_receipt_required_before_check": false
+    },
+    {
+      "case": "A05",
+      "initial_report_complete": false,
+      "extra_resolution": true,
+      "issue": "BEYOND_AUTHORITY_WORK_SCOPE",
+      "advance_approved": false,
+      "future_receipt_required_before_check": false
+    }
+  ],
+  "native_forecast_sum_and_source_history_gates_checked": true,
+  "no_post_trip_invoice_or_future_receipt_gate": true,
+  "all_20_manifests_sources_expected_policy_hashes_verified": true,
+  "input_followup_expected_separated": true,
+  "pipeline_run": false,
+  "independent_gold_adjudication": false,
+  "production_schema_defined": false
+}

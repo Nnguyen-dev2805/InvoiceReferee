@@ -1,0 +1,53 @@
+{
+  "work": "CT-DEMO-01",
+  "employee": "NV-DEMO-01",
+  "as_of": "2026-10-09T10:00:00+07:00",
+  "T": 8000000,
+  "company_direct": 3000000,
+  "E": 5000000,
+  "A": 2000000,
+  "RA": 0,
+  "P": 3000000,
+  "RP": 0,
+  "S": 0,
+  "direction": "BALANCED",
+  "settlement_approved": true,
+  "close_allowed": true,
+  "budget_vnd": 8000000,
+  "job": "B7",
+  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+  "requires_extra_fact_policy_authority_resolution": false,
+  "cash_payer_mode": "POLICY_ATTESTED_NOT_BANK_VERIFIED",
+  "routine_check_report_expected": true,
+  "automatic_request_creation_allowed": false,
+  "automatic_bank_execution_allowed": false,
+  "duplicate_payment_allowed": false,
+  "evidence_refs": {
+    "budget_authority": [
+      "input/authority_and_pretrip.md#authority",
+      "input/authority_and_pretrip.md#pretrip-decision"
+    ],
+    "expense_and_payer": [
+      "input/expense_and_payment_sources.md#air-invoice",
+      "input/expense_and_payment_sources.md#air-receipt",
+      "input/expense_and_payment_sources.md#hotel-invoice",
+      "input/expense_and_payment_sources.md#hotel-payment",
+      "input/expense_and_payment_sources.md#meal-receipt",
+      "input/employee_claim.md#cash-attestation",
+      "input/expense_and_payment_sources.md#ground-receipt"
+    ],
+    "history_and_zero": [
+      "input/coverage_m1.md",
+      "input/employee_claim.md#employee-scope"
+    ],
+    "advance": [
+      "input/expense_and_payment_sources.md#advance-receipt",
+      "input/financial_events_m1.csv"
+    ],
+    "m2_updates": [
+      "input/decision_and_receipt_m2.md#final-decision",
+      "input/decision_and_receipt_m2.md#reimbursement-receipt",
+      "input/decision_and_receipt_m2.md#coverage-m2"
+    ]
+  }
+}

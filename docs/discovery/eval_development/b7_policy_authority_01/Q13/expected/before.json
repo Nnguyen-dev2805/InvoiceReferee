@@ -1,0 +1,37 @@
+{
+  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+  "phase": "INITIAL",
+  "issue_type": "OUTSIDE_POLICY_BUDGET_EXCEPTION_REQUIRED",
+  "requires_extra_resolution": true,
+  "fact_uncertainty": false,
+  "authority_sufficient_for_exception": true,
+  "B_vnd": 8000000,
+  "T_vnd": 9000000,
+  "budget_excess_vnd": 1000000,
+  "employee_paid_verified_vnd": 6000000,
+  "company_direct_verified_vnd": 3000000,
+  "A_vnd": 2000000,
+  "RA_vnd": 0,
+  "P_vnd": 0,
+  "RP_vnd": 0,
+  "E_final_vnd": null,
+  "S_final_vnd": null,
+  "conditional_S_if_all_employee_costs_accepted_vnd": 4000000,
+  "allowed_owner_roles": [
+    "AUTHORIZED_APPROVER"
+  ],
+  "question_semantics_example": "B8triệu, T9triệu: hotelthựcchi4,meal1,ground1 và vécompany3, employeeđãtrả6, companydirect3. APR-DEMO-01 cóquyềnngoạilệtoànT9 theo AUTH-DEMO-01. Anh/chị chấpnhận toàn/phầnhotel hoặc từchối phần nào, với amount/phần/lýdo và quyếtđịnh tiền tươngứng?",
+  "evidence_refs": [
+    "input/authority_and_pretrip.md#authority",
+    "input/authority_and_pretrip.md#pretrip-decision",
+    "input/expense_and_payment_sources.md#hotel-invoice",
+    "input/expense_and_payment_sources.md#hotel-payment"
+  ],
+  "financial_approval_allowed_without_exception": false,
+  "request_creation_allowed": false,
+  "bank_execution_allowed": false,
+  "close_allowed": false,
+  "clip_to_budget_allowed": false,
+  "rewrite_raw_expense_allowed": false,
+  "as_of_money": "2026-10-08T18:00:00+07:00"
+}

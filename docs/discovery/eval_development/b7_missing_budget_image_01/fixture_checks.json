@@ -1,0 +1,30 @@
+{
+  "mode": "DOCUMENT_AND_IMAGE_FIXTURE_SANITY_ONLY",
+  "case_checks": [
+    {
+      "case": "Q08",
+      "initial_total_source": "PNG_OPAQUE_NO_HIDDEN_TEXT",
+      "hotel_amount_before": null,
+      "after_clear_amount": 3000000,
+      "after_S": 3000000,
+      "visual_inspection_done": true,
+      "OCR_run": false
+    },
+    {
+      "case": "Q15",
+      "B_before": null,
+      "B_after": null,
+      "authority_is_budget": false,
+      "after_E": 5000000,
+      "after_S": 5000000,
+      "payment_received": false
+    }
+  ],
+  "all_15_B7_source_expected_hashes_verified": true,
+  "input_followup_expected_separated": true,
+  "image_rendered_deterministically_from_scratch": true,
+  "existing_images_edited": false,
+  "pipeline_run": false,
+  "ocr_run": false,
+  "independent_gold_adjudication": false
+}

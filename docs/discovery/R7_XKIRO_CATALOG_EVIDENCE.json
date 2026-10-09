@@ -1,0 +1,51 @@
+{
+  "evidence_kind": "PUBLIC_CATALOG_GET_NOT_INFERENCE_OR_ACCOUNT_ACCESS",
+  "source_url": "https://api.xkiro.com/v1/models",
+  "retrieved_on_utc": "2026-10-09",
+  "catalog_sha256": "ae5c484947d32d3d455bed32c735c8640b52f1dc71fc51f2c3cfc88e364bbc6a",
+  "catalog_entry_count": 130,
+  "selected_candidates": [
+    {
+      "id": "mistralai/mistral-small-2603",
+      "access_tier": "free",
+      "capabilities": {
+        "vision": true,
+        "tools": true,
+        "reasoning": true
+      },
+      "reasoning_efforts": {
+        "levels": [
+          "none",
+          "high"
+        ],
+        "default": "none"
+      },
+      "context_length": 256000,
+      "max_output_tokens": 65536
+    },
+    {
+      "id": "mistralai/mistral-medium-3.5",
+      "access_tier": "free",
+      "capabilities": {
+        "vision": true,
+        "tools": true,
+        "reasoning": true
+      },
+      "reasoning_efforts": {
+        "levels": [
+          "none",
+          "high"
+        ],
+        "default": "none"
+      },
+      "context_length": 256000,
+      "max_output_tokens": 65536
+    }
+  ],
+  "limitations": [
+    "No authenticated generation call",
+    "No account-specific access verification",
+    "Gateway metadata does not verify upstream identity or semantic quality",
+    "No model quality or latency benchmark"
+  ]
+}

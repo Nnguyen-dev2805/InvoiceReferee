@@ -1,0 +1,35 @@
+{
+  "request_ref": "REQ-ADV-01",
+  "request_version": 1,
+  "submitted_at": "2026-10-03T10:00:00+07:00",
+  "employee_ref": "NV-ADV-01",
+  "work_ref": "CT-ADV-01",
+  "work_purpose": "Trao đổi yêu cầu dự án với PARTNER-ADV-01",
+  "destination": "Hà Nội",
+  "work_start": "2026-10-05",
+  "work_end": "2026-10-06",
+  "currency": "VND",
+  "proposed_total_budget_vnd": 8000000,
+  "planned_company_direct_vnd": 3000000,
+  "planned_employee_paid_vnd": 5000000,
+  "planned_employee_items": [
+    {
+      "description": "Lưu trú",
+      "amount_vnd": 3000000
+    },
+    {
+      "description": "Ăn phục vụ công việc",
+      "amount_vnd": 1000000
+    },
+    {
+      "description": "Di chuyển công việc",
+      "amount_vnd": 1000000
+    }
+  ],
+  "requested_advance_vnd": 2000000,
+  "requested_decision_scope": [
+    "work_permission",
+    "total_budget",
+    "advance_amount"
+  ]
+}

@@ -1,0 +1,3773 @@
+{
+  "archive_date": "2026-10-09",
+  "archive_path": "docs/archive/discovery-2026-10-09.zip",
+  "archive_sha256": "61e1be17d61f01b9b16a99092563dcc779c5bd87129b0e6e2b0de11890691753",
+  "baseline_head": "7d0296fac3bcdd4bf0879c2202152a7d26f87411",
+  "entry_count": 364,
+  "entries": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "fcdb848e7762ccf45b9488e775699eaa034daee0ba5ea45749b4f94f3607411f",
+      "bytes": 14742
+    },
+    {
+      "path": "README.md",
+      "sha256": "1ca4995fc3dabe4d5e146d886f67e7fa559a78d93fe805b882893b42d18ec3f7",
+      "bytes": 5713
+    },
+    {
+      "path": "docs/DISCOVERY_ROADMAP.md",
+      "sha256": "1f5560811efd921c5b219e041b554fdc04c660ca4688555ae9d770532bae57e3",
+      "bytes": 130628
+    },
+    {
+      "path": "docs/discovery/ADVANCE_REJECTION_BRANCH.md",
+      "sha256": "3cd0b39e329fb5d72c8610fffe3e68b8fcb6c69f2b3d6873528415b3b7bf6dcb",
+      "bytes": 2424
+    },
+    {
+      "path": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md",
+      "sha256": "22854c951fd66a285b026441621d900fb18d331e644605e78269e2ae91a86ebe",
+      "bytes": 24622
+    },
+    {
+      "path": "docs/discovery/B7_MVP_PROPOSAL.md",
+      "sha256": "efc5e1b4776ce9e0d703fa350b96853b744bb91140b01791a23fe41d5aa656d8",
+      "bytes": 10958
+    },
+    {
+      "path": "docs/discovery/B8_B9_MVP_PROPOSAL.md",
+      "sha256": "8fea65ab5f01586bd2742e850c6ae6be929a85b8e0b1bf7e1ab828051731c1d3",
+      "bytes": 17454
+    },
+    {
+      "path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "sha256": "4c6f35d9cfc8a308007b104762e6244771c4dd3fddde20e90571239a12253824",
+      "bytes": 70726
+    },
+    {
+      "path": "docs/discovery/R3_MVP_SCOPE_DRAFT.md",
+      "sha256": "d313742486c0390e5e7373b5bfca9c6608042355dbb92b30bf56eb91682a503a",
+      "bytes": 19137
+    },
+    {
+      "path": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md",
+      "sha256": "1fd2abd49a08ba4649b2b7f1507e31911b5d190d3a2d6e9bc92d9372150d7969",
+      "bytes": 9382
+    },
+    {
+      "path": "docs/discovery/R4_DATA_SOURCE_DRAFT.md",
+      "sha256": "5b317725ce6932f980a719f998b0c3e7aeed4696b8a5888d614c711f7a94eb14",
+      "bytes": 13171
+    },
+    {
+      "path": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md",
+      "sha256": "895a56871eb9499ac43795c7bf702a9e7d31e3602187547d00695167789f30ee",
+      "bytes": 12008
+    },
+    {
+      "path": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md",
+      "sha256": "9adb49595ed75e18ddbbea6f4589e171b707b57bde507f4e1505d82975d65a55",
+      "bytes": 14114
+    },
+    {
+      "path": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md",
+      "sha256": "979ef872fd00bf59164f890310d691da09d95b714cfd7aaea19da32d2bd102f5",
+      "bytes": 11014
+    },
+    {
+      "path": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md",
+      "sha256": "4125944dbdb04114559c0225501073c3ff39366cb60a4f83220959273f84ddc9",
+      "bytes": 9466
+    },
+    {
+      "path": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md",
+      "sha256": "86e8dd340485c88a0726a2f3e0352edcf86b152d62133acf78bed16785b67355",
+      "bytes": 14980
+    },
+    {
+      "path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "sha256": "2dd31c343fc6a2fbc908c1b6624a8fcb83e5cb94fdae4baf8cdd668300a9674f",
+      "bytes": 16542
+    },
+    {
+      "path": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md",
+      "sha256": "cb9248542ccad658dfd210b41d8f2c482abb3f80dae1167a7d921cee35cbd9c6",
+      "bytes": 12443
+    },
+    {
+      "path": "docs/discovery/R5_EVALUATION_DESIGN.md",
+      "sha256": "7cb82dd7023171667c885f69ba06e297d680fc29436d4c6e55a87ed2b646901e",
+      "bytes": 21077
+    },
+    {
+      "path": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md",
+      "sha256": "70e3529c22711d2c6144e1d67878460dcd408e751480c66cd063e63bcf12f83e",
+      "bytes": 21455
+    },
+    {
+      "path": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md",
+      "sha256": "f637c3effdb6b866e112aa9df0a7c03aed95ce1535134def27621fc2a4f555cd",
+      "bytes": 18448
+    },
+    {
+      "path": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md",
+      "sha256": "91c16b764db6ca8db63cefaa9a31a9991024ea4360bafbbf6e2d18d50a99cf0e",
+      "bytes": 14378
+    },
+    {
+      "path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "sha256": "b684938e97ebecb244bacc7aae3c8796cf367a32d7c42820006934c3f6b75ea9",
+      "bytes": 19391
+    },
+    {
+      "path": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md",
+      "sha256": "d1e197cc1fcec9ff2103f4c457bd0c3a3547e000697acddb822bf5b741fdfdea",
+      "bytes": 23216
+    },
+    {
+      "path": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md",
+      "sha256": "ace85886cf3c8c9d20354d0e219ac73cff7d945d4a0350a663496bd66f40ca42",
+      "bytes": 15011
+    },
+    {
+      "path": "docs/discovery/R7_XKIRO_CATALOG_EVIDENCE.json",
+      "sha256": "827b79dd506e35892083a36e83592058e9551e8243306721dbc2d75039037393",
+      "bytes": 1319
+    },
+    {
+      "path": "docs/discovery/R8_CODE_GAP_REVIEW.md",
+      "sha256": "4d1e98a0d9ed66de6a9ab0ab63d7f45591fb199b2d3a3e8a337293306d01e002",
+      "bytes": 10508
+    },
+    {
+      "path": "docs/discovery/WORKFLOW_OVERVIEW.md",
+      "sha256": "8938675349bff174fd68559d3777eb5f9d1a3cdfae3b2bb0ce84750dcc46068b",
+      "bytes": 4681
+    },
+    {
+      "path": "docs/discovery/eval_development/CORPUS_AUDIT.json",
+      "sha256": "ce69168759e556458e2cb2056cc039512ee481f7f45995f573c7861df3577ea6",
+      "bytes": 12670
+    },
+    {
+      "path": "docs/discovery/eval_development/CORPUS_INDEX.md",
+      "sha256": "44bdeaed4fa49a5dccf29bfdd7053b3dc65e2c4f77dd21630918700ec52d9a90",
+      "bytes": 4774
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A01/README.md",
+      "sha256": "7802483b35b5757bbdb314cf695d832ea88b6b2fe571a607f57ccfce97983c47",
+      "bytes": 959
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A01/expected/before.json",
+      "sha256": "8734631f1175c821215fd98e86a2c3f3318f625f460af7c0586f35760eca2b68",
+      "bytes": 1537
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A01/input/authority_and_assignment.md",
+      "sha256": "c8c2eeda1e162c4759d27498d1835f78c8b399dc69c9fd6d368fcbc96e2e68b3",
+      "bytes": 825
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A01/input/financial_history.csv",
+      "sha256": "aa14d996a7a0a5d245a4b676d1449eb1e2d971d5b0bbc9fc1bd34efb9db38a56",
+      "bytes": 114
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A01/input/history_scope.md",
+      "sha256": "9a48443647ed0c9f95ccb39c59be048273df130ae965518306dd63e366141206",
+      "bytes": 1138
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A01/input/request_form.json",
+      "sha256": "29e18b80fa01f3efc63cbdffde144df1615b8100c91b0a916a119a3af3e38c4f",
+      "bytes": 897
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A01/manifest.json",
+      "sha256": "e7f32279c7fbc2de0bfba1f619973a1bfe4100cb33796c86352d149582a9b178",
+      "bytes": 2640
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A02/README.md",
+      "sha256": "5f6fcc7a2f104882ee8425541cd96411b203cc988c38b99477c8de5b9a74927b",
+      "bytes": 959
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A02/expected/before.json",
+      "sha256": "d08d008cde3f74bb5d9d68f23e75dac6945ed88996f4820801988d347f4b0167",
+      "bytes": 1665
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A02/input/authority_and_assignment.md",
+      "sha256": "3c4244d54787101009ac36a982633e133ffc98faae89447b5aac9c3f2b3bd144",
+      "bytes": 825
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A02/input/existing_work_budget_decision.md",
+      "sha256": "e70e350c71f197beb323081523b03b159c7067cc543a4c3c1b53e7ca7b31661f",
+      "bytes": 622
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A02/input/external_request.md",
+      "sha256": "7d276d2a23ae828c2e725ca2507c8feffb183efb70d7ee3ae9485c8e8c3dd219",
+      "bytes": 821
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A02/input/financial_history.csv",
+      "sha256": "aa14d996a7a0a5d245a4b676d1449eb1e2d971d5b0bbc9fc1bd34efb9db38a56",
+      "bytes": 114
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A02/input/history_scope.md",
+      "sha256": "2996cec2726073cbffc8c3e56bfc1adef7fa3ad51c5bce79a3f7b4906feeafc7",
+      "bytes": 1042
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A02/manifest.json",
+      "sha256": "f3cbbc599aca5c0b50f6928be8e7c0f4a8405d8fbbb1644b39b5715f141910a6",
+      "bytes": 2802
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A03/README.md",
+      "sha256": "5ae40720508c48b39490b95d35dbe1ea96416e51d1dd8079de752ae8ff81c35b",
+      "bytes": 959
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A03/expected/after.json",
+      "sha256": "c9f97d8db66a6fdff9289481dbd2a2c6ff629cf73d1f5672f2ef27615351bae0",
+      "bytes": 1037
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A03/expected/before.json",
+      "sha256": "e7965a7cec1477a6fe5370a8a937dce639c311318bd5aee3972ebd989adc4cbe",
+      "bytes": 1900
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A03/followup/corrected_form.json",
+      "sha256": "f3ee16b885b530ce665d1fe087eb4e2a4be78fa5b405bbd57053f9b5374b19f0",
+      "bytes": 897
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A03/followup/correction_note.md",
+      "sha256": "405095a25e2e268e8c5d7324f7497f44b1645d1acd6c3ad7687b26c512ece4c6",
+      "bytes": 591
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A03/input/authority_and_assignment.md",
+      "sha256": "37c9ce9e80066c2092f8f805c99e690dca0e1837243470c45887e09c223c904b",
+      "bytes": 825
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A03/input/financial_history.csv",
+      "sha256": "aa14d996a7a0a5d245a4b676d1449eb1e2d971d5b0bbc9fc1bd34efb9db38a56",
+      "bytes": 114
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A03/input/history_scope.md",
+      "sha256": "17b14e0b6920cee191ea9a573345ee227c18f7d71354d8aba4be9cbce59a2078",
+      "bytes": 1138
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A03/input/request_form.json",
+      "sha256": "28c4d615fe3835ceb6ff42f6ef84747c79d355cdcb51cc1f861cc50bdc8fe78a",
+      "bytes": 897
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A03/manifest.json",
+      "sha256": "9e677df0c62a6c0811681d6532b077d4bead02bc189b2a0d0ec1b8b8051f26b5",
+      "bytes": 3058
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A04/README.md",
+      "sha256": "46e653c5e26fcd12fd5cdd742ce8aa858ef0d08b7117d443bc2cce9976b3970c",
+      "bytes": 959
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A04/expected/after.json",
+      "sha256": "5016b59da845962ef9b11c228d8d93ed35a7a1cbf5864fc8f9329d0017cfe1be",
+      "bytes": 990
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A04/expected/before.json",
+      "sha256": "d27badb3c5c1c962238a54905e4d6e874240140b5272b62d21d3e3a7952284b4",
+      "bytes": 1851
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A04/followup/full_history_scope.md",
+      "sha256": "eace1504878ca9e43c5e120142156952fa0b46035bdd365f9ec41e42b90897fc",
+      "bytes": 1024
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A04/input/authority_and_assignment.md",
+      "sha256": "14de3c38ead9fb7a7623516504f8a403006c1d91e8ee8e7f8f78334c74c54fb7",
+      "bytes": 825
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A04/input/financial_history.csv",
+      "sha256": "aa14d996a7a0a5d245a4b676d1449eb1e2d971d5b0bbc9fc1bd34efb9db38a56",
+      "bytes": 114
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A04/input/history_scope.md",
+      "sha256": "5223defc8cdb7aad891a665468a081ecd21f301948cf82e0de75afcb86eb9241",
+      "bytes": 912
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A04/input/request_form.json",
+      "sha256": "d12a78adbaf0d8f4c9afca88636dd67fb6194a0271b0e575d60c368333a7d358",
+      "bytes": 897
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A04/manifest.json",
+      "sha256": "0029c2cee26c7324a7864f79b48b276020dfae92eb41de35287f270b496807a2",
+      "bytes": 2919
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A05/README.md",
+      "sha256": "d6b74bbf0bb70e4e97b4f5cc0f7f53ec878e2bd17b8162741b18a00ab70e8823",
+      "bytes": 959
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A05/expected/after.json",
+      "sha256": "2db05b29d1c1ede619914c55cfba12f9e0ac619b49365ca0bf817a9b87893a85",
+      "bytes": 1169
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A05/expected/before.json",
+      "sha256": "86e932ba7b322196cbe659ba0c4280cf1de99b8c3c1298c2c1d7f194799286c1",
+      "bytes": 1957
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A05/followup/authority_update.md",
+      "sha256": "44a4ca1607f3025ede4d5652d56b210d8272fcb8b1942fcda036514574b5b7f5",
+      "bytes": 830
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A05/input/authority_and_assignment.md",
+      "sha256": "5838ad8c93031480077aede6fd01bce10169d2aff53710936eff24dfa60c3276",
+      "bytes": 784
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A05/input/financial_history.csv",
+      "sha256": "aa14d996a7a0a5d245a4b676d1449eb1e2d971d5b0bbc9fc1bd34efb9db38a56",
+      "bytes": 114
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A05/input/history_scope.md",
+      "sha256": "5d3c7142a3bb392cf79d5b85dee68f8a9d29f936f41fb8daeb05b51085834ef7",
+      "bytes": 1138
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A05/input/request_form.json",
+      "sha256": "2394772cea135c6348ea6659d7d11fd2bc11c2031b212b628f5aec0352f02d47",
+      "bytes": 897
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/A05/manifest.json",
+      "sha256": "9d7a26326f3eb263f348b414437689b51698d3b21535d3735ed8081458a3196b",
+      "bytes": 2917
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/README.md",
+      "sha256": "1e409cac81f1ecfe4186dc2c7c1554454b93f21f29716c1602ebb7d911db5785",
+      "bytes": 6094
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/fixture_checks.json",
+      "sha256": "1220fe513dbfb3fa96364d0d510c1d625ef6ee00c7d97b5afbb090fe9e32557e",
+      "bytes": 1548
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/policy_bundle/B8_B9_MVP_PROPOSAL.md",
+      "sha256": "8fea65ab5f01586bd2742e850c6ae6be929a85b8e0b1bf7e1ab828051731c1d3",
+      "bytes": 17454
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/policy_bundle/R3_MVP_SCOPE_DRAFT.md",
+      "sha256": "8e13dfe2402ddc28ffd3c7459728a17e5bd70f590e06d61bca144735b63cac10",
+      "bytes": 18779
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/policy_bundle/R4_EVIDENCE_RULES_DRAFT.md",
+      "sha256": "9adb49595ed75e18ddbbea6f4589e171b707b57bde507f4e1505d82975d65a55",
+      "bytes": 14114
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/policy_bundle/R4_ROLES_HANDOFF_POLICY.md",
+      "sha256": "4125944dbdb04114559c0225501073c3ff39366cb60a4f83220959273f84ddc9",
+      "bytes": 9466
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/policy_bundle/R4_SOURCE_INTAKE_CONTRACT.md",
+      "sha256": "86e8dd340485c88a0726a2f3e0352edcf86b152d62133acf78bed16785b67355",
+      "bytes": 14980
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/policy_bundle/R4_WORK_BUDGET_POLICY.md",
+      "sha256": "2dd31c343fc6a2fbc908c1b6624a8fcb83e5cb94fdae4baf8cdd668300a9674f",
+      "bytes": 16542
+    },
+    {
+      "path": "docs/discovery/eval_development/b3_advance_01/suite_manifest.json",
+      "sha256": "7992c98a6b29c1b25c7e7de3d68a27b888c7324fbc6fa5c0ce7d780507fc020e",
+      "bytes": 2028
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q05/README.md",
+      "sha256": "1e8ac21d4c9858a3a76071d2ce6e0612f5cddd4ab8ec356de6eef909da006d02",
+      "bytes": 716
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q05/expected/expected.json",
+      "sha256": "a1f0dbeeb6528f32c6aa5bddc76ef022ff0f62e3f960ece2d70ba9a941b43a5b",
+      "bytes": 1424
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q05/input/authority_and_pretrip.md",
+      "sha256": "6f84870ac640aa7286ddcabf104914a7a63acc0140a4951325e1ea055b5e7d29",
+      "bytes": 1113
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q05/input/coverage_m1.md",
+      "sha256": "b5de84cfe6766f39331524aac12856ca64a62d398321b38cacc765b37b7ccaaf",
+      "bytes": 1331
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q05/input/employee_claim.md",
+      "sha256": "3eac1d048668b334e1cc39a810955f6db62996978daf71b7f090a5fab14c4883",
+      "bytes": 1009
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q05/input/expense_and_payment_sources.md",
+      "sha256": "ce5a3ca6d267531c945644c4a275300702209958ae98ae5382dd6123c546cff9",
+      "bytes": 1396
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q05/input/financial_events_m1.csv",
+      "sha256": "a8d6c0f73c60eee88ba8be4721f7bb2798e7dce95ce08a1f56a8984809635370",
+      "bytes": 514
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q05/manifest.json",
+      "sha256": "5d1ec52d5538f0d4feb76463e08750f520e6dbff31272dbff5cd62daacd8981b",
+      "bytes": 2786
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q06/README.md",
+      "sha256": "9c49c4dc84a1077625bad5173e1ed0c760963e2bfdef3647b73f17d70fe38898",
+      "bytes": 707
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q06/expected/expected.json",
+      "sha256": "569bbdebc5c99eff1fb7ceedf1d2047c01755143b03c2d464dfe5e35a87b4890",
+      "bytes": 1293
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q06/input/authority_and_pretrip.md",
+      "sha256": "e7e7c613ba1c40ae57a5cae97e709afd7310ecc11e0225c2292f1aeab88e3386",
+      "bytes": 1144
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q06/input/coverage_m1.md",
+      "sha256": "deb8f9ad8ed44bc57b203e8a2df53e0396e786a504fbdbb53bd1b762a3bd5f1e",
+      "bytes": 1335
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q06/input/employee_claim.md",
+      "sha256": "95aea5af6ad7238e75916e63971995fd462de771843595da694ac25a110fdc14",
+      "bytes": 1044
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q06/input/expense_and_payment_sources.md",
+      "sha256": "5897f2af2d62e8a483cd67008619fc775112cada96cf770016aa0327783ba701",
+      "bytes": 1146
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q06/input/financial_events_m1.csv",
+      "sha256": "6802cabd7ef8e938df21ef47e8e1c1e72d92584417ed4309412edd5838febf6d",
+      "bytes": 324
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q06/manifest.json",
+      "sha256": "863052bff3ebc7334e72d477552a11dfd990fd242ec151118b69ebdf15bac123",
+      "bytes": 2786
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q07/README.md",
+      "sha256": "f3d44d72b5999c6566cdb4877232b1d6b910e6bd8825cd9f96ce177485c886bc",
+      "bytes": 726
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q07/expected/expected.json",
+      "sha256": "f6f71cc8e2501947cfd10997ff06f10ac0127e43b8e32e3bc2dc196d8ac02297",
+      "bytes": 1499
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q07/input/authority_and_pretrip.md",
+      "sha256": "3c528045f913dd9d65b0e0242e72e32152c07d7cfb9b10f25fdb58c2ce1d8842",
+      "bytes": 2125
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q07/input/bank_statement_excerpt.md",
+      "sha256": "39b3190eb54251c4a3141f92a3818e6e30ca1bf1eae1aeee782b72173a8c4a77",
+      "bytes": 754
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q07/input/coverage_m1.md",
+      "sha256": "89c4ab1662b97cab8a190a71ccf2e5c799984d5280cc295ddc636711002a8bf0",
+      "bytes": 2267
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q07/input/employee_claim.md",
+      "sha256": "9deea492d306c9c6c592d43260c263a0cb8fe099def2506808fc605453861f1a",
+      "bytes": 2592
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q07/input/expense_and_payment_sources.md",
+      "sha256": "47dfb0701886058b992907e360f143656650f3c87e0adb7de779b5050d1b7a22",
+      "bytes": 2979
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q07/input/export_scope.md",
+      "sha256": "2916bf46a9d71bf2b2989e090b2582012a2f4c592df942409b2ba8b47cef07c2",
+      "bytes": 1246
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q07/input/finance_bank_correspondence.csv",
+      "sha256": "ffe3b8c84f562c367187f12d5d94911f31600386b8ca6f835a99f54a19edd269",
+      "bytes": 391
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q07/input/financial_events_m1.csv",
+      "sha256": "10df9bfcbb2244a853b6faad83e7e3bf7565a45a1db63d22a820dbbe4cd652ce",
+      "bytes": 505
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q07/input/supplier_documents_copy.md",
+      "sha256": "47dfb0701886058b992907e360f143656650f3c87e0adb7de779b5050d1b7a22",
+      "bytes": 2979
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/Q07/manifest.json",
+      "sha256": "aff5bc043439e2c310c606458f4d61672e875edbceea60de0b49733095940626",
+      "bytes": 3363
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/README.md",
+      "sha256": "8d034a3762a92293535cda81c8c7f1dd0855d24ae21797eb1395c69d5860ac71",
+      "bytes": 5827
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/fixture_checks.json",
+      "sha256": "bf459d66738368dfa33aeeacb782f2abdc96efd74988509a5595db912f070e38",
+      "bytes": 772
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/policy_bundle/B8_B9_MVP_PROPOSAL.md",
+      "sha256": "8fea65ab5f01586bd2742e850c6ae6be929a85b8e0b1bf7e1ab828051731c1d3",
+      "bytes": 17454
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/policy_bundle/R3_MVP_SCOPE_DRAFT.md",
+      "sha256": "8e13dfe2402ddc28ffd3c7459728a17e5bd70f590e06d61bca144735b63cac10",
+      "bytes": 18779
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/policy_bundle/R4_EVIDENCE_RULES_DRAFT.md",
+      "sha256": "9adb49595ed75e18ddbbea6f4589e171b707b57bde507f4e1505d82975d65a55",
+      "bytes": 14114
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/policy_bundle/R4_ROLES_HANDOFF_POLICY.md",
+      "sha256": "4125944dbdb04114559c0225501073c3ff39366cb60a4f83220959273f84ddc9",
+      "bytes": 9466
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/policy_bundle/R4_SOURCE_INTAKE_CONTRACT.md",
+      "sha256": "86e8dd340485c88a0726a2f3e0352edcf86b152d62133acf78bed16785b67355",
+      "bytes": 14980
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/policy_bundle/R4_WORK_BUDGET_POLICY.md",
+      "sha256": "2dd31c343fc6a2fbc908c1b6624a8fcb83e5cb94fdae4baf8cdd668300a9674f",
+      "bytes": 16542
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_allocation_duplicates_01/suite_manifest.json",
+      "sha256": "e89322871be480abe38b1fbe342282c0a5e014e1459bc909e2b7ee5dceff99c8",
+      "bytes": 1783
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q01/README.md",
+      "sha256": "7711590ad221f73d017bc4b75276c9235d1a1d3c550ec0266f6d4a90ffdb2df9",
+      "bytes": 755
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q01/expected/expected.json",
+      "sha256": "01584f93134db6b6842105c086b86b9055a68fd4313845ac00865a458d9a7360",
+      "bytes": 1552
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q01/input/authority_and_pretrip.md",
+      "sha256": "3c528045f913dd9d65b0e0242e72e32152c07d7cfb9b10f25fdb58c2ce1d8842",
+      "bytes": 2125
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q01/input/coverage_m1.md",
+      "sha256": "89c4ab1662b97cab8a190a71ccf2e5c799984d5280cc295ddc636711002a8bf0",
+      "bytes": 2267
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q01/input/employee_claim.md",
+      "sha256": "9deea492d306c9c6c592d43260c263a0cb8fe099def2506808fc605453861f1a",
+      "bytes": 2592
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q01/input/expense_and_payment_sources.md",
+      "sha256": "47dfb0701886058b992907e360f143656650f3c87e0adb7de779b5050d1b7a22",
+      "bytes": 2979
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q01/input/financial_events_m1.csv",
+      "sha256": "10df9bfcbb2244a853b6faad83e7e3bf7565a45a1db63d22a820dbbe4cd652ce",
+      "bytes": 505
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q01/manifest.json",
+      "sha256": "bb9bd3ef9abac975f7bf398056b9fb8465ef1ec2b9c01cdebaae32ebd0c9758c",
+      "bytes": 2617
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q02/README.md",
+      "sha256": "38df04d409a28f65799e378d23150497efe0e73ba65547f861e92af5a95efc02",
+      "bytes": 755
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q02/expected/expected.json",
+      "sha256": "3912a21336735e1d5103f4aa4567645b113625ce1b571dcc5039e888c385d749",
+      "bytes": 1523
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q02/input/authority_and_pretrip.md",
+      "sha256": "936aa806786ff97cfca16bfdfd962cc37b612952825037ad2eb7807d0b95b350",
+      "bytes": 1530
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q02/input/coverage_m1.md",
+      "sha256": "a19c509cf95892b19c2ca1d3b3645c24f103ffffe8ee915f2fcfc5986337f6db",
+      "bytes": 1815
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q02/input/employee_claim.md",
+      "sha256": "513dc1ffdd6b4ed44f5304aadb613b19577c8901ef73e6d985ef96d05a791272",
+      "bytes": 2076
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q02/input/expense_and_payment_sources.md",
+      "sha256": "b9e2eac6073fdaefc3ece9e86cec997567b75b4d956f7a7e5388589017201113",
+      "bytes": 1680
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q02/input/financial_events_m1.csv",
+      "sha256": "77a2e01871a0366415180d34cd045ea0fbb9dbdcecf7dd8d3f39d2340ef955f6",
+      "bytes": 327
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q02/manifest.json",
+      "sha256": "cd9bfa9b254357ef9468921d094625a838868aa52852da900d7d9e1b7fdc34de",
+      "bytes": 2617
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q03/README.md",
+      "sha256": "11084b4ae8ee81681f52ad411bca8fbc86457ef32f75b7d9a7b8566af5ae8791",
+      "bytes": 755
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q03/expected/expected.json",
+      "sha256": "ae4d8d72e62a2c6346f568969274722cf5ece4dc5e236d071cdc7b50c2a9cc38",
+      "bytes": 1552
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q03/input/authority_and_pretrip.md",
+      "sha256": "4307cca3273c3a68b54645ee512c49ed7654328f81bfa7d2f69b18c377b008b7",
+      "bytes": 1516
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q03/input/coverage_m1.md",
+      "sha256": "c4f0b4d338514b24a34c5d2c6b990fa09c003fe2dc89f5002682dc3edf7f4e29",
+      "bytes": 1797
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q03/input/employee_claim.md",
+      "sha256": "c1c8892b1b8ca13f1f4a01bcb110dc4fbb2887b05a1144098435cf0a9d9db1a7",
+      "bytes": 1922
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q03/input/expense_and_payment_sources.md",
+      "sha256": "63b230f2dfec7b828950d5faab2662ce9732d21cd723a22f8c70abb64d990a5f",
+      "bytes": 2043
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q03/input/financial_events_m1.csv",
+      "sha256": "907d9d09f3a173f1f2eb27bc5b13c90531611df340fd72d71e36839ab5117ee5",
+      "bytes": 507
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q03/manifest.json",
+      "sha256": "c4b3926a5b3ae85c596a790aea5a6299a8ae73b020a4ab7bbe5f8aaceede49ad",
+      "bytes": 2617
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q04/README.md",
+      "sha256": "f44e97439e30dcb3313049dcf9ac217b41071f706b7c14e73c020944b0fa1b21",
+      "bytes": 792
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q04/expected/expected.json",
+      "sha256": "e0a065077fb50615904594a57d4a138c26923ed94ea0d5be9c28d57c86cde5d3",
+      "bytes": 1740
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q04/input/authority_and_pretrip.md",
+      "sha256": "3c528045f913dd9d65b0e0242e72e32152c07d7cfb9b10f25fdb58c2ce1d8842",
+      "bytes": 2125
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q04/input/coverage_m1.md",
+      "sha256": "89c4ab1662b97cab8a190a71ccf2e5c799984d5280cc295ddc636711002a8bf0",
+      "bytes": 2267
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q04/input/decision_and_receipt_m2.md",
+      "sha256": "3b19f6a91fffb840f9a678898ad2d4d93ba732fc0fe978fefc213c874c665179",
+      "bytes": 2023
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q04/input/employee_claim.md",
+      "sha256": "9deea492d306c9c6c592d43260c263a0cb8fe099def2506808fc605453861f1a",
+      "bytes": 2592
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q04/input/expense_and_payment_sources.md",
+      "sha256": "47dfb0701886058b992907e360f143656650f3c87e0adb7de779b5050d1b7a22",
+      "bytes": 2979
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q04/input/financial_events_m1.csv",
+      "sha256": "10df9bfcbb2244a853b6faad83e7e3bf7565a45a1db63d22a820dbbe4cd652ce",
+      "bytes": 505
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/Q04/manifest.json",
+      "sha256": "ebe116446fd7cfd8be7c37cf1b1f66b2ffb36fc40e18401d6e3aa832491cf3da",
+      "bytes": 2763
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/README.md",
+      "sha256": "944b421e79585939c458b7aeba755473080db3a39fc45f3925acee4560d0d2e0",
+      "bytes": 4510
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/fixture_checks.json",
+      "sha256": "dff5931df14493068527125330ec06494910598b80e687f23a9244a5cc0358e1",
+      "bytes": 1136
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/policy_bundle/B8_B9_MVP_PROPOSAL.md",
+      "sha256": "8fea65ab5f01586bd2742e850c6ae6be929a85b8e0b1bf7e1ab828051731c1d3",
+      "bytes": 17454
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/policy_bundle/R3_MVP_SCOPE_DRAFT.md",
+      "sha256": "8e13dfe2402ddc28ffd3c7459728a17e5bd70f590e06d61bca144735b63cac10",
+      "bytes": 18779
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/policy_bundle/R4_EVIDENCE_RULES_DRAFT.md",
+      "sha256": "9adb49595ed75e18ddbbea6f4589e171b707b57bde507f4e1505d82975d65a55",
+      "bytes": 14114
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/policy_bundle/R4_ROLES_HANDOFF_POLICY.md",
+      "sha256": "4125944dbdb04114559c0225501073c3ff39366cb60a4f83220959273f84ddc9",
+      "bytes": 9466
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/policy_bundle/R4_SOURCE_INTAKE_CONTRACT.md",
+      "sha256": "86e8dd340485c88a0726a2f3e0352edcf86b152d62133acf78bed16785b67355",
+      "bytes": 14980
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/policy_bundle/R4_WORK_BUDGET_POLICY.md",
+      "sha256": "2dd31c343fc6a2fbc908c1b6624a8fcb83e5cb94fdae4baf8cdd668300a9674f",
+      "bytes": 16542
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_core_01/suite_manifest.json",
+      "sha256": "409fca9c561e6465e78e54a53f1de92021d6241550a76e830370f7f487a0ebd6",
+      "bytes": 2034
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q08/README.md",
+      "sha256": "2d396547cfb28b93dba738a347d4a9c251e4ee26d8b14dbeaf0486bc175af05b",
+      "bytes": 550
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q08/expected/after.json",
+      "sha256": "2052c96ee3113aa5e2e3008d8e492637d29cf337ab393c4a78dd98785c99560b",
+      "bytes": 727
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q08/expected/before.json",
+      "sha256": "8b90cfcd2b8e0db9e31d023f59ce997bc7783fdffb083b20af043f77da750815",
+      "bytes": 1631
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q08/followup/clear_source_note.md",
+      "sha256": "00fd5e21dbed6611f6a7747b1bed0b036d331d1460c3e44ca656547451251a6d",
+      "bytes": 641
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q08/followup/hotel_receipt_clear.png",
+      "sha256": "5b0cf63c61fb421a2894f5f6130d1bd8bc519f72bf044ae89ff121b4b7539358",
+      "bytes": 81425
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q08/input/authority_and_pretrip.md",
+      "sha256": "3c528045f913dd9d65b0e0242e72e32152c07d7cfb9b10f25fdb58c2ce1d8842",
+      "bytes": 2125
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q08/input/coverage_m1.md",
+      "sha256": "89c4ab1662b97cab8a190a71ccf2e5c799984d5280cc295ddc636711002a8bf0",
+      "bytes": 2267
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q08/input/employee_claim.md",
+      "sha256": "eb8d9558f82c07c15b5b77928a3f36d5f7f8a95f30da2cdccd48496f6e5525f3",
+      "bytes": 2653
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q08/input/expense_and_payment_sources.md",
+      "sha256": "762695e052fab61a363f10798cf207b65045a75877b89c4df80887b66aa7c556",
+      "bytes": 2943
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q08/input/financial_events_m1.csv",
+      "sha256": "10df9bfcbb2244a853b6faad83e7e3bf7565a45a1db63d22a820dbbe4cd652ce",
+      "bytes": 505
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q08/input/hotel_receipt.png",
+      "sha256": "fc1896b210eb77567ddcf553e9737233975c09bdb3c84f987a69cd58f58cf194",
+      "bytes": 77727
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q08/manifest.json",
+      "sha256": "fbfa8a800741875ba036e1496869763a78b4d3be33f755b001b4b81ec095a5a0",
+      "bytes": 3446
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q15/README.md",
+      "sha256": "460ceb00964cd769a2aff89c98e8d0a272ffe4453f1d93d7de6d8bb8871a6786",
+      "bytes": 564
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q15/expected/after.json",
+      "sha256": "b098f294bf9a91d34c542e0273c60f4394306d730075af231233abb0e59fdcd5",
+      "bytes": 724
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q15/expected/before.json",
+      "sha256": "b8a9cdcd2a6bee8b7cf78a0468a5503c3e1894e585feb61bcbee81081951b60d",
+      "bytes": 1574
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q15/followup/accept_incurred_costs.md",
+      "sha256": "ace579842f13a8fc2b071ce31268964da7d2c479cae1cd106c72e577bc534568",
+      "bytes": 1225
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q15/input/authority_and_pretrip.md",
+      "sha256": "d06dbff44c8d119bc5a889ce3439f6c7193a7e057d121eb3912186403aebdae2",
+      "bytes": 1101
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q15/input/coverage_m1.md",
+      "sha256": "bdc37a2fb753271434cc45ddeac69e70a48c7e488bb2760cdb18c0afc0a232f5",
+      "bytes": 2311
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q15/input/employee_claim.md",
+      "sha256": "513dc1ffdd6b4ed44f5304aadb613b19577c8901ef73e6d985ef96d05a791272",
+      "bytes": 2076
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q15/input/expense_and_payment_sources.md",
+      "sha256": "b9e2eac6073fdaefc3ece9e86cec997567b75b4d956f7a7e5388589017201113",
+      "bytes": 1680
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q15/input/financial_events_m1.csv",
+      "sha256": "77a2e01871a0366415180d34cd045ea0fbb9dbdcecf7dd8d3f39d2340ef955f6",
+      "bytes": 327
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/Q15/manifest.json",
+      "sha256": "0658db4e751ced03126081fae26fe6fdc605a61c43e2f22f6e14dc232891bd66",
+      "bytes": 3167
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/README.md",
+      "sha256": "b894cc74a94c8960acd12f9174d9782e427b8298e06b90b6c1416624dc80864d",
+      "bytes": 6419
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/fixture_checks.json",
+      "sha256": "97118a602576857854d711099aef92ba5f05a45e0aebe8b82f8defd594b7f31b",
+      "bytes": 808
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/policy_bundle/B8_B9_MVP_PROPOSAL.md",
+      "sha256": "8fea65ab5f01586bd2742e850c6ae6be929a85b8e0b1bf7e1ab828051731c1d3",
+      "bytes": 17454
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/policy_bundle/R3_MVP_SCOPE_DRAFT.md",
+      "sha256": "8e13dfe2402ddc28ffd3c7459728a17e5bd70f590e06d61bca144735b63cac10",
+      "bytes": 18779
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/policy_bundle/R4_EVIDENCE_RULES_DRAFT.md",
+      "sha256": "9adb49595ed75e18ddbbea6f4589e171b707b57bde507f4e1505d82975d65a55",
+      "bytes": 14114
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/policy_bundle/R4_ROLES_HANDOFF_POLICY.md",
+      "sha256": "4125944dbdb04114559c0225501073c3ff39366cb60a4f83220959273f84ddc9",
+      "bytes": 9466
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/policy_bundle/R4_SOURCE_INTAKE_CONTRACT.md",
+      "sha256": "86e8dd340485c88a0726a2f3e0352edcf86b152d62133acf78bed16785b67355",
+      "bytes": 14980
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/policy_bundle/R4_WORK_BUDGET_POLICY.md",
+      "sha256": "2dd31c343fc6a2fbc908c1b6624a8fcb83e5cb94fdae4baf8cdd668300a9674f",
+      "bytes": 16542
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_missing_budget_image_01/suite_manifest.json",
+      "sha256": "a57c5bd9a2341806e22df7166f59bdb507fe2b719c331d3b225e490e40d31c4f",
+      "bytes": 1776
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q13/README.md",
+      "sha256": "fbb2bda7d3dfca324f5f9d56863372eedb8a625b9ce5911920ccb6de60161a73",
+      "bytes": 660
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q13/expected/accept_all.json",
+      "sha256": "a4b187419820bf30c2d5225e50f045194821683d1a81b9c33c53e34b5f7e3e00",
+      "bytes": 877
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q13/expected/accept_part.json",
+      "sha256": "f264d811b325dfd061dfe3045917e921cf30bd9421a73f27e57471b3c888c670",
+      "bytes": 884
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q13/expected/before.json",
+      "sha256": "01cdf4bec8ce99cdd0dd979e614dc7b13e39e9dd8706b969195ae304c399d701",
+      "bytes": 1511
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q13/followup/accept_all.md",
+      "sha256": "c53b1b26eab7cf8db3687eaf77d9f3a073160ebf7507892bac49cf4fae3006a6",
+      "bytes": 1391
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q13/followup/accept_part.md",
+      "sha256": "1cb15d1b91fa21871d9b3de023457d8166aa6db7fd14c4cd284abbd86217d7c5",
+      "bytes": 1481
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q13/input/authority_and_pretrip.md",
+      "sha256": "569283c98aba701d8d7cfffb7b88c9af25b650ee6dd9f16f16cff5bb7723a9d5",
+      "bytes": 2003
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q13/input/coverage_m1.md",
+      "sha256": "89c4ab1662b97cab8a190a71ccf2e5c799984d5280cc295ddc636711002a8bf0",
+      "bytes": 2267
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q13/input/employee_claim.md",
+      "sha256": "53410079a5da3eb645a104c36b3d2a2fa5f1e3b31245c08783f3e6d8f864d9ba",
+      "bytes": 2592
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q13/input/expense_and_payment_sources.md",
+      "sha256": "3d4778cc53425a0086f30dfd13ab23bca538c988cc7ee2deedddae2f1c120c1f",
+      "bytes": 2979
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q13/input/financial_events_m1.csv",
+      "sha256": "10df9bfcbb2244a853b6faad83e7e3bf7565a45a1db63d22a820dbbe4cd652ce",
+      "bytes": 505
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q13/manifest.json",
+      "sha256": "cf27705df919b396dbf6c9d16261e33882392a18e1f9e10e72b4bceca1762e3e",
+      "bytes": 3470
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q14/README.md",
+      "sha256": "6074531aa5a5601a8e224f28f7c22840ae8a99dc5d9225cbfc575143c9d448f8",
+      "bytes": 669
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q14/expected/authority_update.json",
+      "sha256": "65d89ff9dc5a13af07572b80a00f008dfe50daa18e659138003b1d6de44037dd",
+      "bytes": 875
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q14/expected/before.json",
+      "sha256": "a88fa8741da015e1291240b829f7abe30aa6e78222544788b414442094dc9ad0",
+      "bytes": 1620
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q14/followup/authority_update.md",
+      "sha256": "6e01143943b3220785501125c4942075b29a5313095b1a79d66c5ced5cca6708",
+      "bytes": 1210
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q14/input/approval_assignment.md",
+      "sha256": "0378f5ab482a6114cad9654c10efda19c177796f5aa79206a0fc1c421af9d26d",
+      "bytes": 1042
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q14/input/authority_and_pretrip.md",
+      "sha256": "871f4bc869ccfe6dddca3402caf977abef378e3c69be1c5f479b5de965253655",
+      "bytes": 1741
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q14/input/coverage_m1.md",
+      "sha256": "b5a32ecc2469e8e653fb559be146a0a6ee0014c74dfc57b76bd1686716be4f42",
+      "bytes": 2435
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q14/input/employee_claim.md",
+      "sha256": "9deea492d306c9c6c592d43260c263a0cb8fe099def2506808fc605453861f1a",
+      "bytes": 2592
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q14/input/expense_and_payment_sources.md",
+      "sha256": "47dfb0701886058b992907e360f143656650f3c87e0adb7de779b5050d1b7a22",
+      "bytes": 2979
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q14/input/financial_events_m1.csv",
+      "sha256": "10df9bfcbb2244a853b6faad83e7e3bf7565a45a1db63d22a820dbbe4cd652ce",
+      "bytes": 505
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/Q14/manifest.json",
+      "sha256": "01614d049cbf8cf8cc7bd14c4f8c45357f670c65bed3587ffa171ffbd8a131ba",
+      "bytes": 3319
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/README.md",
+      "sha256": "10d7293fe3a85861fe7357c5aa3878e46f50f612fe299fe045e2653fce06461d",
+      "bytes": 6408
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/fixture_checks.json",
+      "sha256": "9ba4e0bce63fed329a3804c199634119442839f2714dbe1953ba6db5716999c4",
+      "bytes": 721
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/policy_bundle/B8_B9_MVP_PROPOSAL.md",
+      "sha256": "8fea65ab5f01586bd2742e850c6ae6be929a85b8e0b1bf7e1ab828051731c1d3",
+      "bytes": 17454
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/policy_bundle/R3_MVP_SCOPE_DRAFT.md",
+      "sha256": "8e13dfe2402ddc28ffd3c7459728a17e5bd70f590e06d61bca144735b63cac10",
+      "bytes": 18779
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/policy_bundle/R4_EVIDENCE_RULES_DRAFT.md",
+      "sha256": "9adb49595ed75e18ddbbea6f4589e171b707b57bde507f4e1505d82975d65a55",
+      "bytes": 14114
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/policy_bundle/R4_ROLES_HANDOFF_POLICY.md",
+      "sha256": "4125944dbdb04114559c0225501073c3ff39366cb60a4f83220959273f84ddc9",
+      "bytes": 9466
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/policy_bundle/R4_SOURCE_INTAKE_CONTRACT.md",
+      "sha256": "86e8dd340485c88a0726a2f3e0352edcf86b152d62133acf78bed16785b67355",
+      "bytes": 14980
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/policy_bundle/R4_WORK_BUDGET_POLICY.md",
+      "sha256": "2dd31c343fc6a2fbc908c1b6624a8fcb83e5cb94fdae4baf8cdd668300a9674f",
+      "bytes": 16542
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_policy_authority_01/suite_manifest.json",
+      "sha256": "86ff16a2f983573341355acafdde8e7e2536e8b14b7aea2b548fbfc632a73b29",
+      "bytes": 1808
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q09/README.md",
+      "sha256": "61272e9d4ded29b97cacdabb8435d10a209be04baeba3008815301f79b265fcf",
+      "bytes": 1076
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q09/expected/after.json",
+      "sha256": "9c32ba9edcca3bb04771c658c6cf1719c0906599000c37a33c80b920f3b1f290",
+      "bytes": 925
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q09/expected/before.json",
+      "sha256": "3c96983179298dbffc9192647e469022bc60b15bb35b09dd5dfadb01643b8c9a",
+      "bytes": 1474
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q09/followup/resolution.md",
+      "sha256": "ea1bf631d2d2897b7e5d3b89a21dc14e49d3c9ede1854a50ced2b8f47319736f",
+      "bytes": 707
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q09/input/authority_and_pretrip.md",
+      "sha256": "3c528045f913dd9d65b0e0242e72e32152c07d7cfb9b10f25fdb58c2ce1d8842",
+      "bytes": 2125
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q09/input/coverage_m1.md",
+      "sha256": "89c4ab1662b97cab8a190a71ccf2e5c799984d5280cc295ddc636711002a8bf0",
+      "bytes": 2267
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q09/input/employee_claim.md",
+      "sha256": "f03635a5d1520edbe31b811e77272143711c5215275ee0908482f092b58556cb",
+      "bytes": 2050
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q09/input/expense_and_payment_sources.md",
+      "sha256": "edddffca7ea7c6b55882e14b85467aabae56ea1654e4105b93d215e0c2ed07ae",
+      "bytes": 2927
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q09/input/financial_events_m1.csv",
+      "sha256": "70df9dbfd53fda7c05ddac6b4dd70f9afdce1ce06f177b68735c0e2cabf7f5f8",
+      "bytes": 508
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q09/manifest.json",
+      "sha256": "79db4501fe94fde4d22b318f22119a3e2126b3d78c37dc9dc8fd2bdca56ded8b",
+      "bytes": 3222
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q10/README.md",
+      "sha256": "ed40b1accbac002f784be7610f0568822773b041605981c155bd2e727a144333",
+      "bytes": 1072
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q10/expected/after.json",
+      "sha256": "f95a0952ed1ae242bdc135c4beb23e3c2c354ccea590897df2f3e706e8d6443c",
+      "bytes": 931
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q10/expected/before.json",
+      "sha256": "cfcf56eb9cf3e1223dfbd025ef2396dded3d04b5ac73a321e576f9d5333feb5e",
+      "bytes": 1623
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q10/followup/resolution.md",
+      "sha256": "114a88414f4d3a357635ac1c08904c183de8f582acf447f5c3e1e5c2986f4ac3",
+      "bytes": 1312
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q10/input/authority_and_pretrip.md",
+      "sha256": "3c528045f913dd9d65b0e0242e72e32152c07d7cfb9b10f25fdb58c2ce1d8842",
+      "bytes": 2125
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q10/input/coverage_m1.md",
+      "sha256": "d8088af4c414b3294ec627ec151bbb5fa63d1891980ac52167bd6cb080a8a151",
+      "bytes": 1158
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q10/input/employee_claim.md",
+      "sha256": "0609e18551448ff1aa824b51c16740412f095b0d2fdb5ccbe41b0d7c3d4715e5",
+      "bytes": 2484
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q10/input/expense_and_payment_sources.md",
+      "sha256": "47dfb0701886058b992907e360f143656650f3c87e0adb7de779b5050d1b7a22",
+      "bytes": 2979
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q10/input/financial_events_m1.csv",
+      "sha256": "70df9dbfd53fda7c05ddac6b4dd70f9afdce1ce06f177b68735c0e2cabf7f5f8",
+      "bytes": 508
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q10/manifest.json",
+      "sha256": "0f11e6129b5e9df07e64e40138f46e789acc72b19fcc81d0ef6e3245a2729ad9",
+      "bytes": 3222
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q11/README.md",
+      "sha256": "bfff9c100427baab6384020808f5194a9d4b8a6c335ed30676e9822ff97b1fe5",
+      "bytes": 1083
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q11/expected/after.json",
+      "sha256": "6a70c9b89d6e558133d182e5e6fc9fbbf6dd4616cc96e06e9ac39d3d9fea93d0",
+      "bytes": 916
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q11/expected/before.json",
+      "sha256": "eb68be9ab13c142713dced2647f2d36aaa28da1aad8ff3cc5fb03db650ef1bed",
+      "bytes": 1509
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q11/followup/resolution.md",
+      "sha256": "9bce26f7e73f4d0de3a51b45870ef3d1b16b6de85a8afc95001da27a3f20cbbd",
+      "bytes": 1107
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q11/input/authority_and_pretrip.md",
+      "sha256": "3c528045f913dd9d65b0e0242e72e32152c07d7cfb9b10f25fdb58c2ce1d8842",
+      "bytes": 2125
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q11/input/coverage_m1.md",
+      "sha256": "ba479737d666327997fd0b5c773dc0c43dd3f2c78cbde14e73436b6941dc9df2",
+      "bytes": 1192
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q11/input/employee_claim.md",
+      "sha256": "5a94952deaf2e328bb1f66e79fba54ff30d5a52cf1646a6850175f7af989067c",
+      "bytes": 2615
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q11/input/expense_and_payment_sources.md",
+      "sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+      "bytes": 2489
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q11/input/financial_events_m1.csv",
+      "sha256": "2db04b0f9d2894b028d449dee4c49c0a12e8fcfdd8d259f0b112d92d0cf9357e",
+      "bytes": 499
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q11/input/payment_attempts.md",
+      "sha256": "ddc9d2b089555193e207eae6b9fab1b04570088f51cc5ab69c6de077a4cd1a9b",
+      "bytes": 446
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q11/manifest.json",
+      "sha256": "d2b5355428860dd8fd17f61af6a05ff6d9817d3156dbe59585e79e06ffcf2cdb",
+      "bytes": 3361
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q12/README.md",
+      "sha256": "c821ec9fb9912ca763de6e8d10f32520e52a37a88217b2712d477b5ac4fd7e5a",
+      "bytes": 1076
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q12/expected/after.json",
+      "sha256": "2bbbbc591218559c8f7dd188aaca42f1aebb8742f33ab772b963fa4f7531ba87",
+      "bytes": 938
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q12/expected/before.json",
+      "sha256": "ef9de28c11c8c12f87a83af801b8c398d39e0b0701d84707806cb019048e6a88",
+      "bytes": 1683
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q12/followup/resolution.md",
+      "sha256": "e48eb744d21800dfbda02dc8f8bb98f43274b050206ebe6b449ce16751b38582",
+      "bytes": 1072
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q12/input/authority_and_pretrip.md",
+      "sha256": "3c528045f913dd9d65b0e0242e72e32152c07d7cfb9b10f25fdb58c2ce1d8842",
+      "bytes": 2125
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q12/input/coverage_m1.md",
+      "sha256": "89c4ab1662b97cab8a190a71ccf2e5c799984d5280cc295ddc636711002a8bf0",
+      "bytes": 2267
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q12/input/employee_claim.md",
+      "sha256": "d0260caa3005fef5304560fb89038101ef911dae7ad63e956ddd3a1649eb554f",
+      "bytes": 2583
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q12/input/expense_and_payment_sources.md",
+      "sha256": "47dfb0701886058b992907e360f143656650f3c87e0adb7de779b5050d1b7a22",
+      "bytes": 2979
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q12/input/financial_events_m1.csv",
+      "sha256": "70df9dbfd53fda7c05ddac6b4dd70f9afdce1ce06f177b68735c0e2cabf7f5f8",
+      "bytes": 508
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/Q12/manifest.json",
+      "sha256": "906e16e93b1bde913a904739b871db8cbd70aeb8c4eb31c6a6e0aa636361cfe4",
+      "bytes": 3222
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/README.md",
+      "sha256": "bcb044962fe301f54e3ba79dc200877e0eaf71d39e97d69ec56daa6d2f37306f",
+      "bytes": 6436
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/fixture_checks.json",
+      "sha256": "0a0e744666d99be0bb85b0a5a5da272d12101b59eee2fb2be93440173b05b3ce",
+      "bytes": 1095
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/policy_bundle/B8_B9_MVP_PROPOSAL.md",
+      "sha256": "8fea65ab5f01586bd2742e850c6ae6be929a85b8e0b1bf7e1ab828051731c1d3",
+      "bytes": 17454
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/policy_bundle/R3_MVP_SCOPE_DRAFT.md",
+      "sha256": "8e13dfe2402ddc28ffd3c7459728a17e5bd70f590e06d61bca144735b63cac10",
+      "bytes": 18779
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/policy_bundle/R4_EVIDENCE_RULES_DRAFT.md",
+      "sha256": "9adb49595ed75e18ddbbea6f4589e171b707b57bde507f4e1505d82975d65a55",
+      "bytes": 14114
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/policy_bundle/R4_ROLES_HANDOFF_POLICY.md",
+      "sha256": "4125944dbdb04114559c0225501073c3ff39366cb60a4f83220959273f84ddc9",
+      "bytes": 9466
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/policy_bundle/R4_SOURCE_INTAKE_CONTRACT.md",
+      "sha256": "86e8dd340485c88a0726a2f3e0352edcf86b152d62133acf78bed16785b67355",
+      "bytes": 14980
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/policy_bundle/R4_WORK_BUDGET_POLICY.md",
+      "sha256": "2dd31c343fc6a2fbc908c1b6624a8fcb83e5cb94fdae4baf8cdd668300a9674f",
+      "bytes": 16542
+    },
+    {
+      "path": "docs/discovery/eval_development/b7_uncertainty_01/suite_manifest.json",
+      "sha256": "ea0b4b656f2d95805bca0e76001a810bdebd9e4bd046f8d6b6091c15cf6bc8f8",
+      "bytes": 1921
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/README.md",
+      "sha256": "d732d9b8fa62cc167237a316103b1f2e6c577af5b5e2d36ce460a9a9c002715f",
+      "bytes": 2919
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/authority_and_pretrip.md",
+      "sha256": "3c528045f913dd9d65b0e0242e72e32152c07d7cfb9b10f25fdb58c2ce1d8842",
+      "bytes": 2125
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/coverage_m1.md",
+      "sha256": "89c4ab1662b97cab8a190a71ccf2e5c799984d5280cc295ddc636711002a8bf0",
+      "bytes": 2267
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/decision_and_receipt_m2.md",
+      "sha256": "3b19f6a91fffb840f9a678898ad2d4d93ba732fc0fe978fefc213c874c665179",
+      "bytes": 2023
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/employee_claim.md",
+      "sha256": "9deea492d306c9c6c592d43260c263a0cb8fe099def2506808fc605453861f1a",
+      "bytes": 2592
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/expected_walkthrough.md",
+      "sha256": "c61b37fb7ab2c7a1c3fd2cc3e6c4723e4b0914a02df5e1195b9c588c291b8ad6",
+      "bytes": 3441
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/expense_and_payment_sources.md",
+      "sha256": "47dfb0701886058b992907e360f143656650f3c87e0adb7de779b5050d1b7a22",
+      "bytes": 2979
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/financial_events_m1.csv",
+      "sha256": "10df9bfcbb2244a853b6faad83e7e3bf7565a45a1db63d22a820dbbe4cd652ce",
+      "bytes": 505
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/policy_manifest.json",
+      "sha256": "6a5cd286e2e3b44e7f7d699a05e3fe45ede82479e519072235b695f8ff60d62a",
+      "bytes": 2121
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/policy_snapshots/B8_B9_MVP_PROPOSAL.md",
+      "sha256": "8fea65ab5f01586bd2742e850c6ae6be929a85b8e0b1bf7e1ab828051731c1d3",
+      "bytes": 17454
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/policy_snapshots/R3_MVP_SCOPE_DRAFT.md",
+      "sha256": "8e13dfe2402ddc28ffd3c7459728a17e5bd70f590e06d61bca144735b63cac10",
+      "bytes": 18779
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/policy_snapshots/R4_EVIDENCE_RULES_DRAFT.md",
+      "sha256": "9adb49595ed75e18ddbbea6f4589e171b707b57bde507f4e1505d82975d65a55",
+      "bytes": 14114
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/policy_snapshots/R4_ROLES_HANDOFF_POLICY.md",
+      "sha256": "4125944dbdb04114559c0225501073c3ff39366cb60a4f83220959273f84ddc9",
+      "bytes": 9466
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/policy_snapshots/R4_SOURCE_INTAKE_CONTRACT.md",
+      "sha256": "86e8dd340485c88a0726a2f3e0352edcf86b152d62133acf78bed16785b67355",
+      "bytes": 14980
+    },
+    {
+      "path": "docs/discovery/examples/work_budget_01/policy_snapshots/R4_WORK_BUDGET_POLICY.md",
+      "sha256": "2dd31c343fc6a2fbc908c1b6624a8fcb83e5cb94fdae4baf8cdd668300a9674f",
+      "bytes": 16542
+    },
+    {
+      "path": "docs/research/2026-10-08-advance-intake.md",
+      "sha256": "9784a192fc57ba85f6f27585a13a238ef1dfd93b15588e85eb379c8be0405bbe",
+      "bytes": 10523
+    },
+    {
+      "path": "docs/research/2026-10-08-travel-authorization-bottleneck.md",
+      "sha256": "068d1cf83218a99be5c60829e88dde247f39123f364edb10cfc6daa9a7912b50",
+      "bytes": 10970
+    },
+    {
+      "path": "docs/reviews/2026-10-06-codebase-readiness/REVIEW.md",
+      "sha256": "9b6dc6bf37d48f4d9a37e4054bdb362f78f64996c41357363ef93634fb6867af",
+      "bytes": 19106
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-1-design/REVIEW.md",
+      "sha256": "ce81241e28ba89e4b244dedae30fd40a80ad9e43d39cc150f8d3e33584e8ddcd",
+      "bytes": 9679
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-1-design/TARGET_R2_CASE_WALKTHROUGH.md",
+      "sha256": "a9b02f88b55d7e66a78dd1d4d9897810169861246ac253245d22fa433bd9a1d1",
+      "bytes": 9757
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-1-design/review-evidence.json",
+      "sha256": "6155eeb7ed65b98c83f19f3fafbf51ddac2d3cfe88cfa9653ccd11925fd38639",
+      "bytes": 917
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-2-design/LEAD_PRE_REVIEW.md",
+      "sha256": "b4ed819bc00ec12baa3618314eb0a1b09e499f27205353c27e300bf9ec901a31",
+      "bytes": 1622
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-2-design/REVIEW.md",
+      "sha256": "dc1b7c2cc1186622f5ac3bb0fa54b3463781a51e6dc10160fae8942f964fa18f",
+      "bytes": 9234
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-2-design/TARGET_R2_CASE_WALKTHROUGH.md",
+      "sha256": "7bf4c96cd3a3d45f133372641604ac6c349cb5baf059e51a203e4361d0d1cae2",
+      "bytes": 13639
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-2-design/review-evidence.json",
+      "sha256": "3b151d62bbbddf24745fddfc4ee826f30aa07b573b7b5f5e22dc44911826e663",
+      "bytes": 917
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-3-design/LEAD_PRE_REVIEW.md",
+      "sha256": "a783fadd7d74ce0446584d325bd7d0ffd5ac7afded4a5048f5510a849b468c6d",
+      "bytes": 5197
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-3-design/REVIEW.md",
+      "sha256": "58529ea4d94da2e56b52d92eec3804fa1a16a411777c0fe30e1b3ddaab06adc8",
+      "bytes": 12054
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-3-design/TARGET_R2_CASE_WALKTHROUGH.md",
+      "sha256": "4284cdd65949c8d584eee5896c3739fa15706adbabf18646241e9b3217e8ba5c",
+      "bytes": 21499
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-3-design/review-evidence.json",
+      "sha256": "76eb9ceedfdf9c776e1ce8bb5e4ae9d1034881f0b9d6b68a7376a20513ef5157",
+      "bytes": 1161
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-4-design/LEAD_PRE_REVIEW.md",
+      "sha256": "631a0a64b69f58d4c83231f5688853785b0629a6996c73974dffc6f7b456d37e",
+      "bytes": 5294
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-4-design/REVIEW.md",
+      "sha256": "629c87d006e548a8481cde5879d959703ce1cf5ca73b4d489e515dbe349bffa9",
+      "bytes": 9999
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-4-design/REVIEWER.md",
+      "sha256": "2f882b91f929c0e0bf0b49690054918394e3c8ca0a89c2fb5d9ea1b742c7a890",
+      "bytes": 6250
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-4-design/TARGET_R2_CASE_WALKTHROUGH.md",
+      "sha256": "64756253dcbe82526f3b325db69bd4b1467f0d66e22f13840f227991b4df8cf3",
+      "bytes": 32312
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-4-design/review-evidence.json",
+      "sha256": "c216e8d5609ca684d0a8ba03a9226fc7004dd40932a04b39357c0b39096d0ef6",
+      "bytes": 1634
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-5-design/LEAD_PRE_REVIEW.md",
+      "sha256": "2ee5cbb7a3ea707de95f0b1bbff415d2ea771a6721c4df6fe2fe0f6d59303055",
+      "bytes": 5184
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-5-design/REVIEW.md",
+      "sha256": "8bcb58dbbf2fb6250f4dd8a02a62e3da53b10df9d06f91905ac72460b196951c",
+      "bytes": 9640
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-5-design/REVIEWER.md",
+      "sha256": "6c452895c4fd4f7bcb3748ed74c769569a5c0ce468c938b73bea9eebaf523619",
+      "bytes": 7306
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-5-design/TARGET_R2_CASE_WALKTHROUGH.md",
+      "sha256": "5f60b9f04e81450c85de28a5d5108144c6ef5c76a064933036b560f3627a9235",
+      "bytes": 43743
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-5-design/review-evidence.json",
+      "sha256": "edfd83df70947c64cd1bfd7e7f8d89698c9f4d309282d832aea46dc56557c71b",
+      "bytes": 1269
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-6-design/LEAD_PRE_REVIEW.md",
+      "sha256": "00b98b659c606e89044bfafef42472dc2ec57054828ff48167f8b52434312907",
+      "bytes": 5149
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-6-design/REVIEW.md",
+      "sha256": "b629a54d152753a59b0072d5b0adf5533137c155dd1356507963ddf23508086c",
+      "bytes": 10193
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-6-design/REVIEWER.md",
+      "sha256": "8d239ec77a4e667da0e5d89b6f7c2143198dc19c0ad096544cd9860c1b9f3377",
+      "bytes": 7425
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-6-design/TARGET_R2_CASE_WALKTHROUGH.md",
+      "sha256": "7dde15f4f0d867fc8d38720b7310c159634f8aea439a67fb343294bb94b6f960",
+      "bytes": 54981
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-6-design/review-evidence.json",
+      "sha256": "5c48ff4ff651bf67dbbe211d0a7e3f692ad0a7e61df4e1a78470be3e0b2101d3",
+      "bytes": 1260
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-7-design/LEAD_PRE_REVIEW.md",
+      "sha256": "486cde6bbaa69eaab54f5b8af5db2c27da2962a22d9f0157a6c273869bc40b86",
+      "bytes": 4330
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-7-design/REVIEW.md",
+      "sha256": "0126f2ce875e510fb100a56beed4ec6dbd7c9f7d211f74c30606caf53458b7fb",
+      "bytes": 8822
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-7-design/REVIEWER.md",
+      "sha256": "fdfc24f99a7f66639911db3298ce18daed318608278ffcb401d2edbf24f581cf",
+      "bytes": 5427
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-7-design/TARGET_R2_CASE_WALKTHROUGH.md",
+      "sha256": "4113e7492b030f4e5b364d2707e2fd0593219a3cfed3f46a5314d7f7243a0e0a",
+      "bytes": 71034
+    },
+    {
+      "path": "docs/reviews/2026-10-08-step-7-design/review-evidence.json",
+      "sha256": "3af7923aac7a9c99bdf3a194743d9d95317c361c8c551fd68fe5d7ab219dbd57",
+      "bytes": 1513
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r3-scope/LEAD_PRE_REVIEW.md",
+      "sha256": "6f6b7e455310b29cc5537cd3ec7112049a2f1c6f6c441b22f0c825ce8c5cfa5e",
+      "bytes": 3332
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r3-scope/REVIEW.md",
+      "sha256": "36b631940443606ef3dc891bb19894de3134ee59895c697ae6adf07d6ab1eb15",
+      "bytes": 4569
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r3-scope/REVIEWER.md",
+      "sha256": "8f47ac93468880844fcf8b1cad79770f533bdef3d843055fb8123ac9ab6c34cd",
+      "bytes": 5436
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r3-scope/TARGET_R3_MVP_SCOPE_DRAFT.md",
+      "sha256": "63876a9fe2c3ebd5cf306579742ffd55b4c1b767f3b56912881236f2ef90cccd",
+      "bytes": 12151
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r3-scope/review-evidence.json",
+      "sha256": "a680fb3360d65b9edd2e42b7159ca3610733614f75ae89b259d16446ea67d2b5",
+      "bytes": 1821
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-data-sources/LEAD_PRE_REVIEW.md",
+      "sha256": "c1f510bd0ec53d3f91408b03b6e3f2e2e726fe0e0aae6629c908de948ec14d07",
+      "bytes": 2729
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-data-sources/REVIEW.md",
+      "sha256": "89c7285e2461008c3449934ee5c5adeb23f6d28698ea2afd58b4e68749864397",
+      "bytes": 3374
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-data-sources/REVIEWER.md",
+      "sha256": "eaccb1f223d41f8126d86c260a73629ba042b7e953f261ff5066394ac54657c5",
+      "bytes": 5575
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-data-sources/TARGET_R4_DATA_SOURCE_DRAFT.md",
+      "sha256": "d6c7498b0bb82fdbff34b1e70f7f27ce883627469e7ea553b6c417670cb75d96",
+      "bytes": 10047
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-data-sources/review-evidence.json",
+      "sha256": "801fcf0aa8d73d312e817dcb8e92f51cc2621f81f7ed3d82fa0b4cac29c4a4bf",
+      "bytes": 1689
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-demo-policy/LEAD_EVALUATION_NOTES.md",
+      "sha256": "883e86273533b7d8c19d21d9fb042a71561cf28753e6111e1c95b8c5429d3800",
+      "bytes": 2689
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-demo-policy/LEAD_PRE_REVIEW.md",
+      "sha256": "d987d48123604fc8dd4facd1fd750cc72fa0f9a7c0888663f377bd809db3ee3e",
+      "bytes": 2241
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-demo-policy/REVIEW.md",
+      "sha256": "190887375449798e86287bba2cf144ef722a1fa869a33461380b54be7771d14a",
+      "bytes": 9673
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-demo-policy/REVIEWER_RESPONSE.md",
+      "sha256": "5a3100f25b72e64d613a91414abf53d8762bb653e4c5e085d115f1f0017946d3",
+      "bytes": 10097
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-demo-policy/TARGET_R4_DEMO_POLICY_PARAMETERS_DRAFT.md",
+      "sha256": "88be013c24d74a7ba9e781908e9747ed910feaccc84023d015cb524362a8bcd3",
+      "bytes": 11421
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-demo-policy/review-evidence.json",
+      "sha256": "b3d163fc684c299b67712d3fd87d9ad645bb704634cc95aafa5549e79b4d17c3",
+      "bytes": 3079
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-evidence/LEAD_PRE_REVIEW.md",
+      "sha256": "5c6d395e596352b5f1186bcd98aeb7033c48ffd3a61ac9fd87366d9255712584",
+      "bytes": 3481
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-evidence/REVIEW.md",
+      "sha256": "e50cc808197d3d0b20033f8eebe8cc7cd49295d261b00598ac8b298c92ee1510",
+      "bytes": 5312
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-evidence/REVIEWER.md",
+      "sha256": "06e2fb57ecb9bd431fa3d0144be08995dca101e9dfcb56a6b7e9e6145ba07b52",
+      "bytes": 2734
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-evidence/TARGET_R4_EVIDENCE_RULES_DRAFT.md",
+      "sha256": "6485e8d7393ffe8e504661e2f0c7714d886268d3f8513749f36743166bb6618e",
+      "bytes": 11826
+    },
+    {
+      "path": "docs/reviews/2026-10-09-r4-evidence/review-evidence.json",
+      "sha256": "d8b65b294d0a522deef5033dc059088676df58d5017c48f0cf022140a0eab093",
+      "bytes": 2707
+    },
+    {
+      "path": "docs/reviews/2026-10-09-step-7-mvp/LEAD_PRE_REVIEW.md",
+      "sha256": "5f32a4fd469f90df93143a291ded4bc1c9708448449424183ec65f7d5e47b741",
+      "bytes": 2655
+    },
+    {
+      "path": "docs/reviews/2026-10-09-step-7-mvp/REVIEW.md",
+      "sha256": "8782f1d35b1454895bafe3d4a2391dda29d653455949d77b011c2530af00ca6f",
+      "bytes": 4932
+    },
+    {
+      "path": "docs/reviews/2026-10-09-step-7-mvp/REVIEWER.md",
+      "sha256": "86d0544a699af6371ba8bf613ded74c8ebe55aad5b6e515cbbe041284e15d600",
+      "bytes": 5087
+    },
+    {
+      "path": "docs/reviews/2026-10-09-step-7-mvp/TARGET_B7_MVP_PROPOSAL.md",
+      "sha256": "c5fe58f2804681a7b0124ab869608caf86eb677d4396dc7d37b25e6e2d45673b",
+      "bytes": 9037
+    },
+    {
+      "path": "docs/reviews/2026-10-09-step-7-mvp/review-evidence.json",
+      "sha256": "64b7e33bbbfdf77f45883ed5a641b5d41cbd67678b7b964a9f4fa92d82c578d9",
+      "bytes": 1632
+    },
+    {
+      "path": "docs/reviews/2026-10-09-step-8-9-design/LEAD_PRE_REVIEW.md",
+      "sha256": "0b4c0b7e73ca35ac31630a69a763c4dd8dc36e0c0137496dcd731c9db2079834",
+      "bytes": 3673
+    },
+    {
+      "path": "docs/reviews/2026-10-09-step-8-9-design/REVIEW.md",
+      "sha256": "3654d983fa1872624757e8900d98d1043af85a1c0e9125d202804ee974736a51",
+      "bytes": 5964
+    },
+    {
+      "path": "docs/reviews/2026-10-09-step-8-9-design/REVIEWER_B8.md",
+      "sha256": "f06585fb276dfd1f84ad6f0e8cf58c11ea7aff8c57cb5d99bf799b6e76092e8b",
+      "bytes": 5335
+    },
+    {
+      "path": "docs/reviews/2026-10-09-step-8-9-design/REVIEWER_B9.md",
+      "sha256": "4b1a3f7d13bfae9a092e493d38a5412099d6cfddca457f9a7aeeaa77ac710431",
+      "bytes": 5072
+    },
+    {
+      "path": "docs/reviews/2026-10-09-step-8-9-design/TARGET_B8_B9_MVP_PROPOSAL.md",
+      "sha256": "767c37b3d3c2cbd7a5338b77e06537cb12d88c32f9b55c335e1a5092cd375ec6",
+      "bytes": 13907
+    },
+    {
+      "path": "docs/reviews/2026-10-09-step-8-9-design/review-evidence.json",
+      "sha256": "5c86c53b7ecbae46586c414de67fb303a6bbb78e01eeb25f522ef6fd442f38ac",
+      "bytes": 2325
+    },
+    {
+      "path": "docs/specs/B1_EVALUATION_SPEC.md",
+      "sha256": "96c7d6fa041511d1e518cf25e16ee4791510e3c4b11a0558cb70f138fdb8dda5",
+      "bytes": 10289
+    },
+    {
+      "path": "docs/specs/B1_PRODUCT_SPEC.md",
+      "sha256": "64e839d456c61745c8a2491fd387b5ced3cf71464451b7199fbe4121f5585757",
+      "bytes": 10494
+    },
+    {
+      "path": "docs/specs/B1_RULEBOOK.md",
+      "sha256": "3260336511fa5820efe4580b669fb28df4fe2958eff4254e7aa26fcb83840ebf",
+      "bytes": 10851
+    },
+    {
+      "path": "docs/specs/B1_SYSTEM_SPEC.md",
+      "sha256": "ecc5290676f13453b0c751792534ac8e85e23ba8a06308ca3021d3e5d7da28ce",
+      "bytes": 19232
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-04-invoice-referee-01-core.md",
+      "sha256": "e8524c24cfc2ed42ac252d07b41921e813909be63884808806983c2c6b574864",
+      "bytes": 28549
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-04-invoice-referee-02-workflow.md",
+      "sha256": "32371703a5c6fa1242792c866ef804dc5960d15945431e187ca4c63a14aecb20",
+      "bytes": 26272
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-04-invoice-referee-03-evidence-release.md",
+      "sha256": "9c0dda52e6103a344323215e8cb89a2f5f2d6e052e64d8dfe5eebeb84d1485b0",
+      "bytes": 29033
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-04-invoice-referee.md",
+      "sha256": "c6477583af47d2732782f3e539218d6539f0e2595847029c924298bf418826c8",
+      "bytes": 27384
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-09-settlement-mvp.md",
+      "sha256": "aac3b4b8a740cb7129f78dec242d79dfc7ba0840685899921c0205d56ed3b4c9",
+      "bytes": 24870
+    }
+  ],
+  "preservation": "Original bytes and repository-relative paths; includes kept datasets as a recovery snapshot, not a replacement for live dataset paths.",
+  "section_provenance_map": [
+    {
+      "original_path": "docs/discovery/ADVANCE_REJECTION_BRANCH.md",
+      "original_heading": "# Nhánh từ chối trước chi và xử lý sau khi đã cấp ứng",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/ADVANCE_REJECTION_BRANCH.md"
+    },
+    {
+      "original_path": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md",
+      "original_heading": "# InvoiceReferee — Workflow công tác, tạm ứng và quyết toán",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md",
+      "original_heading": "## 1. Cách đọc và giả định thiết kế",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md",
+      "original_heading": "## 2. Sơ đồ A — Tiếp nhận, lỗi dữ liệu và cho phép công tác",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md",
+      "original_heading": "## 3. Sơ đồ B — Kiểm tra tạm ứng, người duyệt trả lại/từ chối và tiền thực tế",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md",
+      "original_heading": "## 4. Sơ đồ C — Quyết toán, sửa/từ chối và đối chiếu chi/thu cuối",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md",
+      "original_heading": "## 5. Chuyển tiếp phải đi tới ai và quay về đâu?",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md",
+      "original_heading": "## 6. Điều kiện áp dụng ở mọi bước",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md",
+      "original_heading": "## 7. Các đường đi cần dùng để review sơ đồ",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md",
+      "original_heading": "## 8. Những điểm còn cần quyết định trước khi trở thành spec",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/B7_MVP_PROPOSAL.md",
+      "original_heading": "# Bước 7 — Đề xuất thu gọn phạm vi tự động cho MVP",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B7_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B7_MVP_PROPOSAL.md",
+      "original_heading": "## 1. Luồng xử lý chính",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B7_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B7_MVP_PROPOSAL.md",
+      "original_heading": "## 2. Phạm vi được tự tính",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B7_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B7_MVP_PROPOSAL.md",
+      "original_heading": "## 3. Công thức hiển thị gọn, giữ lịch sử gốc",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B7_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B7_MVP_PROPOSAL.md",
+      "original_heading": "## 4. Các ngoại lệ cần chuyển xử lý",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B7_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B7_MVP_PROPOSAL.md",
+      "original_heading": "## 5. Kết quả và vai trò AI",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B7_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B8_B9_MVP_PROPOSAL.md",
+      "original_heading": "# Bước 8–9 — Quyết định tài chính, chi/thu thực tế và đóng hồ sơ",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B8_B9_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B8_B9_MVP_PROPOSAL.md",
+      "original_heading": "## 1. Giao diện nghiệp vụ giữa B7 → B8 → B9",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B8_B9_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B8_B9_MVP_PROPOSAL.md",
+      "original_heading": "## 2. Bước 8 — Rà soát và quyết định quyết toán",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B8_B9_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B8_B9_MVP_PROPOSAL.md",
+      "original_heading": "### 2.1. Người duyệt làm gì?",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B8_B9_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B8_B9_MVP_PROPOSAL.md",
+      "original_heading": "### 2.2. Giới hạn MVP và hiệu lực",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B8_B9_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B8_B9_MVP_PROPOSAL.md",
+      "original_heading": "## 3. Bước 9 — Thực hiện, đối chiếu và điều kiện đóng",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B8_B9_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B8_B9_MVP_PROPOSAL.md",
+      "original_heading": "### 3.1. Trước và sau hành động bên ngoài",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B8_B9_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B8_B9_MVP_PROPOSAL.md",
+      "original_heading": "### 3.2. Khi nào được đóng?",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B8_B9_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/B8_B9_MVP_PROPOSAL.md",
+      "original_heading": "## 4. Điều cần chủ dự án review và phép thử",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/B8_B9_MVP_PROPOSAL.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "# R2 — Đi một hồ sơ công tác bằng tay",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "## 1. Bối cảnh và giả định",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "## 2. Trước chuyến đi",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "### 2.1. Bước 1 — Nộp bằng form, đã chỉnh sau review",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "### 2.2. Bước 2 — Xem xét và cho phép công tác, đã chỉnh sau review",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "### 2.3. Bước 3 — Kiểm tra đề nghị tạm ứng, đã chỉnh sau review",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "### 2.4. Bước 4 — Quyết định khoản ứng, đã chỉnh sau review",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "### 2.5. Bước 5 — Chi và đối chiếu thực nhận, đã chỉnh sau review",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "## 3. Sau chuyến đi: gói dữ liệu cần đối chiếu",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "### 3.1. Bước 6 — Tiếp nhận hồ sơ sau chi, đã chỉnh sau review",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "### 3.2. Bước 7 — Phạm vi MVP thu gọn đã được đồng ý",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "## 4. Đi từng kiểm tra bằng tay",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "## 5. Báo cáo và việc còn lại của con người",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "### 5.1. Bước 8–9 đã được đồng ý ở mức walkthrough",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "## 6. Ba biến thể để kiểm tra cách hiểu",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R2_CASE_WALKTHROUGH.md",
+      "original_heading": "## 7. Điều cần làm rõ tiếp ở R2",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md",
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_workflow_consolidated_full_walkthrough_archived",
+      "original_preserved_entry": "docs/discovery/R2_CASE_WALKTHROUGH.md"
+    },
+    {
+      "original_path": "docs/discovery/R3_MVP_SCOPE_DRAFT.md",
+      "original_heading": "# R3 — Phạm vi phát hành và đơn vị tự động hóa của MVP",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R3_MVP_SCOPE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R3_MVP_SCOPE_DRAFT.md",
+      "original_heading": "## 1. Phát biểu phạm vi",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R3_MVP_SCOPE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R3_MVP_SCOPE_DRAFT.md",
+      "original_heading": "## 2. Hai công việc được giao tự động, không chỉ đọc OCR",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R3_MVP_SCOPE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R3_MVP_SCOPE_DRAFT.md",
+      "original_heading": "## 3. Các bước workflow trong bản MVP",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R3_MVP_SCOPE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R3_MVP_SCOPE_DRAFT.md",
+      "original_heading": "## 4. Phạm vi case ưu tiên",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R3_MVP_SCOPE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R3_MVP_SCOPE_DRAFT.md",
+      "original_heading": "## 5. Không tự xử lý toàn bộ các ngoại lệ",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R3_MVP_SCOPE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R3_MVP_SCOPE_DRAFT.md",
+      "original_heading": "## 6. Đầu ra kiểm tra và điều kiện hoàn thành",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R3_MVP_SCOPE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R3_MVP_SCOPE_DRAFT.md",
+      "original_heading": "## 7. Tác động và yêu cầu cuộc thi cần chứng minh",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R3_MVP_SCOPE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R3_MVP_SCOPE_DRAFT.md",
+      "original_heading": "## 8. Quyết định cần chủ dự án chốt",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R3_MVP_SCOPE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md",
+      "original_heading": "# R4.3 — Thẩm quyền tài chính cho policy ngân sách tổng",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md",
+      "original_heading": "## AU-01 — Hai mức quyền, không quyền theo từng nhóm chi",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md",
+      "original_heading": "## AU-02 — Số nào được so với giới hạn?",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md",
+      "original_heading": "## AU-03 — Chuyển người theo nguyên nhân thật",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md",
+      "original_heading": "## AU-04 — Chống giảm số/chia hồ sơ để lọt quyền",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md",
+      "original_heading": "## Ví dụ để kiểm tra bảng quyền",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md",
+      "original_heading": "## Tự review và việc cần chốt",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DATA_SOURCE_DRAFT.md",
+      "original_heading": "# R4.1 — Lõi dữ kiện và hợp đồng nguồn cho MVP",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_DATA_SOURCE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DATA_SOURCE_DRAFT.md",
+      "original_heading": "## 1. Bốn lớp phải giữ khác nhau",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_DATA_SOURCE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DATA_SOURCE_DRAFT.md",
+      "original_heading": "## 2. Lõi dữ liệu nghiệp vụ đề xuất",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_DATA_SOURCE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DATA_SOURCE_DRAFT.md",
+      "original_heading": "## 3. Nguồn nào trả lời câu hỏi nào?",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_DATA_SOURCE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DATA_SOURCE_DRAFT.md",
+      "original_heading": "## 4. Dùng bảng tài chính nhập/import trong MVP",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_DATA_SOURCE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DATA_SOURCE_DRAFT.md",
+      "original_heading": "## 5. Ví dụ giả lập để tránh nhầm",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_DATA_SOURCE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DATA_SOURCE_DRAFT.md",
+      "original_heading": "## 6. Điều đề nghị chốt và bước kế tiếp",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_DATA_SOURCE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md",
+      "original_heading": "# R4.3 — Bảng tham số chính sách demo đề xuất",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md",
+      "original_heading": "## 1. Phạm vi và cách áp dụng chung",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md",
+      "original_heading": "## 2. Năm nhóm chi phí",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md",
+      "original_heading": "## 3. Đề nghị tạm ứng",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md",
+      "original_heading": "## 4. Vai và cơ sở thẩm quyền đề xuất",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md",
+      "original_heading": "## 5. Walkthrough cũ thay đổi ra sao?",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md",
+      "original_heading": "## 6. Tự review và quyết định cần chốt",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md",
+      "original_heading": "# R4.2 — Phép kiểm tra áp dụng và bộ căn cứ được chấp nhận",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md",
+      "original_heading": "## 1. Tách hai profile trước và sau chi",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md",
+      "original_heading": "## 2. Điều kiện chung trước khi dùng một fact",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md",
+      "original_heading": "## 3. Evidence về khoản chi và mục đích",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md",
+      "original_heading": "## 4. Evidence payer/receipt theo phương thức",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md",
+      "original_heading": "## 5. Actualmoney, lịch sử và số0",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md",
+      "original_heading": "## 6. Confirmation, contradiction và vòng tiếp tục",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md",
+      "original_heading": "## 7. Quyết định cần chốt và giới hạn tiếp theo",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md",
+      "original_heading": "# R4.3 — Tính tiền, hạn mức và thẩm quyền",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "money_semantics_consolidated_retired_limits_archived",
+      "original_preserved_entry": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md",
+      "original_heading": "## 1. Ba lớp số tiền",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "money_semantics_consolidated_retired_limits_archived",
+      "original_preserved_entry": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md",
+      "original_heading": "## 2. Công thức quyết toán đã thống nhất",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "money_semantics_consolidated_retired_limits_archived",
+      "original_preserved_entry": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md",
+      "original_heading": "## 3. Hành vi vượt hạn mức đã được đồng ý: chuyển xem xét, không tự cắt",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "money_semantics_consolidated_retired_limits_archived",
+      "original_preserved_entry": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md",
+      "original_heading": "## 4. Hạn mức chi phí khác thẩm quyền",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "money_semantics_consolidated_retired_limits_archived",
+      "original_preserved_entry": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md",
+      "original_heading": "## 5. Tính toán và câu hỏi có thể kiểm chứng",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "money_semantics_consolidated_retired_limits_archived",
+      "original_preserved_entry": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md",
+      "original_heading": "## 6. Những lựa chọn còn mở",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "money_semantics_consolidated_retired_limits_archived",
+      "original_preserved_entry": "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md",
+      "original_heading": "# R4 — Ba vai, quyền quyết định và bàn giao hồ sơ",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md",
+      "original_heading": "## 1. Ba vai nghiệp vụ đã thống nhất",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md",
+      "original_heading": "## 2. Một người duyệt, các nội dung quyết định riêng",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md",
+      "original_heading": "## 3. Bàn giao trước công việc",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md",
+      "original_heading": "## 4. Bàn giao sau công việc",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md",
+      "original_heading": "## 5. Ví dụ một hồ sơ trình duyệt",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md",
+      "original_heading": "## 6. Quyền của một người duyệt vẫn phải có căn cứ",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md",
+      "original_heading": "## 7. Tự phản biện và bước tiếp",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md",
+      "original_heading": "# R4.4 — Bộ nguồn tiếp nhận và đối chiếu cho MVP",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md",
+      "original_heading": "## SI-01 — Hai gói đầu vào theo giai đoạn",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md",
+      "original_heading": "## SI-02 — Nguồn nào đủ cho việc gì?",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md",
+      "original_heading": "## SI-03 — Tập nguồn tài chính công ty: nhập/import, không nhập đáp án",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md",
+      "original_heading": "## SI-04 — Phạm vi nguồn được cung cấp",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md",
+      "original_heading": "## SI-05 — Ví dụ một bộ nguồn minh họa",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md",
+      "original_heading": "## SI-06 — Thiếu dữ kiện thì hỏi ai, xử lý thế nào?",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md",
+      "original_heading": "## SI-07 — Tự review: nguồn tốt vẫn có chi phí chuẩn bị",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md",
+      "original_heading": "## Việc tiếp theo trước R5",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "original_heading": "# R4.3 — Policy MVP theo ngân sách tổng công việc",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_WORK_BUDGET_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "original_heading": "## PB-01 — Phạm vi và đơn vị kiểm tra",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_WORK_BUDGET_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "original_heading": "## PB-02 — Ngân sách có quyền và phạm vi",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_WORK_BUDGET_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "original_heading": "## PB-03 — Khoản chi đủ điều kiện",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_WORK_BUDGET_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "original_heading": "## PB-04 — Kiểm tra ngân sách tổng",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_WORK_BUDGET_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "original_heading": "## PB-05 — Tạm ứng theo nhu cầu được xem xét",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_WORK_BUDGET_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "original_heading": "## PB-06 — Hồ sơ tự chi, chưa có ngân sách được duyệt",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_WORK_BUDGET_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "original_heading": "## PB-07 — Tính số quyết toán",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_WORK_BUDGET_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "original_heading": "## PB-08 — Thẩm quyền và hành động",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_WORK_BUDGET_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "original_heading": "## PB-09 — Câu hỏi và bằng chứng đầu ra",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_WORK_BUDGET_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "original_heading": "## Ví dụ review — không phải kết quả chạy hệ thống",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_WORK_BUDGET_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "original_heading": "## Trạng thái chốt và việc còn lại",
+      "current_documents": [
+        "docs/settlement/RULEBOOK.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R4_WORK_BUDGET_POLICY.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md",
+      "original_heading": "# R5.8 — Rà soát corpus và tiêu chí nghiệm thu để tiếp R6",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md",
+      "original_heading": "## 1. Những gì đã rà soát và giới hạn",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md",
+      "original_heading": "## 2. Phản biện cần giữ lại, không che bằng số case",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md",
+      "original_heading": "## 3. Khi nào job được hoàn tất?",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md",
+      "original_heading": "## 4. Khi nào phải dừng kết luận cuối?",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md",
+      "original_heading": "## 5. Phê duyệt, thực hiện và đóng là ba tiêu chí khác nhau",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md",
+      "original_heading": "## 6. Assertions kiểm soát còn phải có bằng chứng thực thi",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md",
+      "original_heading": "## 7. Những cổng cần bằng chứng để công bố chất lượng",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_EVALUATION_DESIGN.md",
+      "original_heading": "# R5.1 — Thiết kế đánh giá hệ thống trước khi code",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_EVALUATION_DESIGN.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_EVALUATION_DESIGN.md",
+      "original_heading": "## EV-01 — Hai điều phải chứng minh riêng",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_EVALUATION_DESIGN.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_EVALUATION_DESIGN.md",
+      "original_heading": "## EV-02 — Đơn vị chấm và kết quả",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_EVALUATION_DESIGN.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_EVALUATION_DESIGN.md",
+      "original_heading": "## EV-03 — Gold từ nguồn, không từ output",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_EVALUATION_DESIGN.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_EVALUATION_DESIGN.md",
+      "original_heading": "## EV-04 — Bảy trục đánh giá",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_EVALUATION_DESIGN.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_EVALUATION_DESIGN.md",
+      "original_heading": "## EV-05 — Mẫu số và lỗi kỹ thuật",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_EVALUATION_DESIGN.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_EVALUATION_DESIGN.md",
+      "original_heading": "## EV-06 — Catalogue20case nghiệp vụ đề xuất",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_EVALUATION_DESIGN.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_EVALUATION_DESIGN.md",
+      "original_heading": "## EV-07 — Development, calibration, holdout và Verify",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_EVALUATION_DESIGN.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_EVALUATION_DESIGN.md",
+      "original_heading": "## EV-08 — Gates: đo baseline khác cho phép hành động",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_EVALUATION_DESIGN.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_EVALUATION_DESIGN.md",
+      "original_heading": "## EV-09 — Đo công sức trước/sau",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_EVALUATION_DESIGN.md"
+    },
+    {
+      "original_path": "docs/discovery/R5_EVALUATION_DESIGN.md",
+      "original_heading": "## Bước tiếp theo",
+      "current_documents": [
+        "docs/settlement/EVALUATION.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R5_EVALUATION_DESIGN.md"
+    },
+    {
+      "original_path": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md",
+      "original_heading": "# R6 — Workflow và trạng thái hồ sơ",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md",
+      "original_heading": "## 1. Quy trình thủ công dùng để so sánh",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md",
+      "original_heading": "## 2. Workflow tổng quan được đề xuất",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md",
+      "original_heading": "## 3. Hệ thống xử lý thế nào để tạo báo cáo?",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md",
+      "original_heading": "## 4. Trạng thái: tách tiến trình, vướng mắc và tiền",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md",
+      "original_heading": "### Vòng đời của một câu hỏi",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md",
+      "original_heading": "## 5. Dùng các case để phản biện workflow",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md",
+      "original_heading": "## 6. Điều kiện kiểm soát phải có trong triển khai sau này",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md",
+      "original_heading": "## 7. Nhận xét của lead và điều cần review",
+      "current_documents": [
+        "docs/settlement/PRODUCT.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md",
+      "original_heading": "# R7.3 — Đường đọc tài liệu và điều phối AI có giới hạn",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md",
+      "original_heading": "## 1. Phương án điều phối đề xuất",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md",
+      "original_heading": "## 2. Chọn đường đọc theo nguồn",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md",
+      "original_heading": "### Chất lượng và biến đổi ảnh",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md",
+      "original_heading": "## 3. Input/output của từng lời gọi",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md",
+      "original_heading": "## 4. Ghép nguồn: thu hẹp context nhưng không che nguồn cần thiết",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md",
+      "original_heading": "## 5. Lỗi, đọc lại và giới hạn lời gọi",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md",
+      "original_heading": "## 6. Đọc lại phần ảnh hưởng, không chạy lại mọi thứ",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md",
+      "original_heading": "## 7. Thực hiện trên UI và khoảng 5 người dùng",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md",
+      "original_heading": "## 8. Phép so sánh để chọn đường đọc",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md",
+      "original_heading": "## 9. Biện luận của lead và bước tiếp",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md",
+      "original_heading": "# R7.1 — Kiến trúc gọn, chất lượng AI và đánh giá trong quá trình phát triển",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md",
+      "original_heading": "## 1. Ràng buộc được bổ sung",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md",
+      "original_heading": "## 2. Kiến trúc đề xuất và lý do chọn",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md",
+      "original_heading": "## 3. AI làm gì và ranh giới kết luận",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md",
+      "original_heading": "## 4. Backend nhỏ nhưng đủ kiểm chứng",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md",
+      "original_heading": "## 5. Kiến trúc phải làm cho lỗi đo được",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md",
+      "original_heading": "## 6. Vừa code vừa chạy trên UI",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md",
+      "original_heading": "## 7. Phản biện và bước tiếp",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "# R7.2 — Hợp đồng dữ liệu tối thiểu và cách chấm từng bước",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "## 1. Đường đi của dữ liệu",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "## 2. Các nhóm dữ liệu cần giữ — không phải mỗi nhóm một service",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "## 3. Hợp đồng đọc tài liệu",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "### Input",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "### Output AI tối thiểu",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "## 4. Hợp đồng ghép và xác định facts đủ căn cứ",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "### Input/output",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "## 5. Hợp đồng kiểm tra, báo cáo và câu hỏi",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "### Checks",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "### Các số tiền trong báo cáo",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "### Một câu hỏi được coi là đủ",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "## 6. Hợp đồng run và evaluator",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "## 7. UI giúp chủ dự án kiểm chứng hợp đồng này",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+      "original_heading": "## 8. Nhận xét của lead và bước tiếp",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md",
+      "original_heading": "# R7.5 — Spec hệ thống MVP để đối chiếu code và lập plan",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md",
+      "original_heading": "## 1. Phạm vi phải làm được",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md",
+      "original_heading": "## 2. Phiên bản và hiệu lực — ba việc phải phân biệt",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md",
+      "original_heading": "## 3. API nghiệp vụ tối thiểu",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md",
+      "original_heading": "### Idempotency và concurrency",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md",
+      "original_heading": "## 4. Lưu dữ liệu nhỏ nhưng truy được căn cứ",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md",
+      "original_heading": "## 5. Trạng thái lưu và Stop",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md",
+      "original_heading": "## 6. Giới hạn nguồn v0 cần kiểm tra trước release",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md",
+      "original_heading": "## 7. Acceptance dùng cho plan và review code",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md",
+      "original_heading": "## 8. Tự phản biện và điều kiện sang R8",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md",
+      "original_heading": "# R7.4 — Stack tối thiểu, Mistral OCR và LLM qua xkiro",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md",
+      "original_heading": "## 1. Stack đề xuất",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md",
+      "original_heading": "## 2. Đường AI đầu tiên",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md",
+      "original_heading": "## 3. xkiro: kết quả tra cứu và kiểm tra công khai",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md",
+      "original_heading": "### Các chi tiết ảnh hưởng thiết kế và phép đo",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md",
+      "original_heading": "## 4. Cấu hình pilot hữu hạn để thử ban đầu",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md",
+      "original_heading": "## 5. So sánh đủ để chọn, không tạo benchmark zoo",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md",
+      "original_heading": "## 6. Kết luận của lead và bước tiếp",
+      "current_documents": [
+        "docs/settlement/SYSTEM.md"
+      ],
+      "treatment": "accepted_semantics_consolidated",
+      "original_preserved_entry": "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md"
+    },
+    {
+      "original_path": "docs/discovery/R8_CODE_GAP_REVIEW.md",
+      "original_heading": "# R8.1 — Đối chiếu code hiện tại với spec quyết toán đã duyệt",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R8_CODE_GAP_REVIEW.md"
+    },
+    {
+      "original_path": "docs/discovery/R8_CODE_GAP_REVIEW.md",
+      "original_heading": "## 1. Bằng chứng và giới hạn discovery",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R8_CODE_GAP_REVIEW.md"
+    },
+    {
+      "original_path": "docs/discovery/R8_CODE_GAP_REVIEW.md",
+      "original_heading": "## 2. Các khác biệt có tác động thực tế",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R8_CODE_GAP_REVIEW.md"
+    },
+    {
+      "original_path": "docs/discovery/R8_CODE_GAP_REVIEW.md",
+      "original_heading": "## 3. Phần đáng giữ",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R8_CODE_GAP_REVIEW.md"
+    },
+    {
+      "original_path": "docs/discovery/R8_CODE_GAP_REVIEW.md",
+      "original_heading": "## 4. SYS-ID → hiện trạng → công việc",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R8_CODE_GAP_REVIEW.md"
+    },
+    {
+      "original_path": "docs/discovery/R8_CODE_GAP_REVIEW.md",
+      "original_heading": "## 5. Fresh checks đã chạy, không quality baseline mới",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R8_CODE_GAP_REVIEW.md"
+    },
+    {
+      "original_path": "docs/discovery/R8_CODE_GAP_REVIEW.md",
+      "original_heading": "## 6. Quyết định triển khai đề xuất",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/R8_CODE_GAP_REVIEW.md"
+    },
+    {
+      "original_path": "docs/discovery/WORKFLOW_OVERVIEW.md",
+      "original_heading": "# Workflow tổng quan — Công tác, tạm ứng và quyết toán",
+      "current_documents": [],
+      "treatment": "historical_reference_only",
+      "original_preserved_entry": "docs/discovery/WORKFLOW_OVERVIEW.md"
+    }
+  ],
+  "authority_routing": {
+    "active_docs": [
+      "docs/settlement/PRODUCT.md",
+      "docs/settlement/RULEBOOK.md",
+      "docs/settlement/SYSTEM.md",
+      "docs/settlement/EVALUATION.md"
+    ],
+    "active_plan": "docs/superpowers/plans/2026-10-09-settlement-mvp.md",
+    "archive_is_not_current_policy": true,
+    "dataset_paths_and_bytes_unchanged": true
+  },
+  "removed_from_active_tree": [
+    "docs/DISCOVERY_ROADMAP.md",
+    "docs/discovery/ADVANCE_REJECTION_BRANCH.md",
+    "docs/discovery/ADVANCE_SETTLEMENT_WORKFLOW_DRAFT.md",
+    "docs/discovery/B7_MVP_PROPOSAL.md",
+    "docs/discovery/B8_B9_MVP_PROPOSAL.md",
+    "docs/discovery/R2_CASE_WALKTHROUGH.md",
+    "docs/discovery/R3_MVP_SCOPE_DRAFT.md",
+    "docs/discovery/R4_AUTHORITY_POLICY_DRAFT.md",
+    "docs/discovery/R4_DATA_SOURCE_DRAFT.md",
+    "docs/discovery/R4_DEMO_POLICY_PARAMETERS_DRAFT.md",
+    "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md",
+    "docs/discovery/R4_MONEY_AUTHORITY_DRAFT.md",
+    "docs/discovery/R4_ROLES_HANDOFF_POLICY.md",
+    "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md",
+    "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+    "docs/discovery/R5_EVALUATION_DESIGN.md",
+    "docs/discovery/R6_WORKFLOW_STATE_DRAFT.md",
+    "docs/discovery/R7_AI_READING_ORCHESTRATION_DRAFT.md",
+    "docs/discovery/R7_ARCHITECTURE_EVALUATION_DRAFT.md",
+    "docs/discovery/R7_DATA_AND_EVALUATION_CONTRACT_DRAFT.md",
+    "docs/discovery/R7_MVP_SYSTEM_SPEC_DRAFT.md",
+    "docs/discovery/R7_STACK_PROVIDER_BENCHMARK_DRAFT.md",
+    "docs/discovery/R8_CODE_GAP_REVIEW.md",
+    "docs/discovery/WORKFLOW_OVERVIEW.md",
+    "docs/research/2026-10-08-advance-intake.md",
+    "docs/research/2026-10-08-travel-authorization-bottleneck.md",
+    "docs/reviews/2026-10-06-codebase-readiness/REVIEW.md",
+    "docs/reviews/2026-10-08-step-1-design/REVIEW.md",
+    "docs/reviews/2026-10-08-step-1-design/TARGET_R2_CASE_WALKTHROUGH.md",
+    "docs/reviews/2026-10-08-step-1-design/review-evidence.json",
+    "docs/reviews/2026-10-08-step-2-design/LEAD_PRE_REVIEW.md",
+    "docs/reviews/2026-10-08-step-2-design/REVIEW.md",
+    "docs/reviews/2026-10-08-step-2-design/TARGET_R2_CASE_WALKTHROUGH.md",
+    "docs/reviews/2026-10-08-step-2-design/review-evidence.json",
+    "docs/reviews/2026-10-08-step-3-design/LEAD_PRE_REVIEW.md",
+    "docs/reviews/2026-10-08-step-3-design/REVIEW.md",
+    "docs/reviews/2026-10-08-step-3-design/TARGET_R2_CASE_WALKTHROUGH.md",
+    "docs/reviews/2026-10-08-step-3-design/review-evidence.json",
+    "docs/reviews/2026-10-08-step-4-design/LEAD_PRE_REVIEW.md",
+    "docs/reviews/2026-10-08-step-4-design/REVIEW.md",
+    "docs/reviews/2026-10-08-step-4-design/REVIEWER.md",
+    "docs/reviews/2026-10-08-step-4-design/TARGET_R2_CASE_WALKTHROUGH.md",
+    "docs/reviews/2026-10-08-step-4-design/review-evidence.json",
+    "docs/reviews/2026-10-08-step-5-design/LEAD_PRE_REVIEW.md",
+    "docs/reviews/2026-10-08-step-5-design/REVIEW.md",
+    "docs/reviews/2026-10-08-step-5-design/REVIEWER.md",
+    "docs/reviews/2026-10-08-step-5-design/TARGET_R2_CASE_WALKTHROUGH.md",
+    "docs/reviews/2026-10-08-step-5-design/review-evidence.json",
+    "docs/reviews/2026-10-08-step-6-design/LEAD_PRE_REVIEW.md",
+    "docs/reviews/2026-10-08-step-6-design/REVIEW.md",
+    "docs/reviews/2026-10-08-step-6-design/REVIEWER.md",
+    "docs/reviews/2026-10-08-step-6-design/TARGET_R2_CASE_WALKTHROUGH.md",
+    "docs/reviews/2026-10-08-step-6-design/review-evidence.json",
+    "docs/reviews/2026-10-08-step-7-design/LEAD_PRE_REVIEW.md",
+    "docs/reviews/2026-10-08-step-7-design/REVIEW.md",
+    "docs/reviews/2026-10-08-step-7-design/REVIEWER.md",
+    "docs/reviews/2026-10-08-step-7-design/TARGET_R2_CASE_WALKTHROUGH.md",
+    "docs/reviews/2026-10-08-step-7-design/review-evidence.json",
+    "docs/reviews/2026-10-09-r3-scope/LEAD_PRE_REVIEW.md",
+    "docs/reviews/2026-10-09-r3-scope/REVIEW.md",
+    "docs/reviews/2026-10-09-r3-scope/REVIEWER.md",
+    "docs/reviews/2026-10-09-r3-scope/TARGET_R3_MVP_SCOPE_DRAFT.md",
+    "docs/reviews/2026-10-09-r3-scope/review-evidence.json",
+    "docs/reviews/2026-10-09-r4-data-sources/LEAD_PRE_REVIEW.md",
+    "docs/reviews/2026-10-09-r4-data-sources/REVIEW.md",
+    "docs/reviews/2026-10-09-r4-data-sources/REVIEWER.md",
+    "docs/reviews/2026-10-09-r4-data-sources/TARGET_R4_DATA_SOURCE_DRAFT.md",
+    "docs/reviews/2026-10-09-r4-data-sources/review-evidence.json",
+    "docs/reviews/2026-10-09-r4-demo-policy/LEAD_EVALUATION_NOTES.md",
+    "docs/reviews/2026-10-09-r4-demo-policy/LEAD_PRE_REVIEW.md",
+    "docs/reviews/2026-10-09-r4-demo-policy/REVIEW.md",
+    "docs/reviews/2026-10-09-r4-demo-policy/REVIEWER_RESPONSE.md",
+    "docs/reviews/2026-10-09-r4-demo-policy/TARGET_R4_DEMO_POLICY_PARAMETERS_DRAFT.md",
+    "docs/reviews/2026-10-09-r4-demo-policy/review-evidence.json",
+    "docs/reviews/2026-10-09-r4-evidence/LEAD_PRE_REVIEW.md",
+    "docs/reviews/2026-10-09-r4-evidence/REVIEW.md",
+    "docs/reviews/2026-10-09-r4-evidence/REVIEWER.md",
+    "docs/reviews/2026-10-09-r4-evidence/TARGET_R4_EVIDENCE_RULES_DRAFT.md",
+    "docs/reviews/2026-10-09-r4-evidence/review-evidence.json",
+    "docs/reviews/2026-10-09-step-7-mvp/LEAD_PRE_REVIEW.md",
+    "docs/reviews/2026-10-09-step-7-mvp/REVIEW.md",
+    "docs/reviews/2026-10-09-step-7-mvp/REVIEWER.md",
+    "docs/reviews/2026-10-09-step-7-mvp/TARGET_B7_MVP_PROPOSAL.md",
+    "docs/reviews/2026-10-09-step-7-mvp/review-evidence.json",
+    "docs/reviews/2026-10-09-step-8-9-design/LEAD_PRE_REVIEW.md",
+    "docs/reviews/2026-10-09-step-8-9-design/REVIEW.md",
+    "docs/reviews/2026-10-09-step-8-9-design/REVIEWER_B8.md",
+    "docs/reviews/2026-10-09-step-8-9-design/REVIEWER_B9.md",
+    "docs/reviews/2026-10-09-step-8-9-design/TARGET_B8_B9_MVP_PROPOSAL.md",
+    "docs/reviews/2026-10-09-step-8-9-design/review-evidence.json"
+  ],
+  "historical_pointer_files": [
+    "docs/specs/B1_EVALUATION_SPEC.md",
+    "docs/specs/B1_PRODUCT_SPEC.md",
+    "docs/specs/B1_RULEBOOK.md",
+    "docs/specs/B1_SYSTEM_SPEC.md",
+    "docs/superpowers/plans/2026-10-04-invoice-referee-01-core.md",
+    "docs/superpowers/plans/2026-10-04-invoice-referee-02-workflow.md",
+    "docs/superpowers/plans/2026-10-04-invoice-referee-03-evidence-release.md",
+    "docs/superpowers/plans/2026-10-04-invoice-referee.md",
+    "docs/discovery/R5_CORPUS_REVIEW_AND_GATES.md"
+  ],
+  "unchanged_data_roots": [
+    "docs/discovery/eval_development",
+    "docs/discovery/examples"
+  ],
+  "verification": {
+    "checked_at_utc": "2026-10-09T15:10:26.559551+00:00",
+    "mode": "DOCUMENTATION_ONLY",
+    "archive_entries_restored_and_hash_checked": 364,
+    "active_dataset_files_inventory_and_hash_checked": 261,
+    "active_documents_checked": 8,
+    "historical_pointers_checked": 9,
+    "current_navigation_links_and_anchors_checked": 83,
+    "introduced_missing_historical_links": 0,
+    "system_acceptance_ids": 17,
+    "control_assertions": 7,
+    "untracked_markdown_files_before": 244,
+    "untracked_markdown_files_after": 173,
+    "original_brief_sha256": "33fbaba876e4b9392ba67f5503878a171db0032d68a8c19758d9d3a16c57a487",
+    "original_brief_unchanged": true,
+    "plan_tasks_unchanged_except_spec_routing": true,
+    "tracked_application_config_unchanged": true,
+    "git_diff_check_exit_code": 0,
+    "mermaid_render": "NOT_RUN; fences and source reviewed only",
+    "application_tests_live_provider_quality": "NOT_RUN; documentation task",
+    "git_actions": "No stage, commit, push or history changes",
+    "limitations": [
+      "Preexisting broken links in retained legacy/frozen documents are not repaired.",
+      "Section provenance mapping is a navigation aid, not a formal semantic equivalence proof."
+    ],
+    "errors": [],
+    "removed_original_files_checked": 90
+  },
+  "cleanup_status": "COMPLETE_DOCUMENTATION_ONLY"
+}

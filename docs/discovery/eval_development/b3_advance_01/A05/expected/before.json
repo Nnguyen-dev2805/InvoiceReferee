@@ -1,0 +1,45 @@
+{
+  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+  "job": "B3",
+  "phase": "INITIAL",
+  "as_of_money": "2026-10-03T10:00:00+07:00",
+  "declared_numbers": {
+    "declared_total_budget_vnd": 8000000,
+    "planned_company_direct_vnd": 3000000,
+    "declared_employee_plan_vnd": 5000000,
+    "sum_employee_items_vnd": 5000000,
+    "requested_advance_vnd": 2000000
+  },
+  "previous_actual_advance_received_vnd": 0,
+  "future_requested_advance_received_vnd": null,
+  "settlement_profile_applied": false,
+  "settlement_amount_vnd": null,
+  "invoices_after_work_required": false,
+  "receipt_of_current_requested_advance_required_before_review": false,
+  "work_budget_decision_reusable": false,
+  "already_approved_budget_vnd": null,
+  "advance_approved": false,
+  "approved_advance_amount_vnd": null,
+  "request_creation_action_allowed": false,
+  "bank_execution_allowed": false,
+  "close_allowed": false,
+  "current_request_counts_as_previous_duplicate": false,
+  "evidence_refs": [
+    "input/authority_and_assignment.md#delegated-scope",
+    "input/authority_and_assignment.md#current-assignment",
+    "input/history_scope.md#history-scope",
+    "input/financial_history.csv"
+  ],
+  "requires_extra_resolution": true,
+  "check_report_complete": false,
+  "ready_for_normal_authorized_decisions": false,
+  "routine_first_pass": false,
+  "issue_type": "BEYOND_AUTHORITY_WORK_SCOPE",
+  "current_actor": "APR-DEMO-02",
+  "current_actor_authorized": false,
+  "known_alternative_approver": null,
+  "allowed_owner_roles": [
+    "ACCOUNTANT_AUTHORITY_SOURCE_OWNER"
+  ],
+  "question_semantics_example": "REQ-ADV-05 củaCT-ADV-05/NV-ADV-05 đềnghịB8 vàứng2; AUTH-ADV-OTHER củaAPR-DEMO-02 chỉCT-ADV-99/NV-ADV-99. Cầnsourcequyền/quyếtđịnh đúngcurrentwork hoặcnguồnngười đủquyền, khôngsmalladvance hoặcROLElabel choqua. Hiệnchưabiếtalternativeđủquyền nên không autoassign người tưởng tượng."
+}

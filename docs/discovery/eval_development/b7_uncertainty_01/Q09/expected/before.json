@@ -1,0 +1,44 @@
+{
+  "status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+  "phase": "INITIAL",
+  "as_of_money": "2026-10-08T18:00:00+07:00",
+  "requires_extra_resolution": true,
+  "issue_type": "FACT_UNCERTAINTY_EXPENSE_PAYER",
+  "unresolved_field": "MEAL_PAYER",
+  "allowed_owner_roles": [
+    "EMPLOYEE"
+  ],
+  "question_semantics_example": "Ai thực trả khoản RCPT-MEAL-001,1triệu cash ngày06/10 cho VENDOR-MEAL-01? Nếu NV-DEMO-01 đã trả, hãy xác nhận đúng số/phần, vendor, thời điểm và mục đích; receipt hiện xác nhận đã nhận cash nhưng không ghi payer.",
+  "known_partial_facts_vnd": {
+    "B": 8000000,
+    "T": 8000000,
+    "employee_paid_known": 4000000,
+    "meal_value_known": 1000000,
+    "A": 2000000,
+    "RA": 0,
+    "P": 0,
+    "RP": 0
+  },
+  "E_vnd": null,
+  "S_vnd": null,
+  "report_finalized": false,
+  "financial_approval_allowed": false,
+  "request_creation_allowed": false,
+  "bank_execution_allowed": false,
+  "close_allowed": false,
+  "fraud_conclusion_allowed": false,
+  "partial_checks_allowed": true,
+  "partial_payment_authorized_by_known_subtotal": false,
+  "forbidden_inferences": [
+    "missing_as_zero",
+    "approval_as_receipt",
+    "assume_employee_paid_remaining",
+    "role_overrides_conflicting_source",
+    "confident_final_amount_from_flagged_fact"
+  ],
+  "evidence_refs": [
+    "input/expense_and_payment_sources.md#meal-receipt",
+    "input/employee_claim.md",
+    "input/coverage_m1.md"
+  ]
+}

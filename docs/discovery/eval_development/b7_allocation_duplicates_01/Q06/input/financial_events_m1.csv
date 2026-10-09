@@ -1,0 +1,2 @@
+source_record_ref,event_ref,event_type,event_date,payer,payee,related_employee,work_ref,amount_vnd,currency,raw_status,business_ref,receipt_source
+FIN-ADV-06,TX-ADV-06,ADVANCE_TO_EMPLOYEE,2026-10-04,ORG-DEMO-01,NV-DEMO-06,NV-DEMO-06,CT-DEMO-06,2000000,VND,SETTLED,DEC-PRE-06,expense_and_payment_sources.md#advance-receipt

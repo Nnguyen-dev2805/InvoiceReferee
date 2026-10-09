@@ -1,5 +1,17 @@
 # InvoiceReferee
 
+## Current design and coding entry points
+
+The accepted advance/settlement design is maintained in four documents:
+[Product](docs/settlement/PRODUCT.md), [Rulebook](docs/settlement/RULEBOOK.md),
+[System](docs/settlement/SYSTEM.md), and [Evaluation](docs/settlement/EVALUATION.md).
+Implementation proceeds through [the six UI slices](docs/superpowers/plans/2026-10-09-settlement-mvp.md).
+
+The runtime/status/setup sections below describe the earlier claim-processing
+implementation; they do not establish that the new settlement spec is implemented
+or verified. Check source and fresh execution before capability claims. Original
+discovery notes, reviews and previous specs are preserved in [the archive](docs/archive/README.md).
+
 Expense-reimbursement MVP (OrganizationAI Challenge A). The system receives a
 claim plus evidence, verifies applicable rules, and either creates a payment
 request for eligible routine cases or asks the right person a concrete question.

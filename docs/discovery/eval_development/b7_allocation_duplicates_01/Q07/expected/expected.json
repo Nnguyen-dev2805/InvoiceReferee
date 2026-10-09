@@ -1,0 +1,50 @@
+{
+  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+  "job": "B7",
+  "as_of_money": "2026-10-08T18:00:00+07:00",
+  "B_vnd": 8000000,
+  "T_vnd": 8000000,
+  "company_direct_vnd": 3000000,
+  "employee_actual_paid_vnd": 5000000,
+  "E_vnd": 5000000,
+  "A_vnd": 2000000,
+  "RA_vnd": 0,
+  "P_vnd": 0,
+  "RP_vnd": 0,
+  "S_vnd": 3000000,
+  "expense_count": 4,
+  "current_company_money_event_count": 2,
+  "requires_extra_resolution": false,
+  "report_ready": true,
+  "settlement_approved": false,
+  "request_creation_allowed": false,
+  "bank_execution_allowed": false,
+  "close_allowed": false,
+  "same_event_aliases": [
+    {
+      "company_event_ref": "TX-AIR-001",
+      "bank_namespace": "BANK-DEMO-A",
+      "bank_ref": "BNK-A44",
+      "booking_ref": "BOOK-DEMO-01"
+    }
+  ],
+  "other_work_event_not_current_cost_or_payment": {
+    "bank_ref": "BNK-A45",
+    "company_event_ref": "TX-AIR-OTHER-99",
+    "booking_ref": "BOOK-OTHER-99",
+    "work_ref": "CT-DEMO-99"
+  },
+  "duplicate_supplier_file_is_new_expense": false,
+  "merge_equal_amount_date_without_relation": false,
+  "retain_all_source_refs": true,
+  "evidence_refs": [
+    "input/expense_and_payment_sources.md",
+    "input/supplier_documents_copy.md",
+    "input/financial_events_m1.csv",
+    "input/bank_statement_excerpt.md#current-bank-row",
+    "input/bank_statement_excerpt.md#other-bank-row",
+    "input/finance_bank_correspondence.csv",
+    "input/export_scope.md#reference-scope",
+    "input/coverage_m1.md"
+  ]
+}

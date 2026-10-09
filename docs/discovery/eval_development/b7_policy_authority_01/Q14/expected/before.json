@@ -1,0 +1,38 @@
+{
+  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+  "phase": "INITIAL",
+  "issue_type": "BEYOND_AUTHORITY_SCOPE",
+  "requires_extra_resolution": true,
+  "fact_uncertainty": false,
+  "B_vnd": 8000000,
+  "T_vnd": 8000000,
+  "E_calculated_vnd": 5000000,
+  "A_vnd": 2000000,
+  "RA_vnd": 0,
+  "P_vnd": 0,
+  "RP_vnd": 0,
+  "S_calculated_vnd": 3000000,
+  "S_final_authorized_vnd": null,
+  "within_budget": true,
+  "current_actor": "APR-DEMO-02",
+  "current_actor_authorized": false,
+  "known_alternative_settlement_approver": null,
+  "authority_evaluated_at": "2026-10-08T18:00:00+07:00",
+  "allowed_owner_roles": [
+    "ACCOUNTANT_AUTHORITY_SOURCE_OWNER"
+  ],
+  "question_semantics_example": "Hồsơ CT-DEMO-01/NV-DEMO-01 trongB8, dữkiện tiền rõ, đanggửiAPR-DEMO-02; AUTH-CURRENT-02 chỉchoquyếttoánCT-DEMO-02. Cần nguồn giaoquyền hoặc quyếtđịnh của người đủ quyền cho CT-DEMO-01; sourcepretrip APR-DEMO-01 chỉcôngviệc/B/ứng. Kếtoán/chủnguồnquyền hãy cungcấp căn cứ phùhợp hoặc chỉ người đãđượcgiaophạmvi đó.",
+  "evidence_refs": [
+    "input/authority_and_pretrip.md#authority",
+    "input/authority_and_pretrip.md#pretrip-decision",
+    "input/approval_assignment.md#current-assignment",
+    "input/approval_assignment.md#current-authority"
+  ],
+  "financial_approval_allowed": false,
+  "request_creation_allowed": false,
+  "bank_execution_allowed": false,
+  "close_allowed": false,
+  "generic_role_switch_resolves_issue": false,
+  "past_pretrip_approval_still_valid": true,
+  "as_of_money": "2026-10-08T18:00:00+07:00"
+}

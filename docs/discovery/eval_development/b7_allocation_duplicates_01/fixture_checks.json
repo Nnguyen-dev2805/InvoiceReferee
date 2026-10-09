@@ -1,0 +1,35 @@
+{
+  "mode": "DOCUMENT_FIXTURE_SANITY_ONLY",
+  "case_checks": [
+    {
+      "case": "Q05",
+      "T": 5000000,
+      "E": 3000000,
+      "A": 1000000,
+      "S": 2000000,
+      "close_allowed": false
+    },
+    {
+      "case": "Q06",
+      "T": 6000000,
+      "E": 6000000,
+      "A": 2000000,
+      "S": 4000000,
+      "close_allowed": false
+    },
+    {
+      "case": "Q07",
+      "T": 8000000,
+      "E": 5000000,
+      "A": 2000000,
+      "S": 3000000,
+      "close_allowed": false
+    }
+  ],
+  "input_expected_separation": true,
+  "dual_payer_and_private_line_amounts_checked": true,
+  "duplicate_source_and_bank_alias_other_booking_checked": true,
+  "all_13_source_expected_hashes_preserved": true,
+  "pipeline_run": false,
+  "independent_gold_adjudication": false
+}

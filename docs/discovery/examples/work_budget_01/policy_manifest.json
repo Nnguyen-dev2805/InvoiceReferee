@@ -1,0 +1,55 @@
+{
+  "bundle_id": "DESIGN-REPLAY-WORK-BUDGET-01",
+  "created_date": "2026-10-09",
+  "status": "frozen_for_manual_walkthrough_only",
+  "runtime_active": false,
+  "b1_baseline_frozen": false,
+  "independent_gold_validated": false,
+  "synthetic_only": true,
+  "scope": "Policy design snapshots for this packet; example authority source is not a global authorization/configuration. Relative snapshot links resolve against source_path.",
+  "policy_files": [
+    {
+      "source_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md",
+      "snapshot_path": "policy_snapshots/R4_WORK_BUDGET_POLICY.md",
+      "sha256": "2dd31c343fc6a2fbc908c1b6624a8fcb83e5cb94fdae4baf8cdd668300a9674f"
+    },
+    {
+      "source_path": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md",
+      "snapshot_path": "policy_snapshots/R4_EVIDENCE_RULES_DRAFT.md",
+      "sha256": "9adb49595ed75e18ddbbea6f4589e171b707b57bde507f4e1505d82975d65a55"
+    },
+    {
+      "source_path": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md",
+      "snapshot_path": "policy_snapshots/R4_ROLES_HANDOFF_POLICY.md",
+      "sha256": "4125944dbdb04114559c0225501073c3ff39366cb60a4f83220959273f84ddc9"
+    },
+    {
+      "source_path": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md",
+      "snapshot_path": "policy_snapshots/R4_SOURCE_INTAKE_CONTRACT.md",
+      "sha256": "86e8dd340485c88a0726a2f3e0352edcf86b152d62133acf78bed16785b67355"
+    },
+    {
+      "source_path": "docs/discovery/B8_B9_MVP_PROPOSAL.md",
+      "snapshot_path": "policy_snapshots/B8_B9_MVP_PROPOSAL.md",
+      "sha256": "8fea65ab5f01586bd2742e850c6ae6be929a85b8e0b1bf7e1ab828051731c1d3"
+    },
+    {
+      "source_path": "docs/discovery/R3_MVP_SCOPE_DRAFT.md",
+      "snapshot_path": "policy_snapshots/R3_MVP_SCOPE_DRAFT.md",
+      "sha256": "8e13dfe2402ddc28ffd3c7459728a17e5bd70f590e06d61bca144735b63cac10"
+    }
+  ],
+  "m1_inputs": [
+    "employee_claim.md",
+    "authority_and_pretrip.md",
+    "expense_and_payment_sources.md",
+    "financial_events_m1.csv",
+    "coverage_m1.md"
+  ],
+  "m2_added_inputs": [
+    "decision_and_receipt_m2.md"
+  ],
+  "excluded_from_input": [
+    "expected_walkthrough.md"
+  ]
+}
