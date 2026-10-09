@@ -174,7 +174,7 @@ Fixtures W04 trong `test_questions.py`: `receipt_unknown_case` có hotel/chi h�
 
 **Create:** tests/settlement/{test_decisions.py,test_money.py,test_controls.py,test_closure.py}; frontend/src/settlement/Actions.tsx. **Modify:** models/store/service/APIandUIreport/history. **Consumes:** currentreport/rights/basis/events+Command. **Produces:** review/decide/money/handoff/control/closure endpoints, persistedepoch/idempotency/incidents andallowedactions.
 
-- [ ] REDauthority/combinedexception/approval khácreceipt; immutableapprovedbasisvsfulfillment; gross4overapproval3 vàwrongrecipientgiữincident; refusedcasecònứng chưaclosed. Mutationstaleversion409, expected payloadchanged samekey409.
+- [x] REDauthority/combinedexception/approval khácreceipt; immutableapprovedbasisvsfulfillment; gross4overapproval3 vàwrongrecipientgiữincident; refusedcasecònứng chưaclosed. Mutationstaleversion409, expected payloadchanged samekey409.
 
 ```python
 def test_stop_ack_then_late_report_cannot_be_current(service, barrier_reader, running_case):
@@ -190,10 +190,10 @@ def test_stop_ack_then_late_report_cannot_be_current(service, barrier_reader, ru
 
 Fixtures W05 trong `test_controls.py`: `barrier_reader.read` đặt threading.Event entered, chờ Event release với timeout10s, rồi trả observations; teardown luôn release trước close. `running_case` được tạo/upload bằng W01 API/service với source giả lập. `start_command(case)` và `stop_command(case)` tạo Command mới đúng version/actor; `wait_entered()` chờ event, không sleeps. Query `closed` và `handoff_allowed` đọc cùng store/gates, không quyết định lại ở test. Service/provider/config có scope riêng mỗi fixture để không lẫn identities.
 
-- [ ] Typeddecisionbasis/noamountoverride, transactionreadgates+writerecord/audit; samecommandretryidempotenttrướccheckoldversion. Actualeventnamespaces/linksdedup khácHTTPkey; foreignkey/uniquesfail khônglọcâmthầm.
-- [ ] Case-version/input-revision/control-epoch riêng; resume tạoepoch/newrun nhưngkhôngautoqueue/cost. Deadline/restart Interrupted/currentguard, revisionmaterialinvalidatesaffectedbasis; đúngreceipt2/approved3/remaining1khôngapprovalmới/pendingchiđúp.
-- [ ] ClosuregatesS0+scope+decisions+receipts+noStop/pending/incident; rejectrequestend khácsettlementclosed; actualeventsnhậpkhiStop chỉsource/history khôngfinancialnewaction. HandoffAonlyreport/decisionrefs/audit, noentityB.
-- [ ] UInguồn/basis/approved/actual/remaining/incident/Stop/resume/refusal/closure. Integrationbarriers/twoDBconnectionraces+C01..07, browser5phiên/2writes cùngcase+Stopmidcall. Khôngsuyfakeconcurrency làproviderloadquality.
+- [x] Typeddecisionbasis/noamountoverride, transactionreadgates+writerecord/audit; samecommandretryidempotenttrướccheckoldversion. Actualeventnamespaces/linksdedup khácHTTPkey; foreignkey/uniquesfail khônglọcâmthầm.
+- [x] Case-version/input-revision/control-epoch riêng; resume tạoepoch/newrun nhưngkhôngautoqueue/cost. Deadline/restart Interrupted/currentguard, revisionmaterialinvalidatesaffectedbasis; đúngreceipt2/approved3/remaining1khôngapprovalmới/pendingchiđúp.
+- [x] ClosuregatesS0+scope+decisions+receipts+noStop/pending/incident; rejectrequestend khácsettlementclosed; actualeventsnhậpkhiStop chỉsource/history khôngfinancialnewaction. HandoffAonlyreport/decisionrefs/audit, noentityB.
+- [x] UInguồn/basis/approved/actual/remaining/incident/Stop/resume/refusal/closure. Integrationbarriers/twoDBconnectionraces+C01..07, browser5phiên/2writes cùngcase+Stopmidcall. Khôngsuyfakeconcurrency làproviderloadquality.
 
 ## W06 — Evaluator, baseline và quality comparison
 
@@ -243,7 +243,7 @@ MỗiWtask cần nguồncodeactualtests+UIevidence vàSYSrefs; chỉcheckdonekhi
 | W02 |VERIFIED (PIPELINE_FAKE_OR_REPLAY; evidence: docs/evidence/settlement-W02.md) |B7report cósource/unknown/negative/zero |
 | W03 |VERIFIED (mock transports; live chưa chạy — M0 probe plan chờ authorization; evidence: docs/evidence/settlement-W03.md) |Reader/transport/budgets vàprobeplan |
 | W04 |VERIFIED (fake reader; evidence: docs/evidence/settlement-W04.md) |B3/questions/assistedrecheck |
-| W05 |PLANNED |Quyếtđịnh/actualmoney/Stop/closure |
+| W05 |VERIFIED (PIPELINE_FAKE_OR_REPLAY; evidence: docs/evidence/settlement-W05.md) |Quyếtđịnh/actualmoney/Stop/closure |
 | W06 |PLANNED |Evaluator/cutover/measurement/baseline |
 
 Source-map/contract/constraints cung cấp đểworkerđọcđược taskđộc lập; snippets là REDassertions vàinterfaces, khôngimplementationhardcodeexpected. Cáchelpers trongtests đượcđịnhnghĩatạitaskconsumers, service convenienceget_case/questions/wait/closed/handoff_allowed chỉquery/projection củarecords/gates, không evaluator thứhai.

@@ -41,6 +41,21 @@ export interface AllowedAction {
   reason: string;
 }
 
+export interface MoneyIncident {
+  kind: 'OVERPAY' | 'WRONG_RECIPIENT';
+  excess_vnd: number | null;
+  event_ref: string | null;
+  payee_ref: string | null;
+}
+
+export interface MoneySummary {
+  approved_vnd: number | null;
+  received_vnd: number | null;
+  remaining_vnd: number | null;
+  pending_events: number;
+  incidents: MoneyIncident[];
+}
+
 export interface CaseView {
   id: string;
   job: Job;
@@ -53,6 +68,7 @@ export interface CaseView {
   submission: Submission;
   sources: SourceView[];
   allowed_actions: AllowedAction[];
+  money_summary: MoneySummary;
   created_at: string;
   updated_at: string;
 }
@@ -227,4 +243,119 @@ export interface RespondPayload {
   expected_case_version: number;
   content: string;
   source_ids: string[];
+}
+
+// --- W05: decision, review, money, control, handoff, closure -------------------
+
+export interface DecisionView {
+  id: string;
+  case_id: string;
+  kind: 'SETTLEMENT';
+  amount_vnd: number | null;
+  direction: 'PAY_EMPLOYEE' | 'COLLECT_FROM_EMPLOYEE' | 'REFUSE';
+  reason: string;
+  basis_report_id: string;
+  basis_case_version: number;
+  basis_input_revision: number;
+  exception_of: string | null;
+  conditions: string[];
+  actor_id: string;
+  created_at: string;
+  idempotent_replay: boolean;
+}
+
+export interface ReviewView {
+  id: string;
+  case_id: string;
+  report_id: string;
+  note: string;
+  refs: string[];
+  actor_id: string;
+  created_at: string;
+  idempotent_replay: boolean;
+}
+
+export interface MoneyEventView {
+  id: string;
+  case_id: string;
+  event_ref: string;
+  kind: 'PAYMENT_TO_EMPLOYEE' | 'PAYMENT_FROM_EMPLOYEE';
+  gross_vnd: number;
+  decision_id: string | null;
+  payee_ref: string;
+  event_at: string;
+  reported_status: 'RECEIVED' | 'PENDING';
+  refs: string[];
+  after_cutoff: boolean;
+  created_at: string;
+  idempotent_replay: boolean;
+}
+
+export interface ClosureView {
+  id: string;
+  case_id: string;
+  kind: 'SETTLEMENT_COMPLETE' | 'REJECTED_REQUEST_ENDED';
+  basis: string;
+  actor_id: string;
+  created_at: string;
+  idempotent_replay: boolean;
+}
+
+export interface DecidePayload {
+  actor_id: string;
+  demo_role: DemoRole;
+  expected_case_version: number;
+  kind: 'SETTLEMENT';
+  amount_vnd: number | null;
+  direction: DecisionView['direction'];
+  reason: string;
+  basis_report_id: string;
+  conditions: string[];
+  exception_of: string | null;
+}
+
+export interface ReviewNotePayload {
+  actor_id: string;
+  demo_role: DemoRole;
+  expected_case_version: number;
+  report_id: string;
+  note: string;
+  refs: string[];
+}
+
+export interface MoneyEventPayload {
+  actor_id: string;
+  demo_role: DemoRole;
+  expected_case_version: number;
+  event_ref: string;
+  kind: MoneyEventView['kind'];
+  gross_vnd: number;
+  decision_id: string | null;
+  payee_ref: string;
+  event_at: string;
+  reported_status: MoneyEventView['reported_status'];
+  refs: string[];
+}
+
+export interface ControlPayload {
+  actor_id: string;
+  demo_role: DemoRole;
+  expected_case_version: number;
+  action: 'STOP' | 'RESUME';
+  reason: string;
+}
+
+export interface HandoffPayload {
+  actor_id: string;
+  demo_role: DemoRole;
+  expected_case_version: number;
+  decision_id: string;
+}
+
+export interface ClosurePayload {
+  actor_id: string;
+  demo_role: DemoRole;
+  expected_case_version: number;
+  kind: ClosureView['kind'];
+  basis: string;
 }

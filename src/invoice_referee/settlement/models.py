@@ -115,6 +115,33 @@ class AllowedAction(BaseModel):
     reason: str
 
 
+class MoneyIncident(BaseModel):
+    """A kept money discrepancy (never clipped or rewritten to fit approval)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["OVERPAY", "WRONG_RECIPIENT"]
+    excess_vnd: StrictInt | None = None
+    event_ref: str | None = None
+    payee_ref: str | None = None
+
+
+class MoneySummary(BaseModel):
+    """Approved vs actually received: approval is not receipt (R9).
+
+    ``None`` means unknown/not-yet, never a hidden ``0``. ``remaining_vnd``
+    floors at 0 only when the excess is preserved as an OVERPAY incident.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    approved_vnd: StrictInt | None = None
+    received_vnd: StrictInt | None = None
+    remaining_vnd: StrictInt | None = None
+    pending_events: StrictInt = 0
+    incidents: list[MoneyIncident] = Field(default_factory=list)
+
+
 class CaseView(BaseModel):
     """Projection of a case for API/UI: versions, stage, sources, actions."""
 
@@ -131,6 +158,7 @@ class CaseView(BaseModel):
     submission: Submission
     sources: list[SourceView] = Field(default_factory=list)
     allowed_actions: list[AllowedAction] = Field(default_factory=list)
+    money_summary: dict[str, Any] = Field(default_factory=dict)
     created_at: AwareDatetime
     updated_at: AwareDatetime
     idempotent_replay: bool = False
@@ -485,4 +513,144 @@ class RunView(BaseModel):
     detail: str | None = None
     completion: Literal["COMPLETE", "INCOMPLETE"] | None = None
     trace: list[CallTrace] = Field(default_factory=list)
+    idempotent_replay: bool = False
+
+
+# --- W05: decision, review, money, handoff, closure contracts (S6) -----------
+
+DecisionKind = Literal["SETTLEMENT"]
+DecisionDirection = Literal["PAY_EMPLOYEE", "COLLECT_FROM_EMPLOYEE", "REFUSE"]
+MoneyEventKind = Literal["PAYMENT_TO_EMPLOYEE", "PAYMENT_FROM_EMPLOYEE"]
+ReportedStatus = Literal["RECEIVED", "PENDING"]
+ControlAction = Literal["STOP", "RESUME"]
+ClosureKind = Literal["SETTLEMENT_COMPLETE", "REJECTED_REQUEST_ENDED"]
+
+
+class DecisionPayload(BaseModel):
+    """Approval/refusal input; amount never overrides the report's arithmetic."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: DecisionKind
+    amount_vnd: StrictInt | None = None
+    direction: DecisionDirection
+    reason: str
+    basis_report_id: str
+    conditions: list[str] = Field(default_factory=list)
+    exception_of: str | None = None
+
+
+class ReviewPayload(BaseModel):
+    """Accountant review note: an observation, never an approval.
+
+    Carrying an amount is rejected with REVIEW_NOT_APPROVAL — review cannot
+    smuggle a money decision through the review path.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    report_id: str
+    note: str
+    refs: list[str] = Field(default_factory=list)
+
+
+class MoneyEventPayload(BaseModel):
+    """An actual money event as reported; gross truth, never clipped."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    event_ref: str
+    kind: MoneyEventKind
+    gross_vnd: StrictInt
+    decision_id: str | None = None
+    payee_ref: str
+    event_at: AwareDatetime
+    reported_status: ReportedStatus
+    refs: list[str] = Field(default_factory=list)
+
+
+class HandoffPayload(BaseModel):
+    """Stage-A handoff reference: which approved decision the cashier gets."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    decision_id: str
+
+
+class ClosurePayload(BaseModel):
+    """Closure declaration; gates are checked before it is accepted."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: ClosureKind
+    basis: str
+
+
+class DecisionView(BaseModel):
+    """A recorded human decision with its typed, immutable basis."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    case_id: str
+    kind: DecisionKind
+    amount_vnd: StrictInt | None = None
+    direction: DecisionDirection
+    reason: str
+    basis_report_id: str
+    basis_case_version: StrictInt
+    basis_input_revision: StrictInt
+    exception_of: str | None = None
+    conditions: list[str] = Field(default_factory=list)
+    actor_id: str
+    created_at: AwareDatetime
+    idempotent_replay: bool = False
+
+
+class ReviewView(BaseModel):
+    """A recorded accountant review; it does not create approval."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    case_id: str
+    report_id: str
+    note: str
+    refs: list[str] = Field(default_factory=list)
+    actor_id: str
+    created_at: AwareDatetime
+    idempotent_replay: bool = False
+
+
+class MoneyEventView(BaseModel):
+    """A persisted money event with its cutoff flag kept visible."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    case_id: str
+    event_ref: str
+    kind: MoneyEventKind
+    gross_vnd: StrictInt
+    decision_id: str | None = None
+    payee_ref: str
+    event_at: AwareDatetime
+    reported_status: ReportedStatus
+    refs: list[str] = Field(default_factory=list)
+    after_cutoff: bool
+    created_at: AwareDatetime
+    idempotent_replay: bool = False
+
+
+class ClosureView(BaseModel):
+    """A recorded closure: settlement-complete and request-rejected are distinct."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    case_id: str
+    kind: ClosureKind
+    basis: str
+    actor_id: str
+    created_at: AwareDatetime
     idempotent_replay: bool = False

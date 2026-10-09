@@ -4,11 +4,21 @@ import type {
   AuditEntry,
   CaseSummary,
   CaseView,
+  ClosurePayload,
+  ClosureView,
+  ControlPayload,
   CreateCasePayload,
+  DecidePayload,
+  DecisionView,
+  HandoffPayload,
+  MoneyEventPayload,
+  MoneyEventView,
   QuestionView,
   Report,
   RespondPayload,
   ResponseView,
+  ReviewNotePayload,
+  ReviewView,
   ReviseSubmissionPayload,
   RunView,
   SourceView,
@@ -136,4 +146,75 @@ export function respondQuestion(
       headers: { ...JSON_HEADERS, 'Idempotency-Key': crypto.randomUUID() },
       body: JSON.stringify(payload),
     });
+}
+
+// --- W05: decision, review, money, control, handoff, closure -------------------
+
+function postCommand<T>(path: string, payload: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'POST',
+    headers: { ...JSON_HEADERS, 'Idempotency-Key': crypto.randomUUID() },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function decide(caseId: string, payload: DecidePayload): Promise<DecisionView> {
+  return postCommand<DecisionView>(
+    `/api/cases/${encodeURIComponent(caseId)}/decisions`, payload);
+}
+
+export function review(caseId: string, payload: ReviewNotePayload): Promise<ReviewView> {
+  return postCommand<ReviewView>(
+    `/api/cases/${encodeURIComponent(caseId)}/reviews`, payload);
+}
+
+export function recordMoney(
+  caseId: string,
+  payload: MoneyEventPayload,
+): Promise<MoneyEventView> {
+  return postCommand<MoneyEventView>(
+    `/api/cases/${encodeURIComponent(caseId)}/money-events`, payload);
+}
+
+export interface ControlResult {
+  case_id: string;
+  action: 'STOP' | 'RESUME';
+  reason: string;
+  stop_active: boolean;
+  control_epoch: number;
+  case_version: number;
+  actor_id: string;
+  created_at: string;
+  idempotent_replay?: boolean;
+}
+
+export function controlCase(
+  caseId: string,
+  payload: ControlPayload,
+): Promise<ControlResult> {
+  return postCommand<ControlResult>(
+    `/api/cases/${encodeURIComponent(caseId)}/control`, payload);
+}
+
+export interface HandoffResult {
+  id: string;
+  case_id: string;
+  decision_id: string;
+  report_id: string;
+  actor_id: string;
+  created_at: string;
+  idempotent_replay?: boolean;
+}
+
+export function handoff(
+  caseId: string,
+  payload: HandoffPayload,
+): Promise<HandoffResult> {
+  return postCommand<HandoffResult>(
+    `/api/cases/${encodeURIComponent(caseId)}/handoffs`, payload);
+}
+
+export function closeCase(caseId: string, payload: ClosurePayload): Promise<ClosureView> {
+  return postCommand<ClosureView>(
+    `/api/cases/${encodeURIComponent(caseId)}/closures`, payload);
 }

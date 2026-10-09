@@ -2,9 +2,10 @@
 // stored original. Displays stage/versions/refs; no report exists yet in this
 // slice. Source technical errors (unsupported/over-limit) are shown separately
 // from business results.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as api from './api';
 import { ApiError } from './api';
+import { ActionsPanel } from './Actions';
 import { QuestionsPanel } from './Questions';
 import { ReportPanel } from './Report';
 import type {
@@ -227,6 +228,29 @@ export function App() {
   };
 
   const runActive = run !== null && (run.status === 'QUEUED' || run.status === 'RUNNING');
+
+  // Quyết định gần nhất từ history (DECISION_RECORDED) làm basis handoff.
+  const decisionId = useMemo(() => {
+    const recorded = [...history].reverse()
+      .find((h) => h.kind === 'DECISION_RECORDED');
+    const decision = recorded?.detail?.decision as { id?: string } | undefined;
+    return decision?.id ?? null;
+  }, [history]);
+
+  const handleAction = async (action: string, perform: () => Promise<unknown>) => {
+    if (!view) return;
+    try {
+      await perform();
+      setError(null);
+      await loadCase(view.id);  // mọi mutation tăng case_version; làm mới view
+      await loadCases();
+    } catch (e) {
+      setError(e instanceof Error
+        ? e.message
+        : `Không thực hiện được ${action}.`);
+    }
+  };
+
   useEffect(() => {
     if (!run || !runActive) return;
     const timer = setInterval(async () => {
@@ -473,6 +497,15 @@ export function App() {
               </div>
 
               {report && <ReportPanel report={report} />}
+
+              <ActionsPanel
+                view={view}
+                role={role}
+                actorId={actorId}
+                decisionId={decisionId}
+                reportReady={report !== null}
+                onAction={handleAction}
+              />
 
               <QuestionsPanel
                 questions={questions}

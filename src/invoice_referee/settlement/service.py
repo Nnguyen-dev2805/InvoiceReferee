@@ -12,17 +12,26 @@ import threading
 from time import monotonic
 from typing import Any, Callable
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError
 
 from invoice_referee.domain.models import DomainError
 from invoice_referee.settlement.models import (
     AuthorityGrant,
     CaseView,
+    ClosurePayload,
+    ClosureView,
     Command,
+    DecisionPayload,
+    DecisionView,
+    HandoffPayload,
+    MoneyEventPayload,
+    MoneyEventView,
     QuestionView,
     Report,
     ResponsePayload,
     ResponseView,
+    ReviewPayload,
+    ReviewView,
     RunBudget,
     RunInput,
     RunStatus,
@@ -229,3 +238,97 @@ class Service:
                 f"Run {run_id} chưa có report (status {run.status}).",
             )
         return report
+
+    # --- W05: decision, review, money, control, handoff, closure -------------
+
+    @staticmethod
+    def _parse_payload(model, payload: dict[str, Any]):
+        """Validate a payload dict; shape errors are technical, not silent."""
+        try:
+            return model.model_validate(payload)
+        except ValidationError as error:
+            raise DomainError(
+                "INVALID_PAYLOAD",
+                f"Payload không hợp lệ cho {model.__name__}: {error}",
+            ) from error
+
+    def _grant_for(self, command: Command, case: CaseView,
+                   amount_vnd: int | None):
+        """Demo authority gate: role APPROVER plus a grant covering work/amount."""
+        if command.demo_role != "APPROVER":
+            return None
+        for grant in self.config.authority:
+            if grant.actor_ref != command.actor_id:
+                continue
+            if grant.work_ref is not None and grant.work_ref != case.submission.work_ref:
+                continue
+            if amount_vnd is not None and amount_vnd > grant.max_settlement_vnd:
+                continue
+            return grant
+        return None
+
+    def decide(self, case_id: str, payload: dict[str, Any],
+               command: Command) -> DecisionView:
+        case = self.store.get_case(case_id)
+        if case.stop_active:
+            raise DomainError(
+                "STOP_ACTIVE",
+                "Hồ sơ đang Stop; không nhận quyết định mới.",
+            )
+        decision = self._parse_payload(DecisionPayload, payload)
+        grant = self._grant_for(command, case, decision.amount_vnd)
+        if grant is None:
+            raise DomainError(
+                "BEYOND_AUTHORITY",
+                f"Vai {command.demo_role}/{command.actor_id} không có quyền duyệt "
+                f"số tiền này cho công việc {case.submission.work_ref}; "
+                f"quyết định không được ghi.",
+            )
+        return self.store.record_decision(case_id, decision, command)
+
+    def review(self, case_id: str, payload: dict[str, Any],
+               command: Command) -> ReviewView:
+        if "amount_vnd" in payload:
+            raise DomainError(
+                "REVIEW_NOT_APPROVAL",
+                "Review không được mang amount; phê duyệt phải qua DECIDE.",
+            )
+        if command.demo_role != "ACCOUNTANT":
+            raise DomainError(
+                "BEYOND_AUTHORITY",
+                f"Vai {command.demo_role} không phải kế toán; review thuộc ACCOUNTANT.",
+            )
+        review = self._parse_payload(ReviewPayload, payload)
+        return self.store.record_review(case_id, review, command)
+
+    def record_money(self, case_id: str, payload: dict[str, Any],
+                     command: Command) -> MoneyEventView:
+        event = self._parse_payload(MoneyEventPayload, payload)
+        case = self.store.get_case(case_id)
+        after_cutoff = event.event_at > case.submission.money_as_of
+        return self.store.record_money(case_id, event, after_cutoff, command)
+
+    def control(self, case_id: str, action: str,
+                command: Command) -> dict[str, Any]:
+        if action not in ("STOP", "RESUME"):
+            raise DomainError(
+                "CONTROL_INVALID",
+                f"Hành động control phải là STOP hoặc RESUME, nhận {action!r}.",
+            )
+        return self.store.control(case_id, action, command)
+
+    def handoff(self, case_id: str, payload: dict[str, Any],
+                command: Command) -> dict[str, Any]:
+        handoff = self._parse_payload(HandoffPayload, payload)
+        return self.store.handoff(case_id, handoff.decision_id, command)
+
+    def close_case(self, case_id: str, payload: dict[str, Any],
+                   command: Command) -> ClosureView:
+        closure = self._parse_payload(ClosurePayload, payload)
+        return self.store.close_case(case_id, closure, command)
+
+    def closed(self, case_id: str) -> bool:
+        return self.store.closed(case_id)
+
+    def handoff_allowed(self, case_id: str) -> bool:
+        return self.store.handoff_allowed(case_id)

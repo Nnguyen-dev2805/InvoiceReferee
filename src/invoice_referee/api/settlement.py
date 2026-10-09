@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, File, Form, Header, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
@@ -25,12 +25,16 @@ from invoice_referee.settlement.models import (
     AuthorityGrant,
     CaseSummary,
     CaseView,
+    ClosureView,
     Command,
+    DecisionView,
     DemoRole,
+    MoneyEventView,
     QuestionView,
     Report,
     ResponsePayload,
     ResponseView,
+    ReviewView,
     RunView,
     SourceRecord,
     SourceView,
@@ -62,15 +66,24 @@ _STATUS_BY_CODE = {
     "SOURCE_NOT_FOUND": 404,
     "RUN_NOT_FOUND": 404,
     "QUESTION_NOT_FOUND": 404,
+    "DECISION_NOT_FOUND": 404,
     "STALE_VERSION": 409,
     "IDEMPOTENCY_CONFLICT": 409,
     "RUN_ACTIVE": 409,
     "STOP_ACTIVE": 409,
     "TOO_MANY_RUNS": 409,
     "REPORT_NOT_READY": 409,
+    "BASIS_STALE": 409,
+    "CLOSURE_BLOCKED": 409,
+    "CASE_CLOSED": 409,
+    "DUPLICATE_EVENT_REF": 409,
+    "BEYOND_AUTHORITY": 403,
     "FILE_TOO_LARGE": 413,
     "SOURCE_LIMIT_REACHED": 413,
     "UNSUPPORTED_FORMAT": 415,
+    "REVIEW_NOT_APPROVAL": 400,
+    "INVALID_PAYLOAD": 400,
+    "CONTROL_INVALID": 400,
 }
 
 
@@ -109,6 +122,82 @@ class RespondRequest(BaseModel):
     expected_case_version: StrictInt
     content: str
     source_ids: list[str] = []
+
+
+class DecisionRequest(BaseModel):
+    """DECIDE over HTTP: authority-checked approval/refusal (S6)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    kind: Literal["SETTLEMENT"]
+    amount_vnd: StrictInt | None = None
+    direction: Literal["PAY_EMPLOYEE", "COLLECT_FROM_EMPLOYEE", "REFUSE"]
+    reason: str
+    basis_report_id: str
+    conditions: list[str] = []
+    exception_of: str | None = None
+
+
+class ReviewRequest(BaseModel):
+    """Accountant review; amount_vnd is surfaced so the semantic error fires."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    report_id: str
+    note: str
+    refs: list[str] = []
+    amount_vnd: StrictInt | None = None
+
+
+class MoneyEventRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    event_ref: str
+    kind: Literal["PAYMENT_TO_EMPLOYEE", "PAYMENT_FROM_EMPLOYEE"]
+    gross_vnd: StrictInt
+    decision_id: str | None = None
+    payee_ref: str
+    event_at: str
+    reported_status: Literal["RECEIVED", "PENDING"]
+    refs: list[str] = []
+
+
+class ControlRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    action: Literal["STOP", "RESUME"]
+    reason: str = ""
+
+
+class HandoffRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    decision_id: str
+
+
+class ClosureRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    kind: Literal["SETTLEMENT_COMPLETE", "REJECTED_REQUEST_ENDED"]
+    basis: str
 
 
 def _reader_from_env(artifact_root: Path):
@@ -276,6 +365,111 @@ def create_runtime_app(*, db_path: Path | None = None,
             return JSONResponse(status_code=200,
                                 content=response.model_dump(mode="json"))
         return response
+
+    @app.post("/api/cases/{case_id}/decisions",
+              response_model=DecisionView, status_code=201)
+    async def decide(
+        case_id: str,
+        request: DecisionRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | DecisionView:
+        payload = {
+            "kind": request.kind, "amount_vnd": request.amount_vnd,
+            "direction": request.direction, "reason": request.reason,
+            "basis_report_id": request.basis_report_id,
+            "conditions": request.conditions, "exception_of": request.exception_of,
+        }
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                          request.expected_case_version, {})
+        decision = service.decide(case_id, payload, command)
+        if decision.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=decision.model_dump(mode="json"))
+        return decision
+
+    @app.post("/api/cases/{case_id}/reviews",
+              response_model=ReviewView, status_code=201)
+    async def review(
+        case_id: str,
+        request: ReviewRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | ReviewView:
+        payload: dict[str, Any] = {
+            "report_id": request.report_id, "note": request.note,
+            "refs": request.refs,
+        }
+        if request.amount_vnd is not None:
+            payload["amount_vnd"] = request.amount_vnd  # → REVIEW_NOT_APPROVAL
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                          request.expected_case_version, {})
+        review = service.review(case_id, payload, command)
+        if review.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=review.model_dump(mode="json"))
+        return review
+
+    @app.post("/api/cases/{case_id}/money-events",
+              response_model=MoneyEventView, status_code=201)
+    async def record_money(
+        case_id: str,
+        request: MoneyEventRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | MoneyEventView:
+        payload = {
+            "event_ref": request.event_ref, "kind": request.kind,
+            "gross_vnd": request.gross_vnd, "decision_id": request.decision_id,
+            "payee_ref": request.payee_ref, "event_at": request.event_at,
+            "reported_status": request.reported_status, "refs": request.refs,
+        }
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                          request.expected_case_version, {})
+        event = service.record_money(case_id, payload, command)
+        if event.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=event.model_dump(mode="json"))
+        return event
+
+    @app.post("/api/cases/{case_id}/control", response_model=None, status_code=201)
+    async def control(
+        case_id: str,
+        request: ControlRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | dict[str, Any]:
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                          request.expected_case_version,
+                          {"reason": request.reason})
+        result = service.control(case_id, request.action, command)
+        status = 200 if result.get("idempotent_replay") else 201
+        return JSONResponse(status_code=status, content=result)
+
+    @app.post("/api/cases/{case_id}/handoffs", response_model=None, status_code=201)
+    async def handoff(
+        case_id: str,
+        request: HandoffRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse:
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                          request.expected_case_version, {})
+        result = service.handoff(case_id, {"decision_id": request.decision_id},
+                                 command)
+        status = 200 if result.get("idempotent_replay") else 201
+        return JSONResponse(status_code=status, content=result)
+
+    @app.post("/api/cases/{case_id}/closures",
+              response_model=ClosureView, status_code=201)
+    async def close_case(
+        case_id: str,
+        request: ClosureRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | ClosureView:
+        payload = {"kind": request.kind, "basis": request.basis}
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                          request.expected_case_version, {})
+        closure = service.close_case(case_id, payload, command)
+        if closure.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=closure.model_dump(mode="json"))
+        return closure
 
     @app.get("/api/cases/{case_id}/history", response_model=None)
     async def case_history(case_id: str) -> list[dict[str, Any]]:

@@ -35,11 +35,21 @@ from invoice_referee.settlement.models import (
     CaseSummary,
     CaseView,
     CallTrace,
+    ClosurePayload,
+    ClosureView,
     Command,
+    DecisionPayload,
+    DecisionView,
+    MoneyEventPayload,
+    MoneyEventView,
+    MoneyIncident,
+    MoneySummary,
     QuestionView,
     Report,
     ResponsePayload,
     ResponseView,
+    ReviewPayload,
+    ReviewView,
     RunInput,
     RunView,
     RunStatus,
@@ -58,10 +68,18 @@ _REVISE_SUBMISSION = "REVISE_SUBMISSION"
 _ADD_SOURCE = "ADD_SOURCE"
 _START_RUN = "START_RUN"
 _RESPOND = "RESPOND"
+_DECIDE = "DECIDE"
+_REVIEW = "REVIEW"
+_RECORD_MONEY = "RECORD_MONEY"
+_CONTROL = "CONTROL"
+_HANDOFF = "HANDOFF"
+_CLOSE_CASE = "CLOSE_CASE"
 
 _NONTERMINAL_STATUSES = ("QUEUED", "RUNNING")
 _TERMINAL_STATUSES = ("SUCCEEDED", "FAILED", "TIMED_OUT", "STOPPED",
                       "SUPERSEDED", "INTERRUPTED")
+_CLOSED_STAGES: tuple[str, ...] = ("SETTLEMENT_CLOSED", "REJECTED_REQUEST_ENDED")
+_OPEN_QUESTION_STATUSES = ("OPEN", "ANSWERED")
 MAX_ACCEPTED_RUNS = 5
 
 
@@ -127,6 +145,12 @@ class Store:
             conn.execute("PRAGMA journal_mode = WAL")
             conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
             self._migrate(conn)
+            conn.execute(
+                "UPDATE runs SET status = 'INTERRUPTED', "
+                "detail = COALESCE(detail, 'process restart: run không kết thúc'), "
+                "updated_at = ? WHERE status IN ('QUEUED', 'RUNNING')",
+                (_iso(utcnow()),),
+            )
 
     @staticmethod
     def _migrate(conn: sqlite3.Connection) -> None:
@@ -308,6 +332,7 @@ class Store:
                                  (_load(row["payload_json"])["source_id"],)).fetchone())
                 return record.model_copy(update={"idempotent_replay": True})
             case = self._case_row(conn, case_id)
+            self._check_open(case)
             if len(upload.content) > MAX_SOURCE_BYTES:
                 raise DomainError(
                     "FILE_TOO_LARGE",
@@ -453,9 +478,19 @@ class Store:
         return view
 
     def publish(self, run_id: str, report: Report) -> RunView:
-        """Publish a report only when controls still hold (Stop/revision/epoch)."""
+        """Publish a report only when controls still hold (Stop/revision/epoch).
+
+        A run that is no longer RUNNING (e.g. marked INTERRUPTED by a process
+        restart) keeps its recorded status; late worker output is discarded.
+        """
         with self._write() as conn:
             run = self._run_row(conn, run_id)
+            if run["status"] != "RUNNING":
+                raise DomainError(
+                    "RUN_TERMINAL",
+                    f"Run {run_id} không còn RUNNING ({run['status']}); "
+                    f"output đến muộn không được ghi đè.",
+                )
             case = self._case_row(conn, run["case_id"])
             if (case["stop_active"] or case["control_epoch"] != run["control_epoch"]
                     or case["input_revision"] != run["input_revision"]):
@@ -673,6 +708,405 @@ class Store:
             resolved_run_id=payload["resolved_run_id"],
         )
 
+    # --- decisions, reviews, money, control, handoff, closure (W05) -----------
+
+    @staticmethod
+    def _check_open(case: sqlite3.Row) -> None:
+        if case["stage"] in _CLOSED_STAGES:
+            raise DomainError(
+                "CASE_CLOSED",
+                f"Hồ sơ đã kết thúc ({case['stage']}); không nhận hành động mới.",
+            )
+
+    def _latest_decision_payload(self, conn: sqlite3.Connection,
+                                  case_id: str) -> dict[str, Any] | None:
+        row = conn.execute(
+            "SELECT payload_json FROM decisions WHERE case_id = ? "
+            "ORDER BY rowid DESC LIMIT 1", (case_id,)).fetchone()
+        return _load(row["payload_json"]) if row is not None else None
+
+    def record_decision(self, case_id: str, payload: DecisionPayload,
+                        command: Command) -> DecisionView:
+        """Record an authority-approved decision; closed/Stop/version gated."""
+        payload_fp = fingerprint(_DECIDE, payload.model_dump(mode="json"))
+        with self._write() as conn:
+            row = self._lookup_command(conn, _DECIDE, command, scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                stored = _load(row["payload_json"])["decision"]
+                return DecisionView.model_validate(stored).model_copy(
+                    update={"idempotent_replay": True})
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            if case["stop_active"]:
+                raise DomainError(
+                    "STOP_ACTIVE",
+                    "Hồ sơ đang Stop; không ghi quyết định mới.",
+                )
+            self._check_version(case, command)
+            self._run_row(conn, payload.basis_report_id)  # basis phải là run có thật
+            decision_id = f"D-{uuid.uuid4().hex[:12]}"
+            now = _iso(utcnow())
+            decision = {
+                "id": decision_id, "case_id": case_id, "kind": payload.kind,
+                "amount_vnd": payload.amount_vnd, "direction": payload.direction,
+                "reason": payload.reason, "basis_report_id": payload.basis_report_id,
+                "basis_case_version": case["case_version"],
+                "basis_input_revision": case["input_revision"],
+                "exception_of": payload.exception_of,
+                "conditions": payload.conditions, "actor_id": command.actor_id,
+                "created_at": now,
+            }
+            conn.execute(
+                "INSERT INTO decisions (id, case_id, payload_json, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (decision_id, case_id, _dump(decision), now),
+            )
+            new_stage = case["stage"]
+            if payload.direction != "REFUSE" and payload.amount_vnd is not None:
+                new_stage = "AWAITING_MONEY"
+            conn.execute(
+                "UPDATE cases SET stage = ?, case_version = ?, updated_at = ? "
+                "WHERE id = ?",
+                (new_stage, case["case_version"] + 1, now, case_id),
+            )
+            self._record_command(conn, case_id, case_id, "DECISION_RECORDED",
+                                 _DECIDE, command, payload_fp,
+                                 {"decision": decision}, now)
+            return DecisionView.model_validate(decision)
+
+    def record_review(self, case_id: str, payload: ReviewPayload,
+                      command: Command) -> ReviewView:
+        """Record an accountant review: observation only, never approval."""
+        payload_fp = fingerprint(_REVIEW, payload.model_dump(mode="json"))
+        with self._write() as conn:
+            row = self._lookup_command(conn, _REVIEW, command, scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                stored = _load(row["payload_json"])["review"]
+                return ReviewView.model_validate(stored).model_copy(
+                    update={"idempotent_replay": True})
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            self._check_version(case, command)
+            self._run_row(conn, payload.report_id)  # review phải chỉ vào run có thật
+            review_id = f"RV-{uuid.uuid4().hex[:12]}"
+            now = _iso(utcnow())
+            review = {
+                "id": review_id, "case_id": case_id, "report_id": payload.report_id,
+                "note": payload.note, "refs": payload.refs,
+                "actor_id": command.actor_id, "created_at": now,
+            }
+            conn.execute(
+                "INSERT INTO interactions (id, case_id, kind, payload_json, "
+                "created_at) VALUES (?, ?, 'REVIEW', ?, ?)",
+                (review_id, case_id, _dump(review), now),
+            )
+            conn.execute(
+                "UPDATE cases SET case_version = ?, updated_at = ? WHERE id = ?",
+                (case["case_version"] + 1, now, case_id),
+            )
+            self._record_command(conn, case_id, case_id, "REVIEW_RECORDED",
+                                 _REVIEW, command, payload_fp,
+                                 {"review": review}, now)
+            return ReviewView.model_validate(review)
+
+    def record_money(self, case_id: str, payload: MoneyEventPayload,
+                     after_cutoff: bool, command: Command) -> MoneyEventView:
+        """Record an actual money event; allowed under Stop, deduped by event_ref."""
+        payload_fp = fingerprint(_RECORD_MONEY, payload.model_dump(mode="json"))
+        with self._write() as conn:
+            row = self._lookup_command(conn, _RECORD_MONEY, command,
+                                       scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                stored = _load(row["payload_json"])["money_event"]
+                return MoneyEventView.model_validate(stored).model_copy(
+                    update={"idempotent_replay": True})
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            for event_row in conn.execute(
+                    "SELECT payload_json FROM money_events WHERE case_id = ?",
+                    (case_id,)):
+                if _load(event_row["payload_json"])["event_ref"] == payload.event_ref:
+                    raise DomainError(
+                        "DUPLICATE_EVENT_REF",
+                        f"event_ref {payload.event_ref} đã được ghi cho hồ sơ; "
+                        f"sự kiện tiền không được ghi hai lần.",
+                    )
+            self._check_version(case, command)
+            event_id = f"M-{uuid.uuid4().hex[:12]}"
+            now = _iso(utcnow())
+            event = {
+                "id": event_id, "case_id": case_id,
+                "event_ref": payload.event_ref, "kind": payload.kind,
+                "gross_vnd": payload.gross_vnd,
+                "decision_id": payload.decision_id,
+                "payee_ref": payload.payee_ref, "event_at": _iso(payload.event_at),
+                "reported_status": payload.reported_status, "refs": payload.refs,
+                "after_cutoff": after_cutoff, "created_at": now,
+            }
+            conn.execute(
+                "INSERT INTO money_events (id, case_id, payload_json, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (event_id, case_id, _dump(event), now),
+            )
+            conn.execute(
+                "UPDATE cases SET case_version = ?, updated_at = ? WHERE id = ?",
+                (case["case_version"] + 1, now, case_id),
+            )
+            self._record_command(conn, case_id, case_id, "MONEY_EVENT_RECORDED",
+                                 _RECORD_MONEY, command, payload_fp,
+                                 {"money_event": event}, now)
+            return MoneyEventView.model_validate(event)
+
+    def control(self, case_id: str, action: str, command: Command) -> dict[str, Any]:
+        """STOP acknowledges and freezes new actions; RESUME opens a new epoch."""
+        if action not in ("STOP", "RESUME"):
+            raise DomainError(
+                "CONTROL_INVALID",
+                f"Hành động control phải là STOP hoặc RESUME, nhận {action!r}.",
+            )
+        reason = str(command.body.get("reason") or "")
+        payload_fp = fingerprint(_CONTROL, {"action": action, "reason": reason})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _CONTROL, command, scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                stored = _load(row["payload_json"])["control"]
+                return dict(stored, idempotent_replay=True)
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            self._check_version(case, command)
+            if action == "STOP" and case["stop_active"]:
+                raise DomainError(
+                    "CONTROL_INVALID",
+                    "Hồ sơ đang Stop; không Stop lần nữa.",
+                )
+            if action == "RESUME" and not case["stop_active"]:
+                raise DomainError(
+                    "CONTROL_INVALID",
+                    "Hồ sơ không đang Stop; không có gì để resume.",
+                )
+            now = _iso(utcnow())
+            new_version = case["case_version"] + 1
+            if action == "STOP":
+                stop_active, epoch = 1, case["control_epoch"]
+                kind = "CONTROL_STOPPED"
+            else:
+                stop_active, epoch = 0, case["control_epoch"] + 1
+                kind = "CONTROL_RESUMED"
+            conn.execute(
+                "UPDATE cases SET stop_active = ?, control_epoch = ?, "
+                "case_version = ?, updated_at = ? WHERE id = ?",
+                (stop_active, epoch, new_version, now, case_id),
+            )
+            control = {
+                "case_id": case_id, "action": action, "reason": reason,
+                "stop_active": bool(stop_active), "control_epoch": epoch,
+                "case_version": new_version, "actor_id": command.actor_id,
+                "created_at": now,
+            }
+            self._record_command(conn, case_id, case_id, kind, _CONTROL,
+                                 command, payload_fp, {"control": control}, now)
+            return dict(control)
+
+    def handoff(self, case_id: str, decision_id: str,
+                command: Command) -> dict[str, Any]:
+        """Create a stage-A handoff reference for an approved, fresh-basis decision."""
+        payload_fp = fingerprint(_HANDOFF, {"decision_id": decision_id})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _HANDOFF, command, scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                stored = _load(row["payload_json"])["handoff"]
+                return dict(stored, idempotent_replay=True)
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            if case["stop_active"]:
+                raise DomainError(
+                    "STOP_ACTIVE",
+                    "Hồ sơ đang Stop; không tạo handoff.",
+                )
+            self._check_version(case, command)
+            decision_row = conn.execute(
+                "SELECT * FROM decisions WHERE id = ? AND case_id = ?",
+                (decision_id, case_id),
+            ).fetchone()
+            if decision_row is None:
+                raise DomainError(
+                    "DECISION_NOT_FOUND",
+                    f"Không tìm thấy quyết định {decision_id} trong hồ sơ.",
+                )
+            run = (conn.execute("SELECT * FROM runs WHERE id = ?",
+                                (case["current_run_id"],)).fetchone()
+                   if case["current_run_id"] else None)
+            if (run is None or run["status"] != "SUCCEEDED"
+                    or run["input_revision"] != case["input_revision"]):
+                raise DomainError(
+                    "BASIS_STALE",
+                    "Input đã thay đổi sau quyết định và chưa re-check xong; "
+                    "không handoff trên basis cũ.",
+                )
+            now = _iso(utcnow())
+            handoff_id = f"H-{uuid.uuid4().hex[:12]}"
+            handoff = {
+                "id": handoff_id, "case_id": case_id, "decision_id": decision_id,
+                "report_id": case["current_run_id"], "actor_id": command.actor_id,
+                "created_at": now,
+            }
+            conn.execute(
+                "UPDATE cases SET case_version = ?, updated_at = ? WHERE id = ?",
+                (case["case_version"] + 1, now, case_id),
+            )
+            self._record_command(conn, case_id, case_id, "HANDOFF_RECORDED",
+                                 _HANDOFF, command, payload_fp,
+                                 {"handoff": handoff}, now)
+            return dict(handoff)
+
+    def close_case(self, case_id: str, payload: ClosurePayload,
+                   command: Command) -> ClosureView:
+        """Close a case only when every closure gate holds, inside the txn."""
+        payload_fp = fingerprint(_CLOSE_CASE, payload.model_dump(mode="json"))
+        with self._write() as conn:
+            row = self._lookup_command(conn, _CLOSE_CASE, command, scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                stored = _load(row["payload_json"])["closure"]
+                return ClosureView.model_validate(stored).model_copy(
+                    update={"idempotent_replay": True})
+            case = self._case_row(conn, case_id)
+            if case["stage"] in _CLOSED_STAGES:
+                existing = conn.execute(
+                    "SELECT * FROM audit_events WHERE case_id = ? AND operation = ? "
+                    "ORDER BY rowid DESC LIMIT 1", (case_id, _CLOSE_CASE),
+                ).fetchone()
+                if existing is not None and existing["fingerprint"] == payload_fp:
+                    stored = _load(existing["payload_json"])["closure"]
+                    return ClosureView.model_validate(stored).model_copy(
+                        update={"idempotent_replay": True})
+                raise DomainError(
+                    "CASE_CLOSED",
+                    "Hồ sơ đã đóng; nội dung đóng mới phải dùng hồ sơ mới.",
+                )
+            self._check_version(case, command)
+            blockers = self._closure_blockers(conn, case, payload.kind)
+            if blockers:
+                raise DomainError(
+                    "CLOSURE_BLOCKED",
+                    "Không đóng được hồ sơ: " + "; ".join(blockers),
+                )
+            closure_id = f"CL-{uuid.uuid4().hex[:12]}"
+            now = _iso(utcnow())
+            closure = {
+                "id": closure_id, "case_id": case_id, "kind": payload.kind,
+                "basis": payload.basis, "actor_id": command.actor_id,
+                "created_at": now,
+            }
+            new_stage: CaseStage = ("SETTLEMENT_CLOSED"
+                                    if payload.kind == "SETTLEMENT_COMPLETE"
+                                    else "REJECTED_REQUEST_ENDED")
+            conn.execute(
+                "UPDATE cases SET stage = ?, case_version = ?, updated_at = ? "
+                "WHERE id = ?",
+                (new_stage, case["case_version"] + 1, now, case_id),
+            )
+            self._record_command(conn, case_id, case_id,
+                                 "CASE_CLOSED" if payload.kind == "SETTLEMENT_COMPLETE"
+                                 else "REQUEST_REJECTED_ENDED",
+                                 _CLOSE_CASE, command, payload_fp,
+                                 {"closure": closure}, now)
+            return ClosureView.model_validate(closure)
+
+    def closed(self, case_id: str) -> bool:
+        with self._read() as conn:
+            return self._case_row(conn, case_id)["stage"] in _CLOSED_STAGES
+
+    def handoff_allowed(self, case_id: str) -> bool:
+        with self._read() as conn:
+            case = self._case_row(conn, case_id)
+            if case["stage"] in _CLOSED_STAGES or case["stop_active"]:
+                return False
+            if self._latest_decision_payload(conn, case_id) is None:
+                return False
+            run = (conn.execute("SELECT * FROM runs WHERE id = ?",
+                                (case["current_run_id"],)).fetchone()
+                   if case["current_run_id"] else None)
+            return (run is not None and run["status"] == "SUCCEEDED"
+                    and run["input_revision"] == case["input_revision"])
+
+    def _money_summary(self, conn: sqlite3.Connection,
+                       case: sqlite3.Row) -> MoneySummary:
+        """Approved vs actual: latest decision approval, RECEIVED events only."""
+        approved: int | None = None
+        latest = self._latest_decision_payload(conn, case["id"])
+        if latest is not None and latest.get("amount_vnd") is not None \
+                and latest.get("direction") != "REFUSE":
+            approved = latest["amount_vnd"]
+        employee_ref = _load(case["submission_json"])["employee_ref"]
+        received: int | None = None
+        pending = 0
+        incidents: list[MoneyIncident] = []
+        for event_row in conn.execute(
+                "SELECT payload_json FROM money_events WHERE case_id = ? "
+                "ORDER BY rowid", (case["id"],)):
+            event = _load(event_row["payload_json"])
+            if event["reported_status"] == "PENDING":
+                pending += 1
+            if event["kind"] != "PAYMENT_TO_EMPLOYEE":
+                continue
+            if event["payee_ref"] != employee_ref:
+                incidents.append(MoneyIncident(
+                    kind="WRONG_RECIPIENT", event_ref=event["event_ref"],
+                    payee_ref=event["payee_ref"]))
+                continue
+            if event["reported_status"] == "RECEIVED":
+                received = (received or 0) + event["gross_vnd"]
+        remaining: int | None = None
+        if approved is not None:
+            actual = received or 0
+            if actual > approved:
+                incidents.append(MoneyIncident(
+                    kind="OVERPAY", excess_vnd=actual - approved))
+            remaining = max(approved - actual, 0)
+        return MoneySummary(approved_vnd=approved, received_vnd=received,
+                            remaining_vnd=remaining, pending_events=pending,
+                            incidents=incidents)
+
+    def _closure_blockers(self, conn: sqlite3.Connection, case: sqlite3.Row,
+                          kind: str) -> list[str]:
+        """All reasons a closure must be refused; empty list means closable."""
+        blockers: list[str] = []
+        if case["stop_active"]:
+            blockers.append("Hồ sơ đang Stop; không đóng khi control đang giữ.")
+        summary = self._money_summary(conn, case)
+        if kind == "SETTLEMENT_COMPLETE":
+            if summary.remaining_vnd is not None and summary.remaining_vnd > 0:
+                blockers.append(
+                    f"Còn phần quyết toán chưa thực nhận: remaining "
+                    f"{summary.remaining_vnd} VND > 0.")
+        elif summary.approved_vnd is not None:
+            blockers.append(
+                "Đã có quyết định duyệt số tiền; không thể kết thúc như "
+                "yêu cầu bị từ chối.")
+        if summary.pending_events:
+            blockers.append(
+                f"Còn {summary.pending_events} sự kiện tiền ở trạng thái PENDING.")
+        if summary.incidents:
+            kinds = ", ".join(sorted({incident.kind
+                                       for incident in summary.incidents}))
+            blockers.append(f"Còn money incident chưa xử lý: {kinds}.")
+        open_questions = 0
+        for question_row in conn.execute(
+                "SELECT payload_json FROM interactions "
+                "WHERE case_id = ? AND kind = 'QUESTION'", (case["id"],)):
+            if _load(question_row["payload_json"])["status"] in _OPEN_QUESTION_STATUSES:
+                open_questions += 1
+        if open_questions:
+            blockers.append(
+                f"Còn {open_questions} câu hỏi chưa được re-check xử lý.")
+        return blockers
+
     # --- history -----------------------------------------------------------
 
     def history(self, case_id: str) -> list[AuditEntry]:
@@ -761,6 +1195,39 @@ class Store:
                 action="START_RUN",
                 reason="Chạy kiểm tra B3/B7 trên snapshot hiện tại của hồ sơ.",
             ))
+        if case["stage"] in _CLOSED_STAGES:
+            actions.append(AllowedAction(
+                action="NONE",
+                reason="Hồ sơ đã đóng; chỉ đọc lại history và report.",
+            ))
+        else:
+            actions.append(AllowedAction(
+                action="STOP_CONTROL" if not case["stop_active"] else "RESUME_CONTROL",
+                reason=("Stop giữ run/decision mới nhưng vẫn nhận nguồn và "
+                        "sự kiện tiền đã xảy ra; resume tạo epoch mới."
+                        if not case["stop_active"] else
+                        "Resume mở epoch mới; run cũ không tự hồi phục."),
+            ))
+            if current_run is not None and current_run["status"] == "SUCCEEDED":
+                actions.append(AllowedAction(
+                    action="DECIDE",
+                    reason="Report đã có; người có quyền duyệt hoặc từ chối.",
+                ))
+                actions.append(AllowedAction(
+                    action="REVIEW",
+                    reason="Kế toán rà soát report; review không phải phê duyệt.",
+                ))
+            if case["stage"] == "AWAITING_MONEY":
+                actions.append(AllowedAction(
+                    action="RECORD_MONEY",
+                    reason="Ghi nhận thực nhận/thực chi; gross giữ nguyên, "
+                           "không clip theo mức duyệt.",
+                ))
+            actions.append(AllowedAction(
+                action="CLOSE_CASE",
+                reason="Đóng hồ sơ khi các gate (remaining/pending/incident/"
+                       "Stop/câu hỏi) đều sạch.",
+            ))
         return CaseView(
             id=case["id"], job=submission.job,
             case_version=case["case_version"], input_revision=case["input_revision"],
@@ -768,6 +1235,7 @@ class Store:
             stage=case["stage"], current_run_id=case["current_run_id"],
             submission=submission, sources=sources,
             allowed_actions=actions,
+            money_summary=self._money_summary(conn, case).model_dump(mode="json"),
             created_at=datetime.fromisoformat(case["created_at"]),
             updated_at=datetime.fromisoformat(case["updated_at"]),
         )
