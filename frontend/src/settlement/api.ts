@@ -23,6 +23,7 @@ import type {
   RunView,
   SourceView,
   StartRunPayload,
+  VerifySuiteReport,
 } from './types';
 
 export class ApiError extends Error {
@@ -217,4 +218,16 @@ export function handoff(
 export function closeCase(caseId: string, payload: ClosurePayload): Promise<ClosureView> {
   return postCommand<ClosureView>(
     `/api/cases/${encodeURIComponent(caseId)}/closures`, payload);
+}
+
+// --- W06: evaluation / Verify ---------------------------------------------------
+
+export function runSettlementVerify(
+  packets: string[] | null,
+): Promise<VerifySuiteReport> {
+  return request<VerifySuiteReport>('/api/verify/settlement/run', {
+    method: 'POST',
+    headers: { ...JSON_HEADERS, 'Idempotency-Key': crypto.randomUUID() },
+    body: JSON.stringify({ packets }),
+  });
 }

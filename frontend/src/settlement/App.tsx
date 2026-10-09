@@ -8,6 +8,7 @@ import { ApiError } from './api';
 import { ActionsPanel } from './Actions';
 import { QuestionsPanel } from './Questions';
 import { ReportPanel } from './Report';
+import { VerifyPanel } from './Verify';
 import type {
   AuditEntry, CaseStage, CaseSummary, CaseView, DemoRole, Job, QuestionView,
   Report, RunView,
@@ -383,6 +384,8 @@ export function App() {
               ))}
             </ul>
           </div>
+
+          <VerifyPanel />
         </section>
 
         <section className="col">

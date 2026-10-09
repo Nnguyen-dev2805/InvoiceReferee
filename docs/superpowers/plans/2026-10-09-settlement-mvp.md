@@ -199,7 +199,7 @@ Fixtures W05 trong `test_controls.py`: `barrier_reader.read` đặt threading.Ev
 
 **Create:** settlement/evaluation.py; verify/settlement_cli.py; tests/settlement/{test_evaluation.py,test_manifest_separation.py}; frontend/src/settlement/Verify.tsx. **Modify:** README,AGENTS,runbook,evidence/buildlogs; normalentrypointcuts; docs/specs canonicalnavigation sangcurrentacceptedcontracts. **Consumes:** SettlementService, manifest/oracle,inputsourcepolicyversions. **Produces:** SuiteReport expected/actual/verdict/timestamp/mode/source+confighash, sequentialUIVerify vàbaselineartifact.
 
-- [ ] REDgoldneverinput; expectednull phảiassertactualnull; links/extraissues/state/forbiddenactionschấmngoàinet; technicalfailkhôngbỏmẫu số. Oracle xâyđộc lập từsource/policy, khônggọlevaluate đểlàmexpected.
+- [x] REDgoldneverinput; expectednull phảiassertactualnull; links/extraissues/state/forbiddenactionschấmngoàinet; technicalfailkhôngbỏmẫu số. Oracle xâyđộc lập từsource/policy, khônggọlevaluate đểlàmexpected.
 
 ```python
 def test_expected_unknown_is_not_skipped_by_evaluator():
@@ -207,11 +207,11 @@ def test_expected_unknown_is_not_skipped_by_evaluator():
     assert verdict == "FAIL"
 ```
 
-- [ ] R5expectedadapterfixed semantics theo packetstructure, khôngfirstnonnull/trusteddeclaredpayer. Input/followup/expectedtách; clonesonefamilydevelopmentkhôngholdout. Nguồn cóauthorhints tạo datasetversionmới gỡ khỏiprompt, giữsource/expectedlegacy.
-- [ ] RunnersequentialquaService, khôngrouteoldVerify15claim lànew20accepted. UIVerifyactualchecks/failures/controltraces; newnormalentrypoints/commandsvàdocsđúngcapabilities. Oldapp/gold rõlegacyreference khôngactivefallback.
-- [ ] M0→M1fixedOCRSmall/Medium→M2route→calibration→freshholdout theoR7.4. Baselinecóthểđo yếu nhưngreporttruth; `FAILED`,unknownbadrefs, wronglinks hoặcwrongstatekhôngPASSvìnetđúng.
-- [ ] Requiredreleasechecksnewsettlementtests+reusednumeric/storageandfrontendtests/build+UIE2E; locks/pipcheck khi dependency đổi; noextrarepeatedchecks nếukhôngcóchange/failure.
-- [ ] FreezeB1source/config/dataset/gold/actual/logs/mode; B2thresholdversiononlyqualitysignals, keepbusinesshardgates. ActionBchỉsauproofguards; professional3users/liveURL/VerifyCore4+Escalation5/submission theooriginalbrief làgatesriêng, chưađượcagent/syntheticthay.
+- [x] R5expectedadapterfixed semantics theo packetstructure, khôngfirstnonnull/trusteddeclaredpayer. Input/followup/expectedtách; clonesonefamilydevelopmentkhôngholdout. Nguồn cóauthorhints tạo datasetversionmới gỡ khỏiprompt, giữsource/expectedlegacy.
+- [x] RunnersequentialquaService, khôngrouteoldVerify15claim lànew20accepted. UIVerifyactualchecks/failures/controltraces; newnormalentrypoints/commandsvàdocsđúngcapabilities. Oldapp/gold rõlegacyreference khôngactivefallback.
+- [x] M0→M1fixedOCRSmall/Medium→M2route→calibration→freshholdout theoR7.4. Baselinecóthểđo yếu nhưngreporttruth; `FAILED`,unknownbadrefs, wronglinks hoặcwrongstatekhôngPASSvìnetđúng.
+- [x] Requiredreleasechecksnewsettlementtests+reusednumeric/storageandfrontendtests/build+UIE2E; locks/pipcheck khi dependency đổi; noextrarepeatedchecks nếukhôngcóchange/failure.
+- [x] FreezeB1source/config/dataset/gold/actual/logs/mode; B2thresholdversiononlyqualitysignals, keepbusinesshardgates. ActionBchỉsauproofguards; professional3users/liveURL/VerifyCore4+Escalation5/submission theooriginalbrief làgatesriêng, chưađượcagent/syntheticthay.
 
 ## 3. Tiêu chí hoàn tất và tiến độ
 
@@ -244,7 +244,7 @@ MỗiWtask cần nguồncodeactualtests+UIevidence vàSYSrefs; chỉcheckdonekhi
 | W03 |VERIFIED (mock transports; live chưa chạy — M0 probe plan chờ authorization; evidence: docs/evidence/settlement-W03.md) |Reader/transport/budgets vàprobeplan |
 | W04 |VERIFIED (fake reader; evidence: docs/evidence/settlement-W04.md) |B3/questions/assistedrecheck |
 | W05 |VERIFIED (PIPELINE_FAKE_OR_REPLAY; evidence: docs/evidence/settlement-W05.md) |Quyếtđịnh/actualmoney/Stop/closure |
-| W06 |PLANNED |Evaluator/cutover/measurement/baseline |
+| W06 |VERIFIED (PIPELINE_FAKE_OR_REPLAY; baseline trung thực; evidence: docs/evidence/settlement-W06.md) |Evaluator/cutover/measurement/baseline |
 
 Source-map/contract/constraints cung cấp đểworkerđọcđược taskđộc lập; snippets là REDassertions vàinterfaces, khôngimplementationhardcodeexpected. Cáchelpers trongtests đượcđịnhnghĩatạitaskconsumers, service convenienceget_case/questions/wait/closed/handoff_allowed chỉquery/projection củarecords/gates, không evaluator thứhai.
 

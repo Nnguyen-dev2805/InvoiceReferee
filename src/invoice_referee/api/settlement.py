@@ -41,6 +41,7 @@ from invoice_referee.settlement.models import (
     Submission,
     Upload,
 )
+from invoice_referee.settlement.evaluation import run_suite
 from invoice_referee.settlement.reader import (
     MISTRAL_OCR_BASE_URL,
     MISTRAL_OCR_MODEL,
@@ -198,6 +199,31 @@ class ClosureRequest(BaseModel):
     expected_case_version: StrictInt
     kind: Literal["SETTLEMENT_COMPLETE", "REJECTED_REQUEST_ENDED"]
     basis: str
+
+
+class VerifyRunRequest(BaseModel):
+    """Run the settlement evaluation suite sequentially (same Service path)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    packets: list[str] | None = None
+
+
+DEFAULT_EVAL_CORPUS = Path("docs/discovery/eval_development")
+DEFAULT_VERIFY_DIR = DEFAULT_DATA_DIR / "verify"
+_verify_service: dict[str, Service] = {}
+
+
+def _evaluation_service() -> Service:
+    """Isolated store for evaluation runs; same Service/reader wiring."""
+    if "service" not in _verify_service:
+        out_dir = Path(os.environ.get("SETTLEMENT_VERIFY_DIR", DEFAULT_VERIFY_DIR))
+        out_dir.mkdir(parents=True, exist_ok=True)
+        store = Store(out_dir / "verify.sqlite", out_dir / "artifacts")
+        reader = _reader_from_env(store.artifact_root)
+        _verify_service["service"] = Service(
+            store, reader, config=ServiceConfig(authority=DEMO_AUTHORITY))
+    return _verify_service["service"]
 
 
 def _reader_from_env(artifact_root: Path):
@@ -470,6 +496,15 @@ def create_runtime_app(*, db_path: Path | None = None,
             return JSONResponse(status_code=200,
                                 content=closure.model_dump(mode="json"))
         return closure
+
+    @app.post("/api/verify/settlement/run", response_model=None, status_code=200)
+    async def run_settlement_verify(
+        request: VerifyRunRequest,
+    ) -> JSONResponse:
+        corpus = Path(os.environ.get("SETTLEMENT_EVAL_CORPUS",
+                                     DEFAULT_EVAL_CORPUS))
+        report = run_suite(corpus, _evaluation_service(), request.packets)
+        return JSONResponse(report.model_dump(mode="json"))
 
     @app.get("/api/cases/{case_id}/history", response_model=None)
     async def case_history(case_id: str) -> list[dict[str, Any]]:

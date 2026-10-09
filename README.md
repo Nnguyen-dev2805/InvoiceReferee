@@ -23,16 +23,22 @@ B1 as **B2**.
 
 ## Status
 
-- **IMPLEMENTED (T01–T11):** domain contracts + demo policy (T01); numeric/quality
-  (T02); policy/decision engine (T03); SQLite history + atomic request lifecycle
-  (T04); Mistral OCR / Kimi adapters (T05); production pipeline (T06); human-action
-  validation + closure (T07); one-process executor + Stop/Override (T08); FastAPI
-  (T09); React UI (T10); Verify corpus + runner (T11).
-- **PLANNED:** B1 freeze/comparison contract (T12), B2 adaptation + independent
-  eval (T13), real-user study (T14), deployment + runbook (T15), submission package
-  (T16).
+- **IMPLEMENTED (W01–W06, settlement rebuild):** intake/stale-version/idempotency
+  guards (W01); B7 report with sourced checks (W02); provider readers with budget
+  and call trace, live mode fail-closed (W03); B3 advance checks and owner-scoped
+  questions with re-check (W04); authority-gated decisions, actual money with
+  incidents, Stop/resume and closure gates (W05); evaluation harness + Verify
+  CLI/UI over the frozen development corpus (W06).
+- **Earlier claim-processing app (T01–T11):** kept as historical reference on
+  `main`/B0. Its Verify corpus (15 claims) is legacy — it is NOT the accepted
+  20-packet settlement evaluation below.
 - **LIVE END-TO-END: INCONCLUSIVE** — no live provider call has been made. All
-  evidence so far is fake/replay (no network). Live OCR/Kimi quality is unmeasured.
+  settlement evidence so far is fake/replay (no network). Live OCR/LLM quality
+  is unmeasured; the measured baseline below reflects the fake reader's
+  capability, reported truthfully (first-pass routine completion 0/9, FP 9/9
+  on the narrative corpus in fake mode).
+- **PLANNED:** live provider bring-up (M0/M1), quality comparison B2, real-user
+  study (3+ professional users), deployment/submission package.
 
 `CREATED` is not `PAID`: the system creates a payment **request**, never a bank
 transfer.
@@ -72,10 +78,13 @@ The accepted settlement design runs on its own core (SQLite + artifacts under
 npm --prefix frontend run dev -- --host 127.0.0.1
 ```
 
-Implemented so far (W01): create case → upload sources → reload → open the
-stored original, with stale-version and idempotency guards. The sections below
-describe the earlier claim-processing implementation kept for comparison; they
-do not establish settlement capabilities.
+Implemented so far (W01–W06): create case → upload sources → reload → open the
+stored original (stale-version and idempotency guards); B3/B7 reports with sourced
+checks and unknown-as-null; questions with owner/refs and re-check resolution;
+decisions (authority-gated), actual money with incidents, Stop/resume, handoff
+and closure gates in the UI. The sections below describe the earlier
+claim-processing implementation kept for comparison; they do not establish
+settlement capabilities.
 
 ### Earlier claim-processing app (historical reference)
 
@@ -115,7 +124,17 @@ npm --prefix frontend run dev
 
 Open <http://127.0.0.1:5173>.
 
-### What you can do in the UI
+### What you can do in the settlement UI (current)
+
+1. **Tạo hồ sơ** B3/B7, upload sources, reload, open the stored original.
+2. **Chạy kiểm tra** B3/B7 và xem report có căn cứ (unknown hiển thị "—", không
+   phải 0); trả lời câu hỏi đúng owner với nguồn, re-check mới resolve.
+3. **Hành động nghiệp vụ**: decision (người duyệt), review kế toán (không phải
+   phê duyệt), sự kiện tiền thực tế với incidents, Stop/resume, handoff, closure.
+4. **Verify panel** chạy bộ đánh giá settlement 20 packets qua cùng Service và
+   hiển thị expected/actual/verdict/metrics trung thực.
+
+### What you can do in the UI (earlier claim-processing app — historical)
 
 1. **Activate the demo policy** (enter a reason). The policy starts INACTIVE; the
    system will not auto-process anything until it is explicitly activated.
@@ -145,7 +164,33 @@ npm --prefix frontend run test -- --run
 npm --prefix frontend run build
 ```
 
-## Verify (offline corpus)
+## Verify (evaluation)
+
+**Settlement (current):** the 20-packet development corpus
+([index](docs/discovery/eval_development/CORPUS_INDEX.md)) runs sequentially
+through the same settlement `Service` the UI uses; expected lives only in the
+packet (hash-verified, never an input) and verdicts cover money, completion,
+links and state — not just the net.
+
+```bash
+.venv/bin/python -m invoice_referee.verify.settlement_cli                 # cả 20 packets
+.venv/bin/python -m invoice_referee.verify.settlement_cli --packets Q01,Q09
+```
+
+Artifacts (SuiteReport JSON: expected/actual/verdict/timestamp/mode +
+source/config hash) are written under `data/settlement/verify/` (Git-ignored).
+Exit code 0 means the measurement ran — a weak-but-truthful baseline is still a
+successful measurement; dataset/gate errors exit 2. The UI also exposes this as
+the **Verify** panel (`POST /api/verify/settlement/run`).
+
+Measured baseline (B1, mode `FAKE_OR_REPLAY`, 2026-10-09): routine 9 / needs 11,
+FN 0, FP 9 (khoảng bảo thủ 100%), U_routine 0, U_needs 1, first-pass routine
+completion **0/9**. The fake reader cannot read the corpus' narrative sources,
+so this number reflects reader capability, not settlement quality — live-mode
+quality measurement (M1/M2) is not done. The corpus is DEVELOPMENT_ONLY from a
+single template family: it is not an independent holdout.
+
+**Earlier claim-processing Verify (legacy reference):**
 
 ```bash
 .venv/bin/python -m invoice_referee.verify --suite core --mode replay --output data/verify
@@ -154,9 +199,8 @@ npm --prefix frontend run build
 ```
 
 `core` = TC01/03/04/11; `escalation` = TC01/02/03/06/11; `all` = the 15-case
-development corpus. Exit code is non-zero if any case FAILs. The runner drives the
-real `CaseService`; expected labels live only in `tests/fixtures/**/manifest.json`
-and the runner, never in the application path.
+development corpus of the historical app. This legacy runner is kept for
+comparison only and is not the accepted settlement evaluation.
 
 ## Policy
 

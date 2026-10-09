@@ -359,3 +359,53 @@ export interface ClosurePayload {
   kind: ClosureView['kind'];
   basis: string;
 }
+
+// --- W06: evaluation / Verify ---------------------------------------------------
+
+export interface VerifyCheck {
+  axis: string;
+  expected: unknown;
+  actual: unknown;
+  ok: boolean;
+  note: string;
+}
+
+export interface VerifyCaseResult {
+  case_id: string;
+  job: Job;
+  phase: 'INITIAL' | 'AFTER_FOLLOWUP';
+  family_id: string;
+  dataset_role: string;
+  verdict: 'PASS' | 'FAIL' | 'INCONCLUSIVE';
+  checks: VerifyCheck[];
+  run_id: string | null;
+  run_status: string | null;
+  mode: string;
+  needs_resolution_expected: boolean;
+  technical: boolean;
+  first_pass_routine_expected: boolean | null;
+  timestamp: string;
+}
+
+export interface VerifyMetrics {
+  n_routine: number;
+  n_needs: number;
+  fn: number;
+  fp: number;
+  u_routine: number;
+  u_needs: number;
+  fn_interval: [number, number] | null;
+  fp_interval: [number, number] | null;
+  routine_completion: string;
+}
+
+export interface VerifySuiteReport {
+  suite: string;
+  timestamp: string;
+  mode: string;
+  source_hash: string;
+  config_hash: string;
+  results: VerifyCaseResult[];
+  metrics: VerifyMetrics;
+  notes: string[];
+}
