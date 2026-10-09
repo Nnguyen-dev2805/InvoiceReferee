@@ -444,6 +444,46 @@ def _compare_initial(service: Service, packet: Packet, case_id: str,
         ok=not missing, note=f"File chưa nạp/tham chiếu: {sorted(missing)}.",
     ))
 
+    # axis facts: gold critical facts theo engine vocabulary, None-strict.
+    gold_facts = expected.get("critical_facts")
+    if isinstance(gold_facts, Mapping):
+        actual_facts = {f.key: (f.value if f.state == "KNOWN" else None)
+                        for f in report.critical_facts}
+        actual_view = {k: actual_facts.get(k) for k in gold_facts}
+        facts_ok = compare_money(gold_facts, actual_view) == "PASS"
+        checks.append(Check(
+            axis="facts", expected=dict(gold_facts), actual=actual_view,
+            ok=facts_ok,
+            note="Fact gold theo engine keys; None là unknown, không skip.",
+        ))
+
+    # axis relations: từng quan hệ đối chiếu phải ESTABLISHED và không extra.
+    gold_relations = expected.get("expected_relations")
+    if isinstance(gold_relations, list):
+        established = [l for l in report.links if l.status == "ESTABLISHED"]
+
+        def _same(gold: Mapping[str, Any], link) -> bool:
+            if link.kind != gold.get("kind") or link.from_id != gold.get("from") \
+                    or link.to_id != gold.get("to"):
+                return False
+            portion = gold.get("portion_vnd")
+            return portion is None or link.portion_vnd == portion
+
+        matched = [g for g in gold_relations if any(_same(g, l) for l in established)]
+        extra = [l.relation_id for l in established
+                 if not any(_same(g, l) for g in gold_relations)]
+        relations_ok = len(matched) == len(gold_relations) and not extra
+        checks.append(Check(
+            axis="relations",
+            expected=list(gold_relations),
+            actual={"established": [f"{l.kind}:{l.from_id}->{l.to_id}"
+                                   for l in established],
+                    "extra": extra},
+            ok=relations_ok,
+            note="Quan hệ gold phải ESTABLISHED đúng cặp/portion; extra "
+                 "wrong link làm case FAIL (E3).",
+        ))
+
     # axis state: không tự duyệt/đóng/tạo request sau run.
     allowed_true = [key for key in (
         "settlement_approved", "close_allowed", "request_creation_allowed",
@@ -584,12 +624,28 @@ def run_suite(corpus_dir: Path, service: Service,
             "B3 được chấm riêng theo trục completion/state; adapter money của "
             "harness v0 chỉ cover components B7."
         )
+    metrics = compute_metrics(metric_rows)
+    metrics["gold_coverage"] = {
+        "facts_business": sum(1 for p in packets
+                              if p.expected_initial.get("critical_facts_business")),
+        "relations_business": sum(
+            1 for p in packets
+            if p.expected_initial.get("reconciliation_relations_business")),
+    }
+    if metrics["gold_coverage"]["facts_business"] \
+            or metrics["gold_coverage"]["relations_business"]:
+        notes.append(
+            f"Gold critical facts/relations theo business vocabulary được khai "
+            f"báo ở {metrics['gold_coverage']['facts_business']}/"
+            f"{metrics['gold_coverage']['relations_business']} packet; chấm "
+            f"engine chờ reader mapping ids (M1) — không bỏ im lặng."
+        )
     return SuiteReport(
         suite=f"settlement-dev-{len(packets)}",
         timestamp=utcnow().isoformat(), mode=service.reader.mode,
         source_hash=_dataset_hash(discover_packets(Path(corpus_dir))),
         config_hash=_config_hash(service),
-        results=results, metrics=compute_metrics(metric_rows), notes=notes,
+        results=results, metrics=metrics, notes=notes,
     )
 
 

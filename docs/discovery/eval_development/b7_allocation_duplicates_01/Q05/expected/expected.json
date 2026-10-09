@@ -1,46 +1,152 @@
 {
-  "T_vnd": 5000000,
-  "B_vnd": 5000000,
-  "company_direct_vnd": 2000000,
-  "employee_actual_paid_vnd": 3000000,
-  "E_vnd": 3000000,
-  "A_vnd": 1000000,
-  "RA_vnd": 0,
-  "P_vnd": 0,
-  "RP_vnd": 0,
-  "S_vnd": 2000000,
-  "invoice_total_vnd": 5000000,
-  "expense_count": 1,
-  "payer_allocations": [
-    {
-      "payer": "ORG-DEMO-01",
-      "amount_vnd": 2000000,
-      "source": "input/expense_and_payment_sources.md#company-deposit-receipt"
-    },
-    {
-      "payer": "NV-DEMO-05",
-      "amount_vnd": 3000000,
-      "source": "input/expense_and_payment_sources.md#employee-balance-receipt"
-    }
-  ],
-  "company_direct_subtracted_twice": false,
-  "deduct_advance_as_new_expense": false,
-  "evidence_refs": [
-    "input/authority_and_pretrip.md#authority",
-    "input/authority_and_pretrip.md#pretrip-decision",
-    "input/expense_and_payment_sources.md#hotel-invoice",
-    "input/expense_and_payment_sources.md#company-deposit-receipt",
-    "input/expense_and_payment_sources.md#employee-balance-receipt",
-    "input/expense_and_payment_sources.md#advance-receipt",
+ "T_vnd": 5000000,
+ "B_vnd": 5000000,
+ "company_direct_vnd": 2000000,
+ "employee_actual_paid_vnd": 3000000,
+ "E_vnd": 3000000,
+ "A_vnd": 1000000,
+ "RA_vnd": 0,
+ "P_vnd": 0,
+ "RP_vnd": 0,
+ "S_vnd": 2000000,
+ "invoice_total_vnd": 5000000,
+ "expense_count": 1,
+ "payer_allocations": [
+  {
+   "payer": "ORG-DEMO-01",
+   "amount_vnd": 2000000,
+   "source": "input/expense_and_payment_sources.md#company-deposit-receipt"
+  },
+  {
+   "payer": "NV-DEMO-05",
+   "amount_vnd": 3000000,
+   "source": "input/expense_and_payment_sources.md#employee-balance-receipt"
+  }
+ ],
+ "company_direct_subtracted_twice": false,
+ "deduct_advance_as_new_expense": false,
+ "evidence_refs": [
+  "input/authority_and_pretrip.md#authority",
+  "input/authority_and_pretrip.md#pretrip-decision",
+  "input/expense_and_payment_sources.md#hotel-invoice",
+  "input/expense_and_payment_sources.md#company-deposit-receipt",
+  "input/expense_and_payment_sources.md#employee-balance-receipt",
+  "input/expense_and_payment_sources.md#advance-receipt",
+  "input/coverage_m1.md"
+ ],
+ "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+ "job": "B7",
+ "requires_extra_resolution": false,
+ "report_ready": true,
+ "settlement_approved": false,
+ "request_creation_allowed": false,
+ "bank_execution_allowed": false,
+ "close_allowed": false,
+ "as_of_money": "2026-10-08T18:00:00+07:00",
+ "critical_facts_business": [
+  {
+   "fact": "invoice.INV-HOTEL-05.total_vnd",
+   "value": 5000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-invoice"
+   ]
+  },
+  {
+   "fact": "payment.TX-DEP-05.payer",
+   "value": "COMPANY",
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#company-deposit-receipt"
+   ]
+  },
+  {
+   "fact": "payment.VENDOR-BAL-05.payer",
+   "value": "EMPLOYEE",
+   "refs": [
+    "input/expense_and_payment_sources.md#employee-balance-receipt"
+   ]
+  },
+  {
+   "fact": "event.TX-DEP-05.amount_vnd",
+   "value": 2000000,
+   "refs": [
+    "input/financial_events_m1.csv"
+   ]
+  },
+  {
+   "fact": "event.TX-ADV-05.amount_vnd",
+   "value": 1000000,
+   "refs": [
+    "input/financial_events_m1.csv"
+   ]
+  },
+  {
+   "fact": "advance.received_vnd",
+   "value": 1000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#advance-receipt"
+   ]
+  },
+  {
+   "fact": "advance.returned_vnd",
+   "value": 0,
+   "refs": [
     "input/coverage_m1.md"
-  ],
-  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
-  "job": "B7",
-  "requires_extra_resolution": false,
-  "report_ready": true,
-  "settlement_approved": false,
-  "request_creation_allowed": false,
-  "bank_execution_allowed": false,
-  "close_allowed": false,
-  "as_of_money": "2026-10-08T18:00:00+07:00"
+   ]
+  },
+  {
+   "fact": "reimbursement.received_vnd",
+   "value": 0,
+   "refs": [
+    "input/coverage_m1.md"
+   ]
+  },
+  {
+   "fact": "reimbursement.returned_vnd",
+   "value": 0,
+   "refs": [
+    "input/coverage_m1.md"
+   ]
+  },
+  {
+   "fact": "budget.approved_vnd",
+   "value": 8000000,
+   "refs": [
+    "input/authority_and_pretrip.md#pretrip-decision"
+   ]
+  }
+ ],
+ "reconciliation_relations_business": [
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "INV-HOTEL-05",
+   "payment": "TX-DEP-05",
+   "portion_vnd": 2000000,
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#company-deposit-receipt"
+   ],
+   "note": "company deposit"
+  },
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "INV-HOTEL-05",
+   "payment": "VENDOR-BAL-05",
+   "portion_vnd": 3000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#employee-balance-receipt"
+   ],
+   "note": "employee balance"
+  },
+  {
+   "kind": "SAME_EVENT",
+   "first": "TX-ADV-05",
+   "second": "RCV-ADV-05",
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#advance-receipt"
+   ],
+   "note": ""
+  }
+ ]
 }

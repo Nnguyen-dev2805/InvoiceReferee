@@ -1,44 +1,82 @@
 {
-  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
-  "job": "B3",
-  "phase": "INITIAL",
-  "as_of_money": "2026-10-03T10:00:00+07:00",
-  "declared_numbers": {
-    "declared_total_budget_vnd": 8000000,
-    "planned_company_direct_vnd": 3000000,
-    "declared_employee_plan_vnd": 4000000,
-    "sum_employee_items_vnd": 4000000,
-    "requested_advance_vnd": 2000000
+ "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+ "job": "B3",
+ "phase": "INITIAL",
+ "as_of_money": "2026-10-03T10:00:00+07:00",
+ "declared_numbers": {
+  "declared_total_budget_vnd": 8000000,
+  "planned_company_direct_vnd": 3000000,
+  "declared_employee_plan_vnd": 4000000,
+  "sum_employee_items_vnd": 4000000,
+  "requested_advance_vnd": 2000000
+ },
+ "previous_actual_advance_received_vnd": 0,
+ "future_requested_advance_received_vnd": null,
+ "settlement_profile_applied": false,
+ "settlement_amount_vnd": null,
+ "invoices_after_work_required": false,
+ "receipt_of_current_requested_advance_required_before_review": false,
+ "work_budget_decision_reusable": false,
+ "already_approved_budget_vnd": null,
+ "advance_approved": false,
+ "approved_advance_amount_vnd": null,
+ "request_creation_action_allowed": false,
+ "bank_execution_allowed": false,
+ "close_allowed": false,
+ "current_request_counts_as_previous_duplicate": false,
+ "evidence_refs": [
+  "input/authority_and_assignment.md#delegated-scope",
+  "input/authority_and_assignment.md#current-assignment",
+  "input/history_scope.md#history-scope",
+  "input/financial_history.csv"
+ ],
+ "requires_extra_resolution": true,
+ "check_report_complete": false,
+ "ready_for_normal_authorized_decisions": false,
+ "routine_first_pass": false,
+ "issue_type": "FACT_CONFLICT_ESTIMATE_SUM",
+ "intended_total_or_component_amount_unknown": true,
+ "allowed_owner_roles": [
+  "EMPLOYEE"
+ ],
+ "question_semantics_example": "REQ-ADV-03 ghi tổng8triệu nhưng company3+employee4=7triệu; hotel2+meal1+ground1=4 phùhợp employee4. Bạn xácđịnh tổng/phần nào cần sửa, nguồn/phạmvi phiênbản đềnghị? Không tự đổi total7 hoặcemployee5 để khớp. Người duyệt không waive sốhọc bằngapprove.",
+ "choose_last_or_convenient_amount_allowed": false,
+ "critical_facts_business": [
+  {
+   "fact": "request.requested_advance_vnd",
+   "value": 2000000,
+   "refs": [
+    "input/request_form.json"
+   ]
   },
-  "previous_actual_advance_received_vnd": 0,
-  "future_requested_advance_received_vnd": null,
-  "settlement_profile_applied": false,
-  "settlement_amount_vnd": null,
-  "invoices_after_work_required": false,
-  "receipt_of_current_requested_advance_required_before_review": false,
-  "work_budget_decision_reusable": false,
-  "already_approved_budget_vnd": null,
-  "advance_approved": false,
-  "approved_advance_amount_vnd": null,
-  "request_creation_action_allowed": false,
-  "bank_execution_allowed": false,
-  "close_allowed": false,
-  "current_request_counts_as_previous_duplicate": false,
-  "evidence_refs": [
-    "input/authority_and_assignment.md#delegated-scope",
-    "input/authority_and_assignment.md#current-assignment",
-    "input/history_scope.md#history-scope",
-    "input/financial_history.csv"
-  ],
-  "requires_extra_resolution": true,
-  "check_report_complete": false,
-  "ready_for_normal_authorized_decisions": false,
-  "routine_first_pass": false,
-  "issue_type": "FACT_CONFLICT_ESTIMATE_SUM",
-  "intended_total_or_component_amount_unknown": true,
-  "allowed_owner_roles": [
-    "EMPLOYEE"
-  ],
-  "question_semantics_example": "REQ-ADV-03 ghi tổng8triệu nhưng company3+employee4=7triệu; hotel2+meal1+ground1=4 phùhợp employee4. Bạn xácđịnh tổng/phần nào cần sửa, nguồn/phạmvi phiênbản đềnghị? Không tự đổi total7 hoặcemployee5 để khớp. Người duyệt không waive sốhọc bằngapprove.",
-  "choose_last_or_convenient_amount_allowed": false
+  {
+   "fact": "request.proposed_total_budget_vnd",
+   "value": 8000000,
+   "refs": [
+    "input/request_form.json"
+   ]
+  },
+  {
+   "fact": "request.planned_company_direct_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/request_form.json"
+   ]
+  },
+  {
+   "fact": "request.planned_employee_paid_vnd",
+   "value": 4000000,
+   "refs": [
+    "input/request_form.json"
+   ]
+  },
+  {
+   "fact": "request.estimate_conflict",
+   "value": null,
+   "refs": [
+    "input/request_form.json"
+   ]
+  }
+ ],
+ "reconciliation_relations_business": []
 }

@@ -192,12 +192,34 @@ export interface Report {
   components: ReportComponents;
   calculated_net_vnd: number | null;
   proposed_net_vnd: number | null;
+  direction: 'COMPANY_TO_EMPLOYEE' | 'EMPLOYEE_TO_COMPANY' | 'BALANCED' | null;
   conditional_results: ConditionalResult[];
   expense_rows: ExpenseRow[];
   checks: CheckResult[];
   issues: Issue[];
+  critical_facts: CriticalFact[];
+  links: ReportLink[];
   next_step: string;
   source_refs: string[];
+}
+
+export type CriticalFactState =
+  'KNOWN' | 'UNKNOWN' | 'CONTRADICTED' | 'UNCLEAR' | 'UNUSABLE';
+
+export interface CriticalFact {
+  key: string;
+  value: number | string | null;
+  state: CriticalFactState;
+  refs: string[];
+}
+
+export interface ReportLink {
+  relation_id: string;
+  kind: 'EXPENSE_PAYMENT' | 'SAME_EVENT';
+  from_id: string;
+  to_id: string;
+  portion_vnd: number | null;
+  status: 'ESTABLISHED' | 'PROPOSED' | 'UNCLEAR';
 }
 
 export interface StartRunPayload {

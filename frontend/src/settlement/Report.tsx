@@ -87,7 +87,74 @@ export function ReportPanel({ report }: { report: Report }) {
       <p>
         <strong>Calculated:</strong> {vnd(report.calculated_net_vnd)} ·{' '}
         <strong>Proposed (chưa duyệt, chưa chi):</strong> {vnd(report.proposed_net_vnd)}
+        {report.direction && (
+          <>
+            {' · '}
+            <strong>Chiều tiền:</strong>{' '}
+            {report.direction === 'COMPANY_TO_EMPLOYEE'
+              ? 'công ty chi cho nhân viên'
+              : report.direction === 'EMPLOYEE_TO_COMPANY'
+                ? 'nhân viên hoàn lại công ty'
+                : 'cân bằng (S = 0)'}
+          </>
+        )}
       </p>
+
+      {report.links.length > 0 && (
+        <>
+          <h3>Quan hệ đối chiếu</h3>
+          <table data-testid="report-links">
+            <thead>
+              <tr><th>Quan hệ</th><th> Từ → tới</th><th>Phần</th><th>Trạng thái</th></tr>
+            </thead>
+            <tbody>
+              {report.links.map((link) => (
+                <tr key={link.relation_id}>
+                  <td>{link.kind}</td>
+                  <td><code>{link.from_id}</code> → <code>{link.to_id}</code></td>
+                  <td>{vnd(link.portion_vnd)}</td>
+                  <td>{link.status === 'ESTABLISHED'
+                    ? 'đã xác lập'
+                    : `${link.status} — chưa dùng làm căn cứ tiền`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {report.critical_facts.length > 0 && (
+        <>
+          <h3>Critical facts (chất lượng nguồn)</h3>
+          <table data-testid="critical-facts">
+            <thead>
+              <tr><th>Fact</th><th>Giá trị</th><th>Trạng thái</th><th>Refs</th></tr>
+            </thead>
+            <tbody>
+              {report.critical_facts.map((fact) => (
+                <tr key={fact.key}>
+                  <td><code>{fact.key}</code></td>
+                  <td>{fact.value === null
+                    ? '—'
+                    : typeof fact.value === 'number'
+                      ? vnd(fact.value)
+                      : String(fact.value)}</td>
+                  <td>{fact.state === 'KNOWN'
+                    ? 'đã đọc rõ'
+                    : fact.state === 'CONTRADICTED'
+                      ? 'MÂU THUẪN — hai nguồn khác nhau, không chọn một'
+                      : fact.state === 'UNUSABLE'
+                        ? 'chất lượng không đủ'
+                        : fact.state === 'UNCLEAR'
+                          ? 'không đọc được'
+                          : 'chưa có'}</td>
+                  <td>{refs(fact.refs)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
       {report.conditional_results.length > 0 && (
         <ul className="reasons">
           {report.conditional_results.map((c) => (

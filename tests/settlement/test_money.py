@@ -183,3 +183,116 @@ def test_money_events_allowed_during_stop(approved_case, service):
     event = service.record_money(fresh.id, money_payload(fresh),
                                  money_command(fresh))
     assert event.gross_vnd == 2_000_000
+
+
+# --- regression: chiều thu tiền COLLECT_FROM_EMPLOYEE (W05.1) -----------------
+
+LEDGER_COLLECT = (
+    "fact F1 expense.EXP-1.amount 2000000\n"
+    "fact F2 expense.EXP-1.purpose BUSINESS\n"
+    "fact F3 payment.PAY-1.amount 2000000\n"
+    "fact F4 payment.PAY-1.payer EMPLOYEE\n"
+    "fact F5 payment.PAY-1.status RECEIVED\n"
+    "fact F6 budget.approved 8000000\n"
+    "fact F7 history.advance.received 5000000\n"
+    "fact F8 history.advance.returned 0\n"
+    "fact F9 history.reimbursement.received 0\n"
+    "fact F10 history.reimbursement.returned 0\n"
+    "rel R1 EXPENSE_PAYMENT EXP-1 PAY-1\n"
+)
+
+
+def test_collection_direction_fulfillment_and_closure(service, tmp_path):
+    # E=2M, A=5M → S=-3M: nhân viên hoàn lại 3M (EMPLOYEE_TO_COMPANY)
+    submission = Submission(employee_ref="NV-01", work_ref="CT-COLLECT",
+                            job="B7", money_as_of=_CUTOFF,
+                            knowledge_cutoff=_CUTOFF,
+                            form={"purpose": "Công tác B"})
+    case = service.submit(submission, Command(
+        key="cc", actor_id="NV-01", demo_role="EMPLOYEE",
+        expected_case_version=None, body={}))
+    service.add_source(case.id,
+                       Upload(filename="d.txt", content=LEDGER_COLLECT.encode()),
+                       Command(key="cs", actor_id="NV-01", demo_role="EMPLOYEE",
+                               expected_case_version=case.case_version, body={}))
+    view = service.get_case(case.id)
+    run = service.start(case.id, Command(
+        key="cr", actor_id="NV-01", demo_role="EMPLOYEE",
+        expected_case_version=view.case_version, body={}))
+    service.wait(run.id, timeout=10)
+    report = service.report(run.id)
+    assert report.calculated_net_vnd == -3_000_000
+    assert report.direction == "EMPLOYEE_TO_COMPANY"
+
+    fresh = service.get_case(case.id)
+    decision = service.decide(fresh.id, {
+        "kind": "SETTLEMENT", "amount_vnd": 3_000_000,
+        "direction": "COLLECT_FROM_EMPLOYEE", "reason": "thu lại phần ứng thừa",
+        "basis_report_id": fresh.current_run_id, "conditions": [],
+    }, Command(key="cdec", actor_id="P-DEMO", demo_role="APPROVER",
+               expected_case_version=fresh.case_version, body={}))
+    assert decision.direction == "COLLECT_FROM_EMPLOYEE"
+    summary = service.get_case(case.id).money_summary
+    assert summary["approved_vnd"] == 3_000_000
+    assert summary["received_vnd"] is None
+    assert summary["remaining_vnd"] == 3_000_000
+
+    # nhân viên nộp lại cho công ty → thực thu đủ, đóng được
+    paying = service.get_case(case.id)
+    event = service.record_money(paying.id, {
+        "event_ref": "EV-BACK", "kind": "PAYMENT_FROM_EMPLOYEE",
+        "gross_vnd": 3_000_000, "decision_id": decision.id,
+        "payee_ref": "ORG-DEMO-01", "event_at": "2026-10-08T12:00:00+00:00",
+        "reported_status": "RECEIVED", "refs": [],
+    }, Command(key="cm", actor_id="ACC-01", demo_role="ACCOUNTANT",
+               expected_case_version=paying.case_version, body={}))
+    assert event.gross_vnd == 3_000_000
+    summary = service.get_case(case.id).money_summary
+    assert summary["received_vnd"] == 3_000_000
+    assert summary["remaining_vnd"] == 0
+
+    final_view = service.get_case(case.id)
+    closure = service.close_case(final_view.id, {
+        "kind": "SETTLEMENT_COMPLETE",
+        "basis": "Đã thu đủ 3.000.000; remaining 0.",
+    }, Command(key="cclose", actor_id="ACC-01", demo_role="ACCOUNTANT",
+               expected_case_version=final_view.case_version, body={}))
+    assert closure.kind == "SETTLEMENT_COMPLETE"
+
+
+def test_collection_wrong_payee_keeps_incident(service, tmp_path):
+    submission = Submission(employee_ref="NV-01", work_ref="CT-COLLECT-BAD",
+                            job="B7", money_as_of=_CUTOFF,
+                            knowledge_cutoff=_CUTOFF,
+                            form={"purpose": "Công tác B"})
+    case = service.submit(submission, Command(
+        key="cc", actor_id="NV-01", demo_role="EMPLOYEE",
+        expected_case_version=None, body={}))
+    service.add_source(case.id,
+                       Upload(filename="d.txt", content=LEDGER_COLLECT.encode()),
+                       Command(key="cs", actor_id="NV-01", demo_role="EMPLOYEE",
+                               expected_case_version=case.case_version, body={}))
+    view = service.get_case(case.id)
+    run = service.start(case.id, Command(
+        key="cr", actor_id="NV-01", demo_role="EMPLOYEE",
+        expected_case_version=view.case_version, body={}))
+    service.wait(run.id, timeout=10)
+    fresh = service.get_case(case.id)
+    service.decide(fresh.id, {
+        "kind": "SETTLEMENT", "amount_vnd": 3_000_000,
+        "direction": "COLLECT_FROM_EMPLOYEE", "reason": "thu lại",
+        "basis_report_id": fresh.current_run_id, "conditions": [],
+    }, Command(key="cdec", actor_id="P-DEMO", demo_role="APPROVER",
+               expected_case_version=fresh.case_version, body={}))
+    paying = service.get_case(case.id)
+    # nộp về chính mình (payee = nhân viên) → không tính fulfilled, giữ incident
+    service.record_money(paying.id, {
+        "event_ref": "EV-SELF", "kind": "PAYMENT_FROM_EMPLOYEE",
+        "gross_vnd": 3_000_000, "decision_id": None, "payee_ref": "NV-01",
+        "event_at": "2026-10-08T12:00:00+00:00",
+        "reported_status": "RECEIVED", "refs": [],
+    }, Command(key="cm", actor_id="ACC-01", demo_role="ACCOUNTANT",
+               expected_case_version=paying.case_version, body={}))
+    summary = service.get_case(case.id).money_summary
+    assert summary["received_vnd"] is None
+    assert any(i["kind"] == "WRONG_RECIPIENT" for i in summary["incidents"])

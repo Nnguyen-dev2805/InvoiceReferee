@@ -194,3 +194,97 @@ def test_closure_blocked_by_open_question(service):
         service.close_case(view.id, {"kind": "SETTLEMENT_COMPLETE",
                                      "basis": "x"}, close_command(view))
     assert error.value.code == "CLOSURE_BLOCKED"
+
+
+# --- regression: khoá lỗi closure (W05.1) --------------------------------------
+
+def test_closure_blocked_by_overpay_incident(service):
+    # duyệt 3, thực nhận 4 → OVERPAY incident còn mở → không đóng
+    case = make_case(service, "CT-CLOSE-OVER", LEDGER_BALANCED)
+    fresh = service.get_case(case.id)
+    service.decide(fresh.id, {
+        "kind": "SETTLEMENT", "amount_vnd": 3_000_000,
+        "direction": "PAY_EMPLOYEE", "reason": "duyệt",
+        "basis_report_id": fresh.current_run_id, "conditions": [],
+    }, Command(key="dec", actor_id="P-DEMO", demo_role="APPROVER",
+               expected_case_version=fresh.case_version, body={}))
+    view = service.get_case(case.id)
+    service.record_money(view.id, {
+        "event_ref": "EV-OVER", "kind": "PAYMENT_TO_EMPLOYEE",
+        "gross_vnd": 4_000_000, "decision_id": None, "payee_ref": "NV-01",
+        "event_at": "2026-10-08T12:00:00+00:00",
+        "reported_status": "RECEIVED", "refs": [],
+    }, Command(key="m", actor_id="ACC-01", demo_role="ACCOUNTANT",
+               expected_case_version=view.case_version, body={}))
+    blocked_view = service.get_case(case.id)
+    with pytest.raises(DomainError) as error:
+        service.close_case(blocked_view.id, {"kind": "SETTLEMENT_COMPLETE",
+                                             "basis": "x"},
+                           close_command(blocked_view))
+    assert error.value.code == "CLOSURE_BLOCKED"
+    assert "incident" in error.value.message.lower()
+
+
+def test_rejected_request_end_blocked_when_money_already_received(service):
+    # từ chối đề nghị nhưng đã có tiền thực nhận → không được kết thúc kiểu từ chối
+    case = make_case(service, "CT-CLOSE-REF-MONEY", LEDGER_BALANCED)
+    fresh = service.get_case(case.id)
+    service.decide(fresh.id, {
+        "kind": "SETTLEMENT", "amount_vnd": None, "direction": "REFUSE",
+        "reason": "ngoài phạm vi", "basis_report_id": fresh.current_run_id,
+        "conditions": [],
+    }, Command(key="dec", actor_id="P-DEMO", demo_role="APPROVER",
+               expected_case_version=fresh.case_version, body={}))
+    view = service.get_case(case.id)
+    service.record_money(view.id, {
+        "event_ref": "EV-REF", "kind": "PAYMENT_TO_EMPLOYEE",
+        "gross_vnd": 1_000_000, "decision_id": None, "payee_ref": "NV-01",
+        "event_at": "2026-10-08T12:00:00+00:00",
+        "reported_status": "RECEIVED", "refs": [],
+    }, Command(key="m", actor_id="ACC-01", demo_role="ACCOUNTANT",
+               expected_case_version=view.case_version, body={}))
+    blocked_view = service.get_case(case.id)
+    with pytest.raises(DomainError) as error:
+        service.close_case(blocked_view.id, {"kind": "REJECTED_REQUEST_ENDED",
+                                             "basis": "x"},
+                           close_command(blocked_view))
+    assert error.value.code == "CLOSURE_BLOCKED"
+
+
+def test_money_and_handoff_after_close_are_blocked(service):
+    case = make_case(service, "CT-CLOSE-AFTER", LEDGER_BALANCED)
+    view = service.get_case(case.id)
+    decision = service.decide(view.id, {
+        "kind": "SETTLEMENT", "amount_vnd": 3_000_000,
+        "direction": "PAY_EMPLOYEE", "reason": "duyệt",
+        "basis_report_id": view.current_run_id, "conditions": [],
+    }, Command(key="dec", actor_id="P-DEMO", demo_role="APPROVER",
+               expected_case_version=view.case_version, body={}))
+    fresh = service.get_case(case.id)
+    service.record_money(fresh.id, {
+        "event_ref": "EV-FULL", "kind": "PAYMENT_TO_EMPLOYEE",
+        "gross_vnd": 3_000_000, "decision_id": decision.id,
+        "payee_ref": "NV-01", "event_at": "2026-10-08T12:00:00+00:00",
+        "reported_status": "RECEIVED", "refs": [],
+    }, Command(key="m", actor_id="ACC-01", demo_role="ACCOUNTANT",
+               expected_case_version=fresh.case_version, body={}))
+    paid = service.get_case(case.id)
+    service.close_case(paid.id, {"kind": "SETTLEMENT_COMPLETE", "basis": "đủ"},
+                       close_command(paid))
+    closed_view = service.get_case(case.id)
+    with pytest.raises(DomainError) as error:
+        service.record_money(closed_view.id, {
+            "event_ref": "EV-LATE", "kind": "PAYMENT_TO_EMPLOYEE",
+            "gross_vnd": 1_000_000, "decision_id": None, "payee_ref": "NV-01",
+            "event_at": "2026-10-08T13:00:00+00:00",
+            "reported_status": "RECEIVED", "refs": [],
+        }, Command(key="m2", actor_id="ACC-01", demo_role="ACCOUNTANT",
+                   expected_case_version=closed_view.case_version, body={}))
+    assert error.value.code == "CASE_CLOSED"
+    with pytest.raises(DomainError) as error:
+        service.handoff(closed_view.id, {"decision_id": decision.id},
+                        Command(key="h", actor_id="ACC-01",
+                                demo_role="ACCOUNTANT",
+                                expected_case_version=closed_view.case_version,
+                                body={}))
+    assert error.value.code == "CASE_CLOSED"

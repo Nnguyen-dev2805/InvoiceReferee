@@ -198,6 +198,62 @@ def test_run_suite_routine_pass_and_wrong_oracle_fail(service, tmp_path):
     assert metrics["routine_completion"] == "1/2"
 
 
+def test_run_suite_scores_critical_fact_and_relation_gold(service, tmp_path):
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    write_packet(corpus, "EPF1", ledger=LEDGER_ROUTINE,
+                 expected=routine_expected(
+                     critical_facts={
+                         "expense.EXP-1.amount": 5_000_000,
+                         "history.advance.received": 2_000_000,
+                         "history.reimbursement.received": 0,
+                     },
+                     expected_relations=[{
+                         "kind": "EXPENSE_PAYMENT",
+                         "from": "EXP-1", "to": "PAY-1",
+                         "portion_vnd": None,
+                     }]))
+    report = run_suite(corpus, service)
+    result = report.results[0]
+    axes = {c.axis: c for c in result.checks}
+    assert result.verdict == "PASS"
+    assert axes["facts"].ok and axes["relations"].ok
+    assert axes["facts"].actual["expense.EXP-1.amount"] == 5_000_000
+
+    # gold relation sai cặp + fact sai số → FAIL cả hai axis
+    write_packet(corpus, "EPF2", ledger=LEDGER_ROUTINE,
+                 expected=routine_expected(
+                     critical_facts={"expense.EXP-1.amount": 9_000_000},
+                     expected_relations=[{
+                         "kind": "EXPENSE_PAYMENT",
+                         "from": "EXP-1", "to": "PAY-9",
+                         "portion_vnd": None,
+                     }]))
+    report = run_suite(corpus, service, packet_ids=["EPF2"])
+    failed = {c.axis: c.ok for c in report.results[0].checks}
+    assert failed.get("facts") is False and failed.get("relations") is False
+    assert report.results[0].verdict == "FAIL"
+
+
+def test_run_suite_counts_business_gold_coverage(service, tmp_path):
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    write_packet(corpus, "EPG1", ledger=LEDGER_ROUTINE, expected=routine_expected(
+        critical_facts_business=[
+            {"fact": "air_invoice_total_vnd", "value": 3_000_000,
+             "refs": ["input/ledger.txt"]}],
+        reconciliation_relations_business=[
+            {"expense": "INV-AIR-001", "payment": "PAY-AIR-001",
+             "kind": "EXPENSE_PAYMENT"}],
+    ))
+    report = run_suite(corpus, service)
+    # gold business vocabulary được ghi nhận, không bị bỏ im lặng; chấm engine
+    # chờ reader mapping (M1)
+    assert report.metrics["gold_coverage"] == {
+        "facts_business": 1, "relations_business": 1}
+    assert any("business vocabulary" in note for note in report.notes)
+
+
 def test_run_suite_needs_case_must_not_fabricate(service, tmp_path):
     corpus = tmp_path / "corpus"
     corpus.mkdir()

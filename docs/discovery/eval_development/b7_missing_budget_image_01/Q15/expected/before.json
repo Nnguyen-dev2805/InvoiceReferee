@@ -1,37 +1,192 @@
 {
-  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
-  "phase": "INITIAL",
-  "requires_extra_resolution": true,
-  "issue_type": "OUTSIDE_POLICY_PRIOR_BUDGET_ABSENT_POST_ACCEPTANCE_REQUIRED",
-  "fact_uncertainty": false,
-  "authority_sufficient_for_post_acceptance": true,
-  "budget_vnd": null,
-  "authority_scope_amount_vnd": 8000000,
-  "T_verified_vnd": 8000000,
-  "employee_paid_verified_vnd": 5000000,
-  "company_direct_vnd": 3000000,
-  "A_vnd": 0,
-  "RA_vnd": 0,
-  "P_vnd": 0,
-  "RP_vnd": 0,
-  "E_final_vnd": null,
-  "S_final_vnd": null,
-  "S_if_costs_accepted_vnd": 5000000,
-  "allowed_owner_roles": [
-    "AUTHORIZED_APPROVER"
-  ],
-  "question_semantics_example": "CT-DEMO-02 đượcphép côngtác nhưng chưa cóB hoặc quyếtđịnhchấpnhận chi phí. Sources cho thấyT8, companypaid3, employee5, khôngứng/hoàntrước cócăn cứ. APR-DEMO-01 cóquyềnxét sauphátsinh theoAUTH-POST-02: chấpnhận khoản/phần nào và quyếtđịnh chi tươngứng? Không bắt nhânviên tạoB/ngân sách hoặc khoảnứng giả.",
-  "financial_approval_allowed_without_acceptance": false,
-  "automatic_reject_due_only_to_missing_budget": false,
-  "authority_amount_is_budget": false,
-  "request_creation_allowed": false,
-  "bank_execution_allowed": false,
-  "close_allowed": false,
-  "evidence_refs": [
-    "input/authority_and_pretrip.md#authority",
-    "input/authority_and_pretrip.md#pretrip-decision",
-    "input/coverage_m1.md#decision-history",
-    "input/employee_claim.md",
-    "input/expense_and_payment_sources.md"
-  ]
+ "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+ "phase": "INITIAL",
+ "requires_extra_resolution": true,
+ "issue_type": "OUTSIDE_POLICY_PRIOR_BUDGET_ABSENT_POST_ACCEPTANCE_REQUIRED",
+ "fact_uncertainty": false,
+ "authority_sufficient_for_post_acceptance": true,
+ "budget_vnd": null,
+ "authority_scope_amount_vnd": 8000000,
+ "T_verified_vnd": 8000000,
+ "employee_paid_verified_vnd": 5000000,
+ "company_direct_vnd": 3000000,
+ "A_vnd": 0,
+ "RA_vnd": 0,
+ "P_vnd": 0,
+ "RP_vnd": 0,
+ "E_final_vnd": null,
+ "S_final_vnd": null,
+ "S_if_costs_accepted_vnd": 5000000,
+ "allowed_owner_roles": [
+  "AUTHORIZED_APPROVER"
+ ],
+ "question_semantics_example": "CT-DEMO-02 đượcphép côngtác nhưng chưa cóB hoặc quyếtđịnhchấpnhận chi phí. Sources cho thấyT8, companypaid3, employee5, khôngứng/hoàntrước cócăn cứ. APR-DEMO-01 cóquyềnxét sauphátsinh theoAUTH-POST-02: chấpnhận khoản/phần nào và quyếtđịnh chi tươngứng? Không bắt nhânviên tạoB/ngân sách hoặc khoảnứng giả.",
+ "financial_approval_allowed_without_acceptance": false,
+ "automatic_reject_due_only_to_missing_budget": false,
+ "authority_amount_is_budget": false,
+ "request_creation_allowed": false,
+ "bank_execution_allowed": false,
+ "close_allowed": false,
+ "evidence_refs": [
+  "input/authority_and_pretrip.md#authority",
+  "input/authority_and_pretrip.md#pretrip-decision",
+  "input/coverage_m1.md#decision-history",
+  "input/employee_claim.md",
+  "input/expense_and_payment_sources.md"
+ ],
+ "critical_facts_business": [
+  {
+   "fact": "invoice.INV-AIR-02.total_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#air-invoice"
+   ]
+  },
+  {
+   "fact": "payment.PAY-AIR-02.payer",
+   "value": "COMPANY",
+   "refs": [
+    "input/expense_and_payment_sources.md#air-receipt"
+   ]
+  },
+  {
+   "fact": "invoice.INV-HOTEL-02.total_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-invoice"
+   ]
+  },
+  {
+   "fact": "payment.PAY-HOTEL-02.payer",
+   "value": "EMPLOYEE",
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-payment"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-MEAL-02.total_vnd",
+   "value": 1000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#meal-receipt"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-MEAL-02.payer",
+   "value": "EMPLOYEE",
+   "refs": [
+    "input/expense_and_payment_sources.md#meal-receipt",
+    "input/employee_claim.md#cash-attestation"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-GROUND-02.total_vnd",
+   "value": 1000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#ground-receipt"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-GROUND-02.payer",
+   "value": "EMPLOYEE",
+   "refs": [
+    "input/expense_and_payment_sources.md#ground-receipt"
+   ]
+  },
+  {
+   "fact": "event.TX-AIR-02.amount_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/financial_events_m1.csv"
+   ]
+  },
+  {
+   "fact": "advance.received_vnd",
+   "value": 0,
+   "refs": [
+    "input/employee_claim.md#employee-scope"
+   ]
+  },
+  {
+   "fact": "advance.returned_vnd",
+   "value": 0,
+   "refs": [
+    "input/employee_claim.md#employee-scope"
+   ]
+  },
+  {
+   "fact": "reimbursement.received_vnd",
+   "value": 0,
+   "refs": [
+    "input/employee_claim.md#employee-scope"
+   ]
+  },
+  {
+   "fact": "reimbursement.returned_vnd",
+   "value": 0,
+   "refs": [
+    "input/employee_claim.md#employee-scope"
+   ]
+  },
+  {
+   "fact": "budget.approved_vnd",
+   "value": null,
+   "refs": [
+    "input/authority_and_pretrip.md#pretrip-decision"
+   ]
+  }
+ ],
+ "reconciliation_relations_business": [
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "INV-AIR-02",
+   "payment": "TX-AIR-02",
+   "portion_vnd": 3000000,
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#air-receipt"
+   ],
+   "note": "company direct"
+  },
+  {
+   "kind": "SAME_EVENT",
+   "first": "TX-AIR-02",
+   "second": "PAY-AIR-02",
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#air-receipt"
+   ],
+   "note": ""
+  },
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "INV-HOTEL-02",
+   "payment": "PAY-HOTEL-02",
+   "portion_vnd": 3000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-payment"
+   ],
+   "note": "employee"
+  },
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "RCPT-MEAL-02",
+   "payment": "RCPT-MEAL-02-cash",
+   "portion_vnd": 1000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#meal-receipt",
+    "input/employee_claim.md#cash-attestation"
+   ],
+   "note": "employee cash"
+  },
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "RCPT-GROUND-02",
+   "payment": "RCPT-GROUND-02-cash",
+   "portion_vnd": 1000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#ground-receipt"
+   ],
+   "note": "employee cash"
+  }
+ ]
 }

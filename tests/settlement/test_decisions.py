@@ -212,3 +212,73 @@ def test_review_is_recorded_not_approval(complete_case, service):
                    expected_case_version=service.get_case(view.id).case_version,
                    body={}))
     assert error.value.code == "REVIEW_NOT_APPROVAL"
+
+
+# --- regression: duyệt phải đứng trên đúng basis (W05.1) ----------------------
+
+def _make_case_with_run(service, work_ref: str):
+    submission = Submission(employee_ref="NV-01", work_ref=work_ref, job="B7",
+                            money_as_of=_CUTOFF, knowledge_cutoff=_CUTOFF,
+                            form={"purpose": "Công tác A"})
+    case = service.submit(submission, Command(
+        key=f"c-{work_ref}", actor_id="NV-01", demo_role="EMPLOYEE",
+        expected_case_version=None, body={}))
+    service.add_source(case.id, Upload(filename="d.txt", content=LEDGER.encode()),
+                       Command(key=f"s-{work_ref}", actor_id="NV-01",
+                               demo_role="EMPLOYEE",
+                               expected_case_version=case.case_version, body={}))
+    view = service.get_case(case.id)
+    run = service.start(case.id, Command(
+        key=f"r-{work_ref}", actor_id="NV-01", demo_role="EMPLOYEE",
+        expected_case_version=view.case_version, body={}))
+    service.wait(run.id, timeout=10)
+    return service.get_case(case.id)
+
+
+def test_decision_rejects_basis_run_of_another_case(complete_case, service):
+    other = _make_case_with_run(service, "CT-OTHER")
+    view = service.get_case(complete_case.id)
+    # duyệt hồ sơ này nhưng basis là run của hồ sơ khác → từ chối
+    with pytest.raises(DomainError) as error:
+        service.decide(view.id,
+                       decision_payload(view, basis_report_id=other.current_run_id),
+                       approver_command(view))
+    assert error.value.code == "BASIS_MISMATCH"
+
+
+def test_decision_rejects_basis_run_not_succeeded(tmp_path):
+    from invoice_referee.settlement.reader import StructuredLedgerReader
+    from invoice_referee.settlement.models import AuthorityGrant
+
+    class BudgetOutReader(StructuredLedgerReader):
+        def read(self, source, keys, budget):
+            raise DomainError("BUDGET_EXHAUSTED", "hết lượt gọi; không bịa.")
+
+    store = Store(tmp_path / "cases.sqlite", tmp_path / "artifacts")
+    service = Service(store, BudgetOutReader(store.artifact_root),
+                      config=ServiceConfig(authority=[
+                          AuthorityGrant(actor_ref="P-DEMO", work_ref=None,
+                                         max_settlement_vnd=10_000_000)]))
+    case = _make_case_with_run(service, "CT-FAILED-RUN")
+    assert service.get_run(case.current_run_id).status != "SUCCEEDED"
+    view = service.get_case(case.id)
+    with pytest.raises(DomainError) as error:
+        service.decide(view.id,
+                       decision_payload(view, amount_vnd=None, direction="REFUSE"),
+                       approver_command(view))
+    assert error.value.code == "BASIS_MISMATCH"
+
+
+def test_decision_rejects_stale_basis_after_input_change(complete_case, service):
+    view = service.get_case(complete_case.id)
+    old_run = view.current_run_id
+    service.add_source(view.id, Upload(
+        filename="extra.txt", content=b"fact Z budget.approved 9000000\n"),
+        Command(key="s-stale", actor_id="NV-01", demo_role="EMPLOYEE",
+                expected_case_version=view.case_version, body={}))
+    fresh = service.get_case(view.id)
+    # input đã đổi: duyệt trên report cũ phải bị chặn cho tới khi re-check
+    with pytest.raises(DomainError) as error:
+        service.decide(fresh.id, decision_payload(fresh, basis_report_id=old_run),
+                       approver_command(fresh))
+    assert error.value.code == "BASIS_STALE"

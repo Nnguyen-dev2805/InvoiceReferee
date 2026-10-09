@@ -744,7 +744,27 @@ class Store:
                     "Hồ sơ đang Stop; không ghi quyết định mới.",
                 )
             self._check_version(case, command)
-            self._run_row(conn, payload.basis_report_id)  # basis phải là run có thật
+            run = self._run_row(conn, payload.basis_report_id)  # basis có thật
+            if run["case_id"] != case_id:
+                raise DomainError(
+                    "BASIS_MISMATCH",
+                    f"Run basis {payload.basis_report_id} thuộc hồ sơ khác "
+                    f"({run['case_id']}); quyết định không được dựng trên "
+                    f"report của hồ sơ khác.",
+                )
+            if run["status"] != "SUCCEEDED":
+                raise DomainError(
+                    "BASIS_MISMATCH",
+                    f"Run basis {payload.basis_report_id} chưa SUCCEEDED "
+                    f"({run['status']}); không duyệt trên report chưa sẵn sàng.",
+                )
+            if (case["current_run_id"] != payload.basis_report_id
+                    or run["input_revision"] != case["input_revision"]):
+                raise DomainError(
+                    "BASIS_STALE",
+                    "Report basis đã cũ (input đã đổi hoặc run khác là current); "
+                    "re-check trước khi duyệt, không duyệt trên basis cũ.",
+                )
             decision_id = f"D-{uuid.uuid4().hex[:12]}"
             now = _iso(utcnow())
             decision = {
@@ -1037,12 +1057,20 @@ class Store:
 
     def _money_summary(self, conn: sqlite3.Connection,
                        case: sqlite3.Row) -> MoneySummary:
-        """Approved vs actual: latest decision approval, RECEIVED events only."""
+        """Approved vs actual per direction; gross truth, never clipped.
+
+        PAY_EMPLOYEE counts PAYMENT_TO_EMPLOYEE events received by the
+        employee; COLLECT_FROM_EMPLOYEE counts PAYMENT_FROM_EMPLOYEE events
+        received back (payee = the employee returning to themself is a
+        WRONG_RECIPIENT incident, not fulfillment).
+        """
         approved: int | None = None
+        direction: str | None = None
         latest = self._latest_decision_payload(conn, case["id"])
         if latest is not None and latest.get("amount_vnd") is not None \
                 and latest.get("direction") != "REFUSE":
             approved = latest["amount_vnd"]
+            direction = latest.get("direction")
         employee_ref = _load(case["submission_json"])["employee_ref"]
         received: int | None = None
         pending = 0
@@ -1053,15 +1081,26 @@ class Store:
             event = _load(event_row["payload_json"])
             if event["reported_status"] == "PENDING":
                 pending += 1
-            if event["kind"] != "PAYMENT_TO_EMPLOYEE":
-                continue
-            if event["payee_ref"] != employee_ref:
-                incidents.append(MoneyIncident(
-                    kind="WRONG_RECIPIENT", event_ref=event["event_ref"],
-                    payee_ref=event["payee_ref"]))
-                continue
-            if event["reported_status"] == "RECEIVED":
-                received = (received or 0) + event["gross_vnd"]
+            if direction == "COLLECT_FROM_EMPLOYEE":
+                if event["kind"] != "PAYMENT_FROM_EMPLOYEE":
+                    continue
+                if event["payee_ref"] == employee_ref:
+                    incidents.append(MoneyIncident(
+                        kind="WRONG_RECIPIENT", event_ref=event["event_ref"],
+                        payee_ref=event["payee_ref"]))
+                    continue
+                if event["reported_status"] == "RECEIVED":
+                    received = (received or 0) + event["gross_vnd"]
+            else:
+                if event["kind"] != "PAYMENT_TO_EMPLOYEE":
+                    continue
+                if event["payee_ref"] != employee_ref:
+                    incidents.append(MoneyIncident(
+                        kind="WRONG_RECIPIENT", event_ref=event["event_ref"],
+                        payee_ref=event["payee_ref"]))
+                    continue
+                if event["reported_status"] == "RECEIVED":
+                    received = (received or 0) + event["gross_vnd"]
         remaining: int | None = None
         if approved is not None:
             actual = received or 0
@@ -1089,6 +1128,10 @@ class Store:
             blockers.append(
                 "Đã có quyết định duyệt số tiền; không thể kết thúc như "
                 "yêu cầu bị từ chối.")
+        if kind == "REJECTED_REQUEST_ENDED" and summary.received_vnd is not None:
+            blockers.append(
+                "Đã có tiền thực nhận; không được kết thúc hồ sơ như yêu cầu "
+                "bị từ chối — phải xử lý nghĩa vụ tiền đã nhận.")
         if summary.pending_events:
             blockers.append(
                 f"Còn {summary.pending_events} sự kiện tiền ở trạng thái PENDING.")

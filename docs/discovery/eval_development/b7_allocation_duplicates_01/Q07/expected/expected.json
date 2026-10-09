@@ -1,50 +1,253 @@
 {
-  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
-  "job": "B7",
-  "as_of_money": "2026-10-08T18:00:00+07:00",
-  "B_vnd": 8000000,
-  "T_vnd": 8000000,
-  "company_direct_vnd": 3000000,
-  "employee_actual_paid_vnd": 5000000,
-  "E_vnd": 5000000,
-  "A_vnd": 2000000,
-  "RA_vnd": 0,
-  "P_vnd": 0,
-  "RP_vnd": 0,
-  "S_vnd": 3000000,
-  "expense_count": 4,
-  "current_company_money_event_count": 2,
-  "requires_extra_resolution": false,
-  "report_ready": true,
-  "settlement_approved": false,
-  "request_creation_allowed": false,
-  "bank_execution_allowed": false,
-  "close_allowed": false,
-  "same_event_aliases": [
-    {
-      "company_event_ref": "TX-AIR-001",
-      "bank_namespace": "BANK-DEMO-A",
-      "bank_ref": "BNK-A44",
-      "booking_ref": "BOOK-DEMO-01"
-    }
-  ],
-  "other_work_event_not_current_cost_or_payment": {
-    "bank_ref": "BNK-A45",
-    "company_event_ref": "TX-AIR-OTHER-99",
-    "booking_ref": "BOOK-OTHER-99",
-    "work_ref": "CT-DEMO-99"
+ "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+ "job": "B7",
+ "as_of_money": "2026-10-08T18:00:00+07:00",
+ "B_vnd": 8000000,
+ "T_vnd": 8000000,
+ "company_direct_vnd": 3000000,
+ "employee_actual_paid_vnd": 5000000,
+ "E_vnd": 5000000,
+ "A_vnd": 2000000,
+ "RA_vnd": 0,
+ "P_vnd": 0,
+ "RP_vnd": 0,
+ "S_vnd": 3000000,
+ "expense_count": 4,
+ "current_company_money_event_count": 2,
+ "requires_extra_resolution": false,
+ "report_ready": true,
+ "settlement_approved": false,
+ "request_creation_allowed": false,
+ "bank_execution_allowed": false,
+ "close_allowed": false,
+ "same_event_aliases": [
+  {
+   "company_event_ref": "TX-AIR-001",
+   "bank_namespace": "BANK-DEMO-A",
+   "bank_ref": "BNK-A44",
+   "booking_ref": "BOOK-DEMO-01"
+  }
+ ],
+ "other_work_event_not_current_cost_or_payment": {
+  "bank_ref": "BNK-A45",
+  "company_event_ref": "TX-AIR-OTHER-99",
+  "booking_ref": "BOOK-OTHER-99",
+  "work_ref": "CT-DEMO-99"
+ },
+ "duplicate_supplier_file_is_new_expense": false,
+ "merge_equal_amount_date_without_relation": false,
+ "retain_all_source_refs": true,
+ "evidence_refs": [
+  "input/expense_and_payment_sources.md",
+  "input/supplier_documents_copy.md",
+  "input/financial_events_m1.csv",
+  "input/bank_statement_excerpt.md#current-bank-row",
+  "input/bank_statement_excerpt.md#other-bank-row",
+  "input/finance_bank_correspondence.csv",
+  "input/export_scope.md#reference-scope",
+  "input/coverage_m1.md"
+ ],
+ "critical_facts_business": [
+  {
+   "fact": "invoice.INV-AIR-001.total_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#air-invoice"
+   ]
   },
-  "duplicate_supplier_file_is_new_expense": false,
-  "merge_equal_amount_date_without_relation": false,
-  "retain_all_source_refs": true,
-  "evidence_refs": [
-    "input/expense_and_payment_sources.md",
-    "input/supplier_documents_copy.md",
-    "input/financial_events_m1.csv",
-    "input/bank_statement_excerpt.md#current-bank-row",
-    "input/bank_statement_excerpt.md#other-bank-row",
-    "input/finance_bank_correspondence.csv",
-    "input/export_scope.md#reference-scope",
+  {
+   "fact": "payment.PAY-AIR-001.payer",
+   "value": "COMPANY",
+   "refs": [
+    "input/expense_and_payment_sources.md#air-receipt"
+   ]
+  },
+  {
+   "fact": "invoice.INV-HOTEL-001.total_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-invoice"
+   ]
+  },
+  {
+   "fact": "payment.PAY-HOTEL-001.amount_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-payment"
+   ]
+  },
+  {
+   "fact": "payment.PAY-HOTEL-001.payer",
+   "value": "EMPLOYEE",
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-payment"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-MEAL-001.total_vnd",
+   "value": 1000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#meal-receipt"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-MEAL-001.payer",
+   "value": "EMPLOYEE",
+   "refs": [
+    "input/expense_and_payment_sources.md#meal-receipt",
+    "input/employee_claim.md#cash-attestation"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-GROUND-001.total_vnd",
+   "value": 1000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#ground-receipt"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-GROUND-001.payer",
+   "value": "EMPLOYEE",
+   "refs": [
+    "input/expense_and_payment_sources.md#ground-receipt"
+   ]
+  },
+  {
+   "fact": "event.TX-AIR-001.amount_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/financial_events_m1.csv"
+   ]
+  },
+  {
+   "fact": "event.TX-ADV-001.amount_vnd",
+   "value": 2000000,
+   "refs": [
+    "input/financial_events_m1.csv"
+   ]
+  },
+  {
+   "fact": "advance.received_vnd",
+   "value": 2000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#advance-receipt"
+   ]
+  },
+  {
+   "fact": "advance.returned_vnd",
+   "value": 0,
+   "refs": [
     "input/coverage_m1.md"
-  ]
+   ]
+  },
+  {
+   "fact": "reimbursement.received_vnd",
+   "value": 0,
+   "refs": [
+    "input/coverage_m1.md"
+   ]
+  },
+  {
+   "fact": "reimbursement.returned_vnd",
+   "value": 0,
+   "refs": [
+    "input/coverage_m1.md"
+   ]
+  },
+  {
+   "fact": "budget.approved_vnd",
+   "value": 8000000,
+   "refs": [
+    "input/authority_and_pretrip.md#pretrip-decision"
+   ]
+  },
+  {
+   "fact": "event.TX-AIR-OTHER-99.belongs_to_work",
+   "value": "CT-DEMO-99",
+   "refs": [
+    "input/bank_statement_excerpt.md"
+   ]
+  },
+  {
+   "fact": "supplier_documents_copy.is_new_expense",
+   "value": false,
+   "refs": [
+    "input/supplier_documents_copy.md"
+   ]
+  }
+ ],
+ "reconciliation_relations_business": [
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "INV-AIR-001",
+   "payment": "TX-AIR-001",
+   "portion_vnd": 3000000,
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#air-receipt"
+   ],
+   "note": "company direct"
+  },
+  {
+   "kind": "SAME_EVENT",
+   "first": "TX-AIR-001",
+   "second": "PAY-AIR-001",
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#air-receipt"
+   ],
+   "note": "ledger row và vendor receipt cùng event"
+  },
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "INV-HOTEL-001",
+   "payment": "PAY-HOTEL-001",
+   "portion_vnd": 3000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-payment"
+   ],
+   "note": "employee"
+  },
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "RCPT-MEAL-001",
+   "payment": "RCPT-MEAL-001-cash",
+   "portion_vnd": 1000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#meal-receipt",
+    "input/employee_claim.md#cash-attestation"
+   ],
+   "note": "employee cash, payer attested (Q09: unknown)"
+  },
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "RCPT-GROUND-001",
+   "payment": "RCPT-GROUND-001-cash",
+   "portion_vnd": 1000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#ground-receipt"
+   ],
+   "note": "employee cash"
+  },
+  {
+   "kind": "SAME_EVENT",
+   "first": "TX-ADV-001",
+   "second": "RCV-ADV-001",
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#advance-receipt"
+   ],
+   "note": "company ledger và receiver receipt cùng event ứng"
+  },
+  {
+   "kind": "SAME_EVENT",
+   "first": "TX-AIR-001",
+   "second": "BNK-A44",
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/bank_statement_excerpt.md"
+   ],
+   "note": "alias bank namespace BANK-DEMO-A của cùng event"
+  }
+ ]
 }

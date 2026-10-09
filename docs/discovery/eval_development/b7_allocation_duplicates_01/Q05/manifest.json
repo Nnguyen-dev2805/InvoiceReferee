@@ -62,7 +62,7 @@
     }
   ],
   "expected_path": "expected/expected.json",
-  "expected_sha256": "a1f0dbeeb6528f32c6aa5bddc76ef022ff0f62e3f960ece2d70ba9a941b43a5b",
+  "expected_sha256": "5d68b4eda24b240f882f07d6dd6137cdf348dace84c25246f60f1ed410c96ddc",
   "expected_is_input": false,
   "synthetic_only": true,
   "independent_gold_validated": false,

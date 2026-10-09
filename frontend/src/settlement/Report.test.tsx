@@ -25,6 +25,7 @@ function makeReport(overrides: Partial<Report> = {}): Report {
     },
     calculated_net_vnd: null,
     proposed_net_vnd: null,
+    direction: null,
     conditional_results: [],
     expense_rows: [{
       expense_id: 'EXP-1',
@@ -47,9 +48,34 @@ function makeReport(overrides: Partial<Report> = {}): Report {
     }],
     next_step: 'Xử lý issue rồi chạy lại.',
     source_refs: ['S-bill', 'S-history', 'S-budget'],
+    critical_facts: [],
+    links: [],
     ...overrides,
   };
 }
+
+test('chiều thu hiển thị khi S âm và mâu thuẫn fact không bị giấu', () => {
+  render(<ReportPanel report={makeReport({
+    completion: 'INCOMPLETE',
+    calculated_net_vnd: -700_000,
+    direction: 'EMPLOYEE_TO_COMPANY',
+    critical_facts: [{
+      key: 'history.advance.received', value: null, state: 'CONTRADICTED',
+      refs: ['S-history'],
+    }],
+    links: [{
+      relation_id: 'R1', kind: 'EXPENSE_PAYMENT', from_id: 'EXP-1',
+      to_id: 'PAY-1', portion_vnd: null, status: 'PROPOSED',
+    }],
+  })} />);
+  const panel = screen.getByTestId('report-panel');
+  expect(panel.textContent).toContain('nhân viên hoàn lại công ty');
+  const facts = screen.getByTestId('critical-facts').textContent ?? '';
+  expect(facts).toContain('MÂU THUẪN');
+  const links = screen.getByTestId('report-links').textContent ?? '';
+  expect(links).toContain('PROPOSED');
+  expect(links).toContain('chưa dùng làm căn cứ tiền');
+});
 
 test('hiển thị components, unknown giữ "—" không phải 0', () => {
   render(<ReportPanel report={makeReport()} />);

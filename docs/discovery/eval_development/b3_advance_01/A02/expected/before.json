@@ -1,44 +1,103 @@
 {
-  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
-  "job": "B3",
-  "phase": "INITIAL",
-  "as_of_money": "2026-10-03T10:00:00+07:00",
-  "declared_numbers": {
-    "declared_total_budget_vnd": 8000000,
-    "planned_company_direct_vnd": 3000000,
-    "declared_employee_plan_vnd": 5000000,
-    "sum_employee_items_vnd": 5000000,
-    "requested_advance_vnd": 2000000
+ "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+ "job": "B3",
+ "phase": "INITIAL",
+ "as_of_money": "2026-10-03T10:00:00+07:00",
+ "declared_numbers": {
+  "declared_total_budget_vnd": 8000000,
+  "planned_company_direct_vnd": 3000000,
+  "declared_employee_plan_vnd": 5000000,
+  "sum_employee_items_vnd": 5000000,
+  "requested_advance_vnd": 2000000
+ },
+ "previous_actual_advance_received_vnd": 0,
+ "future_requested_advance_received_vnd": null,
+ "settlement_profile_applied": false,
+ "settlement_amount_vnd": null,
+ "invoices_after_work_required": false,
+ "receipt_of_current_requested_advance_required_before_review": false,
+ "work_budget_decision_reusable": true,
+ "already_approved_budget_vnd": 8000000,
+ "advance_approved": false,
+ "approved_advance_amount_vnd": null,
+ "request_creation_action_allowed": false,
+ "bank_execution_allowed": false,
+ "close_allowed": false,
+ "current_request_counts_as_previous_duplicate": false,
+ "evidence_refs": [
+  "input/authority_and_assignment.md#delegated-scope",
+  "input/authority_and_assignment.md#current-assignment",
+  "input/history_scope.md#history-scope",
+  "input/financial_history.csv",
+  "input/external_request.md",
+  "input/existing_work_budget_decision.md#approved-scope"
+ ],
+ "requires_extra_resolution": false,
+ "check_report_complete": true,
+ "ready_for_normal_authorized_decisions": true,
+ "routine_first_pass": true,
+ "issue_type": null,
+ "company_plan_is_already_paid": false,
+ "request_within_employee_plan": true,
+ "request_within_proposed_or_approved_total": true,
+ "unnecessary_reapproval_of_same_work_budget_allowed": false,
+ "critical_facts_business": [
+  {
+   "fact": "request.requested_advance_vnd",
+   "value": 2000000,
+   "refs": [
+    "input/external_request.md"
+   ]
   },
-  "previous_actual_advance_received_vnd": 0,
-  "future_requested_advance_received_vnd": null,
-  "settlement_profile_applied": false,
-  "settlement_amount_vnd": null,
-  "invoices_after_work_required": false,
-  "receipt_of_current_requested_advance_required_before_review": false,
-  "work_budget_decision_reusable": true,
-  "already_approved_budget_vnd": 8000000,
-  "advance_approved": false,
-  "approved_advance_amount_vnd": null,
-  "request_creation_action_allowed": false,
-  "bank_execution_allowed": false,
-  "close_allowed": false,
-  "current_request_counts_as_previous_duplicate": false,
-  "evidence_refs": [
-    "input/authority_and_assignment.md#delegated-scope",
-    "input/authority_and_assignment.md#current-assignment",
-    "input/history_scope.md#history-scope",
-    "input/financial_history.csv",
-    "input/external_request.md",
+  {
+   "fact": "request.proposed_total_budget_vnd",
+   "value": 8000000,
+   "refs": [
+    "input/external_request.md"
+   ]
+  },
+  {
+   "fact": "request.planned_company_direct_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/external_request.md"
+   ]
+  },
+  {
+   "fact": "request.planned_employee_paid_vnd",
+   "value": 5000000,
+   "refs": [
+    "input/external_request.md"
+   ]
+  },
+  {
+   "fact": "budget.existing_decision",
+   "value": "DEC-WORK-BUDGET-02",
+   "refs": [
     "input/existing_work_budget_decision.md#approved-scope"
-  ],
-  "requires_extra_resolution": false,
-  "check_report_complete": true,
-  "ready_for_normal_authorized_decisions": true,
-  "routine_first_pass": true,
-  "issue_type": null,
-  "company_plan_is_already_paid": false,
-  "request_within_employee_plan": true,
-  "request_within_proposed_or_approved_total": true,
-  "unnecessary_reapproval_of_same_work_budget_allowed": false
+   ]
+  },
+  {
+   "fact": "budget.approved_vnd",
+   "value": 8000000,
+   "refs": [
+    "input/existing_work_budget_decision.md#approved-scope"
+   ]
+  },
+  {
+   "fact": "history.previous_advance_received_vnd",
+   "value": 0,
+   "refs": [
+    "input/history_scope.md#history-scope"
+   ]
+  },
+  {
+   "fact": "authority.advance_approval",
+   "value": null,
+   "refs": [
+    "input/external_request.md"
+   ]
+  }
+ ],
+ "reconciliation_relations_business": []
 }

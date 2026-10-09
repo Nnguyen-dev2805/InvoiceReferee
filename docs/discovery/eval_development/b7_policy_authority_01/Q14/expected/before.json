@@ -1,38 +1,239 @@
 {
-  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
-  "phase": "INITIAL",
-  "issue_type": "BEYOND_AUTHORITY_SCOPE",
-  "requires_extra_resolution": true,
-  "fact_uncertainty": false,
-  "B_vnd": 8000000,
-  "T_vnd": 8000000,
-  "E_calculated_vnd": 5000000,
-  "A_vnd": 2000000,
-  "RA_vnd": 0,
-  "P_vnd": 0,
-  "RP_vnd": 0,
-  "S_calculated_vnd": 3000000,
-  "S_final_authorized_vnd": null,
-  "within_budget": true,
-  "current_actor": "APR-DEMO-02",
-  "current_actor_authorized": false,
-  "known_alternative_settlement_approver": null,
-  "authority_evaluated_at": "2026-10-08T18:00:00+07:00",
-  "allowed_owner_roles": [
-    "ACCOUNTANT_AUTHORITY_SOURCE_OWNER"
-  ],
-  "question_semantics_example": "Hồsơ CT-DEMO-01/NV-DEMO-01 trongB8, dữkiện tiền rõ, đanggửiAPR-DEMO-02; AUTH-CURRENT-02 chỉchoquyếttoánCT-DEMO-02. Cần nguồn giaoquyền hoặc quyếtđịnh của người đủ quyền cho CT-DEMO-01; sourcepretrip APR-DEMO-01 chỉcôngviệc/B/ứng. Kếtoán/chủnguồnquyền hãy cungcấp căn cứ phùhợp hoặc chỉ người đãđượcgiaophạmvi đó.",
-  "evidence_refs": [
-    "input/authority_and_pretrip.md#authority",
-    "input/authority_and_pretrip.md#pretrip-decision",
-    "input/approval_assignment.md#current-assignment",
+ "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+ "phase": "INITIAL",
+ "issue_type": "BEYOND_AUTHORITY_SCOPE",
+ "requires_extra_resolution": true,
+ "fact_uncertainty": false,
+ "B_vnd": 8000000,
+ "T_vnd": 8000000,
+ "E_calculated_vnd": 5000000,
+ "A_vnd": 2000000,
+ "RA_vnd": 0,
+ "P_vnd": 0,
+ "RP_vnd": 0,
+ "S_calculated_vnd": 3000000,
+ "S_final_authorized_vnd": null,
+ "within_budget": true,
+ "current_actor": "APR-DEMO-02",
+ "current_actor_authorized": false,
+ "known_alternative_settlement_approver": null,
+ "authority_evaluated_at": "2026-10-08T18:00:00+07:00",
+ "allowed_owner_roles": [
+  "ACCOUNTANT_AUTHORITY_SOURCE_OWNER"
+ ],
+ "question_semantics_example": "Hồsơ CT-DEMO-01/NV-DEMO-01 trongB8, dữkiện tiền rõ, đanggửiAPR-DEMO-02; AUTH-CURRENT-02 chỉchoquyếttoánCT-DEMO-02. Cần nguồn giaoquyền hoặc quyếtđịnh của người đủ quyền cho CT-DEMO-01; sourcepretrip APR-DEMO-01 chỉcôngviệc/B/ứng. Kếtoán/chủnguồnquyền hãy cungcấp căn cứ phùhợp hoặc chỉ người đãđượcgiaophạmvi đó.",
+ "evidence_refs": [
+  "input/authority_and_pretrip.md#authority",
+  "input/authority_and_pretrip.md#pretrip-decision",
+  "input/approval_assignment.md#current-assignment",
+  "input/approval_assignment.md#current-authority"
+ ],
+ "financial_approval_allowed": false,
+ "request_creation_allowed": false,
+ "bank_execution_allowed": false,
+ "close_allowed": false,
+ "generic_role_switch_resolves_issue": false,
+ "past_pretrip_approval_still_valid": true,
+ "as_of_money": "2026-10-08T18:00:00+07:00",
+ "critical_facts_business": [
+  {
+   "fact": "invoice.INV-AIR-001.total_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#air-invoice"
+   ]
+  },
+  {
+   "fact": "payment.PAY-AIR-001.payer",
+   "value": "COMPANY",
+   "refs": [
+    "input/expense_and_payment_sources.md#air-receipt"
+   ]
+  },
+  {
+   "fact": "invoice.INV-HOTEL-001.total_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-invoice"
+   ]
+  },
+  {
+   "fact": "payment.PAY-HOTEL-001.amount_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-payment"
+   ]
+  },
+  {
+   "fact": "payment.PAY-HOTEL-001.payer",
+   "value": "EMPLOYEE",
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-payment"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-MEAL-001.total_vnd",
+   "value": 1000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#meal-receipt"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-MEAL-001.payer",
+   "value": "EMPLOYEE",
+   "refs": [
+    "input/expense_and_payment_sources.md#meal-receipt",
+    "input/employee_claim.md#cash-attestation"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-GROUND-001.total_vnd",
+   "value": 1000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#ground-receipt"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-GROUND-001.payer",
+   "value": "EMPLOYEE",
+   "refs": [
+    "input/expense_and_payment_sources.md#ground-receipt"
+   ]
+  },
+  {
+   "fact": "event.TX-AIR-001.amount_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/financial_events_m1.csv"
+   ]
+  },
+  {
+   "fact": "event.TX-ADV-001.amount_vnd",
+   "value": 2000000,
+   "refs": [
+    "input/financial_events_m1.csv"
+   ]
+  },
+  {
+   "fact": "advance.received_vnd",
+   "value": 2000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#advance-receipt"
+   ]
+  },
+  {
+   "fact": "advance.returned_vnd",
+   "value": 0,
+   "refs": [
+    "input/coverage_m1.md"
+   ]
+  },
+  {
+   "fact": "reimbursement.received_vnd",
+   "value": 0,
+   "refs": [
+    "input/coverage_m1.md"
+   ]
+  },
+  {
+   "fact": "reimbursement.returned_vnd",
+   "value": 0,
+   "refs": [
+    "input/coverage_m1.md"
+   ]
+  },
+  {
+   "fact": "budget.approved_vnd",
+   "value": 8000000,
+   "refs": [
+    "input/authority_and_pretrip.md#pretrip-decision"
+   ]
+  },
+  {
+   "fact": "authority.current_actor",
+   "value": "APR-DEMO-02",
+   "refs": [
+    "input/approval_assignment.md#current-assignment"
+   ]
+  },
+  {
+   "fact": "authority.current_actor_scope",
+   "value": "CT-DEMO-02",
+   "refs": [
     "input/approval_assignment.md#current-authority"
-  ],
-  "financial_approval_allowed": false,
-  "request_creation_allowed": false,
-  "bank_execution_allowed": false,
-  "close_allowed": false,
-  "generic_role_switch_resolves_issue": false,
-  "past_pretrip_approval_still_valid": true,
-  "as_of_money": "2026-10-08T18:00:00+07:00"
+   ]
+  },
+  {
+   "fact": "authority.covering_grant_for_CT-DEMO-01",
+   "value": null,
+   "refs": [
+    "input/approval_assignment.md#current-authority",
+    "input/authority_and_pretrip.md#authority"
+   ]
+  }
+ ],
+ "reconciliation_relations_business": [
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "INV-AIR-001",
+   "payment": "TX-AIR-001",
+   "portion_vnd": 3000000,
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#air-receipt"
+   ],
+   "note": "company direct"
+  },
+  {
+   "kind": "SAME_EVENT",
+   "first": "TX-AIR-001",
+   "second": "PAY-AIR-001",
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#air-receipt"
+   ],
+   "note": "ledger row và vendor receipt cùng event"
+  },
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "INV-HOTEL-001",
+   "payment": "PAY-HOTEL-001",
+   "portion_vnd": 3000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-payment"
+   ],
+   "note": "employee"
+  },
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "RCPT-MEAL-001",
+   "payment": "RCPT-MEAL-001-cash",
+   "portion_vnd": 1000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#meal-receipt",
+    "input/employee_claim.md#cash-attestation"
+   ],
+   "note": "employee cash, payer attested (Q09: unknown)"
+  },
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "RCPT-GROUND-001",
+   "payment": "RCPT-GROUND-001-cash",
+   "portion_vnd": 1000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#ground-receipt"
+   ],
+   "note": "employee cash"
+  },
+  {
+   "kind": "SAME_EVENT",
+   "first": "TX-ADV-001",
+   "second": "RCV-ADV-001",
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#advance-receipt"
+   ],
+   "note": "company ledger và receiver receipt cùng event ứng"
+  }
+ ]
 }

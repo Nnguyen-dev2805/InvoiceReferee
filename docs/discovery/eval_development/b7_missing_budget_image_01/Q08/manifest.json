@@ -45,7 +45,7 @@
   "expected_files": [
     {
       "path": "expected/before.json",
-      "sha256": "8b90cfcd2b8e0db9e31d023f59ce997bc7783fdffb083b20af043f77da750815"
+      "sha256": "8d3e4cee655fff4725a89f7935af83b31f2e805638130ddd081276aca482a8cc"
     },
     {
       "path": "expected/after.json",

@@ -44,7 +44,7 @@
   "expected_files": [
     {
       "path": "expected/before.json",
-      "sha256": "a88fa8741da015e1291240b829f7abe30aa6e78222544788b414442094dc9ad0"
+      "sha256": "697d01d874be66d60fa74a6ed0058420cfbae98e8478d82cd2ab7d0ab09f9e82"
     },
     {
       "path": "expected/authority_update.json",

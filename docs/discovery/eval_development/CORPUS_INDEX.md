@@ -2,6 +2,14 @@
 
 Ngày: 09/10/2026 · **20 PACKETCONDITIONS ĐÃ DỰNG, CHƯA PIPELINE/VERIFY/GOLD THẨM ĐỊNH ĐỘC LẬP**.
 
+Dataset expected version 2 (09/10/2026): mỗi packet bổ sung `critical_facts_business`
+(critical fact kèm value hoặc null = unknown/unobservable/conflict, refs mở nguồn) và
+`reconciliation_relations_business` (từng quan hệ đối chiếu expense–payment với
+portion và same-event alias) theo adjudication độc lập từ nguồn, phục vụ trục
+Extraction/Linking (Evaluation §E2/E3). Input files giữ nguyên bytes; manifest hash
+của expected được cập nhật theo version mới. Chấm engine hai trục này chờ reader
+mapping ids chuẩn (M1); harness đếm gold_coverage để không bỏ im lặng.
+
 Nguồn synthetic, cùng một templatefamily cấp doanh nghiệp/công tác. Mỗi sourceworld là input riêng theo manifest; không merge eventrefs giữa các counterfactual scenarios. Q04 là mốc sau Q01, không businessstory mới. Followupbranches/answers không đếm thêm như case độc lập. Không dùng corpus làm independentholdout cho hệ thống đã thiết kế từ chính nó.
 
 | ID | Job | Packet | Hướng expected ban đầu, chưa actual result |

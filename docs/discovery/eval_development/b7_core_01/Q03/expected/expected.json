@@ -1,48 +1,220 @@
 {
-  "work": "CT-DEMO-03",
-  "employee": "NV-DEMO-03",
-  "as_of": "2026-10-08T18:00:00+07:00",
-  "T": 6300000,
-  "company_direct": 3000000,
-  "E": 3300000,
-  "A": 4000000,
-  "RA": 0,
-  "P": 0,
-  "RP": 0,
-  "S": -700000,
-  "direction": "EMPLOYEE_TO_COMPANY",
-  "settlement_approved": false,
-  "close_allowed": false,
-  "budget_vnd": 8000000,
-  "job": "B7",
-  "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
-  "requires_extra_fact_policy_authority_resolution": false,
-  "cash_payer_mode": "POLICY_ATTESTED_NOT_BANK_VERIFIED",
-  "routine_check_report_expected": true,
-  "automatic_request_creation_allowed": false,
-  "automatic_bank_execution_allowed": false,
-  "duplicate_payment_allowed": false,
-  "evidence_refs": {
-    "budget_authority": [
-      "input/authority_and_pretrip.md#authority",
-      "input/authority_and_pretrip.md#pretrip-decision"
-    ],
-    "expense_and_payer": [
-      "input/expense_and_payment_sources.md#air-invoice",
-      "input/expense_and_payment_sources.md#air-receipt",
-      "input/expense_and_payment_sources.md#hotel-invoice",
-      "input/expense_and_payment_sources.md#hotel-payment",
-      "input/expense_and_payment_sources.md#meal-receipt",
-      "input/employee_claim.md#cash-attestation",
-      "input/expense_and_payment_sources.md#ground-receipt"
-    ],
-    "history_and_zero": [
-      "input/coverage_m1.md",
-      "input/employee_claim.md#employee-scope"
-    ],
-    "advance": [
-      "input/expense_and_payment_sources.md#advance-receipt",
-      "input/financial_events_m1.csv"
-    ]
+ "work": "CT-DEMO-03",
+ "employee": "NV-DEMO-03",
+ "as_of": "2026-10-08T18:00:00+07:00",
+ "T": 6300000,
+ "company_direct": 3000000,
+ "E": 3300000,
+ "A": 4000000,
+ "RA": 0,
+ "P": 0,
+ "RP": 0,
+ "S": -700000,
+ "direction": "EMPLOYEE_TO_COMPANY",
+ "settlement_approved": false,
+ "close_allowed": false,
+ "budget_vnd": 8000000,
+ "job": "B7",
+ "gold_status": "DRAFT_SINGLE_AUTHOR_NOT_INDEPENDENTLY_ADJUDICATED",
+ "requires_extra_fact_policy_authority_resolution": false,
+ "cash_payer_mode": "POLICY_ATTESTED_NOT_BANK_VERIFIED",
+ "routine_check_report_expected": true,
+ "automatic_request_creation_allowed": false,
+ "automatic_bank_execution_allowed": false,
+ "duplicate_payment_allowed": false,
+ "evidence_refs": {
+  "budget_authority": [
+   "input/authority_and_pretrip.md#authority",
+   "input/authority_and_pretrip.md#pretrip-decision"
+  ],
+  "expense_and_payer": [
+   "input/expense_and_payment_sources.md#air-invoice",
+   "input/expense_and_payment_sources.md#air-receipt",
+   "input/expense_and_payment_sources.md#hotel-invoice",
+   "input/expense_and_payment_sources.md#hotel-payment",
+   "input/expense_and_payment_sources.md#meal-receipt",
+   "input/employee_claim.md#cash-attestation",
+   "input/expense_and_payment_sources.md#ground-receipt"
+  ],
+  "history_and_zero": [
+   "input/coverage_m1.md",
+   "input/employee_claim.md#employee-scope"
+  ],
+  "advance": [
+   "input/expense_and_payment_sources.md#advance-receipt",
+   "input/financial_events_m1.csv"
+  ]
+ },
+ "critical_facts_business": [
+  {
+   "fact": "invoice.INV-AIR-03.total_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#air-invoice"
+   ]
+  },
+  {
+   "fact": "payment.PAY-AIR-03.payer",
+   "value": "COMPANY",
+   "refs": [
+    "input/expense_and_payment_sources.md#air-receipt"
+   ]
+  },
+  {
+   "fact": "invoice.INV-HOTEL-03.total_vnd",
+   "value": 2000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-invoice"
+   ]
+  },
+  {
+   "fact": "payment.PAY-HOTEL-03.payer",
+   "value": "EMPLOYEE",
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-payment"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-MEAL-03.total_vnd",
+   "value": 800000,
+   "refs": [
+    "input/expense_and_payment_sources.md#meal-receipt"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-MEAL-03.payer",
+   "value": "EMPLOYEE",
+   "refs": [
+    "input/expense_and_payment_sources.md#meal-receipt",
+    "input/employee_claim.md#cash-attestation"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-GROUND-03.total_vnd",
+   "value": 500000,
+   "refs": [
+    "input/expense_and_payment_sources.md#ground-receipt"
+   ]
+  },
+  {
+   "fact": "receipt.RCPT-GROUND-03.payer",
+   "value": "EMPLOYEE",
+   "refs": [
+    "input/expense_and_payment_sources.md#ground-receipt"
+   ]
+  },
+  {
+   "fact": "event.TX-AIR-03.amount_vnd",
+   "value": 3000000,
+   "refs": [
+    "input/financial_events_m1.csv"
+   ]
+  },
+  {
+   "fact": "event.TX-ADV-03.amount_vnd",
+   "value": 4000000,
+   "refs": [
+    "input/financial_events_m1.csv"
+   ]
+  },
+  {
+   "fact": "advance.received_vnd",
+   "value": 4000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#advance-receipt"
+   ]
+  },
+  {
+   "fact": "advance.returned_vnd",
+   "value": 0,
+   "refs": [
+    "input/employee_claim.md#employee-scope"
+   ]
+  },
+  {
+   "fact": "reimbursement.received_vnd",
+   "value": 0,
+   "refs": [
+    "input/employee_claim.md#employee-scope"
+   ]
+  },
+  {
+   "fact": "reimbursement.returned_vnd",
+   "value": 0,
+   "refs": [
+    "input/employee_claim.md#employee-scope"
+   ]
+  },
+  {
+   "fact": "budget.approved_vnd",
+   "value": 8000000,
+   "refs": [
+    "input/authority_and_pretrip.md#pretrip-decision"
+   ]
   }
+ ],
+ "reconciliation_relations_business": [
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "INV-AIR-03",
+   "payment": "TX-AIR-03",
+   "portion_vnd": 3000000,
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#air-receipt"
+   ],
+   "note": "company direct"
+  },
+  {
+   "kind": "SAME_EVENT",
+   "first": "TX-AIR-03",
+   "second": "PAY-AIR-03",
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#air-receipt"
+   ],
+   "note": ""
+  },
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "INV-HOTEL-03",
+   "payment": "PAY-HOTEL-03",
+   "portion_vnd": 2000000,
+   "refs": [
+    "input/expense_and_payment_sources.md#hotel-payment"
+   ],
+   "note": "employee"
+  },
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "RCPT-MEAL-03",
+   "payment": "RCPT-MEAL-03-cash",
+   "portion_vnd": 800000,
+   "refs": [
+    "input/expense_and_payment_sources.md#meal-receipt",
+    "input/employee_claim.md#cash-attestation"
+   ],
+   "note": "employee cash"
+  },
+  {
+   "kind": "EXPENSE_PAYMENT",
+   "expense": "RCPT-GROUND-03",
+   "payment": "RCPT-GROUND-03-cash",
+   "portion_vnd": 500000,
+   "refs": [
+    "input/expense_and_payment_sources.md#ground-receipt"
+   ],
+   "note": "employee cash"
+  },
+  {
+   "kind": "SAME_EVENT",
+   "first": "TX-ADV-03",
+   "second": "RCV-ADV-03",
+   "refs": [
+    "input/financial_events_m1.csv",
+    "input/expense_and_payment_sources.md#advance-receipt"
+   ],
+   "note": ""
+  }
+ ]
 }

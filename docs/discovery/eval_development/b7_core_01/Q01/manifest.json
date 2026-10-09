@@ -63,7 +63,7 @@
   ],
   "policy_path_base": "..",
   "expected_path": "expected/expected.json",
-  "expected_sha256": "01584f93134db6b6842105c086b86b9055a68fd4313845ac00865a458d9a7360",
+  "expected_sha256": "4c547fa2a70ced7dfd96ca7348324ae9e16d10053787df38b3bcb64be2dcfe05",
   "expected_is_input": false,
   "independent_gold_validated": false,
   "runtime_run": false

@@ -37,7 +37,7 @@ export function ActionsPanel({
     || view.stage === 'REJECTED_REQUEST_ENDED';
 
   const [decisionDirection, setDecisionDirection] =
-    useState<'PAY_EMPLOYEE' | 'REFUSE'>('PAY_EMPLOYEE');
+    useState<'PAY_EMPLOYEE' | 'COLLECT_FROM_EMPLOYEE' | 'REFUSE'>('PAY_EMPLOYEE');
   const [decisionAmount, setDecisionAmount] = useState('');
   const [decisionReason, setDecisionReason] = useState('');
   const [reviewNote, setReviewNote] = useState('');
@@ -116,13 +116,17 @@ export function ActionsPanel({
             <label htmlFor="decision-direction">Loại quyết định</label>
             <select id="decision-direction" value={decisionDirection}
                     onChange={(e) => setDecisionDirection(
-                      e.target.value as 'PAY_EMPLOYEE' | 'REFUSE')}>
+                      e.target.value as 'PAY_EMPLOYEE' | 'COLLECT_FROM_EMPLOYEE'
+                        | 'REFUSE')}>
               <option value="PAY_EMPLOYEE">Duyệt chi cho nhân viên</option>
+              <option value="COLLECT_FROM_EMPLOYEE">
+                Thu lại từ nhân viên (S âm — nhân viên hoàn)
+              </option>
               <option value="REFUSE">Từ chối (không duyệt số tiền)</option>
             </select>
-            {decisionDirection === 'PAY_EMPLOYEE' && (
+            {decisionDirection !== 'REFUSE' && (
               <>
-                <label htmlFor="decision-amount">Số tiền duyệt (VND)</label>
+                <label htmlFor="decision-amount">Số tiền duyệt/thu (VND)</label>
                 <input id="decision-amount" type="number" min="0"
                        value={decisionAmount}
                        onChange={(e) => setDecisionAmount(e.target.value)} />
@@ -139,7 +143,7 @@ export function ActionsPanel({
                         demo_role: role,
                         expected_case_version: view.case_version,
                         kind: 'SETTLEMENT',
-                        amount_vnd: decisionDirection === 'PAY_EMPLOYEE'
+                        amount_vnd: decisionDirection !== 'REFUSE'
                           ? Number(decisionAmount) : null,
                         direction: decisionDirection,
                         reason: decisionReason.trim(),
