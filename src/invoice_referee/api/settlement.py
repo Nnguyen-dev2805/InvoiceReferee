@@ -21,6 +21,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, StrictInt
 
 from invoice_referee.domain.models import DomainError
+from invoice_referee.env import load_repo_env
 from invoice_referee.settlement.models import (
     AuthorityGrant,
     CaseSummary,
@@ -258,6 +259,9 @@ def create_runtime_app(*, db_path: Path | None = None,
                        service: Service | None = None) -> FastAPI:
     """Build the settlement app; pilot defaults under ``data/settlement``."""
     if service is None:
+        # Repo-root .env (Git-ignored) được nạp như app cũ: biến đã export
+        # trong môi trường luôn thắng (setdefault semantics).
+        load_repo_env()
         db = Path(db_path or os.environ.get(
             "SETTLEMENT_DB_PATH", DEFAULT_DATA_DIR / "settlement.sqlite"))
         root = Path(artifact_root or os.environ.get(
