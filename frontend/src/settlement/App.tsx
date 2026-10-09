@@ -5,9 +5,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as api from './api';
 import { ApiError } from './api';
+import { QuestionsPanel } from './Questions';
 import { ReportPanel } from './Report';
 import type {
-  AuditEntry, CaseStage, CaseSummary, CaseView, DemoRole, Job, Report, RunView,
+  AuditEntry, CaseStage, CaseSummary, CaseView, DemoRole, Job, QuestionView,
+  Report, RunView,
 } from './types';
 
 const STAGE_LABELS: Record<CaseStage, string> = {
@@ -55,12 +57,15 @@ export function App() {
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [run, setRun] = useState<RunView | null>(null);
   const [report, setReport] = useState<Report | null>(null);
+  const [questions, setQuestions] = useState<QuestionView[]>([]);
 
   const [job, setJob] = useState<Job>('B7');
   const [employeeRef, setEmployeeRef] = useState('NV-01');
   const [workRef, setWorkRef] = useState('');
   const [purpose, setPurpose] = useState('');
   const [scope, setScope] = useState('');
+  const [requestAmount, setRequestAmount] = useState('');
+  const [forecastAmount, setForecastAmount] = useState('');
   const [moneyAsOf, setMoneyAsOf] = useState(nowLocalInput());
   const [knowledgeCutoff, setKnowledgeCutoff] = useState(nowLocalInput());
 
@@ -86,6 +91,7 @@ export function App() {
       setHistory(await api.getHistory(id));
       setReport(null);
       setRun(null);
+      setQuestions(await api.getQuestions(id));
       if (next.current_run_id) {
         const currentRun = await api.getRun(next.current_run_id);
         setRun(currentRun);
@@ -119,7 +125,14 @@ export function App() {
           job,
           money_as_of: new Date(moneyAsOf).toISOString(),
           knowledge_cutoff: new Date(knowledgeCutoff).toISOString(),
-          form: { purpose: purpose.trim(), scope: scope.trim() },
+          form: {
+            purpose: purpose.trim(),
+            scope: scope.trim(),
+            ...(job === 'B3' && requestAmount.trim()
+              ? { request_amount_vnd: Number(requestAmount) } : {}),
+            ...(job === 'B3' && forecastAmount.trim()
+              ? { forecast_employee_vnd: Number(forecastAmount) } : {}),
+          },
         },
         actor_id: actorId.trim(),
         demo_role: role,
@@ -158,17 +171,33 @@ export function App() {
   const handleStartRun = async () => {
     if (!view) return;
     try {
-      const started = await api.startRun(view.id, {
+      await api.startRun(view.id, {
         actor_id: actorId.trim(),
         demo_role: role,
         expected_case_version: view.case_version,
       });
-      setRun(started);
-      setReport(null);
       setError(null);
       await loadCases();
+      await loadCase(view.id);  // case_version tăng khi run được accept
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không khởi động được run.');
+    }
+  };
+
+  const handleRespond = async (questionId: string, draft: { content: string; sourceIds: string[] }) => {
+    if (!view) return;
+    try {
+      await api.respondQuestion(questionId, {
+        actor_id: actorId.trim(),
+        demo_role: role,
+        expected_case_version: view.case_version,
+        content: draft.content.trim(),
+        source_ids: draft.sourceIds,
+      });
+      setError(null);
+      await loadCase(view.id);  // respond tăng case_version; làm mới view
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không gửi được trả lời.');
     }
   };
 
@@ -205,9 +234,10 @@ export function App() {
         const next = await api.getRun(run.id);
         setRun(next);
         if (next.status === 'SUCCEEDED') {
-          setReport(await api.getReport(next.id));
+          await loadCase(next.case_id);  // làm mới case_version + report + questions
         } else if (next.status !== 'QUEUED' && next.status !== 'RUNNING' && next.detail) {
           setError(`Run kết thúc với ${next.status}: ${next.detail}`);
+          await loadCase(next.case_id);
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Không theo dõi được run.');
@@ -229,16 +259,16 @@ export function App() {
           chuẩn bị kiểm tra/ghép nguồn; quyết định và tiền do con người.
         </p>
         <div className="field">
-          <label>Vai trò demo</label>
-          <select value={role} onChange={(e) => setRole(e.target.value as DemoRole)}>
+          <label htmlFor="demo-role">Vai trò demo</label>
+          <select id="demo-role" value={role} onChange={(e) => setRole(e.target.value as DemoRole)}>
             {Object.entries(ROLE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
         </div>
         <div className="field">
-          <label>Mã người thao tác</label>
-          <input value={actorId} onChange={(e) => setActorId(e.target.value)} />
+          <label htmlFor="actor-id">Mã người thao tác</label>
+          <input id="actor-id" value={actorId} onChange={(e) => setActorId(e.target.value)} />
         </div>
       </header>
 
@@ -281,6 +311,24 @@ export function App() {
               <input id="scope" value={scope} onChange={(e) => setScope(e.target.value)}
                       placeholder="Vé, khách sạn, tiếp khách trong CT-01" />
             </div>
+            {job === 'B3' && (
+              <>
+                <div className="field">
+                  <label htmlFor="request-amount">Số xin ứng (VND, khai báo — không phải actual)</label>
+                  <input id="request-amount" type="number" min="0"
+                          value={requestAmount}
+                          onChange={(e) => setRequestAmount(e.target.value)}
+                          placeholder="2000000" />
+                </div>
+                <div className="field">
+                  <label htmlFor="forecast-amount">Dự toán phần nhân viên (VND)</label>
+                  <input id="forecast-amount" type="number" min="0"
+                          value={forecastAmount}
+                          onChange={(e) => setForecastAmount(e.target.value)}
+                          placeholder="5000000" />
+                </div>
+              </>
+            )}
             <div className="field">
               <label htmlFor="money-as-of">Mốc tiền (money_as_of)</label>
               <input id="money-as-of" type="datetime-local" value={moneyAsOf}
@@ -425,6 +473,14 @@ export function App() {
               </div>
 
               {report && <ReportPanel report={report} />}
+
+              <QuestionsPanel
+                questions={questions}
+                caseVersion={view.case_version}
+                sourceIds={view.sources.map((s) => s.id)}
+                role={role}
+                onResponded={handleRespond}
+              />
 
               <div className="panel">
                 <h2>Sửa khai báo</h2>

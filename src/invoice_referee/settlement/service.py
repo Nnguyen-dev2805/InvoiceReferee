@@ -19,7 +19,10 @@ from invoice_referee.settlement.models import (
     AuthorityGrant,
     CaseView,
     Command,
+    QuestionView,
     Report,
+    ResponsePayload,
+    ResponseView,
     RunBudget,
     RunInput,
     RunStatus,
@@ -135,7 +138,9 @@ class Service:
                 checkpoint = self._checkpoint(run_id, run_input)
                 report = process(run_input, self.reader, budget, checkpoint,
                                  run_id=run_id)
-                self.store.publish(run_id, report)
+                published = self.store.publish(run_id, report)
+                if published.status == "SUCCEEDED":
+                    self._sync_questions(run_id, report)
         except DomainError as error:
             status: RunStatus = _STATUS_BY_CODE.get(error.code, "FAILED")
             try:
@@ -187,6 +192,33 @@ class Service:
 
     def get_run(self, run_id: str) -> RunView:
         return self.store.get_run(run_id)
+
+    # --- questions ------------------------------------------------------------
+
+    def questions(self, case_id: str) -> list[QuestionView]:
+        self.store.get_case(case_id)
+        return self.store.list_questions(case_id)
+
+    def respond(self, question_id: str, response: ResponsePayload,
+                command: Command) -> ResponseView:
+        question = self.store.get_question(question_id)
+        accepted = command.demo_role == question.owner
+        reason = (""
+                  if accepted
+                  else f"Phản hồi từ vai {command.demo_role} không phải owner "
+                       f"{question.owner} của câu hỏi; ghi nhận lịch sử, "
+                       f"không resolve.")
+        return self.store.record_response(question_id, response, command,
+                                          accepted, reason)
+
+    def _sync_questions(self, run_id: str, report: Report) -> None:
+        """Questions follow the report: new issues open, cleared ones resolve."""
+        case_id = report.run_id and self.store.get_run(run_id).case_id
+        unresolved = [issue for issue in report.issues if issue.unresolved]
+        self.store.ensure_questions(case_id, unresolved, run_id)
+        self.store.resolve_questions(case_id,
+                                     {issue.issue_id for issue in unresolved},
+                                     run_id)
 
     def report(self, run_id: str) -> Report:
         run = self.store.get_run(run_id)

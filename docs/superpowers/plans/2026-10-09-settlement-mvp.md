@@ -152,7 +152,7 @@ W03 định nghĩa `RunBudget(deadline:float,max_calls:int)`, `calls:int`, `rese
 
 **Create:** tests/settlement/{test_advance.py,test_questions.py}; frontend/src/settlement/Questions.tsx. **Modify:** rules/service/store/models/APIandnativeform/reportUI. **Consumes:** W01–03, scope/quyền/coverage vàresponse refs. **Produces:** evaluate_B3, question/response/reviewrecords vớirun/revisionlinked; b3native/importUI.
 
-- [ ] REDA01newproposal khôngđòiafterworkinvoice/approval đangxin; A02reuseexternalB; A03estimateconflict; A04historyunknown; A05wrongscope. Amountrequested≠actualadvance.
+- [x] REDA01newproposal khôngđòiafterworkinvoice/approval đangxin; A02reuseexternalB; A03estimateconflict; A04historyunknown; A05wrongscope. Amountrequested≠actualadvance.
 
 ```python
 def test_answer_without_source_does_not_resolve_receipt_question(service, receipt_unknown_case, employee_response):
@@ -166,9 +166,9 @@ def test_answer_without_source_does_not_resolve_receipt_question(service, receip
 
 Fixtures W04 trong `test_questions.py`: `receipt_unknown_case` có hotel/chi hợp lệ5triệu nhưng actual advance còn unknown, question cần nguồn actualreceipt phía kế toán; `employee_response` là lời khai "đã nhận2triệu", refs rỗng, actorNV-01/EMPLOYEE. `response_command(case)` và `next_run_command(case)` trả Command với key mới và expected_case_version hiện tại; `wait_report(service,id)` lấy current_run_id, wait rồi report. `Service.questions` trả question có id/issue_id. Reader giả lập trả observations có nguồn đã định cho case, không đọc expected. Assertions nhằm chứng minh reply sai owner/thiếu căn cứ không tự làm advance=2.
 
-- [ ] Defineresponse/next_run/waitfixturesinmodule theoCommandhelpers; wrongowner/source/unreadabletyping nằmC06. Khôngautoresolve question từlời"đãchuyển"; sauvalidsource re-check phầnảnhhưởng, giữinitialrunassistedhistory.
-- [ ] UIcâu hỏi nêuowner/ref/đãbiết/cầnnguồn hoặcdecision, upload/answer vàreportrevision. Nhiềuissues trảcùnglần; correctedclaim khôngđổi source gốc hoặccoveragecompany.
-- [ ] GREENB3/questionsintegration/componenttests, browserA01/A02 vàQ11sourcebổsung/saianswer; SYS-07/08. Reportreviewkhôngapproval.
+- [x] Defineresponse/next_run/waitfixturesinmodule theoCommandhelpers; wrongowner/source/unreadabletyping nằmC06. Khôngautoresolve question từlời"đãchuyển"; sauvalidsource re-check phầnảnhhưởng, giữinitialrunassistedhistory.
+- [x] UIcâu hỏi nêuowner/ref/đãbiết/cầnnguồn hoặcdecision, upload/answer vàreportrevision. Nhiềuissues trảcùnglần; correctedclaim khôngđổi source gốc hoặccoveragecompany.
+- [x] GREENB3/questionsintegration/componenttests, browserA01/A02 vàQ11sourcebổsung/saianswer; SYS-07/08. Reportreviewkhôngapproval.
 
 ## W05 — Decision, tiền thực tế, Stop và đóng hồ sơ
 
@@ -242,7 +242,7 @@ MỗiWtask cần nguồncodeactualtests+UIevidence vàSYSrefs; chỉcheckdonekhi
 | W01 |VERIFIED (local/fake; evidence: docs/evidence/settlement-W01.md) |Nativeform/source/reloadUI vàstoreguard |
 | W02 |VERIFIED (PIPELINE_FAKE_OR_REPLAY; evidence: docs/evidence/settlement-W02.md) |B7report cósource/unknown/negative/zero |
 | W03 |VERIFIED (mock transports; live chưa chạy — M0 probe plan chờ authorization; evidence: docs/evidence/settlement-W03.md) |Reader/transport/budgets vàprobeplan |
-| W04 |PLANNED |B3/questions/assistedrecheck |
+| W04 |VERIFIED (fake reader; evidence: docs/evidence/settlement-W04.md) |B3/questions/assistedrecheck |
 | W05 |PLANNED |Quyếtđịnh/actualmoney/Stop/closure |
 | W06 |PLANNED |Evaluator/cutover/measurement/baseline |
 

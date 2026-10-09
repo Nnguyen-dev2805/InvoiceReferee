@@ -165,6 +165,52 @@ class AuditEntry(BaseModel):
     detail: dict[str, Any] = Field(default_factory=dict)
 
 
+class ResponsePayload(BaseModel):
+    """A human answer to a question; refs point at uploaded sources."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    content: str
+    source_ids: list[str] = Field(default_factory=list)
+
+
+class QuestionView(BaseModel):
+    """An unresolved report issue surfaced to its owner with refs."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    case_id: str
+    issue_id: str
+    owner: IssueOwner
+    message: str
+    refs: list[str] = Field(default_factory=list)
+    blocked: str | None = None
+    status: Literal["OPEN", "ANSWERED", "RESOLVED", "SUPERSEDED"]
+    created_at: AwareDatetime
+    origin_run_id: str | None = None
+    answered_at: AwareDatetime | None = None
+    resolved_run_id: str | None = None
+
+
+class ResponseView(BaseModel):
+    """A recorded response; accepted=False keeps the question open."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    question_id: str
+    case_id: str
+    actor_id: str
+    demo_role: DemoRole
+    content: str
+    source_ids: list[str] = Field(default_factory=list)
+    accepted: bool
+    reason: str
+    created_at: AwareDatetime
+    idempotent_replay: bool = False
+
+
 class CaseSnapshot(BaseModel):
     """Immutable input snapshot for a run (consumed by W02+)."""
 

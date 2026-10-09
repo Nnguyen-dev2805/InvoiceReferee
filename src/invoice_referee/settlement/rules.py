@@ -465,8 +465,19 @@ def _evaluate_b3(run_input: RunInput, observations: list[Observation],
             return None, []
         return observation.value, [observation.source_id, observation.fact_id]
 
+    # Ưu tiên khai báo native form; import ngoài dùng fact từ nguồn (R1: số xin
+    # là đề nghị, không phải evidence và không phải actual advance).
+    form = run_input.submission.form
+    declared_request = form.get("request_amount_vnd")
+    declared_forecast = form.get("forecast_employee_vnd")
     request, request_refs = value_of("advance.request.amount")
+    if declared_request is not None:
+        request = declared_request
+        request_refs = ["declaration:request_amount_vnd"]
     forecast, forecast_refs = value_of("forecast.employee")
+    if declared_forecast is not None:
+        forecast = declared_forecast
+        forecast_refs = ["declaration:forecast_employee_vnd"]
     budget_obs = _first(grouped, "budget.approved")
     b = budget_obs.value if budget_obs else None
     b_refs = [budget_obs.source_id, budget_obs.fact_id] if budget_obs else []
@@ -532,9 +543,35 @@ def _evaluate_b3(run_input: RunInput, observations: list[Observation],
                                   refs=a_refs + ra_refs,
                                   reason="Lịch sử ứng đủ nguồn."))
 
+    # Authority routing (R8): ai đủ quyền duyệt số xin trong scope work này.
+    work_ref = run_input.submission.work_ref
+    covering = [g for g in run_input.authority
+                if g.work_ref is None or g.work_ref == work_ref]
+    if request is None:
+        checks.append(CheckResult(rule="authority", status="NOT_APPLICABLE",
+                                  refs=[],
+                                  reason="Chưa có số xin rõ để xét quyền."))
+    elif any(g.max_settlement_vnd >= request for g in covering):
+        checks.append(CheckResult(
+            rule="authority", status="PASS",
+            refs=[g.actor_ref for g in covering
+                  if g.max_settlement_vnd >= request],
+            reason="Có người có quyền hạn mức cho số xin trong scope."))
+    else:
+        checks.append(CheckResult(
+            rule="authority", status="UNRESOLVED",
+            refs=[g.actor_ref for g in covering],
+            reason="Chưa có quyền đủ hạn mức đúng scope; chuyển người có quyền."))
+        issues.append(Issue(
+            issue_id="I-AUTHORITY", type="AUTHORITY", owner="APPROVER",
+            message="Chưa có người có quyền duyệt mức xin này trong scope work; "
+                    "không tự hạ số xin để lọt quyền.",
+            refs=[g.actor_ref for g in covering], blocked="request",
+        ))
+
     completion = "COMPLETE" if not any(i.unresolved for i in issues) else "INCOMPLETE"
-    next_step = ("Kiểm tra đề nghị đã đủ cho người quyết định tiếp; không đòi invoice "
-                 "sau công việc ở bước B3." if completion == "COMPLETE"
+    next_step = ("Đề nghị đã đủ căn cứ cho người quyết định tiếp; không đòi chứng từ "
+                 "sau công việc ở bước kiểm tra ứng." if completion == "COMPLETE"
                  else "Xử lý các issue theo owner rồi chạy lại phần ảnh hưởng.")
     return Report(
         run_id=run_id, job="B3", completion=completion, mode=mode,

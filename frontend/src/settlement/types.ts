@@ -189,3 +189,42 @@ export interface StartRunPayload {
   demo_role: DemoRole;
   expected_case_version: number;
 }
+
+// --- W04: questions and responses ---------------------------------------------
+
+export interface QuestionView {
+  id: string;
+  case_id: string;
+  issue_id: string;
+  owner: 'EMPLOYEE' | 'ACCOUNTANT' | 'APPROVER';
+  message: string;
+  refs: string[];
+  blocked: string | null;
+  status: 'OPEN' | 'ANSWERED' | 'RESOLVED' | 'SUPERSEDED';
+  created_at: string;
+  origin_run_id: string | null;
+  answered_at: string | null;
+  resolved_run_id: string | null;
+}
+
+export interface ResponseView {
+  id: string;
+  question_id: string;
+  case_id: string;
+  actor_id: string;
+  demo_role: DemoRole;
+  content: string;
+  source_ids: string[];
+  accepted: boolean;
+  reason: string;
+  created_at: string;
+  idempotent_replay: boolean;
+}
+
+export interface RespondPayload {
+  actor_id: string;
+  demo_role: DemoRole;
+  expected_case_version: number;
+  content: string;
+  source_ids: string[];
+}

@@ -5,7 +5,10 @@ import type {
   CaseSummary,
   CaseView,
   CreateCasePayload,
+  QuestionView,
   Report,
+  RespondPayload,
+  ResponseView,
   ReviseSubmissionPayload,
   RunView,
   SourceView,
@@ -117,4 +120,20 @@ export function getRun(runId: string): Promise<RunView> {
 
 export function getReport(runId: string): Promise<Report> {
   return request<Report>(`/api/runs/${encodeURIComponent(runId)}/report`);
+}
+
+export function getQuestions(caseId: string): Promise<QuestionView[]> {
+  return request<QuestionView[]>(`/api/cases/${encodeURIComponent(caseId)}/questions`);
+}
+
+export function respondQuestion(
+  questionId: string,
+  payload: RespondPayload,
+): Promise<ResponseView> {
+  return request<ResponseView>(
+    `/api/questions/${encodeURIComponent(questionId)}/responses`, {
+      method: 'POST',
+      headers: { ...JSON_HEADERS, 'Idempotency-Key': crypto.randomUUID() },
+      body: JSON.stringify(payload),
+    });
 }

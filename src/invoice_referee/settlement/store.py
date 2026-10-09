@@ -34,9 +34,12 @@ from invoice_referee.settlement.models import (
     CaseStage,
     CaseSummary,
     CaseView,
-    Command,
     CallTrace,
+    Command,
+    QuestionView,
     Report,
+    ResponsePayload,
+    ResponseView,
     RunInput,
     RunView,
     RunStatus,
@@ -54,6 +57,7 @@ _CREATE_CASE = "CREATE_CASE"
 _REVISE_SUBMISSION = "REVISE_SUBMISSION"
 _ADD_SOURCE = "ADD_SOURCE"
 _START_RUN = "START_RUN"
+_RESPOND = "RESPOND"
 
 _NONTERMINAL_STATUSES = ("QUEUED", "RUNNING")
 _TERMINAL_STATUSES = ("SUCCEEDED", "FAILED", "TIMED_OUT", "STOPPED",
@@ -532,6 +536,141 @@ class Store:
             detail=row["detail"],
             completion=completion,
             trace=trace,
+        )
+
+    # --- questions and responses ---------------------------------------------
+
+    def ensure_questions(self, case_id: str, issues, run_id: str) -> None:
+        """Materialize unresolved report issues as owner-scoped questions."""
+        with self._write() as conn:
+            existing = {_load(row["payload_json"])["issue_id"] for row in
+                        conn.execute("SELECT payload_json FROM interactions "
+                                     "WHERE case_id = ? AND kind = 'QUESTION'",
+                                     (case_id,))}
+            now = _iso(utcnow())
+            for issue in issues:
+                if issue.issue_id in existing:
+                    continue
+                question_id = f"Q-{uuid.uuid4().hex[:12]}"
+                payload = {
+                    "id": question_id, "issue_id": issue.issue_id,
+                    "owner": issue.owner, "message": issue.message,
+                    "refs": issue.refs, "blocked": issue.blocked,
+                    "status": "OPEN", "origin_run_id": run_id,
+                    "answered_at": None, "resolved_run_id": None,
+                }
+                conn.execute(
+                    "INSERT INTO interactions (id, case_id, kind, payload_json, "
+                    "created_at) VALUES (?, ?, 'QUESTION', ?, ?)",
+                    (question_id, case_id, _dump(payload), now),
+                )
+
+    def resolve_questions(self, case_id: str, unresolved_issue_ids: set[str],
+                          run_id: str) -> None:
+        """Mark questions RESOLVED when a re-check clears their issue."""
+        with self._write() as conn:
+            rows = conn.execute(
+                "SELECT id, payload_json FROM interactions "
+                "WHERE case_id = ? AND kind = 'QUESTION'", (case_id,)).fetchall()
+            for row in rows:
+                payload = _load(row["payload_json"])
+                if payload["issue_id"] in unresolved_issue_ids or \
+                        payload["status"] in {"RESOLVED", "SUPERSEDED"}:
+                    continue
+                payload["status"] = "RESOLVED"
+                payload["resolved_run_id"] = run_id
+                conn.execute(
+                    "UPDATE interactions SET payload_json = ? WHERE id = ?",
+                    (_dump(payload), row["id"]),
+                )
+
+    def get_question(self, question_id: str) -> QuestionView:
+        with self._read() as conn:
+            row = conn.execute(
+                "SELECT * FROM interactions WHERE id = ? AND kind = 'QUESTION'",
+                (question_id,)).fetchone()
+            if row is None:
+                raise DomainError("QUESTION_NOT_FOUND",
+                                  f"Không tìm thấy câu hỏi {question_id}.")
+            return self._question_view(row)
+
+    def list_questions(self, case_id: str) -> list[QuestionView]:
+        with self._read() as conn:
+            rows = conn.execute(
+                "SELECT * FROM interactions WHERE case_id = ? AND kind = 'QUESTION' "
+                "ORDER BY rowid", (case_id,)).fetchall()
+        return [self._question_view(row) for row in rows]
+
+    def record_response(self, question_id: str, payload: ResponsePayload,
+                        command: Command, accepted: bool,
+                        reason: str) -> ResponseView:
+        """Record a response; accepted updates the question, else keeps OPEN."""
+        semantic = {"question_id": question_id, "content": payload.content,
+                    "source_ids": payload.source_ids}
+        payload_fp = fingerprint(_RESPOND, semantic)
+        with self._write() as conn:
+            row = self._lookup_command(conn, _RESPOND, command,
+                                       scope_key=question_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                stored = _load(row["payload_json"])["response"]
+                return ResponseView.model_validate(stored).model_copy(
+                    update={"idempotent_replay": True})
+            question = conn.execute(
+                "SELECT * FROM interactions WHERE id = ? AND kind = 'QUESTION'",
+                (question_id,)).fetchone()
+            if question is None:
+                raise DomainError("QUESTION_NOT_FOUND",
+                                  f"Không tìm thấy câu hỏi {question_id}.")
+            case = self._case_row(conn, question["case_id"])
+            self._check_version(case, command)
+            response_id = f"RS-{uuid.uuid4().hex[:12]}"
+            now = _iso(utcnow())
+            response = {
+                "id": response_id, "question_id": question_id,
+                "case_id": question["case_id"], "actor_id": command.actor_id,
+                "demo_role": command.demo_role, "content": payload.content,
+                "source_ids": payload.source_ids, "accepted": accepted,
+                "reason": reason, "created_at": now,
+            }
+            conn.execute(
+                "INSERT INTO interactions (id, case_id, kind, payload_json, "
+                "created_at) VALUES (?, ?, 'RESPONSE', ?, ?)",
+                (response_id, question["case_id"], _dump(response), now),
+            )
+            if accepted:
+                qpayload = _load(question["payload_json"])
+                qpayload["status"] = "ANSWERED"
+                qpayload["answered_at"] = now
+                conn.execute(
+                    "UPDATE interactions SET payload_json = ? WHERE id = ?",
+                    (_dump(qpayload), question_id),
+                )
+            conn.execute(
+                "UPDATE cases SET case_version = ?, input_revision = ?, "
+                "updated_at = ? WHERE id = ?",
+                (case["case_version"] + 1, case["input_revision"] + 1, now,
+                 question["case_id"]),
+            )
+            self._record_command(
+                conn, question["case_id"], question_id, "QUESTION_ANSWERED",
+                _RESPOND, command, payload_fp,
+                {"response": response, "question_id": question_id}, now)
+            return ResponseView.model_validate(response)
+
+    @staticmethod
+    def _question_view(row: sqlite3.Row) -> QuestionView:
+        payload = _load(row["payload_json"])
+        return QuestionView(
+            id=payload["id"], case_id=row["case_id"],
+            issue_id=payload["issue_id"], owner=payload["owner"],
+            message=payload["message"], refs=payload["refs"],
+            blocked=payload["blocked"], status=payload["status"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            origin_run_id=payload["origin_run_id"],
+            answered_at=(datetime.fromisoformat(payload["answered_at"])
+                          if payload["answered_at"] else None),
+            resolved_run_id=payload["resolved_run_id"],
         )
 
     # --- history -----------------------------------------------------------

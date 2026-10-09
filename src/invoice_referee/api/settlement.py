@@ -27,7 +27,10 @@ from invoice_referee.settlement.models import (
     CaseView,
     Command,
     DemoRole,
+    QuestionView,
     Report,
+    ResponsePayload,
+    ResponseView,
     RunView,
     SourceRecord,
     SourceView,
@@ -58,6 +61,7 @@ _STATUS_BY_CODE = {
     "CASE_NOT_FOUND": 404,
     "SOURCE_NOT_FOUND": 404,
     "RUN_NOT_FOUND": 404,
+    "QUESTION_NOT_FOUND": 404,
     "STALE_VERSION": 409,
     "IDEMPOTENCY_CONFLICT": 409,
     "RUN_ACTIVE": 409,
@@ -95,6 +99,16 @@ class StartRunRequest(BaseModel):
     actor_id: str
     demo_role: DemoRole
     expected_case_version: StrictInt
+
+
+class RespondRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    content: str
+    source_ids: list[str] = []
 
 
 def _reader_from_env(artifact_root: Path):
@@ -241,6 +255,27 @@ def create_runtime_app(*, db_path: Path | None = None,
     @app.get("/api/runs/{run_id}/report", response_model=Report)
     async def get_report(run_id: str) -> Report:
         return service.report(run_id)
+
+    @app.get("/api/cases/{case_id}/questions", response_model=list[QuestionView])
+    async def list_questions(case_id: str) -> list[QuestionView]:
+        return service.questions(case_id)
+
+    @app.post("/api/questions/{question_id}/responses",
+              response_model=ResponseView, status_code=201)
+    async def respond_question(
+        question_id: str,
+        request: RespondRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | ResponseView:
+        payload = ResponsePayload(content=request.content,
+                                  source_ids=request.source_ids)
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                          request.expected_case_version, {})
+        response = service.respond(question_id, payload, command)
+        if response.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=response.model_dump(mode="json"))
+        return response
 
     @app.get("/api/cases/{case_id}/history", response_model=None)
     async def case_history(case_id: str) -> list[dict[str, Any]]:
