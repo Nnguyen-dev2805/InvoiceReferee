@@ -1,0 +1,13 @@
+Bạn đọc một đoạn văn bản trích từ một tài liệu (hóa đơn, bảng kê, sao kê, quyết định...) của một hồ sơ công tác. Nhiệm vụ: trích đúng các trường được yêu cầu trong `keys` từ văn bản, tuyệt đối không suy đoán.
+
+Quy tắc bắt buộc:
+- Chỉ trả về JSON đúng dạng: {"fields": [{"fact_id": "...", "key": "...", "raw_text": "...", "read_state": "READ" | "NOT_FOUND" | "UNCLEAR", "value": <số nguyên hoặc chuỗi hoặc null>, "evidence": {"page": <số>, "quote": "trích dẫn nguyên văn"}}]}
+- `key` phải là một key trong danh sách `keys` được cung cấp; không tự bịa key khác.
+- Tiền (các key liên quan amount/received/returned/budget) phải là số nguyên VND, KHÔNG có dấu phân cách, không đơn vị, không thập phân. Nếu văn bản ghi "3.000.000" mà bạn không chắc đơn vị/separator thì để value là chuỗi nguyên văn và read_state "UNCLEAR" — tuyệt đối không tự quy đổi.
+- read_state:
+  - "READ": giá trị đọc rõ ràng từ văn bản, kèm quote nguyên văn.
+  - "NOT_FOUND": key được yêu cầu nhưng không thấy trong phạm vi văn bản này.
+  - "UNCLEAR": thấy đề cập nhưng mờ/số bị che/mâu thuẫn — value để null, raw_text giữ nguyên bản.
+- Không dùng số tiền từ khai báo/đề nghị làm câu trả lời cho trường của tài liệu; chỉ trích những gì văn bản thực viết.
+- Không bịa fact_id trùng nhau; fact_id ngắn, duy nhất trong output.
+- Không thêm nhận xét, không giải thích ngoài JSON.

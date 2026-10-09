@@ -389,14 +389,31 @@ export function App() {
                 )}
               </div>
 
-              <div className="panel">
+              <div className="panel" data-testid="run-panel">
                 <h2>Kiểm tra</h2>
                 {run && (
-                  <p>
-                    Run <code>{run.id}</code> — <strong>{run.status}</strong>
-                    {run.completion ? ` (${run.completion})` : ''} · chế độ{' '}
-                    <strong>{run.mode}</strong>
-                  </p>
+                  <>
+                    <p>
+                      Run <code>{run.id}</code> — <strong>{run.status}</strong>
+                      {run.completion ? ` (${run.completion})` : ''} · chế độ{' '}
+                      <strong>{run.mode}</strong>
+                      {run.stage ? ` · stage: ${run.stage}` : ''}
+                    </p>
+                    {run.trace.length > 0 && (
+                      <ul className="reasons">
+                        {run.trace.map((entry) => (
+                          <li key={entry.call_id}>
+                            {entry.stage}
+                            {entry.source_id ? ` · nguồn ${entry.source_id}` : ''}{' '}
+                            — {entry.ok ? 'ok' : `lỗi ${entry.error_code}`}
+                            {entry.usage
+                              ? ` · tokens: ${entry.usage.total_tokens ?? '?'}`
+                              : ' · usage: không có (None)'}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
                 )}
                 <button className="btn btn-primary" disabled={!canStartRun}
                         onClick={() => void handleStartRun()}>

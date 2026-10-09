@@ -29,7 +29,8 @@ from invoice_referee.settlement.models import (
     Upload,
     fingerprint,
 )
-from invoice_referee.settlement.pipeline import Reader, process
+from invoice_referee.settlement.pipeline import process
+from invoice_referee.settlement.reader import Reader
 from invoice_referee.settlement.store import Store
 
 _STATUS_BY_CODE = {
@@ -129,7 +130,9 @@ class Service:
         try:
             with self._slots:
                 self.store.mark_run(run_id, "RUNNING")
-                checkpoint = self._checkpoint(run_input)
+                if hasattr(self.reader, "reset_trace"):
+                    self.reader.reset_trace()
+                checkpoint = self._checkpoint(run_id, run_input)
                 report = process(run_input, self.reader, budget, checkpoint,
                                  run_id=run_id)
                 self.store.publish(run_id, report)
@@ -146,14 +149,23 @@ class Service:
             except DomainError:
                 pass
         finally:
+            if hasattr(self.reader, "trace_entries"):
+                try:
+                    self.store.set_run_trace(
+                        run_id, [entry.model_dump(mode="json")
+                                 for entry in self.reader.trace_entries()])
+                except DomainError:
+                    pass  # run đã terminal và bị dọn; trace chỉ là diagnostics
             event.set()
             with self._events_lock:
                 self._events.pop(run_id, None)
 
-    def _checkpoint(self, run_input: RunInput) -> Callable[[str], None]:
+    def _checkpoint(self, run_id: str,
+                    run_input: RunInput) -> Callable[[str], None]:
         """Validate Stop/revision/epoch before each pipeline stage."""
 
         def check(stage: str) -> None:
+            self.store.update_run_stage(run_id, stage)
             case = self.store.get_case(run_input.case_id)
             if case.stop_active:
                 raise DomainError("STOP_ACTIVE",

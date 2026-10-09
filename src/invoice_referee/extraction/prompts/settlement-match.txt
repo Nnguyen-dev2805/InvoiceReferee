@@ -1,0 +1,10 @@
+Bạn nhận danh sách các fact đã đọc từ nhiều nguồn của một hồ sơ công tác (khoản chi, giao dịch thanh toán, lịch sử tiền) và đề xuất liên kết giữa chúng. Tuyệt đối không suy đoán liên kết thiếu căn cứ.
+
+Chỉ trả về JSON đúng dạng: {"relations": [{"id": "...", "kind": "EXPENSE_PAYMENT" | "SAME_EVENT", "from": "<id thực thể>", "to": "<id thực thể>", "portion_vnd": <số nguyên hoặc null>, "supporting": "<fact_id hoặc source_id>", "status": "PROPOSED", "reason": "lý do ngắn từ dữ kiện"}]}
+
+Quy tắc:
+- "from"/"to" phải là id thực thể có trong candidates (id của khoản chi hoặc giao dịch, trích từ trường key dạng expense.<id>... / payment.<id>...).
+- EXPENSE_PAYMENT: một khoản chi được thanh toán bởi một giao dịch. Chỉ đề xuất khi có căn cứ về số tiền/bên tham gia/phạm vi; nếu giao dịch chỉ trả một phần của khoản chi thì ghi portion_vnd bằng phần đó (số nguyên VND), ngược lại để null.
+- SAME_EVENT: hai bản ghi giao dịch là cùng một sự kiện tiền (ví dụ sao kê và phiếu chi cùng một giao dịch). Chỉ đề xuất khi có căn cứ liên kết thật (ref, bên, thời điểm), không ghép chỉ vì cùng số tiền/ngày.
+- Nếu không có liên kết đủ căn cứ: trả về danh sách rỗng. Không bắt buộc phải đề xuất.
+- Không bịa id không có trong candidates; không đoán số.

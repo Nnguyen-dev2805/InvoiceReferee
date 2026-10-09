@@ -95,6 +95,19 @@ export type RunStatus =
   | 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'TIMED_OUT'
   | 'STOPPED' | 'SUPERSEDED' | 'INTERRUPTED';
 
+export interface CallTrace {
+  call_id: string;
+  stage: 'read' | 'ocr' | 'extract' | 'match';
+  source_id: string | null;
+  requested_model: string | null;
+  response_model: string | null;
+  usage: Record<string, number | null> | null;
+  ok: boolean;
+  error_code: string | null;
+  detail: string | null;
+  duration_ms: number;
+}
+
 export interface RunView {
   id: string;
   case_id: string;
@@ -102,10 +115,12 @@ export interface RunView {
   mode: string;
   input_revision: number;
   control_epoch: number;
+  stage: string | null;
   created_at: string;
   updated_at: string;
   detail: string | null;
   completion: 'COMPLETE' | 'INCOMPLETE' | null;
+  trace: CallTrace[];
   idempotent_replay: boolean;
 }
 

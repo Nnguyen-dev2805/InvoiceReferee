@@ -34,7 +34,16 @@ from invoice_referee.settlement.models import (
     Submission,
     Upload,
 )
-from invoice_referee.settlement.pipeline import StructuredLedgerReader
+from invoice_referee.settlement.reader import (
+    MISTRAL_OCR_BASE_URL,
+    MISTRAL_OCR_MODEL,
+    XKIRO_BASE_URL,
+    XKIRO_MODEL,
+    MistralOCRClient,
+    SettlementReader,
+    StructuredLedgerReader,
+    XkiroClient,
+)
 from invoice_referee.settlement.service import Service, ServiceConfig
 from invoice_referee.settlement.store import Store
 
@@ -88,6 +97,33 @@ class StartRunRequest(BaseModel):
     expected_case_version: StrictInt
 
 
+def _reader_from_env(artifact_root: Path):
+    """Explicit provider mode: fake offline default; live fails loudly.
+
+    There is NO live→fake fallback: ``SETTLEMENT_PROVIDER_MODE=live`` without
+    the required keys raises CONFIG_NOT_ACTIVE at startup.
+    """
+    mode = os.environ.get("SETTLEMENT_PROVIDER_MODE", "fake").strip().lower()
+    if mode not in {"fake", "live"}:
+        raise DomainError(
+            "CONFIG_NOT_ACTIVE",
+            f"SETTLEMENT_PROVIDER_MODE phải là fake hoặc live, nhận {mode!r}.",
+        )
+    if mode == "live":
+        ocr = MistralOCRClient(
+            api_key=os.environ.get("MISTRAL_API_KEY", ""),
+            base_url=os.environ.get("MISTRAL_BASE_URL", MISTRAL_OCR_BASE_URL),
+            model=os.environ.get("MISTRAL_OCR_MODEL", MISTRAL_OCR_MODEL),
+        )
+        xkiro = XkiroClient(
+            api_key=os.environ.get("XKIRO_API_KEY", ""),
+            base_url=os.environ.get("XKIRO_BASE_URL", XKIRO_BASE_URL),
+            model=os.environ.get("XKIRO_MODEL", XKIRO_MODEL),
+        )
+        return SettlementReader(artifact_root, ocr, xkiro)
+    return StructuredLedgerReader(artifact_root)
+
+
 def create_runtime_app(*, db_path: Path | None = None,
                        artifact_root: Path | None = None,
                        service: Service | None = None) -> FastAPI:
@@ -98,7 +134,7 @@ def create_runtime_app(*, db_path: Path | None = None,
         root = Path(artifact_root or os.environ.get(
             "SETTLEMENT_ARTIFACT_ROOT", DEFAULT_DATA_DIR / "artifacts"))
         store = Store(db, root)
-        reader = StructuredLedgerReader(store.artifact_root)
+        reader = _reader_from_env(store.artifact_root)
         service = Service(store, reader,
                           config=ServiceConfig(authority=DEMO_AUTHORITY))
     app = FastAPI(title="InvoiceReferee Settlement", version="0.2.0")

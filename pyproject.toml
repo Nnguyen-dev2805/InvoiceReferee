@@ -17,6 +17,10 @@ dependencies = [
     # over the heavy official `mistralai` SDK (httpx2 + jsonpath-python) for one
     # endpoint; see docs/evidence/provider-contract.md.
     "httpx>=0.27,<1",
+    # W03 reader: native PDF text extraction (pypdfium2, single-threaded executor)
+    # and image/representation handling with pixel limits (Pillow).
+    "pypdfium2>=4,<5",
+    "Pillow>=10,<12",
 ]
 
 [project.optional-dependencies]

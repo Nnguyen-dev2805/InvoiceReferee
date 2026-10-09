@@ -41,7 +41,7 @@ from invoice_referee.settlement.models import (
     RunInput,
 )
 
-_MONEY_KEYS_SUFFIXES = (
+MONEY_KEY_SUFFIXES = (
     ".amount", ".received", ".returned", "budget.approved",
     "advance.request.amount", "forecast.employee",
 )
@@ -78,7 +78,7 @@ def _validate_observations(observations: list[Observation]) -> None:
         if observation.read_state != "READ":
             continue
         if any(observation.key.endswith(suffix) or observation.key == suffix
-                for suffix in _MONEY_KEYS_SUFFIXES):
+                for suffix in MONEY_KEY_SUFFIXES):
             _validate_money(observation.value, observation.key, observation.fact_id)
 
 
@@ -171,7 +171,8 @@ def _dedup_payments(payments: dict[str, dict[str, Any]],
 
 
 def _evaluate_b7(run_input: RunInput, observations: list[Observation],
-                 relations: list[Relation], run_id: str, mode: str) -> Report:
+                 relations: list[Relation], run_id: str, mode: str,
+                 technical_issues: list[Issue] | None = None) -> Report:
     grouped = _by_key(observations)
     all_obs = [o for entries in grouped.values() for o in entries]
     _validate_observations(observations)  # SYS-02: reject before aggregation
@@ -205,7 +206,7 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
                 payment["sources"].append(observation.source_id)
 
     _validate_relations(relations, set(expenses), set(payments))
-    issues: list[Issue] = []
+    issues: list[Issue] = list(technical_issues or [])
     checks: list[CheckResult] = []
     canonical = _dedup_payments(payments, relations, issues, checks)
 
@@ -451,10 +452,11 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
 # --- B3 ----------------------------------------------------------------------
 
 def _evaluate_b3(run_input: RunInput, observations: list[Observation],
-                 relations: list[Relation], run_id: str, mode: str) -> Report:
+                 relations: list[Relation], run_id: str, mode: str,
+                 technical_issues: list[Issue] | None = None) -> Report:
     grouped = _by_key(observations)
     _validate_observations(observations)  # SYS-02: reject before aggregation
-    issues: list[Issue] = []
+    issues: list[Issue] = list(technical_issues or [])
     checks: list[CheckResult] = []
 
     def value_of(key: str) -> tuple[int | None, list[str]]:
@@ -555,9 +557,12 @@ def _evaluate_b3(run_input: RunInput, observations: list[Observation],
 
 def evaluate(run_input: RunInput, observations: list[Observation],
              relations: list[Relation], run_id: str = "R-ENGINE",
-             mode: str | None = None) -> Report:
+             mode: str | None = None,
+             technical_issues: list[Issue] | None = None) -> Report:
     """Dispatch by job; B7 computes settlement, B3 checks the advance request."""
     reader_mode = mode or run_input.config.get("reader_mode", "UNKNOWN")
     if run_input.submission.job == "B3":
-        return _evaluate_b3(run_input, observations, relations, run_id, reader_mode)
-    return _evaluate_b7(run_input, observations, relations, run_id, reader_mode)
+        return _evaluate_b3(run_input, observations, relations, run_id,
+                           reader_mode, technical_issues)
+    return _evaluate_b7(run_input, observations, relations, run_id,
+                        reader_mode, technical_issues)

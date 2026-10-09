@@ -129,7 +129,7 @@ def test_settlement_amount_and_unknown(e,a,ra,p,rp,expected):
 
 **Create:** settlement/reader.py; tests/settlement/{test_readers.py,test_pipeline.py}; extraction/prompts/settlement-{extract,match}.txt. **Modify:** models/pipeline/service/composition,pyproject/locks/.env.example nếudependencies/configthựcđổi; UIrunprogress/sourceobservations. **Consumes:** SourceRecord/RunBudget/RunInput. **Produces:** Readerread/match cóidentities/usage/ref/null, processsamecore vàrunrecords.
 
-- [ ] REDmocktransportbody/responseMistralpage0→UIpage1 mapping, xkirofullmodelID/none/JSONcontract, unknown/invalid/truncated, statswithmissingusage không0. Testproviderkeys chỉmock; khôngprintenv.
+- [x] REDmocktransportbody/responseMistralpage0→UIpage1 mapping, xkirofullmodelID/none/JSONcontract, unknown/invalid/truncated, statswithmissingusage không0. Testproviderkeys chỉmock; khôngprintenv.
 
 ```python
 def test_budget_exhaustion_is_not_an_unreadable_source():
@@ -143,10 +143,10 @@ def test_budget_exhaustion_is_not_an_unreadable_source():
 
 W03 định nghĩa `RunBudget(deadline:float,max_calls:int)`, `calls:int`, `reserve_call()->None`; reserve kiểm deadline và call cap trước gửi request. Test transport dùng `httpx.MockTransport`: callback raise `httpx.ReadTimeout` để kiểm technical outcome, callback trả JSON thiếu/truncated để kiểm validator. Không gọi network thật từ unit/integration tests.
 
-- [ ] ParseCSV/form/nativePDFdirect khi đủ; MistralOCR→shortextract; dependenciespypdfium2/Pillowchỉ thêm/resolvepin khi thựcneeded. PDFoperations tuần tự, giữoriginals/transform; nofabricatedbbox/confidence.
-- [ ] Per-runreader/calltrace; budget2attempts/chungrepair/cappeddeadline32calls vàglobal2calls, admitted5/active2. Candidatecontextscope/coverage, nofixedtop-k→absence. Fakeoffline modekhôngsilentfallback từLIVE.
-- [ ] UIprogresscóstage/outputsource, unknownfield vàtechnicalerror riêng. Rerunảnhđổi chỉaffectedreader/checks; oldresultreuseghi originrun/config.
-- [ ] Mock/replayintegrationGREEN, no-regressionUI/build. Chuẩn bịM0probe cụthểđểreview:1syntheticsourceOCR/extract+1unknown/1visioncontrol, giới hạncalls/budget vàreportmode. Chỉ gọllivekhiđượcauthorizationtươngứng; chưađượcphép khôngclaimquality/livepass.
+- [x] ParseCSV/form/nativePDFdirect khi đủ; MistralOCR→shortextract; dependenciespypdfium2/Pillowchỉ thêm/resolvepin khi thựcneeded. PDFoperations tuần tự, giữoriginals/transform; nofabricatedbbox/confidence.
+- [x] Per-runreader/calltrace; budget2attempts/chungrepair/cappeddeadline32calls vàglobal2calls, admitted5/active2. Candidatecontextscope/coverage, nofixedtop-k→absence. Fakeoffline modekhôngsilentfallback từLIVE.
+- [x] UIprogresscóstage/outputsource, unknownfield vàtechnicalerror riêng. Rerunảnhđổi chỉaffectedreader/checks; oldresultreuseghi originrun/config.
+- [x] Mock/replayintegrationGREEN, no-regressionUI/build. Chuẩn bịM0probe cụthểđểreview:1syntheticsourceOCR/extract+1unknown/1visioncontrol, giới hạncalls/budget vàreportmode. Chỉ gọllivekhiđượcauthorizationtươngứng; chưađượcphép khôngclaimquality/livepass.
 
 ## W04 — B3, câu hỏi và re-check có căn cứ
 
@@ -241,7 +241,7 @@ MỗiWtask cần nguồncodeactualtests+UIevidence vàSYSrefs; chỉcheckdonekhi
 | --- | --- | --- |
 | W01 |VERIFIED (local/fake; evidence: docs/evidence/settlement-W01.md) |Nativeform/source/reloadUI vàstoreguard |
 | W02 |VERIFIED (PIPELINE_FAKE_OR_REPLAY; evidence: docs/evidence/settlement-W02.md) |B7report cósource/unknown/negative/zero |
-| W03 |PLANNED |Reader/transport/budgets vàprobeplan |
+| W03 |VERIFIED (mock transports; live chưa chạy — M0 probe plan chờ authorization; evidence: docs/evidence/settlement-W03.md) |Reader/transport/budgets vàprobeplan |
 | W04 |PLANNED |B3/questions/assistedrecheck |
 | W05 |PLANNED |Quyếtđịnh/actualmoney/Stop/closure |
 | W06 |PLANNED |Evaluator/cutover/measurement/baseline |

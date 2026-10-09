@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS runs (
     snapshot_json TEXT NOT NULL,
     report_json TEXT,
     detail TEXT,
+    stage TEXT,
+    trace_json TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );

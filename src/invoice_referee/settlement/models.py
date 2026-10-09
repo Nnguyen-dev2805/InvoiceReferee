@@ -402,6 +402,26 @@ class Report(BaseModel):
     source_refs: list[str] = Field(default_factory=list)
 
 
+class CallTrace(BaseModel):
+    """One provider call (or direct parse note) with identity and usage.
+
+    ``usage`` is None when the API returns no usage — never a fabricated 0.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    call_id: str
+    stage: Literal["read", "ocr", "extract", "match"]
+    source_id: str | None = None
+    requested_model: str | None = None
+    response_model: str | None = None
+    usage: dict[str, int | None] | None = None
+    ok: bool
+    error_code: str | None = None
+    detail: str | None = None
+    duration_ms: StrictInt = 0
+
+
 class RunView(BaseModel):
     """Projection of a run for API/UI: status first, report by its own route."""
 
@@ -413,8 +433,10 @@ class RunView(BaseModel):
     mode: str
     input_revision: StrictInt
     control_epoch: StrictInt
+    stage: str | None = None
     created_at: AwareDatetime
     updated_at: AwareDatetime
     detail: str | None = None
     completion: Literal["COMPLETE", "INCOMPLETE"] | None = None
+    trace: list[CallTrace] = Field(default_factory=list)
     idempotent_replay: bool = False

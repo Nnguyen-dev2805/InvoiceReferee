@@ -35,6 +35,7 @@ from invoice_referee.settlement.models import (
     CaseSummary,
     CaseView,
     Command,
+    CallTrace,
     Report,
     RunInput,
     RunView,
@@ -133,6 +134,10 @@ class Store:
         columns = {row[1] for row in conn.execute("PRAGMA table_info(runs)")}
         if columns and "detail" not in columns:
             conn.execute("ALTER TABLE runs ADD COLUMN detail TEXT")
+        if columns and "stage" not in columns:
+            conn.execute("ALTER TABLE runs ADD COLUMN stage TEXT")
+        if columns and "trace_json" not in columns:
+            conn.execute("ALTER TABLE runs ADD COLUMN trace_json TEXT")
 
     # --- connections and transactions --------------------------------------
 
@@ -475,6 +480,22 @@ class Store:
         with self._read() as conn:
             return self._run_view(self._run_row(conn, run_id))
 
+    def update_run_stage(self, run_id: str, stage: str) -> None:
+        with self._write() as conn:
+            run = self._run_row(conn, run_id)
+            if run["status"] in _TERMINAL_STATUSES:
+                return  # run đã kết thúc; stage cũ giữ nguyên làm history
+            conn.execute("UPDATE runs SET stage = ?, updated_at = ? WHERE id = ?",
+                         (stage, _iso(utcnow()), run_id))
+
+    def set_run_trace(self, run_id: str,
+                      entries: list[dict[str, Any]]) -> None:
+        with self._write() as conn:
+            self._run_row(conn, run_id)
+            conn.execute("UPDATE runs SET trace_json = ?, updated_at = ? "
+                         "WHERE id = ?",
+                         (_dump(entries), _iso(utcnow()), run_id))
+
     def get_report(self, run_id: str) -> Report | None:
         with self._read() as conn:
             row = self._run_row(conn, run_id)
@@ -498,14 +519,19 @@ class Store:
         completion = None
         if row["report_json"]:
             completion = _load(row["report_json"]).get("completion")
+        trace = []
+        if row["trace_json"]:
+            trace = [CallTrace.model_validate(entry)
+                     for entry in _load(row["trace_json"])]
         return RunView(
             id=row["id"], case_id=row["case_id"], status=row["status"],
             mode=row["mode"], input_revision=row["input_revision"],
-            control_epoch=row["control_epoch"],
+            control_epoch=row["control_epoch"], stage=row["stage"],
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),
             detail=row["detail"],
             completion=completion,
+            trace=trace,
         )
 
     # --- history -----------------------------------------------------------
