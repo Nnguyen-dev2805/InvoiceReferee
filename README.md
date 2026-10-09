@@ -59,6 +59,26 @@ versions are pinned in `frontend/package-lock.json`.
 
 ## Run the app (dev)
 
+### Settlement rebuild (current normal entrypoint)
+
+The accepted settlement design runs on its own core (SQLite + artifacts under
+`data/settlement/`, Git-ignored) with its own API factory and UI slice:
+
+```bash
+# Backend (port 8000; the Vite dev server proxies /api here)
+.venv/bin/uvicorn invoice_referee.api.settlement:create_runtime_app --factory --host 127.0.0.1 --port 8000
+
+# Frontend (normal UI now mounts the settlement App)
+npm --prefix frontend run dev -- --host 127.0.0.1
+```
+
+Implemented so far (W01): create case → upload sources → reload → open the
+stored original, with stale-version and idempotency guards. The sections below
+describe the earlier claim-processing implementation kept for comparison; they
+do not establish settlement capabilities.
+
+### Earlier claim-processing app (historical reference)
+
 The app needs two processes. The backend listens on **port 8000** because the Vite
 dev server proxies `/api` to `127.0.0.1:8000` (see `frontend/vite.config.ts`).
 

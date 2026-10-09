@@ -59,7 +59,7 @@ Cácmethodwrappersđược dùng bởiAPI/eval/UItests, không tạo factory/plu
 
 **Create:** settlement/models.py,store.py,schema.sql; api/settlement.py; frontend/src/settlement/{types.ts,api.ts,App.tsx}; tests/settlement/test_intake.py. **Modify:** frontend/src/main.tsx; README/AGENTS sourceauthority/currentcommands. **Consumes:** Submission/Command/specintake. **Produces:** CaseView/SourceRecord/Store, APIcreate/list/get/revise/sources/content/history, UIintake/reload; các bảng khác chỉinit nếudependency thực cần.
 
-- [ ] Định nghĩa strictcontracts vàmeaningfulREDcheck create→uploadoriginal→reload→staleedit khôngoverwrite; commandretry samekey khácpayload409. Sử dụngfilegiảlậpmới, khôngprivatebill.
+- [x] Định nghĩa strictcontracts vàmeaningfulREDcheck create→uploadoriginal→reload→staleedit khôngoverwrite; commandretry samekey khácpayload409. Sử dụngfilegiảlậpmới, khôngprivatebill.
 
 ```python
 def test_stale_revision_preserves_the_new_submission(store, submission, command):
@@ -72,7 +72,7 @@ def test_stale_revision_preserves_the_new_submission(store, submission, command)
     assert store.get_case(created.id).case_version == current.case_version
 ```
 
-- [ ] Khởi tạo fixtures trong `test_intake.py` theo nội dung dưới đây. Chạy RED bằng `rtk proxy .venv/bin/python -m pytest tests/settlement/test_intake.py -q`; expected failure là module/contract chưa tồn tại, không cố tình làm assertion yếu đi.
+- [x] Khởi tạo fixtures trong `test_intake.py` theo nội dung dưới đây. Chạy RED bằng `rtk proxy .venv/bin/python -m pytest tests/settlement/test_intake.py -q`; expected failure là module/contract chưa tồn tại, không cố tình làm assertion yếu đi.
 
 ```python
 from datetime import datetime, timezone
@@ -97,15 +97,15 @@ def command():
     return Command(key="create-1", actor_id="NV-01", demo_role="EMPLOYEE",
                    expected_case_version=None, body={})
 ```
-- [ ] Implementcreate/revision/source/schema transaction/file ownership, limitchecks/errors theoSYS-01/15. Reuseatomicartifacthelper, giữmỗiassociation thayvì bỏsourceđồngbytes; originals khôngoverwrite theo filename.
-- [ ] UIformjobB3/B7,scope/purpose và nguồn; sau lưu hiệnstage/refs/chưareport. Không gọioldauto-requestpath. Sourceunsupported/overlimits báo riêng, khôngbusinessREJECT.
-- [ ] GREENfocusedtests, frontendtypecheck/build; chạy2serversfake/offline và thao tácbrowsercreate→upload→reload→openoriginal. Lưuactual/UIevidence tạidata/settlement/evidence, tóm tắt publicsafe trongdocs/evidence/settlement-W01.md.
+- [x] Implementcreate/revision/source/schema transaction/file ownership, limitchecks/errors theoSYS-01/15. Reuseatomicartifacthelper, giữmỗiassociation thayvì bỏsourceđồngbytes; originals khôngoverwrite theo filename.
+- [x] UIformjobB3/B7,scope/purpose và nguồn; sau lưu hiệnstage/refs/chưareport. Không gọioldauto-requestpath. Sourceunsupported/overlimits báo riêng, khôngbusinessREJECT.
+- [x] GREENfocusedtests, frontendtypecheck/build; chạy2serversfake/offline và thao tácbrowsercreate→upload→reload→openoriginal. Lưuactual/UIevidence tạidata/settlement/evidence, tóm tắt publicsafe trongdocs/evidence/settlement-W01.md.
 
 ## W02 — B7 report thuần và kiểm chứng tiền trên UI
 
 **Create:** settlement/rules.py,pipeline.py,service.py; tests/settlement/{builders.py,test_rules.py,test_report_api.py}; frontend/src/settlement/Report.tsx. **Modify:** models/store/API/settlementApp types theointerfaces. **Consumes:** W01snapshots và observations/relations injected córefs. **Produces:** evaluate/process/Report, run/report routes, persistedstep/actuals và basic evaluatorhook.
 
-- [ ] Builders dựngfacts/relations/coverage từnguồngiảlậpđộc lập, không gọiengine để tạoexpected. REDpositive/negative/zero/unknown vàcompanydirect/duplicate/partialportion.
+- [x] Builders dựngfacts/relations/coverage từnguồngiảlậpđộc lập, không gọiengine để tạoexpected. REDpositive/negative/zero/unknown vàcompanydirect/duplicate/partialportion.
 
 ```python
 @pytest.mark.parametrize("e,a,ra,p,rp,expected", [
@@ -121,9 +121,9 @@ def test_settlement_amount_and_unknown(e,a,ra,p,rp,expected):
 
 `MoneyComponents` là record Pydantic với năm trường e/a/ra/p/rp bắt buộc, mỗi trường StrictInt hoặc None. `calculate_net` trả None khi thiếu thành phần; khi đủ, trả đúng e−(a−ra)−(p−rp). Hàm này không chứng minh nguồn hoặc cấp quyền: tests report/API riêng phải kiểm tra facts, links, policy, quyền và approved amount vẫn None trước quyết định.
 
-- [ ] Implementeligibility/payerparts/historyscope/budgetauthority checks; moneyincident/chưaB/vượtB/rightsissues giữcalculated/conditional riêng, unknown không0. S chỉ từđủfacts, noAUTOpaymententity.
-- [ ] Persistreport vàrunstatus/jobcompletion; UIbảngcomponents/expense rows/ref/issue owner, nhãnFAKE_OR_REPLAY củainjectedreader. Bấmnguồnkiểmtrađượctừngsố; GETreport không tựreread/provider.
-- [ ] Tests`test_rules.py test_report_api.py`, oldnumericregressions liênquan, frontendReportcomponenttest/build. UIđiQ01/Q03/Q04vàunknown quaAPIcùngservice; Q04khôngrequest/approval0. SYS-02..06/17 nối vàoexpectedactualchấm theo nghĩa.
+- [x] Implementeligibility/payerparts/historyscope/budgetauthority checks; moneyincident/chưaB/vượtB/rightsissues giữcalculated/conditional riêng, unknown không0. S chỉ từđủfacts, noAUTOpaymententity.
+- [x] Persistreport vàrunstatus/jobcompletion; UIbảngcomponents/expense rows/ref/issue owner, nhãnFAKE_OR_REPLAY củainjectedreader. Bấmnguồnkiểmtrađượctừngsố; GETreport không tựreread/provider.
+- [x] Tests`test_rules.py test_report_api.py`, oldnumericregressions liênquan, frontendReportcomponenttest/build. UIđiQ01/Q03/Q04vàunknown quaAPIcùngservice; Q04khôngrequest/approval0. SYS-02..06/17 nối vàoexpectedactualchấm theo nghĩa.
 
 ## W03 — Mistral/xkiro reader và pipeline có budget
 
@@ -239,8 +239,8 @@ MỗiWtask cần nguồncodeactualtests+UIevidence vàSYSrefs; chỉcheckdonekhi
 
 | Task | Status lúc viết plan | Deliverable next |
 | --- | --- | --- |
-| W01 |PLANNED |Nativeform/source/reloadUI vàstoreguard |
-| W02 |PLANNED |B7report cósource/unknown/negative/zero |
+| W01 |VERIFIED (local/fake; evidence: docs/evidence/settlement-W01.md) |Nativeform/source/reloadUI vàstoreguard |
+| W02 |VERIFIED (PIPELINE_FAKE_OR_REPLAY; evidence: docs/evidence/settlement-W02.md) |B7report cósource/unknown/negative/zero |
 | W03 |PLANNED |Reader/transport/budgets vàprobeplan |
 | W04 |PLANNED |B3/questions/assistedrecheck |
 | W05 |PLANNED |Quyếtđịnh/actualmoney/Stop/closure |
