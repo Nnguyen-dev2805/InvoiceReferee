@@ -128,6 +128,20 @@ describe('uiState - summarizeCase', () => {
     expect(summary.tone).toBe('warning');
   });
 
+  test('B3 draft with null trip fields says not-extracted, not employee omission', () => {
+    // Extraction ran (report.b3 exists) but destination/purpose are null:
+    // the UI must say the fields were NOT EXTRACTED from the document, not
+    // imply the employee failed to declare them.
+    const view = createCase();
+    const run = createRun();
+    const report = createReport(); // b3.intake.destination/purpose are null
+
+    const summary = summarizeCase(view, run, report);
+    expect(summary.description).toContain('Chưa trích được');
+    expect(summary.description).toContain('từ tài liệu');
+    expect(summary.description).not.toContain('thiếu');
+  });
+
   test('stopped case prioritizes Stop status', () => {
     const view = createCase({ stop_active: true });
     const run = createRun();

@@ -16,6 +16,7 @@ import httpx
 import pytest
 
 from invoice_referee.domain.models import DomainError
+from invoice_referee.settlement.b3 import B3_V1_KEYS
 from invoice_referee.settlement.models import RunBudget, SourceRecord
 from invoice_referee.settlement.reader import StructuredLedgerReader
 from tests.settlement import builders as b
@@ -290,6 +291,48 @@ def test_usage_missing_is_none_not_zero(tmp_path):
         assert entry.usage is None
 
 
+def test_usage_nested_token_details_are_traced_not_rejected(tmp_path):
+    """Real APIs nest ``*_tokens_details`` objects inside ``usage``.
+
+    A raw provider ``usage`` carrying nested detail objects must not crash the
+    run: the trace records the nested counts instead of a Pydantic failure that
+    would mark the whole run FAILED.
+    """
+    ocr_pages = [{"index": 0, "markdown": "Tổng: 5.000.000"}]
+    nested_usage = {
+        "prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30,
+        "prompt_tokens_details": {"cached_tokens": 512},
+        "completion_tokens_details": {"reasoning_tokens": 4},
+    }
+    extract = xkiro_body(fields=[], usage=nested_usage)
+    reader = make_reader(tmp_path, ocr_transport(ocr_pages, usage=nested_usage),
+                         scripted_transport([extract], []))
+    source = write_source(tmp_path, "hoa-don.png", png_bytes(), "image/png")
+    reader.read(source, [], budget())
+    usages = [entry.usage for entry in reader.trace_entries() if entry.usage]
+    assert len(usages) == 2  # OCR + extract both traced, none rejected
+    for usage in usages:
+        assert usage["total_tokens"] == 30
+        assert usage["prompt_tokens_details"] == {"cached_tokens": 512}
+
+
+def test_usage_non_numeric_values_are_dropped_not_fatal(tmp_path):
+    """A stray non-numeric usage value is dropped, never fatal to the run."""
+    ocr_pages = [{"index": 0, "markdown": "text"}]
+    extract = xkiro_body(fields=[], usage={
+        "total_tokens": 7, "weird": "not-a-number",
+        "prompt_tokens_details": {"cached_tokens": 3},
+    })
+    reader = make_reader(tmp_path, ocr_transport(ocr_pages, usage={"total_tokens": 7}),
+                         scripted_transport([extract], []))
+    source = write_source(tmp_path, "hoa-don.png", png_bytes(), "image/png")
+    reader.read(source, [], budget())
+    for entry in reader.trace_entries():
+        if entry.usage:
+            assert entry.usage["total_tokens"] == 7
+            assert "weird" not in entry.usage
+
+
 # --- Invalid / truncated / unknown ------------------------------------------
 
 def test_invalid_json_retries_once_then_succeeds(tmp_path):
@@ -529,3 +572,122 @@ def test_fake_reader_filters_b3_grammar_keys(tmp_path):
         budget())
     keys = {o.key for o in observations}
     assert keys == {"document.role", "forecast.total"}
+
+
+# --- B3 v1 extraction contract: concrete trip fields, not prefixes ------------
+
+def _b3_extract_payload(captured: list[dict]) -> dict:
+    """The user payload sent to the model, decoded from the chat request."""
+    request = captured[0]
+    return json.loads(request["messages"][1]["content"])
+
+
+def test_b3_keys_are_concrete_scalar_fields_not_prefixes():
+    # trip./person./advance. prefix thô không phải field dữ liệu: model không
+    # thể trả "trip." — nó phải thấy trip.destination/trip.purpose cụ thể.
+    assert "trip.destination" in B3_V1_KEYS
+    assert "trip.purpose" in B3_V1_KEYS
+    assert "trip.start" in B3_V1_KEYS
+    assert "trip.end" in B3_V1_KEYS
+    assert "person.employee_ref" in B3_V1_KEYS
+    assert "person.name" in B3_V1_KEYS
+    assert "trip." not in B3_V1_KEYS
+    assert "person." not in B3_V1_KEYS
+    assert "advance." not in B3_V1_KEYS
+
+
+def test_b3_extract_request_asks_for_destination_and_purpose(tmp_path):
+    ocr_pages = [{"index": 0, "markdown": "Lý do tạm ứng: công tác Hà Nội"}]
+    captured: list[dict] = []
+    reader = make_reader(tmp_path, ocr_transport(ocr_pages),
+                         scripted_transport([xkiro_body(fields=[])], captured))
+    source = write_source(tmp_path, "de-nghi.png", png_bytes(), "image/png")
+    reader.read(source, B3_V1_KEYS, budget())
+    keys = _b3_extract_payload(captured)["keys"]
+    assert "trip.destination" in keys
+    assert "trip.purpose" in keys
+    assert "trip." not in keys
+
+
+def test_b3_merged_prose_text_reaches_extraction(tmp_path):
+    prose = ("Lý do tạm ứng: khảo sát yêu cầu và thống nhất phạm vi triển khai "
+             "dự án tại Đà Nẵng từ 2026-10-12 đến 2026-10-13.")
+    ocr_pages = [{"index": 0, "markdown": prose}]
+    captured: list[dict] = []
+    reader = make_reader(tmp_path, ocr_transport(ocr_pages),
+                         scripted_transport([xkiro_body(fields=[])], captured))
+    source = write_source(tmp_path, "de-nghi.png", png_bytes(), "image/png")
+    reader.read(source, B3_V1_KEYS, budget())
+    payload = _b3_extract_payload(captured)
+    assert "Đà Nẵng" in payload["text"]
+    assert "khảo sát yêu cầu" in payload["text"]
+
+
+def test_omitted_b3_trip_field_is_unclear_not_prefix_or_not_found(tmp_path):
+    ocr_pages = [{"index": 0, "markdown": "text"}]
+    # Model returns trip.destination but omits trip.purpose entirely.
+    extract = xkiro_body(fields=[{
+        "key": "trip.destination", "raw_text": "Đà Nẵng",
+        "read_state": "READ", "value": "Đà Nẵng",
+        "evidence": {"page": 1, "quote": "Đà Nẵng"}}])
+    reader = make_reader(tmp_path, ocr_transport(ocr_pages),
+                         scripted_transport([extract], []))
+    source = write_source(tmp_path, "de-nghi.png", png_bytes(), "image/png")
+    observations = reader.read(source, B3_V1_KEYS, budget())
+    by_key = {o.key: o for o in observations}
+    # No fabricated prefix pseudo-field.
+    assert "trip." not in by_key
+    assert "person." not in by_key
+    assert "forecast." not in by_key
+    # Omitted concrete field → UNCLEAR, never NOT_FOUND.
+    assert by_key["trip.purpose"].read_state == "UNCLEAR"
+    assert by_key["trip.purpose"].value is None
+    # Extracted concrete field kept as READ.
+    assert by_key["trip.destination"].read_state == "READ"
+    assert by_key["trip.destination"].value == "Đà Nẵng"
+
+
+def test_explicit_not_found_is_kept_distinct_from_unclear(tmp_path):
+    ocr_pages = [{"index": 0, "markdown": "text"}]
+    extract = xkiro_body(fields=[{
+        "key": "trip.destination", "raw_text": None,
+        "read_state": "NOT_FOUND", "value": None,
+        "evidence": {"page": 1, "quote": ""}}])
+    reader = make_reader(tmp_path, ocr_transport(ocr_pages),
+                         scripted_transport([extract], []))
+    source = write_source(tmp_path, "de-nghi.png", png_bytes(), "image/png")
+    observations = reader.read(source, B3_V1_KEYS, budget())
+    by_key = {o.key: o for o in observations}
+    assert by_key["trip.destination"].read_state == "NOT_FOUND"
+
+
+def test_ambiguous_destination_stays_unclear(tmp_path):
+    ocr_pages = [{"index": 0, "markdown": "text"}]
+    extract = xkiro_body(fields=[{
+        "key": "trip.destination", "raw_text": "Hà Nội / Đà Nẵng",
+        "read_state": "UNCLEAR", "value": None,
+        "evidence": {"page": 1, "quote": "Hà Nội / Đà Nẵng"}}])
+    reader = make_reader(tmp_path, ocr_transport(ocr_pages),
+                         scripted_transport([extract], []))
+    source = write_source(tmp_path, "de-nghi.png", png_bytes(), "image/png")
+    observations = reader.read(source, B3_V1_KEYS, budget())
+    destination = next(o for o in observations if o.key == "trip.destination")
+    assert destination.read_state == "UNCLEAR"
+    assert destination.value is None
+
+
+def test_b3_extract_prompt_guides_merged_prose_trip_fields():
+    from invoice_referee.settlement.reader import load_prompt
+
+    prompt = load_prompt("settlement-b3-extract.txt")
+    # Must name the concrete scalar keys the backend needs.
+    assert "trip.destination" in prompt
+    assert "trip.purpose" in prompt
+    assert "trip.start" in prompt
+    assert "trip.end" in prompt
+    # Must tell the model to read from merged prose, not a dedicated label.
+    assert "Lý do tạm ứng" in prompt or "Nội dung công tác" in prompt
+    # Must forbid inferring the place from company address / a cost row.
+    assert "địa chỉ công ty" in prompt
+    # Keep the "no guessing / null when unclear" contract.
+    assert "không đoán" in prompt

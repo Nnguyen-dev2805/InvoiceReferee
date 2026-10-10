@@ -107,6 +107,13 @@ export function ActionsPanel({
         <p className="muted">
           Hồ sơ đã kết thúc ({view.stage}); chỉ đọc lại history và report.
         </p>
+      ) : role === 'EMPLOYEE' ? (
+        <div className="notice notice-info" role="status" style={{ marginTop: 'var(--space-4)' }}>
+          <p>
+            👤 <strong>Góc nhìn Nhân viên:</strong> Bạn đang theo dõi tiến độ hồ sơ của mình.
+            Các thao tác rà soát kế toán, phê duyệt và thanh toán do Người có thẩm quyền và Kế toán thực hiện.
+          </p>
+        </div>
       ) : (
         <>
           {b3V1 ? (

@@ -111,13 +111,17 @@ export type RunStatus =
   | 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'TIMED_OUT'
   | 'STOPPED' | 'SUPERSEDED' | 'INTERRUPTED';
 
+// Provider usage: ints, or one level of nested int/null detail objects
+// (e.g. prompt_tokens_details.cached_tokens). Mirrors CallTrace.usage.
+export type UsageValue = number | { [key: string]: number | null } | null;
+
 export interface CallTrace {
   call_id: string;
   stage: 'read' | 'ocr' | 'extract' | 'match';
   source_id: string | null;
   requested_model: string | null;
   response_model: string | null;
-  usage: Record<string, number | null> | null;
+  usage: Record<string, UsageValue> | null;
   ok: boolean;
   error_code: string | null;
   detail: string | null;

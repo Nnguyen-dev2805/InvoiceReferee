@@ -215,10 +215,29 @@ class StructuredLedgerReader:
         return relations
 
 
+def _key_matches(key: str, requested: str) -> bool:
+    """One requested key matches one returned key.
+
+    Three shapes (System §S2 key grammar):
+    - concrete scalar (``trip.destination``): exact match only.
+    - prefix family (``expense.`` / ``payment.`` / ``forecast.`` in B7): a
+      trailing-dot namespace matches any key under it.
+    - row template (``forecast.row.<row_id>.description``): ``<row_id>`` is a
+      document-local placeholder, so any non-empty row id matches.
+    """
+    if "<row_id>" in requested:
+        prefix, suffix = requested.split("<row_id>", 1)
+        return (key.startswith(prefix) and key.endswith(suffix)
+                and len(key) > len(prefix) + len(suffix))
+    if requested.endswith("."):
+        return key.startswith(requested)
+    return key == requested
+
+
 def _wanted(key: str, keys: list[str]) -> bool:
     if not keys:
         return True
-    return any(key == prefix or key.startswith(prefix) for prefix in keys)
+    return any(_key_matches(key, requested) for requested in keys)
 
 
 # --- CSV ledger contract (direct parse, System §S8) ---------------------------
@@ -766,8 +785,13 @@ class SettlementReader:
                 page=final_page, locator=locator, basis=basis,
                 usability="USABLE" if read_state == "READ" else "UNCERTAIN",
             ))
-        # Field yêu cầu bị bỏ khỏi output không tự NOT_FOUND (System §S2)
-        requested = [k for k in keys if "." in k]
+        # A requested concrete field omitted from output is UNCLEAR — never
+        # NOT_FOUND (System §S2): "chưa trả đủ dữ liệu" ≠ "đã tìm không thấy".
+        # Prefix families (``expense.``) and row templates
+        # (``forecast.row.<row_id>.x``) are grammars, not single fields, so they
+        # are never fabricated as pseudo-observations.
+        requested = [k for k in keys if "." in k and "<row_id>" not in k
+                     and not k.endswith(".")]
         returned = {o.key for o in observations}
         for key in requested:
             if key not in returned:

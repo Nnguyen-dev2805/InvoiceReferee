@@ -359,7 +359,22 @@ def is_b3_v1(form: dict[str, Any] | None) -> bool:
 # estimate_arithmetic, request_forecast_consistency, proposal_relation,
 # source_form_consistency, history_coverage, prior_advance_state, decision_route.
 
-B3_V1_KEYS = ["document.role", "person.", "trip.", "advance.", "forecast."]
+# Concrete scalar keys the backend consumes. Prefixes are NOT fields: the model
+# must return e.g. ``trip.destination``, never the bare ``trip.``. Forecast rows
+# use a separate grammar where ``<row_id>`` is document-local (see prompt).
+B3_SCALAR_KEYS = [
+    "document.role",
+    "person.employee_ref", "person.name",
+    "trip.destination", "trip.start", "trip.end", "trip.purpose",
+    "advance.request.amount", "advance.request.amount_words",
+    "advance.request.amount_words_value", "advance.settlement_due",
+    "forecast.company", "forecast.employee", "forecast.total",
+]
+B3_ROW_KEY_TEMPLATES = [
+    "forecast.row.<row_id>.description", "forecast.row.<row_id>.basis",
+    "forecast.row.<row_id>.company", "forecast.row.<row_id>.employee",
+]
+B3_V1_KEYS = B3_SCALAR_KEYS + B3_ROW_KEY_TEMPLATES
 
 _ROW_FIELDS = ("description", "basis", "company", "employee")
 _TRIP_FIELDS = ("trip.destination", "trip.start", "trip.end", "trip.purpose")

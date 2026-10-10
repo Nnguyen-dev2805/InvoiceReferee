@@ -98,3 +98,15 @@ test('Stop đang bật: không cho Stop nữa, cho Resume', () => {
   expect((screen.getByText(/Resume \(epoch/) as HTMLButtonElement).disabled)
     .toBe(false);
 });
+
+test('vai EMPLOYEE chỉ thấy tình trạng tiền và thông báo, không thấy form duyệt/chi', () => {
+  render(<ActionsPanel view={makeView()} role="EMPLOYEE" actorId="NV-01"
+    decisionId={null} reportReady onAction={noop} />);
+  expect(screen.getByTestId('money-summary')).toBeTruthy();
+  expect(screen.getByText(/Góc nhìn Nhân viên/)).toBeTruthy();
+  expect(screen.queryByText('Quyết định (người duyệt)')).not.toBeInTheDocument();
+  expect(screen.queryByText(/Rà soát kế toán/)).not.toBeInTheDocument();
+  expect(screen.queryByText('Ghi sự kiện tiền')).not.toBeInTheDocument();
+  expect(screen.queryByText('Stop hồ sơ')).not.toBeInTheDocument();
+});
+

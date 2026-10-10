@@ -165,6 +165,59 @@ def test_fake_reader_mode_is_explicit_not_live(tmp_path):
     assert reader.mode == "FAKE_OR_REPLAY"
 
 
+def test_run_succeeds_when_provider_usage_has_nested_token_details(tmp_path):
+    """Regression: nested provider ``usage`` must not fail the whole run.
+
+    A raw provider response can carry ``prompt_tokens_details`` objects. When
+    the reader traced that, ``CallTrace`` rejected the nested value and the run
+    was marked FAILED. The run must now reach SUCCEEDED with the nested counts
+    persisted on the trace.
+    """
+    store = Store(tmp_path / "cases.sqlite", tmp_path / "artifacts")
+
+    class NestedUsageReader(StructuredLedgerReader):
+        def reset_trace(self):
+            self._calls = []
+
+        def trace_entries(self):
+            return list(self._calls)
+
+        def read(self, source, keys, budget):
+            observations = super().read(source, keys, budget)
+            self._calls = [CallTrace(
+                call_id="c1", stage="read", source_id=source.id, ok=True,
+                duration_ms=1, usage={
+                    "prompt_tokens": 10, "completion_tokens": 20,
+                    "total_tokens": 30,
+                    "prompt_tokens_details": {"cached_tokens": 512},
+                })]
+            return observations
+
+    reader = NestedUsageReader(store.artifact_root)
+    service = Service(store, reader, config=ServiceConfig())
+    cutoff = datetime(2026, 10, 8, 11, tzinfo=timezone.utc)
+    submission = Submission(employee_ref="NV-01", work_ref="CT-01", job="B7",
+                            money_as_of=cutoff, knowledge_cutoff=cutoff,
+                            form={"purpose": "Công tác A"})
+    case = service.submit(submission, Command(
+        key="c1", actor_id="NV-01", demo_role="EMPLOYEE",
+        expected_case_version=None, body={}))
+    service.add_source(case.id, Upload(filename="hoa-don.txt",
+                                       content=LEDGER.encode()), Command(
+        key="s1", actor_id="NV-01", demo_role="EMPLOYEE",
+        expected_case_version=case.case_version, body={}))
+    view = service.get_case(case.id)
+    run = service.start(case.id, Command(key="r1", actor_id="NV-01",
+                                         demo_role="EMPLOYEE",
+                                         expected_case_version=view.case_version,
+                                         body={}))
+    ended = service.wait(run.id, timeout=10)
+    assert ended.status == "SUCCEEDED"
+    assert ended.trace
+    assert ended.trace[0].usage["total_tokens"] == 30
+    assert ended.trace[0].usage["prompt_tokens_details"] == {"cached_tokens": 512}
+
+
 # --- B3 v1 (b3-intake-v1): pipeline branch -------------------------------------
 
 from tests.settlement import b3_builders as b3b  # noqa: E402
@@ -271,7 +324,11 @@ def test_b3_v1_reader_receives_b3_key_grammar(tmp_path):
     assert reader.read_keys, "phải có ít nhất một lần read"
     for keys in reader.read_keys:
         assert "document.role" in keys
-        assert any(key.startswith("forecast.") for key in keys)
+        # Concrete scalar trip keys, not the bare "trip." prefix.
+        assert "trip.destination" in keys
+        assert "trip.purpose" in keys
+        assert "trip." not in keys
+        assert any(key.startswith("forecast.row.") for key in keys)
 
 
 def test_b3_v1_native_form_runs_without_sources_or_matcher(tmp_path):

@@ -12,7 +12,14 @@ from pathlib import Path
 from time import monotonic as _monotonic
 from typing import Any, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictInt
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictInt,
+    field_validator,
+)
 
 from invoice_referee.domain.models import DomainError
 from invoice_referee.settlement.b3 import B3CompanyContext, B3Proposal
@@ -515,6 +522,10 @@ class CallTrace(BaseModel):
     """One provider call (or direct parse note) with identity and usage.
 
     ``usage`` is None when the API returns no usage — never a fabricated 0.
+    Real APIs nest detail objects (``prompt_tokens_details`` /
+    ``completion_tokens_details``), so a value is an int or one level of
+    int/null pairs. Non-numeric leaves are dropped, never fatal: usage is
+    diagnostics and must not fail a run.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -524,11 +535,37 @@ class CallTrace(BaseModel):
     source_id: str | None = None
     requested_model: str | None = None
     response_model: str | None = None
-    usage: dict[str, int | None] | None = None
+    usage: dict[str, int | dict[str, int | None] | None] | None = None
     ok: bool
     error_code: str | None = None
     detail: str | None = None
     duration_ms: StrictInt = 0
+
+    @field_validator("usage", mode="before")
+    @classmethod
+    def _coerce_usage(cls, value: object) -> object:
+        """Normalize raw provider usage into int / one-level-int-dict values.
+
+        Keeps known numeric leaves, keeps one level of nested numeric detail,
+        and drops anything else (strings, bools, deeper nesting) so a stray
+        provider field can never raise and fail the run.
+        """
+        if not isinstance(value, dict):
+            return None
+
+        def leaf(item: object) -> int | None:
+            return item if isinstance(item, int) and not isinstance(item, bool) \
+                else None
+
+        cleaned: dict[str, int | dict[str, int | None] | None] = {}
+        for key, item in value.items():
+            if isinstance(item, bool):
+                continue
+            if isinstance(item, int):
+                cleaned[key] = item
+            elif isinstance(item, dict):
+                cleaned[key] = {str(k): leaf(v) for k, v in item.items()}
+        return cleaned
 
 
 class RunView(BaseModel):

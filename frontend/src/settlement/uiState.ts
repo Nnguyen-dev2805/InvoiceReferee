@@ -70,11 +70,28 @@ export function summarizeCase(
       }
       if (!form.settlement_due) missing.push('Hạn thanh toán tạm ứng');
 
+      // Distinguish "extraction did not find the field" from "the employee
+      // omitted it": a null trip field means the document did not yield it,
+      // not that the submitter failed to declare it.
+      const tripNotExtracted =
+        !form.destination && !form.purpose;
+      const nonTripMissing = missing.filter(
+        (name) => name !== 'Nơi đến' && name !== 'Mục đích công tác',
+      );
+      let description: string;
+      if (tripNotExtracted) {
+        description = nonTripMissing.length > 0
+          ? `Chưa trích được Nơi đến và Mục đích công tác từ tài liệu. Cần bổ sung: ${nonTripMissing.join(', ')}.`
+          : 'Chưa trích được Nơi đến và Mục đích công tác từ tài liệu. Vui lòng kiểm tra và bổ sung trước khi gửi.';
+      } else if (missing.length > 0) {
+        description = `AI đã đọc tài liệu. Còn thiếu: ${missing.join(', ')}.`;
+      } else {
+        description = 'Kiểm tra lại toàn bộ thông tin đề nghị trước khi gửi duyệt.';
+      }
+
       return {
         title: 'Kiểm tra bản nháp trước khi gửi',
-        description: missing.length > 0
-          ? `AI đã đọc tài liệu. Còn thiếu: ${missing.join(', ')}.`
-          : 'Kiểm tra lại toàn bộ thông tin đề nghị trước khi gửi duyệt.',
+        description,
         tone: missing.length > 0 ? 'warning' : 'info',
         missingFields: missing,
         primaryTarget: 'draft-editor',

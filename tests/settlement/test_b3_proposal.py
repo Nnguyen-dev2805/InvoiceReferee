@@ -165,6 +165,55 @@ def test_t02_words_consistent_passes():
     assert check_of(report, "amount_words_consistency").status == "PASS"
 
 
+def test_draft_keeps_destination_and_purpose_with_source_refs():
+    # Regression: destination/purpose extracted from merged prose must reach
+    # the draft AND keep their source refs (not just the request amount).
+    draft = {"schema_version": "b3-intake-v1", "intake_method": "IMPORT",
+             "confirmed": False}
+    report = evaluate(make_b3_run(form=draft), make_b3_observations())
+    intake = report.b3.intake
+    assert intake.destination == "Hà Nội"
+    assert intake.purpose == ("Khảo sát yêu cầu và thống nhất phạm vi triển khai "
+                              "dự án tại Hà Nội.")
+    assert any("S-B3-REQ" in ref
+               for ref in report.b3.field_refs["destination"])
+    assert any("S-B3-REQ" in ref
+               for ref in report.b3.field_refs["purpose"])
+    # Draft never auto-submits: still awaiting employee confirmation.
+    assert report.b3.readiness == "DRAFT_CONFIRMATION_REQUIRED"
+    assert intake.confirmed is False
+
+
+def test_draft_trip_fields_are_not_hardcoded():
+    # Different destination/purpose must flow through unchanged — proves the
+    # pipeline does not hardcode "Hà Nội" or the sample sentence.
+    observations = []
+    for o in make_b3_observations():
+        if o.key == "trip.destination":
+            observations.append(o.model_copy(update={"value": "Đà Nẵng"}))
+        elif o.key == "trip.purpose":
+            observations.append(o.model_copy(
+                update={"value": "Khảo sát nhà máy tại Đà Nẵng."}))
+        else:
+            observations.append(o)
+    draft = {"schema_version": "b3-intake-v1", "intake_method": "IMPORT",
+             "confirmed": False}
+    report = evaluate(make_b3_run(form=draft), observations)
+    assert report.b3.intake.destination == "Đà Nẵng"
+    assert report.b3.intake.purpose == "Khảo sát nhà máy tại Đà Nẵng."
+
+
+def test_conflicting_destination_across_sources_is_not_silently_picked():
+    # Request says Hà Nội, forecast says Đà Nẵng → keep the contradiction.
+    observations = replace(make_b3_observations(), "FC-3", value="Đà Nẵng")
+    draft = {"schema_version": "b3-intake-v1", "intake_method": "IMPORT",
+             "confirmed": False}
+    report = evaluate(make_b3_run(form=draft), observations)
+    assert report.b3.intake.destination is None  # no arbitrary pick
+    assert check_of(report, "proposal_relation").status == "UNRESOLVED"
+    assert issues_of(report, owner="EMPLOYEE")
+
+
 # --- T03: words vs number -------------------------------------------------------
 
 def test_t03_amount_words_mismatch_fails():

@@ -146,6 +146,18 @@ pre {
     grid-template-columns: 1fr 1fr;
     align-items: start;
   }
+
+  .grid.grid-split,
+  .grid.grid-master-detail {
+    grid-template-columns: 340px minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-6);
+  }
+
+  .grid.grid-single {
+    grid-template-columns: minmax(0, 840px);
+    justify-content: center;
+  }
 }
 
 .col {
@@ -1954,4 +1966,595 @@ button:focus-visible {
   font-size: 0.85rem;
   color: #b45309;
 }
+
+/* --- Empty State Dashboard & Workflow Steps ------------------------------ */
+
+.empty-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-8) var(--space-6);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.empty-hero h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0 0 var(--space-2);
+  color: var(--color-foreground);
+}
+
+.empty-hero p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--color-muted-foreground);
+}
+
+.workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  background: var(--color-muted);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+}
+
+.workflow-step {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.step-content strong {
+  display: block;
+  font-size: 0.92rem;
+  margin-bottom: 2px;
+  color: var(--color-foreground);
+}
+
+.step-content p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.quick-cases-section h3 {
+  font-size: 1.05rem;
+  margin: 0 0 var(--space-3);
+  color: var(--color-foreground);
+}
+
+.quick-cases-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.quick-case-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: left;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  font: inherit;
+}
+
+.quick-case-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.quick-case-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.quick-case-head .case-id {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--color-primary);
+}
+
+.quick-case-body {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin-bottom: var(--space-3);
+  color: var(--color-foreground);
+}
+
+.quick-case-foot {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+}
+
+.empty-cta-box {
+  padding: var(--space-4);
+  background: var(--color-muted);
+  border-radius: var(--radius);
+  border: 1px dashed var(--color-border);
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+/* ==========================================================================
+   Modern App Header & Branding
+   ========================================================================== */
+.app-brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.app-brand-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app-brand-title h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #0f172a 0%, #0369a1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.app-logo-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.app-tagline {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-muted-foreground);
+}
+
+.field.field-topbar {
+  margin-bottom: 0;
+}
+
+.field.field-topbar label {
+  font-size: 0.78rem;
+  color: var(--color-muted-foreground);
+  margin-bottom: 2px;
+}
+
+.field.field-topbar select,
+.field.field-topbar input {
+  min-height: 38px;
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.88rem;
+  border-radius: var(--radius);
+  background: var(--color-card);
+}
+
+/* ==========================================================================
+   New Case Button Banner
+   ========================================================================== */
+.col-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.col-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.new-case-banner {
+  margin-bottom: var(--space-1);
+}
+
+.btn-new-case-active {
+  background: var(--color-secondary) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.35);
+}
+
+/* ==========================================================================
+   Sleek Case List Sidebar
+   ========================================================================== */
+.case-list-panel {
+  padding: var(--space-4);
+}
+
+.case-search-box {
+  margin-bottom: var(--space-2);
+}
+
+.case-search-input {
+  width: 100%;
+  font-size: 0.85rem;
+  padding: var(--space-2) var(--space-3);
+  min-height: 38px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.case-search-input:focus {
+  outline: 2px solid var(--color-secondary);
+  background: #ffffff;
+}
+
+.case-list-scrollable {
+  max-height: calc(100vh - 280px);
+  min-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+.case-list-scrollable::-webkit-scrollbar {
+  width: 6px;
+}
+
+.case-list-scrollable::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+.case-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.case-item-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  cursor: pointer;
+  transition: all 160ms ease;
+  font: inherit;
+  color: inherit;
+}
+
+.case-item-card:hover {
+  border-color: var(--color-secondary);
+  background: #f8fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.case-item-card-active {
+  border-color: var(--color-secondary);
+  background: #f0f9ff !important;
+  border-left: 4px solid var(--color-secondary);
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.12);
+}
+
+.case-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.case-item-id {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--color-foreground);
+}
+
+.case-item-job-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-muted);
+  color: var(--color-foreground);
+}
+
+.case-item-job-badge.badge-b3 {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.case-item-job-badge.badge-b7 {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.case-item-stage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.case-stage-pill {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.case-version-text {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--color-muted-foreground);
+}
+
+.case-item-bottom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+}
+
+.case-item-actor {
+  font-weight: 500;
+}
+
+.case-item-work {
+  font-family: var(--font-mono);
+}
+
+/* ==========================================================================
+   Case Detail Header
+   ========================================================================== */
+.case-header-panel {
+  padding: var(--space-4) var(--space-6);
+  border-radius: var(--radius);
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow);
+}
+
+.case-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.case-header-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.case-header-badge-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.case-header-id {
+  margin: var(--space-1) 0 0;
+  font-size: 1.45rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--color-foreground);
+}
+
+.case-header-amount-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+}
+
+.case-header-amount-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #166534;
+}
+
+.case-header-amount-val {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #15803d;
+  font-family: var(--font-mono);
+}
+
+.case-header-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+  color: var(--color-muted-foreground);
+  margin-top: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-muted);
+}
+
+/* ==========================================================================
+   Alert Banners (Action Needed)
+   ========================================================================== */
+.alert-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  gap: var(--space-3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.alert-banner-warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.alert-banner-info {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+}
+
+.alert-banner-body {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.alert-banner-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.alert-banner-desc {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+/* ==========================================================================
+   Pill Badges
+   ========================================================================== */
+.pill-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.pill-badge-green {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.pill-badge-amber {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.pill-badge-red {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ==========================================================================
+   Case Navigation Tabs
+   ========================================================================== */
+.case-tabs-nav {
+  display: flex;
+  gap: var(--space-2);
+  background: #ffffff;
+  padding: var(--space-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.case-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.92rem;
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  transition: all 160ms ease;
+  min-height: 40px;
+}
+
+.case-tab-btn:hover {
+  background: #f1f5f9;
+  color: var(--color-foreground);
+}
+
+.case-tab-btn.case-tab-active {
+  background: #0284c7;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(2, 132, 199, 0.3);
+}
+
+.case-tab-btn.case-tab-active .pill-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   History Timeline
+   ========================================================================== */
+.history-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.history-timeline-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-muted);
+}
+
+.history-timeline-item:last-child {
+  border-bottom: none;
+}
+
+.history-time {
+  font-size: 0.78rem;
+  color: var(--color-muted-foreground);
+}
+
+.history-content {
+  font-size: 0.9rem;
+}
+
+
 

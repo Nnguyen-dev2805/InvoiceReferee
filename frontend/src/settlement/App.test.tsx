@@ -284,4 +284,35 @@ test('Verify panel đóng mặc định và mở được mà không tự độn
   expect(verifySpy).not.toHaveBeenCalled();
 });
 
+test('hồ sơ IMPORT tự động nạp AI draft data vào form xác nhận khi mở', async () => {
+  const user = userEvent.setup();
+  const emptyImportCase: CaseView = {
+    ...caseView(false),
+    submission: {
+      ...caseView(false).submission,
+      form: {
+        schema_version: 'b3-intake-v1',
+        intake_method: 'IMPORT',
+        confirmed: false,
+        destination: '',
+        trip_start: null,
+        trip_end: null,
+        purpose: '',
+        assignment_note: null,
+        request_amount_vnd: null,
+        settlement_due: null,
+        estimate_rows: [],
+      },
+    },
+  };
+  setup(emptyImportCase, true);
+  await user.click(await screen.findByText(/C-b3test01/));
+
+  expect(await screen.findByTestId('b3-revise-panel')).toBeInTheDocument();
+  expect(screen.getByText(/AI đã trích xuất dữ liệu từ chứng từ đính kèm/)).toBeInTheDocument();
+  const destInput = screen.getByLabelText('Nơi đến') as HTMLInputElement;
+  expect(destInput.value).toBe('Hà Nội');
+});
+
+
 

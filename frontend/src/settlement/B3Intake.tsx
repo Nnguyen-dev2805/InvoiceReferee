@@ -74,7 +74,7 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
           <input id="b3-destination" value={value.destination ?? ''}
                  disabled={disabled}
                  onChange={(e) => update({destination: e.target.value})}
-                 placeholder="Hà Nội" />
+                 placeholder="Ví dụ: Hà Nội, Đà Nẵng..." />
         </div>
         <div className="field">
           <label htmlFor="b3-settlement-due">Hạn thanh toán tạm ứng</label>
@@ -104,7 +104,7 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
         <label htmlFor="b3-purpose">Mục đích công tác</label>
         <input id="b3-purpose" value={value.purpose ?? ''} disabled={disabled}
                onChange={(e) => update({purpose: e.target.value})}
-               placeholder="Khảo sát yêu cầu và thống nhất phạm vi dự án" />
+               placeholder="Ví dụ: Đi khảo sát yêu cầu và thống nhất phạm vi dự án..." />
       </div>
 
       <div className="field">
@@ -112,7 +112,7 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
         <input id="b3-request-amount" type="number" min="0"
                value={numberField(value.request_amount_vnd)} disabled={disabled}
                onChange={(e) => update({request_amount_vnd: parseAmount(e.target.value)})}
-               placeholder="2000000" />
+               placeholder="0" />
         <span className="helper">Số tiền bạn đang xin, chưa phải tiền đã nhận</span>
         {value.request_amount_vnd !== null && value.request_amount_vnd > 0 && (
           <span className="field-hint" data-testid="b3-request-hint">
@@ -127,7 +127,7 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
         </label>
         <input id="b3-assignment-note" value={value.assignment_note ?? ''}
                disabled={disabled}
-               placeholder="Giao việc bằng lời; không đính kèm giấy lệnh"
+               placeholder="Ví dụ: Giao việc qua điện thoại, không có giấy lệnh..."
                onChange={(e) => update({assignment_note: e.target.value || null})} />
       </div>
 
