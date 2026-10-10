@@ -1,6 +1,8 @@
 // B7/B3 report panel (W02): components, expense rows with openable refs,
 // checks, issues with owner, and an explicit fake/replay mode label.
-import type { Report } from './types';
+// B3 v1 (b3-intake-v1) hiển thị section proposal thay bảng S — S quyết toán
+// không phải kết quả chính của bước đề nghị ứng (Product P2a).
+import type { B3Proposal, B3RunContext, Report } from './types';
 import { sourceContentUrl } from './api';
 
 const COMPONENT_LABELS: Record<string, string> = {
@@ -27,12 +29,22 @@ const STATE_LABELS: Record<string, string> = {
   EXCLUDED: 'Loại',
 };
 
+const READINESS_LABELS: Record<B3Proposal['readiness'], string> = {
+  DRAFT_CONFIRMATION_REQUIRED: 'Cần nhân viên xác nhận bản nháp',
+  NEEDS_INFORMATION: 'Còn thiếu thông tin / mâu thuẫn cần làm rõ',
+  NEEDS_AUTHORIZED_REVIEW: 'Cần người có quyền xem xét (work/B/advance)',
+  READY_FOR_ACCOUNTANT_REVIEW: 'Đủ để kế toán rà soát',
+};
+
 function vnd(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
   return `${value.toLocaleString('vi-VN')} VND`;
 }
 
-export function ReportPanel({ report }: { report: Report }) {
+export function ReportPanel({ report, b3Context = null }: {
+  report: Report;
+  b3Context?: B3RunContext | null;
+}) {
   const sourceIds = new Set(report.source_refs);
   const refs = (list: string[]) => (
     <span className="reasons">
@@ -65,40 +77,47 @@ export function ReportPanel({ report }: { report: Report }) {
         </span>
       </p>
 
-      <h3>Components (S = E − (A − RA) − (P − RP))</h3>
-      <table>
-        <thead>
-          <tr><th>Thành phần</th><th>Giá trị</th><th>Trạng thái</th><th>Refs</th></tr>
-        </thead>
-        <tbody>
-          {(['t', 'b', 'e', 'a', 'ra', 'p', 'rp'] as const).map((key) => {
-            const slot = report.components[key];
-            return (
-              <tr key={key}>
-                <td>{COMPONENT_LABELS[key]}</td>
-                <td>{vnd(slot.value)}</td>
-                <td>{slot.state === 'KNOWN' ? 'đủ căn cứ' : slot.state === 'UNKNOWN' ? 'chưa rõ' : slot.state}</td>
-                <td>{refs(slot.refs)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <p>
-        <strong>Calculated:</strong> {vnd(report.calculated_net_vnd)} ·{' '}
-        <strong>Proposed (chưa duyệt, chưa chi):</strong> {vnd(report.proposed_net_vnd)}
-        {report.direction && (
-          <>
-            {' · '}
-            <strong>Chiều tiền:</strong>{' '}
-            {report.direction === 'COMPANY_TO_EMPLOYEE'
-              ? 'công ty chi cho nhân viên'
-              : report.direction === 'EMPLOYEE_TO_COMPANY'
-                ? 'nhân viên hoàn lại công ty'
-                : 'cân bằng (S = 0)'}
-          </>
-        )}
-      </p>
+      {report.b3 ? (
+        <B3ProposalSection proposal={report.b3} b3Context={b3Context}
+                            refs={refs} />
+      ) : (
+        <>
+          <h3>Components (S = E − (A − RA) − (P − RP))</h3>
+          <table>
+            <thead>
+              <tr><th>Thành phần</th><th>Giá trị</th><th>Trạng thái</th><th>Refs</th></tr>
+            </thead>
+            <tbody>
+              {(['t', 'b', 'e', 'a', 'ra', 'p', 'rp'] as const).map((key) => {
+                const slot = report.components[key];
+                return (
+                  <tr key={key}>
+                    <td>{COMPONENT_LABELS[key]}</td>
+                    <td>{vnd(slot.value)}</td>
+                    <td>{slot.state === 'KNOWN' ? 'đủ căn cứ' : slot.state === 'UNKNOWN' ? 'chưa rõ' : slot.state}</td>
+                    <td>{refs(slot.refs)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p>
+            <strong>Calculated:</strong> {vnd(report.calculated_net_vnd)} ·{' '}
+            <strong>Proposed (chưa duyệt, chưa chi):</strong> {vnd(report.proposed_net_vnd)}
+            {report.direction && (
+              <>
+                {' · '}
+                <strong>Chiều tiền:</strong>{' '}
+                {report.direction === 'COMPANY_TO_EMPLOYEE'
+                  ? 'công ty chi cho nhân viên'
+                  : report.direction === 'EMPLOYEE_TO_COMPANY'
+                    ? 'nhân viên hoàn lại công ty'
+                    : 'cân bằng (S = 0)'}
+              </>
+            )}
+          </p>
+        </>
+      )}
 
       {report.links.length > 0 && (
         <>
@@ -217,6 +236,140 @@ export function ReportPanel({ report }: { report: Report }) {
       <p className="muted">
         Report là kiểm tra có căn cứ, chưa phê duyệt tài chính, chưa ghi nhận
         thực nhận và chưa đóng hồ sơ.
+      </p>
+    </div>
+  );
+}
+
+function B3ProposalSection({ proposal, b3Context, refs }: {
+  proposal: B3Proposal;
+  b3Context: B3RunContext | null;
+  refs: (list: string[]) => React.ReactNode;
+}) {
+  const intake = proposal.intake;
+  const decisionLabel = (state: B3Proposal['work_permission']) =>
+    state === 'PENDING_DECISION'
+      ? 'Đang chờ quyết định (chưa duyệt)'
+      : 'Cần rà soát thêm trước khi quyết';
+  return (
+    <div data-testid="b3-proposal">
+      <h3>Đề nghị tạm ứng B3 — proposal</h3>
+      <p>
+        <strong>Trạng thái:</strong> {READINESS_LABELS[proposal.readiness]}{' '}
+        (<code>{proposal.readiness}</code>)
+      </p>
+      <p>
+        <strong>Số xin ứng:</strong> {vnd(intake.request_amount_vnd)}{' '}
+        {proposal.field_refs['request_amount_vnd'] &&
+          <>— căn cứ: {refs(proposal.field_refs['request_amount_vnd'])}</>}
+      </p>
+      <p>
+        <strong>Công tác:</strong> {intake.destination ?? '—'} ·{' '}
+        {intake.trip_start ?? '—'} → {intake.trip_end ?? '—'} ·{' '}
+        hạn quyết toán {intake.settlement_due ?? '—'}
+        {' · '}<strong>Mục đích:</strong> {intake.purpose ?? '—'}
+      </p>
+
+      <h4>Dự toán (phần công ty / nhân viên giữ riêng)</h4>
+      <table data-testid="b3-estimate-report">
+        <thead>
+          <tr><th>Nội dung</th><th>Cơ sở</th><th>Công ty</th><th>Nhân viên</th><th>Căn cứ</th></tr>
+        </thead>
+        <tbody>
+          {intake.estimate_rows.map((row) => (
+            <tr key={row.row_id}>
+              <td>{row.description}</td>
+              <td>{row.basis ?? '—'}</td>
+              <td>{vnd(row.company_vnd)}</td>
+              <td>{vnd(row.employee_vnd)}</td>
+              <td>
+                {refs([
+                  ...(proposal.field_refs[`estimate_rows.${row.row_id}.company_vnd`] ?? []),
+                  ...(proposal.field_refs[`estimate_rows.${row.row_id}.employee_vnd`] ?? []),
+                ])}
+              </td>
+            </tr>
+          ))}
+          <tr>
+            <td><strong>Tổng</strong></td>
+            <td></td>
+            <td><strong>{vnd(proposal.forecast_company_vnd)}</strong></td>
+            <td><strong>{vnd(proposal.forecast_employee_vnd)}</strong></td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        <strong>Tổng dự toán:</strong> {vnd(proposal.forecast_total_vnd)} —
+        dự toán không phải ngân sách đã duyệt; phần dự kiến công ty trả không
+        phải actual payer.
+      </p>
+
+      <h4>Nội dung cần người có quyền quyết định</h4>
+      <ul className="reasons">
+        <li>
+          <strong>Cho phép công tác (work):</strong> {decisionLabel(proposal.work_permission)}
+        </li>
+        <li>
+          <strong>Duyệt ngân sách (B):</strong> {decisionLabel(proposal.work_permission)}
+        </li>
+        <li>
+          <strong>Duyệt ứng:</strong> {decisionLabel(proposal.advance_approval)}
+        </li>
+      </ul>
+      <p>
+        <strong>Tuyến xử lý:</strong> kế toán {proposal.accountant_ref ?? '— (chưa cấu hình)'}{' '}
+        · người duyệt {proposal.approver_ref ?? '— (chưa cấu hình)'} (readonly theo
+        cấu hình công ty, không nhập trên form).
+      </p>
+
+      {b3Context && (
+        <div data-testid="b3-run-context">
+          <h4>Company context của run (snapshot)</h4>
+          <p className="muted">
+            {b3Context.synthetic
+              ? `Fixture mô phỏng "${b3Context.version}"${
+                  b3Context.demo_clock
+                    ? ` — mốc mô phỏng ${b3Context.demo_clock}`
+                    : ''}`
+              : `Context "${b3Context.version}"`}
+          </p>
+          <ul className="reasons">
+            {b3Context.grants.map((grant) => (
+              <li key={grant.ref}>
+                <code>{grant.ref}</code>: {grant.actor_ref} được phép work={
+                  grant.allow_work ? 'có' : 'không'}, ngân sách ≤{' '}
+                {vnd(grant.max_budget_vnd)}, ứng ≤ {vnd(grant.max_advance_vnd)}{' '}
+                cho {grant.employee_ref}
+                {grant.work_ref ? ` (work ${grant.work_ref})` : ' (mọi work)'}
+              </li>
+            ))}
+            {b3Context.coverage.map((record) => (
+              <li key={record.ref}>
+                <code>{record.ref}</code>: coverage {record.employee_ref}
+                {record.work_ref ? ` (work ${record.work_ref})` : ' (mọi work)'}{' '}
+                {record.from} → {record.to}
+                {record.complete_prior_history
+                  ? ' — gồm mở sổ/tồn trước kỳ' : ' — không gồm số dư đầu kỳ'}
+                {' '}(owner {record.owner_ref})
+              </li>
+            ))}
+            {b3Context.history.length === 0
+              ? <li>Lịch sử company-side: trống (theo coverage đã khai báo).</li>
+              : b3Context.history.map((event) => (
+                <li key={event.event_ref}>
+                  <code>{event.event_ref}</code>: {event.kind}/{event.status}{' '}
+                  {vnd(event.amount_vnd)} — {event.event_at} (work {event.work_ref})
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="notice-warn" role="alert">
+        B3 v1 chỉ tạo report đề nghị: chưa có hành động duyệt ứng/chi tiền/đóng
+        hồ sơ trong nhánh này. Complete nghĩa là đủ căn cứ rà soát, không nghĩa
+        đã duyệt.
       </p>
     </div>
   );

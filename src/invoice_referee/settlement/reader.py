@@ -497,29 +497,44 @@ class SettlementReader:
             )
 
     def _read_image(self, source: SourceRecord, content: bytes,
-                    keys: list[str], budget: RunBudget) -> list[Observation]:
+                    keys: list[str], budget: RunBudget, *,
+                    source_page: int | None = None) -> list[Observation]:
         budget.reserve_call()
+        # PDF pages are rendered as PNG; the retained source is still a PDF.
+        image_media_type = "image/png" if source_page is not None else source.media_type
         document = {
             "type": "image_url",
-            "image_url": f"data:{source.media_type};base64,"
+            "image_url": f"data:{image_media_type};base64,"
                          f"{base64.b64encode(content).decode('ascii')}",
         }
         started = time.monotonic()
-        payload = self.ocr.ocr_document(
-            document, _remaining_timeout(budget, self.ocr.timeout))
-        pages = self._validated_pages(payload)
+        try:
+            payload = self.ocr.ocr_document(
+                document, _remaining_timeout(budget, self.ocr.timeout))
+            pages = self._validated_pages(payload)
+            if source_page is not None and len(pages) != 1:
+                raise DomainError("PROVIDER_OUTPUT_INVALID",
+                                  "OCR một trang PDF phải trả đúng một trang ảnh.")
+        except DomainError as error:
+            self._record("ocr", source.id, False, requested_model=self.ocr.model,
+                         error_code=error.code, detail=error.message,
+                         duration_ms=int((time.monotonic() - started) * 1000))
+            raise
         self._record("ocr", source.id, True, requested_model=self.ocr.model,
                      response_model=payload.get("model") if isinstance(
                          payload.get("model"), str) else None,
                      usage=payload.get("usage") if isinstance(
                          payload.get("usage"), dict) else None,
                      duration_ms=int((time.monotonic() - started) * 1000))
-        self._count_run_pages(len(pages), source)
+        if source_page is None:
+            self._count_run_pages(len(pages), source)
         observations: list[Observation] = []
         # trang chưa đọc là technical/capability, không NOT_FOUND (System §S2)
         for page in pages:
             observations.extend(self._extract_from_text(
-                source, page["markdown"], page["index"] + 1, keys, budget))
+                source, page["markdown"],
+                source_page if source_page is not None else page["index"] + 1,
+                keys, budget))
         return observations
 
     def _read_pdf(self, source: SourceRecord, content: bytes,
@@ -556,8 +571,9 @@ class SettlementReader:
         for page_number, text in pages_text:
             observations.extend(self._extract_from_text(
                 source, text, page_number, keys, budget))
-        for _page_number, image_bytes in pages_image:
-            observations.extend(self._read_image(source, image_bytes, keys, budget))
+        for page_number, image_bytes in pages_image:
+            observations.extend(self._read_image(source, image_bytes, keys, budget,
+                                                source_page=page_number))
         return observations
 
     @staticmethod
@@ -623,7 +639,11 @@ class SettlementReader:
     def _extract_from_text(self, source: SourceRecord, text: str,
                            page: int | None, keys: list[str],
                            budget: RunBudget) -> list[Observation]:
-        prompt = load_prompt("settlement-extract.txt")
+        # B3 v1 dùng grammar riêng (document.role/forecast.row.*...); B7/B3
+        # legacy giữ prompt extraction chung.
+        prompt = load_prompt(
+            "settlement-b3-extract.txt" if "document.role" in keys
+            else "settlement-extract.txt")
         payload = {
             "source_id": source.id,
             "filename": source.filename,
@@ -697,17 +717,24 @@ class SettlementReader:
                                                           list):
             raise DomainError("PROVIDER_OUTPUT_INVALID",
                               "Extract output thiếu danh sách fields.")
+        location_id = f"{source.id}-p{page}" if page is not None else source.id
         observations: list[Observation] = []
         seen_fact_ids: set[str] = set()
         for entry in parsed["fields"]:
             if not isinstance(entry, dict):
                 raise DomainError("PROVIDER_OUTPUT_INVALID",
                                   "Field không phải object.")
-            fact_id = entry.get("fact_id") or f"{source.id}-{len(observations) + 1}"
-            if fact_id in seen_fact_ids:
-                raise DomainError("PROVIDER_OUTPUT_INVALID",
-                                  f"Fact ID trùng trong output: {fact_id}.")
-            seen_fact_ids.add(fact_id)
+            local_id = entry.get("fact_id")
+            if local_id:
+                if not isinstance(local_id, str):
+                    raise DomainError("PROVIDER_OUTPUT_INVALID",
+                                      "Fact ID của model phải là chuỗi.")
+                if local_id in seen_fact_ids:
+                    raise DomainError("PROVIDER_OUTPUT_INVALID",
+                                      f"Fact ID trùng trong output: {local_id}.")
+                seen_fact_ids.add(local_id)
+            # Model IDs belong to one response, not the whole dossier.
+            fact_id = f"{location_id}-field-{len(observations) + 1}"
             key = entry.get("key")
             if not isinstance(key, str) or not key:
                 raise DomainError("PROVIDER_OUTPUT_INVALID",
@@ -745,7 +772,7 @@ class SettlementReader:
         for key in requested:
             if key not in returned:
                 observations.append(Observation(
-                    fact_id=f"{source.id}-missing-{key}", key=key,
+                    fact_id=f"{location_id}-missing-{key}", key=key,
                     raw=None, read_state="UNCLEAR", value=None,
                     source_id=source.id, page=page,
                     locator=f"page {page}" if page is not None else "n/a",

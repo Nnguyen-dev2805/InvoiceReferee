@@ -778,8 +778,15 @@ def evaluate(run_input: RunInput, observations: list[Observation],
              relations: list[Relation], run_id: str = "R-ENGINE",
              mode: str | None = None,
              technical_issues: list[Issue] | None = None) -> Report:
-    """Dispatch by job; B7 computes settlement, B3 checks the advance request."""
+    """Dispatch by job/form; B7 computes settlement, legacy B3 keeps the old
+    advance checks, B3 v1 (b3-intake-v1) evaluates the intake proposal."""
+    from invoice_referee.settlement.b3 import evaluate_b3_proposal, is_b3_v1
+
     reader_mode = mode or run_input.config.get("reader_mode", "UNKNOWN")
+    if run_input.submission.job == "B3" and is_b3_v1(run_input.submission.form):
+        return evaluate_b3_proposal(run_input, observations, run_id=run_id,
+                                    mode=reader_mode,
+                                    technical_issues=technical_issues)
     if run_input.submission.job == "B3":
         return _evaluate_b3(run_input, observations, relations, run_id,
                            reader_mode, technical_issues)

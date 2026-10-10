@@ -35,6 +35,10 @@ export function ActionsPanel({
   const summary = view.money_summary;
   const closed = view.stage === 'SETTLEMENT_CLOSED'
     || view.stage === 'REJECTED_REQUEST_ENDED';
+  // B3 v1 là nhánh intake/report: không quảng cáo decision/money/handoff/
+  // closure; backend cũng chặn bằng B3_REPORT_ONLY.
+  const b3V1 = (view.submission.form as Record<string, unknown>)
+    ?.schema_version === 'b3-intake-v1';
 
   const [decisionDirection, setDecisionDirection] =
     useState<'PAY_EMPLOYEE' | 'COLLECT_FROM_EMPLOYEE' | 'REFUSE'>('PAY_EMPLOYEE');
@@ -105,6 +109,13 @@ export function ActionsPanel({
         </p>
       ) : (
         <>
+          {b3V1 ? (
+            <p className="notice-warn" role="alert">
+              Hồ sơ B3 v1 chỉ tạo report đề nghị; duyệt work/B/advance, ghi
+              tiền và bàn giao là lifecycle riêng chưa mở ở nhánh này
+              (backend chặn B3_REPORT_ONLY).
+            </p>
+          ) : (
           <div className="field">
             <h3>Quyết định (người duyệt)</h3>
             {role !== 'APPROVER' && (
@@ -155,6 +166,7 @@ export function ActionsPanel({
               Ghi quyết định (basis {view.current_run_id ?? '—'})
             </button>
           </div>
+          )}
 
           <div className="field">
             <h3>Rà soát kế toán (không phải phê duyệt)</h3>
@@ -177,6 +189,7 @@ export function ActionsPanel({
             </button>
           </div>
 
+          {!b3V1 && (
           <div className="field">
             <h3>Sự kiện tiền thực tế</h3>
             <label htmlFor="event-ref">Mã sự kiện (event_ref, duy nhất)</label>
@@ -227,6 +240,7 @@ export function ActionsPanel({
               Ghi sự kiện tiền
             </button>
           </div>
+          )}
 
           <div className="field">
             <h3>Stop / Resume</h3>
@@ -260,7 +274,7 @@ export function ActionsPanel({
             </button>
           </div>
 
-          {canHandoff && (
+          {canHandoff && !b3V1 && (
             <div className="field">
               <h3>Bàn giao thủ quỹ (stage A)</h3>
               <button className="btn"
@@ -277,6 +291,7 @@ export function ActionsPanel({
             </div>
           )}
 
+          {!b3V1 && (
           <div className="field">
             <h3>Đóng hồ sơ</h3>
             <label htmlFor="closure-kind">Kiểu đóng</label>
@@ -306,6 +321,7 @@ export function ActionsPanel({
               Đóng hồ sơ
             </button>
           </div>
+          )}
         </>
       )}
     </div>

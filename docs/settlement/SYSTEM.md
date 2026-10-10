@@ -78,6 +78,8 @@ Câu hỏi giữ issue_id/owner/refs, khoản/phần, đã biết, vướng mắ
 
 Form/bảng hỗ trợ parse trực tiếp; PDF text phù hợp dùng text+locator; ảnh/scan dùng Mistral OCR→xkiro extraction. PDF hỗn hợp routing theo trang/vùng; có text không proof mọi trang/field đủ hoặc lớp OCR ẩn đúng. Giữ bản gốc và case để phát hiện hidden-text mismatch; không claim heuristic phát hiện mọi lỗi layer.
 
+Trang PDF render thành PNG gửi OCR với MIME của ảnh, giữ source PDF và số trang gốc. Budget trang tính mỗi trang gốc một lần; backend cấp observation ID theo nguồn/trang/vị trí field, không dùng model-local ID làm ID toàn hồ sơ. ID model trùng trong cùng response vẫn bị từ chối; các giá trị mâu thuẫn giữa nguồn/trang vẫn giữ để kiểm tra. OCR thất bại vẫn có call trace và giữ technical failure, không coi là không tìm thấy thông tin.
+
 Render/rotate/crop là representation có transform/mapping về original. Crop giữ context tổng/subtotal/receipt và contradictions; không sinh lại chữ số thiếu rồi dùng làm evidence. Một tài liệu nhiều trang giữ context cần thiết; không gộp tất cả hồ sơ vào một prompt. Chỉ đọc fields/lines/parts cần theo check, nhưng không dùng total để bỏ chi tiết bắt buộc cho personal/split.
 
 Đọc lại field/vùng chỉ khi có lý do và khả năng làm rõ; actual source che/thiếu giữ uncertainty, không gọi tới khi sinh số. Mọi corrective/transient/targeted attempts dùng chung budget. Provider failure/invalid output không thành employee violation.
@@ -195,3 +197,46 @@ UI mở được source từ observation→normalized fact/basis→link→rule�
 | SYS-17 | Routine job tự hoàn tất; A chưa tạo payment entity của B; action B có gates riêng; BTC chưa xác nhận ranh giới routine này |
 
 Acceptance cần command/actual/log/mode/refs, không checkbox/spec hoặc worker self-report. [Evaluation](EVALUATION.md) giữ oracle và measurement gates; unit/integration/UI fake khác live quality và professional trial.
+
+## S10. B3 v1 verbal intake (b3-intake-v1)
+
+Nhánh khởi tạo B3 khi giao công tác bằng lời (Product P2a; plan
+[2026-10-10-b3-verbal-intake](../superpowers/plans/2026-10-10-b3-verbal-intake.md)).
+Form là lời khai (`B3Intake`, schema_version `b3-intake-v1`): IMPORT draft được
+thiếu fields; bản confirmed phải đủ destination/purpose/dates/request dương/
+deadline/ít nhất một row, `trip_start ≤ trip_end ≤ settlement_due`, tiền
+StrictInt, không row âm, không row_id trùng. `Report.b3` là `B3Proposal`
+(readiness/intake/forecast company–employee–total/work_permission/
+advance_approval/accountant_ref/approver_ref/field_refs); components giữ a/ra
+cho history actual (zero chỉ khi coverage đủ), b cho budget decision trước đó
+(initial null), t/e/p/rp NOT_APPLICABLE; calculated/proposed/direction null.
+
+Company context là backend fixture (`B3CompanyContext`, file env mới
+`SETTLEMENT_B3_CONTEXT_PATH`; absent = None/unknown, malformed = startup
+error, không fallback quyền). Clock cố định chỉ accepted khi activated+
+synthetic; run ghi `simulation_clock` và map known-at nguồn tham gia snapshot
+sang clock mô phỏng, audit nhận file vẫn giữ timestamp máy thật. Context
+persist cùng RunInput (snapshot hash gồm submission/sources/revision/epoch +
+policy + authority + b3_context + reader config); đổi config sau run không
+sửa report/basis cũ.
+
+Endpoint mới: `GET /api/demo-context` (people/routes, không cấp quyền do
+client nhập); `POST /api/b3-cases` (actor_id + intake; persona/role/employee_ref
+tra trong fixture, work id `WORK-<uuid12>` idempotent theo replay key trước khi
+phát id mới, clocks backend); `GET /api/runs/{run_id}/b3-context` (snapshot
+grants/coverage/history, refs `company:<...>`). PATCH submission giữ
+employee/work/clocks immutable cho B3 v1 và reject form b3-intake-v1 trên hồ
+sơ legacy (không di trú ngầm). B3 v1 bị chặn ở transaction guard bằng
+`B3_REPORT_ONLY` cho decision/money/handoff/closure (review chỉ nhận khi đã
+confirm); allowed_actions không quảng cáo action chưa hỗ trợ.
+
+Reader B3 v1 dùng grammar `document.role/person.name/trip.*/advance.request.*/
+forecast.*` (row_id document-local, backend namespace theo nguồn/trang;
+`amount_words_value` là đề xuất diễn giải do LLM, Python so số). B3 v1 không
+gọi generic payment matcher B7. Rule IDs: `trip_context`, `request_positive`,
+`amount_words_consistency`, `estimate_arithmetic`, `request_forecast_consistency`,
+`proposal_relation`, `source_form_consistency`, `history_coverage`,
+`prior_advance_state`, `decision_route`. Nguồn tham chiếu form:
+`form:<input_revision>:<field-path>`; không form-wins — form và nguồn khác
+nhau là mâu thuẫn giữ cả hai refs. Duyệt work/B/advance, chi ứng, liên kết
+B3→B7 và closure là lifecycle riêng chưa mở ở nhánh này.

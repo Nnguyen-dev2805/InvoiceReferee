@@ -163,3 +163,137 @@ def test_service_persists_stage_and_trace(tmp_path):
 def test_fake_reader_mode_is_explicit_not_live(tmp_path):
     reader = StructuredLedgerReader(tmp_path)
     assert reader.mode == "FAKE_OR_REPLAY"
+
+
+# --- B3 v1 (b3-intake-v1): pipeline branch -------------------------------------
+
+from tests.settlement import b3_builders as b3b  # noqa: E402
+
+B3_REQUEST_LEDGER = (
+    "fact B1 document.role ADVANCE_REQUEST\n"
+    "fact B2 person.name Nguyễn_An\n"
+    "fact B3 trip.destination Hà_Nội\n"
+    "fact B4 trip.start 2026-10-12\n"
+    "fact B5 trip.end 2026-10-13\n"
+    "fact B6 trip.purpose Khảo_sát_yêu_cầu_và_thống_nhất_phạm_vi_triển_khai_dự_án_tại_Hà_Nội.\n"
+    "fact B7 advance.request.amount 2000000\n"
+    "fact B8 advance.request.amount_words Hai_triệu_đồng\n"
+    "fact B9 advance.request.amount_words_value 2000000\n"
+    "fact B10 advance.settlement_due 2026-10-16\n"
+)
+B3_FORECAST_LEDGER = (
+    "fact C1 document.role FORECAST\n"
+    "fact C2 person.name Nguyễn_An\n"
+    "fact C3 trip.destination Hà_Nội\n"
+    "fact C4 trip.start 2026-10-12\n"
+    "fact C5 trip.end 2026-10-13\n"
+    "fact C6 forecast.row.flight.description Vé_máy_bay\n"
+    "fact C7 forecast.row.flight.company 3000000\n"
+    "fact C8 forecast.row.flight.employee 0\n"
+    "fact C9 forecast.row.hotel.description Khách_sạn\n"
+    "fact C10 forecast.row.hotel.company 0\n"
+    "fact C11 forecast.row.hotel.employee 3000000\n"
+    "fact C12 forecast.row.ground.description Di_chuyển\n"
+    "fact C13 forecast.row.ground.company 0\n"
+    "fact C14 forecast.row.ground.employee 1000000\n"
+    "fact C15 forecast.row.meal.description Bữa_ăn\n"
+    "fact C16 forecast.row.meal.company 0\n"
+    "fact C17 forecast.row.meal.employee 1000000\n"
+    "fact C18 forecast.company 3000000\n"
+    "fact C19 forecast.employee 5000000\n"
+    "fact C20 forecast.total 8000000\n"
+)
+
+
+class SpyReader(StructuredLedgerReader):
+    """Ghi lại keys nhận được và số lần match được gọi.
+
+    Ledger giả lập không chứa dấu cách trong value; dấu gạch dưới được
+    chuẩn hóa lại thành dấu cách để text khớp form như một reader thật.
+    """
+
+    def __init__(self, root):
+        super().__init__(root)
+        self.read_keys: list[list[str]] = []
+        self.match_calls = 0
+
+    def read(self, source, keys, budget):
+        self.read_keys.append(list(keys))
+        observations = super().read(source, keys, budget)
+        return [o.model_copy(update={"value": o.value.replace("_", " ")})
+                if isinstance(o.value, str) and o.key != "document.role"
+                else o
+                for o in observations]
+
+    def match(self, run_input, candidates, budget):
+        self.match_calls += 1
+        return super().match(run_input, candidates, budget)
+
+
+def _b3_import_run(sources):
+    import json
+
+    form = json.loads(json.dumps(b3b.NATIVE_FORM))
+    form["intake_method"] = "IMPORT"
+    return b3b.make_b3_run(form=form).model_copy(
+        update={"sources": list(sources)})
+
+
+def test_b3_v1_pipeline_skips_generic_matcher(tmp_path):
+    sources = [
+        write_source(tmp_path, "S-REQ", "de-nghi.txt",
+                     B3_REQUEST_LEDGER.encode(), "text/plain"),
+        write_source(tmp_path, "S-FC", "du-toan.txt",
+                     B3_FORECAST_LEDGER.encode(), "text/plain"),
+    ]
+    run_input = _b3_import_run(sources)
+    reader = SpyReader(tmp_path)
+    checkpoint, stages = checkpoint_spy()
+    report = process(run_input, reader,
+                     RunBudget(deadline=time.monotonic() + 30, max_calls=32),
+                     checkpoint)
+    assert reader.match_calls == 0  # B3 v1 không gọi matcher B7
+    assert stages == ["reading", "matching", "evaluating", "publishing"]
+    assert report.b3 is not None
+    assert report.b3.readiness == "READY_FOR_ACCOUNTANT_REVIEW"
+    assert report.b3.forecast_total_vnd == 8_000_000
+
+
+def test_b3_v1_reader_receives_b3_key_grammar(tmp_path):
+    sources = [write_source(tmp_path, "S-REQ", "de-nghi.txt",
+                            B3_REQUEST_LEDGER.encode(), "text/plain")]
+    run_input = _b3_import_run(sources)
+    reader = SpyReader(tmp_path)
+    checkpoint, _ = checkpoint_spy()
+    process(run_input, reader,
+            RunBudget(deadline=time.monotonic() + 30, max_calls=32),
+            checkpoint)
+    assert reader.read_keys, "phải có ít nhất một lần read"
+    for keys in reader.read_keys:
+        assert "document.role" in keys
+        assert any(key.startswith("forecast.") for key in keys)
+
+
+def test_b3_v1_native_form_runs_without_sources_or_matcher(tmp_path):
+    run_input = b3b.make_b3_run()  # WEB confirmed, không nguồn, không OCR
+    reader = SpyReader(tmp_path)
+    checkpoint, _ = checkpoint_spy()
+    report = process(run_input, reader,
+                     RunBudget(deadline=time.monotonic() + 30, max_calls=32),
+                     checkpoint)
+    assert reader.read_keys == []  # không nguồn: không gọi provider
+    assert reader.match_calls == 0
+    assert report.b3 is not None
+    assert report.b3.readiness == "READY_FOR_ACCOUNTANT_REVIEW"
+
+
+def test_b7_pipeline_still_calls_matcher(tmp_path):
+    source = write_source(tmp_path, "S1", "hoa-don.txt", LEDGER.encode(),
+                          "text/plain")
+    run_input = run_input_with([source])
+    reader = SpyReader(tmp_path)
+    checkpoint, _ = checkpoint_spy()
+    process(run_input, reader,
+            RunBudget(deadline=time.monotonic() + 30, max_calls=32),
+            checkpoint)
+    assert reader.match_calls == 1  # B7 giữ nguyên đường match

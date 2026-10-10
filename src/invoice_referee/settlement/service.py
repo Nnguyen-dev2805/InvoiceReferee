@@ -9,12 +9,14 @@ the store transaction, so late output never becomes current.
 from __future__ import annotations
 
 import threading
+from datetime import datetime, timezone
 from time import monotonic
 from typing import Any, Callable
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError
 
 from invoice_referee.domain.models import DomainError
+from invoice_referee.settlement.b3 import B3CompanyContext, B3Intake, is_b3_v1
 from invoice_referee.settlement.models import (
     AuthorityGrant,
     CaseView,
@@ -62,6 +64,7 @@ class ServiceConfig(BaseModel):
     run_deadline_seconds: float = 240.0
     max_provider_calls_per_run: StrictInt = 32
     authority: list[AuthorityGrant] = Field(default_factory=list)
+    b3_context: B3CompanyContext | None = None
     policy: dict[str, Any] = Field(default_factory=lambda: {
         "version": "settlement-demo-v0", "activated": True,
         "origin": "RULEBOOK 2026-10-09 (demo, not company law)",
@@ -85,13 +88,73 @@ class Service:
     # --- W01 passthroughs ---------------------------------------------------
 
     def submit(self, submission: Submission, command: Command) -> CaseView:
+        if is_b3_v1(submission.form):
+            raise DomainError(
+                "INVALID_PAYLOAD",
+                "Hồ sơ B3 v1 phải tạo qua POST /api/b3-cases; employee/work/"
+                "clock do backend cap, không tự nhập.",
+            )
         return self.store.create_case(submission, command)
+
+    def submit_b3(self, actor_id: str, intake: B3Intake,
+                  command: Command) -> CaseView:
+        """B3 v1 intake: persona tra cứu trong company fixture; work id và
+        clock do backend cap; replay key tra truoc khi tao id moi."""
+        context = self.config.b3_context
+        if context is None or not context.activated:
+            raise DomainError(
+                "CONFIG_NOT_ACTIVE",
+                "Chưa cấu hình SETTLEMENT_B3_CONTEXT_PATH (company fixture "
+                "B3); không tạo hồ sơ B3 v1 với quyền/context do client nhập.",
+            )
+        person = next((p for p in context.people
+                       if p.actor_ref == actor_id), None)
+        if person is None or person.role != "EMPLOYEE":
+            raise DomainError(
+                "PERSONA_MISMATCH",
+                f"Người nộp {actor_id} không phải persona nhân viên trong "
+                f"company fixture; chỉ nhân viên tự nộp đề nghị B3.",
+            )
+        clock = (context.demo_clock
+                 if context.demo_clock is not None
+                 else datetime.now(timezone.utc))
+
+        def build(work_ref: str) -> Submission:
+            return Submission(
+                employee_ref=actor_id, work_ref=work_ref, job="B3",
+                money_as_of=clock, knowledge_cutoff=clock,
+                form=intake.model_dump(mode="json"),
+            )
+
+        return self.store.create_b3_case(
+            build, command,
+            {"actor_id": actor_id, "intake": intake.model_dump(mode="json")},
+        )
 
     def get_case(self, case_id: str) -> CaseView:
         return self.store.get_case(case_id)
 
     def revise(self, case_id: str, submission: Submission,
                command: Command) -> CaseView:
+        case = self.store.get_case(case_id)
+        if is_b3_v1(case.submission.form) or is_b3_v1(submission.form):
+            if not is_b3_v1(case.submission.form):
+                raise DomainError(
+                    "INVALID_PAYLOAD",
+                    "Hồ sơ legacy không nhận form b3-intake-v1; không âm thầm "
+                    "di trú hồ sơ cũ.",
+                )
+            try:
+                intake = B3Intake.model_validate(submission.form)
+            except ValidationError as error:
+                raise DomainError(
+                    "INVALID_PAYLOAD",
+                    f"Form B3 không hợp lệ: {error}",
+                ) from error
+            # B3 v1: employee/work/clocks immutable; chỉ form (lời khai) đổi.
+            merged = case.submission.model_copy(
+                update={"form": intake.model_dump(mode="json")})
+            return self.store.revise(case_id, merged, command)
         return self.store.revise(case_id, submission, command)
 
     def add_source(self, case_id: str, upload: Upload,
@@ -102,24 +165,43 @@ class Service:
 
     def start(self, case_id: str, command: Command) -> RunView:
         snapshot = self.store.snapshot(case_id)
+        b3_v1 = is_b3_v1(snapshot.submission.form)
+        context = self.config.b3_context if b3_v1 else None
+        config: dict[str, Any] = {"reader_mode": self.reader.mode}
+        sources = snapshot.sources
+        if (b3_v1 and context is not None and context.activated
+                and context.synthetic and context.demo_clock is not None):
+            # Clock mô phỏng là mốc business/knowledge của fixture; audit nhận
+            # file vẫn giữ timestamp máy thật. UI công bố nguồn mô phỏng.
+            config["simulation_clock"] = context.demo_clock.isoformat()
+            sources = [source.model_copy(
+                update={"received_at": context.demo_clock})
+                for source in sources]
         run_input = RunInput(
             case_id=snapshot.case_id,
             case_version=snapshot.case_version,
             input_revision=snapshot.input_revision,
             control_epoch=snapshot.control_epoch,
             submission=snapshot.submission,
-            sources=snapshot.sources,
+            sources=sources,
             coverage=None,
             policy=self.policy,
             authority=self.config.authority,
             response_refs=[],
-            config={"reader_mode": self.reader.mode},
+            config=config,
+            b3_context=context,
             snapshot_hash=fingerprint("RUN_SNAPSHOT", {
                 "case_id": snapshot.case_id,
                 "input_revision": snapshot.input_revision,
                 "control_epoch": snapshot.control_epoch,
                 "sources": [[s.id, s.sha256] for s in snapshot.sources],
                 "submission": snapshot.submission.model_dump(mode="json"),
+                "policy": self.policy,
+                "authority": [g.model_dump(mode="json")
+                              for g in self.config.authority],
+                "b3_context": (context.model_dump(mode="json")
+                               if context is not None else None),
+                "reader_mode": self.reader.mode,
             }),
         )
         run = self.store.create_run(run_input, command)
@@ -270,6 +352,13 @@ class Service:
     def decide(self, case_id: str, payload: dict[str, Any],
                command: Command) -> DecisionView:
         case = self.store.get_case(case_id)
+        if is_b3_v1(case.submission.form):
+            raise DomainError(
+                "B3_REPORT_ONLY",
+                "Hồ sơ B3 v1 chỉ tạo report intake; không dùng action "
+                "SETTLEMENT để duyệt ứng — duyệt work/B/advance là "
+                "lifecycle riêng chưa triển khai.",
+            )
         if case.stop_active:
             raise DomainError(
                 "STOP_ACTIVE",

@@ -1,0 +1,22 @@
+{
+  "packet": "b3-verbal-v2",
+  "validation": "PASS",
+  "pdf_pages": [
+    1,
+    1,
+    2
+  ],
+  "request_amount_vnd": 2000000,
+  "forecasts": [
+    3000000,
+    5000000,
+    8000000
+  ],
+  "manifest_hashes": 10,
+  "scan_embedded_images": "identical to reviewed PNGs",
+  "zip_crc": "PASS",
+  "plan_links": "PASS",
+  "application_changed": false,
+  "live_calls": 0,
+  "pipeline_test": "NOT_RUN"
+}

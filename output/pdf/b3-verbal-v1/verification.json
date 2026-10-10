@@ -1,0 +1,14 @@
+{
+  "artifact_validation": "PASS",
+  "native_pdf_pages": [
+    1,
+    1
+  ],
+  "scan_pdf_pages": 2,
+  "manifest_hashes_verified": 10,
+  "archive_crc": "PASS",
+  "plan_links": "PASS",
+  "arithmetic": "2M requested; forecasts3M+5M=8M",
+  "runtime_pipeline_test": "NOT_RUN",
+  "live_provider_calls": 0
+}

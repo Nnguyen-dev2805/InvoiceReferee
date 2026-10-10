@@ -2,6 +2,9 @@
 // `{code, message}` envelope; no decision logic lives here.
 import type {
   AuditEntry,
+  B3DemoContext,
+  B3Intake,
+  B3RunContext,
   CaseSummary,
   CaseView,
   ClosurePayload,
@@ -221,6 +224,26 @@ export function closeCase(caseId: string, payload: ClosurePayload): Promise<Clos
 }
 
 // --- W06: evaluation / Verify ---------------------------------------------------
+
+export function getDemoContext(): Promise<B3DemoContext> {
+  return request<B3DemoContext>('/api/demo-context');
+}
+
+export function createB3Case(
+  actorId: string,
+  intake: B3Intake,
+): Promise<CaseView> {
+  return request<CaseView>('/api/b3-cases', {
+    method: 'POST',
+    headers: { ...JSON_HEADERS, 'Idempotency-Key': crypto.randomUUID() },
+    body: JSON.stringify({ actor_id: actorId, intake }),
+  });
+}
+
+export function getB3RunContext(runId: string): Promise<B3RunContext> {
+  return request<B3RunContext>(
+    `/api/runs/${encodeURIComponent(runId)}/b3-context`);
+}
 
 export function runSettlementVerify(
   packets: string[] | null,

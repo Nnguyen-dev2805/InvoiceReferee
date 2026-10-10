@@ -64,6 +64,7 @@ from invoice_referee.storage.artifacts import put_artifact
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
 _CREATE_CASE = "CREATE_CASE"
+_CREATE_B3_CASE = "CREATE_B3_CASE"
 _REVISE_SUBMISSION = "REVISE_SUBMISSION"
 _ADD_SOURCE = "ADD_SOURCE"
 _START_RUN = "START_RUN"
@@ -283,6 +284,45 @@ class Store:
 
     def get_case(self, case_id: str) -> CaseView:
         with self._read() as conn:
+            return self._case_view(conn, case_id)
+
+    def create_b3_case(self, build_submission, command: Command,
+                       request_payload: dict[str, Any]) -> CaseView:
+        """Create a B3 v1 case: replay key checked BEFORE a new work id exists.
+
+        ``request_payload`` is the semantic user request (actor + intake); it
+        must stay stable across retries so the same key replays, while a new
+        work id is generated exactly once and persisted with the case.
+        """
+        payload_fp = fingerprint(_CREATE_B3_CASE, request_payload)
+        with self._write() as conn:
+            row = self._lookup_command(conn, _CREATE_B3_CASE, command,
+                                       scope_key="")
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                return self._case_view(conn, row["case_id"]).model_copy(
+                    update={"idempotent_replay": True})
+            work_ref = f"WORK-{uuid.uuid4().hex[:12]}"
+            submission = build_submission(work_ref)
+            case_id = f"C-{uuid.uuid4().hex[:12]}"
+            now = _iso(utcnow())
+            stage: CaseStage = "CHECKING"
+            conn.execute(
+                "INSERT INTO cases (id, case_version, input_revision, control_epoch, "
+                "stop_active, stage, current_run_id, submission_json, created_at, updated_at) "
+                "VALUES (?, 1, 1, 1, 0, ?, NULL, ?, ?, ?)",
+                (case_id, stage, _dump(submission.model_dump(mode="json")), now, now),
+            )
+            conn.execute(
+                "INSERT INTO case_revisions (id, case_id, revision, submission_json, "
+                "reason, actor_id, command_key, created_at) VALUES (?, ?, 1, ?, '', ?, ?, ?)",
+                (f"R-{uuid.uuid4().hex[:12]}", case_id,
+                 _dump(submission.model_dump(mode="json")), command.actor_id,
+                 command.key, now),
+            )
+            self._record_command(conn, case_id, "", "B3_CASE_CREATED",
+                                 _CREATE_B3_CASE, command, payload_fp,
+                                 {"case_id": case_id}, now)
             return self._case_view(conn, case_id)
 
     def list_cases(self) -> list[CaseSummary]:
@@ -542,6 +582,12 @@ class Store:
                 return None
             return Report.model_validate(_load(row["report_json"]))
 
+    def get_run_input(self, run_id: str) -> RunInput:
+        """The immutable snapshot a run evaluated (context/policy persisted)."""
+        with self._read() as conn:
+            row = self._run_row(conn, run_id)
+            return RunInput.model_validate(_load(row["snapshot_json"]))
+
     def run_status(self, run_id: str) -> RunStatus:
         with self._read() as conn:
             return self._run_row(conn, run_id)["status"]
@@ -718,6 +764,35 @@ class Store:
                 f"Hồ sơ đã kết thúc ({case['stage']}); không nhận hành động mới.",
             )
 
+    @staticmethod
+    def _b3_v1_form(case: sqlite3.Row) -> dict[str, Any]:
+        form = _load(case["submission_json"]).get("form")
+        if isinstance(form, dict) and form.get("schema_version") == "b3-intake-v1":
+            return form
+        return {}
+
+    def _check_b3_v1_action(self, case: sqlite3.Row, action: str) -> None:
+        """B3 v1 là nhánh intake/report: financial/handoff/closure bị chặn ở
+        transaction guard (backend code, không chỉ hide UI); review chỉ nhận
+        khi bản khai đã confirm."""
+        form = self._b3_v1_form(case)
+        if not form:
+            return
+        if action == "REVIEW":
+            if not form.get("confirmed"):
+                raise DomainError(
+                    "B3_REPORT_ONLY",
+                    "Hồ sơ B3 v1 đang là draft chưa confirm; chưa nhận "
+                    "accounting review.",
+                )
+            return
+        raise DomainError(
+            "B3_REPORT_ONLY",
+            f"Hồ sơ B3 v1 (b3-intake-v1) chỉ tạo report intake; hành động "
+            f"{action} chưa hỗ trợ ở nhánh này — duyệt ứng/chi/tiền là "
+            f"lifecycle riêng.",
+        )
+
     def _latest_decision_payload(self, conn: sqlite3.Connection,
                                   case_id: str) -> dict[str, Any] | None:
         row = conn.execute(
@@ -737,6 +812,7 @@ class Store:
                 return DecisionView.model_validate(stored).model_copy(
                     update={"idempotent_replay": True})
             case = self._case_row(conn, case_id)
+            self._check_b3_v1_action(case, "DECISION")
             self._check_open(case)
             if case["stop_active"]:
                 raise DomainError(
@@ -807,6 +883,7 @@ class Store:
                 return ReviewView.model_validate(stored).model_copy(
                     update={"idempotent_replay": True})
             case = self._case_row(conn, case_id)
+            self._check_b3_v1_action(case, "REVIEW")
             self._check_open(case)
             self._check_version(case, command)
             self._run_row(conn, payload.report_id)  # review phải chỉ vào run có thật
@@ -844,6 +921,7 @@ class Store:
                 return MoneyEventView.model_validate(stored).model_copy(
                     update={"idempotent_replay": True})
             case = self._case_row(conn, case_id)
+            self._check_b3_v1_action(case, "MONEY_EVENT")
             self._check_open(case)
             for event_row in conn.execute(
                     "SELECT payload_json FROM money_events WHERE case_id = ?",
@@ -942,6 +1020,7 @@ class Store:
                 stored = _load(row["payload_json"])["handoff"]
                 return dict(stored, idempotent_replay=True)
             case = self._case_row(conn, case_id)
+            self._check_b3_v1_action(case, "HANDOFF")
             self._check_open(case)
             if case["stop_active"]:
                 raise DomainError(
@@ -1010,6 +1089,7 @@ class Store:
                     "Hồ sơ đã đóng; nội dung đóng mới phải dùng hồ sơ mới.",
                 )
             self._check_version(case, command)
+            self._check_b3_v1_action(case, "CLOSURE")
             blockers = self._closure_blockers(conn, case, payload.kind)
             if blockers:
                 raise DomainError(
@@ -1238,6 +1318,8 @@ class Store:
                 action="START_RUN",
                 reason="Chạy kiểm tra B3/B7 trên snapshot hiện tại của hồ sơ.",
             ))
+        b3_v1_form = self._b3_v1_form(case)
+        b3_v1 = bool(b3_v1_form)
         if case["stage"] in _CLOSED_STAGES:
             actions.append(AllowedAction(
                 action="NONE",
@@ -1252,25 +1334,28 @@ class Store:
                         "Resume mở epoch mới; run cũ không tự hồi phục."),
             ))
             if current_run is not None and current_run["status"] == "SUCCEEDED":
-                actions.append(AllowedAction(
-                    action="DECIDE",
-                    reason="Report đã có; người có quyền duyệt hoặc từ chối.",
-                ))
-                actions.append(AllowedAction(
-                    action="REVIEW",
-                    reason="Kế toán rà soát report; review không phải phê duyệt.",
-                ))
-            if case["stage"] == "AWAITING_MONEY":
+                if not b3_v1:
+                    actions.append(AllowedAction(
+                        action="DECIDE",
+                        reason="Report đã có; người có quyền duyệt hoặc từ chối.",
+                    ))
+                if not b3_v1 or b3_v1_form.get("confirmed"):
+                    actions.append(AllowedAction(
+                        action="REVIEW",
+                        reason="Kế toán rà soát report; review không phải phê duyệt.",
+                    ))
+            if case["stage"] == "AWAITING_MONEY" and not b3_v1:
                 actions.append(AllowedAction(
                     action="RECORD_MONEY",
                     reason="Ghi nhận thực nhận/thực chi; gross giữ nguyên, "
                            "không clip theo mức duyệt.",
                 ))
-            actions.append(AllowedAction(
-                action="CLOSE_CASE",
-                reason="Đóng hồ sơ khi các gate (remaining/pending/incident/"
-                       "Stop/câu hỏi) đều sạch.",
-            ))
+            if not b3_v1:
+                actions.append(AllowedAction(
+                    action="CLOSE_CASE",
+                    reason="Đóng hồ sơ khi các gate (remaining/pending/incident/"
+                           "Stop/câu hỏi) đều sạch.",
+                ))
         return CaseView(
             id=case["id"], job=submission.job,
             case_version=case["case_version"], input_revision=case["input_revision"],

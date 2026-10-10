@@ -98,3 +98,28 @@ So manual/assisted cùng scope/checkpoints, đảo thứ tự hoặc cases tươ
 Pilot cùng operator không professional trial. Ít nhất 3 người thật theo đề, permission và synthetic/redacted data phù hợp; feedback/cải tiến có nguồn. Báo N nhỏ, từng case/person, errors/corrections; không suy mọi doanh nghiệp hoặc hứa tiết kiệm 80%. Research/agent/synthetic feedback không thay người làm nghiệp vụ.
 
 Live URL public không signup, clean-clone runbook, Core 4/Escalation 5/new input/audit/Stop/Override, public repo/history, đúng 5 slides/video ≤3 phút/build log và rehearsal là gates riêng theo đề. User muốn live URL cuối; không tự publish/Git/outbound hoặc tạo feedback giả. Hạn 15/10 khóa,17/10 demo; quality không suy từ spec hoặc agent completion.
+
+## E8. Hướng dẫn thực hành
+
+[Test thủ công từng hồ sơ và toàn pipeline](../testing/SETTLEMENT_MANUAL_TEST_GUIDE.md)
+có các bước UI, dữ liệu nạp, expected và cách ghi kết quả cho 20 hồ sơ cùng các
+kịch bản control, định dạng và regression. Đây là checklist để thực thi, không
+phải bằng chứng các case đã PASS hoặc bộ holdout độc lập.
+
+## E9. B3 verbal intake — synthetic test scope (b3-intake-v1)
+
+Gói `data/settlement/b3-verbal-v2` (local/ignored, supersedes v1) là bộ mẫu
+riêng cho nhánh B3 v1: employee-input (hai PDF lẻ hoặc PNG/scan 2 trang),
+forms/native-form.json (hợp đồng form), company-context (fixture backend) và
+expected/business-oracle.json. Oracle là **single-author business assertion,
+chưa phải measured gold**; expected/manifest/build script không bao giờ vào
+Reader/provider prompt (manifest `excluded_from_model`). Hash context.json
+khớp manifest được kiểm trong test (skip khi gói vắng mặt).
+
+Kết quả khớp oracle ở chế độ `PIPELINE_FAKE_OR_REPLAY` (native form, không
+nguồn) chỉ chứng minh application path đúng nghiệp vụ — không chứng minh
+OCR/LLM đọc được hai giấy thật. Import U02/U03 với file thật cần Reader LIVE
+có cấu hình Mistral/xkiro và authorization của chủ dự án: ghi
+`USER_LIVE_UNEXECUTED` cho tới khi có trial thật. Một sample synthetic
+"happy" không phải baseline chất lượng đo được; trial ≥3 người làm nghiệp vụ
+thật và so critical facts/links/checks với oracle là gates riêng (E7).

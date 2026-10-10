@@ -21,6 +21,40 @@ Hai tiêu chí riêng: **đúng** về facts/links/rules/money/workflow; **có �
 - Khoảng 5 người trong pilot; ba vai demo. Một người có thể mô phỏng các vai; role picker không xác thực danh tính/quyền thật. Không enterprise auth/tenancy, bank/ERP hoặc hạ tầng phân tán.
 - Scope/history có thể liên quan nhiều hồ sơ trong dataset được quản lý; không suy toàn công ty đã được kết nối. Unknown nguồn/phân bổ giữ vướng mắc.
 
+Ví dụ nghiệp vụ cho hai giai đoạn cùng chuyến đi: [hai bộ hồ sơ mẫu](WORKED_EXAMPLE.md). Đây là walkthrough thiết kế, không thay rulebook, dataset frozen hoặc bằng chứng runtime.
+
+### P2a. B3 khởi tạo khi giao công tác bằng lời (chốt ngày 10/10/2026)
+
+**PLANNED:** nhân viên nộp đề nghị tạm ứng và dự toán; chưa có văn bản công tác
+không phải lỗi hồ sơ. Lời khai giao việc chưa là quyết định của người có quyền.
+Kế toán rà soát report; người đủ quyền có thể xác nhận công việc, duyệt ngân sách
+và ứng trong một quyết định có nội dung/phạm vi riêng. Không yêu cầu nhân viên
+đính kèm chính những quyết định đang xin hoặc nguồn quyền/lịch sử ứng của công ty.
+
+- Form web dùng profile demo đã cấu hình; nhập nơi/ngày/mục đích công tác, số xin,
+  hạn quyết toán và dự toán tách phần công ty/nhân viên. Backend cấp mã công việc
+  cho hồ sơ mới; hệ thống hiển thị tuyến kế toán/người duyệt từ cấu hình.
+- Nhập ngoài: giữ ảnh/PDF gốc, AI chuẩn bị bản nháp có refs; nhân viên xem/sửa và
+  xác nhận trước khi nộp. Không tự nộp vì vừa upload; sửa không xóa originals.
+- Không nhập tự do người duyệt, thông tin nhân viên hoặc hai mốc kỹ thuật trên
+  màn nghiệp vụ B3. Mốc vẫn lưu để tái lập; clock giả lập phải ghi rõ và chỉ áp
+  dụng fixture mô phỏng. Role picker/profile demo không phải authentication.
+- Dự toán không là B đã duyệt, phần dự kiến trả không là actual payer. Lịch sử
+  ứng/hoàn ứng/approval/pending/coverage lấy từ phía công ty; thiếu hỏi kế toán,
+  không gán zero. Có quyền để xem xét không đồng nghĩa đã duyệt hồ sơ.
+- Report B3 trình bày đề nghị, kiểm tra, vướng mắc và người xử lý; không dùng S
+  quyết toán làm kết quả chính. “Đủ để rà soát” không phải được phép chi.
+
+Gói mẫu: `data/settlement/b3-verbal-v2.zip` (synthetic, local, chưa đo baseline).
+Hai tài liệu nhân viên: đề nghị và dự toán; dữ liệu công ty và oracle tách riêng.
+Mẫu giấy đã chốt: Công ty InvoiceReferee, tiền có hậu tố đ, không địa chỉ/số mẫu/
+số giấy giả định/thông tin giao việc/trạng thái/nhãn thử nghiệm; trip context gộp
+trong lý do hoặc nội dung công tác. Web vẫn lưu place/dates/purpose riêng, mã hồ
+sơ backend cấp; giấy ngoài không bị buộc có employee_ref/work_ref/mã DN nội bộ.
+[Plan intake/report B3](../superpowers/plans/2026-10-10-b3-verbal-intake.md)
+thực hiện nhánh khởi tạo này. Approval/actual ứng/end-to-end đến B7 chưa được
+nghiệm thu bởi plan đó; không dùng action SETTLEMENT làm approval ứng.
+
 ## P3. Ba vai và ranh giới quyết định
 
 | Vai | Công việc | Ranh giới |

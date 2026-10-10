@@ -1469,5 +1469,273 @@ button:focus-visible {
   gap: var(--space-2);
 }
 
+/* --- Settlement Rebuild Modern UI Enhancements ---------------------------- */
 
+.settlement-topbar {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-end;
+  flex-wrap: wrap;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-2);
+}
 
+.settlement-topbar .field {
+  margin: 0;
+  flex: 1 1 220px;
+}
+
+/* Tab Switcher */
+.tab-nav {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  background: var(--color-muted);
+  padding: 4px;
+  border-radius: calc(var(--radius) + 2px);
+  border: 1px solid var(--color-border);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  background: transparent;
+  color: var(--color-muted-foreground);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  text-align: center;
+}
+
+.tab-btn:hover {
+  color: var(--color-foreground);
+}
+
+.tab-btn.active {
+  background: var(--color-card);
+  color: var(--color-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* 2-Column Form Grid */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 640px) {
+  .form-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.form-grid-2 .field {
+  margin-bottom: var(--space-3);
+}
+
+.field-hint {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+/* Table Responsive & Estimate Table */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  margin-bottom: var(--space-3);
+}
+
+.estimate-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.estimate-table th,
+.estimate-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.estimate-table input {
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 10px;
+}
+
+.text-right {
+  text-align: right;
+}
+
+/* Empty State Dashboard */
+.empty-dashboard {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-5);
+}
+
+.workflow-roadmap {
+  margin: var(--space-4) 0;
+  padding: var(--space-4);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.workflow-roadmap h3 {
+  margin: 0 0 var(--space-3);
+  font-size: 1rem;
+  color: var(--color-foreground);
+}
+
+.workflow-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.workflow-step {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.workflow-step p {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+}
+
+/* Quick Cases Section */
+.quick-cases-section {
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-4);
+}
+
+.quick-cases-section h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 1rem;
+}
+
+.quick-cases-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+@media (min-width: 640px) {
+  .quick-cases-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.quick-case-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-3);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease-in-out;
+}
+
+.quick-case-card:hover {
+  background: var(--color-muted);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.quick-case-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.quick-case-job {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: 4px;
+}
+
+.quick-case-id {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.quick-case-stage {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+}
+
+.quick-case-meta {
+  display: flex;
+  gap: var(--space-2);
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+.empty-state-guide {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-muted);
+  border-radius: var(--radius);
+  border: 1px dashed var(--color-border);
+}
+
+.empty-state-guide h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 0.95rem;
+  color: var(--color-foreground);
+}
+
+.empty-state-guide ul {
+  margin: 0;
+  padding-left: var(--space-4);
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.empty-state-guide li {
+  line-height: 1.5;
+}

@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, StrictInt
 
 from invoice_referee.domain.models import DomainError
 from invoice_referee.env import load_repo_env
+from invoice_referee.settlement.b3 import B3Intake, load_b3_context
 from invoice_referee.settlement.models import (
     AuthorityGrant,
     CaseSummary,
@@ -80,6 +81,8 @@ _STATUS_BY_CODE = {
     "CASE_CLOSED": 409,
     "DUPLICATE_EVENT_REF": 409,
     "BEYOND_AUTHORITY": 403,
+    "PERSONA_MISMATCH": 403,
+    "B3_REPORT_ONLY": 409,
     "FILE_TOO_LARGE": 413,
     "SOURCE_LIMIT_REACHED": 413,
     "UNSUPPORTED_FORMAT": 415,
@@ -210,6 +213,15 @@ class VerifyRunRequest(BaseModel):
     packets: list[str] | None = None
 
 
+class CreateB3CaseRequest(BaseModel):
+    """B3 v1 intake: chỉ actor + lời khai; context/quyền/clock do backend."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    intake: dict[str, Any]
+
+
 DEFAULT_EVAL_CORPUS = Path("docs/discovery/eval_development")
 DEFAULT_VERIFY_DIR = DEFAULT_DATA_DIR / "verify"
 _verify_service: dict[str, Service] = {}
@@ -268,8 +280,15 @@ def create_runtime_app(*, db_path: Path | None = None,
             "SETTLEMENT_ARTIFACT_ROOT", DEFAULT_DATA_DIR / "artifacts"))
         store = Store(db, root)
         reader = _reader_from_env(store.artifact_root)
+        b3_context = None
+        context_path = os.environ.get(
+            "SETTLEMENT_B3_CONTEXT_PATH", "").strip()
+        if context_path:
+            # File cấu hình sai dạng phải lỗi startup rõ, không fallback quyền.
+            b3_context = load_b3_context(context_path)
         service = Service(store, reader,
-                          config=ServiceConfig(authority=DEMO_AUTHORITY))
+                          config=ServiceConfig(authority=DEMO_AUTHORITY,
+                                               b3_context=b3_context))
     app = FastAPI(title="InvoiceReferee Settlement", version="0.2.0")
 
     @app.exception_handler(DomainError)
@@ -306,6 +325,48 @@ def create_runtime_app(*, db_path: Path | None = None,
     @app.get("/api/cases", response_model=list[CaseSummary])
     async def list_cases() -> list[CaseSummary]:
         return service.store.list_cases()
+
+    @app.get("/api/demo-context", response_model=None)
+    async def demo_context() -> JSONResponse:
+        """Profile demo đã cấu hình; không cấp quyền do client nhập."""
+        context = service.config.b3_context
+        if context is None or not context.activated:
+            raise DomainError(
+                "CONFIG_NOT_ACTIVE",
+                "Chưa cấu hình SETTLEMENT_B3_CONTEXT_PATH trỏ tới company "
+                "fixture B3; không generate profile/quyền giả.",
+            )
+        return JSONResponse({
+            "version": context.version,
+            "synthetic": context.synthetic,
+            "demo_clock": (context.demo_clock.isoformat()
+                           if context.demo_clock else None),
+            "people": [p.model_dump(mode="json") for p in context.people],
+            "routes": [r.model_dump(mode="json") for r in context.routes],
+        })
+
+    @app.post("/api/b3-cases", response_model=None, status_code=201)
+    async def create_b3_case(
+        request: CreateB3CaseRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | CaseView:
+        from pydantic import ValidationError
+
+        try:
+            intake = B3Intake.model_validate(request.intake)
+        except ValidationError as error:
+            raise DomainError(
+                "INVALID_PAYLOAD",
+                f"Lời khai B3 không hợp lệ (không nhận context/quyền do "
+                f"client nhập): {error}",
+            ) from error
+        command = _command(idempotency_key, request.actor_id, "EMPLOYEE",
+                           None, {})
+        view = service.submit_b3(request.actor_id, intake, command)
+        if view.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=view.model_dump(mode="json"))
+        return view
 
     @app.get("/api/cases/{case_id}", response_model=CaseView)
     async def get_case(case_id: str) -> CaseView:
@@ -374,6 +435,28 @@ def create_runtime_app(*, db_path: Path | None = None,
     @app.get("/api/runs/{run_id}/report", response_model=Report)
     async def get_report(run_id: str) -> Report:
         return service.report(run_id)
+
+    @app.get("/api/runs/{run_id}/b3-context", response_model=None)
+    async def b3_run_context(run_id: str) -> JSONResponse:
+        """Snapshot context của run đó (immutable); refs company:<...> mở tới
+        record tương ứng trong response này."""
+        run_input = service.store.get_run_input(run_id)
+        context = run_input.b3_context
+        if context is None:
+            raise DomainError(
+                "CONFIG_NOT_ACTIVE",
+                f"Run {run_id} không mang company context trong snapshot.",
+            )
+        return JSONResponse({
+            "version": context.version,
+            "synthetic": context.synthetic,
+            "demo_clock": (context.demo_clock.isoformat()
+                           if context.demo_clock else None),
+            "grants": [g.model_dump(mode="json") for g in context.grants],
+            "coverage": [c.model_dump(by_alias=True, mode="json")
+                         for c in context.coverage],
+            "history": [h.model_dump(mode="json") for h in context.history],
+        })
 
     @app.get("/api/cases/{case_id}/questions", response_model=list[QuestionView])
     async def list_questions(case_id: str) -> list[QuestionView]:

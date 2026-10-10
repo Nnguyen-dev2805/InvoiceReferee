@@ -199,8 +199,120 @@ export interface Report {
   issues: Issue[];
   critical_facts: CriticalFact[];
   links: ReportLink[];
+  b3: B3Proposal | null;
   next_step: string;
   source_refs: string[];
+}
+
+// --- B3 v1 (b3-intake-v1): verbal assignment intake/report ---------------------
+
+export interface B3EstimateRow {
+  row_id: string;
+  description: string;
+  basis: string | null;
+  company_vnd: number | null;
+  employee_vnd: number | null;
+}
+
+export interface B3Intake {
+  schema_version: 'b3-intake-v1';
+  intake_method: 'WEB' | 'IMPORT';
+  confirmed: boolean;
+  destination: string | null;
+  trip_start: string | null;
+  trip_end: string | null;
+  purpose: string | null;
+  assignment_note: string | null;
+  request_amount_vnd: number | null;
+  settlement_due: string | null;
+  estimate_rows: B3EstimateRow[];
+}
+
+export type B3Readiness =
+  | 'DRAFT_CONFIRMATION_REQUIRED'
+  | 'NEEDS_INFORMATION'
+  | 'NEEDS_AUTHORIZED_REVIEW'
+  | 'READY_FOR_ACCOUNTANT_REVIEW';
+
+export interface B3Proposal {
+  readiness: B3Readiness;
+  intake: B3Intake;
+  forecast_company_vnd: number | null;
+  forecast_employee_vnd: number | null;
+  forecast_total_vnd: number | null;
+  work_permission: 'PENDING_DECISION' | 'NEEDS_REVIEW';
+  advance_approval: 'PENDING_DECISION' | 'NEEDS_REVIEW';
+  accountant_ref: string | null;
+  approver_ref: string | null;
+  field_refs: Record<string, string[]>;
+}
+
+export interface B3Person {
+  actor_ref: string;
+  role: DemoRole;
+  name: string;
+  department: string | null;
+}
+
+export interface B3Route {
+  employee_ref: string;
+  accountant_ref: string;
+  approver_ref: string;
+}
+
+export interface B3DemoContext {
+  version: string;
+  synthetic: boolean;
+  demo_clock: string | null;
+  people: B3Person[];
+  routes: B3Route[];
+}
+
+export interface B3GrantRecord {
+  actor_ref: string;
+  employee_ref: string;
+  work_ref: string | null;
+  allow_work: boolean;
+  max_budget_vnd: number | null;
+  max_advance_vnd: number | null;
+  effective_from: string;
+  effective_to: string;
+  ref: string;
+}
+
+export interface B3CoverageRecord {
+  employee_ref: string;
+  work_ref: string | null;
+  from: string;
+  to: string;
+  complete_prior_history: boolean;
+  groups: string[];
+  methods: string[];
+  missing_ranges: Array<Record<string, unknown>>;
+  owner_ref: string;
+  origin: string;
+  ref: string;
+}
+
+export interface B3HistoryRecord {
+  event_ref: string;
+  employee_ref: string;
+  work_ref: string;
+  kind: string;
+  amount_vnd: number | null;
+  event_at: string;
+  known_at: string;
+  status: string;
+  ref: string;
+}
+
+export interface B3RunContext {
+  version: string;
+  synthetic: boolean;
+  demo_clock: string | null;
+  grants: B3GrantRecord[];
+  coverage: B3CoverageRecord[];
+  history: B3HistoryRecord[];
 }
 
 export type CriticalFactState =

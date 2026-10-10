@@ -5,6 +5,7 @@ network, prints env values, or needs real API keys.
 """
 from __future__ import annotations
 
+import base64
 import io
 import json
 import time
@@ -142,6 +143,103 @@ def test_mistral_page0_maps_to_ui_page1(tmp_path):
     assert observations[0].page == 1
     assert observations[0].value == 5_000_000
     assert observations[0].source_id == source.id
+
+
+def scanned_pdf_bytes(pages=1):
+    from PIL import Image
+
+    image = Image.open(io.BytesIO(png_bytes())).convert("RGB")
+    output = io.BytesIO()
+    image.save(output, format="PDF", save_all=True,
+               append_images=[image] * (pages - 1))
+    return output.getvalue()
+
+
+def test_scanned_pdf_sends_rendered_png_with_image_mime(tmp_path):
+    def image_api(request):
+        document = json.loads(request.content)["document"]
+        url = document["image_url"]
+        if not url.startswith("data:image/png;base64,"):
+            return httpx.Response(422, json={"detail": "Expected PNG image"})
+        assert base64.b64decode(url.split(",", 1)[1]).startswith(b"\x89PNG\r\n\x1a\n")
+        return httpx.Response(200, json={"pages": [{"index": 0,
+                            "markdown": "Tổng: 1.000.000 VND"}]})
+
+    fields = [{"key": "expense.EXP-1.amount", "value": 1000000,
+               "read_state": "READ", "raw_text": "1.000.000",
+               "evidence": {"page": 1, "quote": "Tổng: 1.000.000 VND"}}]
+    reader = make_reader(tmp_path, httpx.MockTransport(image_api),
+                         scripted_transport([xkiro_body(fields=fields)], []))
+    source = write_source(tmp_path, "scan.pdf", scanned_pdf_bytes(), "application/pdf")
+    observations = reader.read(source, ["expense."], budget())
+    assert observations[0].value == 1000000
+    assert observations[0].source_id == source.id
+
+
+def test_two_scan_pages_keep_original_page_and_consume_two_page_slots(tmp_path, monkeypatch):
+    from invoice_referee.settlement import reader as reader_module
+
+    monkeypatch.setattr(reader_module, "MAX_PDF_IMAGE_PAGES_PER_RUN", 2)
+    fields = [{"key": "expense.EXP-1.amount", "value": 1000000,
+               "read_state": "READ", "raw_text": "1.000.000",
+               "evidence": {"page": 1, "quote": "Tổng: 1.000.000 VND"}}]
+    reader = make_reader(tmp_path,
+                         ocr_transport([{"index": 0, "markdown": "Tổng: 1.000.000 VND"}]),
+                         scripted_transport([xkiro_body(fields=fields)] * 2, []))
+    source = write_source(tmp_path, "two-pages.pdf", scanned_pdf_bytes(2), "application/pdf")
+    observations = reader.read(source, [], budget())
+    assert [o.page for o in observations] == [1, 2]
+    assert [o.locator for o in observations] == ["page 1", "page 2"]
+    assert len({o.fact_id for o in observations}) == 2
+
+
+def test_failed_ocr_is_retained_in_call_trace(tmp_path):
+    reader = make_reader(tmp_path, timeout_transport())
+    source = write_source(tmp_path, "scan.png", png_bytes(), "image/png")
+    with pytest.raises(DomainError) as error:
+        reader.read(source, [], budget())
+    assert error.value.code == "PROVIDER_FAILED"
+    trace = reader.trace_entries()
+    assert len(trace) == 1
+    assert trace[0].stage == "ocr"
+    assert trace[0].ok is False
+    assert trace[0].error_code == "PROVIDER_FAILED"
+    assert trace[0].source_id == source.id
+
+
+@pytest.mark.parametrize("different_source", [False, True])
+def test_model_local_fact_ids_do_not_collide_across_extractions(tmp_path, different_source):
+    from invoice_referee.settlement.rules import evaluate
+
+    reader = make_reader(tmp_path)
+    first = write_source(tmp_path, "one.png", png_bytes(), "image/png", "S1")
+    second = (write_source(tmp_path, "two.png", png_bytes(), "image/png", "S2")
+              if different_source else first)
+    facts = []
+    for source, page, amount in [(first, 1, 2000000),
+                                  (second, 1 if different_source else 2, 4000000)]:
+        content = json.dumps({"fields": [{
+            "fact_id": "f1", "key": "history.advance.received", "value": amount,
+            "read_state": "READ", "raw_text": str(amount),
+            "evidence": {"page": 1, "quote": str(amount)},
+        }]})
+        facts.extend(reader._parse_extract(content, source, page, []))
+    run_input, _, _ = b.run_input(job="B3")
+    report = evaluate(run_input, facts, [])
+    assert len({o.fact_id for o in facts}) == 2
+    assert report.components.a.value is None  # differing values are still a conflict
+    issue = next(i for i in report.issues if i.issue_id == "I-CONTRADICTION")
+    assert all(o.fact_id in issue.refs for o in facts)
+
+
+def test_duplicate_model_fact_id_in_one_output_still_rejected(tmp_path):
+    reader = make_reader(tmp_path)
+    source = write_source(tmp_path, "one.png", png_bytes(), "image/png")
+    field = {"fact_id": "f1", "key": "history.advance.received", "value": 2000000,
+             "read_state": "READ", "raw_text": "2000000", "evidence": {"page": 1}}
+    with pytest.raises(DomainError) as error:
+        reader._parse_extract(json.dumps({"fields": [field, field]}), source, 1, [])
+    assert error.value.code == "PROVIDER_OUTPUT_INVALID"
 
 
 def test_ocr_duplicate_page_index_is_invalid(tmp_path):
@@ -375,3 +473,59 @@ def test_fake_reader_also_parses_csv_directly(tmp_path):
     payers = [o for o in observations if o.key == "payment.TX-02.payer"]
     assert payers and payers[0].value == "EMPLOYEE"
     assert reader.trace_entries() == []
+
+
+# --- B3 v1 key grammar và prompt --------------------------------------------
+
+def test_b3_keys_select_b3_extract_prompt(tmp_path, monkeypatch):
+    import invoice_referee.settlement.reader as reader_module
+
+    captured: list[str] = []
+    original_load = reader_module.load_prompt
+
+    def spy_load_prompt(name):
+        captured.append(name)
+        return original_load(name)
+
+    monkeypatch.setattr(reader_module, "load_prompt", spy_load_prompt)
+    reader = make_reader(tmp_path, ocr_transport([{"index": 0,
+                                                   "markdown": "text"}]),
+                         scripted_transport([xkiro_body(fields=[])], []))
+    source = write_source(tmp_path, "de-nghi.png", png_bytes(), "image/png")
+    reader.read(source, ["document.role", "advance."], budget())
+    assert captured == ["settlement-b3-extract.txt"]
+
+
+def test_b7_keys_keep_shared_extract_prompt(tmp_path, monkeypatch):
+    import invoice_referee.settlement.reader as reader_module
+
+    captured: list[str] = []
+    original_load = reader_module.load_prompt
+
+    def spy_load_prompt(name):
+        captured.append(name)
+        return original_load(name)
+
+    monkeypatch.setattr(reader_module, "load_prompt", spy_load_prompt)
+    reader = make_reader(tmp_path, ocr_transport([{"index": 0,
+                                                   "markdown": "text"}]),
+                         scripted_transport([xkiro_body(fields=[])], []))
+    source = write_source(tmp_path, "hoa-don.png", png_bytes(), "image/png")
+    reader.read(source, ["expense."], budget())
+    assert captured == ["settlement-extract.txt"]
+
+
+def test_fake_reader_filters_b3_grammar_keys(tmp_path):
+    ledger = (
+        "fact X1 document.role FORECAST\n"
+        "fact X2 forecast.total 8000000\n"
+        "fact X3 payment.TX-9.amount 100\n"
+    )
+    source = write_source(tmp_path, "du-toan.txt", ledger.encode(),
+                          "text/plain", source_id="S-b3ledger")
+    reader = StructuredLedgerReader(tmp_path)
+    observations = reader.read(
+        source, ["document.role", "person.", "trip.", "advance.", "forecast."],
+        budget())
+    keys = {o.key for o in observations}
+    assert keys == {"document.role", "forecast.total"}

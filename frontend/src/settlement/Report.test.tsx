@@ -50,6 +50,7 @@ function makeReport(overrides: Partial<Report> = {}): Report {
     source_refs: ['S-bill', 'S-history', 'S-budget'],
     critical_facts: [],
     links: [],
+    b3: null,
     ...overrides,
   };
 }
@@ -107,4 +108,90 @@ test('proposed khác calculated: proposed null giữ "—"', () => {
   expect(text).toContain('Calculated:');
   expect(text).toContain('3.000.000 VND');
   expect(text).toContain('Proposed (chưa duyệt, chưa chi): —');
+});
+
+// --- B3 v1 proposal (Task 4) ---------------------------------------------------
+
+function makeB3Report(): Report {
+  return makeReport({
+    job: 'B3',
+    b3: {
+      readiness: 'READY_FOR_ACCOUNTANT_REVIEW',
+      intake: {
+        schema_version: 'b3-intake-v1',
+        intake_method: 'WEB',
+        confirmed: true,
+        destination: 'Hà Nội',
+        trip_start: '2026-10-12',
+        trip_end: '2026-10-13',
+        purpose: 'Khảo sát yêu cầu và thống nhất phạm vi triển khai dự án.',
+        assignment_note: null,
+        request_amount_vnd: 2_000_000,
+        settlement_due: '2026-10-16',
+        estimate_rows: [
+          {row_id: 'flight', description: 'Vé máy bay khứ hồi', basis: '1 vé',
+           company_vnd: 3_000_000, employee_vnd: 0},
+          {row_id: 'hotel', description: 'Khách sạn', basis: '1 đêm',
+           company_vnd: 0, employee_vnd: 3_000_000},
+        ],
+      },
+      forecast_company_vnd: 3_000_000,
+      forecast_employee_vnd: 5_000_000,
+      forecast_total_vnd: 8_000_000,
+      work_permission: 'PENDING_DECISION',
+      advance_approval: 'PENDING_DECISION',
+      accountant_ref: 'ACC-DEMO-01',
+      approver_ref: 'APR-DEMO-01',
+      field_refs: {request_amount_vnd: ['form:1:request_amount_vnd']},
+    },
+  });
+}
+
+test('report B3 dùng section proposal, không dùng bảng S; pending không là issue', () => {
+  render(<ReportPanel report={makeB3Report()} />);
+  expect(screen.queryByText(/S = E/)).not.toBeInTheDocument();
+  expect(screen.getAllByText(/Đang chờ quyết định/).length).toBeGreaterThan(0);
+  expect(screen.getByText(/2[.,]000[.,]000/)).toBeInTheDocument();
+  const text = screen.getByTestId('report-panel').textContent ?? '';
+  expect(text).toContain('Tổng dự toán');
+  expect(text).toContain('8.000.000 VND');
+  expect(text).toContain('kế toán ACC-DEMO-01');
+  expect(text).toContain('người duyệt APR-DEMO-01');
+  expect(text).toContain('dự toán không phải ngân sách đã duyệt');
+  expect(text).toContain('Complete nghĩa là đủ căn cứ rà soát, không nghĩa đã duyệt');
+});
+
+test('report B3 với company context hiển thị grants/coverage và nhãn mô phỏng', () => {
+  render(<ReportPanel report={makeB3Report()} b3Context={{
+    version: 'synthetic-verbal-v2',
+    synthetic: true,
+    demo_clock: '2026-10-10T09:00:00+07:00',
+    grants: [{
+      actor_ref: 'APR-DEMO-01', employee_ref: 'NV-DEMO-01', work_ref: null,
+      allow_work: true, max_budget_vnd: 10_000_000,
+      max_advance_vnd: 5_000_000,
+      effective_from: '2026-10-01T00:00:00+07:00',
+      effective_to: '2026-10-31T23:59:59+07:00',
+      ref: 'company:grant-01',
+    }],
+    coverage: [{
+      employee_ref: 'NV-DEMO-01', work_ref: null,
+      from: '2026-10-01T00:00:00+07:00', to: '2026-10-10T09:00:00+07:00',
+      complete_prior_history: true, groups: ['ADVANCE'], methods: ['CASH'],
+      missing_ranges: [], owner_ref: 'ACC-DEMO-01',
+      origin: 'synthetic register', ref: 'company:coverage-01',
+    }],
+    history: [],
+  }} />);
+  const context = screen.getByTestId('b3-run-context').textContent ?? '';
+  expect(context).toContain('company:grant-01');
+  expect(context).toContain('mô phỏng');
+  expect(context).toContain('gồm mở sổ/tồn trước kỳ');
+  expect(context).toContain('Lịch sử company-side: trống');
+});
+
+test('report B7 không có section B3 proposal', () => {
+  render(<ReportPanel report={makeReport()} />);
+  expect(screen.queryByTestId('b3-proposal')).not.toBeInTheDocument();
+  expect(screen.getByText(/S = E/)).toBeInTheDocument();
 });

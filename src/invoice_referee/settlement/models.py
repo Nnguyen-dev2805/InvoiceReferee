@@ -15,6 +15,7 @@ from typing import Any, Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictInt
 
 from invoice_referee.domain.models import DomainError
+from invoice_referee.settlement.b3 import B3CompanyContext, B3Proposal
 
 Job = Literal["B3", "B7"]
 DemoRole = Literal["EMPLOYEE", "ACCOUNTANT", "APPROVER"]
@@ -337,6 +338,7 @@ class RunInput(BaseModel):
     authority: list[AuthorityGrant] = Field(default_factory=list)
     response_refs: list[str] = Field(default_factory=list)
     config: dict[str, Any] = Field(default_factory=dict)
+    b3_context: B3CompanyContext | None = None
     snapshot_hash: str
 
 
@@ -504,6 +506,7 @@ class Report(BaseModel):
     issues: list[Issue] = Field(default_factory=list)
     critical_facts: list[CriticalFact] = Field(default_factory=list)
     links: list[ReportLink] = Field(default_factory=list)
+    b3: B3Proposal | None = None
     next_step: str = ""
     source_refs: list[str] = Field(default_factory=list)
 

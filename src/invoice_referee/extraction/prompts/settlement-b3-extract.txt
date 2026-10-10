@@ -1,0 +1,18 @@
+Bạn đọc một đoạn văn bản trích từ tài liệu của một đề nghị tạm ứng công tác (B3): giấy đề nghị tạm ứng, bảng dự toán chi phí, hoặc tài liệu đính kèm khác. Nhiệm vụ: trích đúng các trường được yêu cầu trong `keys`, tuyệt đối không suy đoán.
+
+Quy tắc bắt buộc:
+- Chỉ trả về JSON đúng dạng: {"fields": [{"fact_id": "...", "key": "...", "raw_text": "...", "read_state": "READ" | "NOT_FOUND" | "UNCLEAR", "value": <số nguyên hoặc chuỗi hoặc null>, "evidence": {"page": <số>, "quote": "trích dẫn nguyên văn"}}]}
+- `key` phải là một key trong danh sách `keys` được cung cấp; không tự bịa key khác.
+- `document.role`: ADVANCE_REQUEST (giấy đề nghị tạm ứng), FORECAST (bảng dự toán chi phí), SUPPORTING (tài liệu khác). Một trang chỉ nhận một role; trang nào không chắc thì dùng SUPPORTING và để READ với giá trị role đọc được, không đoán.
+- `forecast.row.<row_id>.*`: mỗi dòng dự toán là một row. `row_id` là mã NHỎ do bạn đặt cho dòng đó trong tài liệu này (ví dụ r1, r2 theo thứ tự dòng), chỉ dùng nội bộ — không dùng row_id để kết luận bất kỳ điều gì nghiệp vụ. Mỗi dòng cần: description (nội dung chi), basis (cơ sở dự toán nếu có), company (phần công ty trả), employee (phần nhân viên tự chi). Phần nào bảng không có cột/ô tương ứng thì để NOT_FOUND, không ghi 0 thay cho ô trống không rõ. Phải đọc đủ mọi dòng của bảng trước khi trả kết quả; bảng bị cắt giữa chừng thì các dòng chưa thấy để UNCLEAR, không tự bổ sung.
+- Tiền (advance.request.amount, forecast.company/employee/total, forecast.row.*.company/employee) phải là số nguyên VND, KHÔNG dấu phân cách, không đơn vị, không thập phân. Tiền trên giấy có hậu tố "đ" vẫn là VND. Nếu không chắc separator/đơn vị thì để value null và read_state "UNCLEAR" với raw_text nguyên văn.
+- `advance.request.amount_words` là chuỗi số bằng chữ nguyên văn. `advance.request.amount_words_value` là BẠN ĐỀ XUẤT diễn giải số bằng chữ thành số — chỉ điền khi bạn chắc chắn, kèm quote gốc của dòng số bằng chữ; không chắc thì để null (UNCLEAR), tuyệt đối không đoán số. Việc so khớp số bằng chữ với số do hệ thống kiểm, không phải bạn kết luận.
+- Ngày (trip.start, trip.end, advance.settlement_due) theo dạng YYYY-MM-DD; đọc từ nội dung trip gộp trong lý do/nội dung công tác nếu văn bản gộp.
+- `person.name` là tên người đề nghị in trên giấy. `person.employee_ref` chỉ điền khi giấy in sẵn mã nhân viên; không suy mã từ tên.
+- read_state:
+  - "READ": giá trị đọc rõ từ văn bản, kèm quote nguyên văn.
+  - "NOT_FOUND": key được yêu cầu nhưng không thấy trong phạm vi văn bản này.
+  - "UNCLEAR": thấy đề cập nhưng mờ/bị che/mâu thuẫn — value null, raw_text giữ nguyên.
+- Không dùng số từ khai báo/đề nghị để trả trường của tài liệu khác; chỉ trích những gì văn bản thực viết. Không dùng nhãn "đã duyệt/trạng thái" hay chữ ký trống để kết luận bất kỳ điều gì.
+- Không bịa fact_id trùng nhau; fact_id ngắn, duy nhất trong output.
+- Không thêm nhận xét, không giải thích ngoài JSON.
