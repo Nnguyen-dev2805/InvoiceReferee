@@ -1,7 +1,8 @@
 // Questions panel (W04): each unresolved report issue becomes a question with
 // owner and refs; answering records the response — only a re-check resolves.
 import { useState } from 'react';
-import type { QuestionView } from './types';
+import type { QuestionView, SourceView } from './types';
+import { EvidenceLinks } from './EvidenceLinks';
 
 const OWNER_LABELS: Record<QuestionView['owner'], string> = {
   EMPLOYEE: 'Nhân viên',
@@ -25,12 +26,14 @@ export function QuestionsPanel({
   questions,
   caseVersion,
   sourceIds,
+  sources = [],
   role,
   onResponded,
 }: {
   questions: QuestionView[];
   caseVersion: number;
   sourceIds: string[];
+  sources?: SourceView[];
   role: string;
   onResponded: (questionId: string, draft: AnswerDraft) => Promise<void>;
 }) {
@@ -69,11 +72,8 @@ export function QuestionsPanel({
             <h3>{STATUS_LABELS[question.status]} — {OWNER_LABELS[question.owner]}</h3>
             <p>{question.message}</p>
             {question.refs.length > 0 && (
-              <p className="muted">
-                Refs:{' '}
-                {question.refs.map((ref) => (
-                  <code key={ref}>{ref}</code>
-                ))}
+              <p className="muted" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                Căn cứ: <EvidenceLinks refs={question.refs} sources={sources} />
               </p>
             )}
             {question.status === 'OPEN' && (
@@ -85,26 +85,30 @@ export function QuestionsPanel({
                   placeholder="Nội dung trả lời cho owner"
                   onChange={(e) => setDraft(question.id, { content: e.target.value })}
                 />
-                <label>Nguồn tham chiếu (chọn nguồn đã upload)</label>
+                <label>Tài liệu tham chiếu (chọn tài liệu đã tải lên)</label>
                 {sourceIds.length === 0 && (
-                  <p className="muted">Chưa có nguồn nào trong hồ sơ để tham chiếu.</p>
+                  <p className="muted">Chưa có tài liệu nào trong hồ sơ để tham chiếu.</p>
                 )}
-                {sourceIds.map((sourceId) => (
-                  <label key={sourceId} className="helper">
-                    <input
-                      type="checkbox"
-                      checked={draft.sourceIds.includes(sourceId)}
-                      onChange={(e) =>
-                        setDraft(question.id, {
-                          sourceIds: e.target.checked
-                            ? [...draft.sourceIds, sourceId]
-                            : draft.sourceIds.filter((s) => s !== sourceId),
-                        })
-                      }
-                    />{' '}
-                    {sourceId}
-                  </label>
-                ))}
+                {sourceIds.map((sourceId) => {
+                  const source = sources.find((s) => s.id === sourceId);
+                  const label = source ? `${source.filename} (${sourceId})` : sourceId;
+                  return (
+                    <label key={sourceId} className="helper">
+                      <input
+                        type="checkbox"
+                        checked={draft.sourceIds.includes(sourceId)}
+                        onChange={(e) =>
+                          setDraft(question.id, {
+                            sourceIds: e.target.checked
+                              ? [...draft.sourceIds, sourceId]
+                              : draft.sourceIds.filter((s) => s !== sourceId),
+                          })
+                        }
+                      />{' '}
+                      {label}
+                    </label>
+                  );
+                })}
                 {!ownerMatch && (
                   <p className="notice-warn" role="alert">
                     Vai hiện tại ({role}) không phải owner của câu hỏi — phản hồi

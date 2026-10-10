@@ -15,8 +15,8 @@ test('render đầy đủ trường nghiệp vụ B3', () => {
   expect(screen.getByLabelText('Nơi đến')).toBeTruthy();
   expect(screen.getByLabelText('Ngày đi')).toBeTruthy();
   expect(screen.getByLabelText('Ngày về')).toBeTruthy();
-  expect(screen.getByLabelText(/Số xin ứng/)).toBeTruthy();
-  expect(screen.getByLabelText('Hạn quyết toán')).toBeTruthy();
+  expect(screen.getByLabelText(/Số tiền đề nghị tạm ứng|Số xin ứng/)).toBeTruthy();
+  expect(screen.getByLabelText(/Hạn thanh toán tạm ứng|Hạn quyết toán/)).toBeTruthy();
   expect(screen.getByLabelText(/Ghi chú giao việc/)).toBeTruthy();
   expect(screen.getByTestId('b3-estimate-rows')).toBeTruthy();
 });

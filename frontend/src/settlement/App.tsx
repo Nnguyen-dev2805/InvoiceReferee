@@ -2,7 +2,7 @@
 // Create a case, upload sources, reload, open the stored original; B3 v1 flow:
 // persona demo → form/lời khai (WEB) hoặc draft từ giấy (IMPORT) → preview →
 // confirm → report proposal. Persona chọn ở UI không xác thực danh tính.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as api from './api';
 import { ApiError } from './api';
 import { B3IntakeForm, emptyB3Intake } from './B3Intake';
@@ -10,6 +10,8 @@ import { ActionsPanel } from './Actions';
 import { QuestionsPanel } from './Questions';
 import { ReportPanel } from './Report';
 import { VerifyPanel } from './Verify';
+import { summarizeCase } from './uiState';
+import { historyKindLabel } from './uiCopy';
 import type {
   B3DemoContext, B3Intake, B3RunContext, AuditEntry, CaseStage, CaseSummary,
   CaseView, DemoRole, Job, QuestionView, Report, RunView,
@@ -92,6 +94,25 @@ export function App() {
   const [b3ReviseIntake, setB3ReviseIntake] = useState<B3Intake | null>(null);
   const [b3ReviseReason, setB3ReviseReason] = useState('');
   const [activeIntakeTab, setActiveIntakeTab] = useState<'B3' | 'B7'>('B3');
+  const [importFiles, setImportFiles] = useState<File[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [showVerify, setShowVerify] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleAddImportFiles = (files: FileList | File[] | null) => {
+    if (!files) return;
+    const incoming = Array.from(files);
+    if (incoming.length === 0) return;
+    setImportFiles((prev) => {
+      const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`));
+      const newUnique = incoming.filter((f) => !existingKeys.has(`${f.name}-${f.size}`));
+      return [...prev, ...newUnique];
+    });
+  };
+
+  const handleRemoveImportFile = (index: number) => {
+    setImportFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const loadCases = useCallback(async () => {
     try {
@@ -247,6 +268,25 @@ export function App() {
       if (b3Method === 'WEB') {
         await startRunFor(created.id, created.case_version);
         await loadCase(created.id);
+      } else if (b3Method === 'IMPORT' && importFiles.length > 0) {
+        let currentCase = created;
+        for (const file of importFiles) {
+          await api.addSource(
+            currentCase.id,
+            file,
+            currentCase.case_version,
+            b3PersonaRef || actorId.trim(),
+            role,
+            `Tệp đề nghị B3 (${file.name})`,
+          );
+          currentCase = await api.getCase(currentCase.id);
+        }
+        setImportFiles([]);
+        await startRunFor(currentCase.id, currentCase.case_version);
+        await loadCase(currentCase.id);
+        await loadCases();
+      } else {
+        await loadCase(created.id);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không tạo được hồ sơ B3.');
@@ -256,15 +296,14 @@ export function App() {
   const handleFillFromDraft = () => {
     if (!report?.b3) return;
     const filled = {...report.b3.intake, confirmed: false};
-    // Điền vào form sửa/xác nhận của case đang mở (nơi confirm được gửi);
-    // đồng thời cập nhật form bên trái để giữ nhất quán nếu tạo hồ sơ mới.
-    setB3ReviseIntake((current) => current === null ? current : filled);
-    setB3Intake(filled);
+    setB3ReviseIntake(filled);
   };
 
   const handleReviseB3 = async (confirmed: boolean) => {
     if (!view || !b3ReviseIntake) return;
-    if (!b3ReviseReason.trim()) {
+    const isFirstConfirm = confirmed && !view.submission.form.confirmed;
+    const reason = b3ReviseReason.trim() || (isFirstConfirm ? 'Xác nhận bản nháp từ tài liệu đính kèm' : '');
+    if (!reason) {
       setError('Cần lý do sửa/xác nhận để ghi history.');
       return;
     }
@@ -275,7 +314,7 @@ export function App() {
         actor_id: b3PersonaRef || actorId.trim(),
         demo_role: role,
         expected_case_version: view.case_version,
-        reason: b3ReviseReason.trim(),
+        reason,
       });
       setError(null);
       setB3ReviseReason('');
@@ -414,6 +453,7 @@ export function App() {
   const viewIsB3 = view !== null && isB3V1Form(view.submission.form);
   const b3DraftReadyForFill = report?.b3 !== null
     && report?.b3.readiness === 'DRAFT_CONFIRMATION_REQUIRED';
+  const caseSummary = view ? summarizeCase(view, run, report) : null;
 
   return (
     <div className="app">
@@ -502,23 +542,125 @@ export function App() {
                       </option>
                     </select>
                   </div>
-                  <B3IntakeForm value={b3Intake} onChange={setB3Intake}
-                                disabled={false} />
-                  <p className="muted">
-                    Không nhập người duyệt/mã nội bộ/mốc thời gian trên form nghiệp
-                    vụ; backend cấp mã hồ sơ, clocks lấy từ cấu hình.
-                  </p>
+
+                  {b3Method === 'IMPORT' && (
+                    <div className="import-upload-card" data-testid="b3-import-upload-card">
+                      <div
+                        className={`dropzone ${isDragging ? 'dropzone-active' : ''}`}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setIsDragging(true);
+                        }}
+                        onDragLeave={() => setIsDragging(false)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setIsDragging(false);
+                          if (e.dataTransfer.files) {
+                            handleAddImportFiles(e.dataTransfer.files);
+                          }
+                        }}
+                        onClick={() => fileInputRef.current?.click()}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            fileInputRef.current?.click();
+                          }
+                        }}
+                      >
+                        <input
+                          ref={fileInputRef}
+                          id="b3-import-file-input"
+                          data-testid="b3-import-file-input"
+                          type="file"
+                          multiple
+                          accept="image/*,application/pdf,.csv,.txt,.md"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            handleAddImportFiles(e.target.files);
+                            e.target.value = '';
+                          }}
+                        />
+                        <div className="dropzone-icon">📁</div>
+                        <div className="dropzone-text">
+                          <strong>Kéo thả các tệp chứng từ vào đây</strong>
+                          <span className="dropzone-subtext">
+                            hoặc <span className="dropzone-link">bấm để chọn tệp</span> (chọn được 1 hoặc nhiều tệp cùng lúc)
+                          </span>
+                        </div>
+                        <p className="dropzone-hint">
+                          Hỗ trợ: Giấy đề nghị, Dự toán chi phí, Thư mời, Báo giá... (PDF, Ảnh, CSV)
+                        </p>
+                      </div>
+
+                      {importFiles.length > 0 && (
+                        <div className="attached-files-box" style={{ marginTop: 'var(--space-3)' }}>
+                          <div className="attached-files-header">
+                            <strong>Đã chọn {importFiles.length} tệp đính kèm:</strong>
+                            <button
+                              type="button"
+                              className="btn-clear-all"
+                              onClick={() => setImportFiles([])}
+                            >
+                              Xóa tất cả
+                            </button>
+                          </div>
+                          <ul className="attached-files-list">
+                            {importFiles.map((file, idx) => (
+                              <li key={`${file.name}-${idx}`} className="attached-file-item">
+                                <span className="file-icon">📄</span>
+                                <span className="file-name" title={file.name}>
+                                  {file.name}
+                                </span>
+                                <span className="file-size">({(file.size / 1024).toFixed(0)} KB)</span>
+                                <button
+                                  type="button"
+                                  className="btn-remove-file"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveImportFile(idx);
+                                  }}
+                                  title="Gỡ tệp này"
+                                  aria-label={`Xóa tệp ${file.name}`}
+                                >
+                                  ✕
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      <p className="muted" style={{ fontSize: '0.85rem', marginTop: 'var(--space-2)' }}>
+                        <em>* AI sẽ tự động đọc, trích xuất và phân loại dữ liệu từ tất cả các tệp tải lên. Bạn cũng có thể bổ sung thêm tệp bất kỳ lúc nào ở panel Nguồn bên phải.</em>
+                      </p>
+                    </div>
+                  )}
+
+                  {b3Method === 'WEB' && (
+                    <>
+                      <B3IntakeForm value={b3Intake} onChange={setB3Intake}
+                                    disabled={false} />
+                      <p className="muted">
+                        Không nhập người duyệt/mã nội bộ/mốc thời gian trên form nghiệp
+                        vụ; backend cấp mã hồ sơ, clocks lấy từ cấu hình.
+                      </p>
+                    </>
+                  )}
                   <button className="btn btn-primary" onClick={() => void handleCreateB3()}
                           disabled={!b3PersonaRef}>
                     {b3Method === 'WEB'
                       ? 'Nộp đề nghị B3 (web)'
-                      : 'Tạo hồ sơ nháp B3 (chưa xác nhận)'}
+                      : (importFiles.length > 0
+                          ? 'Tải lên & Tạo hồ sơ nháp B3'
+                          : 'Tạo hồ sơ nháp B3 (chưa xác nhận)')}
                   </button>
                   {b3Method === 'IMPORT' && (
                     <p className="muted">
-                      Sau khi tạo nháp: tải hai giấy (đề nghị + dự toán) ở panel
-                      Nguồn, bấm "Chạy kiểm tra" để AI đọc bản nháp, xem report
-                      rồi quay lại đây điền/ chỉnh và bấm "Xác nhận nộp B3".
+                      {importFiles.length > 0
+                        ? 'Hệ thống sẽ tải tệp lên và tự động khởi chạy AI để đọc thành bản nháp.'
+                        : 'Sau khi tạo nháp: bạn có thể tải hai giấy (đề nghị + dự toán) ở ô trên hoặc ở panel Nguồn bên phải, rồi bấm "Chạy kiểm tra" để AI đọc bản nháp.'}
                     </p>
                   )}
                 </>
@@ -606,12 +748,131 @@ export function App() {
             </ul>
           </div>
 
-          <VerifyPanel />
+          <div className="panel" data-testid="verify-container">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                fontWeight: 600,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: 'var(--space-2) 0',
+              }}
+              onClick={() => setShowVerify((v) => !v)}
+            >
+              <span>Đánh giá hệ thống (Verify)</span>
+              <span>{showVerify ? '▲ Thu gọn' : '▼ Mở rộng'}</span>
+            </button>
+            {showVerify && (
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                <VerifyPanel />
+              </div>
+            )}
+          </div>
         </section>
 
         <section className="col">
           {view ? (
             <>
+              {caseSummary && (
+                <div className={`panel summary-card summary-${caseSummary.tone}`}>
+                  <div className="summary-header">
+                    <div className="summary-title">{caseSummary.title}</div>
+                    {caseSummary.primaryTarget && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => {
+                          if (caseSummary.primaryTarget === 'draft-editor') {
+                            const el = document.getElementById('b3-destination');
+                            if (el instanceof HTMLElement) {
+                              el.focus();
+                            }
+                          } else if (caseSummary.primaryTarget) {
+                            const el = document.querySelector(caseSummary.primaryTarget);
+                            if (el instanceof HTMLElement) {
+                              el.focus();
+                            }
+                          }
+                        }}
+                      >
+                        Kiểm tra bản nháp
+                      </button>
+                    )}
+                  </div>
+                  <div className="summary-description">{caseSummary.description}</div>
+                  {caseSummary.missingFields.length > 0 && (
+                    <div className="summary-missing">
+                      <strong>Trường còn thiếu:</strong> {caseSummary.missingFields.join(', ')}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {viewIsB3 && b3ReviseIntake && (
+                <div className="panel" data-testid="b3-revise-panel">
+                  <h2>
+                    {view.submission.form.confirmed
+                      ? 'Sửa khai báo đề nghị B3'
+                      : 'Kiểm tra & Xác nhận bản nháp B3'}
+                  </h2>
+                  <B3IntakeForm
+                    value={b3ReviseIntake}
+                    onChange={setB3ReviseIntake}
+                    disabled={false}
+                  />
+                  <div className="field">
+                    <label htmlFor="b3-revise-reason">Lý do sửa / xác nhận</label>
+                    <input
+                      id="b3-revise-reason"
+                      value={b3ReviseReason}
+                      onChange={(e) => setB3ReviseReason(e.target.value)}
+                      placeholder={
+                        view.submission.form.confirmed
+                          ? 'Lý do điều chỉnh thông tin...'
+                          : 'Mặc định: Xác nhận bản nháp từ tài liệu đính kèm'
+                      }
+                    />
+                  </div>
+                  <div className="btn-group" style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+                    {!view.submission.form.confirmed ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => void handleReviseB3(true)}
+                        >
+                          Xác nhận và gửi đề nghị
+                        </button>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => void handleReviseB3(false)}
+                        >
+                          Lưu bản nháp (chưa gửi)
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={!b3ReviseReason.trim()}
+                        onClick={() => void handleReviseB3(true)}
+                      >
+                        Cập nhật khai báo
+                      </button>
+                    )}
+                  </div>
+                  <p className="muted" style={{ marginTop: 'var(--space-2)', fontSize: '0.85rem' }}>
+                    Sửa không xóa giấy đã nộp: form và giấy khác nhau vẫn là
+                    mâu thuẫn phải làm rõ, không lấy form đè nguồn.
+                  </p>
+                </div>
+              )}
+
               <div className="panel">
                 <h2>Hồ sơ {view.id}</h2>
                 <p>
@@ -751,7 +1012,13 @@ export function App() {
                 )}
               </div>
 
-              {report && <ReportPanel report={report} b3Context={b3RunContext} />}
+              {report && (
+                <ReportPanel
+                  report={report}
+                  b3Context={b3RunContext}
+                  sources={view.sources}
+                />
+              )}
 
               <ActionsPanel
                 view={view}
@@ -766,41 +1033,12 @@ export function App() {
                 questions={questions}
                 caseVersion={view.case_version}
                 sourceIds={view.sources.map((s) => s.id)}
+                sources={view.sources}
                 role={role}
                 onResponded={handleRespond}
               />
 
-              {viewIsB3 && b3ReviseIntake ? (
-                <div className="panel" data-testid="b3-revise-panel">
-                  <h2>Sửa / xác nhận khai báo B3</h2>
-                  <B3IntakeForm value={b3ReviseIntake}
-                                onChange={setB3ReviseIntake}
-                                disabled={false} />
-                  <div className="field">
-                    <label htmlFor="b3-revise-reason">Lý do sửa/xác nhận</label>
-                    <input id="b3-revise-reason" value={b3ReviseReason}
-                           onChange={(e) => setB3ReviseReason(e.target.value)}
-                           placeholder="Sửa số xin sau khi xem lại dự toán" />
-                  </div>
-                  <button className="btn"
-                          disabled={!b3ReviseReason.trim()}
-                          onClick={() => void handleReviseB3(
-                            Boolean(view.submission.form.confirmed))}>
-                    Gửi revision (giữ nguyên trạng thái confirm)
-                  </button>
-                  {!view.submission.form.confirmed && (
-                    <button className="btn btn-primary"
-                            disabled={!b3ReviseReason.trim()}
-                            onClick={() => void handleReviseB3(true)}>
-                      Xác nhận nộp B3 (confirm + chạy lại kiểm tra)
-                    </button>
-                  )}
-                  <p className="muted">
-                    Sửa không xóa giấy đã nộp: form và giấy khác nhau vẫn là
-                    mâu thuẫn phải làm rõ, không lấy form đè nguồn.
-                  </p>
-                </div>
-              ) : (
+              {!viewIsB3 && (
                 <div className="panel">
                   <h2>Sửa khai báo</h2>
                   <div className="field">
@@ -825,15 +1063,27 @@ export function App() {
               )}
 
               <div className="panel">
-                <h2>History</h2>
-                <ul>
-                  {history.map((h) => (
-                    <li key={h.id}>
-                      {new Date(h.occurred_at).toLocaleString('vi-VN')} —{' '}
-                      <strong>{h.kind}</strong> bởi {h.actor_id}
-                    </li>
-                  ))}
-                </ul>
+                <h2>Lịch sử xử lý</h2>
+                {history.length === 0 ? (
+                  <p className="muted">Chưa có lịch sử thao tác nào.</p>
+                ) : (
+                  <ul>
+                    {history.map((h) => (
+                      <li key={h.id}>
+                        {new Date(h.occurred_at).toLocaleString('vi-VN')} —{' '}
+                        <strong>{historyKindLabel(h.kind)}</strong> bởi {h.actor_id}
+                        <details className="meta-details" style={{ display: 'inline-block', marginLeft: 'var(--space-1)' }}>
+                          <summary style={{ cursor: 'pointer', color: 'var(--color-muted)' }}>({h.kind})</summary>
+                          {h.detail && (
+                            <pre style={{ margin: 'var(--space-1) 0', fontSize: '0.8rem' }}>
+                              {JSON.stringify(h.detail, null, 2)}
+                            </pre>
+                          )}
+                        </details>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </>
           ) : (

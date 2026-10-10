@@ -77,10 +77,11 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
                  placeholder="Hà Nội" />
         </div>
         <div className="field">
-          <label htmlFor="b3-settlement-due">Hạn quyết toán</label>
+          <label htmlFor="b3-settlement-due">Hạn thanh toán tạm ứng</label>
           <input id="b3-settlement-due" type="date"
                  value={value.settlement_due ?? ''} disabled={disabled}
                  onChange={(e) => update({settlement_due: e.target.value || null})} />
+          <span className="helper">Ngày dự kiến nộp chứng từ và xử lý tiền ứng</span>
         </div>
       </div>
 
@@ -107,14 +108,15 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
       </div>
 
       <div className="field">
-        <label htmlFor="b3-request-amount">Số xin ứng (VND, lời khai — không phải actual)</label>
+        <label htmlFor="b3-request-amount">Số tiền đề nghị tạm ứng</label>
         <input id="b3-request-amount" type="number" min="0"
                value={numberField(value.request_amount_vnd)} disabled={disabled}
                onChange={(e) => update({request_amount_vnd: parseAmount(e.target.value)})}
                placeholder="2000000" />
+        <span className="helper">Số tiền bạn đang xin, chưa phải tiền đã nhận</span>
         {value.request_amount_vnd !== null && value.request_amount_vnd > 0 && (
           <span className="field-hint" data-testid="b3-request-hint">
-            ≈ {value.request_amount_vnd.toLocaleString('vi-VN')} VND
+            {value.request_amount_vnd.toLocaleString('vi-VN')} đ
           </span>
         )}
       </div>
@@ -135,9 +137,9 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
           <thead>
             <tr>
               <th>Nội dung chi</th>
-              <th>Cơ sở</th>
-              <th className="text-right">Công ty trả</th>
-              <th className="text-right">Nhân viên trả</th>
+              <th>Cơ sở dự toán</th>
+              <th className="text-right">Công ty dự kiến trả</th>
+              <th className="text-right">Nhân viên dự kiến trả</th>
               {!disabled && <th></th>}
             </tr>
           </thead>

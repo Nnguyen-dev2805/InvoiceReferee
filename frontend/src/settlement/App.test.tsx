@@ -169,7 +169,7 @@ test('WEB submit tạo case confirmed và tự chạy kiểm tra', async () => {
   await user.type(
     screen.getByLabelText('Mục đích công tác', {selector: '#b3-purpose'}),
     'Khảo sát dự án');
-  await user.type(screen.getByLabelText(/Số xin ứng/), '2000000');
+  await user.type(screen.getByLabelText(/Số tiền đề nghị tạm ứng|Số xin ứng/), '2000000');
   await user.click(screen.getByText('Nộp đề nghị B3 (web)'));
   await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
   const payload = createSpy.mock.calls[0][1];
@@ -179,7 +179,7 @@ test('WEB submit tạo case confirmed và tự chạy kiểm tra', async () => {
   await waitFor(() => expect(startSpy).toHaveBeenCalledTimes(1));
 });
 
-test('IMPORT tạo draft chưa confirm và không tự submit/confirm', async () => {
+test('IMPORT creation không render form rỗng và tạo draft chưa confirm', async () => {
   const user = userEvent.setup();
   const createSpy = vi.spyOn(api, 'createB3Case')
     .mockResolvedValue(caseView(false));
@@ -187,13 +187,36 @@ test('IMPORT tạo draft chưa confirm và không tự submit/confirm', async ()
   setup(caseView(false));
   await screen.findByText('Nộp đề nghị B3 (web)');
   await user.selectOptions(screen.getByLabelText('Cách nộp'), 'IMPORT');
-  await user.type(screen.getByLabelText('Nơi đến'), 'Hà Nội');
+  expect(screen.queryByTestId('b3-intake-form')).toBeNull();
   await user.click(screen.getByText('Tạo hồ sơ nháp B3 (chưa xác nhận)'));
   await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
   const payload = createSpy.mock.calls[0][1];
-  expect(payload.confirmed).toBe(false);  // chưa đánh dấu submitted sau preview
+  expect(payload.confirmed).toBe(false);
   expect(payload.intake_method).toBe('IMPORT');
-  expect(startSpy).not.toHaveBeenCalled(); // không tự nộp vì vừa upload
+  expect(startSpy).not.toHaveBeenCalled();
+});
+
+test('preview CTA focus editor và xác nhận gửi đề nghị dùng audit reason mặc định', async () => {
+  const user = userEvent.setup();
+  const reviseSpy = vi.spyOn(api, 'reviseSubmission')
+    .mockResolvedValue(caseView(true));
+  vi.spyOn(api, 'startRun').mockResolvedValue(RUN);
+
+  setup(caseView(false), true);
+  await user.click(await screen.findByText(/C-b3test01/));
+
+  expect(await screen.findByText('Kiểm tra bản nháp trước khi gửi')).toBeInTheDocument();
+  const checkBtn = screen.getByRole('button', { name: 'Kiểm tra bản nháp' });
+  await user.click(checkBtn);
+  expect(screen.getByLabelText('Nơi đến')).toHaveFocus();
+
+  const confirmBtn = screen.getByText('Xác nhận và gửi đề nghị');
+  await user.click(confirmBtn);
+
+  await waitFor(() => expect(reviseSpy).toHaveBeenCalledTimes(1));
+  const call = reviseSpy.mock.calls[0][1];
+  expect(call.reason).toBe('Xác nhận bản nháp từ tài liệu đính kèm');
+  expect((call.submission.form as unknown as B3Intake).confirmed).toBe(true);
 });
 
 test('report B3 hiển thị "đang chờ quyết định", không nút đã duyệt ứng', async () => {
@@ -207,3 +230,58 @@ test('report B3 hiển thị "đang chờ quyết định", không nút đã duy
   expect(text).not.toContain('S = E −');
   expect(screen.queryByText(/Đã duyệt ứng/)).not.toBeInTheDocument();
 });
+
+test('IMPORT cho phép tải lên 2 tệp riêng biệt và thêm từng nguồn', async () => {
+  const user = userEvent.setup();
+  const createSpy = vi.spyOn(api, 'createB3Case').mockResolvedValue(caseView(false));
+  const addSourceSpy = vi.spyOn(api, 'addSource').mockResolvedValue({
+    id: 'src-1',
+    filename: 'giay_de_nghi.pdf',
+    media_type: 'application/pdf',
+    sha256: 'abc123',
+    size_bytes: 100,
+    status: 'ACCEPTED',
+    uploader_actor_id: 'NV-DEMO-01',
+    received_at: '2026-10-10T09:00:00Z',
+    supersedes_source_id: null,
+    provenance: {},
+  });
+  const startSpy = vi.spyOn(api, 'startRun').mockResolvedValue(RUN);
+  setup(caseView(false));
+  await screen.findByText('Nộp đề nghị B3 (web)');
+  await user.selectOptions(screen.getByLabelText('Cách nộp'), 'IMPORT');
+
+  const file1 = new File(['de nghi content'], 'giay_de_nghi.pdf', { type: 'application/pdf' });
+  const file2 = new File(['du toan content'], 'bang_du_toan.pdf', { type: 'application/pdf' });
+  const file3 = new File(['thu moi content'], 'thu_moi.pdf', { type: 'application/pdf' });
+
+  const fileInput = screen.getByTestId('b3-import-file-input') as HTMLInputElement;
+  await user.upload(fileInput, [file1, file2, file3]);
+
+  expect(screen.getByText(/giay_de_nghi\.pdf/)).toBeInTheDocument();
+  expect(screen.getByText(/bang_du_toan\.pdf/)).toBeInTheDocument();
+  expect(screen.getByText(/thu_moi\.pdf/)).toBeInTheDocument();
+  expect(screen.getByText('Đã chọn 3 tệp đính kèm:')).toBeInTheDocument();
+
+  const uploadBtn = screen.getByText('Tải lên & Tạo hồ sơ nháp B3');
+  await user.click(uploadBtn);
+
+  await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(addSourceSpy).toHaveBeenCalledTimes(3));
+  expect(startSpy).toHaveBeenCalledTimes(1);
+});
+
+test('Verify panel đóng mặc định và mở được mà không tự động chạy', async () => {
+  const user = userEvent.setup();
+  const verifySpy = vi.spyOn(api, 'runSettlementVerify');
+  setup();
+
+  expect(screen.queryByRole('button', { name: /Chạy Verify/ })).not.toBeInTheDocument();
+  const toggleBtn = screen.getByText('Đánh giá hệ thống (Verify)');
+  await user.click(toggleBtn);
+
+  expect(screen.getByRole('button', { name: /Chạy Verify/ })).toBeVisible();
+  expect(verifySpy).not.toHaveBeenCalled();
+});
+
+

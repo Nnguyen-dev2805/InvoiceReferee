@@ -2,8 +2,9 @@
 // checks, issues with owner, and an explicit fake/replay mode label.
 // B3 v1 (b3-intake-v1) hiển thị section proposal thay bảng S — S quyết toán
 // không phải kết quả chính của bước đề nghị ứng (Product P2a).
-import type { B3Proposal, B3RunContext, Report } from './types';
-import { sourceContentUrl } from './api';
+import type { B3Proposal, B3RunContext, Report, SourceView } from './types';
+import { EvidenceLinks } from './EvidenceLinks';
+import { checkLabel } from './uiCopy';
 
 const COMPONENT_LABELS: Record<string, string> = {
   t: 'T — tổng chi công việc',
@@ -41,23 +42,33 @@ function vnd(value: number | null | undefined): string {
   return `${value.toLocaleString('vi-VN')} VND`;
 }
 
-export function ReportPanel({ report, b3Context = null }: {
+export function ReportPanel({ report, b3Context = null, sources = [] }: {
   report: Report;
   b3Context?: B3RunContext | null;
+  sources?: SourceView[];
 }) {
-  const sourceIds = new Set(report.source_refs);
+  const effectiveSources: SourceView[] = [...sources];
+  const knownSourceIds = new Set(sources.map((s) => s.id));
+  for (const id of report.source_refs) {
+    if (!knownSourceIds.has(id)) {
+      effectiveSources.push({
+        id,
+        filename: id,
+        media_type: 'unknown',
+        sha256: '',
+        size_bytes: 0,
+        status: 'ACCEPTED',
+        uploader_actor_id: '',
+        received_at: '',
+        supersedes_source_id: null,
+        provenance: {},
+      });
+      knownSourceIds.add(id);
+    }
+  }
+
   const refs = (list: string[]) => (
-    <span className="reasons">
-      {list.map((ref) =>
-        sourceIds.has(ref) ? (
-          <a key={ref} href={sourceContentUrl(ref)} target="_blank" rel="noreferrer">
-            {ref}
-          </a>
-        ) : (
-          <code key={ref}>{ref}</code>
-        ),
-      )}
-    </span>
+    <EvidenceLinks refs={list} sources={effectiveSources} />
   );
 
   return (
@@ -207,11 +218,11 @@ export function ReportPanel({ report, b3Context = null }: {
         </>
       )}
 
-      <h3>Checks</h3>
+      <h3>Mục kiểm tra</h3>
       <ul className="reasons">
         {report.checks.map((check) => (
           <li key={check.rule}>
-            <strong>{check.rule}</strong>: {check.status} — {check.reason}
+            <strong>{checkLabel(check.rule)}</strong> ({check.rule}): {check.status} — {check.reason}
           </li>
         ))}
       </ul>
