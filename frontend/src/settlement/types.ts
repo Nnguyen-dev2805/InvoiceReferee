@@ -81,6 +81,8 @@ export interface CaseSummary {
   stage: CaseStage;
   case_version: number;
   updated_at: string;
+  // 'USER' for cases created via the UI; 'SYSTEM' for eval/verify/seed cases.
+  origin: 'USER' | 'SYSTEM';
 }
 
 export interface AuditEntry {

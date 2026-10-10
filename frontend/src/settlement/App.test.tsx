@@ -125,7 +125,8 @@ function setup(caseAfterCreate?: CaseView, withCaseList = false) {
   vi.spyOn(api, 'listCases').mockResolvedValue(withCaseList
     ? [{id: 'C-b3test01', job: 'B3' as const, employee_ref: 'NV-DEMO-01',
         work_ref: 'WORK-b3test01', stage: 'CHECKING' as const,
-        case_version: 1, updated_at: '2026-10-10T09:00:00+07:00'}]
+        case_version: 1, updated_at: '2026-10-10T09:00:00+07:00',
+        origin: 'USER' as const}]
     : []);
   vi.spyOn(api, 'getHistory').mockResolvedValue([]);
   vi.spyOn(api, 'getQuestions').mockResolvedValue([]);
@@ -312,6 +313,50 @@ test('hồ sơ IMPORT tự động nạp AI draft data vào form xác nhận khi
   expect(screen.getByText(/AI đã trích xuất dữ liệu từ chứng từ đính kèm/)).toBeInTheDocument();
   const destInput = screen.getByLabelText('Nơi đến') as HTMLInputElement;
   expect(destInput.value).toBe('Hà Nội');
+});
+
+test('hồ sơ hệ thống hiện tag và có nút xoá gọi API rồi tải lại danh sách', async () => {
+  const user = userEvent.setup();
+  vi.spyOn(api, 'getDemoContext').mockResolvedValue(DEMO_CONTEXT);
+  vi.spyOn(api, 'getHistory').mockResolvedValue([]);
+  vi.spyOn(api, 'getQuestions').mockResolvedValue([]);
+  const systemCase = {
+    id: 'C-sys01', job: 'B7' as const, employee_ref: 'NV-01',
+    work_ref: 'CT-E2E-01', stage: 'CHECKING' as const, case_version: 1,
+    updated_at: '2026-10-10T09:00:00+07:00', origin: 'SYSTEM' as const,
+  };
+  const listSpy = vi.spyOn(api, 'listCases')
+    .mockResolvedValueOnce([systemCase]).mockResolvedValue([]);
+  const deleteSpy = vi.spyOn(api, 'deleteCase').mockResolvedValue(undefined);
+  const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+  render(<App />);
+
+  expect(await screen.findByText('Hệ thống')).toBeInTheDocument();
+  await user.click(screen.getByTestId('delete-case-C-sys01'));
+
+  await waitFor(() => expect(deleteSpy).toHaveBeenCalledWith('C-sys01'));
+  expect(confirmSpy).toHaveBeenCalled();
+  await waitFor(() => expect(listSpy).toHaveBeenCalledTimes(2));
+});
+
+test('không xoá khi người dùng huỷ hộp thoại xác nhận', async () => {
+  const user = userEvent.setup();
+  vi.spyOn(api, 'getDemoContext').mockResolvedValue(DEMO_CONTEXT);
+  vi.spyOn(api, 'getHistory').mockResolvedValue([]);
+  vi.spyOn(api, 'getQuestions').mockResolvedValue([]);
+  vi.spyOn(api, 'listCases').mockResolvedValue([{
+    id: 'C-user01', job: 'B7' as const, employee_ref: 'NV-01',
+    work_ref: 'CT-USER', stage: 'CHECKING' as const, case_version: 1,
+    updated_at: '2026-10-10T09:00:00+07:00', origin: 'USER' as const,
+  }]);
+  const deleteSpy = vi.spyOn(api, 'deleteCase').mockResolvedValue(undefined);
+  vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+  render(<App />);
+
+  await user.click(await screen.findByTestId('delete-case-C-user01'));
+  expect(deleteSpy).not.toHaveBeenCalled();
 });
 
 

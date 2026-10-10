@@ -83,6 +83,10 @@ export function getCase(id: string): Promise<CaseView> {
   return request<CaseView>(`/api/cases/${encodeURIComponent(id)}`);
 }
 
+export function deleteCase(id: string): Promise<void> {
+  return request<void>(`/api/cases/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
 export function reviseSubmission(id: string, payload: ReviseSubmissionPayload): Promise<CaseView> {
   return request<CaseView>(`/api/cases/${encodeURIComponent(id)}/submission`, {
     method: 'PATCH',

@@ -26,6 +26,8 @@ from invoice_referee.settlement.b3 import B3CompanyContext, B3Proposal
 
 Job = Literal["B3", "B7"]
 DemoRole = Literal["EMPLOYEE", "ACCOUNTANT", "APPROVER"]
+# Who created a case: a person via the UI/API, or the system (eval/verify/seed).
+CaseOrigin = Literal["USER", "SYSTEM"]
 CaseStage = Literal[
     "CHECKING",
     "ACCOUNTING_REVIEW",
@@ -167,6 +169,7 @@ class CaseView(BaseModel):
     sources: list[SourceView] = Field(default_factory=list)
     allowed_actions: list[AllowedAction] = Field(default_factory=list)
     money_summary: dict[str, Any] = Field(default_factory=dict)
+    origin: CaseOrigin = "USER"
     created_at: AwareDatetime
     updated_at: AwareDatetime
     idempotent_replay: bool = False
@@ -184,6 +187,7 @@ class CaseSummary(BaseModel):
     stage: CaseStage
     case_version: StrictInt
     updated_at: AwareDatetime
+    origin: CaseOrigin = "USER"
 
 
 class AuditEntry(BaseModel):

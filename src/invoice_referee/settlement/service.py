@@ -87,17 +87,18 @@ class Service:
 
     # --- W01 passthroughs ---------------------------------------------------
 
-    def submit(self, submission: Submission, command: Command) -> CaseView:
+    def submit(self, submission: Submission, command: Command,
+               origin: str = "USER") -> CaseView:
         if is_b3_v1(submission.form):
             raise DomainError(
                 "INVALID_PAYLOAD",
                 "Hồ sơ B3 v1 phải tạo qua POST /api/b3-cases; employee/work/"
                 "clock do backend cap, không tự nhập.",
             )
-        return self.store.create_case(submission, command)
+        return self.store.create_case(submission, command, origin=origin)
 
     def submit_b3(self, actor_id: str, intake: B3Intake,
-                  command: Command) -> CaseView:
+                  command: Command, origin: str = "USER") -> CaseView:
         """B3 v1 intake: persona tra cứu trong company fixture; work id và
         clock do backend cap; replay key tra truoc khi tao id moi."""
         context = self.config.b3_context
@@ -129,10 +130,15 @@ class Service:
         return self.store.create_b3_case(
             build, command,
             {"actor_id": actor_id, "intake": intake.model_dump(mode="json")},
+            origin=origin,
         )
 
     def get_case(self, case_id: str) -> CaseView:
         return self.store.get_case(case_id)
+
+    def delete_case(self, case_id: str) -> None:
+        """Delete a case from the database and remove its artifacts."""
+        self.store.delete_case(case_id)
 
     def revise(self, case_id: str, submission: Submission,
                command: Command) -> CaseView:

@@ -16,7 +16,7 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, File, Form, Header, Request, UploadFile
+from fastapi import FastAPI, File, Form, Header, Request, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, StrictInt
 
@@ -371,6 +371,11 @@ def create_runtime_app(*, db_path: Path | None = None,
     @app.get("/api/cases/{case_id}", response_model=CaseView)
     async def get_case(case_id: str) -> CaseView:
         return service.get_case(case_id)
+
+    @app.delete("/api/cases/{case_id}", status_code=204)
+    async def delete_case(case_id: str) -> Response:
+        service.delete_case(case_id)
+        return Response(status_code=204)
 
     @app.patch("/api/cases/{case_id}/submission", response_model=CaseView)
     async def revise_submission(

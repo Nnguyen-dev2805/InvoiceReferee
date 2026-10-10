@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import sqlite3
 import uuid
 from contextlib import contextmanager
@@ -82,6 +83,15 @@ _TERMINAL_STATUSES = ("SUCCEEDED", "FAILED", "TIMED_OUT", "STOPPED",
 _CLOSED_STAGES: tuple[str, ...] = ("SETTLEMENT_CLOSED", "REJECTED_REQUEST_ENDED")
 _OPEN_QUESTION_STATUSES = ("OPEN", "ANSWERED")
 MAX_ACCEPTED_RUNS = 5
+
+# Legacy work-ref prefixes that mark eval/verify/debug-seeded cases as SYSTEM
+# during the one-time ``origin`` backfill (see ``_migrate``).
+_SYSTEM_WORK_REF_PREFIXES = ("CT-E2E-", "CT-DEBUG", "WORK-DEMO-")
+
+
+def _is_system_work_ref(work_ref: str) -> bool:
+    return any(work_ref.startswith(prefix)
+               for prefix in _SYSTEM_WORK_REF_PREFIXES)
 
 
 def utcnow() -> datetime:
@@ -167,6 +177,20 @@ class Store:
             conn.execute("ALTER TABLE runs ADD COLUMN stage TEXT")
         if columns and "trace_json" not in columns:
             conn.execute("ALTER TABLE runs ADD COLUMN trace_json TEXT")
+        case_columns = {row[1] for row in conn.execute("PRAGMA table_info(cases)")}
+        if case_columns and "origin" not in case_columns:
+            conn.execute("ALTER TABLE cases ADD COLUMN origin TEXT NOT NULL "
+                         "DEFAULT 'USER'")
+            # One-time backfill: legacy cases seeded by eval/verify/debug runs
+            # are marked SYSTEM. work_ref lives inside submission_json, so the
+            # match is done in Python. Runs only when the column is first
+            # created, so cases made after the migration are never relabeled.
+            for row in conn.execute(
+                    "SELECT id, submission_json FROM cases").fetchall():
+                work_ref = _load(row["submission_json"]).get("work_ref", "")
+                if _is_system_work_ref(work_ref):
+                    conn.execute("UPDATE cases SET origin = 'SYSTEM' WHERE id = ?",
+                                 (row["id"],))
 
     # --- connections and transactions --------------------------------------
 
@@ -217,7 +241,8 @@ class Store:
 
     # --- cases -------------------------------------------------------------
 
-    def create_case(self, submission: Submission, command: Command) -> CaseView:
+    def create_case(self, submission: Submission, command: Command,
+                    origin: str = "USER") -> CaseView:
         payload_fp = fingerprint(_CREATE_CASE, {
             "submission": submission.model_dump(mode="json"),
         })
@@ -232,9 +257,11 @@ class Store:
             stage: CaseStage = "CHECKING"
             conn.execute(
                 "INSERT INTO cases (id, case_version, input_revision, control_epoch, "
-                "stop_active, stage, current_run_id, submission_json, created_at, updated_at) "
-                "VALUES (?, 1, 1, 1, 0, ?, NULL, ?, ?, ?)",
-                (case_id, stage, _dump(submission.model_dump(mode="json")), now, now),
+                "stop_active, stage, current_run_id, submission_json, origin, "
+                "created_at, updated_at) "
+                "VALUES (?, 1, 1, 1, 0, ?, NULL, ?, ?, ?, ?)",
+                (case_id, stage, _dump(submission.model_dump(mode="json")),
+                 origin, now, now),
             )
             conn.execute(
                 "INSERT INTO case_revisions (id, case_id, revision, submission_json, "
@@ -287,7 +314,8 @@ class Store:
             return self._case_view(conn, case_id)
 
     def create_b3_case(self, build_submission, command: Command,
-                       request_payload: dict[str, Any]) -> CaseView:
+                       request_payload: dict[str, Any],
+                       origin: str = "USER") -> CaseView:
         """Create a B3 v1 case: replay key checked BEFORE a new work id exists.
 
         ``request_payload`` is the semantic user request (actor + intake); it
@@ -309,9 +337,11 @@ class Store:
             stage: CaseStage = "CHECKING"
             conn.execute(
                 "INSERT INTO cases (id, case_version, input_revision, control_epoch, "
-                "stop_active, stage, current_run_id, submission_json, created_at, updated_at) "
-                "VALUES (?, 1, 1, 1, 0, ?, NULL, ?, ?, ?)",
-                (case_id, stage, _dump(submission.model_dump(mode="json")), now, now),
+                "stop_active, stage, current_run_id, submission_json, origin, "
+                "created_at, updated_at) "
+                "VALUES (?, 1, 1, 1, 0, ?, NULL, ?, ?, ?, ?)",
+                (case_id, stage, _dump(submission.model_dump(mode="json")),
+                 origin, now, now),
             )
             conn.execute(
                 "INSERT INTO case_revisions (id, case_id, revision, submission_json, "
@@ -337,8 +367,37 @@ class Store:
                 work_ref=submission["work_ref"], stage=row["stage"],
                 case_version=row["case_version"],
                 updated_at=datetime.fromisoformat(row["updated_at"]),
+                origin=row["origin"],
             ))
         return summaries
+
+    def delete_case(self, case_id: str) -> None:
+        """Remove a case and every child row plus its artifacts.
+
+        Refuses while a run is active (QUEUED/RUNNING) so an in-flight worker
+        cannot write into a half-deleted case. Irreversible by design: the case
+        is gone from the database and its files are removed from disk.
+        """
+        with self._write() as conn:
+            self._case_row(conn, case_id)  # CASE_NOT_FOUND when absent
+            active = conn.execute(
+                "SELECT COUNT(*) FROM runs WHERE case_id = ? AND status IN (?, ?)",
+                (case_id, *_NONTERMINAL_STATUSES),
+            ).fetchone()[0]
+            if active:
+                raise DomainError(
+                    "CASE_BUSY",
+                    f"Hồ sơ {case_id} đang có run xử lý; dừng/đợi xong rồi mới xoá.",
+                )
+            for table in ("sources", "runs", "interactions", "decisions",
+                          "money_events", "case_revisions", "audit_events"):
+                conn.execute(f"DELETE FROM {table} WHERE case_id = ?", (case_id,))
+            conn.execute("DELETE FROM cases WHERE id = ?", (case_id,))
+        # Filesystem cleanup after the row is committed: best-effort, never
+        # resurrects the case if a file is already missing.
+        case_dir = self.artifact_root / case_id
+        if case_dir.exists():
+            shutil.rmtree(case_dir, ignore_errors=True)
 
     def snapshot(self, case_id: str) -> CaseSnapshot:
         with self._read() as conn:
@@ -1364,6 +1423,7 @@ class Store:
             submission=submission, sources=sources,
             allowed_actions=actions,
             money_summary=self._money_summary(conn, case).model_dump(mode="json"),
+            origin=case["origin"],
             created_at=datetime.fromisoformat(case["created_at"]),
             updated_at=datetime.fromisoformat(case["updated_at"]),
         )

@@ -361,7 +361,8 @@ def _run_case(service: Service, packet: Packet, phase: str,
               "scope": "eval"},
     )
     case = service.submit(submission, _command(packet.case_id, phase,
-                                                "create", None))
+                                                "create", None),
+                          origin="SYSTEM")
     version = case.case_version
     for index, path in enumerate(files):
         record = service.add_source(

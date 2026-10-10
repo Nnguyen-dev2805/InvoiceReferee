@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS cases (
     stage TEXT NOT NULL,
     current_run_id TEXT,
     submission_json TEXT NOT NULL,
+    origin TEXT NOT NULL DEFAULT 'USER' CHECK (origin IN ('USER', 'SYSTEM')),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );

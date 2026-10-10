@@ -136,6 +136,19 @@ export function App() {
     }
   }, []);
 
+  const handleDeleteCase = async (id: string) => {
+    if (!window.confirm(`Xoá hẳn hồ sơ ${id} khỏi hệ thống? Thao tác không thể hoàn tác.`)) {
+      return;
+    }
+    try {
+      await api.deleteCase(id);
+      if (view?.id === id) setView(null);
+      await loadCases();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không xoá được hồ sơ.');
+    }
+  };
+
   const loadCase = useCallback(async (id: string) => {
     try {
       const next = await api.getCase(id);
@@ -493,7 +506,15 @@ export function App() {
       <header className="app-head">
         <div className="app-brand">
           <div className="app-brand-title">
-            <span className="app-logo-icon">⚖️</span>
+            <span className="app-logo-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+                <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+                <path d="M7 21h10" />
+                <path d="M12 3v18" />
+                <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" />
+              </svg>
+            </span>
             <h1>InvoiceReferee</h1>
           </div>
           <p className="muted app-tagline">
@@ -501,7 +522,7 @@ export function App() {
           </p>
         </div>
         <div className="settlement-topbar">
-          <div className="field field-topbar">
+          <div className="field-topbar">
             <label htmlFor="demo-role">Vai trò demo</label>
             <select id="demo-role" value={role} onChange={(e) => setRole(e.target.value as DemoRole)}>
               {Object.entries(ROLE_LABELS).map(([value, label]) => (
@@ -509,7 +530,7 @@ export function App() {
               ))}
             </select>
           </div>
-          <div className="field field-topbar">
+          <div className="field-topbar">
             <label htmlFor="actor-id">Mã người thao tác</label>
             <input id="actor-id" value={actorId} onChange={(e) => setActorId(e.target.value)} />
           </div>
@@ -534,7 +555,7 @@ export function App() {
             <button
               type="button"
               className={`btn ${view === null ? 'btn-primary btn-new-case-active' : ''}`}
-              style={{ width: '100%', justifyContent: 'center' }}
+              style={{ width: '100%', justifyContent: 'center', gap: '6px' }}
               onClick={() => {
                 setView(null);
                 setReport(null);
@@ -542,7 +563,11 @@ export function App() {
                 setB3RunContext(null);
               }}
             >
-              ➕ Tạo hồ sơ mới
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Tạo hồ sơ mới
             </button>
           </div>
 
@@ -558,7 +583,7 @@ export function App() {
                 <input
                   type="text"
                   className="case-search-input"
-                  placeholder="🔍 Tìm mã hồ sơ, nhân viên..."
+                  placeholder="Tìm mã hồ sơ, nhân viên..."
                   value={caseSearch}
                   onChange={(e) => setCaseSearch(e.target.value)}
                 />
@@ -575,26 +600,45 @@ export function App() {
                   {filteredCases.map((c) => {
                     const isActive = c.id === view?.id;
                     return (
-                      <button
+                      <div
                         key={c.id}
-                        type="button"
                         className={`case-item-card ${isActive ? 'case-item-card-active' : ''}`}
-                        onClick={() => void loadCase(c.id)}
                       >
-                        <div className="case-item-top">
-                          <span className="case-item-id">{c.id}</span>
-                          <span className={`case-item-job-badge badge-${c.job.toLowerCase()}`}>{c.job}</span>
-                        </div>
-                        <div className="case-item-stage">
-                          <span className="case-stage-pill">{STAGE_LABELS[c.stage]}</span>
-                          <span className="case-version-text">v{c.case_version}</span>
-                        </div>
-                        <div className="case-item-bottom">
-                          <span className="case-item-actor">{c.employee_ref}</span>
-                          <span>/</span>
-                          <span className="case-item-work">{c.work_ref}</span>
-                        </div>
-                      </button>
+                        <button
+                          type="button"
+                          className="case-item-main"
+                          onClick={() => void loadCase(c.id)}
+                        >
+                          <div className="case-item-top">
+                            <span className="case-item-id">{c.id}</span>
+                            <span className="case-item-badges">
+                              {c.origin === 'SYSTEM' && (
+                                <span className="case-item-system-badge">Hệ thống</span>
+                              )}
+                              <span className={`case-item-job-badge badge-${c.job.toLowerCase()}`}>{c.job}</span>
+                            </span>
+                          </div>
+                          <div className="case-item-stage">
+                            <span className="case-stage-pill">{STAGE_LABELS[c.stage]}</span>
+                            <span className="case-version-text">v{c.case_version}</span>
+                          </div>
+                          <div className="case-item-bottom">
+                            <span className="case-item-actor">{c.employee_ref}</span>
+                            <span>/</span>
+                            <span className="case-item-work">{c.work_ref}</span>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          className="case-item-delete"
+                          data-testid={`delete-case-${c.id}`}
+                          aria-label={`Xoá hồ sơ ${c.id}`}
+                          title="Xoá hồ sơ"
+                          onClick={() => void handleDeleteCase(c.id)}
+                        >
+                          🗑
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -731,7 +775,13 @@ export function App() {
                               e.target.value = '';
                             }}
                           />
-                          <div className="dropzone-icon">📁</div>
+                          <div className="dropzone-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                              <polyline points="17 8 12 3 7 8" />
+                              <line x1="12" y1="3" x2="12" y2="15" />
+                            </svg>
+                          </div>
                           <div className="dropzone-text">
                             <strong>Kéo thả các tệp chứng từ vào đây</strong>
                             <span className="dropzone-subtext">
@@ -758,7 +808,12 @@ export function App() {
                             <ul className="attached-files-list">
                               {importFiles.map((file, idx) => (
                                 <li key={`${file.name}-${idx}`} className="attached-file-item">
-                                  <span className="file-icon">📄</span>
+                                  <span className="file-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                      <polyline points="14 2 14 8 20 8" />
+                                    </svg>
+                                  </span>
                                   <span className="file-name" title={file.name}>
                                     {file.name}
                                   </span>
@@ -894,9 +949,9 @@ export function App() {
                     </span>
                     {viewIsB3 && (
                       view.submission.form.confirmed ? (
-                        <span className="pill-badge pill-badge-green">✓ Đã xác nhận</span>
+                        <span className="pill-badge pill-badge-green">Đã xác nhận</span>
                       ) : (
-                        <span className="pill-badge pill-badge-amber">⚠️ Bản nháp chưa gửi</span>
+                        <span className="pill-badge pill-badge-amber">Bản nháp chưa gửi</span>
                       )
                     )}
                   </div>
@@ -920,47 +975,26 @@ export function App() {
               </div>
             </div>
 
-            {/* Action Needed Alert Banners */}
+            {/* Contextual Notice: Bổ sung câu hỏi giải trình */}
             {questions.length > 0 && (
-              <div className="alert-banner alert-banner-warning">
-                <div className="alert-banner-body">
-                  <span className="alert-banner-icon">💬</span>
+              <div className="case-notice-bar case-notice-warning">
+                <div className="case-notice-body">
+                  <svg className="icon-notice" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
                   <div>
-                    <strong>Có {questions.length} câu hỏi cần giải trình!</strong>
-                    <p className="alert-banner-desc">AI cần làm rõ thông tin hoặc mâu thuẫn chứng từ trước khi hoàn tất kiểm tra.</p>
+                    <strong>Cần bổ sung giải trình ({questions.length} câu hỏi)</strong>
+                    <span className="case-notice-subtext">Có thông tin hoặc mâu thuẫn chứng từ cần làm rõ trước khi hoàn tất kiểm tra.</span>
                   </div>
                 </div>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  className="btn btn-secondary btn-sm"
                   onClick={() => setCaseTab('questions')}
                 >
-                  Trả lời câu hỏi ngay →
-                </button>
-              </div>
-            )}
-
-            {viewIsB3 && !view.submission.form.confirmed && (
-              <div className="alert-banner alert-banner-info">
-                <div className="alert-banner-body">
-                  <span className="alert-banner-icon">🤖</span>
-                  <div>
-                    <strong>Bản nháp AI trích xuất đang chờ bạn xác nhận.</strong>
-                    <p className="alert-banner-desc">Vui lòng rà soát lại thông tin bên dưới và nhấn "Xác nhận và gửi đề nghị" để hoàn tất.</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => {
-                    setCaseTab('draft');
-                    setTimeout(() => {
-                      const el = document.getElementById('b3-destination');
-                      if (el instanceof HTMLElement) el.focus();
-                    }, 0);
-                  }}
-                >
-                  Kiểm tra &amp; Xác nhận bản nháp →
+                  Xem câu hỏi ({questions.length})
                 </button>
               </div>
             )}
@@ -968,7 +1002,15 @@ export function App() {
             {caseSummary && (
               <div className={`panel summary-card summary-${caseSummary.tone}`}>
                 <div className="summary-header">
-                  <div className="summary-title">{caseSummary.title}</div>
+                  <div className="summary-title-group">
+                    <svg className="summary-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="16" y1="13" x2="8" y2="13" />
+                      <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                    <div className="summary-title">{caseSummary.title}</div>
+                  </div>
                   {caseSummary.primaryTarget && (
                     <button
                       type="button"
@@ -1012,7 +1054,7 @@ export function App() {
                 className={`case-tab-btn ${caseTab === 'report' ? 'case-tab-active' : ''}`}
                 onClick={() => setCaseTab('report')}
               >
-                📊 Kết quả &amp; Báo cáo
+                Kết quả &amp; Báo cáo
               </button>
               {viewIsB3 ? (
                 <button
@@ -1022,9 +1064,9 @@ export function App() {
                   className={`case-tab-btn ${caseTab === 'draft' ? 'case-tab-active' : ''}`}
                   onClick={() => setCaseTab('draft')}
                 >
-                  ✍️ Bản nháp B3
+                  Bản nháp B3
                   {!view.submission.form.confirmed && (
-                    <span className="pill-badge pill-badge-amber">Chưa gửi</span>
+                    <span className="tab-count-badge badge-warning">Chưa gửi</span>
                   )}
                 </button>
               ) : (
@@ -1035,7 +1077,7 @@ export function App() {
                   className={`case-tab-btn ${caseTab === 'draft' ? 'case-tab-active' : ''}`}
                   onClick={() => setCaseTab('draft')}
                 >
-                  ✍️ Sửa khai báo
+                  Sửa khai báo
                 </button>
               )}
               <button
@@ -1045,7 +1087,8 @@ export function App() {
                 className={`case-tab-btn ${caseTab === 'sources' ? 'case-tab-active' : ''}`}
                 onClick={() => setCaseTab('sources')}
               >
-                📎 Nguồn ({view.sources.length})
+                Nguồn chứng từ
+                <span className="tab-count-badge">{view.sources.length}</span>
               </button>
               <button
                 type="button"
@@ -1054,9 +1097,11 @@ export function App() {
                 className={`case-tab-btn ${caseTab === 'questions' ? 'case-tab-active' : ''}`}
                 onClick={() => setCaseTab('questions')}
               >
-                💬 Câu hỏi ({questions.length})
-                {questions.length > 0 && (
-                  <span className="pill-badge pill-badge-red">{questions.length}</span>
+                Câu hỏi
+                {questions.length > 0 ? (
+                  <span className="tab-count-badge badge-danger">{questions.length}</span>
+                ) : (
+                  <span className="tab-count-badge">0</span>
                 )}
               </button>
               <button
@@ -1066,7 +1111,7 @@ export function App() {
                 className={`case-tab-btn ${caseTab === 'history' ? 'case-tab-active' : ''}`}
                 onClick={() => setCaseTab('history')}
               >
-                📜 Lịch sử &amp; Kỹ thuật
+                Lịch sử &amp; Kỹ thuật
               </button>
             </div>
 
@@ -1123,7 +1168,12 @@ export function App() {
                 />
               ) : (
                 <div className="panel" style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-4)', marginBottom: 'var(--space-4)' }}>
-                  <div style={{ fontSize: '2.5rem', marginBottom: 'var(--space-2)' }}>⏳</div>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.5 }}>
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                  </div>
                   <h3 style={{ margin: '0 0 var(--space-2)' }}>Chưa có báo cáo kết quả</h3>
                   <p className="muted" style={{ maxWidth: '500px', margin: '0 auto' }}>
                     {runActive
@@ -1153,9 +1203,14 @@ export function App() {
                       : 'Kiểm tra & Xác nhận bản nháp B3'}
                   </h2>
                   {!view.submission.form.confirmed && (
-                    <div className="notice notice-info" style={{ marginBottom: 'var(--space-3)' }}>
-                      <p>
-                        🤖 <strong>AI đã trích xuất dữ liệu từ chứng từ đính kèm.</strong> Vui lòng rà soát lại thông tin bên dưới và nhấn <em>"Xác nhận và gửi đề nghị"</em> để hoàn tất nộp hồ sơ.
+                    <div className="notice notice-info" style={{ marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, marginTop: '2px' }}>
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="16" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                      </svg>
+                      <p style={{ margin: 0 }}>
+                        <strong>AI đã trích xuất dữ liệu từ chứng từ đính kèm.</strong> Vui lòng rà soát lại thông tin bên dưới và nhấn <em>"Xác nhận và gửi đề nghị"</em> để hoàn tất nộp hồ sơ.
                       </p>
                     </div>
                   )}
