@@ -113,6 +113,7 @@ LLM là thành phần hỗ trợ suy luận và giao tiếp trên dữ kiện c�
 
 - `docs/ACCOUNTING_AGENT_REQUIREMENTS.md` - yêu cầu bài toán kế toán đã chốt.
 - `docs/PRODUCT_SPEC.md` - chức năng sản phẩm trong Sprint 1.
+- `docs/CURRENT_COMPANY_RULES.md` - policy hiện đang được code thực thi, viết theo ngôn ngữ nghiệp vụ.
 - `docs/POLICY.md` - policy thực thi v1 và ranh giới quyết định.
 - `docs/DATA_MODEL.md` - hợp đồng lược đồ giữa các mô-đun.
 - `docs/DECISION_FLOW.md` - luồng từ đầu vào đến quyết định.
@@ -126,7 +127,15 @@ LLM là thành phần hỗ trợ suy luận và giao tiếp trên dữ kiện c�
 
 ## Chạy và kiểm tra
 
-### Giao diện nộp hồ sơ
+### Giao diện FastAPI UC-03
+
+```powershell
+C:\Users\namth\AppData\Local\Programs\Python\Python312\python.exe -m uvicorn app.fastapi_app:app --reload
+```
+
+Mở `http://127.0.0.1:8000`. API docs nằm tại `http://127.0.0.1:8000/docs`.
+
+### Giao diện Streamlit cũ
 
 ```powershell
 python -m streamlit run app/streamlit_app.py

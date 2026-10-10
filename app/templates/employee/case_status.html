@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ case.case_id }} | InvoiceReferee{% endblock %}
+{% block head %}
+{% if case.processing_status in ["PENDING", "PROCESSING"] %}
+<meta http-equiv="refresh" content="3">
+{% endif %}
+{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <a class="back-link" href="/employee/settlements/new">← Nộp hồ sơ khác</a>
+    <span class="eyebrow">Hồ sơ đã tiếp nhận</span>
+    <h1>{{ case.case_id }}</h1>
+    <p>Gửi lúc {{ case.submitted_at }}</p>
+  </div>
+  <span class="status status-{{ (case.automation_decision or case.processing_status)|lower }}">
+    {{ case.automation_decision or case.processing_status }}
+  </span>
+</header>
+<section class="summary-band">
+  <div><span>Loại</span><strong>{{ case.settlement_type }}</strong></div>
+  <div><span>Tổng khai báo</span><strong>{{ case.claimed_total }} {{ case.currency }}</strong></div>
+  <div><span>Chứng từ</span><strong>{{ case.documents|length }}</strong></div>
+</section>
+{% if case.decision %}
+<section class="detail-section">
+  <h2>Kết quả sàng lọc</h2>
+  <p class="lead">{{ case.decision.reason }}</p>
+  {% if case.decision.question %}
+  <div class="alert warning"><strong>Nội dung cần xử lý</strong>{{ case.decision.question }}</div>
+  {% endif %}
+</section>
+{% else %}
+<div class="alert info">Hệ thống đang xử lý hồ sơ. Trang sẽ tự cập nhật.</div>
+{% endif %}
+{% endblock %}

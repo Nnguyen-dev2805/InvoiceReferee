@@ -17,6 +17,14 @@ class AppSettings:
     def submissions_root(self) -> Path:
         return self.data_root / "submissions"
 
+    @property
+    def settlement_database_path(self) -> Path:
+        return self.data_root / "invoice_referee.sqlite3"
+
+    @property
+    def settlement_artifacts_root(self) -> Path:
+        return self.data_root / "settlement_cases"
+
     @classmethod
     def from_environment(cls, project_root: Path) -> "AppSettings":
         configured_data_root = os.getenv("INVOICE_REFEREE_DATA_DIR")

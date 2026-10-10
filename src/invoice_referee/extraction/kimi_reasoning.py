@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from invoice_referee.domain import (
     ConfidenceAnalysis,
     ConflictAnalysis,
+    ExpenseDocumentFacts,
 )
 
 from .conflict_reasoning import CONFLICT_SYSTEM_PROMPT
@@ -91,6 +92,49 @@ Trả về đúng một JSON object, không bọc Markdown:
 }
 
 Không trả chain-of-thought, policy, conflict hoặc kết luận hồ sơ.
+"""
+
+
+EXPENSE_EXTRACTION_SYSTEM_PROMPT = """Bạn là Expense Document Extraction Agent.
+Mỗi lần bạn chỉ trích xuất dữ kiện từ MỘT chứng từ đã vượt qua kiểm tra chất
+lượng. Không đánh giá policy, không quyết định duyệt, không suy đoán dữ kiện
+không xuất hiện và không dùng business context để bù dữ liệu chứng từ.
+
+Giữ nguyên document_id từ input. Chuẩn hóa số tiền thành số JSON không có dấu
+phân cách hàng nghìn. Trường không đọc được dùng null. source_refs phải trỏ đến
+document_id hoặc page/block được cung cấp.
+
+Trả về đúng một JSON object, không bọc Markdown:
+{
+  "document_id": "DOC-001",
+  "document_type": "E_INVOICE|PAPER_RECEIPT|TICKET|PAYMENT_PROOF|OTHER",
+  "issuer_name": null,
+  "issuer_tax_code": null,
+  "buyer_name": null,
+  "buyer_tax_code": null,
+  "document_number": null,
+  "serial_number": null,
+  "document_date": null,
+  "subtotal": null,
+  "discount": null,
+  "tax": null,
+  "service_charge": null,
+  "total_amount": null,
+  "payment_method": null,
+  "line_items": [
+    {
+      "description": "Tên hàng hóa hoặc dịch vụ",
+      "quantity": null,
+      "unit_price": null,
+      "line_amount": null,
+      "source_refs": ["DOC:DOC-001"]
+    }
+  ],
+  "source_refs": ["DOC:DOC-001"],
+  "extraction_warnings": []
+}
+
+Không trả chain-of-thought; chỉ trả dữ kiện và cảnh báo trích xuất ngắn gọn.
 """
 
 
@@ -280,4 +324,15 @@ class KimiReasoningAdapter:
             stage="Cross-source Conflict Agent",
             system_prompt=CONFLICT_SYSTEM_PROMPT,
             model_type=ConflictAnalysis,
+        )
+
+    def extract_expense_document(
+        self,
+        document_payload: dict[str, Any],
+    ) -> ExpenseDocumentFacts:
+        return self._analyze(
+            document_payload,
+            stage="Expense Document Extraction Agent",
+            system_prompt=EXPENSE_EXTRACTION_SYSTEM_PROMPT,
+            model_type=ExpenseDocumentFacts,
         )

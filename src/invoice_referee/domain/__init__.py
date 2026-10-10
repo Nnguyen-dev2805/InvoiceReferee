@@ -1,6 +1,13 @@
 """Domain contracts for InvoiceReferee."""
 
 from .errors import SubmissionValidationError
+from .decisions import (
+    AutomationDecision,
+    DecisionTarget,
+    SettlementDecision,
+    SettlementFinding,
+    UncertaintyType,
+)
 from .processing import (
     BlockAssessment,
     CaseProcessingResult,
@@ -28,9 +35,25 @@ from .submission import (
     SubmissionReceipt,
     UploadPayload,
 )
+from .settlement import (
+    BusinessContext,
+    DocumentLineFact,
+    EmployeeProfile,
+    ExpenseCategory,
+    ExpenseDocumentFacts,
+    ExpenseItemDraft,
+    SettlementDocumentRole,
+    SettlementDraft,
+    SettlementReceipt,
+    SettlementType,
+    SettlementUpload,
+    SubmissionSourceType,
+)
 
 __all__ = [
     "BlockAssessment",
+    "AutomationDecision",
+    "BusinessContext",
     "ClaimDraft",
     "CaseProcessingResult",
     "ConfidenceAnalysis",
@@ -40,6 +63,12 @@ __all__ = [
     "EvidenceRecord",
     "EvidenceRole",
     "EvidenceQualityResult",
+    "DecisionTarget",
+    "DocumentLineFact",
+    "EmployeeProfile",
+    "ExpenseCategory",
+    "ExpenseDocumentFacts",
+    "ExpenseItemDraft",
     "FieldAssessment",
     "InventoryAnalysis",
     "InventoryDocumentFacts",
@@ -51,7 +80,16 @@ __all__ = [
     "PotentialConflict",
     "ProcessingDecision",
     "RuleFinding",
+    "SettlementDecision",
+    "SettlementDocumentRole",
+    "SettlementDraft",
+    "SettlementFinding",
+    "SettlementReceipt",
+    "SettlementType",
+    "SettlementUpload",
+    "SubmissionSourceType",
     "SubmissionReceipt",
     "SubmissionValidationError",
     "UploadPayload",
+    "UncertaintyType",
 ]

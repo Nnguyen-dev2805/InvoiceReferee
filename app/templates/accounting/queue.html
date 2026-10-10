@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Hàng đợi kế toán | InvoiceReferee{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <span class="eyebrow">Dành cho kế toán</span>
+    <h1>Hàng đợi hồ sơ</h1>
+    <p>Ưu tiên hồ sơ cần bổ sung hoặc chuyển cấp trước khi xem hồ sơ thường quy.</p>
+  </div>
+</header>
+{% if deleted_case_id %}
+<div class="alert success">Đã xóa hồ sơ {{ deleted_case_id }} và toàn bộ chứng từ liên quan.</div>
+{% endif %}
+<nav class="queue-tabs" aria-label="Lọc quyết định">
+  <a class="{% if not selected_decision %}active{% endif %}" href="/accounting/cases">Tất cả</a>
+  <a class="{% if selected_decision == 'REQUEST_INFO' %}active{% endif %}"
+     href="/accounting/cases?decision=REQUEST_INFO">Cần bổ sung <strong>{{ counts.REQUEST_INFO }}</strong></a>
+  <a class="{% if selected_decision == 'ESCALATE' %}active{% endif %}"
+     href="/accounting/cases?decision=ESCALATE">Chuyển cấp <strong>{{ counts.ESCALATE }}</strong></a>
+  <a class="{% if selected_decision == 'AUTO_PROCESS' %}active{% endif %}"
+     href="/accounting/cases?decision=AUTO_PROCESS">Sẵn sàng <strong>{{ counts.AUTO_PROCESS }}</strong></a>
+  <a href="/accounting/cases">Đang xử lý <strong>{{ counts.PROCESSING }}</strong></a>
+</nav>
+<section class="table-section">
+  {% if cases %}
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Hồ sơ</th><th>Nhân viên</th><th>Loại</th><th class="money">Số tiền</th>
+          <th>Kết quả</th><th>Lý do chính</th><th>Thời gian</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for item in cases %}
+        <tr>
+          <td><a class="case-link" href="/accounting/cases/{{ item.case_id }}">{{ item.case_id }}</a></td>
+          <td><strong>{{ item.employee_name }}</strong><small>{{ item.department }}</small></td>
+          <td>{{ item.settlement_type }}</td>
+          <td class="money">{{ item.claimed_total }} {{ item.currency }}</td>
+          <td><span class="status status-{{ (item.automation_decision or item.processing_status)|lower }}">
+            {{ item.automation_decision or item.processing_status }}
+          </span></td>
+          <td class="reason-cell">
+            <span>{{ item.decision_reason or "Hồ sơ đang được hệ thống xử lý." }}</span>
+            {% if item.primary_finding_code %}
+              <small>{{ item.primary_finding_code }}</small>
+            {% endif %}
+          </td>
+          <td>{{ item.submitted_at }}</td>
+          <td class="row-action">
+            <form method="post" action="/accounting/cases/{{ item.case_id }}/delete"
+                  onsubmit="return confirm('Xóa vĩnh viễn hồ sơ {{ item.case_id }} và toàn bộ chứng từ?');">
+              <button class="icon-button danger" type="submit" title="Xóa hồ sơ" aria-label="Xóa hồ sơ {{ item.case_id }}">×</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><strong>Chưa có hồ sơ</strong><span>Hồ sơ phù hợp bộ lọc sẽ xuất hiện tại đây.</span></div>
+  {% endif %}
+</section>
+{% endblock %}

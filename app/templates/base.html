@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}InvoiceReferee{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/employee/settlements/new">
+        <span class="brand-mark">IR</span>
+        <span>
+          <strong>InvoiceReferee</strong>
+          <small>Accounting operations</small>
+        </span>
+      </a>
+      <nav aria-label="Không gian làm việc">
+        <a class="nav-link {% if active_page == 'employee' %}active{% endif %}"
+           href="/employee/settlements/new">Nhân viên</a>
+        <a class="nav-link {% if active_page == 'accounting' %}active{% endif %}"
+           href="/accounting/cases">Kế toán</a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>Policy demo 1.0</strong>
+        <span>Dữ liệu và hạn mức đang được mô phỏng.</span>
+      </div>
+    </aside>
+    <main class="main-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f6f8fb; color: #26354b; font-family: Arial, sans-serif; }
+  .canvas { width: 1500px; min-height: 1420px; padding: 48px 64px 58px; background: #fff; }
+  h1 { margin: 0 0 10px; text-align: center; font-size: 30px; color: #31445f; }
+  .subtitle { text-align: center; margin-bottom: 26px; color: #607189; font-size: 17px; }
+  .node { border: 2px solid #8ca4c0; background: #edf4fb; border-radius: 10px; padding: 15px 22px; text-align: center; font-size: 19px; line-height: 1.35; }
+  .main { width: 560px; margin: 0 auto; }
+  .arrow { height: 34px; text-align: center; font-size: 30px; line-height: 34px; color: #657f9c; }
+  .gate-row { display: grid; grid-template-columns: 1fr 1.35fr 1fr; gap: 35px; align-items: center; }
+  .red { border-color: #d9968e; background: #fff0ee; }
+  .amber { border-color: #dda84a; background: #fff6e1; }
+  .blue { border-color: #76a8d2; background: #eaf4fd; }
+  .green { border-color: #74b18a; background: #ebf7ef; }
+  .purple { border-color: #a28ac2; background: #f3effa; }
+  .label { font-size: 15px; font-weight: 700; color: #6b788a; text-align: center; margin: 8px 0; }
+  .mini-flow .node { margin-bottom: 18px; }
+  .facts { width: 650px; margin: 0 auto; }
+  .branch-line { height: 40px; width: 72%; margin: 0 auto; border-top: 3px solid #738ba5; border-left: 3px solid #738ba5; border-right: 3px solid #738ba5; }
+  .columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; }
+  .policy { min-height: 235px; padding: 22px; }
+  .policy strong { display: block; margin-bottom: 12px; font-size: 21px; }
+  .policy p { margin: 8px 0; }
+  .merge { height: 40px; width: 72%; margin: 0 auto; border-bottom: 3px solid #738ba5; border-left: 3px solid #738ba5; border-right: 3px solid #738ba5; }
+  .wide { width: 1050px; margin: 0 auto; }
+  .decision { font-weight: 700; font-size: 21px; }
+  .note { margin-top: 24px; padding: 16px 20px; border-left: 5px solid #526f90; background: #f2f5f9; font-size: 17px; line-height: 1.45; }
+</style>
+</head>
+<body>
+<main class="canvas">
+  <h1>WORKFLOW HỆ THỐNG XỬ LÝ HỒ SƠ</h1>
+  <div class="subtitle">Xử lý từng file độc lập, giữ tham chiếu chứng từ gốc và tổng hợp theo ExpenseCase</div>
+
+  <div class="node main">Hồ sơ nhân viên đã gửi</div>
+  <div class="arrow">↓</div>
+  <div class="node main">Kiểm tra tài liệu bắt buộc theo loại hồ sơ</div>
+  <div class="arrow">↓</div>
+
+  <div class="gate-row">
+    <div class="mini-flow">
+      <div class="label">THIẾU / KHÔNG ĐỌC ĐƯỢC</div>
+      <div class="node red"><strong>REQUEST_INFO</strong><br>Thiếu tài liệu hoặc trường quan trọng chưa rõ</div>
+      <div class="node red">Nhân viên bổ sung và gửi lại hồ sơ</div>
+    </div>
+    <div>
+      <div class="node">OCR từng file<br>Đọc văn bản, bảng, bbox và độ tin cậy</div>
+      <div class="arrow">↓</div>
+      <div class="node">Confidence Gate<br>Phát hiện khối OCR nghi ngờ</div>
+    </div>
+    <div class="mini-flow">
+      <div class="label">CONFIDENCE THẤP</div>
+      <div class="node amber"><strong>Confidence Agent</strong><br>Đánh giá khối nghi ngờ</div>
+      <div class="node amber">CLEAR → quay lại luồng chính<br>Không rõ → REQUEST_INFO</div>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+  <div class="node facts">LLM phân loại và trích xuất<br>Kiểm tra schema bằng Pydantic</div>
+  <div class="arrow">↓</div>
+  <div class="node facts">Structured Facts theo từng file<br>Dữ kiện kèm source reference</div>
+  <div class="arrow">↓</div>
+  <div class="node facts">Điều phối theo loại ExpenseCase</div>
+  <div class="branch-line"></div>
+
+  <section class="columns">
+    <div class="node blue policy">
+      <strong>Đối chiếu nhận hàng</strong>
+      <p>AI đề xuất ghép dòng hàng</p>
+      <p>Code so sánh số lượng, đơn vị, đơn giá và thành tiền</p>
+      <p>Mở rộng PO ↔ Invoice ↔ Goods Receipt</p>
+    </div>
+    <div class="node amber policy">
+      <strong>Yêu cầu tạm ứng</strong>
+      <p>Kiểm tra mục đích, số tiền và thời hạn hoàn ứng</p>
+      <p>Kiểm tra bằng chứng phê duyệt, hạn mức và tạm ứng cũ</p>
+      <p>Không tự động giải ngân</p>
+    </div>
+    <div class="node green policy">
+      <strong>Quyết toán / hoàn trả</strong>
+      <p>Đối chiếu đơn với nhiều chứng từ</p>
+      <p>Kiểm tra trùng, tính tổng và chính sách từng khoản</p>
+      <p>Tính công ty trả thêm hoặc nhân viên hoàn lại</p>
+    </div>
+  </section>
+
+  <div class="merge"></div>
+  <div class="node wide">Python + PolicyConfig + dữ liệu lịch sử</div>
+  <div class="arrow">↓</div>
+  <div class="node main">Decision Guard<br>Tổng hợp findings, phạm vi quyền hạn và trạng thái</div>
+  <div class="arrow">↓</div>
+  <div class="node purple wide decision">PASS / READY_FOR_APPROVAL / REQUEST_INFO / ESCALATE<br><span style="font-size:17px;font-weight:400">Kèm lý do, bằng chứng và số tiền đối chiếu</span></div>
+  <div class="arrow">↓</div>
+  <div class="node main">Chuyển kết quả cho kế toán hoặc cấp có thẩm quyền</div>
+
+  <div class="note"><strong>Ranh giới an toàn:</strong> LLM trích xuất và đề xuất ngữ nghĩa; Python thực hiện phép tính và rule; con người giữ quyền phê duyệt, xử lý ngoại lệ và ghi đè có lý do.</div>
+</main>
+</body>
+</html>

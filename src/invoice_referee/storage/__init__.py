@@ -7,6 +7,7 @@ from .local_evidence_repository import (
     StoredEvidence,
 )
 from .local_case_store import LocalCaseStore
+from .sqlite_settlement_repository import SQLiteSettlementRepository
 
 __all__ = [
     "CaseStore",
@@ -14,4 +15,5 @@ __all__ = [
     "LocalEvidenceRepository",
     "StoredCase",
     "StoredEvidence",
+    "SQLiteSettlementRepository",
 ]

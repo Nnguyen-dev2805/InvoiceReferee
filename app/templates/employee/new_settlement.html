@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Nộp hồ sơ hoàn ứng | InvoiceReferee{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div>
+    <span class="eyebrow">UC-03 · Dành cho nhân viên</span>
+    <h1>Hoàn ứng và quyết toán chi phí</h1>
+    <p>Khai báo các khoản chi và gắn đúng chứng từ trước khi gửi kế toán.</p>
+  </div>
+  <div class="employee-chip">
+    <span class="avatar">NA</span>
+    <span><strong>Nguyễn Minh An</strong><small>EMP-DEMO-001 · Phòng Kinh doanh</small></span>
+  </div>
+</header>
+
+<div id="form-errors" class="alert error hidden" role="alert"></div>
+
+<form id="settlement-form">
+  <section class="form-section">
+    <div class="section-title">
+      <span class="step">01</span>
+      <div><h2>Loại hồ sơ</h2><p>Chọn đúng dòng tiền và nguồn đơn đề nghị.</p></div>
+    </div>
+    <div class="choice-grid">
+      <label class="choice">
+        <input type="radio" name="settlement_type" value="EMPLOYEE_REIMBURSEMENT" checked>
+        <span><strong>Nhân viên tự chi</strong><small>Công ty hoàn lại khoản được chấp nhận.</small></span>
+      </label>
+      <label class="choice">
+        <input type="radio" name="settlement_type" value="ADVANCE_SETTLEMENT">
+        <span><strong>Quyết toán tạm ứng</strong><small>Đối trừ với khoản tạm ứng đã nhận.</small></span>
+      </label>
+    </div>
+    <div class="choice-grid compact">
+      <label class="choice">
+        <input type="radio" name="source_type" value="DIGITAL_FORM" checked>
+        <span><strong>Form điện tử</strong><small>Hệ thống tạo dữ liệu đề nghị chuẩn hóa.</small></span>
+      </label>
+      <label class="choice">
+        <input type="radio" name="source_type" value="PAPER_SCAN">
+        <span><strong>Đơn giấy</strong><small>Tải ảnh hoặc PDF giấy đề nghị đã lập.</small></span>
+      </label>
+    </div>
+    <div id="paper-form-field" class="field hidden">
+      <label for="settlement_form_file">Giấy đề nghị hoàn ứng/quyết toán</label>
+      <input id="settlement_form_file" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf">
+      <small>Chữ ký tay sẽ được chuyển cho kế toán xác nhận trong MVP.</small>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <div class="section-title">
+      <span class="step">02</span>
+      <div><h2>Business context</h2><p>Nêu rõ lý do để kế toán hiểu khoản chi phục vụ công việc nào.</p></div>
+    </div>
+    <div class="form-grid">
+      <div class="field span-2">
+        <label for="purpose">Mục đích công việc</label>
+        <textarea id="purpose" rows="3" placeholder="Công tác gặp khách hàng tại Hà Nội..."></textarea>
+      </div>
+      <div class="field">
+        <label for="project_code">Mã dự án</label>
+        <input id="project_code" type="text" placeholder="DEMO-2026">
+      </div>
+      <div class="field">
+        <label for="client_name">Khách hàng</label>
+        <input id="client_name" type="text" placeholder="Khách hàng Demo">
+      </div>
+      <div class="field">
+        <label for="activity_start_date">Từ ngày</label>
+        <input id="activity_start_date" type="date">
+      </div>
+      <div class="field">
+        <label for="activity_end_date">Đến ngày</label>
+        <input id="activity_end_date" type="date">
+      </div>
+    </div>
+    <div id="advance-fields" class="form-grid hidden">
+      <div class="field">
+        <label for="advance_id">Mã khoản tạm ứng</label>
+        <input id="advance_id" type="text" placeholder="ADV-202610-001">
+      </div>
+      <div class="field">
+        <label for="allocated_advance_amount">Số tiền tạm ứng phân bổ</label>
+        <input id="allocated_advance_amount" type="number" min="0" step="1" value="0">
+      </div>
+    </div>
+  </section>
+
+  <section class="form-section">
+    <div class="section-title action-title">
+      <div class="title-with-step">
+        <span class="step">03</span>
+        <div><h2>Các khoản chi</h2><p>Mỗi khoản phải gắn chứng từ hoặc mã ngoại lệ.</p></div>
+      </div>
+      <button id="add-expense" class="button secondary" type="button">+ Thêm khoản</button>
+    </div>
+    <div id="expense-items"></div>
+  </section>
+
+  <section class="form-section">
+    <div class="section-title">
+      <span class="step">04</span>
+      <div><h2>Chứng từ chi phí</h2><p>Tải bill, hóa đơn điện tử, vé hoặc bằng chứng thanh toán.</p></div>
+    </div>
+    <div class="field">
+      <label>Chứng từ đính kèm</label>
+      <div class="evidence-picker-bar">
+        <input id="evidence_files" class="visually-hidden-file" type="file" multiple
+               accept=".jpg,.jpeg,.png,.webp,.pdf,.xml,.json,.txt">
+        <label class="button secondary" for="evidence_files">Thêm chứng từ</label>
+        <span id="evidence-count">Chưa chọn file</span>
+      </div>
+      <small>Có thể chọn nhiều file cùng lúc hoặc bấm chọn nhiều lần. Danh sách đã chọn sẽ được giữ lại.</small>
+    </div>
+    <div id="file-mapping" class="file-mapping empty">
+      Chưa có chứng từ được chọn.
+    </div>
+  </section>
+
+  <footer class="form-actions">
+    <div><span>Tổng khai báo</span><strong id="claimed-total">0 VND</strong></div>
+    <button id="submit-button" class="button primary" type="submit">Gửi hồ sơ</button>
+  </footer>
+</form>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/settlement-form.js?v=20261010-2"></script>
+{% endblock %}
