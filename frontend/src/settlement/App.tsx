@@ -24,6 +24,7 @@ const STAGE_LABELS: Record<CaseStage, string> = {
   AWAITING_MONEY: 'Chờ thực nhận tiền',
   AWAITING_WORK_SETTLEMENT: 'Chờ quyết toán công việc',
   RESOLVING_OBLIGATIONS: 'Đang xử lý nghĩa vụ',
+  ADVANCE_REQUEST_REFUSED: 'Đề nghị tạm ứng bị từ chối',
   REJECTED_REQUEST_ENDED: 'Yêu cầu bị từ chối đã kết thúc',
   SETTLEMENT_CLOSED: 'Hồ sơ đã đóng',
 };
@@ -592,6 +593,9 @@ export function App() {
       (h) => h.kind === 'REVIEW_RECORDED' || h.operation === 'RECORD_REVIEW'
     ).slice(-1)[0] ?? null;
   }, [history]);
+
+  const b3WorkflowPending = viewIsB3
+    && view?.b3_workflow?.status === 'PENDING';
 
   const employeeName = view
     ? demoContext?.people.find((p) => p.actor_ref === view.submission.employee_ref)?.name || view.submission.employee_ref
@@ -1183,16 +1187,22 @@ export function App() {
               {/* MỘT trạng thái nghiệp vụ thống nhất trên cùng */}
               {role === 'ACCOUNTANT' ? (
                 <div
-                  className={`business-status-card ${latestReview ? 'business-status-reviewed' : 'business-status-pending-review'}`}
+                  className={`business-status-card ${b3WorkflowPending ? 'business-status-reviewed' : latestReview ? 'business-status-reviewed' : 'business-status-pending-review'}`}
                   data-testid="accountant-status-card"
                 >
                   <div className="business-status-title-row">
-                    <span className={`status-pill ${latestReview ? 'status-pill-success' : 'status-pill-warning'}`}>
-                      {latestReview ? 'Đã lưu kết quả rà soát' : 'Chờ kế toán rà soát'}
+                    <span className={`status-pill ${b3WorkflowPending || latestReview ? 'status-pill-success' : 'status-pill-warning'}`}>
+                      {b3WorkflowPending
+                        ? 'Chờ người duyệt tạm ứng'
+                        : latestReview ? 'Đã lưu kết quả rà soát' : 'Chờ kế toán rà soát'}
                     </span>
                   </div>
                   <div className="business-status-desc">
-                    {latestReview ? (
+                    {b3WorkflowPending ? (
+                      <>
+                        Đã trình người có quyền <strong>{view.b3_workflow?.approver_ref}</strong> quyết định; chưa ghi nhận tiền thực nhận.
+                      </>
+                    ) : latestReview ? (
                       <>
                         Đã lưu kết quả rà soát bởi <strong>{latestReview.actor_id}</strong> lúc {new Date(latestReview.occurred_at).toLocaleString('vi-VN')}
                         {latestReview.detail?.note ? ` — Ghi chú: “${String(latestReview.detail.note)}”` : ''}
@@ -1206,7 +1216,11 @@ export function App() {
                 <div className="business-status-card business-status-general" data-testid="business-status-card">
                   <div className="business-status-title-row">
                     <span className={`status-pill status-${view.stage.toLowerCase()}`}>
-                      {STAGE_LABELS[view.stage]}
+                      {viewIsB3 && view.b3_workflow?.status === 'APPROVED'
+                        ? 'Đã duyệt tạm ứng — chờ chi ứng'
+                        : viewIsB3 && view.b3_workflow?.status === 'PENDING'
+                          ? 'Chờ người duyệt tạm ứng'
+                          : STAGE_LABELS[view.stage]}
                     </span>
                   </div>
                 </div>

@@ -44,6 +44,15 @@ và ứng trong một quyết định có nội dung/phạm vi riêng. Không y�
   không gán zero. Có quyền để xem xét không đồng nghĩa đã duyệt hồ sơ.
 - Report B3 trình bày đề nghị, kiểm tra, vướng mắc và người xử lý; không dùng S
   quyết toán làm kết quả chính. “Đủ để rà soát” không phải được phép chi.
+- Trình duyệt và quyết định ứng (IMPLEMENTED, chưa phải nghiệm thu nghiệp vụ):
+  kế toán **trình** basis đã confirmed cho người duyệt (lưu review + presentation
+  trong cùng transaction, stage `AWAITING_DECISION`); người có quyền quyết định
+  **APPROVE/RETURN/REFUSE** trên đúng một B3 grant (scope employee/work, hiệu
+  lực, hạn mức budget/advance). APPROVE ghi `work_allowed/budget_vnd/advance_vnd`
+  và chuyển `AWAITING_MONEY`; RETURN về `CHECKING` để sửa/kiểm lại/trình lại;
+  REFUSE thêm stage `ADVANCE_REQUEST_REFUSED`. **Phê duyệt KHÔNG phải thực nhận**:
+  không tạo money event, handoff, closure hay B7 money_summary; chưa có đường chi
+  ứng. Điều chỉnh/mở lại sau quyết định là capability chưa mở.
 
 Gói mẫu: `data/settlement/b3-verbal-v2.zip` (synthetic, local, chưa đo baseline).
 Hai tài liệu nhân viên: đề nghị và dự toán; dữ liệu công ty và oracle tách riêng.
@@ -51,9 +60,11 @@ Mẫu giấy đã chốt: Công ty InvoiceReferee, tiền có hậu tố đ, kh�
 số giấy giả định/thông tin giao việc/trạng thái/nhãn thử nghiệm; trip context gộp
 trong lý do hoặc nội dung công tác. Web vẫn lưu place/dates/purpose riêng, mã hồ
 sơ backend cấp; giấy ngoài không bị buộc có employee_ref/work_ref/mã DN nội bộ.
-[Plan intake/report B3](../superpowers/plans/2026-10-10-b3-verbal-intake.md)
-thực hiện nhánh khởi tạo này. Approval/actual ứng/end-to-end đến B7 chưa được
-nghiệm thu bởi plan đó; không dùng action SETTLEMENT làm approval ứng.
+[Plan intake/report B3](../superpowers/plans/2026-10-10-b3-verbal-intake.md) và
+[plan trình duyệt/quyết định ứng](../superpowers/plans/2026-10-11-b3-present-and-approve.md)
+thực hiện nhánh khởi tạo + trình duyệt này. **Chưa** có actual ứng (ghi tiền),
+liên kết nhập B3→B7, mở lại refusal hoặc đóng lifecycle; không dùng action
+SETTLEMENT/record_money/handoff/closure cho B3.
 
 ## P3. Ba vai và ranh giới quyết định
 

@@ -25,6 +25,8 @@ from invoice_referee.env import load_repo_env
 from invoice_referee.settlement.b3 import B3Intake, load_b3_context
 from invoice_referee.settlement.models import (
     AuthorityGrant,
+    B3DecisionView,
+    B3PresentationView,
     CaseSummary,
     CaseView,
     ClosureView,
@@ -84,6 +86,9 @@ _STATUS_BY_CODE = {
     "BEYOND_AUTHORITY": 403,
     "PERSONA_MISMATCH": 403,
     "B3_REPORT_ONLY": 409,
+    "B3_WORKFLOW_BLOCKED": 409,
+    "B3_DECISION_EXISTS": 409,
+    "BASIS_MISMATCH": 400,
     "FILE_TOO_LARGE": 413,
     "SOURCE_LIMIT_REACHED": 413,
     "UNSUPPORTED_FORMAT": 415,
@@ -222,6 +227,35 @@ class CreateB3CaseRequest(BaseModel):
 
     actor_id: str
     intake: dict[str, Any]
+
+
+class B3PresentRequest(BaseModel):
+    """Accountant presentation over HTTP (envelope + payload)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    basis_report_id: str
+    review_id: str | None = None
+    review: dict[str, Any] | None = None
+
+
+class B3DecisionRequest(BaseModel):
+    """Approver B3 outcome over HTTP (envelope + payload)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    presentation_id: str
+    outcome: Literal["APPROVE", "RETURN", "REFUSE"]
+    reason: str
+    work_allowed: bool | None = None
+    budget_vnd: StrictInt | None = None
+    advance_vnd: StrictInt | None = None
 
 
 DEFAULT_EVAL_CORPUS = Path("docs/discovery/eval_development")
@@ -369,6 +403,48 @@ def create_runtime_app(*, db_path: Path | None = None,
             return JSONResponse(status_code=200,
                                 content=view.model_dump(mode="json"))
         return view
+
+    @app.post("/api/cases/{case_id}/b3-presentations",
+              response_model=B3PresentationView, status_code=201)
+    async def present_b3(
+        case_id: str,
+        request: B3PresentRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | B3PresentationView:
+        payload: dict[str, Any] = {"basis_report_id": request.basis_report_id}
+        if request.review_id is not None:
+            payload["review_id"] = request.review_id
+        if request.review is not None:
+            payload["review"] = request.review
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        presentation = service.present_b3(case_id, payload, command)
+        if presentation.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=presentation.model_dump(mode="json"))
+        return presentation
+
+    @app.post("/api/cases/{case_id}/b3-decisions",
+              response_model=B3DecisionView, status_code=201)
+    async def decide_b3(
+        case_id: str,
+        request: B3DecisionRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | B3DecisionView:
+        payload = {
+            "presentation_id": request.presentation_id,
+            "outcome": request.outcome, "reason": request.reason,
+            "work_allowed": request.work_allowed,
+            "budget_vnd": request.budget_vnd,
+            "advance_vnd": request.advance_vnd,
+        }
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        decision = service.decide_b3(case_id, payload, command)
+        if decision.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=decision.model_dump(mode="json"))
+        return decision
 
     @app.get("/api/cases/{case_id}", response_model=CaseView)
     async def get_case(case_id: str) -> CaseView:

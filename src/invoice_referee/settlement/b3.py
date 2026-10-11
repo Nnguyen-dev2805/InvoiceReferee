@@ -1080,6 +1080,12 @@ def evaluate_b3_proposal(run_input, observations, *, run_id: str, mode: str,
     b_value: int | None = None
     b_refs: list[str] = []
     budget_amounts: list[int] = []
+    # The case's own verified approval (folded into history by Service.start)
+    # is not a foreign duplicate: re-checking the same request must not raise a
+    # false "prior approved" issue for it.
+    own_decision_ref = run_input.config.get("b3_current_decision_ref")
+    own_namespace = (own_decision_ref.rsplit(":", 1)[0]
+                     if isinstance(own_decision_ref, str) else None)
     if context is not None:
         for record in context.history:
             if record.employee_ref != employee_ref or record.work_ref != work_ref:
@@ -1088,6 +1094,9 @@ def evaluate_b3_proposal(run_input, observations, *, run_id: str, mode: str,
                          and record.known_at <= knowledge_cutoff)
             if not in_window:
                 continue  # sau cutoff: giữ raw ref, không cộng, không quyết
+            if own_namespace is not None and \
+                    record.ref.startswith(own_namespace):
+                continue  # chính quyết định của đề nghị này, không phải prior
             prior_refs.append(record.ref)
             if record.kind == "ADVANCE" and record.status == "RECEIVED":
                 sum_a += record.amount_vnd or 0

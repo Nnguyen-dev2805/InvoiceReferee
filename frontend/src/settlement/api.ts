@@ -2,8 +2,12 @@
 // `{code, message}` envelope; no decision logic lives here.
 import type {
   AuditEntry,
+  B3DecisionPayload,
+  B3DecisionView,
   B3DemoContext,
   B3Intake,
+  B3PresentPayload,
+  B3PresentationView,
   B3RunContext,
   CaseSummary,
   CaseView,
@@ -247,6 +251,22 @@ export function createB3Case(
 export function getB3RunContext(runId: string): Promise<B3RunContext> {
   return request<B3RunContext>(
     `/api/runs/${encodeURIComponent(runId)}/b3-context`);
+}
+
+export function presentB3(
+  caseId: string,
+  payload: B3PresentPayload,
+): Promise<B3PresentationView> {
+  return postCommand<B3PresentationView>(
+    `/api/cases/${encodeURIComponent(caseId)}/b3-presentations`, payload);
+}
+
+export function decideB3(
+  caseId: string,
+  payload: B3DecisionPayload,
+): Promise<B3DecisionView> {
+  return postCommand<B3DecisionView>(
+    `/api/cases/${encodeURIComponent(caseId)}/b3-decisions`, payload);
 }
 
 export function runSettlementVerify(

@@ -19,6 +19,10 @@ from invoice_referee.domain.models import DomainError
 from invoice_referee.settlement.b3 import B3CompanyContext, B3Intake, is_b3_v1
 from invoice_referee.settlement.models import (
     AuthorityGrant,
+    B3DecisionPayload,
+    B3DecisionView,
+    B3PresentPayload,
+    B3PresentationView,
     CaseView,
     ClosurePayload,
     ClosureView,
@@ -52,6 +56,44 @@ _STATUS_BY_CODE = {
     "STALE_INPUT": "SUPERSEDED",
     "BUDGET_EXHAUSTED": "TIMED_OUT",
 }
+
+
+def _merge_b3_decision_into_history(
+        context: B3CompanyContext, decision) -> tuple[B3CompanyContext, str]:
+    """Fold a case's own verified B3 approval into its company history.
+
+    Produces one linked record set (WORK_DECISION/BUDGET_DECISION/
+    ADVANCE_APPROVAL) sharing the decision's namespace ``b3decision:<id>`` with
+    the effective/known times, so a re-check of the same request does not raise
+    a false duplicate-approval issue. Never a money event, and never applied to
+    a foreign approval. Returns the new context and the ADVANCE_APPROVAL ref.
+    """
+    from invoice_referee.settlement.b3 import B3HistoryRecord
+
+    namespace = f"b3decision:{decision.id}"
+    employee_ref = decision.employee_ref
+    work_ref = decision.work_ref
+    effective_at = decision.effective_at
+    known_at = decision.created_at
+    records = [
+        B3HistoryRecord(
+            event_ref=f"{namespace}:work", employee_ref=employee_ref,
+            work_ref=work_ref, kind="WORK_DECISION",
+            amount_vnd=None, event_at=effective_at, known_at=known_at,
+            status="APPROVED", ref=f"{namespace}:work"),
+        B3HistoryRecord(
+            event_ref=f"{namespace}:budget", employee_ref=employee_ref,
+            work_ref=work_ref, kind="BUDGET_DECISION",
+            amount_vnd=decision.budget_vnd, event_at=effective_at,
+            known_at=known_at, status="APPROVED", ref=f"{namespace}:budget"),
+        B3HistoryRecord(
+            event_ref=f"{namespace}:advance", employee_ref=employee_ref,
+            work_ref=work_ref, kind="ADVANCE_APPROVAL",
+            amount_vnd=decision.advance_vnd, event_at=effective_at,
+            known_at=known_at, status="APPROVED", ref=f"{namespace}:advance"),
+    ]
+    merged = context.model_copy(update={"history": [*context.history, *records]})
+    return merged, f"{namespace}:advance"
 
 
 class ServiceConfig(BaseModel):
@@ -183,6 +225,14 @@ class Service:
             sources = [source.model_copy(
                 update={"received_at": context.demo_clock})
                 for source in sources]
+        if b3_v1 and context is not None:
+            # Fold this case's own verified approval into the company history so
+            # re-checking the SAME request does not raise a false
+            # duplicate-approval issue; a foreign approval is never folded in.
+            own = self.store.current_b3_decision(case_id)
+            if own is not None:
+                context, own_ref = _merge_b3_decision_into_history(context, own)
+                config["b3_current_decision_ref"] = own_ref
         run_input = RunInput(
             case_id=snapshot.case_id,
             case_version=snapshot.case_version,
@@ -406,6 +456,53 @@ class Service:
             )
         review = self._parse_payload(ReviewPayload, payload)
         return self.store.record_review(case_id, review, command)
+
+    # --- B3 present-and-approve (b3-intake-v1) -------------------------------
+
+    def _b3_context(self):
+        context = self.config.b3_context
+        if context is None or not context.activated:
+            raise DomainError(
+                "CONFIG_NOT_ACTIVE",
+                "Chưa cấu hình company context B3; không trình/quyết định B3.",
+            )
+        return context
+
+    def present_b3(self, case_id: str, payload: dict[str, Any],
+                   command: Command) -> B3PresentationView:
+        context = self._b3_context()
+        present = self._parse_payload(B3PresentPayload, payload)
+        return self.store.record_b3_presentation(
+            case_id, present, command, context, self.policy)
+
+    def decide_b3(self, case_id: str, payload: dict[str, Any],
+                  command: Command) -> B3DecisionView:
+        from invoice_referee.settlement.b3_workflow import (
+            authorize_b3_decision,
+            effective_b3_time,
+        )
+
+        context = self._b3_context()
+        decision = self._parse_payload(B3DecisionPayload, payload)
+        case = self.store.get_case(case_id)
+        if case.b3_workflow is None or case.b3_workflow.presentation is None:
+            raise DomainError(
+                "B3_WORKFLOW_BLOCKED",
+                "Chưa có presentation để quyết định; kế toán phải trình trước.",
+            )
+        proposal = None
+        run = self.store.get_run(case.b3_workflow.presentation.basis_report_id)
+        report = self.store.get_report(run.id)
+        if report is not None:
+            proposal = report.b3
+        requested = proposal.intake.request_amount_vnd if proposal else None
+        effective_at = effective_b3_time(context)
+        grant = authorize_b3_decision(
+            context, case.submission.employee_ref, case.submission.work_ref,
+            decision, command.actor_id, effective_at, requested)
+        return self.store.record_b3_decision(
+            case_id, decision, command, context, self.policy,
+            grant.ref, effective_at)
 
     def record_money(self, case_id: str, payload: dict[str, Any],
                      command: Command) -> MoneyEventView:

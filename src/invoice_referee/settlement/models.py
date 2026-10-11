@@ -17,8 +17,10 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StrictBool,
     StrictInt,
     field_validator,
+    model_validator,
 )
 
 from invoice_referee.domain.models import DomainError
@@ -35,6 +37,7 @@ CaseStage = Literal[
     "AWAITING_MONEY",
     "AWAITING_WORK_SETTLEMENT",
     "RESOLVING_OBLIGATIONS",
+    "ADVANCE_REQUEST_REFUSED",
     "REJECTED_REQUEST_ENDED",
     "SETTLEMENT_CLOSED",
 ]
@@ -152,6 +155,126 @@ class MoneySummary(BaseModel):
     incidents: list[MoneyIncident] = Field(default_factory=list)
 
 
+# --- B3 v1 present-and-approve contracts (b3-intake-v1) ----------------------
+#
+# A presentation records that an accountant routed a confirmed B3 basis to the
+# configured approver; a B3 decision records the approver's APPROVE/RETURN/
+# REFUSE. Approval is NOT receipt: no money event, handoff or closure is created
+# here. These live in this module so ``CaseView`` can carry the projection
+# without a models<->b3_workflow import cycle.
+
+B3WorkflowStatus = Literal[
+    "NOT_PRESENTED", "PENDING", "RETURNED", "REFUSED", "APPROVED",
+    "NEEDS_RECHECK",
+]
+B3DecisionOutcome = Literal["APPROVE", "RETURN", "REFUSE"]
+B3DecisionValidity = Literal["VALID", "RECHECK_REQUIRED"]
+
+
+class B3PresentationView(BaseModel):
+    """A persisted presentation: which basis an accountant routed to whom."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    case_id: str
+    basis_report_id: str
+    review_id: str
+    employee_ref: str
+    work_ref: str
+    accountant_ref: str
+    approver_ref: str
+    basis_input_revision: StrictInt
+    basis_control_epoch: StrictInt
+    basis_signature: str
+    context_signature: str
+    created_at: AwareDatetime
+    idempotent_replay: bool = False
+
+
+class B3DecisionPayload(BaseModel):
+    """Approver's B3 outcome; three outcomes, one decision.
+
+    APPROVE requires ``work_allowed=true`` and both money figures > 0; RETURN
+    and REFUSE require all three approved fields to be ``None``. No extra
+    conditions/actor/rights are accepted — authority comes from the backend
+    company context, never from this payload.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    presentation_id: str
+    outcome: B3DecisionOutcome
+    reason: str
+    work_allowed: StrictBool | None = None
+    budget_vnd: StrictInt | None = None
+    advance_vnd: StrictInt | None = None
+
+    @model_validator(mode="after")
+    def _outcome_shape(self) -> "B3DecisionPayload":
+        if not self.reason.strip():
+            raise ValueError("Lý do quyết định không được để trắng.")
+        if self.outcome == "APPROVE":
+            if self.work_allowed is not True:
+                raise ValueError(
+                    "APPROVE phải cho phép công việc (work_allowed=true).")
+            if self.budget_vnd is None or self.budget_vnd <= 0:
+                raise ValueError("APPROVE phải có budget_vnd > 0.")
+            if self.advance_vnd is None or self.advance_vnd <= 0:
+                raise ValueError("APPROVE phải có advance_vnd > 0.")
+        else:
+            if (self.work_allowed is not None or self.budget_vnd is not None
+                    or self.advance_vnd is not None):
+                raise ValueError(
+                    "RETURN/REFUSE không được mang work_allowed/budget_vnd/"
+                    "advance_vnd (để null).")
+        return self
+
+
+class B3DecisionView(BaseModel):
+    """A recorded B3 advance decision bound to its presentation basis."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    case_id: str
+    kind: Literal["B3_ADVANCE"]
+    presentation_id: str
+    outcome: B3DecisionOutcome
+    reason: str
+    work_allowed: StrictBool | None = None
+    budget_vnd: StrictInt | None = None
+    advance_vnd: StrictInt | None = None
+    basis_report_id: str
+    basis_review_id: str
+    basis_input_revision: StrictInt
+    basis_control_epoch: StrictInt
+    basis_signature: str
+    context_signature: str
+    employee_ref: str
+    work_ref: str
+    actor_id: str
+    grant_ref: str
+    effective_at: AwareDatetime
+    created_at: AwareDatetime
+    idempotent_replay: bool = False
+
+
+class B3WorkflowView(BaseModel):
+    """Current B3 workflow projection derived from records + basis, not free text."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    status: B3WorkflowStatus
+    presentation: B3PresentationView | None = None
+    decision: B3DecisionView | None = None
+    basis_current: bool
+    decision_validity: B3DecisionValidity | None = None
+    blocked_reason: str | None = None
+    accountant_ref: str | None = None
+    approver_ref: str | None = None
+
+
 class CaseView(BaseModel):
     """Projection of a case for API/UI: versions, stage, sources, actions."""
 
@@ -170,6 +293,7 @@ class CaseView(BaseModel):
     allowed_actions: list[AllowedAction] = Field(default_factory=list)
     money_summary: dict[str, Any] = Field(default_factory=dict)
     origin: CaseOrigin = "USER"
+    b3_workflow: B3WorkflowView | None = None
     created_at: AwareDatetime
     updated_at: AwareDatetime
     idempotent_replay: bool = False
@@ -639,6 +763,35 @@ class ReviewPayload(BaseModel):
     report_id: str
     note: str
     refs: list[str] = Field(default_factory=list)
+
+
+class B3PresentPayload(BaseModel):
+    """Accountant presentation input: a saved review or a new note+refs.
+
+    Exactly one of ``review_id`` (reuse a stored review) or ``review`` (a new
+    note/refs to store) must be given. A new review's ``report_id`` must equal
+    ``basis_report_id`` and its note must not be blank.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    basis_report_id: str
+    review_id: str | None = None
+    review: ReviewPayload | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_review_source(self) -> "B3PresentPayload":
+        if (self.review_id is None) == (self.review is None):
+            raise ValueError(
+                "Cần đúng một trong review_id (review đã lưu) hoặc review "
+                "(note+refs mới), không cả hai hoặc không có.")
+        if self.review is not None:
+            if not self.review.note.strip():
+                raise ValueError("Ghi chú rà soát không được để trắng.")
+            if self.review.report_id != self.basis_report_id:
+                raise ValueError(
+                    "review.report_id phải bằng basis_report_id của presentation.")
+        return self
 
 
 class MoneyEventPayload(BaseModel):

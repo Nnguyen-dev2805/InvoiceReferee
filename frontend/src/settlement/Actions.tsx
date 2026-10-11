@@ -3,6 +3,7 @@
 // are shown separately; gross events are never clipped to the approved amount.
 import { useEffect, useState } from 'react';
 import * as api from './api';
+import { B3ApprovalPanel } from './B3Approval';
 import type { AuditEntry, CaseView, DemoRole, Report } from './types';
 
 function formatVnd(value: number | null): string {
@@ -127,6 +128,17 @@ export function ActionsPanel({
         hành động riêng; hệ thống không chuyển tiền.
       </p>
 
+      {b3V1 && (
+        <B3ApprovalPanel
+          view={view}
+          report={report ?? null}
+          history={history ?? []}
+          role={role}
+          actorId={actorId}
+          onAction={onAction}
+        />
+      )}
+
       {/* Tình trạng tiền chỉ áp dụng cho B7, ẩn trên B3 */}
       {!b3V1 && (
         <>
@@ -177,16 +189,8 @@ export function ActionsPanel({
           {role === 'ACCOUNTANT' ? (
             /* ================= GIAO DIỆN KẾ TOÁN (KT01, KT02, KT03) ================= */
             <>
-              {/* Thông báo cho B3: chức năng hỗ trợ rà soát đề nghị tạm ứng */}
-              {b3V1 && (
-                <div className="notice notice-info" role="status" style={{ marginTop: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-                  <p>
-                    ℹ️ Chức năng hiện tại hỗ trợ rà soát đề nghị tạm ứng; chưa thực hiện duyệt và chi ứng.
-                  </p>
-                </div>
-              )}
-
-              {/* 1. Rà soát kế toán ưu tiên hàng đầu */}
+              {/* 1. Rà soát kế toán ưu tiên hàng đầu (B7; B3 dùng panel trình duyệt) */}
+              {!b3V1 && (
               <div className="field" id="accountant-review-section">
                 <h3>Rà soát kế toán (không phải phê duyệt)</h3>
                 <p className="muted" style={{ fontSize: '0.85rem' }}>
@@ -246,6 +250,7 @@ export function ActionsPanel({
                   </p>
                 )}
               </div>
+              )}
 
               {/* 2. Cảnh báo quyền phê duyệt cho Kế toán (chỉ hiển thị cho B7; ẩn form quyết định của Approver khỏi góc nhìn Kế toán trên B3) */}
               {!b3V1 && (
@@ -350,11 +355,7 @@ export function ActionsPanel({
             </>
           ) : b3V1 ? (
             /* ================= NGƯỜI DUYỆT B3 V1 ================= */
-            <div className="notice notice-info" role="status" style={{ marginTop: 'var(--space-2)' }}>
-              <p>
-                ℹ️ Chức năng hiện tại hỗ trợ rà soát đề nghị tạm ứng; chưa thực hiện duyệt và chi ứng.
-              </p>
-            </div>
+            null
           ) : (
             /* ================= GIAO DIỆN NGƯỜI DUYỆT (AP01, AP02, AP03) ================= */
             <>

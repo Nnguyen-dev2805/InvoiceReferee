@@ -10,7 +10,34 @@
 
 **Spec:** [B3 present-and-approve design](../specs/2026-10-11-b3-present-and-approve-design.md).
 
-**Status:** PLANNED; thiết kế/plan được viết theo yêu cầu tiếp tục nghiệp vụ B3, chưa implementation/acceptance.
+**Status:** IMPLEMENTED (fake/replay, 2026-10-11); chưa nghiệm thu LIVE/UI.
+
+## Evidence (2026-10-11)
+
+Mode **PIPELINE_FAKE_OR_REPLAY** (fake reader + packet-literal context); không
+LIVE/Git/publish. Commands/exit/count actual:
+
+```
+SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/test_b3_workflow.py -q      # 17 passed
+SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/test_b3_workflow_api.py -q  # 6 passed
+SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/ -q                          # 322 passed
+SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/ -q                                     # 742 passed
+.venv/bin/python -m pip check                                                                          # No broken requirements found
+npm --prefix frontend run test -- --run                                                                # 105 passed (18 files)
+npm --prefix frontend run build                                                                        # tsc --noEmit + vite build OK
+```
+
+Artifacts: `src/invoice_referee/settlement/b3_workflow.py` (mới), models/service/
+store/API B3 workflow, `frontend/src/settlement/B3Approval.tsx` (+ test), docs
+`docs/testing/B3_APPROVAL_WALKTHROUGH.md`, `PRODUCT.md` P2a, `SYSTEM.md` S10.
+Breaking expectations (source-justified): `CaseStage` thêm `ADVANCE_REQUEST_REFUSED`
+(không vào `_CLOSED_STAGES`); B7 `_latest_decision_payload` chỉ đọc kind
+`SETTLEMENT`; 3 test Actions.tsx cũ mô tả UI report-only được thay bằng hành vi
+trình/quyết định mới.
+
+**Chưa kiểm (honest limits):** UI walkthrough `USER_UI_UNEXECUTED` (browser chưa
+thao tác trong phiên); LIVE/OCR/LLM quality PLANNED; chưa ghi tiền actual, chi
+ngân hàng, handoff/closure, mở lại refusal, B3→B7.
 
 ## Global Constraints
 
@@ -55,7 +82,7 @@ nhét lifecycle vào Reader hay dùng LLM cho quyết định/phép cộng/quy�
 - `Store.record_b3_presentation(case_id:str,payload:B3PresentPayload,command:Command,context:B3CompanyContext,policy:dict)->B3PresentationView`.
 - `POST /api/cases/{id}/b3-presentations`: actor_id/demo_role/expected_case_version + payload fields; Idempotency-Key; response201 mới,200 replay.
 
-- [ ] **1.1 Viết fixtures/tests failing**
+- [x] **1.1 Viết fixtures/tests failing**
 
 Fixture sau được tạo trong `test_b3_workflow.py`; copy vào API test hoặc import
 fixture module test qua pytest_plugins có phạm vi tests này. Không database thật.
@@ -104,7 +131,7 @@ def test_present_stores_review_and_pending_atomically(ready_b3):
 
 Run: `rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/test_b3_workflow.py -q`; trước implement FAIL vì chưa có present_b3.
 
-- [ ] **1.2 Implement transaction và projection tối thiểu**
+- [x] **1.2 Implement transaction và projection tối thiểu**
 
 Reuse _write/_check_version/_lookup_command/_record_command. Operation B3_PRESENT,
 audit kind B3_PRESENTED chứa typed presentation và review liên quan. Không thêm
@@ -135,7 +162,7 @@ Chưa trình thì NOT_PRESENTED; không suy pending chỉ vì đã có review no
 Errors: INVALID_PAYLOAD400, BEYOND_AUTHORITY403, BASIS_MISMATCH400,
 BASIS_STALE409, STOP_ACTIVE409, B3_WORKFLOW_BLOCKED409. Áp envelope hiện có.
 
-- [ ] **1.3 API tests và panel kế toán**
+- [x] **1.3 API tests và panel kế toán**
 
 HTTP tests: actor employee/approver không trình; accountant sai route; draft;
 report incomplete; review khác case; same-key retry; changed-body same key;
@@ -159,7 +186,7 @@ bắt nhập note lại; pending không submit lần hai; failed API giữ form 
 thông báo cụ thể, không optimistic pending giả. Button disabled/in-flight
 và helper reason; keyboard/label dùng native controls, styles hiện có.
 
-- [ ] **1.4 Chạy focused tests và UI checkpoint**
+- [x] **1.4 Chạy focused tests và UI checkpoint**
 
 ```bash
 rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/test_b3_workflow.py tests/settlement/test_b3_workflow_api.py tests/settlement/test_b3_api.py -q
@@ -185,7 +212,7 @@ basis còn current. Nếu không current phải Run/review lại, không sửa D
 - POST /api/cases/{id}/b3-decisions có envelope hiện tại + payload;201 mới/200 replay.
 - `api.decideB3(caseId,payload)->Promise<B3DecisionView>`; không gọi api.decide/SETTLEMENT.
 
-- [ ] **2.1 Viết tests failing ba outcomes**
+- [x] **2.1 Viết tests failing ba outcomes**
 
 Thêm fixture `presented_b3` dùng ready_b3 và present_b3 ở Task1; function đầy
 đủ dưới đây, không helper chưa định nghĩa:
@@ -228,7 +255,7 @@ def test_return_refuse_do_not_create_approved_amount(presented_b3, outcome):
     assert not svc.closed(case.id)
 ```
 
-- [ ] **2.2 Implement quyền và transaction**
+- [x] **2.2 Implement quyền và transaction**
 
 Transaction mới dùng operation B3_DECIDE/kind B3_DECISION_RECORDED và decision
 JSON kind B3_ADVANCE. Reuse command/version/Stop guards; load presentation
@@ -263,7 +290,7 @@ Sửa `_latest_decision_payload` B7 chỉ đọc kind SETTLEMENT; handoff/closur
 không nhận B3_ADVANCE như final settlement. Giữ B3_REPORT_ONLY chặn generic
 SETTLEMENT/record_money/handoff/closure; không xóa guard để nút approve chạy.
 
-- [ ] **2.3 UI người duyệt và nhân viên**
+- [x] **2.3 UI người duyệt và nhân viên**
 
 Summary lấy presentation basis, không latest report/review sai. Input
 budget gợi ý forecast_total, advance gợi ý request; checkbox xác nhận cho
@@ -283,7 +310,7 @@ role submit request rõ; lower advance1,5 giữ request2; unknown/invalid input
 không Number('')→0; retry không double; after return edit/recheck/represent;
 after refuse không present; change role refresh vẫn state từ server.
 
-- [ ] **2.4 Run focused tests + UI checkpoint**
+- [x] **2.4 Run focused tests + UI checkpoint**
 
 ```bash
 rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/test_b3_workflow.py tests/settlement/test_b3_workflow_api.py tests/settlement/test_decisions.py tests/settlement/test_b3_api.py -q
@@ -319,7 +346,7 @@ Không overwrite case vừa approve để test outcome khác.
   client nhập hoặc chỉ khớp tiền/ngày không được miễn check. Test own decision
   rerun và foreign decision cùng scope phải cho hành vi khác nhau.
 
-- [ ] **3.1 Regression matrix trước code**
+- [x] **3.1 Regression matrix trước code**
 
 1. Run/review/presentation khác case: không write.
 2. Revision/source thêm sau trình: decision cũ rejected BASIS_STALE; old
@@ -342,7 +369,7 @@ Mỗi test assertions trên records/history/stage, không chỉ HTTP status.
 Races dùng hai commands expected version giống nhau trên tmp SQLite; outcomes
 phải chỉ một success, conflict409 còn lại; không cần threading infrastructure.
 
-- [ ] **3.2 Implement invalidation và derived stage**
+- [x] **3.2 Implement invalidation và derived stage**
 
 Thêm source/revise/Stop/publish recheck các dấu current B3. Signature
 business giống khi rerun không tự mất approval; pending new decision vẫn
@@ -362,7 +389,7 @@ readiness, stage/capability projection phải nói financial state riêng và
 không tạo question giả cho chính approval đã có. Không sửa dataset expected
 để che integration gap; bổ sung B3 rerun test thật qua Service.
 
-- [ ] **3.3 Kiểm tổng thể và UI walkthrough**
+- [x] **3.3 Kiểm tổng thể và UI walkthrough**
 
 ```bash
 rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/ -q
@@ -394,7 +421,7 @@ Hồ sơ IMPORT/LIVE hiện có có thể reuse report/review nếu current, kh�
 gọi model lại chỉ để test quyết định. LIVE rerun chỉ với authorization; chưa
 thao tác browser thì USER_UI_UNEXECUTED, không dùng workaround denial.
 
-- [ ] **3.4 Docs và self-review**
+- [x] **3.4 Docs và self-review**
 
 Product P2a bỏ mô tả toàn bộ B3 report-only chỉ khi ba tasks wired và checked;
 nêu rõ mới hỗ trợ trình/decision, chưa money/hand-off/closure/B3→B7 import.
@@ -406,13 +433,13 @@ case/ref namespaces, type imports và mapping stages. Không tự commit/publish
 
 ## Acceptance
 
-- [ ] Current review reuse hoặc save+present atomic; pending survives reload/restart.
-- [ ] APPROVE work/B/advance đúng grant/time/scope; requested khác approved/received.
-- [ ] RETURN có vòng sửa/recheck/review/present; REFUSE có reason và không bypass.
-- [ ] Cross-case/stale/Stop/expiry/same-key/double-key/race không tạo quyết định sai.
-- [ ] B3_ADVANCE không lọt B7 summary/action/closure; money/handoff B3 vẫn chặn.
-- [ ] User nhìn thấy bước tiếp theo trên cả ba vai, không chồng banner checking/reviewed/pending.
-- [ ] UI execution evidence hoặc limitation rõ; không tự claim professional trial/AI LIVE quality.
+- [x] Current review reuse hoặc save+present atomic; pending survives reload/restart.
+- [x] APPROVE work/B/advance đúng grant/time/scope; requested khác approved/received.
+- [x] RETURN có vòng sửa/recheck/review/present; REFUSE có reason và không bypass.
+- [x] Cross-case/stale/Stop/expiry/same-key/double-key/race không tạo quyết định sai.
+- [x] B3_ADVANCE không lọt B7 summary/action/closure; money/handoff B3 vẫn chặn.
+- [x] User nhìn thấy bước tiếp theo trên cả ba vai, không chồng banner checking/reviewed/pending.
+- [x] UI execution evidence hoặc limitation rõ; không tự claim professional trial/AI LIVE quality.
 
 ## Prompt giao coding agent
 

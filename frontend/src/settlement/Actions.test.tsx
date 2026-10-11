@@ -1,6 +1,20 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { ActionsPanel } from './Actions';
 import type { AuditEntry, CaseView, MoneySummary } from './types';
+
+function b3Workflow(overrides: Partial<CaseView['b3_workflow']> = {}) {
+  return {
+    status: 'NOT_PRESENTED' as const,
+    presentation: null,
+    decision: null,
+    basis_current: false,
+    decision_validity: null,
+    blocked_reason: null,
+    accountant_ref: null,
+    approver_ref: null,
+    ...overrides,
+  };
+}
 
 function makeSummary(overrides: Partial<MoneySummary> = {}): MoneySummary {
   return {
@@ -110,80 +124,127 @@ test('vai EMPLOYEE chỉ thấy tình trạng tiền và thông báo, không th�
   expect(screen.queryByText('Stop hồ sơ')).not.toBeInTheDocument();
 });
 
-test('vai ACCOUNTANT trên hồ sơ B3 thấy form rà soát kế toán và nút Lưu kết quả rà soát', () => {
-  render(<ActionsPanel view={makeView({ job: 'B3' })} role="ACCOUNTANT" actorId="ACC-01"
+test('B3 chưa trình: kế toán thấy nút Lưu rà soát và trình duyệt; ẩn tình trạng tiền', () => {
+  render(<ActionsPanel view={makeView({
+    job: 'B3', b3_workflow: b3Workflow(),
+    submission: { ...makeView().submission, job: 'B3',
+      form: { schema_version: 'b3-intake-v1', confirmed: true } },
+  })} role="ACCOUNTANT" actorId="ACC-01"
     decisionId={null} reportReady onAction={noop} />);
-  expect(screen.getByText('Rà soát kế toán (không phải phê duyệt)')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Lưu kết quả rà soát' })).toBeInTheDocument();
-  expect(screen.queryByText('Ghi sự kiện tiền')).not.toBeInTheDocument();
+  expect(screen.getByTestId('b3-approval-panel')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Lưu rà soát và trình duyệt' })).toBeInTheDocument();
+  expect(screen.queryByTestId('money-summary')).not.toBeInTheDocument();
+  expect(screen.queryByText(/B3_REPORT_ONLY/)).not.toBeInTheDocument();
 });
 
-test('khi chưa nhập ghi chú rà soát: nút disabled và hiển thị gợi ý thân thiện', () => {
-  render(<ActionsPanel view={makeView({ job: 'B3' })} role="ACCOUNTANT" actorId="ACC-01"
-    decisionId={null} reportReady onAction={noop} />);
-  const btn = screen.getByRole('button', { name: 'Lưu kết quả rà soát' }) as HTMLButtonElement;
-  expect(btn.disabled).toBe(true);
-  expect(screen.getByTestId('review-note-hint')).toHaveTextContent(
-    'Vui lòng nhập ghi chú rà soát để lưu kết quả.'
-  );
-
-  // Nhập ghi chú: nút enabled và gợi ý biến mất
-  fireEvent.change(screen.getByLabelText('Ghi chú rà soát'), {
-    target: { value: 'Đã đối soát xong bảng kê chi phí dự kiến.' },
-  });
-  expect(btn.disabled).toBe(false);
-  expect(screen.queryByTestId('review-note-hint')).not.toBeInTheDocument();
-});
-
-test('sau khi lưu review: hiển thị thẻ tóm tắt nổi bật Kế toán đã rà soát nếu có trong history', () => {
+test('B3 đã có review còn current: kế toán không phải nhập lại, thấy nút Trình người duyệt', () => {
   const historyEntry: AuditEntry = {
-    id: 'H-01',
-    case_id: 'C-t01',
-    kind: 'REVIEW_RECORDED',
-    operation: 'RECORD_REVIEW',
-    actor_id: 'ACC-LEAD-01',
-    command_key: 'ck-rev-1',
-    occurred_at: '2026-10-11T09:30:00Z',
-    detail: {
-      note: 'Đã đối chiếu bảng kê và vé máy bay gốc.',
-      report_id: 'R-run01',
-    },
+    id: 'H-01', case_id: 'C-t01', kind: 'REVIEW_RECORDED',
+    operation: 'RECORD_REVIEW', actor_id: 'ACC-01',
+    command_key: 'ck-rev-1', occurred_at: '2026-10-11T09:30:00Z',
+    detail: { review: {
+      id: 'RV-1', case_id: 'C-t01', report_id: 'R-run01',
+      note: 'Đã đối chiếu bảng kê.', refs: [], actor_id: 'ACC-01',
+      created_at: '2026-10-11T09:30:00Z' } },
   };
-
-  render(<ActionsPanel view={makeView({ job: 'B3' })} role="ACCOUNTANT" actorId="ACC-01"
+  render(<ActionsPanel view={makeView({
+    job: 'B3', b3_workflow: b3Workflow(),
+    submission: { ...makeView().submission, job: 'B3',
+      form: { schema_version: 'b3-intake-v1', confirmed: true } },
+  })} role="ACCOUNTANT" actorId="ACC-01"
     decisionId={null} reportReady history={[historyEntry]} onAction={noop} />);
-
-  const summary = screen.getByTestId('accountant-review-summary');
-  expect(summary).toBeInTheDocument();
-  expect(summary).toHaveTextContent('Kế toán đã rà soát');
-  expect(summary).toHaveTextContent('ACC-LEAD-01');
-  expect(summary).toHaveTextContent('Ghi chú: "Đã đối chiếu bảng kê và vé máy bay gốc."');
-  expect(summary).toHaveTextContent('Căn cứ report R-run01');
+  expect(screen.getByTestId('b3-saved-review')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Trình người duyệt' })).toBeInTheDocument();
+  expect(screen.queryByLabelText('Ghi chú rà soát')).not.toBeInTheDocument();
 });
 
-test('với hồ sơ B3: ẩn bảng tình trạng tiền, ẩn form quyết định Approver khỏi kế toán, hiển thị thông báo nghiệp vụ ngắn gọn', () => {
-  render(<ActionsPanel view={makeView({ job: 'B3' })} role="ACCOUNTANT" actorId="ACC-01"
+test('B3 pending: approver thấy ba nút quyết định, employee không thấy', () => {
+  const presented = {
+    ...makeView(), job: 'B3' as const,
+    stage: 'AWAITING_DECISION' as const,
+    submission: { ...makeView().submission, job: 'B3' as const,
+      form: { schema_version: 'b3-intake-v1', confirmed: true } },
+    b3_workflow: b3Workflow({
+      status: 'PENDING', basis_current: true,
+      accountant_ref: 'ACC-DEMO-01', approver_ref: 'APR-DEMO-01',
+      presentation: {
+        id: 'PR-1', case_id: 'C-t01', basis_report_id: 'R-run01',
+        review_id: 'RV-1', employee_ref: 'NV-01', work_ref: 'CT-01',
+        accountant_ref: 'ACC-DEMO-01', approver_ref: 'APR-DEMO-01',
+        basis_input_revision: 3, basis_control_epoch: 1,
+        basis_signature: 'sig', context_signature: 'ctx',
+        created_at: '2026-10-11T10:00:00Z', idempotent_replay: false,
+      },
+    }),
+  };
+  const { unmount } = render(
+    <ActionsPanel view={presented} role="APPROVER" actorId="APR-DEMO-01"
+      decisionId={null} reportReady onAction={noop} />);
+  expect(screen.getByRole('button', { name: 'Phê duyệt tạm ứng' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Yêu cầu bổ sung' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Từ chối đề nghị' })).toBeInTheDocument();
+  unmount();
+
+  render(<ActionsPanel view={presented} role="EMPLOYEE" actorId="NV-01"
     decisionId={null} reportReady onAction={noop} />);
-
-  // 1. Ẩn hoàn toàn bảng tình trạng tiền
-  expect(screen.queryByTestId('money-summary')).not.toBeInTheDocument();
-  expect(screen.queryByText('Tình trạng tiền')).not.toBeInTheDocument();
-
-  // 2. Ẩn form/cảnh báo quyết định của Approver khỏi góc nhìn Kế toán
-  expect(screen.queryByText('Quyết định (người duyệt)')).not.toBeInTheDocument();
-  expect(screen.queryByText(/BEYOND_AUTHORITY/)).not.toBeInTheDocument();
-
-  // 3. Hiển thị thông báo nghiệp vụ thay vì lỗi kỹ thuật B3_REPORT_ONLY
-  expect(screen.getByText(/Chức năng hiện tại hỗ trợ rà soát đề nghị tạm ứng; chưa thực hiện duyệt và chi ứng/)).toBeInTheDocument();
-  expect(screen.queryByText(/B3_REPORT_ONLY/)).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Phê duyệt tạm ứng' }))
+    .not.toBeInTheDocument();
 });
 
-test('vai APPROVER trên hồ sơ B3 hiển thị thông báo nghiệp vụ và không hiện B3_REPORT_ONLY', () => {
-  render(<ActionsPanel view={makeView({ job: 'B3' })} role="APPROVER" actorId="APR-01"
+test('B3 approved: hiển thị chờ chi ứng và "Chưa ghi nhận", không có nút chi/đóng', () => {
+  const approved = {
+    ...makeView(), job: 'B3' as const, stage: 'AWAITING_MONEY' as const,
+    submission: { ...makeView().submission, job: 'B3' as const,
+      form: { schema_version: 'b3-intake-v1', confirmed: true } },
+    b3_workflow: b3Workflow({
+      status: 'APPROVED', basis_current: true,
+      decision: {
+        id: 'BD-1', case_id: 'C-t01', kind: 'B3_ADVANCE',
+        presentation_id: 'PR-1', outcome: 'APPROVE', reason: 'Duyệt theo đề nghị',
+        work_allowed: true, budget_vnd: 8_000_000, advance_vnd: 2_000_000,
+        basis_report_id: 'R-run01', basis_review_id: 'RV-1',
+        basis_input_revision: 3, basis_control_epoch: 1, basis_signature: 'sig',
+        context_signature: 'ctx', employee_ref: 'NV-01', work_ref: 'CT-01',
+        actor_id: 'APR-DEMO-01', grant_ref: 'company:grant-01',
+        effective_at: '2026-10-10T09:00:00+07:00',
+        created_at: '2026-10-11T10:00:00Z', idempotent_replay: false,
+      },
+    }),
+  };
+  render(<ActionsPanel view={approved} role="APPROVER" actorId="APR-DEMO-01"
     decisionId={null} reportReady onAction={noop} />);
+  const panel = screen.getByTestId('b3-approval-panel').textContent ?? '';
+  expect(panel).toContain('Đã duyệt tạm ứng — chờ chi ứng');
+  expect(panel).toContain('Thực nhận: Chưa ghi nhận');
+  expect(screen.queryByText('Ghi sự kiện tiền')).not.toBeInTheDocument();
+  expect(screen.queryByText('Đóng hồ sơ')).not.toBeInTheDocument();
+});
 
-  expect(screen.getByText(/Chức năng hiện tại hỗ trợ rà soát đề nghị tạm ứng; chưa thực hiện duyệt và chi ứng/)).toBeInTheDocument();
-  expect(screen.queryByText(/B3_REPORT_ONLY/)).not.toBeInTheDocument();
-  expect(screen.queryByTestId('money-summary')).not.toBeInTheDocument();
+test('B3 refused: employee thấy lý do, không có form mở lại', () => {
+  const refused = {
+    ...makeView(), job: 'B3' as const, stage: 'ADVANCE_REQUEST_REFUSED' as const,
+    submission: { ...makeView().submission, job: 'B3' as const,
+      form: { schema_version: 'b3-intake-v1', confirmed: true } },
+    b3_workflow: b3Workflow({
+      status: 'REFUSED', basis_current: true,
+      decision: {
+        id: 'BD-2', case_id: 'C-t01', kind: 'B3_ADVANCE',
+        presentation_id: 'PR-1', outcome: 'REFUSE', reason: 'Chưa cấp ứng',
+        work_allowed: null, budget_vnd: null, advance_vnd: null,
+        basis_report_id: 'R-run01', basis_review_id: 'RV-1',
+        basis_input_revision: 3, basis_control_epoch: 1, basis_signature: 'sig',
+        context_signature: 'ctx', employee_ref: 'NV-01', work_ref: 'CT-01',
+        actor_id: 'APR-DEMO-01', grant_ref: 'company:grant-01',
+        effective_at: '2026-10-10T09:00:00+07:00',
+        created_at: '2026-10-11T10:00:00Z', idempotent_replay: false,
+      },
+    }),
+  };
+  render(<ActionsPanel view={refused} role="EMPLOYEE" actorId="NV-01"
+    decisionId={null} reportReady onAction={noop} />);
+  expect(screen.getByText(/Đề nghị tạm ứng bị từ chối/)).toBeInTheDocument();
+  expect(screen.getByText('Chưa cấp ứng')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Lưu rà soát và trình duyệt' }))
+    .not.toBeInTheDocument();
 });
 

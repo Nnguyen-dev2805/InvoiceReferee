@@ -11,6 +11,7 @@ export type CaseStage =
   | 'AWAITING_MONEY'
   | 'AWAITING_WORK_SETTLEMENT'
   | 'RESOLVING_OBLIGATIONS'
+  | 'ADVANCE_REQUEST_REFUSED'
   | 'REJECTED_REQUEST_ENDED'
   | 'SETTLEMENT_CLOSED';
 
@@ -69,6 +70,7 @@ export interface CaseView {
   sources: SourceView[];
   allowed_actions: AllowedAction[];
   money_summary: MoneySummary;
+  b3_workflow?: B3WorkflowView | null;
   created_at: string;
   updated_at: string;
 }
@@ -319,6 +321,88 @@ export interface B3RunContext {
   grants: B3GrantRecord[];
   coverage: B3CoverageRecord[];
   history: B3HistoryRecord[];
+}
+
+// --- B3 present-and-approve (b3-intake-v1) ------------------------------------
+
+export type B3WorkflowStatus =
+  | 'NOT_PRESENTED' | 'PENDING' | 'RETURNED' | 'REFUSED' | 'APPROVED'
+  | 'NEEDS_RECHECK';
+
+export type B3DecisionOutcome = 'APPROVE' | 'RETURN' | 'REFUSE';
+
+export interface B3PresentationView {
+  id: string;
+  case_id: string;
+  basis_report_id: string;
+  review_id: string;
+  employee_ref: string;
+  work_ref: string;
+  accountant_ref: string;
+  approver_ref: string;
+  basis_input_revision: number;
+  basis_control_epoch: number;
+  basis_signature: string;
+  context_signature: string;
+  created_at: string;
+  idempotent_replay: boolean;
+}
+
+export interface B3DecisionView {
+  id: string;
+  case_id: string;
+  kind: 'B3_ADVANCE';
+  presentation_id: string;
+  outcome: B3DecisionOutcome;
+  reason: string;
+  work_allowed: boolean | null;
+  budget_vnd: number | null;
+  advance_vnd: number | null;
+  basis_report_id: string;
+  basis_review_id: string;
+  basis_input_revision: number;
+  basis_control_epoch: number;
+  basis_signature: string;
+  context_signature: string;
+  employee_ref: string;
+  work_ref: string;
+  actor_id: string;
+  grant_ref: string;
+  effective_at: string;
+  created_at: string;
+  idempotent_replay: boolean;
+}
+
+export interface B3WorkflowView {
+  status: B3WorkflowStatus;
+  presentation: B3PresentationView | null;
+  decision: B3DecisionView | null;
+  basis_current: boolean;
+  decision_validity: 'VALID' | 'RECHECK_REQUIRED' | null;
+  blocked_reason: string | null;
+  accountant_ref: string | null;
+  approver_ref: string | null;
+}
+
+export interface B3PresentPayload {
+  actor_id: string;
+  demo_role: DemoRole;
+  expected_case_version: number;
+  basis_report_id: string;
+  review_id?: string | null;
+  review?: { report_id: string; note: string; refs: string[] } | null;
+}
+
+export interface B3DecisionPayload {
+  actor_id: string;
+  demo_role: DemoRole;
+  expected_case_version: number;
+  presentation_id: string;
+  outcome: B3DecisionOutcome;
+  reason: string;
+  work_allowed?: boolean | null;
+  budget_vnd?: number | null;
+  advance_vnd?: number | null;
 }
 
 export type CriticalFactState =

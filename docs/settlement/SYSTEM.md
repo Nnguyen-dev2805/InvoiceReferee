@@ -226,9 +226,38 @@ tra trong fixture, work id `WORK-<uuid12>` idempotent theo replay key trước k
 phát id mới, clocks backend); `GET /api/runs/{run_id}/b3-context` (snapshot
 grants/coverage/history, refs `company:<...>`). PATCH submission giữ
 employee/work/clocks immutable cho B3 v1 và reject form b3-intake-v1 trên hồ
-sơ legacy (không di trú ngầm). B3 v1 bị chặn ở transaction guard bằng
-`B3_REPORT_ONLY` cho decision/money/handoff/closure (review chỉ nhận khi đã
+sơ legacy (không di trú ngầm). Generic decision/money/handoff/closure vẫn bị
+chặn ở transaction guard bằng `B3_REPORT_ONLY` (review chỉ nhận khi đã
 confirm); allowed_actions không quảng cáo action chưa hỗ trợ.
+
+Trình duyệt/quyết định ứng B3 (plan
+[2026-10-11-b3-present-and-approve](../superpowers/plans/2026-10-11-b3-present-and-approve.md))
+thêm hai endpoint chuyên biệt, **không** mở generic financial path:
+`POST /api/cases/{id}/b3-presentations` (kế toán trình: `basis_report_id` +
+đúng một `review_id` đã lưu hoặc `review` note/refs mới; lưu review +
+presentation cùng transaction, stage `AWAITING_DECISION`; review mới lưu
+`interactions` kind REVIEW, presentation lưu `audit_events` kind
+`B3_PRESENTED`) và `POST /api/cases/{id}/b3-decisions` (`B3DecisionPayload`:
+presentation_id/outcome APPROVE|RETURN|REFUSE/reason/work_allowed/budget_vnd/
+advance_vnd; quyết định lưu `decisions` JSON kind `B3_ADVANCE`, audit
+`B3_DECISION_RECORDED`). `CaseView.b3_workflow` (`B3WorkflowView`) là projection
+derive từ records/basis (không suy từ free text): status NOT_PRESENTED/PENDING/
+RETURNED/REFUSED/APPROVED/NEEDS_RECHECK, presentation/decision/basis_current/
+blocked_reason. Presentation/decision bind một `basis_signature` (scope/form/
+source hashes/policy/context/checks/issues — bỏ run id/timestamp/token) và
+`context_signature`; đổi nguồn/revision/epoch/context làm basis stale
+(`BASIS_STALE`/NEEDS_RECHECK). Quyền dùng `B3Grant` scoped (actor/employee/work/
+hiệu lực, `max_budget_vnd`/`max_advance_vnd`; thiếu hạn mức không vô hạn) qua
+`authorize_b3_decision`; route approver/accountant do backend cấp. APPROVE →
+`AWAITING_MONEY`, RETURN → `CHECKING`, REFUSE → stage mới
+`ADVANCE_REQUEST_REFUSED` (không thuộc `_CLOSED_STAGES`). `Service.start` gộp
+quyết định B3 của chính hồ sơ (namespace `b3decision:<id>`) vào company history
+khi re-run để không tạo issue duplicate giả; quyết định ngoài hồ sơ vẫn bị nêu.
+B7 `_latest_decision_payload` chỉ đọc kind `SETTLEMENT`, nên `B3_ADVANCE` không
+thành nghĩa vụ/money/handoff/closure B7. Error codes thêm: `BASIS_MISMATCH`
+400, `B3_WORKFLOW_BLOCKED`/`B3_DECISION_EXISTS` 409 (cùng envelope hiện có).
+Chưa có actual ứng (ghi tiền), liên kết nhập B3→B7, mở lại refusal hoặc đóng
+lifecycle.
 
 Reader B3 v1 dùng grammar `document.role/person.name/trip.*/advance.request.*/
 forecast.*` (row_id document-local, backend namespace theo nguồn/trang;
@@ -238,5 +267,6 @@ gọi generic payment matcher B7. Rule IDs: `trip_context`, `request_positive`,
 `proposal_relation`, `source_form_consistency`, `history_coverage`,
 `prior_advance_state`, `decision_route`. Nguồn tham chiếu form:
 `form:<input_revision>:<field-path>`; không form-wins — form và nguồn khác
-nhau là mâu thuẫn giữ cả hai refs. Duyệt work/B/advance, chi ứng, liên kết
-B3→B7 và closure là lifecycle riêng chưa mở ở nhánh này.
+nhau là mâu thuẫn giữ cả hai refs. Duyệt work/B/advance và trình duyệt nay có
+trên app; chi ứng (actual money), liên kết B3→B7 và closure là lifecycle riêng
+chưa mở ở nhánh này.
