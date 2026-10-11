@@ -45,10 +45,11 @@
       <label for="settlement_form_file">Giấy đề nghị hoàn ứng/quyết toán</label>
       <input id="settlement_form_file" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf">
       <small>Chữ ký tay sẽ được chuyển cho kế toán xác nhận trong MVP.</small>
+      <small>Trạng thái evidence và lý do thiếu chứng từ sẽ được OCR từ cột ghi chú của từng dòng trên đơn.</small>
     </div>
   </section>
 
-  <section class="form-section">
+  <section id="digital-business-section" class="form-section">
     <div class="section-title">
       <span class="step">02</span>
       <div><h2>Business context</h2><p>Nêu rõ lý do để kế toán hiểu khoản chi phục vụ công việc nào.</p></div>
@@ -76,18 +77,29 @@
       </div>
     </div>
     <div id="advance-fields" class="form-grid hidden">
+      <div class="field span-2">
+        <label for="allocated_advance_amount">Số tiền đã tạm ứng</label>
+        <input id="allocated_advance_amount" type="number" min="0" step="1" value="0">
+        <small>Trong MVP, hệ thống dùng số tiền khai báo để tính quyết toán và không tra cứu khoản tạm ứng gốc.</small>
+      </div>
+    </div>
+    <div class="form-grid">
       <div class="field">
-        <label for="advance_id">Mã khoản tạm ứng</label>
-        <input id="advance_id" type="text" placeholder="ADV-202610-001">
+        <label for="beneficiary_name">Tên người thụ hưởng (nếu có)</label>
+        <input id="beneficiary_name" type="text" placeholder="NGUYỄN MINH AN">
       </div>
       <div class="field">
-        <label for="allocated_advance_amount">Số tiền tạm ứng phân bổ</label>
-        <input id="allocated_advance_amount" type="number" min="0" step="1" value="0">
+        <label for="bank_account_number">Số tài khoản nhận tiền (nếu có)</label>
+        <input id="bank_account_number" type="text" inputmode="numeric" placeholder="0123456789">
+      </div>
+      <div class="field span-2">
+        <label for="bank_name">Ngân hàng (nếu có)</label>
+        <input id="bank_name" type="text" placeholder="Ngân hàng Demo">
       </div>
     </div>
   </section>
 
-  <section class="form-section">
+  <section id="digital-expenses-section" class="form-section">
     <div class="section-title action-title">
       <div class="title-with-step">
         <span class="step">03</span>
@@ -125,5 +137,5 @@
 </form>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/settlement-form.js?v=20261010-2"></script>
+<script src="/static/js/settlement-form.js?v=20261011-4"></script>
 {% endblock %}

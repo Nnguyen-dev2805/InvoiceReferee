@@ -76,6 +76,11 @@ def test_accounting_case_resolves_ocr_block_as_annotated_evidence() -> None:
                 "status": "ERROR",
                 "source_refs": [],
             },
+            {
+                "rule_id": "SET_APPROVAL_001",
+                "status": "PENDING_APPROVAL",
+                "source_refs": ["DOC:DOC-001"],
+            },
         ],
         "decision": {
             "source_refs": ["DOC:DOC-001:page-0-block-0"]
@@ -91,6 +96,10 @@ def test_accounting_case_resolves_ocr_block_as_annotated_evidence() -> None:
     ]
     assert "left:50.000%" in preview["annotation_style"]
     assert "top:75.000%" in preview["annotation_style"]
+    assert preview["ocr_preview_url"] == (
+        "/api/v1/cases/SET-VIEW-001/documents/DOC-001/ocr-preview"
+        "?page_index=0&block_id=page-0-block-0"
+    )
     assert decorated["expense_items"][0]["documents"][0]["document_id"] == (
         "DOC-001"
     )
@@ -100,3 +109,6 @@ def test_accounting_case_resolves_ocr_block_as_annotated_evidence() -> None:
     assert [finding["status"] for finding in decorated["passed_findings"]] == [
         "PASS"
     ]
+    assert [
+        finding["status"] for finding in decorated["pending_approval_findings"]
+    ] == ["PENDING_APPROVAL"]

@@ -5,10 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from invoice_referee.domain import (
+    ExpenseEvidenceStatus,
     SettlementDocumentRole,
     SettlementDraft,
     SettlementReceipt,
     SettlementUpload,
+    SubmissionSourceType,
     SubmissionValidationError,
 )
 from invoice_referee.policy import SettlementPolicyConfig
@@ -95,6 +97,7 @@ class SubmitSettlementService:
             if (
                 upload.role == SettlementDocumentRole.EXPENSE_EVIDENCE
                 and upload.linked_item_id not in item_ids
+                and draft.source_type != SubmissionSourceType.PAPER_SCAN
             ):
                 issues.append(
                     f"File '{upload.original_name}' chưa được gắn vào khoản chi hợp lệ."
@@ -125,5 +128,40 @@ class SubmitSettlementService:
                     f"Khoản '{item.description}' tham chiếu file không tồn tại: "
                     + ", ".join(missing)
                 )
+            if (
+                draft.source_type == SubmissionSourceType.DIGITAL_FORM
+                and item.evidence_status
+                in {
+                    ExpenseEvidenceStatus.ORIGINAL_EVIDENCE,
+                    ExpenseEvidenceStatus.ALTERNATIVE_EVIDENCE,
+                }
+                and not item.evidence_names
+            ):
+                label = (
+                    "chứng từ gốc"
+                    if item.evidence_status
+                    == ExpenseEvidenceStatus.ORIGINAL_EVIDENCE
+                    else "bằng chứng thay thế"
+                )
+                issues.append(
+                    f"Khoản '{item.description}' chưa được gắn {label}."
+                )
+            if (
+                item.evidence_status == ExpenseEvidenceStatus.NO_EVIDENCE
+                and item.evidence_names
+            ):
+                issues.append(
+                    f"Khoản '{item.description}' đã chọn không có chứng từ "
+                    "nhưng vẫn tham chiếu file evidence."
+                )
+        paper_forms = [
+            upload
+            for upload in uploads
+            if upload.role == SettlementDocumentRole.SETTLEMENT_REQUEST_FORM
+        ]
+        if draft.source_type == SubmissionSourceType.PAPER_SCAN:
+            if len(paper_forms) != 1:
+                issues.append("Hồ sơ đơn giấy phải có đúng một đơn/báo cáo chính.")
+        elif paper_forms:
+            issues.append("Form điện tử không được gửi file đơn giấy chính.")
         return issues
-

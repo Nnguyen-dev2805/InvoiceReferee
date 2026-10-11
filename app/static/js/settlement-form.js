@@ -41,6 +41,10 @@
     return file.name.toLocaleLowerCase("vi");
   }
 
+  function isPaperSubmission() {
+    return form.querySelector("[name=source_type]:checked").value === "PAPER_SCAN";
+  }
+
   function addExpense() {
     itemSequence += 1;
     const id = "ITEM-" + String(itemSequence).padStart(3, "0");
@@ -61,8 +65,29 @@
       '<div class="field"><label>Ngày chi</label><input class="item-date" type="date"></div>' +
       '<div class="field"><label>Số tiền khai báo</label>' +
       '<input class="item-amount" type="number" min="1" step="1" placeholder="1200000"></div>' +
-      '<div class="field"><label>Mã ngoại lệ (nếu không có chứng từ)</label>' +
-      '<input class="item-exception" type="text" placeholder="Để trống nếu có chứng từ"></div></div>';
+      '<div class="field span-2"><label>Tình trạng chứng từ</label>' +
+      '<select class="item-evidence-status">' +
+      '<option value="ORIGINAL_EVIDENCE">Có hóa đơn / bill / chứng từ gốc</option>' +
+      '<option value="ALTERNATIVE_EVIDENCE">Có bằng chứng thay thế</option>' +
+      '<option value="NO_EVIDENCE">Không có chứng từ</option>' +
+      '</select></div>' +
+      '<div class="field span-2 alternative-evidence-fields hidden">' +
+      '<label>Loại bằng chứng thay thế</label>' +
+      '<select class="item-alternative-type">' +
+      '<option value="">Chọn loại bằng chứng</option>' +
+      '<option value="PAYMENT_PROOF">Ảnh chuyển khoản / giao dịch thanh toán</option>' +
+      '<option value="RECEIPT_OR_COLLECTION_NOTE">Phiếu thu / phiếu nhận tiền</option>' +
+      '<option value="CONTRACT_OR_ACCEPTANCE">Hợp đồng / biên bản nghiệm thu</option>' +
+      '<option value="SUPPLIER_CONFIRMATION">Xác nhận của nhà cung cấp</option>' +
+      '<option value="OTHER">Tài liệu khác</option>' +
+      '</select>' +
+      '<label class="secondary-label">Lý do không có chứng từ gốc</label>' +
+      '<textarea class="item-alternative-reason" rows="2" placeholder="Ví dụ: nhà cung cấp cá nhân không xuất hóa đơn"></textarea></div>' +
+      '<div class="field span-2 no-evidence-fields hidden">' +
+      '<label>Lý do không có chứng từ</label>' +
+      '<textarea class="item-no-evidence-reason" rows="2" placeholder="Nêu rõ nguyên nhân và căn cứ để kế toán xem xét ngoại lệ"></textarea>' +
+      '<small>Khoản này sẽ được chuyển kế toán xem xét, không tự động duyệt.</small>' +
+      '</div></div>';
     node.querySelector(".remove-expense").addEventListener("click", () => {
       if (itemsRoot.children.length === 1) return;
       node.remove();
@@ -71,12 +96,29 @@
     });
     node.querySelector(".item-amount").addEventListener("input", updateTotal);
     node.querySelector(".item-description").addEventListener("input", renderFileMapping);
+    node.querySelector(".item-evidence-status").addEventListener("change", (event) => {
+      const status = event.target.value;
+      node.querySelector(".alternative-evidence-fields").classList.toggle(
+        "hidden", status !== "ALTERNATIVE_EVIDENCE"
+      );
+      node.querySelector(".no-evidence-fields").classList.toggle(
+        "hidden", status !== "NO_EVIDENCE"
+      );
+      if (status === "NO_EVIDENCE") {
+        evidenceTargets.forEach((target, key) => {
+          if (target === id) evidenceTargets.delete(key);
+        });
+      }
+      renderFileMapping();
+    });
     itemsRoot.appendChild(node);
     renderFileMapping();
   }
 
   function itemOptions(selectedValue) {
-    return [...itemsRoot.querySelectorAll(".expense-row")].map((row) => {
+    return [...itemsRoot.querySelectorAll(".expense-row")].filter((row) => (
+      row.querySelector(".item-evidence-status").value !== "NO_EVIDENCE"
+    )).map((row) => {
       const description = row.querySelector(".item-description").value || "Chưa nhập nội dung";
       const selected = row.dataset.itemId === selectedValue ? " selected" : "";
       return '<option value="' + escapeHtml(row.dataset.itemId) + '"' + selected + ">" +
@@ -99,12 +141,16 @@
     mappingRoot.innerHTML = selectedEvidenceFiles.map((file, index) => {
       const key = fileKey(file);
       const previous = evidenceTargets.get(key) || "";
+      const targetControl = isPaperSubmission()
+        ? '<span class="automatic-match">Sẽ tự đối chiếu sau khi OCR đơn giấy</span>'
+        : '<select class="file-target" data-file-key="' + escapeHtml(key) +
+          '" data-filename="' + escapeHtml(file.name) +
+          '"><option value="">Chọn khoản chi liên quan</option>' +
+          itemOptions(previous) + '</select>';
       return '<div class="file-map-row"><div><strong>' + escapeHtml(file.name) +
         "</strong><small>" + (file.size / 1024).toFixed(1) +
-        ' KB</small></div><div class="file-map-actions"><select class="file-target" data-file-key="' +
-        escapeHtml(key) + '" data-filename="' + escapeHtml(file.name) +
-        '"><option value="">Chọn khoản chi liên quan</option>' +
-        itemOptions(previous) + '</select><button class="remove-file" type="button" data-file-index="' +
+        ' KB</small></div><div class="file-map-actions">' + targetControl +
+        '<button class="remove-file" type="button" data-file-index="' +
         index + '" aria-label="Bỏ chứng từ ' + escapeHtml(file.name) + '">×</button></div></div>';
     }).join("");
     mappingRoot.querySelectorAll(".file-target").forEach((select) => {
@@ -143,7 +189,7 @@
       evidenceByItem[target] ||= [];
       evidenceByItem[target].push(file.name);
     });
-    const expenseItems = [...itemsRoot.querySelectorAll(".expense-row")].map((row) => ({
+    const expenseItems = isPaperSubmission() ? [] : [...itemsRoot.querySelectorAll(".expense-row")].map((row) => ({
       item_id: row.dataset.itemId,
       category: row.querySelector(".item-category").value,
       description: row.querySelector(".item-description").value.trim(),
@@ -151,7 +197,18 @@
       claimed_amount: row.querySelector(".item-amount").value || "0",
       currency: "VND",
       evidence_names: evidenceByItem[row.dataset.itemId] || [],
-      policy_exception_code: row.querySelector(".item-exception").value.trim() || null,
+      evidence_status: row.querySelector(".item-evidence-status").value,
+      alternative_evidence_type:
+        row.querySelector(".item-evidence-status").value === "ALTERNATIVE_EVIDENCE"
+          ? row.querySelector(".item-alternative-type").value || null
+          : null,
+      evidence_exception_reason:
+        row.querySelector(".item-evidence-status").value === "ALTERNATIVE_EVIDENCE"
+          ? row.querySelector(".item-alternative-reason").value.trim() || null
+          : row.querySelector(".item-evidence-status").value === "NO_EVIDENCE"
+            ? row.querySelector(".item-no-evidence-reason").value.trim() || null
+            : null,
+      policy_exception_code: null,
     }));
     const settlementType = form.querySelector("[name=settlement_type]:checked").value;
     return {
@@ -171,10 +228,14 @@
         activity_start_date: value("activity_start_date"),
         activity_end_date: value("activity_end_date"),
       },
-      advance_id: settlementType === "ADVANCE_SETTLEMENT" ? value("advance_id") : null,
+      advance_id: null,
       allocated_advance_amount: settlementType === "ADVANCE_SETTLEMENT"
         ? document.querySelector("#allocated_advance_amount").value || "0"
         : "0",
+      beneficiary_name: value("beneficiary_name"),
+      bank_account_number: value("bank_account_number"),
+      bank_name: value("bank_name"),
+      paper_no_evidence_reason: null,
       currency: "VND",
       expense_items: expenseItems,
     };
@@ -212,10 +273,12 @@
   });
   form.querySelectorAll("[name=source_type]").forEach((input) => {
     input.addEventListener("change", () => {
-      document.querySelector("#paper-form-field").classList.toggle(
-        "hidden",
-        input.value !== "PAPER_SCAN" || !input.checked
-      );
+      if (!input.checked) return;
+      const paper = input.value === "PAPER_SCAN";
+      document.querySelector("#paper-form-field").classList.toggle("hidden", !paper);
+      document.querySelector("#digital-business-section").classList.toggle("hidden", paper);
+      document.querySelector("#digital-expenses-section").classList.toggle("hidden", paper);
+      renderFileMapping();
     });
   });
 
@@ -231,7 +294,30 @@
       if (Number(item.claimed_amount) <= 0) {
         localIssues.push(item.item_id + ": số tiền phải lớn hơn 0.");
       }
+      if (
+        ["ORIGINAL_EVIDENCE", "ALTERNATIVE_EVIDENCE"].includes(item.evidence_status) &&
+        !item.evidence_names.length
+      ) {
+        localIssues.push(item.item_id + ": chưa gắn file chứng từ đã khai báo.");
+      }
+      if (
+        item.evidence_status === "ALTERNATIVE_EVIDENCE" &&
+        (!item.alternative_evidence_type || !item.evidence_exception_reason)
+      ) {
+        localIssues.push(
+          item.item_id + ": hãy chọn loại bằng chứng thay thế và nhập lý do không có chứng từ gốc."
+        );
+      }
+      if (
+        item.evidence_status === "NO_EVIDENCE" &&
+        !item.evidence_exception_reason
+      ) {
+        localIssues.push(item.item_id + ": hãy nhập lý do không có chứng từ.");
+      }
     });
+    if (isPaperSubmission() && !document.querySelector("#settlement_form_file").files[0]) {
+      localIssues.push("Đơn giấy phải có file giấy đề nghị hoàn ứng/quyết toán.");
+    }
     if (localIssues.length) {
       showErrors(localIssues);
       return;

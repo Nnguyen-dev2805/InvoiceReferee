@@ -1,0 +1,113 @@
+{
+  "schema_version": "2.0",
+  "case_id": "TC16",
+  "title": "Hợp lệ ba hóa đơn trong một báo cáo công tác",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_khach_san.pdf",
+      "hoa_don_ve_may_bay.pdf",
+      "hoa_don_taxi.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "AUTO_PROCESS",
+    "uncertainty_type": "NONE",
+    "primary_rule": null,
+    "findings": [
+      "SET_MULTI_EVIDENCE_MATCH_001",
+      "SET_PAPER_TOTAL_001",
+      "SET_SETTLEMENT_DIFF_001"
+    ],
+    "followup": "PENDING_APPROVAL"
+  },
+  "implementation_status": "GAP_EXPECTED",
+  "accounting_facts": {
+    "report_lines": [
+      {
+        "line_id": "L01",
+        "description": "Phòng nghỉ công tác",
+        "invoice_ref": "00001601",
+        "amount": "4320000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L02",
+        "description": "Vé máy bay khứ hồi",
+        "invoice_ref": "00001602",
+        "amount": "5400000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L03",
+        "description": "Taxi sân bay",
+        "invoice_ref": "00001603",
+        "amount": "540000",
+        "note": "Đính kèm hóa đơn"
+      }
+    ],
+    "report_line_sum": "10260000",
+    "report_total": "10260000",
+    "advance_amount": "12000000",
+    "declared_difference": "1740000",
+    "evidence": [
+      {
+        "evidence_id": "EV01",
+        "file": "hoa_don_khach_san.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00001601",
+        "description": "Phòng nghỉ công tác",
+        "amount": "4320000"
+      },
+      {
+        "evidence_id": "EV02",
+        "file": "hoa_don_ve_may_bay.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00001602",
+        "description": "Vé máy bay khứ hồi",
+        "amount": "5400000"
+      },
+      {
+        "evidence_id": "EV03",
+        "file": "hoa_don_taxi.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00001603",
+        "description": "Dịch vụ taxi sân bay",
+        "amount": "540000"
+      }
+    ]
+  },
+  "line_support_expectations": [
+    {
+      "report_line_id": "L01",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_khach_san.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Số hóa đơn, nội dung và số tiền khớp."
+    },
+    {
+      "report_line_id": "L02",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_ve_may_bay.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Số hóa đơn, nội dung và số tiền khớp."
+    },
+    {
+      "report_line_id": "L03",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_taxi.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Số hóa đơn, nội dung và số tiền khớp."
+    }
+  ],
+  "rationale": "Ba dòng được ghép một-một với ba hóa đơn; tổng hồ sơ 10.260.000 VND."
+}

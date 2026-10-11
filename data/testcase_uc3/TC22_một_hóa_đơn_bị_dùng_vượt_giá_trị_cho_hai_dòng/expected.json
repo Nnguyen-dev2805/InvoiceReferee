@@ -1,0 +1,103 @@
+{
+  "schema_version": "2.0",
+  "case_id": "TC22",
+  "title": "Một hóa đơn bị dùng vượt giá trị cho hai dòng",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_thiet_bi.pdf",
+      "hoa_don_van_chuyen.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "uncertainty_type": "FACTUAL_UNKNOWN",
+    "primary_rule": "SET_EVIDENCE_REUSE_001",
+    "findings": [
+      "SET_EVIDENCE_REUSE_001",
+      "SET_PAPER_AMOUNT_001"
+    ],
+    "followup": null
+  },
+  "implementation_status": "GAP_EXPECTED",
+  "accounting_facts": {
+    "report_lines": [
+      {
+        "line_id": "L01",
+        "description": "Mua thiết bị mạng",
+        "invoice_ref": "00002201",
+        "amount": "5400000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L02",
+        "description": "Nhân công lắp đặt",
+        "invoice_ref": "00002201",
+        "amount": "2160000",
+        "note": "Dùng chung hóa đơn 00002201"
+      },
+      {
+        "line_id": "L03",
+        "description": "Vận chuyển",
+        "invoice_ref": "00002202",
+        "amount": "540000",
+        "note": "Đính kèm hóa đơn"
+      }
+    ],
+    "report_line_sum": "8100000",
+    "report_total": "8100000",
+    "advance_amount": "9000000",
+    "declared_difference": "900000",
+    "evidence": [
+      {
+        "evidence_id": "EV01",
+        "file": "hoa_don_thiet_bi.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00002201",
+        "description": "Thiết bị mạng văn phòng",
+        "amount": "5400000"
+      },
+      {
+        "evidence_id": "EV02",
+        "file": "hoa_don_van_chuyen.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00002202",
+        "description": "Vận chuyển thiết bị",
+        "amount": "540000"
+      }
+    ]
+  },
+  "line_support_expectations": [
+    {
+      "report_line_id": "L01",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_thiet_bi.pdf"
+      ],
+      "match_status": "CONFLICT",
+      "reason": "Riêng dòng này bằng toàn bộ giá trị hóa đơn 00002201."
+    },
+    {
+      "report_line_id": "L02",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_thiet_bi.pdf"
+      ],
+      "match_status": "CONFLICT",
+      "reason": "Tái sử dụng hóa đơn 00002201 làm tổng phân bổ vượt giá trị hóa đơn."
+    },
+    {
+      "report_line_id": "L03",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_van_chuyen.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn vận chuyển khớp."
+    }
+  ],
+  "rationale": "Hóa đơn 00002201 có tổng 5.400.000 VND nhưng hai dòng cùng tham chiếu với tổng 7.560.000 VND."
+}

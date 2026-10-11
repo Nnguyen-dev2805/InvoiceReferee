@@ -35,7 +35,7 @@ Canonical JSON trong database hoặc case store là nguồn dữ liệu cho poli
 - AI không được tuyên bố chữ ký tay là thật hoặc đúng danh tính.
 - `VERIFIED` chỉ dành cho chữ ký số đã được công cụ chuyên dụng kiểm tra chứng thư và hash tài liệu.
 - MVP mô phỏng phê duyệt, chưa tích hợp nhà cung cấp chữ ký số. UI và tài liệu phải ghi rõ `SIMULATED_APPROVAL`.
-- Đơn giấy thiếu bất kỳ chữ ký bắt buộc nào được trả `REQUEST_INFO`; nhân viên bổ sung và tải lên phiên bản mới. MVP không trộn chữ ký tay và phê duyệt điện tử trên cùng một phiên bản tài liệu.
+- Chỉ chữ ký/approval được policy yêu cầu phải có trước thời điểm nộp (ví dụ chữ ký người đề nghị) mới tạo `REQUEST_INFO` khi thiếu hoặc không rõ. Chữ ký của kế toán, kế toán trưởng hoặc giám đốc thuộc các bước sau kiểm tra được ghi `PENDING_APPROVAL`, không phải lỗi hồ sơ. MVP không trộn chữ ký tay và phê duyệt điện tử trên cùng một phiên bản tài liệu.
 
 ### 2.3. Profile và policy giả lập
 
@@ -201,7 +201,8 @@ Nhân viên -> Phụ trách bộ phận -> Kế toán trưởng -> Giám đốc
 | --- | --- |
 | Thiếu mục đích, số tiền hoặc hạn hoàn ứng | `REQUEST_INFO / FACTUAL_UNKNOWN`. |
 | Số bằng chữ khác số bằng số | `REQUEST_INFO / FACTUAL_UNKNOWN`. |
-| Đơn giấy thiếu hoặc mờ chữ ký bắt buộc | `REQUEST_INFO / FACTUAL_UNKNOWN`; tải lại phiên bản mới. |
+| Thiếu hoặc mờ chữ ký bắt buộc phải có trước khi nộp | `REQUEST_INFO / FACTUAL_UNKNOWN`; tải lại phiên bản mới. |
+| Chưa có chữ ký của vai trò phê duyệt ở bước sau | `PENDING_APPROVAL`; hồ sơ tiếp tục đến đúng vai trò, không coi là failure. |
 | Vượt hạn mức | `ESCALATE / BEYOND_AUTHORITY`. |
 | Mục đích thuộc danh mục cấm | `ESCALATE / OUTSIDE_POLICY`. |
 | Có tạm ứng cũ quá hạn | Chặn hoặc `ESCALATE` theo `PolicyConfig`. |
@@ -238,6 +239,17 @@ Chi tiết triển khai: [uc02_advance_request_plan.md](uc02_advance_request_pla
 - `advance_id` đối với `ADVANCE_SETTLEMENT`.
 - Business context: mục đích, công việc/chuyến công tác, project/client khi policy yêu cầu.
 
+Với form điện tử, mỗi khoản chi phải khai một trạng thái evidence:
+
+| Trạng thái | Dữ liệu bắt buộc | Xử lý |
+| --- | --- | --- |
+| `ORIGINAL_EVIDENCE` | Ít nhất một hóa đơn, bill, vé hoặc chứng từ gốc được gắn đúng khoản. | OCR, trích xuất và đối chiếu bình thường. |
+| `ALTERNATIVE_EVIDENCE` | File bằng chứng thay thế, loại tài liệu và lý do không có chứng từ gốc. | OCR và đối chiếu số tiền; chuyển kế toán xác nhận tính chấp nhận được. |
+| `NO_EVIDENCE` | Lý do cụ thể; không yêu cầu file. | Không tự động pass; chuyển kế toán xem xét ngoại lệ. |
+
+`policy_exception_code` là mã nội bộ do hệ thống/policy sinh ra, không phải dữ
+liệu nhân viên phải biết hoặc nhập trên giao diện.
+
 ## 6.4. Luồng chính
 
 1. Nhân viên chọn UC-03, subtype và kênh đầu vào.
@@ -250,6 +262,19 @@ Chi tiết triển khai: [uc02_advance_request_plan.md](uc02_advance_request_pla
 8. Decision Guard áp dụng invariant Track A và tạo action.
 9. Tab Kế toán hiển thị bảng khoản chi, evidence, số tiền khai báo/chứng từ/đề xuất, findings và câu hỏi.
 10. Sau khi con người xác nhận, hệ thống mới lưu `approved_amount` và tính số phải trả/thu hồi.
+
+### 6.4.1. Nhánh xử lý đơn giấy có bảng chi phí
+
+1. Nhân viên tải đúng một giấy đề nghị hoàn ứng/quyết toán và toàn bộ evidence hiện có; chưa phải khai lại từng dòng trên giao diện.
+2. OCR và Confidence Gate chạy độc lập cho đơn chính và từng evidence. Một trường kế toán quan trọng chưa rõ sẽ dừng hồ sơ ở `REQUEST_INFO` trước khi đối chiếu.
+3. Extraction Agent đọc bảng trên đơn thành các dòng chi phí, giữ số hóa đơn/chứng từ, số tiền, ghi chú và tham chiếu nguồn.
+4. Mỗi dòng ghi số hóa đơn, “đính kèm bảng kê”, “kèm chứng từ” hoặc nội dung tương đương được đánh dấu `requires_evidence=true`.
+5. Hệ thống ghép evidence theo thứ tự: số chứng từ trùng chính xác; số tiền và nội dung; bằng chứng thay thế như giao dịch thanh toán. Ghép chưa đủ chắc chắn không được tự xác nhận.
+6. Một dòng có thể ghép nhiều evidence và một evidence chỉ được cộng một lần. Python dùng `Decimal` để so tổng evidence với số tiền trên dòng.
+7. OCR đọc cột ghi chú theo từng dòng. “Đính kèm bảng kê/thống kê” làm phát sinh yêu cầu ghép evidence; “không có chứng từ” hoặc giải thích tương đương được lưu thành ngoại lệ của chính dòng đó và chuyển kế toán xác nhận.
+8. Evidence không ghép được với dòng nào cũng tạo finding riêng để kế toán xác nhận, thay vì bị bỏ qua.
+9. Tab Kế toán hiển thị từng dòng OCR, evidence đã ghép, phương pháp/độ mạnh của phép ghép, chênh lệch tiền và file gốc làm dẫn chứng.
+10. Chữ ký tay là tín hiệu hình ảnh trong MVP; kế toán vẫn phải xác nhận trực tiếp trước khi hồ sơ được coi là đủ điều kiện phê duyệt.
 
 ## 6.5. Công thức
 
@@ -270,6 +295,13 @@ Với `EMPLOYEE_REIMBURSEMENT`, `A = 0` và công ty hoàn trả `E` sau khi đ�
 | Tình huống | Kết quả |
 | --- | --- |
 | Thiếu chứng từ cho khoản bắt buộc có evidence | `REQUEST_INFO / FACTUAL_UNKNOWN`. |
+| Form chọn chứng từ gốc/thay thế nhưng chưa gắn file | Không cho gửi; yêu cầu gắn file đúng khoản. |
+| Có bằng chứng thay thế và giải trình đầy đủ | `ESCALATE / OUTSIDE_POLICY`; kế toán quyết định có chấp nhận hay không. |
+| Không có chứng từ nhưng có lý do | `ESCALATE / OUTSIDE_POLICY`; không tự động duyệt ngoại lệ. |
+| Ghi chú yêu cầu đính kèm nhưng không tìm thấy evidence tương ứng | `REQUEST_INFO / FACTUAL_UNKNOWN`; yêu cầu bổ sung đúng dòng. |
+| Ghi chú trên đơn xác nhận không có chứng từ | `ESCALATE / OUTSIDE_POLICY`; kế toán xem xét ngoại lệ theo dòng. |
+| Có lý do thiếu chứng từ gắn đúng dòng | `ESCALATE / OUTSIDE_POLICY`; kế toán quyết định ngoại lệ, Agent không tự duyệt. |
+| Evidence chỉ khớp một phần hoặc khớp nhiều dòng | `REQUEST_INFO / FACTUAL_UNKNOWN`; kế toán xác nhận liên kết. |
 | Số tiền/ngày/số hóa đơn quan trọng không rõ | `REQUEST_INFO / FACTUAL_UNKNOWN` với câu hỏi cụ thể. |
 | Bảng kê khác chứng từ nhưng chưa xác định giá trị đúng | `REQUEST_INFO / FACTUAL_UNKNOWN`. |
 | Duplicate chính xác | `ESCALATE / OUTSIDE_POLICY`; không tính lặp. |

@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "case_id": "TC09",
+  "title": "Mã số thuế người mua thuộc công ty khác",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_dien_tu.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "ESCALATE",
+    "uncertainty_type": "OUTSIDE_POLICY",
+    "primary_rule": "SET_BUYER_TAX_001",
+    "findings": [
+      "SET_BUYER_TAX_001"
+    ],
+    "followup": null
+  },
+  "implementation_status": "GAP_EXPECTED",
+  "accounting_facts": {
+    "report_line_sum": "3240000",
+    "report_total": "3240000",
+    "advance_amount": "4000000",
+    "declared_difference": "760000",
+    "invoice_subtotal": "3000000",
+    "invoice_tax": "240000",
+    "invoice_total": "3240000",
+    "buyer_tax_code": "7777777777",
+    "expected_company_tax_code": "0319999996"
+  },
+  "rationale": "MST người mua là 7777777777, khác MST đã cấu hình của công ty 0319999996."
+}

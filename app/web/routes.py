@@ -3,15 +3,26 @@
 from __future__ import annotations
 
 import json
+from io import BytesIO
 from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 
 from app.web.runtime import WebRuntime
+from invoice_referee.application.settlement_summary import (
+    build_settlement_business_summary,
+    build_settlement_success_reason,
+)
 from invoice_referee.domain import (
     SettlementDocumentRole,
     SettlementDraft,
@@ -21,6 +32,8 @@ from invoice_referee.domain import (
 from invoice_referee.extraction import (
     DEFAULT_WORD_REVIEW_THRESHOLD,
 )
+
+from app.web.ocr_preview import render_ocr_block_preview
 
 
 def _runtime(request: Request) -> WebRuntime:
@@ -35,16 +48,43 @@ RULE_LABELS = {
     "SET_CONTEXT_001": "Mục đích công việc",
     "SET_INPUT_001": "Hồ sơ đề nghị",
     "SET_ADV_001": "Thông tin tạm ứng",
+    "SET_ADV_AMOUNT_001": "Số tiền tạm ứng",
+    "SET_SETTLEMENT_DIFF_001": "Chênh lệch quyết toán",
     "SET_DOC_001": "Chứng từ khoản chi",
     "SET_QUALITY_001": "Chất lượng chứng từ",
     "SET_EXTRACTION_001": "Đọc dữ liệu chứng từ",
+    "SET_DOCUMENT_CLASSIFICATION_001": "Phân loại chứng từ",
+    "SET_DOCUMENT_REQUIRED_FIELDS_001": "Trường bắt buộc của chứng từ",
+    "SET_DOCUMENT_VALIDITY_001": "Tính hợp lệ của chứng từ",
+    "SET_DOCUMENT_CONSISTENCY_001": "Nhất quán dữ liệu chứng từ",
+    "SET_BUYER_IDENTITY_001": "Đơn vị mua trên hóa đơn",
+    "SET_PAPER_FORM_VALIDITY_001": "Dữ liệu đơn giấy",
     "SET_TOTAL_001": "Đối chiếu số tiền",
     "SET_SIGNATURE_001": "Xác nhận chữ ký",
+    "SET_APPROVAL_001": "Phê duyệt hồ sơ",
     "SET_CATEGORY_001": "Danh mục chi phí",
     "SET_LIMIT_001": "Hạn mức danh mục",
     "SET_DEADLINE_001": "Thời hạn nộp",
     "SET_AUTH_001": "Thẩm quyền phê duyệt",
-    "SET_DUP_001": "Trùng chứng từ",
+    "SET_PAPER_LINES_001": "Trích xuất dòng chi",
+    "SET_PAPER_MATCH_001": "Ghép evidence với khoản chi",
+    "SET_PAPER_EVIDENCE_REQUIRED": "Evidence bắt buộc",
+    "SET_PAPER_EVIDENCE_EXCEPTION": "Ngoại lệ thiếu evidence",
+    "SET_PAPER_AMOUNT_001": "Đối chiếu tổng evidence",
+    "SET_PAPER_LINE_AMOUNT_001": "Số tiền từng dòng",
+    "SET_PAPER_TOTAL_001": "Tổng bảng chi phí",
+    "SET_PAPER_CONSISTENCY_001": "Nhất quán nội dung đơn giấy",
+    "SET_PAPER_UNMATCHED_001": "Evidence chưa xác định",
+    "SET_ALT_EVIDENCE_001": "Bằng chứng thay thế",
+    "SET_NO_EVIDENCE_001": "Khoản không có chứng từ",
+}
+
+FINDING_STATUS_LABELS = {
+    "ERROR": "Lỗi xử lý",
+    "FAIL": "Chưa đáp ứng",
+    "WARN": "Cần lưu ý",
+    "PASS": "Đã đáp ứng",
+    "PENDING_APPROVAL": "Chờ phê duyệt",
 }
 
 
@@ -180,6 +220,9 @@ def _ocr_block_index(
                     "block_id": block_id,
                     "excerpt": content.strip(),
                     "annotation_style": annotation_style,
+                    "bounding_box": box,
+                    "page_width": page_width,
+                    "page_height": page_height,
                     "low_words": low_words,
                 }
     return index
@@ -191,6 +234,8 @@ def _decorate_accounting_case(
 ) -> dict[str, Any]:
     """Resolve stored source references into links suitable for audit review."""
 
+    case["business_summary"] = build_settlement_business_summary(case)
+
     documents_by_id: dict[str, dict[str, Any]] = {}
     for document in case["documents"]:
         document["url"] = (
@@ -199,6 +244,16 @@ def _decorate_accounting_case(
         )
         document["preview_kind"] = _document_preview_kind(
             document["mime_type"], document["original_name"]
+        )
+        artifact_loader = getattr(repository, "load_json_artifact", None)
+        document["validity"] = (
+            artifact_loader(
+                case["case_id"],
+                document["document_id"],
+                "validity",
+            )
+            if artifact_loader is not None
+            else None
         )
         documents_by_id[document["document_id"]] = document
 
@@ -238,6 +293,14 @@ def _decorate_accounting_case(
             for document in case["evidence_documents"]
             if document["linked_item_id"] == item["item_id"]
         ]
+        item["document_matches"] = [
+            {
+                **link,
+                "document": documents_by_id.get(link["document_id"]),
+            }
+            for link in case.get("document_links", [])
+            if link["item_id"] == item["item_id"]
+        ]
 
     def resolve(source_ref: str) -> dict[str, Any]:
         if source_ref.startswith("FORM:EXPENSE_ITEM:"):
@@ -270,6 +333,11 @@ def _decorate_accounting_case(
             block = block_index.get(f"{document_id}:{location}")
             if block:
                 resolved.update(block)
+                resolved["ocr_preview_url"] = (
+                    f"/api/v1/cases/{case['case_id']}/documents/{document_id}/"
+                    f"ocr-preview?page_index={block['page_index']}"
+                    f"&block_id={block['block_id']}"
+                )
             return resolved
         return {
             "kind": "reference",
@@ -281,6 +349,9 @@ def _decorate_accounting_case(
         finding["rule_label"] = RULE_LABELS.get(
             finding["rule_id"], finding["rule_id"]
         )
+        finding["status_label"] = FINDING_STATUS_LABELS.get(
+            finding["status"], finding["status"]
+        )
         finding["evidence_refs"] = [
             resolve(source_ref) for source_ref in finding["source_refs"]
         ]
@@ -291,13 +362,24 @@ def _decorate_accounting_case(
         ]
     attention_order = {"ERROR": 0, "FAIL": 1, "WARN": 2}
     case["attention_findings"] = sorted(
-        [finding for finding in case["findings"] if finding["status"] != "PASS"],
+        [
+            finding
+            for finding in case["findings"]
+            if finding["status"] not in {"PASS", "PENDING_APPROVAL"}
+        ],
         key=lambda finding: attention_order.get(finding["status"], 3),
     )
+    case["pending_approval_findings"] = [
+        finding
+        for finding in case["findings"]
+        if finding["status"] == "PENDING_APPROVAL"
+    ]
     case["passed_findings"] = [
         finding for finding in case["findings"] if finding["status"] == "PASS"
     ]
     if case["decision"]:
+        if case["decision"].get("automation_decision") == "AUTO_PROCESS":
+            case["decision"]["reason"] = build_settlement_success_reason(case)
         case["decision"]["evidence_refs"] = [
             resolve(source_ref)
             for source_ref in case["decision"]["source_refs"]
@@ -357,13 +439,18 @@ def build_router(templates_root: Path) -> APIRouter:
     ) -> HTMLResponse:
         repository = _runtime(request).repository
         all_cases = repository.list_cases()
-        cases = (
-            repository.list_cases(decision=decision)
-            if decision
-            else all_cases
-        )
+        for case in all_cases:
+            if case["automation_decision"] == "AUTO_PROCESS":
+                case["decision_reason"] = build_settlement_success_reason(case)
+        cases = [
+            case
+            for case in all_cases
+            if decision is None or case["automation_decision"] == decision
+        ]
         counts = {
-            key: len(repository.list_cases(decision=key))
+            key: len(
+                [case for case in all_cases if case["automation_decision"] == key]
+            )
             for key in ("AUTO_PROCESS", "REQUEST_INFO", "ESCALATE")
         }
         counts["PROCESSING"] = len(
@@ -562,6 +649,47 @@ def build_router(templates_root: Path) -> APIRouter:
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return FileResponse(path)
+
+    @router.get(
+        "/api/v1/cases/{case_id}/documents/{document_id}/ocr-preview"
+    )
+    def get_document_ocr_preview(
+        request: Request,
+        case_id: str,
+        document_id: str,
+        page_index: int,
+        block_id: str,
+    ) -> StreamingResponse:
+        repository = _runtime(request).repository
+        try:
+            case = repository.get_case(case_id)
+            document = next(
+                item
+                for item in case["documents"]
+                if item["document_id"] == document_id
+            )
+            block = _ocr_block_index(
+                repository,
+                case_id,
+                [document],
+                {f"{document_id}:{block_id}"},
+            ).get(f"{document_id}:{block_id}")
+            if block is None or block["page_index"] != page_index:
+                raise FileNotFoundError("Không tìm thấy vùng OCR cần kiểm tra.")
+            image = render_ocr_block_preview(
+                repository.document_path(case_id, document_id),
+                page_index=page_index,
+                bounding_box=block["bounding_box"],
+                ocr_width=float(block["page_width"]),
+                ocr_height=float(block["page_height"]),
+            )
+        except (FileNotFoundError, StopIteration, TypeError, ValueError) as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        output = BytesIO()
+        image.save(output, format="PNG", optimize=True)
+        output.seek(0)
+        return StreamingResponse(output, media_type="image/png")
 
     @router.post("/internal/process-next", include_in_schema=False)
     def process_next(request: Request) -> dict[str, bool]:

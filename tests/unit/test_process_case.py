@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Callable
 
 from invoice_referee.application import CaseProcessingService
+from invoice_referee.application.process_case import SETTLEMENT_BLOCKING_FIELDS
 from invoice_referee.domain import (
     BlockAssessment,
     ClaimDraft,
@@ -606,6 +607,59 @@ def test_unclear_tax_rate_with_clear_zero_tax_does_not_block_inventory() -> None
     assert assessment.review_action == "ASK_HUMAN"
     assert assessment.semantic_category is None
     assert assessment.human_question is not None
+    assert findings[0].rule_id == "OCR_NON_BLOCKING_QUALITY_WARNING"
+    assert findings[0].status == "WARN"
+
+
+def test_unclear_item_name_is_warning_not_blocking() -> None:
+    candidate = {
+        "candidate_id": "EV-001:page-0-block-3",
+        "source_file": "hoa_don_ve_may_bay.pdf",
+        "content": "Vẻ máy bay khứ hồi",
+    }
+    assessment = BlockAssessment(
+        candidate_id=candidate["candidate_id"],
+        importance="CRITICAL",
+        quality_state="UNCERTAIN",
+        review_action="ASK_HUMAN",
+        requires_verification=True,
+        canonical_fields=["item_name"],
+        observed_text="Vẻ máy bay khứ hồi",
+        reason="Một ký tự trong tên dịch vụ chưa chắc chắn.",
+        human_question="Vui lòng xác nhận tên dịch vụ.",
+    )
+
+    findings = CaseProcessingService._confidence_findings(
+        [candidate],
+        ConfidenceAnalysis(block_assessments=[assessment]),
+        blocking_fields=SETTLEMENT_BLOCKING_FIELDS,
+    )
+
+    assert findings[0].rule_id == "OCR_NON_BLOCKING_QUALITY_WARNING"
+    assert findings[0].status == "WARN"
+
+
+def test_non_critical_unknown_field_never_blocks() -> None:
+    candidate = {
+        "candidate_id": "EV-001:page-0-block-9",
+        "source_file": "bill.pdf",
+        "content": "Chúc quý khách một ngày tốt lành",
+    }
+    assessment = BlockAssessment(
+        candidate_id=candidate["candidate_id"],
+        importance="NON_CRITICAL",
+        quality_state="UNREADABLE",
+        review_action="ASK_HUMAN",
+        requires_verification=True,
+        canonical_fields=[],
+        reason="Nội dung chân trang không đọc được.",
+    )
+
+    findings = CaseProcessingService._confidence_findings(
+        [candidate],
+        ConfidenceAnalysis(block_assessments=[assessment]),
+    )
+
     assert findings[0].rule_id == "OCR_NON_BLOCKING_QUALITY_WARNING"
     assert findings[0].status == "WARN"
 

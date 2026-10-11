@@ -55,6 +55,10 @@ CREATE TABLE IF NOT EXISTS settlement_cases (
     activity_end_date TEXT,
     advance_id TEXT,
     allocated_advance_amount TEXT NOT NULL,
+    beneficiary_name TEXT,
+    bank_account_number TEXT,
+    bank_name TEXT,
+    paper_no_evidence_reason TEXT,
     claimed_total TEXT NOT NULL,
     currency TEXT NOT NULL,
     workflow_status TEXT NOT NULL,
@@ -76,6 +80,9 @@ CREATE TABLE IF NOT EXISTS expense_items (
     expense_date TEXT,
     claimed_amount TEXT NOT NULL,
     currency TEXT NOT NULL,
+    evidence_status TEXT NOT NULL DEFAULT 'ORIGINAL_EVIDENCE',
+    alternative_evidence_type TEXT,
+    evidence_exception_reason TEXT,
     policy_exception_code TEXT,
     PRIMARY KEY (case_id, item_id)
 );
@@ -92,6 +99,18 @@ CREATE TABLE IF NOT EXISTS settlement_documents (
     sha256 TEXT NOT NULL,
     relative_path TEXT NOT NULL,
     created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS expense_item_documents (
+    case_id TEXT NOT NULL REFERENCES settlement_cases(case_id) ON DELETE CASCADE,
+    item_id TEXT NOT NULL,
+    document_id TEXT NOT NULL REFERENCES settlement_documents(document_id) ON DELETE CASCADE,
+    link_status TEXT NOT NULL,
+    link_method TEXT NOT NULL,
+    score REAL NOT NULL,
+    explanation TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (case_id, item_id, document_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_settlement_documents_sha
@@ -195,10 +214,68 @@ class SQLiteSettlementRepository:
     def _initialize(self) -> None:
         with self._connect() as connection:
             connection.executescript(SCHEMA_SQL)
+            case_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(settlement_cases)")
+            }
+            if "paper_no_evidence_reason" not in case_columns:
+                connection.execute(
+                    "ALTER TABLE settlement_cases "
+                    "ADD COLUMN paper_no_evidence_reason TEXT"
+                )
+            for column_name in (
+                "beneficiary_name",
+                "bank_account_number",
+                "bank_name",
+            ):
+                if column_name not in case_columns:
+                    connection.execute(
+                        f"ALTER TABLE settlement_cases ADD COLUMN {column_name} TEXT"
+                    )
+            item_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(expense_items)")
+            }
+            if "evidence_status" not in item_columns:
+                connection.execute(
+                    "ALTER TABLE expense_items ADD COLUMN evidence_status TEXT "
+                    "NOT NULL DEFAULT 'ORIGINAL_EVIDENCE'"
+                )
+            if "alternative_evidence_type" not in item_columns:
+                connection.execute(
+                    "ALTER TABLE expense_items "
+                    "ADD COLUMN alternative_evidence_type TEXT"
+                )
+            if "evidence_exception_reason" not in item_columns:
+                connection.execute(
+                    "ALTER TABLE expense_items "
+                    "ADD COLUMN evidence_exception_reason TEXT"
+                )
             connection.execute(
                 """
                 INSERT OR IGNORE INTO schema_migrations(version, applied_at)
                 VALUES (1, ?)
+                """,
+                (self.clock().isoformat(),),
+            )
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO schema_migrations(version, applied_at)
+                VALUES (2, ?)
+                """,
+                (self.clock().isoformat(),),
+            )
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO schema_migrations(version, applied_at)
+                VALUES (3, ?)
+                """,
+                (self.clock().isoformat(),),
+            )
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO schema_migrations(version, applied_at)
+                VALUES (4, ?)
                 """,
                 (self.clock().isoformat(),),
             )
@@ -308,11 +385,13 @@ class SQLiteSettlementRepository:
                         case_id, settlement_type, source_type, employee_id,
                         employee_name, department, position, purpose, project_code,
                         client_name, activity_start_date, activity_end_date,
-                        advance_id, allocated_advance_amount, claimed_total, currency,
+                        advance_id, allocated_advance_amount,
+                        beneficiary_name, bank_account_number, bank_name,
+                        paper_no_evidence_reason, claimed_total, currency,
                         workflow_status, processing_status, submitted_at, updated_at,
                         policy_id, policy_version
                     ) VALUES (
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                         'ACTIVE', 'PENDING', ?, ?, ?, ?
                     )
                     """,
@@ -339,6 +418,10 @@ class SQLiteSettlementRepository:
                         ),
                         draft.advance_id,
                         str(draft.allocated_advance_amount),
+                        draft.beneficiary_name,
+                        draft.bank_account_number,
+                        draft.bank_name,
+                        draft.paper_no_evidence_reason,
                         str(draft.claimed_total),
                         draft.currency,
                         submitted_at,
@@ -351,8 +434,10 @@ class SQLiteSettlementRepository:
                     """
                     INSERT INTO expense_items(
                         item_id, case_id, category, description, expense_date,
-                        claimed_amount, currency, policy_exception_code
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        claimed_amount, currency, evidence_status,
+                        alternative_evidence_type, evidence_exception_reason,
+                        policy_exception_code
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     [
                         (
@@ -363,6 +448,13 @@ class SQLiteSettlementRepository:
                             item.expense_date.isoformat() if item.expense_date else None,
                             str(item.claimed_amount),
                             item.currency,
+                            item.evidence_status.value,
+                            (
+                                item.alternative_evidence_type.value
+                                if item.alternative_evidence_type
+                                else None
+                            ),
+                            item.evidence_exception_reason,
                             item.policy_exception_code,
                         )
                         for item in draft.expense_items
@@ -770,7 +862,9 @@ class SQLiteSettlementRepository:
     def list_cases(self, decision: str | None = None) -> list[dict[str, Any]]:
         query = """
             SELECT case_id, settlement_type, source_type, employee_name,
-                   department, purpose, claimed_total, currency, workflow_status,
+                   department, purpose, claimed_total, allocated_advance_amount,
+                   beneficiary_name, bank_account_number, bank_name,
+                   currency, workflow_status,
                    processing_status, automation_decision, uncertainty_type,
                    primary_finding_code, submitted_at,
                    CASE WHEN automation_decision IS NOT NULL THEN (
@@ -818,6 +912,17 @@ class SQLiteSettlementRepository:
                     SELECT * FROM settlement_documents
                     WHERE case_id = ?
                     ORDER BY created_at, document_id
+                    """,
+                    (case_id,),
+                ).fetchall()
+            ]
+            result["document_links"] = [
+                dict(row)
+                for row in connection.execute(
+                    """
+                    SELECT * FROM expense_item_documents
+                    WHERE case_id = ?
+                    ORDER BY item_id, score DESC, document_id
                     """,
                     (case_id,),
                 ).fetchall()
@@ -875,6 +980,126 @@ class SQLiteSettlementRepository:
                 ).fetchall()
             ]
             return result
+
+    def replace_paper_items(
+        self,
+        case_id: str,
+        *,
+        purpose: str | None,
+        items: list[dict[str, Any]],
+        links: list[dict[str, Any]],
+        claimed_total: str,
+        allocated_advance_amount: str | None = None,
+        beneficiary_name: str | None = None,
+        bank_account_number: str | None = None,
+        bank_name: str | None = None,
+    ) -> None:
+        """Persist OCR-derived paper lines and their explainable document links."""
+
+        occurred_at = self.clock().isoformat()
+        with self._connect() as connection:
+            exists = connection.execute(
+                "SELECT 1 FROM settlement_cases WHERE case_id = ?",
+                (case_id,),
+            ).fetchone()
+            if exists is None:
+                raise FileNotFoundError(f"Không tìm thấy hồ sơ: {case_id}")
+            connection.execute(
+                "DELETE FROM expense_item_documents WHERE case_id = ?",
+                (case_id,),
+            )
+            connection.execute(
+                "DELETE FROM expense_items WHERE case_id = ?",
+                (case_id,),
+            )
+            connection.executemany(
+                """
+                INSERT INTO expense_items(
+                    item_id, case_id, category, description, expense_date,
+                    claimed_amount, currency, evidence_status,
+                    alternative_evidence_type, evidence_exception_reason,
+                    policy_exception_code
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        item["item_id"],
+                        case_id,
+                        item.get("category", "OTHER"),
+                        item["description"],
+                        item.get("expense_date"),
+                        str(item["claimed_amount"]),
+                        item.get("currency", "VND"),
+                        item.get("evidence_status", "ORIGINAL_EVIDENCE"),
+                        item.get("alternative_evidence_type"),
+                        item.get("evidence_exception_reason"),
+                        item.get("policy_exception_code"),
+                    )
+                    for item in items
+                ],
+            )
+            connection.executemany(
+                """
+                INSERT INTO expense_item_documents(
+                    case_id, item_id, document_id, link_status, link_method,
+                    score, explanation, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        case_id,
+                        link["item_id"],
+                        link["document_id"],
+                        link["link_status"],
+                        link["link_method"],
+                        float(link["score"]),
+                        link["explanation"],
+                        occurred_at,
+                    )
+                    for link in links
+                ],
+            )
+            connection.execute(
+                "UPDATE settlement_documents SET linked_item_id = NULL "
+                "WHERE case_id = ? AND role = 'EXPENSE_EVIDENCE'",
+                (case_id,),
+            )
+            for link in links:
+                if link["link_status"] != "AUTO_LINK":
+                    continue
+                connection.execute(
+                    """
+                    UPDATE settlement_documents
+                    SET linked_item_id = ?
+                    WHERE case_id = ? AND document_id = ?
+                      AND linked_item_id IS NULL
+                    """,
+                    (link["item_id"], case_id, link["document_id"]),
+                )
+            connection.execute(
+                """
+                UPDATE settlement_cases
+                SET purpose = CASE WHEN ? <> '' THEN ? ELSE purpose END,
+                    claimed_total = ?,
+                    allocated_advance_amount = COALESCE(?, allocated_advance_amount),
+                    beneficiary_name = COALESCE(?, beneficiary_name),
+                    bank_account_number = COALESCE(?, bank_account_number),
+                    bank_name = COALESCE(?, bank_name),
+                    updated_at = ?
+                WHERE case_id = ?
+                """,
+                (
+                    purpose or "",
+                    purpose or "",
+                    claimed_total,
+                    allocated_advance_amount,
+                    beneficiary_name,
+                    bank_account_number,
+                    bank_name,
+                    occurred_at,
+                    case_id,
+                ),
+            )
 
     def delete_case(self, case_id: str) -> None:
         """Permanently delete a demo case, its metadata and stored artifacts."""
@@ -942,6 +1167,19 @@ class SQLiteSettlementRepository:
     ) -> dict[str, Any] | None:
         """Load a persisted OCR response after verifying document ownership."""
 
+        return self.load_json_artifact(case_id, document_id, "ocr")
+
+    def load_json_artifact(
+        self,
+        case_id: str,
+        document_id: str,
+        group: str,
+    ) -> dict[str, Any] | None:
+        """Load one per-document JSON artifact after verifying ownership."""
+
+        if not re.fullmatch(r"[a-z][a-z0-9_-]*", group):
+            raise ValueError("Nhóm artifact không hợp lệ.")
+
         with self._connect() as connection:
             exists = connection.execute(
                 """
@@ -955,7 +1193,7 @@ class SQLiteSettlementRepository:
         artifact = (
             self.artifacts_root.resolve()
             / case_id
-            / "ocr"
+            / group
             / f"{document_id}.json"
         ).resolve()
         case_dir = (self.artifacts_root.resolve() / case_id).resolve()

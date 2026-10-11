@@ -147,7 +147,7 @@ Giá trị doanh nghiệp không được rải trực tiếp trong check implem
 
 <!-- POLICY_CONFIG_START -->
 ```yaml
-policy_version: "1.0.0"
+policy_version: "1.1.0"
 currency: VND
 
 decision_actions:
@@ -158,7 +158,7 @@ decision_actions:
 thresholds:
   critical_fact_confidence: 0.85
   non_critical_fact_confidence: 0.60
-  authority_amount_vnd: 50000000
+  authority_amount_vnd: 100000000
   submission_window_days: 30
   arithmetic_tolerance_vnd: 1
   duplicate_similarity_review_threshold: 0.85
@@ -676,7 +676,7 @@ INVARIANT-15: Không có nhánh xử lý dựa trên case_id hoặc tên file fi
   "policy_rule_ids": ["P08"],
   "evidence_refs": ["CLAIM-001"],
   "findings": [],
-  "policy_version": "1.0.0",
+  "policy_version": "1.1.0",
   "decided_at": "2026-09-21T10:05:00+07:00"
 }
 ```

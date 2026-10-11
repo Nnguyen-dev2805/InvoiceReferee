@@ -1,0 +1,103 @@
+{
+  "schema_version": "2.0",
+  "case_id": "TC23",
+  "title": "Hợp lệ một hóa đơn phân bổ cho nhiều dòng",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_van_phong_pham.pdf",
+      "hoa_don_muc_in.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "AUTO_PROCESS",
+    "uncertainty_type": "NONE",
+    "primary_rule": null,
+    "findings": [
+      "SET_MULTI_EVIDENCE_MATCH_001",
+      "SET_EVIDENCE_ALLOCATION_001"
+    ],
+    "followup": "PENDING_APPROVAL"
+  },
+  "implementation_status": "GAP_EXPECTED",
+  "accounting_facts": {
+    "report_lines": [
+      {
+        "line_id": "L01",
+        "description": "Giấy in A4",
+        "invoice_ref": "00002301",
+        "amount": "2160000",
+        "note": "Một phần hóa đơn 00002301"
+      },
+      {
+        "line_id": "L02",
+        "description": "Bút và dụng cụ",
+        "invoice_ref": "00002301",
+        "amount": "1080000",
+        "note": "Một phần hóa đơn 00002301"
+      },
+      {
+        "line_id": "L03",
+        "description": "Mực in",
+        "invoice_ref": "00002302",
+        "amount": "5400000",
+        "note": "Đính kèm hóa đơn"
+      }
+    ],
+    "report_line_sum": "8640000",
+    "report_total": "8640000",
+    "advance_amount": "9000000",
+    "declared_difference": "360000",
+    "evidence": [
+      {
+        "evidence_id": "EV01",
+        "file": "hoa_don_van_phong_pham.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00002301",
+        "description": "Văn phòng phẩm",
+        "amount": "3240000"
+      },
+      {
+        "evidence_id": "EV02",
+        "file": "hoa_don_muc_in.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00002302",
+        "description": "Mực in văn phòng",
+        "amount": "5400000"
+      }
+    ]
+  },
+  "line_support_expectations": [
+    {
+      "report_line_id": "L01",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_van_phong_pham.pdf"
+      ],
+      "match_status": "MATCHED_ALLOCATION",
+      "reason": "Cùng L02 phân bổ đủ giá trị hóa đơn 00002301."
+    },
+    {
+      "report_line_id": "L02",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_van_phong_pham.pdf"
+      ],
+      "match_status": "MATCHED_ALLOCATION",
+      "reason": "Cùng L01 phân bổ đủ giá trị hóa đơn 00002301."
+    },
+    {
+      "report_line_id": "L03",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_muc_in.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn khớp."
+    }
+  ],
+  "rationale": "Hai dòng phân bổ hóa đơn 00002301 cộng đúng 3.240.000 VND; hóa đơn 00002302 khớp riêng 5.400.000 VND."
+}

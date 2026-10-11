@@ -12,6 +12,8 @@ class AppSettings:
     project_root: Path
     data_root: Path
     ocr_word_review_threshold: float = 0.85
+    company_legal_name: str | None = None
+    company_tax_codes: frozenset[str] = frozenset()
 
     @property
     def submissions_root(self) -> Path:
@@ -36,8 +38,16 @@ class AppSettings:
         threshold = float(os.getenv("OCR_WORD_REVIEW_THRESHOLD", "0.85"))
         if not 0 < threshold <= 1:
             raise ValueError("OCR_WORD_REVIEW_THRESHOLD phải nằm trong (0, 1].")
+        company_legal_name = os.getenv("COMPANY_LEGAL_NAME", "").strip() or None
+        company_tax_codes = frozenset(
+            value.strip()
+            for value in os.getenv("COMPANY_TAX_CODES", "").split(",")
+            if value.strip()
+        )
         return cls(
             project_root=project_root,
             data_root=data_root,
             ocr_word_review_threshold=threshold,
+            company_legal_name=company_legal_name,
+            company_tax_codes=company_tax_codes,
         )

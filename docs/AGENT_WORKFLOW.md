@@ -14,7 +14,7 @@ Workflow dùng bốn loại thành phần:
 | `LLM` | Kimi Vision để đọc ảnh; Kimi Reasoning để giải thích, chọn vấn đề chính và tạo câu hỏi | Không; mọi đề xuất phải qua Bộ bảo vệ |
 | `HUMAN` | Nhân viên, kế toán, quản lý tài chính hoặc kiểm soát nội bộ | Có quyền bổ sung, dừng hoặc ghi đè |
 
-`HARDCODE` trong tài liệu này nghĩa là **logic tất định được viết bằng mã**, không có nghĩa là ghi trực tiếp mọi giá trị chính sách vào mã nguồn. Ví dụ, phép so sánh `amount > authority_threshold` là `HARDCODE`, còn `authority_threshold = 50.000.000 VND` là `CONFIG` giả lập.
+`HARDCODE` trong tài liệu này nghĩa là **logic tất định được viết bằng mã**, không có nghĩa là ghi trực tiếp mọi giá trị chính sách vào mã nguồn. Ví dụ, phép so sánh `amount > authority_threshold` là `HARDCODE`, còn `authority_threshold = 100.000.000 VND` là `CONFIG` giả lập.
 
 > **Trạng thái hiện tại:** ứng dụng dùng Mistral OCR, Confidence Quality Agent
 > theo từng evidence, Cross-source Conflict Agent và policy kiểm kê tất định.
@@ -470,7 +470,7 @@ evidence_requirements_by_expense_type
 escalation_targets
 ```
 
-Trong Sprint 1, ngưỡng `50.000.000 VND` và thời hạn `30 ngày` là `CONFIG` giả lập. Khi tích hợp doanh nghiệp thật, chúng phải được lấy từ policy store hoặc tệp cấu hình có phiên bản.
+Trong Sprint 1, ngưỡng `100.000.000 VND` và thời hạn `30 ngày` là `CONFIG` giả lập. Khi tích hợp doanh nghiệp thật, chúng phải được lấy từ policy store hoặc tệp cấu hình có phiên bản.
 
 ## 11. Audit bắt buộc
 

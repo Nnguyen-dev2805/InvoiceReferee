@@ -24,7 +24,12 @@ def test_fastapi_employee_and_accounting_pages_render(
         assert employee_page.status_code == 200
         assert "Hoàn ứng và quyết toán chi phí" in employee_page.text
         assert "Thêm chứng từ" in employee_page.text
-        assert "settlement-form.js?v=20261010-2" in employee_page.text
+        assert "settlement-form.js?v=20261011-4" in employee_page.text
+        assert "Số tài khoản nhận tiền" in employee_page.text
+        script = client.get("/static/js/settlement-form.js")
+        assert "Có bằng chứng thay thế" in script.text
+        assert "Không có chứng từ" in script.text
+        assert "Mã ngoại lệ" not in script.text
         assert client.get("/accounting/cases").status_code == 200
         assert "Hàng đợi hồ sơ" in client.get("/accounting/cases").text
 
@@ -37,6 +42,9 @@ def test_multipart_submission_is_visible_to_accounting(
     payload = {
         "settlement_type": "EMPLOYEE_REIMBURSEMENT",
         "source_type": "DIGITAL_FORM",
+        "beneficiary_name": "NGUYỄN MINH AN",
+        "bank_account_number": "0123456789",
+        "bank_name": "Ngân hàng Demo",
         "business_context": {"purpose": "Tiếp khách dự án Demo"},
         "expense_items": [
             {
@@ -71,6 +79,8 @@ def test_multipart_submission_is_visible_to_accounting(
         detail = client.get(f"/accounting/cases/{case_id}")
         assert detail.status_code == 200
         assert "Bữa trưa với khách hàng" in detail.text
+        assert "Tóm tắt nghiệp vụ" in detail.text
+        assert "0123456789" in detail.text
         assert "Kết quả kiểm tra và dẫn chứng" in detail.text
         assert "Điều kiện đã đáp ứng" in detail.text
         assert '<details class="passed-findings">' in detail.text
@@ -81,7 +91,8 @@ def test_multipart_submission_is_visible_to_accounting(
         queue = client.get("/accounting/cases")
         assert queue.status_code == 200
         assert "Lý do chính" in queue.text
-        assert "Hồ sơ đã vượt qua các kiểm tra bắt buộc" in queue.text
+        assert "Công ty hoàn lại cho nhân viên 1.200.000 VND" in queue.text
+        assert "Tiếp khách dự án Demo" in queue.text
 
         action = client.post(
             f"/accounting/cases/{case_id}/actions",
@@ -159,3 +170,92 @@ def test_submission_accepts_multiple_evidence_files_for_multiple_items(
         assert {
             document["linked_item_id"] for document in case["documents"]
         } == {"ITEM-001", "ITEM-002"}
+
+
+def test_paper_submission_accepts_form_and_unlinked_evidence_without_items(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app = _load_app(tmp_path, monkeypatch)
+    payload = {
+        "settlement_type": "EMPLOYEE_REIMBURSEMENT",
+        "source_type": "PAPER_SCAN",
+        "business_context": {},
+        "paper_no_evidence_reason": None,
+        "expense_items": [],
+    }
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/settlements",
+            data={"payload": json.dumps(payload)},
+            files=[
+                (
+                    "settlement_form",
+                    ("giay-de-nghi.jpg", b"paper-form", "image/jpeg"),
+                ),
+                (
+                    "evidence_files",
+                    ("hoa-don-01.jpg", b"invoice-01", "image/jpeg"),
+                ),
+                (
+                    "evidence_files",
+                    ("chuyen-khoan.png", b"payment-proof", "image/png"),
+                ),
+            ],
+        )
+
+        assert response.status_code == 202
+        case = client.get(
+            f"/api/v1/cases/{response.json()['case_id']}"
+        ).json()
+        assert case["expense_items"] == []
+        assert len(case["documents"]) == 3
+        assert all(
+            document["linked_item_id"] is None
+            for document in case["documents"]
+        )
+
+
+def test_digital_form_accepts_explicit_no_evidence_reason_and_escalates(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app = _load_app(tmp_path, monkeypatch)
+    payload = {
+        "settlement_type": "EMPLOYEE_REIMBURSEMENT",
+        "source_type": "DIGITAL_FORM",
+        "business_context": {"purpose": "Thuê nhân công sửa chữa khẩn cấp"},
+        "expense_items": [
+            {
+                "item_id": "ITEM-001",
+                "category": "OPERATIONS",
+                "description": "Thuê nhân công sửa đường ống",
+                "claimed_amount": "800000",
+                "currency": "VND",
+                "evidence_names": [],
+                "evidence_status": "NO_EVIDENCE",
+                "evidence_exception_reason": (
+                    "Người cung cấp dịch vụ không cấp chứng từ."
+                ),
+            }
+        ],
+    }
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/settlements",
+            data={"payload": json.dumps(payload)},
+        )
+        assert response.status_code == 202
+        case_id = response.json()["case_id"]
+        case = client.get(f"/api/v1/cases/{case_id}").json()
+        assert case["expense_items"][0]["evidence_status"] == "NO_EVIDENCE"
+        assert "không cấp chứng từ" in case["expense_items"][0][
+            "evidence_exception_reason"
+        ]
+
+        assert client.post("/internal/process-next").json() == {"processed": True}
+        processed = client.get(f"/api/v1/cases/{case_id}").json()
+        assert processed["automation_decision"] == "ESCALATE"
+        assert processed["primary_finding_code"] == "SET_NO_EVIDENCE_001"

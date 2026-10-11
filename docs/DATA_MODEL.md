@@ -290,7 +290,7 @@ NOT_APPLICABLE
 ```json
 {
   "scope_status": "IN_SCOPE",
-  "authority_threshold_vnd": 50000000,
+  "authority_threshold_vnd": 100000000,
   "applicable_rule_ids": ["P01", "P05", "P12"],
   "deterministic_uncertainties": ["FACTUAL_UNKNOWN"],
   "suspicious_flags": []

@@ -44,6 +44,24 @@
   </dl>
 </section>
 {% endif %}
+<section class="business-summary" aria-label="Tóm tắt nghiệp vụ hồ sơ">
+  <div>
+    <span>Tóm tắt nghiệp vụ</span>
+    <h2>{{ case.business_summary.cash_flow }}</h2>
+    <p>{{ case.business_summary.purpose }}</p>
+  </div>
+  <dl>
+    <dt>Người đề nghị</dt>
+    <dd>{{ case.business_summary.employee }} · {{ case.business_summary.department }}</dd>
+    <dt>Tổng chi phí</dt><dd>{{ case.business_summary.total }}</dd>
+    {% if case.business_summary.advance %}
+      <dt>Đã tạm ứng</dt><dd>{{ case.business_summary.advance }}</dd>
+    {% endif %}
+    {% if case.business_summary.payment_account %}
+      <dt>{{ case.business_summary.account_label }}</dt><dd>{{ case.business_summary.payment_account }}</dd>
+    {% endif %}
+  </dl>
+</section>
 <section class="summary-band">
   <div><span>Loại hồ sơ</span><strong>{{ case.settlement_type }}</strong></div>
   <div><span>Nguồn</span><strong>{{ case.source_type }}</strong></div>
@@ -86,6 +104,40 @@
   </form>
 </section>
 <section class="detail-section">
+  {% if case.pending_approval_findings %}
+  <div class="section-heading">
+    <div>
+      <h2>Bước phê duyệt tiếp theo</h2>
+      <p>Đây là bước nghiệp vụ bình thường sau khi kiểm tra hồ sơ, không phải lỗi của chứng từ.</p>
+    </div>
+  </div>
+  <div class="finding-list approval-list">
+    {% for finding in case.pending_approval_findings %}
+    <article class="finding finding-pending_approval">
+      <div>
+        <strong>{{ finding.rule_label }}</strong>
+        <span>{{ finding.status_label }} · {{ finding.rule_id }}</span>
+      </div>
+      <p>{{ finding.message }}</p>
+      {% if finding.question %}
+        <div class="approval-next-step"><strong>Bước tiếp theo:</strong> {{ finding.question }}</div>
+      {% endif %}
+      {% if finding.evidence_refs %}
+      <div class="evidence-citations">
+        <strong>Đơn cần xác nhận:</strong>
+        {% for evidence in finding.evidence_refs %}
+          {% if evidence.url %}
+            <a href="{{ evidence.url }}" target="_blank">{{ evidence.label }}</a>
+          {% else %}
+            <span>{{ evidence.label }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
   <div class="section-heading">
     <div>
       <h2>Hồ sơ nhân viên đã gửi</h2>
@@ -96,19 +148,28 @@
   <div>
     <h3>Báo cáo / đề nghị của nhân viên</h3>
     <p class="lead">{{ case.purpose or "Chưa có mục đích công việc." }}</p>
+    {% if case.paper_no_evidence_reason %}
+    <div class="case-explanation">
+      <strong>Giải trình thiếu evidence của nhân viên</strong>
+      <p>{{ case.paper_no_evidence_reason }}</p>
+    </div>
+    {% endif %}
     <dl class="facts">
       <dt>Người gửi</dt><dd>{{ case.employee_name }} · {{ case.department }}</dd>
       <dt>Dự án</dt><dd>{{ case.project_code or "Không khai báo" }}</dd>
       <dt>Khách hàng</dt><dd>{{ case.client_name or "Không khai báo" }}</dd>
       <dt>Thời gian</dt><dd>{{ case.activity_start_date or "Không khai báo" }} → {{ case.activity_end_date or "Không khai báo" }}</dd>
-      <dt>Mã tạm ứng</dt><dd>{{ case.advance_id or "Không áp dụng" }}</dd>
+      <dt>Đối chiếu khoản tạm ứng gốc</dt><dd>Không thực hiện trong phạm vi MVP</dd>
     </dl>
     <div class="source-file-list">
       <div><strong>Form điện tử của hồ sơ</strong><span>Dữ liệu khai báo chuẩn hóa · {{ case.expense_items|length }} khoản chi</span></div>
       {% for document in case.request_documents %}
       <a href="{{ document.url }}" target="_blank">
         <strong>{{ document.original_name }}</strong>
-        <span>Đơn/báo cáo đính kèm · {{ (document.size_bytes / 1024)|round(1) }} KB</span>
+        <span>
+          {% if document.validity %}{{ document.validity.document_type }} · {{ document.validity.status }} · {% endif %}
+          Đơn/báo cáo đính kèm · {{ (document.size_bytes / 1024)|round(1) }} KB
+        </span>
       </a>
       {% endfor %}
     </div>
@@ -119,7 +180,10 @@
       {% for document in case.evidence_documents %}
       <a href="{{ document.url }}" target="_blank">
         <strong>{{ document.original_name }}</strong>
-        <span>{{ document.linked_item_id or "Chưa gắn khoản chi" }} · {{ (document.size_bytes / 1024)|round(1) }} KB</span>
+        <span>
+          {% if document.validity %}{{ document.validity.document_type }} · {{ document.validity.status }} · {% endif %}
+          {{ document.linked_item_id or "Chưa gắn khoản chi" }} · {{ (document.size_bytes / 1024)|round(1) }} KB
+        </span>
       </a>
       {% else %}
       <div><strong>Chưa có evidence</strong><span>Không có bill hoặc chứng từ chi phí đính kèm.</span></div>
@@ -132,16 +196,35 @@
   <h2>Các khoản chi</h2>
   <div class="table-scroll">
     <table>
-      <thead><tr><th>Mã</th><th>Nội dung</th><th>Danh mục</th><th>Ngày</th><th>Evidence</th><th class="money">Khai báo</th></tr></thead>
+      <thead><tr><th>Mã</th><th>Nội dung</th><th>Danh mục</th><th>Ngày</th><th>Trạng thái chứng từ</th><th>Evidence</th><th class="money">Khai báo</th></tr></thead>
       <tbody>
       {% for item in case.expense_items %}
         <tr><td>{{ item.item_id }}</td><td>{{ item.description }}</td><td>{{ item.category }}</td>
           <td>{{ item.expense_date or "Không có" }}</td>
-          <td class="item-evidence-links">
-            {% for document in item.documents %}
-              <a href="{{ document.url }}" target="_blank">{{ document.original_name }}</a>
+          <td>
+            {% if item.evidence_status == "ORIGINAL_EVIDENCE" %}
+              Chứng từ gốc
+            {% elif item.evidence_status == "ALTERNATIVE_EVIDENCE" %}
+              Bằng chứng thay thế
+              <small>{{ item.alternative_evidence_type or "Chưa phân loại" }}</small>
+              <small>{{ item.evidence_exception_reason or "Chưa có lý do" }}</small>
             {% else %}
-              <span>Không có</span>
+              Không có chứng từ
+              <small>{{ item.evidence_exception_reason or "Chưa có lý do" }}</small>
+            {% endif %}
+          </td>
+          <td class="item-evidence-links">
+            {% for match in item.document_matches %}
+              {% if match.document %}
+              <a href="{{ match.document.url }}" target="_blank">{{ match.document.original_name }}</a>
+              <small>{{ match.link_status }} · {{ (match.score * 100)|round(0) }}% · {{ match.explanation }}</small>
+              {% endif %}
+            {% else %}
+              {% for document in item.documents %}
+                <a href="{{ document.url }}" target="_blank">{{ document.original_name }}</a>
+              {% else %}
+                <span>Không có evidence đã ghép</span>
+              {% endfor %}
             {% endfor %}
           </td>
           <td class="money">{{ item.claimed_amount }} {{ item.currency }}</td></tr>
@@ -162,7 +245,7 @@
     <article class="finding finding-{{ finding.status|lower }}">
       <div>
         <strong>{{ finding.rule_label }}</strong>
-        <span>{{ finding.status }} · {{ finding.rule_id }}</span>
+        <span>{{ finding.status_label }} · {{ finding.rule_id }}</span>
       </div>
       <p>{{ finding.message }}</p>
       {% if finding.question %}
@@ -199,7 +282,11 @@
             </div>
             <a href="{{ evidence.url }}" target="_blank">Mở bản gốc</a>
           </div>
-          {% if evidence.preview_kind == "image" %}
+          {% if evidence.ocr_preview_url %}
+          <a class="issue-image" href="{{ evidence.url }}" target="_blank">
+            <img src="{{ evidence.ocr_preview_url }}" alt="Vùng OCR cần kiểm tra trên {{ evidence.label }}" loading="lazy">
+          </a>
+          {% elif evidence.preview_kind == "image" %}
           <a class="issue-image" href="{{ evidence.url }}" target="_blank">
             <img src="{{ evidence.url }}" alt="Bằng chứng {{ evidence.label }}" loading="lazy">
             {% if evidence.annotation_style %}

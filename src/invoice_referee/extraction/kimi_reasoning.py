@@ -11,6 +11,7 @@ from invoice_referee.domain import (
     ConfidenceAnalysis,
     ConflictAnalysis,
     ExpenseDocumentFacts,
+    PaperSettlementFacts,
 )
 
 from .conflict_reasoning import CONFLICT_SYSTEM_PROMPT
@@ -30,6 +31,11 @@ Markdown, không thêm lời dẫn, không thêm nội dung sau JSON. Mọi chu�
 CONFIDENCE_SYSTEM_PROMPT = """Bạn là Evidence Confidence Quality Agent. Mỗi
 lần bạn chỉ đánh giá MỘT evidence đã được OCR và các candidate block có word
 confidence thấp của chính evidence đó.
+
+Input có document_type và required_fields đã được Extraction Agent xác định.
+Hãy đánh giá mức độ quan trọng theo đúng loại chứng từ đó. Không yêu cầu MST,
+mẫu số, ký hiệu hoặc trường của hóa đơn GTGT đối với vé, bill, phiếu thu, bằng
+chứng thanh toán hay tài liệu thay thế nếu required_fields không yêu cầu.
 
 Nhiệm vụ duy nhất:
 1. Đánh giá MỌI candidate block đúng một lần, giữ nguyên candidate_id.
@@ -61,6 +67,10 @@ cho bước đối chiếu tiếp theo.
 Ví dụ:
 - "Helineken" vẫn nhận diện chắc là một tên mặt hàng: SEMANTICALLY_READABLE,
   requires_verification=false.
+- "Vẻ máy bay" trong mô tả vẫn hiểu chắc là "Vé máy bay":
+  SEMANTICALLY_READABLE, requires_verification=false. Lỗi chính tả, dấu tiếng
+  Việt hoặc một phần tên hàng không được ASK_HUMAN khi vẫn đủ hiểu loại chi phí
+  và các số tiền/định danh trọng yếu đã rõ.
 - Tổng tiền chỉ nhìn được một phần: UNCERTAIN, requires_verification=true.
 - Lời chào hoặc chân trang mờ: NON_CRITICAL, requires_verification=false.
 - Thuế suất không đọc được: canonical_fields=["tax_rate"], UNCERTAIN và
@@ -96,23 +106,57 @@ Không trả chain-of-thought, policy, conflict hoặc kết luận hồ sơ.
 
 
 EXPENSE_EXTRACTION_SYSTEM_PROMPT = """Bạn là Expense Document Extraction Agent.
-Mỗi lần bạn chỉ trích xuất dữ kiện từ MỘT chứng từ đã vượt qua kiểm tra chất
-lượng. Không đánh giá policy, không quyết định duyệt, không suy đoán dữ kiện
-không xuất hiện và không dùng business context để bù dữ liệu chứng từ.
+Mỗi lần bạn chỉ phân loại và trích xuất dữ kiện từ MỘT chứng từ đã OCR. Không
+đánh giá policy, không quyết định duyệt, không suy đoán dữ kiện không xuất hiện
+và không dùng business context để bù dữ liệu chứng từ.
+
+Trước hết phân loại tài liệu theo nội dung nhìn thấy, không dựa vào tên file:
+- E_INVOICE: hóa đơn điện tử/hóa đơn GTGT có số hóa đơn, ký hiệu, mẫu số và MST.
+- PAPER_RECEIPT: bill/biên lai bán hàng của cửa hàng, nhà hàng hoặc POS receipt.
+- CARD_SLIP: slip máy quẹt thẻ; chỉ chứng minh thao tác thanh toán.
+- PAYMENT_PROOF: ảnh chuyển khoản/sao kê/xác nhận giao dịch ngân hàng hoặc ví.
+- TRANSPORT_TICKET: vé máy bay, tàu, xe hoặc chứng từ chuyến đi.
+- HOTEL_RECEIPT: bill/phiếu thanh toán khách sạn không phải hóa đơn điện tử.
+- COLLECTION_RECEIPT: phiếu thu có bên nộp, bên thu và số phiếu.
+- CONTRACT, QUOTATION, PURCHASE_ORDER: hợp đồng, báo giá hoặc đơn đặt hàng.
+- ACCEPTANCE_RECORD, DELIVERY_NOTE, GOODS_RECEIPT: biên bản nghiệm thu, phiếu
+  giao hàng hoặc phiếu nhập/nhận hàng.
+- SUPPLIER_CONFIRMATION: xác nhận của nhà cung cấp.
+- OTHER hoặc UNKNOWN chỉ dùng khi thật sự không thể xếp vào các loại trên.
+Một hóa đơn khách sạn vẫn là E_INVOICE nếu có đầy đủ dấu hiệu hóa đơn điện tử.
 
 Giữ nguyên document_id từ input. Chuẩn hóa số tiền thành số JSON không có dấu
 phân cách hàng nghìn. Trường không đọc được dùng null. source_refs phải trỏ đến
 document_id hoặc page/block được cung cấp.
 
+classification_confidence nằm trong [0,1]. classification_signals là các dấu
+hiệu trực tiếp nhìn thấy dùng để phân loại. alternative_document_types chỉ ghi
+loại còn có khả năng đúng. field_states ghi trạng thái của các trường kế toán
+quan trọng bằng PRESENT, ABSENT, UNREADABLE, INVALID hoặc NOT_APPLICABLE. Không
+đánh dấu PRESENT nếu giá trị trả về là null.
+
+extraction_warnings chỉ ghi mâu thuẫn hoặc độ mơ hồ có thể làm sai định danh
+chứng từ, ngày, MST, số tiền, trạng thái thanh toán hoặc tính hợp lệ pháp lý.
+Không cảnh báo lỗi chính tả, thiếu dấu hay sai một ký tự trong tên hàng hóa/dịch
+vụ khi vẫn hiểu chắc nội dung và không làm thay đổi số tiền hoặc bản chất khoản
+chi. Ví dụ "Vẻ máy bay" vẫn trích xuất là mô tả dòng và không tạo warning.
+Sau khi phân loại, không cảnh báo việc thiếu trường không áp dụng cho loại chứng
+từ đó. Ví dụ TRANSPORT_TICKET, PAPER_RECEIPT và PAYMENT_PROOF không phải hóa
+đơn GTGT nên thiếu MST bên bán/bên mua không phải extraction_warning.
+
 Trả về đúng một JSON object, không bọc Markdown:
 {
   "document_id": "DOC-001",
-  "document_type": "E_INVOICE|PAPER_RECEIPT|TICKET|PAYMENT_PROOF|OTHER",
+  "document_type": "E_INVOICE",
+  "classification_confidence": 0.98,
+  "classification_signals": ["Có ký hiệu, mẫu số và số hóa đơn"],
+  "alternative_document_types": [],
   "issuer_name": null,
   "issuer_tax_code": null,
   "buyer_name": null,
   "buyer_tax_code": null,
   "document_number": null,
+  "template_number": null,
   "serial_number": null,
   "document_date": null,
   "subtotal": null,
@@ -121,12 +165,92 @@ Trả về đúng một JSON object, không bọc Markdown:
   "service_charge": null,
   "total_amount": null,
   "payment_method": null,
+  "payer_name": null,
+  "payee_name": null,
+  "transaction_reference": null,
+  "transaction_status": null,
+  "confirmation_present": null,
   "line_items": [
     {
       "description": "Tên hàng hóa hoặc dịch vụ",
       "quantity": null,
       "unit_price": null,
       "line_amount": null,
+      "source_refs": ["DOC:DOC-001"]
+    }
+  ],
+  "field_states": {
+    "buyer_tax_code": "PRESENT",
+    "total_amount": "PRESENT"
+  },
+  "source_refs": ["DOC:DOC-001"],
+  "extraction_warnings": []
+}
+
+Không trả chain-of-thought; chỉ trả dữ kiện và cảnh báo trích xuất ngắn gọn.
+"""
+
+
+PAPER_SETTLEMENT_EXTRACTION_SYSTEM_PROMPT = """Bạn là Paper Settlement Form
+Extraction Agent. Bạn chỉ trích xuất dữ kiện từ MỘT giấy đề nghị hoàn ứng hoặc
+quyết toán đã OCR. Không đánh giá policy, không ghép evidence và không tự tạo
+dữ kiện không xuất hiện.
+
+Giữ nguyên document_id. Mỗi dòng chi phí trong bảng phải trở thành đúng một
+line. Bỏ qua dòng tổng cộng. Chuẩn hóa số tiền thành số JSON không có dấu phân
+cách hàng nghìn. invoice_refs là danh sách số hóa đơn/chứng từ ghi tại dòng.
+
+Phải giữ nguyên nội dung cột ghi chú trong note.
+- requires_evidence=true khi dòng thể hiện phải có tài liệu kèm theo, ví dụ có
+  số hóa đơn, ghi "đính kèm bảng kê", "đính kèm thống kê", "kèm chứng từ",
+  "có hóa đơn" hoặc cách diễn đạt tương đương.
+- Khi ghi chú ghi "không có chứng từ", "không có hóa đơn" hoặc có giải thích
+  tương đương: requires_evidence=false và no_evidence_reason phải chứa nguyên
+  nội dung ghi chú nhìn thấy trên đơn.
+- Khi ghi chú trống và không có số chứng từ: requires_evidence=false và
+  no_evidence_reason=null.
+Không tự suy đoán lý do không xuất hiện trên đơn.
+
+Quy tắc số tiền quyết toán:
+- advance_amount là đúng số nằm cạnh nhãn "số tiền đã tạm ứng" hoặc cách ghi
+  tương đương; null nếu đơn không có hoặc không đọc được.
+- reimbursement_amount là trị tuyệt đối của khoản chênh lệch được ghi rõ trên
+  đơn (công ty trả thêm hoặc nhân viên hoàn lại); null nếu đơn không ghi.
+- Không tự suy ra chiều dòng tiền và không tự tính giá trị còn thiếu. Python sẽ
+  tính lại từ total_amount và advance_amount.
+
+Thông tin chuyển khoản là tùy chọn:
+- beneficiary_name, bank_account_number và bank_name chỉ lấy khi nhìn thấy rõ
+  trên đơn; không có hoặc không đọc được thì trả null.
+- Không lấy số tài khoản của nhà cung cấp trên hóa đơn evidence làm tài khoản
+  nhận tiền của người đề nghị hoàn ứng.
+
+extraction_warnings chỉ ghi các vấn đề kế toán trọng yếu nhìn thấy rõ, ví dụ số
+tiền bằng chữ khác số, tổng dòng khác tổng cộng, số hoàn ứng/hoàn trả mâu thuẫn
+hoặc giá trị bắt buộc không đọc được. Không ghi lỗi chính tả, thiếu dấu, sai một
+ký tự trong mô tả hàng hóa/dịch vụ, lỗi trình bày hoặc khác biệt không làm thay
+đổi số tiền, định danh chứng từ hay bản chất khoản chi.
+
+Trả về đúng một JSON object, không bọc Markdown:
+{
+  "document_id": "DOC-001",
+  "document_type": "PAPER_SETTLEMENT_REQUEST",
+  "purpose": null,
+  "total_amount": 3314780,
+  "advance_amount": 4000000,
+  "reimbursement_amount": 685220,
+  "beneficiary_name": "HỨA THỊ NGHĨA",
+  "bank_account_number": "0123456789",
+  "bank_name": "Ngân hàng Demo",
+  "lines": [
+    {
+      "line_id": "LINE-001",
+      "description": "Chi phí ăn trưa Kiều Hoa Quán",
+      "invoice_refs": ["HQ54201", "KHQ54202"],
+      "amount": 3314780,
+      "note": "Đính kèm bảng kê",
+      "requires_evidence": true,
+      "no_evidence_reason": null,
       "source_refs": ["DOC:DOC-001"]
     }
   ],
@@ -335,4 +459,15 @@ class KimiReasoningAdapter:
             stage="Expense Document Extraction Agent",
             system_prompt=EXPENSE_EXTRACTION_SYSTEM_PROMPT,
             model_type=ExpenseDocumentFacts,
+        )
+
+    def extract_paper_settlement(
+        self,
+        document_payload: dict[str, Any],
+    ) -> PaperSettlementFacts:
+        return self._analyze(
+            document_payload,
+            stage="Paper Settlement Form Extraction Agent",
+            system_prompt=PAPER_SETTLEMENT_EXTRACTION_SYSTEM_PROMPT,
+            model_type=PaperSettlementFacts,
         )

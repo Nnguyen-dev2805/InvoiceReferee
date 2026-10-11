@@ -56,7 +56,7 @@ TECHNICAL_QUESTION_MARKERS = (
     "ev-",
 )
 
-CONFLICT_REQUIRED_FIELDS = {
+INVENTORY_BLOCKING_FIELDS = {
     "seller_name",
     "seller_tax_code",
     "buyer_tax_code",
@@ -69,6 +69,20 @@ CONFLICT_REQUIRED_FIELDS = {
     "line_amount",
     "total_amount",
     "receipt_status",
+}
+
+SETTLEMENT_BLOCKING_FIELDS = {
+    "seller_name",
+    "seller_tax_code",
+    "buyer_tax_code",
+    "invoice_date",
+    "invoice_number",
+    "template_number",
+    "serial_number",
+    "line_amount",
+    "total_amount",
+    "transaction_reference",
+    "transaction_status",
 }
 
 
@@ -469,7 +483,14 @@ class CaseProcessingService:
     def _confidence_findings(
         candidates: list[dict[str, Any]],
         analysis: ConfidenceAnalysis,
+        *,
+        blocking_fields: set[str] | None = None,
     ) -> list[RuleFinding]:
+        effective_blocking_fields = (
+            INVENTORY_BLOCKING_FIELDS
+            if blocking_fields is None
+            else blocking_fields
+        )
         expected_ids = {candidate["candidate_id"] for candidate in candidates}
         assessment_counts: dict[str, int] = {}
         assessment_by_id: dict[str, Any] = {}
@@ -509,7 +530,10 @@ class CaseProcessingService:
                 )
                 continue
 
-            if CaseProcessingService._assessment_blocks_conflict(assessment):
+            if CaseProcessingService._assessment_blocks_conflict(
+                assessment,
+                effective_blocking_fields,
+            ):
                 question = CaseProcessingService._accountant_question(
                     assessment,
                     candidate,
@@ -561,11 +585,21 @@ class CaseProcessingService:
         return assessment.review_action == "ASK_HUMAN"
 
     @staticmethod
-    def _assessment_blocks_conflict(assessment: Any) -> bool:
+    def _assessment_blocks_conflict(
+        assessment: Any,
+        blocking_fields: set[str] | None = None,
+    ) -> bool:
         if not CaseProcessingService._assessment_requires_verification(assessment):
             return False
+        if assessment.importance != "CRITICAL":
+            return False
         fields = set(assessment.canonical_fields)
-        return not fields or bool(fields.intersection(CONFLICT_REQUIRED_FIELDS))
+        effective_blocking_fields = (
+            INVENTORY_BLOCKING_FIELDS
+            if blocking_fields is None
+            else blocking_fields
+        )
+        return not fields or bool(fields.intersection(effective_blocking_fields))
 
     @classmethod
     def _evidence_quality_results(

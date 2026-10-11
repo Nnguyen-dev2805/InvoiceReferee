@@ -13,6 +13,8 @@ from invoice_referee.domain import (
 
 def build_settlement_decision(
     findings: list[SettlementFinding],
+    *,
+    success_reason: str | None = None,
 ) -> SettlementDecision:
     blocking = [finding for finding in findings if finding.status == "FAIL"]
     if not blocking:
@@ -27,7 +29,7 @@ def build_settlement_decision(
             automation_decision=AutomationDecision.AUTO_PROCESS,
             uncertainty_type=UncertaintyType.NONE,
             target=DecisionTarget.ACCOUNTANT,
-            reason=(
+            reason=success_reason or (
                 "Hồ sơ đã vượt qua các kiểm tra bắt buộc trong phạm vi policy "
                 "demo và sẵn sàng để kế toán xem xét."
             ),

@@ -70,6 +70,68 @@ INVALID_CONFLICT_JSON = """{
   "extraction_warnings": []
 }"""
 
+PAPER_SETTLEMENT_JSON = """{
+  "document_id": "DOC-FORM",
+  "document_type": "PAPER_SETTLEMENT_REQUEST",
+  "purpose": "Chi phí ăn trưa Kiều Hoa Quán",
+  "total_amount": 3314780,
+  "advance_amount": 4000000,
+  "reimbursement_amount": 685220,
+  "beneficiary_name": "HỨA THỊ NGHĨA",
+  "bank_account_number": "0123456789",
+  "bank_name": "Ngân hàng Demo",
+  "lines": [
+    {
+      "line_id": "LINE-001",
+      "description": "Chi phí ăn trưa Kiều Hoa Quán",
+      "invoice_refs": ["HQ54201", "KHQ54202"],
+      "amount": 3314780,
+      "note": "Đính kèm bảng kê",
+      "requires_evidence": true,
+      "no_evidence_reason": null,
+      "source_refs": ["DOC:DOC-FORM"]
+    }
+  ],
+  "source_refs": ["DOC:DOC-FORM"],
+  "extraction_warnings": []
+}"""
+
+EXPENSE_DOCUMENT_JSON = """{
+  "document_id": "DOC-RECEIPT",
+  "document_type": "PAPER_RECEIPT",
+  "classification_confidence": 0.97,
+  "classification_signals": ["Có tên cửa hàng, ngày và tổng thanh toán"],
+  "alternative_document_types": [],
+  "issuer_name": "Nhà hàng Demo",
+  "issuer_tax_code": null,
+  "buyer_name": null,
+  "buyer_tax_code": null,
+  "document_number": null,
+  "template_number": null,
+  "serial_number": null,
+  "document_date": "2026-10-10",
+  "subtotal": null,
+  "discount": null,
+  "tax": null,
+  "service_charge": null,
+  "total_amount": 450000,
+  "payment_method": "Tiền mặt",
+  "payer_name": null,
+  "payee_name": null,
+  "transaction_reference": null,
+  "transaction_status": null,
+  "confirmation_present": null,
+  "line_items": [],
+  "field_states": {
+    "issuer_name": "PRESENT",
+    "document_date": "PRESENT",
+    "total_amount": "PRESENT",
+    "buyer_tax_code": "NOT_APPLICABLE"
+  },
+  "source_refs": ["DOC:DOC-RECEIPT"],
+  "extraction_warnings": []
+}"""
+
 
 def build_adapter(completions: FakeCompletions) -> KimiReasoningAdapter:
     client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
@@ -181,3 +243,44 @@ def test_conflict_agent_receives_all_sources_and_uses_dedicated_prompt() -> None
     assert '"EV-BILL"' in messages[1]["content"]
     assert '"EV-REPORT"' in messages[1]["content"]
     assert '"business_context"' in messages[1]["content"]
+
+
+def test_paper_settlement_extractor_keeps_rows_and_evidence_requirement() -> None:
+    completions = FakeCompletions(PAPER_SETTLEMENT_JSON)
+    adapter = build_adapter(completions)
+
+    result = adapter.extract_paper_settlement(
+        {"document_id": "DOC-FORM", "ocr_text": "Giấy đề nghị hoàn ứng"}
+    )
+
+    assert result.lines[0].invoice_refs == ["HQ54201", "KHQ54202"]
+    assert result.lines[0].requires_evidence is True
+    assert result.bank_account_number == "0123456789"
+    assert result.beneficiary_name == "HỨA THỊ NGHĨA"
+    prompt = completions.calls[0]["messages"][0]["content"]
+    assert "Paper Settlement Form" in prompt
+    assert "Extraction Agent" in prompt
+    assert 'requires_evidence=true' in prompt
+    assert "bank_account_number" in prompt
+    assert "không ghép evidence" in prompt
+
+
+def test_expense_extractor_classifies_document_without_using_filename() -> None:
+    completions = FakeCompletions(EXPENSE_DOCUMENT_JSON)
+    adapter = build_adapter(completions)
+
+    result = adapter.extract_expense_document(
+        {
+            "document_id": "DOC-RECEIPT",
+            "filename": "scan-001.jpg",
+            "ocr_text": "Nhà hàng Demo - Tổng thanh toán 450.000",
+        }
+    )
+
+    assert result.document_type == "PAPER_RECEIPT"
+    assert result.classification_confidence == 0.97
+    assert result.field_states["buyer_tax_code"] == "NOT_APPLICABLE"
+    prompt = completions.calls[0]["messages"][0]["content"]
+    assert "không dựa vào tên file" in prompt
+    assert "PAYMENT_PROOF" in prompt
+    assert "classification_signals" in prompt

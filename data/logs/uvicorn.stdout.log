@@ -1,0 +1,106 @@
+INFO:     127.0.0.1:54682 - "GET /accounting/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54682 - "GET /static/css/app.css?v=20261011-4 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:57398 - "POST /accounting/cases/SET-20261011-5885FCB7/delete HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:57398 - "GET /accounting/cases?deleted=SET-20261011-5885FCB7 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57398 - "GET /employee/settlements/new HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57398 - "GET /static/js/settlement-form.js?v=20261011-4 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:58606 - "GET /accounting/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61552 - "GET /accounting/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54610 - "GET /employee/settlements/new HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58712 - "POST /api/v1/settlements HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:58712 - "GET /employee/settlements/SET-20261011-ABEC167D HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58712 - "GET /employee/settlements/SET-20261011-ABEC167D HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59761 - "GET /accounting/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59761 - "POST /accounting/cases/SET-20261011-ABEC167D/delete HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:59761 - "GET /accounting/cases?deleted=SET-20261011-ABEC167D HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59761 - "GET /employee/settlements/new HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51150 - "POST /api/v1/settlements HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:51150 - "GET /employee/settlements/SET-20261011-A41B3B9F HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51150 - "GET /employee/settlements/SET-20261011-A41B3B9F HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51150 - "GET /employee/settlements/SET-20261011-A41B3B9F HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51150 - "GET /employee/settlements/SET-20261011-A41B3B9F HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51150 - "GET /employee/settlements/SET-20261011-A41B3B9F HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51150 - "GET /employee/settlements/SET-20261011-A41B3B9F HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51150 - "GET /employee/settlements/SET-20261011-A41B3B9F HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56702 - "GET /accounting/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56702 - "GET /accounting/cases/SET-20261011-A41B3B9F HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56702 - "GET /api/v1/cases/SET-20261011-A41B3B9F/documents/DOC-4AE0330BF0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56702 - "GET /api/v1/cases/SET-20261011-A41B3B9F/documents/DOC-8B5F021E1D HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65451 - "GET /employee/settlements/new HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53235 - "POST /api/v1/settlements HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:53235 - "GET /employee/settlements/SET-20261011-1E12A287 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53235 - "GET /employee/settlements/SET-20261011-1E12A287 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53235 - "GET /employee/settlements/SET-20261011-1E12A287 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53235 - "GET /employee/settlements/SET-20261011-1E12A287 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53235 - "GET /employee/settlements/SET-20261011-1E12A287 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53235 - "GET /employee/settlements/SET-20261011-1E12A287 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53235 - "GET /employee/settlements/SET-20261011-1E12A287 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53235 - "GET /employee/settlements/SET-20261011-1E12A287 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53235 - "GET /employee/settlements/SET-20261011-1E12A287 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53235 - "GET /employee/settlements/SET-20261011-1E12A287 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62844 - "GET /accounting/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62844 - "GET /accounting/cases/SET-20261011-1E12A287 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62844 - "GET /api/v1/cases/SET-20261011-1E12A287/documents/DOC-5280F1A8F2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58329 - "GET /api/v1/cases/SET-20261011-1E12A287/documents/DOC-E8754013F7 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58329 - "GET /api/v1/cases/SET-20261011-1E12A287/documents/DOC-287FB47C10 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58329 - "GET /api/v1/cases/SET-20261011-1E12A287/documents/DOC-5A57DCBDC2 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58774 - "GET /employee/settlements/new HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58774 - "GET /accounting/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65307 - "POST /accounting/cases/SET-20261011-DD0EC81D/delete HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:65307 - "GET /accounting/cases?deleted=SET-20261011-DD0EC81D HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65307 - "GET /employee/settlements/new HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51590 - "POST /api/v1/settlements HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:51590 - "GET /employee/settlements/SET-20261011-FAB80252 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51590 - "GET /employee/settlements/SET-20261011-FAB80252 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64054 - "GET /accounting/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64054 - "POST /accounting/cases/SET-20261011-FAB80252/delete HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:64054 - "GET /accounting/cases?deleted=SET-20261011-FAB80252 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64054 - "GET /employee/settlements/new HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59475 - "POST /api/v1/settlements HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:59475 - "GET /employee/settlements/SET-20261011-DE6FBECA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59475 - "GET /employee/settlements/SET-20261011-DE6FBECA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50081 - "GET /accounting/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58165 - "POST /accounting/cases/SET-20261011-DE6FBECA/delete HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:58165 - "GET /accounting/cases?deleted=SET-20261011-DE6FBECA HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58165 - "GET /employee/settlements/new HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61546 - "POST /api/v1/settlements HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:61546 - "GET /employee/settlements/SET-20261011-1C2E9C0D HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61546 - "GET /employee/settlements/SET-20261011-1C2E9C0D HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61546 - "GET /employee/settlements/SET-20261011-1C2E9C0D HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61546 - "GET /employee/settlements/SET-20261011-1C2E9C0D HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61546 - "GET /employee/settlements/SET-20261011-1C2E9C0D HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61546 - "GET /employee/settlements/SET-20261011-1C2E9C0D HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61546 - "GET /employee/settlements/SET-20261011-1C2E9C0D HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49243 - "GET /accounting/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54562 - "GET /employee/settlements/new HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61685 - "POST /api/v1/settlements HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:61685 - "GET /employee/settlements/SET-20261011-719FFFF0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61685 - "GET /employee/settlements/SET-20261011-719FFFF0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61685 - "GET /accounting/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51044 - "POST /accounting/cases/SET-20261011-719FFFF0/delete HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:51044 - "GET /accounting/cases?deleted=SET-20261011-719FFFF0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51044 - "GET /employee/settlements/new HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "POST /api/v1/settlements HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:56523 - "GET /employee/settlements/SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "GET /employee/settlements/SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "GET /employee/settlements/SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "GET /employee/settlements/SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "GET /employee/settlements/SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "GET /employee/settlements/SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "GET /employee/settlements/SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "GET /employee/settlements/SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "GET /employee/settlements/SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "GET /employee/settlements/SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "GET /employee/settlements/SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56523 - "GET /employee/settlements/SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51319 - "GET /accounting/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62230 - "GET /accounting/cases/SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62230 - "GET /api/v1/cases/SET-20261011-ABCEE08C/documents/DOC-CF25890B9E HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55933 - "GET /api/v1/cases/SET-20261011-ABCEE08C/documents/DOC-57907AA0BB HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55933 - "GET /api/v1/cases/SET-20261011-ABCEE08C/documents/DOC-E5E1EB10F1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55933 - "GET /api/v1/cases/SET-20261011-ABCEE08C/documents/DOC-726D81B383 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55842 - "GET /employee/settlements/new HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55842 - "GET /accounting/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55842 - "POST /accounting/cases/SET-20261011-ABCEE08C/delete HTTP/1.1" 303 See Other
+INFO:     127.0.0.1:55842 - "GET /accounting/cases?deleted=SET-20261011-ABCEE08C HTTP/1.1" 200 OK
+ INFO:     127.0.0.1:61639 - "GET /accounting/cases HTTP/1.1" 200 OK

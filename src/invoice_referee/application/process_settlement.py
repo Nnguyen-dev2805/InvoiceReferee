@@ -6,13 +6,25 @@ from decimal import Decimal
 from typing import Any
 
 from invoice_referee.application.decision_guard import build_settlement_decision
-from invoice_referee.application.process_case import CaseProcessingService
+from invoice_referee.application.paper_evidence_matching import match_paper_evidence
+from invoice_referee.application.process_case import (
+    SETTLEMENT_BLOCKING_FIELDS,
+    CaseProcessingService,
+)
+from invoice_referee.application.settlement_summary import (
+    build_settlement_success_reason,
+)
 from invoice_referee.domain import (
     DecisionTarget,
+    DocumentValidityResult,
+    DocumentValidityStatus,
     ExpenseDocumentFacts,
+    ExpenseEvidenceStatus,
+    PaperSettlementFacts,
     SettlementDocumentRole,
     SettlementDraft,
     SettlementFinding,
+    SettlementType,
     SubmissionSourceType,
     UncertaintyType,
 )
@@ -21,7 +33,12 @@ from invoice_referee.extraction import (
     collect_low_confidence_blocks,
     restructure_mistral_ocr,
 )
-from invoice_referee.policy import SettlementPolicyConfig, evaluate_settlement_policy
+from invoice_referee.policy import (
+    SettlementPolicyConfig,
+    evaluate_settlement_policy,
+    validate_expense_document,
+    validate_paper_settlement_document,
+)
 from invoice_referee.storage import SQLiteSettlementRepository
 
 OCR_SUFFIXES = {".jpeg", ".jpg", ".pdf", ".png", ".webp"}
@@ -32,6 +49,34 @@ SOURCE_GATE_RULES = {
     "SET_DOC_001",
 }
 
+VALIDITY_TO_CONFIDENCE_FIELDS = {
+    "issuer_name": {"seller_name"},
+    "issuer_tax_code": {"seller_tax_code"},
+    "buyer_name": {"buyer_name"},
+    "buyer_tax_code": {"buyer_tax_code"},
+    "document_number": {"invoice_number", "transaction_reference"},
+    "template_number": {"template_number"},
+    "serial_number": {"serial_number"},
+    "document_date": {"invoice_date"},
+    "total_amount": {"total_amount"},
+    "payer_name": {"buyer_name"},
+    "payee_name": {"seller_name"},
+    "transaction_reference": {"transaction_reference"},
+    "transaction_status": {"transaction_status"},
+    "confirmation_present": {"receipt_status"},
+    "purpose": {"business_purpose"},
+    "advance_amount": {"total_amount"},
+}
+
+
+def _required_confidence_fields(
+    validity: DocumentValidityResult,
+) -> set[str]:
+    fields: set[str] = set()
+    for field_name in validity.required_fields:
+        fields.update(VALIDITY_TO_CONFIDENCE_FIELDS.get(field_name, set()))
+    return fields.intersection(SETTLEMENT_BLOCKING_FIELDS)
+
 
 def _ocr_markdown(response: dict[str, Any]) -> str:
     return "\n\n".join(
@@ -39,6 +84,59 @@ def _ocr_markdown(response: dict[str, Any]) -> str:
         for page in response.get("pages") or []
         if str(page.get("markdown") or "").strip()
     )
+
+
+def _validity_findings(
+    result: DocumentValidityResult,
+    *,
+    filename: str,
+) -> list[SettlementFinding]:
+    source_refs = result.source_refs or [f"DOC:{result.document_id}"]
+    findings: list[SettlementFinding] = []
+    for issue in result.issues:
+        if issue.code.startswith("DOCUMENT_TYPE"):
+            rule_id = "SET_DOCUMENT_CLASSIFICATION_001"
+        elif issue.code == "BUYER_TAX_CODE_MISMATCH":
+            rule_id = "SET_BUYER_IDENTITY_001"
+        elif issue.code == "PAPER_FORM_DATA_WARNING":
+            rule_id = "SET_PAPER_CONSISTENCY_001"
+        elif issue.code == "DOCUMENT_DATA_WARNING":
+            rule_id = "SET_DOCUMENT_CONSISTENCY_001"
+        elif result.document_type == "PAPER_SETTLEMENT_REQUEST":
+            rule_id = "SET_PAPER_FORM_VALIDITY_001"
+        else:
+            rule_id = "SET_DOCUMENT_REQUIRED_FIELDS_001"
+        outside_policy = issue.code == "BUYER_TAX_CODE_MISMATCH"
+        findings.append(
+            SettlementFinding(
+                rule_id=rule_id,
+                status="FAIL" if issue.blocking else "WARN",
+                message=f"Chứng từ '{filename}': {issue.message}",
+                uncertainty_type=(
+                    UncertaintyType.OUTSIDE_POLICY
+                    if outside_policy
+                    else UncertaintyType.NONE
+                    if not issue.blocking
+                    else UncertaintyType.FACTUAL_UNKNOWN
+                ),
+                target=DecisionTarget.ACCOUNTANT,
+                question=issue.question if issue.blocking else None,
+                source_refs=source_refs,
+            )
+        )
+    if result.status == DocumentValidityStatus.CLEAR:
+        findings.append(
+            SettlementFinding(
+                rule_id="SET_DOCUMENT_VALIDITY_001",
+                status="PASS",
+                message=(
+                    f"Chứng từ '{filename}' được phân loại là "
+                    f"{result.document_type} và đủ dữ kiện bắt buộc."
+                ),
+                source_refs=source_refs,
+            )
+        )
+    return findings
 
 
 class SettlementProcessingService:
@@ -94,9 +192,10 @@ class SettlementProcessingService:
             quality_findings: list[SettlementFinding] = []
             document_facts: list[ExpenseDocumentFacts] = []
             if self.enable_document_pipeline:
-                quality_findings, document_facts = self._process_documents(
+                quality_findings, document_facts, paper_facts = self._process_documents(
                     case_id,
                     documents,
+                    draft,
                 )
                 if any(finding.status == "FAIL" for finding in quality_findings):
                     self._finish(
@@ -105,12 +204,24 @@ class SettlementProcessingService:
                         [*source_findings, *quality_findings],
                     )
                     return True
+            else:
+                paper_facts = None
 
-            duplicates = self.repository.find_case_duplicate_documents(case_id)
+            if draft.source_type == SubmissionSourceType.PAPER_SCAN:
+                self._finish_paper_case(
+                    job_id=job_id,
+                    case_id=case_id,
+                    draft=draft,
+                    documents=documents,
+                    quality_findings=quality_findings,
+                    document_facts=document_facts,
+                    paper_facts=paper_facts,
+                    has_paper_form=has_paper_form,
+                )
+                return True
             findings = evaluate_settlement_policy(
                 draft,
                 has_paper_form=has_paper_form,
-                duplicate_document_names=duplicates,
                 config=self.policy,
             )
             findings.extend(quality_findings)
@@ -123,29 +234,6 @@ class SettlementProcessingService:
                     )
                 )
 
-            if draft.source_type == SubmissionSourceType.PAPER_SCAN and has_paper_form:
-                findings.append(
-                    SettlementFinding(
-                        rule_id="SET_SIGNATURE_001",
-                        status="FAIL",
-                        message=(
-                            "Giấy đề nghị đã được tiếp nhận nhưng chữ ký tay "
-                            "chưa được xác nhận."
-                        ),
-                        uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
-                        target=DecisionTarget.ACCOUNTANT,
-                        question=(
-                            "Vui lòng kiểm tra giấy đề nghị và xác nhận đủ chữ ký "
-                            "theo chuỗi phê duyệt."
-                        ),
-                        source_refs=[
-                            f"DOC:{document['document_id']}"
-                            for document in documents
-                            if document["role"]
-                            == SettlementDocumentRole.SETTLEMENT_REQUEST_FORM.value
-                        ],
-                    )
-                )
             self._finish(job_id, case_id, findings)
         except Exception as exc:
             self.repository.fail_job(job_id, case_id, str(exc))
@@ -157,16 +245,27 @@ class SettlementProcessingService:
         case_id: str,
         findings: list[SettlementFinding],
     ) -> None:
-        decision = build_settlement_decision(findings)
+        decision = build_settlement_decision(
+            findings,
+            success_reason=build_settlement_success_reason(
+                self.repository.get_case(case_id)
+            ),
+        )
         self.repository.complete_job(job_id, case_id, findings, decision)
 
     def _process_documents(
         self,
         case_id: str,
         documents: list[dict[str, Any]],
-    ) -> tuple[list[SettlementFinding], list[ExpenseDocumentFacts]]:
+        draft: SettlementDraft,
+    ) -> tuple[
+        list[SettlementFinding],
+        list[ExpenseDocumentFacts],
+        PaperSettlementFacts | None,
+    ]:
         findings: list[SettlementFinding] = []
         facts: list[ExpenseDocumentFacts] = []
+        paper_facts: PaperSettlementFacts | None = None
         if self.ocr_adapter is None:
             return [
                 SettlementFinding(
@@ -177,7 +276,7 @@ class SettlementProcessingService:
                     target=DecisionTarget.ACCOUNTANT,
                     question="Vui lòng cấu hình OCR hoặc kiểm tra chứng từ thủ công.",
                 )
-            ], []
+            ], [], None
         if self.reasoning_adapter is None:
             return [
                 SettlementFinding(
@@ -191,7 +290,7 @@ class SettlementProcessingService:
                         "chứng từ thủ công."
                     ),
                 )
-            ], []
+            ], [], None
 
         for document in documents:
             document_id = str(document["document_id"])
@@ -235,6 +334,59 @@ class SettlementProcessingService:
                 for candidate in candidates:
                     candidate["source_file"] = document["original_name"]
 
+                extraction_payload = {
+                    "case_id": case_id,
+                    "document_id": document_id,
+                    "filename": document["original_name"],
+                    "role": document["role"],
+                    "ocr_text": _ocr_markdown(execution.response),
+                }
+                if (
+                    document["role"]
+                    == SettlementDocumentRole.SETTLEMENT_REQUEST_FORM.value
+                ):
+                    extracted_paper = self.reasoning_adapter.extract_paper_settlement(
+                        extraction_payload
+                    )
+                    if extracted_paper.document_id != document_id:
+                        raise ValueError(
+                            "Paper Extraction Agent trả document_id không khớp nguồn."
+                        )
+                    artifact_payload = extracted_paper.model_dump(mode="json")
+                    validity = validate_paper_settlement_document(
+                        extracted_paper,
+                        advance_amount_required=(
+                            draft.settlement_type
+                            == SettlementType.ADVANCE_SETTLEMENT
+                        ),
+                    )
+                else:
+                    extracted = self.reasoning_adapter.extract_expense_document(
+                        extraction_payload
+                    )
+                    if extracted.document_id != document_id:
+                        raise ValueError(
+                            "Extraction Agent trả document_id không khớp nguồn."
+                        )
+                    artifact_payload = extracted.model_dump(mode="json")
+                    validity = validate_expense_document(
+                        extracted,
+                        company_tax_codes=self.policy.company_tax_codes,
+                    )
+                self.repository.save_json_artifact(
+                    case_id,
+                    "facts",
+                    f"{document_id}.json",
+                    artifact_payload,
+                )
+                self.repository.save_json_artifact(
+                    case_id,
+                    "validity",
+                    f"{document_id}.json",
+                    validity.model_dump(mode="json"),
+                )
+                confidence_blocking_fields = _required_confidence_fields(validity)
+
                 if candidates:
                     confidence = self.reasoning_adapter.analyze_confidence(
                         {
@@ -244,6 +396,8 @@ class SettlementProcessingService:
                                 "evidence_id": document_id,
                                 "role": document["role"],
                                 "filename": document["original_name"],
+                                "document_type": validity.document_type,
+                                "required_fields": validity.required_fields,
                                 "ocr_text": _ocr_markdown(execution.response),
                                 "candidate_blocks": candidates,
                             },
@@ -252,6 +406,7 @@ class SettlementProcessingService:
                     legacy_findings = CaseProcessingService._confidence_findings(
                         candidates,
                         confidence,
+                        blocking_fields=confidence_blocking_fields,
                     )
                     for finding in legacy_findings:
                         detailed_source_refs = [
@@ -298,33 +453,30 @@ class SettlementProcessingService:
                         )
                     )
 
+                findings.extend(
+                    _validity_findings(
+                        validity,
+                        filename=document["original_name"],
+                    )
+                )
                 if any(
                     finding.status == "FAIL"
-                    and f"DOC:{document_id}" in finding.source_refs
+                    and any(
+                        source_ref == f"DOC:{document_id}"
+                        or source_ref.startswith(f"DOC:{document_id}:")
+                        for source_ref in finding.source_refs
+                    )
                     for finding in findings
                 ):
                     continue
-
-                extracted = self.reasoning_adapter.extract_expense_document(
-                    {
-                        "case_id": case_id,
-                        "document_id": document_id,
-                        "filename": document["original_name"],
-                        "role": document["role"],
-                        "ocr_text": _ocr_markdown(execution.response),
-                    }
-                )
-                if extracted.document_id != document_id:
-                    raise ValueError(
-                        "Extraction Agent trả document_id không khớp nguồn."
-                    )
-                self.repository.save_json_artifact(
-                    case_id,
-                    "facts",
-                    f"{document_id}.json",
-                    extracted.model_dump(mode="json"),
-                )
-                facts.append(extracted)
+                if validity.eligible_for_matching:
+                    if (
+                        document["role"]
+                        == SettlementDocumentRole.SETTLEMENT_REQUEST_FORM.value
+                    ):
+                        paper_facts = extracted_paper
+                    else:
+                        facts.append(extracted)
             except Exception as exc:
                 findings.append(
                     SettlementFinding(
@@ -343,7 +495,260 @@ class SettlementProcessingService:
                         source_refs=[f"DOC:{document_id}"],
                     )
                 )
-        return findings, facts
+        return findings, facts, paper_facts
+
+    def _finish_paper_case(
+        self,
+        *,
+        job_id: str,
+        case_id: str,
+        draft: SettlementDraft,
+        documents: list[dict[str, Any]],
+        quality_findings: list[SettlementFinding],
+        document_facts: list[ExpenseDocumentFacts],
+        paper_facts: PaperSettlementFacts | None,
+        has_paper_form: bool,
+    ) -> None:
+        base_findings = evaluate_settlement_policy(
+            draft,
+            has_paper_form=has_paper_form,
+            config=self.policy,
+        )
+        base_findings = [
+            finding for finding in base_findings if finding.rule_id != "SET_AUTH_001"
+        ]
+        if paper_facts is None or not paper_facts.lines:
+            base_findings.append(
+                SettlementFinding(
+                    rule_id="SET_PAPER_LINES_001",
+                    status="FAIL",
+                    message="Chưa trích xuất được các dòng chi phí từ đơn giấy.",
+                    uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
+                    target=DecisionTarget.ACCOUNTANT,
+                    question="Vui lòng kiểm tra bảng khoản chi trên đơn giấy.",
+                    source_refs=[
+                        f"DOC:{document['document_id']}"
+                        for document in documents
+                        if document["role"]
+                        == SettlementDocumentRole.SETTLEMENT_REQUEST_FORM.value
+                    ],
+                )
+            )
+            self._finish(job_id, case_id, [*base_findings, *quality_findings])
+            return
+
+        evidence_documents = [
+            document
+            for document in documents
+            if document["role"] == SettlementDocumentRole.EXPENSE_EVIDENCE.value
+        ]
+        items, links, matching_findings = match_paper_evidence(
+            paper_facts,
+            document_facts,
+            evidence_documents,
+            fallback_no_evidence_reason=draft.paper_no_evidence_reason,
+        )
+        for warning in paper_facts.extraction_warnings:
+            matching_findings.append(
+                SettlementFinding(
+                    rule_id="SET_PAPER_CONSISTENCY_001",
+                    status="FAIL",
+                    message=f"Đơn giấy có dữ liệu chưa nhất quán: {warning}",
+                    uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
+                    target=DecisionTarget.ACCOUNTANT,
+                    question=(
+                        "Vui lòng đối chiếu bản gốc và xác nhận giá trị đúng "
+                        "trên đơn giấy."
+                    ),
+                    source_refs=paper_facts.source_refs,
+                )
+            )
+        line_amounts = [line.amount for line in paper_facts.lines]
+        if paper_facts.total_amount is None:
+            matching_findings.append(
+                SettlementFinding(
+                    rule_id="SET_PAPER_TOTAL_001",
+                    status="FAIL",
+                    message="Chưa đọc được tổng cộng trên đơn giấy.",
+                    uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
+                    target=DecisionTarget.ACCOUNTANT,
+                    question="Vui lòng xác nhận tổng cộng trên đơn giấy.",
+                    source_refs=paper_facts.source_refs,
+                )
+            )
+        elif all(amount is not None for amount in line_amounts):
+            line_total = sum(
+                (amount for amount in line_amounts if amount is not None),
+                start=Decimal("0"),
+            )
+            if abs(line_total - paper_facts.total_amount) > Decimal("1"):
+                matching_findings.append(
+                    SettlementFinding(
+                        rule_id="SET_PAPER_TOTAL_001",
+                        status="FAIL",
+                        message=(
+                            f"Tổng các dòng là {line_total:,.0f} VND nhưng tổng "
+                            f"trên đơn là {paper_facts.total_amount:,.0f} VND."
+                        ),
+                        uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
+                        target=DecisionTarget.ACCOUNTANT,
+                        question=(
+                            "Vui lòng xác nhận tổng cộng hoặc số tiền của từng "
+                            "dòng trên đơn giấy."
+                        ),
+                        source_refs=paper_facts.source_refs,
+                    )
+                )
+            else:
+                matching_findings.append(
+                    SettlementFinding(
+                        rule_id="SET_PAPER_TOTAL_001",
+                        status="PASS",
+                        message="Tổng các dòng khớp tổng cộng trên đơn giấy.",
+                        source_refs=paper_facts.source_refs,
+                    )
+                )
+        claimed_total = paper_facts.total_amount or sum(
+            (Decimal(str(item["claimed_amount"])) for item in items),
+            start=Decimal("0"),
+        )
+        if draft.settlement_type == SettlementType.ADVANCE_SETTLEMENT:
+            if paper_facts.advance_amount is None or paper_facts.advance_amount <= 0:
+                matching_findings.append(
+                    SettlementFinding(
+                        rule_id="SET_ADV_AMOUNT_001",
+                        status="FAIL",
+                        message="Chưa đọc được số tiền đã tạm ứng hợp lệ trên đơn giấy.",
+                        uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
+                        target=DecisionTarget.ACCOUNTANT,
+                        question="Vui lòng xác nhận số tiền đã tạm ứng ghi trên đơn.",
+                        source_refs=paper_facts.source_refs,
+                    )
+                )
+            else:
+                matching_findings.append(
+                    SettlementFinding(
+                        rule_id="SET_ADV_AMOUNT_001",
+                        status="PASS",
+                        message=(
+                            f"Đơn khai số tiền đã tạm ứng "
+                            f"{paper_facts.advance_amount:,.0f} VND; MVP không đối "
+                            "chiếu với lịch sử giải ngân."
+                        ),
+                        source_refs=paper_facts.source_refs,
+                    )
+                )
+                expected_difference = abs(
+                    paper_facts.advance_amount - claimed_total
+                )
+                if paper_facts.reimbursement_amount is not None:
+                    if (
+                        abs(
+                            paper_facts.reimbursement_amount
+                            - expected_difference
+                        )
+                        > Decimal("1")
+                    ):
+                        matching_findings.append(
+                            SettlementFinding(
+                                rule_id="SET_SETTLEMENT_DIFF_001",
+                                status="FAIL",
+                                message=(
+                                    f"Chênh lệch tính lại là "
+                                    f"{expected_difference:,.0f} VND nhưng đơn ghi "
+                                    f"{paper_facts.reimbursement_amount:,.0f} VND."
+                                ),
+                                uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
+                                target=DecisionTarget.ACCOUNTANT,
+                                question=(
+                                    "Vui lòng xác nhận số tiền quyết toán chênh lệch "
+                                    "đúng trên đơn."
+                                ),
+                                source_refs=paper_facts.source_refs,
+                            )
+                        )
+                    else:
+                        if paper_facts.advance_amount > claimed_total:
+                            direction = "nhân viên hoàn trả công ty"
+                        elif paper_facts.advance_amount < claimed_total:
+                            direction = "công ty thanh toán thêm cho nhân viên"
+                        else:
+                            direction = "không phát sinh thanh toán thêm hoặc hoàn trả"
+                        matching_findings.append(
+                            SettlementFinding(
+                                rule_id="SET_SETTLEMENT_DIFF_001",
+                                status="PASS",
+                                message=(
+                                    f"Chênh lệch {expected_difference:,.0f} VND khớp "
+                                    f"phép tính; chiều tiền: {direction}."
+                                ),
+                                source_refs=paper_facts.source_refs,
+                            )
+                        )
+        self.repository.replace_paper_items(
+            case_id,
+            purpose=paper_facts.purpose,
+            items=items,
+            links=links,
+            claimed_total=str(claimed_total),
+            allocated_advance_amount=(
+                str(paper_facts.advance_amount)
+                if draft.settlement_type == SettlementType.ADVANCE_SETTLEMENT
+                and paper_facts.advance_amount is not None
+                else None
+            ),
+            beneficiary_name=paper_facts.beneficiary_name,
+            bank_account_number=paper_facts.bank_account_number,
+            bank_name=paper_facts.bank_name,
+        )
+        if claimed_total > self.policy.authority_amount_vnd:
+            authority_finding = SettlementFinding(
+                rule_id="SET_AUTH_001",
+                status="FAIL",
+                message=(
+                    f"Tổng hồ sơ {claimed_total:,.0f} VND vượt thẩm quyền demo "
+                    f"{self.policy.authority_amount_vnd:,.0f} VND."
+                ),
+                uncertainty_type=UncertaintyType.BEYOND_AUTHORITY,
+                target=DecisionTarget.DIRECTOR,
+                source_refs=paper_facts.source_refs,
+            )
+        else:
+            authority_finding = SettlementFinding(
+                rule_id="SET_AUTH_001",
+                status="PASS",
+                message="Tổng hồ sơ trong thẩm quyền demo.",
+                source_refs=paper_facts.source_refs,
+            )
+        approval_finding = SettlementFinding(
+            rule_id="SET_APPROVAL_001",
+            status="PENDING_APPROVAL",
+            message=(
+                "Hồ sơ đã qua bước kiểm tra tự động và đang chờ kế toán "
+                "xác nhận hoặc ký theo quy trình phê duyệt."
+            ),
+            uncertainty_type=UncertaintyType.NONE,
+            target=DecisionTarget.ACCOUNTANT,
+            question=(
+                "Kế toán kiểm tra bản gốc và thực hiện bước xác nhận/chữ ký; "
+                "sau đó hồ sơ được chuyển tiếp đến cấp phê duyệt kế tiếp."
+            ),
+            source_refs=[
+                f"DOC:{document['document_id']}"
+                for document in documents
+                if document["role"]
+                == SettlementDocumentRole.SETTLEMENT_REQUEST_FORM.value
+            ],
+        )
+        findings = [
+            *base_findings,
+            *quality_findings,
+            *matching_findings,
+            authority_finding,
+        ]
+        if not any(finding.status == "FAIL" for finding in findings):
+            findings.append(approval_finding)
+        self._finish(job_id, case_id, findings)
 
     @staticmethod
     def _reconciliation_findings(
@@ -354,7 +759,10 @@ class SettlementProcessingService:
         findings: list[SettlementFinding] = []
         facts_by_id = {fact.document_id: fact for fact in facts}
         for item in draft.expense_items:
-            if item.policy_exception_code:
+            if (
+                item.evidence_status == ExpenseEvidenceStatus.NO_EVIDENCE
+                or item.policy_exception_code
+            ):
                 continue
             item_documents = [
                 document

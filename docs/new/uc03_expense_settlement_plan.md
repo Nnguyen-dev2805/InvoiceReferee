@@ -14,7 +14,8 @@
 ```text
 ADVANCE_SETTLEMENT
   Nhân viên đã nhận tiền tạm ứng.
-  Bắt buộc advance_id và allocated_advance_amount.
+  MVP chỉ yêu cầu số tiền đã tạm ứng; không yêu cầu advance_id và không đối
+  chiếu/liên kết với lịch sử giải ngân.
 
 EMPLOYEE_REIMBURSEMENT
   Nhân viên tự chi tiền.
@@ -83,7 +84,8 @@ Cần thay đổi:
     "activity_start_date": "2026-10-15",
     "activity_end_date": "2026-10-17"
   },
-  "advance_id": "ADV-202610-001",
+  "advance_id": null,
+  "allocated_advance_amount": "4000000",
   "expense_items": [
     {
       "item_id": "ITEM-001",
@@ -114,7 +116,8 @@ Evidence có thể là hóa đơn điện tử, bill giấy, vé, chứng từ t
 
 ### 4.3. Quy tắc submit
 
-- `ADVANCE_SETTLEMENT` bắt buộc `advance_id`.
+- `ADVANCE_SETTLEMENT` không bắt buộc `advance_id` trong MVP. Form điện tử yêu
+  cầu số tiền tạm ứng lớn hơn 0; đơn giấy lấy số tiền này từ OCR.
 - `EMPLOYEE_REIMBURSEMENT` cấm gắn advance đang mở nếu người dùng chưa đổi subtype.
 - Mỗi expense item phải có evidence hoặc `policy_exception_code`.
 - File được gắn document role, không chỉ `PRIMARY/SUPPORTING`.
@@ -143,12 +146,16 @@ class ExpenseItem(BaseModel):
 
 class ExpenseDocumentFacts(BaseModel):
     document_id: str
-    document_type: str
+    document_type: ExpenseDocumentType
+    classification_confidence: float | None
+    classification_signals: list[str]
+    alternative_document_types: list[ExpenseDocumentType]
     issuer_name: str | None
     issuer_tax_code: str | None
     buyer_name: str | None
     buyer_tax_code: str | None
     document_number: str | None
+    template_number: str | None
     serial_number: str | None
     document_date: date | None
     subtotal: Decimal | None
@@ -157,7 +164,13 @@ class ExpenseDocumentFacts(BaseModel):
     service_charge: Decimal | None
     total_amount: Decimal | None
     payment_method: str | None
+    payer_name: str | None
+    payee_name: str | None
+    transaction_reference: str | None
+    transaction_status: str | None
+    confirmation_present: bool | None
     line_items: list[DocumentLineFact]
+    field_states: dict[str, DocumentFieldState]
     source_refs: list[str]
 
 class EvidenceAllocation(BaseModel):
@@ -214,8 +227,9 @@ Submit
        Confidence Agent nếu có candidate
        block nếu critical field chưa rõ
        document classification/extraction
+       document validity gate theo đúng loại chứng từ
   -> parse structured form trực tiếp nếu DIGITAL_FORM
-  -> validate extraction coverage
+  -> chỉ khi tất cả file cần dùng có eligible_for_matching=true
   -> link expense items to documents
   -> duplicate checks
   -> arithmetic and allocation checks
@@ -226,10 +240,50 @@ Submit
   -> accounting review UI
 ```
 
-### 7.1. Fail-fast nhưng không mất findings
+### 7.1. Phân loại và validity gate theo từng loại chứng từ
+
+Extraction Agent phân loại theo nội dung, không dùng tên file làm bằng chứng.
+Python chọn profile bắt buộc và quyết định file có được đưa vào matching hay
+không.
+
+| Loại | Vai trò | Dữ kiện bắt buộc trước matching |
+| --- | --- | --- |
+| `E_INVOICE` | Chứng từ gốc | Tên + MST hai bên, ngày, mẫu số, ký hiệu, số hóa đơn, tổng tiền và ít nhất một dòng hàng/dịch vụ |
+| `PAPER_RECEIPT`, `HOTEL_RECEIPT` | Chứng từ gốc | Đơn vị phát hành, ngày và tổng tiền; không ép có MST |
+| `TRANSPORT_TICKET` | Chứng từ gốc | Nhà vận chuyển, số vé/chứng từ, ngày và tổng tiền |
+| `COLLECTION_RECEIPT` | Chứng từ gốc | Bên thu, bên nộp, số phiếu, ngày và tổng tiền |
+| `CARD_SLIP` | Tài liệu bổ sung | Đơn vị chấp nhận thẻ, ngày, số tiền và mã giao dịch |
+| `PAYMENT_PROOF` | Tài liệu bổ sung | Người nhận, ngày, số tiền, mã giao dịch và trạng thái hoàn tất |
+| `CONTRACT`, `QUOTATION`, `PURCHASE_ORDER` | Tài liệu bổ sung | Các bên, ngày, số tham chiếu theo loại và dữ liệu tiền/hàng cần đối chiếu |
+| `ACCEPTANCE_RECORD`, `DELIVERY_NOTE`, `GOODS_RECEIPT` | Tài liệu bổ sung | Các bên, ngày, hàng hóa/dịch vụ và dấu hiệu xác nhận/tiếp nhận |
+| `SUPPLIER_CONFIRMATION` | Tài liệu bổ sung | Nhà cung cấp, ngày, nội dung xác nhận và dấu hiệu xác nhận |
+| `OTHER`, `UNKNOWN` | Chưa xác định | Luôn `NEEDS_HUMAN`, không được matching |
+
+Kết quả từng file được lưu tại `validity/{document_id}.json`, gồm:
+
+```json
+{
+  "document_type": "E_INVOICE",
+  "document_role": "ORIGINAL_EVIDENCE",
+  "status": "CLEAR | NEEDS_HUMAN | OUTSIDE_POLICY",
+  "eligible_for_matching": true,
+  "required_fields": [],
+  "present_fields": [],
+  "issues": [],
+  "source_refs": []
+}
+```
+
+Hóa đơn điện tử thiếu/không đọc rõ MST người mua là `NEEDS_HUMAN`. MST đọc
+rõ nhưng không thuộc danh sách `COMPANY_TAX_CODES` là `OUTSIDE_POLICY`. Bill
+giấy không bị áp yêu cầu MST của hóa đơn điện tử.
+
+### 7.2. Fail-fast nhưng không mất findings
 
 - Thiếu file bắt buộc: không gọi OCR/LLM; tạo `REQUEST_INFO` ngay.
 - Một file critical chưa rõ: dừng trước cross-source policy, nhưng giữ kết quả quality của mọi file đã xử lý.
+- Một file không vượt validity gate: không dùng facts của file đó để ghép; nếu
+  hồ sơ có bất kỳ file bắt buộc nào như vậy thì toàn case dừng trước matching.
 - Tool/LLM lỗi sau retry: fail closed, không dùng output dở dang để tính tiền.
 - Khi chạy lại, dùng OCR/facts cache theo `sha256 + model_version + prompt_version`.
 
@@ -254,6 +308,8 @@ Prompt phải tách riêng:
 
 ## 9. Liên kết khoản khai báo với evidence
 
+### 9.1. Form điện tử
+
 Thứ tự:
 
 1. Số hóa đơn/document reference do nhân viên khai trùng chính xác.
@@ -261,6 +317,66 @@ Thứ tự:
 3. So khớp amount/date/vendor.
 4. LLM đề xuất semantic link.
 5. Mơ hồ -> `REQUEST_INFO`, không tự chọn.
+
+Mỗi `ExpenseItemDraft` có khai báo evidence tường minh:
+
+```json
+{
+  "evidence_status": "ORIGINAL_EVIDENCE | ALTERNATIVE_EVIDENCE | NO_EVIDENCE",
+  "alternative_evidence_type": "PAYMENT_PROOF | RECEIPT_OR_COLLECTION_NOTE | CONTRACT_OR_ACCEPTANCE | SUPPLIER_CONFIRMATION | OTHER | null",
+  "evidence_exception_reason": "string | null",
+  "evidence_names": []
+}
+```
+
+- `ORIGINAL_EVIDENCE`: bắt buộc gắn file vào item.
+- `ALTERNATIVE_EVIDENCE`: bắt buộc gắn file, chọn loại và nhập lý do thiếu
+  chứng từ gốc; kết quả luôn cần kế toán xác nhận trong policy demo.
+- `NO_EVIDENCE`: bắt buộc nhập lý do, không gắn file và không tự động pass.
+- `policy_exception_code` chỉ dùng nội bộ và không hiển thị trong form nhân viên.
+
+### 9.2. Đơn giấy có bảng chi phí
+
+Đơn giấy không có `ExpenseItemDraft` tại thời điểm upload. Hệ thống tạo item sau
+khi OCR và trích xuất bảng:
+
+```text
+PAPER_SCAN + evidence chưa gắn item
+  -> OCR/Confidence từng file
+  -> Paper Settlement Extraction cho đơn chính
+  -> Expense Extraction cho từng evidence
+  -> tạo ExpenseItem từ từng dòng trên đơn
+  -> deterministic matching
+       invoice reference exact       = AUTO_LINK
+       amount + semantic đủ ngưỡng   = AUTO_LINK
+       tín hiệu trung bình            = SUGGEST_LINK + REQUEST_INFO
+       không có tín hiệu              = UNMATCHED + REQUEST_INFO
+  -> cộng unique evidence bằng Decimal
+  -> so tổng evidence với số tiền từng dòng
+  -> lưu item-document links và findings có source_refs
+```
+
+Quy tắc evidence của dòng:
+
+- `requires_evidence=true` khi dòng có số hóa đơn/chứng từ hoặc ghi rõ tài liệu
+  đính kèm.
+- Với `PAPER_SCAN`, `note` và `no_evidence_reason` được đọc trực tiếp từ cột
+  ghi chú của dòng; giao diện không yêu cầu nhân viên nhập lại giải trình.
+- Ghi chú “đính kèm bảng kê/thống kê” yêu cầu matching evidence. Ghi chú
+  “không có chứng từ” tạo `NO_EVIDENCE` cho dòng và chuyển kế toán xem xét.
+- Evidence gốc có thể được thay bằng bằng chứng thanh toán hay tài liệu khác,
+  nhưng chỉ `AUTO_LINK` khi đồng thời có số tiền và nội dung đủ mạnh; trường hợp
+  còn nghi ngờ phải để kế toán xác nhận.
+- Nếu hóa đơn và bằng chứng thanh toán cùng chứng minh một khoản, cả hai được
+  hiển thị nhưng tiền chỉ lấy từ chứng từ chi phí; không cộng thêm giao dịch
+  thanh toán lần thứ hai.
+- Một evidence không được tự ghép vào hai dòng. Liên kết thứ hai chỉ là đề xuất
+  và phải có kế toán xác nhận phân bổ.
+- Không có evidence và không có lý do riêng -> `REQUEST_INFO/FACTUAL_UNKNOWN`.
+- Có lý do riêng -> `ESCALATE/OUTSIDE_POLICY`; đây là đề nghị ngoại lệ, không
+  phải điều kiện tự động pass.
+- Không dùng một giải trình cấp hồ sơ để áp cho nhiều dòng; nguồn chuẩn của đơn
+  giấy là ô ghi chú gắn với chính dòng chi phí.
 
 Một document có thể cấp evidence cho nhiều item, nhưng bắt buộc có `EvidenceAllocation` và:
 
@@ -327,11 +443,11 @@ Không sử dụng trường có nhãn mơ hồ trên giấy như “số tiền
 
 ```yaml
 policy_id: DEMO-EXPENSE-2026
-policy_version: "1.0"
+policy_version: "1.2"
 data_classification: SYNTHETIC
 base_currency: VND
 submission_window_days: 30
-authority_amount_vnd: 50000000
+authority_amount_vnd: 100000000
 ocr_word_review_threshold: 0.85
 require_business_purpose: true
 require_project_for_categories: [TRAVEL, CLIENT_MEAL]
@@ -342,8 +458,9 @@ category_limits:
   TAXI:
     per_item: 2000000
 evidence_optional_categories: []
-required_paper_signature_roles:
+required_submission_signature_roles:
   - REQUESTER
+approval_roles:
   - CHIEF_ACCOUNTANT
   - DIRECTOR
 ```
@@ -355,10 +472,30 @@ required_paper_signature_roles:
 | Rule ID | Kiểm tra | Failure class/action |
 | --- | --- | --- |
 | `SET_INPUT_001` | Đúng subtype và đủ form chính | Thiếu -> `FACTUAL_UNKNOWN/REQUEST_INFO` |
-| `SET_ADV_001` | `ADVANCE_SETTLEMENT` có advance hợp lệ | Thiếu/không truy cập -> `REQUEST_INFO` |
+| `SET_ADV_001` | Form điện tử có số tiền tạm ứng lớn hơn 0; không tra cứu khoản gốc | Thiếu/số tiền không hợp lệ -> `REQUEST_INFO` |
+| `SET_ADV_AMOUNT_001` | Đơn giấy đọc được số tiền đã tạm ứng lớn hơn 0 | Thiếu/không rõ -> `REQUEST_INFO` |
+| `SET_SETTLEMENT_DIFF_001` | Chênh lệch trên đơn khớp `abs(tạm ứng - tổng chi)` nếu đơn có ghi chênh lệch | Không khớp -> `REQUEST_INFO` |
 | `SET_DOC_001` | Mỗi item có evidence hoặc exception | Thiếu -> `REQUEST_INFO` |
+| `SET_ALT_EVIDENCE_001` | Bằng chứng thay thế có file, loại và lý do | Đủ -> `OUTSIDE_POLICY/ESCALATE`; thiếu -> không cho gửi hoặc `REQUEST_INFO` |
+| `SET_NO_EVIDENCE_001` | Khoản không chứng từ có giải trình | Có lý do -> `OUTSIDE_POLICY/ESCALATE` |
+| `SET_PAPER_LINES_001` | Đọc được bảng chi phí trên đơn giấy | Không đọc được -> `REQUEST_INFO` |
+| `SET_PAPER_MATCH_001` | Evidence được ghép chắc chắn với dòng | Mơ hồ -> `REQUEST_INFO` |
+| `SET_PAPER_EVIDENCE_REQUIRED` | Dòng yêu cầu evidence có tài liệu hoặc lý do riêng | Thiếu -> `REQUEST_INFO` |
+| `SET_PAPER_EVIDENCE_EXCEPTION` | Lý do thiếu evidence cần kế toán chấp nhận | Có lý do -> `OUTSIDE_POLICY/ESCALATE` |
+| `SET_PAPER_AMOUNT_001` | Tổng evidence khớp số tiền dòng | Lệch -> `REQUEST_INFO` |
+| `SET_PAPER_LINE_AMOUNT_001` | Số tiền từng dòng đọc được | Không rõ -> `REQUEST_INFO` |
+| `SET_PAPER_TOTAL_001` | Tổng các dòng khớp tổng trên đơn | Lệch/thiếu -> `REQUEST_INFO` |
+| `SET_PAPER_CONSISTENCY_001` | Số bằng chữ, số bằng số và các giá trị quyết toán nhất quán | Mâu thuẫn -> `REQUEST_INFO` |
+| `SET_PAPER_UNMATCHED_001` | Mọi evidence đã xác định được dòng | Chưa ghép -> `REQUEST_INFO` |
 | `SET_QUALITY_001` | Critical field mỗi file đọc rõ | Không rõ -> `REQUEST_INFO` |
-| `SET_SIGNATURE_001` | Đơn giấy đủ signature role | Thiếu/mờ -> `REQUEST_INFO` |
+| `SET_DOCUMENT_CLASSIFICATION_001` | Chứng từ thuộc loại UC03 hỗ trợ | Mơ hồ/không xác định -> `REQUEST_INFO` |
+| `SET_DOCUMENT_REQUIRED_FIELDS_001` | Đủ trường bắt buộc theo đúng loại chứng từ | Thiếu/không hợp lệ -> `REQUEST_INFO` |
+| `SET_DOCUMENT_VALIDITY_001` | Chứng từ rõ và đủ dữ kiện để matching | Đủ -> `PASS` |
+| `SET_DOCUMENT_CONSISTENCY_001` | Không có cảnh báo dữ liệu trọng yếu trong chính chứng từ | Có cảnh báo -> `REQUEST_INFO` |
+| `SET_BUYER_IDENTITY_001` | MST người mua thuộc doanh nghiệp cấu hình | Khác rõ -> `OUTSIDE_POLICY/ESCALATE` |
+| `SET_PAPER_FORM_VALIDITY_001` | Đơn giấy có mục đích, tổng và các dòng chi rõ | Thiếu -> `REQUEST_INFO` |
+| `SET_SIGNATURE_001` | Đủ chữ ký phải có trước khi nhân viên nộp hồ sơ | Thiếu/mờ -> `REQUEST_INFO` |
+| `SET_APPROVAL_001` | Hồ sơ đã đạt kiểm tra và chờ kế toán/cấp tiếp theo phê duyệt | `PENDING_APPROVAL`; không phải failure và không chặn Decision Guard |
 | `SET_LINK_001` | Item-evidence link xác định | Mơ hồ -> `REQUEST_INFO` |
 | `SET_DUP_001` | Không exact duplicate | Trùng -> `OUTSIDE_POLICY/ESCALATE` |
 | `SET_DUP_002` | Probable duplicate được xác minh | Chưa rõ -> `REQUEST_INFO` |
@@ -423,7 +560,7 @@ Question không được chứa “confidence thấp”, block ID, schema hay t�
 ### 15.2. Digital form
 
 - Business context.
-- Advance selector khi là `ADVANCE_SETTLEMENT`.
+- Ô số tiền đã tạm ứng khi là `ADVANCE_SETTLEMENT`; không hiển thị advance selector hoặc mã tạm ứng trong MVP.
 - Expense-item editor có thêm/xóa dòng.
 - Upload evidence và gắn vào item.
 - Client validation trước submit.
@@ -642,7 +779,8 @@ Schema mới tăng version và reader vẫn đọc được case `1.0/1.3` cũ.
 | `SET-05` | Tổng thanh toán OCR không rõ | `REQUEST_INFO/FACTUAL_UNKNOWN` |
 | `SET-06` | Claimed amount khác document amount | `REQUEST_INFO/FACTUAL_UNKNOWN` |
 | `SET-07` | Thiếu business purpose bắt buộc | `REQUEST_INFO/FACTUAL_UNKNOWN` |
-| `SET-08` | Đơn giấy thiếu chữ ký kế toán trưởng | `REQUEST_INFO/FACTUAL_UNKNOWN` |
+| `SET-08` | Đơn giấy chưa có chữ ký kế toán trưởng vì đây là bước sau kiểm tra | `AUTO_PROCESS` kèm `SET_APPROVAL_001/PENDING_APPROVAL` |
+| `SET-09` | Đơn giấy thiếu chữ ký người đề nghị bắt buộc trước khi nộp | `REQUEST_INFO/FACTUAL_UNKNOWN` |
 | `SET-09` | Exact duplicate lịch sử | `ESCALATE/OUTSIDE_POLICY` |
 | `SET-10` | Probable duplicate chưa đủ căn cứ | `REQUEST_INFO/FACTUAL_UNKNOWN` |
 | `SET-11` | Chi phí cá nhân rõ ràng | `ESCALATE/OUTSIDE_POLICY` |

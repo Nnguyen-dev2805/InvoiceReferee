@@ -9,6 +9,7 @@ from decimal import Decimal
 from invoice_referee.domain import (
     DecisionTarget,
     ExpenseCategory,
+    ExpenseEvidenceStatus,
     SettlementDraft,
     SettlementFinding,
     SettlementType,
@@ -20,10 +21,12 @@ from invoice_referee.domain import (
 @dataclass(frozen=True, slots=True)
 class SettlementPolicyConfig:
     policy_id: str = "DEMO-EXPENSE-2026"
-    policy_version: str = "1.0"
+    policy_version: str = "1.2"
     data_classification: str = "SYNTHETIC"
     submission_window_days: int = 30
-    authority_amount_vnd: Decimal = Decimal("50000000")
+    authority_amount_vnd: Decimal = Decimal("100000000")
+    company_legal_name: str | None = None
+    company_tax_codes: frozenset[str] = frozenset()
     category_limits: dict[ExpenseCategory, Decimal] = field(
         default_factory=lambda: {
             ExpenseCategory.CLIENT_MEAL: Decimal("5000000"),
@@ -43,7 +46,6 @@ def evaluate_settlement_policy(
     draft: SettlementDraft,
     *,
     has_paper_form: bool,
-    duplicate_document_names: list[str] | None = None,
     today: date | None = None,
     config: SettlementPolicyConfig | None = None,
 ) -> list[SettlementFinding]:
@@ -53,7 +55,14 @@ def evaluate_settlement_policy(
     current_date = today or date.today()
     findings: list[SettlementFinding] = []
 
-    if draft.business_context.purpose.strip():
+    if draft.source_type == SubmissionSourceType.PAPER_SCAN:
+        findings.append(
+            _pass(
+                "SET_CONTEXT_001",
+                "Mục đích và nội dung khoản chi được đọc từ đơn giấy.",
+            )
+        )
+    elif draft.business_context.purpose.strip():
         findings.append(_pass("SET_CONTEXT_001", "Đã có mục đích khoản chi."))
     else:
         findings.append(
@@ -82,23 +91,34 @@ def evaluate_settlement_policy(
         findings.append(_pass("SET_INPUT_001", "Đã có dữ liệu đề nghị chính."))
 
     if draft.settlement_type == SettlementType.ADVANCE_SETTLEMENT:
-        if not draft.advance_id or draft.allocated_advance_amount <= 0:
+        if draft.source_type == SubmissionSourceType.PAPER_SCAN:
+            findings.append(
+                _pass(
+                    "SET_ADV_001",
+                    "Số tiền tạm ứng sẽ được đọc và kiểm tra từ đơn giấy; "
+                    "MVP không đối chiếu khoản tạm ứng gốc.",
+                )
+            )
+        elif draft.allocated_advance_amount <= 0:
             findings.append(
                 SettlementFinding(
                     rule_id="SET_ADV_001",
                     status="FAIL",
-                    message="Hồ sơ hoàn ứng chưa xác định đủ khoản tạm ứng liên quan.",
+                    message="Hồ sơ quyết toán chưa có số tiền tạm ứng hợp lệ.",
                     uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
                     target=DecisionTarget.EMPLOYEE,
-                    question=(
-                        "Vui lòng bổ sung mã khoản tạm ứng và số tiền tạm ứng "
-                        "được phân bổ cho hồ sơ này."
-                    ),
+                    question="Vui lòng bổ sung số tiền tạm ứng lớn hơn 0.",
                 )
             )
         else:
-            findings.append(_pass("SET_ADV_001", "Đã khai báo khoản tạm ứng."))
-    elif draft.advance_id or draft.allocated_advance_amount != 0:
+            findings.append(
+                _pass(
+                    "SET_ADV_001",
+                    "Đã khai báo số tiền tạm ứng; MVP chấp nhận dữ liệu này "
+                    "mà không tra cứu hoặc liên kết khoản tạm ứng gốc.",
+                )
+            )
+    elif draft.allocated_advance_amount != 0:
         findings.append(
             SettlementFinding(
                 rule_id="SET_ADV_001",
@@ -117,7 +137,11 @@ def evaluate_settlement_policy(
 
     for item in draft.expense_items:
         item_ref = f"FORM:EXPENSE_ITEM:{item.item_id}"
-        if not item.evidence_names and not item.policy_exception_code:
+        if (
+            item.evidence_status == ExpenseEvidenceStatus.ORIGINAL_EVIDENCE
+            and not item.evidence_names
+            and not item.policy_exception_code
+        ):
             findings.append(
                 SettlementFinding(
                     rule_id="SET_DOC_001",
@@ -128,6 +152,62 @@ def evaluate_settlement_policy(
                     question=(
                         f"Vui lòng bổ sung chứng từ cho khoản '{item.description}' "
                         "hoặc nêu mã ngoại lệ được phép."
+                    ),
+                    source_refs=[item_ref],
+                )
+            )
+        elif item.evidence_status == ExpenseEvidenceStatus.ALTERNATIVE_EVIDENCE:
+            if not item.evidence_names:
+                findings.append(
+                    SettlementFinding(
+                        rule_id="SET_ALT_EVIDENCE_001",
+                        status="FAIL",
+                        message=(
+                            f"Khoản '{item.description}' chọn bằng chứng thay thế "
+                            "nhưng chưa có file đính kèm."
+                        ),
+                        uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
+                        target=DecisionTarget.EMPLOYEE,
+                        question=(
+                            f"Vui lòng tải bằng chứng thay thế cho khoản "
+                            f"'{item.description}'."
+                        ),
+                        source_refs=[item_ref],
+                    )
+                )
+            else:
+                findings.append(
+                    SettlementFinding(
+                        rule_id="SET_ALT_EVIDENCE_001",
+                        status="FAIL",
+                        message=(
+                            f"Khoản '{item.description}' sử dụng bằng chứng thay "
+                            f"thế loại {item.alternative_evidence_type.value}; lý do: "
+                            f"{item.evidence_exception_reason}"
+                        ),
+                        uncertainty_type=UncertaintyType.OUTSIDE_POLICY,
+                        target=DecisionTarget.ACCOUNTANT,
+                        question=(
+                            "Vui lòng xác nhận bằng chứng thay thế có được chấp "
+                            "nhận cho khoản chi này hay không."
+                        ),
+                        source_refs=[item_ref],
+                    )
+                )
+        elif item.evidence_status == ExpenseEvidenceStatus.NO_EVIDENCE:
+            findings.append(
+                SettlementFinding(
+                    rule_id="SET_NO_EVIDENCE_001",
+                    status="FAIL",
+                    message=(
+                        f"Khoản '{item.description}' không có chứng từ; lý do: "
+                        f"{item.evidence_exception_reason}"
+                    ),
+                    uncertainty_type=UncertaintyType.OUTSIDE_POLICY,
+                    target=DecisionTarget.ACCOUNTANT,
+                    question=(
+                        "Vui lòng xác nhận khoản không có chứng từ này có được "
+                        "chấp nhận theo ngoại lệ hay không."
                     ),
                     source_refs=[item_ref],
                 )
@@ -208,21 +288,4 @@ def evaluate_settlement_policy(
     else:
         findings.append(_pass("SET_AUTH_001", "Tổng hồ sơ trong thẩm quyền demo."))
 
-    duplicates = duplicate_document_names or []
-    if duplicates:
-        findings.append(
-            SettlementFinding(
-                rule_id="SET_DUP_001",
-                status="FAIL",
-                message="Phát hiện chứng từ trùng hồ sơ đã lưu: " + ", ".join(duplicates),
-                uncertainty_type=UncertaintyType.SUSPICIOUS,
-                target=DecisionTarget.ACCOUNTANT,
-            )
-        )
-    else:
-        findings.append(
-            _pass("SET_DUP_001", "Không phát hiện file chứng từ trùng lịch sử.")
-        )
-
     return findings
-

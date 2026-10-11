@@ -12,6 +12,7 @@ from invoice_referee.application import (
 )
 from invoice_referee.config import AppSettings
 from invoice_referee.extraction import KimiReasoningAdapter, MistralOcrAdapter
+from invoice_referee.policy import SettlementPolicyConfig
 from invoice_referee.storage import SQLiteSettlementRepository
 
 
@@ -28,6 +29,10 @@ def build_runtime(settings: AppSettings) -> WebRuntime:
     repository = SQLiteSettlementRepository(
         settings.settlement_database_path,
         settings.settlement_artifacts_root,
+    )
+    policy = SettlementPolicyConfig(
+        company_legal_name=settings.company_legal_name,
+        company_tax_codes=settings.company_tax_codes,
     )
     document_pipeline_enabled = os.getenv(
         "UC03_DOCUMENT_PIPELINE_ENABLED",
@@ -54,9 +59,10 @@ def build_runtime(settings: AppSettings) -> WebRuntime:
     return WebRuntime(
         settings=settings,
         repository=repository,
-        submit_service=SubmitSettlementService(repository),
+        submit_service=SubmitSettlementService(repository, policy=policy),
         processor=SettlementProcessingService(
             repository,
+            policy=policy,
             ocr_adapter=ocr_adapter,
             reasoning_adapter=reasoning_adapter,
             enable_document_pipeline=document_pipeline_enabled,
