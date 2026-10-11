@@ -74,6 +74,8 @@ Freeze dataset/input/source/policy/gold/model/config trước run. B1 có thể 
 
 Verify Escalation 5 đề xuất 3 B7 routine (+3, surplus−0,7, fulfilled0) và 2 needs (actual advance unknown, budget exception có quyền). Full suite vẫn cần authority Q14/Q15 và inputs mới. Core 4 là suite riêng theo đề. Runner sequential qua cùng app; hiển thị expected/actual/verdict/timestamp/mode/versions. CLI được mô tả nhưng chưa chạy không verified.
 
+**B7 v2 (2026-10-11):** corpus `docs/discovery/eval_development_v2` (5 packets, `schema_version: settlement-packet-v2`) với context typed + oracle `ExpectedV2` + replay sidecar. Chạy `POLICY_REPLAY` qua cùng `Service`/application; mode chọn bằng `--mode policy-replay` (CLI), `mode` trong `VerifyRunRequest`, hoặc env `SETTLEMENT_EVAL_MODE`. `POLICY_REPLAY` chỉ kiểm rules/application với facts/links chuẩn bị sẵn (source-mapped theo sha256 nguồn) — **không** chứng minh reader tự đọc/ghép nguồn; cần LIVE với originals cho điều đó. Kết quả tham chiếu (development, chưa phải chất lượng đã chứng minh): 3 routine PASS, 2 needs (Q11 unknown-A + followup assisted, Q13 POLICY exception undecided) — artifact local `data/settlement/verify/b7-v2/`. Q13 decision branches (`accept_all`/`accept_part`) là audit-only, NOT_EXECUTED. Authority là grant scoped theo employee/work + hiệu lực + hạn mức employee-cost/settlement; thiếu hạn mức không phải vô hạn.
+
 ## E6. Gates và phép so sánh AI
 
 | Gate | Evidence |

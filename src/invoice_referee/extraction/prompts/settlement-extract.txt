@@ -9,5 +9,6 @@ Quy tắc bắt buộc:
   - "NOT_FOUND": key được yêu cầu nhưng không thấy trong phạm vi văn bản này.
   - "UNCLEAR": thấy đề cập nhưng mờ/số bị che/mâu thuẫn — value để null, raw_text giữ nguyên bản.
 - Không dùng số tiền từ khai báo/đề nghị làm câu trả lời cho trường của tài liệu; chỉ trích những gì văn bản thực viết.
+- Sự kiện tiền ứng: dùng `history.advance_event.<event_ref>.amount` (số tiền lệnh), `.receiver_ref` (người nhận), `.decision_ref` (mã quyết định), `.outcome` (UNCONFIRMED | RECEIVED | FAILED | PENDING), `.event_at` (thời điểm). `event_ref` là mã giao dịch/lệnh trên nguồn. KHÔNG dùng số tiền đề nghị/approval làm `history.advance.received`; `received` chỉ khi nguồn chứng minh người nhận đã thực nhận. Trạng thái thô (ví dụ SUBMITTED) không phải đã nhận.
 - Không bịa fact_id trùng nhau; fact_id ngắn, duy nhất trong output.
 - Không thêm nhận xét, không giải thích ngoài JSON.

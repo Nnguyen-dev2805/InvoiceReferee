@@ -342,18 +342,29 @@ class Service:
 
     def _grant_for(self, command: Command, case: CaseView,
                    amount_vnd: int | None):
-        """Demo authority gate: role APPROVER plus a grant covering work/amount."""
+        """Demo authority gate: role APPROVER plus a scoped covering grant.
+
+        Uses the shared ``covering_grant`` so a decision is bounded by the same
+        employee/work scope, effective window and settlement limit as the
+        engine — not by comparing the payload amount alone.
+        """
+        from invoice_referee.settlement.rules import covering_grant
+
         if command.demo_role != "APPROVER":
             return None
-        for grant in self.config.authority:
-            if grant.actor_ref != command.actor_id:
-                continue
-            if grant.work_ref is not None and grant.work_ref != case.submission.work_ref:
-                continue
-            if amount_vnd is not None and amount_vnd > grant.max_settlement_vnd:
-                continue
-            return grant
-        return None
+        scoped = [g for g in self.config.authority
+                  if g.actor_ref == command.actor_id]
+        if not scoped:
+            return None
+        return covering_grant(
+            scoped, employee_ref=case.submission.employee_ref,
+            work_ref=case.submission.work_ref,
+            effective_at=case.submission.money_as_of,
+            employee_cost_vnd=None,
+            settlement_vnd=amount_vnd,
+            total_work_cost_vnd=None,
+            exception_required=False,
+        )
 
     def decide(self, case_id: str, payload: dict[str, Any],
                command: Command) -> DecisionView:

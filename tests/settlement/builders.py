@@ -101,7 +101,12 @@ def same_event(rel_id: str, first: str, second: str,
 def run_input(job: str = "B7", facts=(), relations=(),
               max_settlement: int = 100_000_000,
               work_ref: str = "CT-01") -> RunInput:
-    """Build a RunInput plus the engine inputs; sources referenced by fixtures."""
+    """Build a RunInput plus the engine inputs; sources referenced by fixtures.
+
+    The default grant is a *scoped, sufficient* authority for the routine
+    fixture (employee NV-01 / work CT-01, effective at the cutoff). Tests that
+    exercise authority limits override ``authority`` themselves.
+    """
     from invoice_referee.settlement.models import AuthorityGrant
 
     return RunInput(
@@ -109,8 +114,13 @@ def run_input(job: str = "B7", facts=(), relations=(),
         submission=submission(job, work_ref),
         sources=[_source_record(f"S{i}") for i in range(1, 5)],
         coverage=None, policy={"version": "demo-v0", "activated": True},
-        authority=[AuthorityGrant(actor_ref="P-01", work_ref=None,
-                                  max_settlement_vnd=max_settlement)],
+        authority=[AuthorityGrant(
+            actor_ref="P-01", work_ref=work_ref, employee_ref="NV-01",
+            max_settlement_vnd=max_settlement,
+            max_employee_cost_vnd=max_settlement,
+            effective_from=datetime(2026, 10, 3, tzinfo=timezone.utc),
+            effective_until=datetime(2026, 10, 10, 23, 59, 59,
+                                     tzinfo=timezone.utc))],
         response_refs=[], config={"reader_mode": "FAKE_OR_REPLAY"},
         snapshot_hash="snap-test",
     ), list(facts), list(relations)

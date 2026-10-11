@@ -39,7 +39,9 @@ def service(tmp_path):
     reader = StructuredLedgerReader(store.artifact_root)
     return Service(store, reader, config=ServiceConfig(authority=[
         AuthorityGrant(actor_ref="P-DEMO", work_ref=None,
-                       max_settlement_vnd=10_000_000),
+                       employee_ref=None,
+                       max_settlement_vnd=10_000_000,
+                       max_employee_cost_vnd=10_000_000),
     ]))
 
 
@@ -258,7 +260,9 @@ def test_decision_rejects_basis_run_not_succeeded(tmp_path):
     service = Service(store, BudgetOutReader(store.artifact_root),
                       config=ServiceConfig(authority=[
                           AuthorityGrant(actor_ref="P-DEMO", work_ref=None,
-                                         max_settlement_vnd=10_000_000)]))
+                       employee_ref=None,
+                       max_settlement_vnd=10_000_000,
+                       max_employee_cost_vnd=10_000_000)]))
     case = _make_case_with_run(service, "CT-FAILED-RUN")
     assert service.get_run(case.current_run_id).status != "SUCCEEDED"
     view = service.get_case(case.id)

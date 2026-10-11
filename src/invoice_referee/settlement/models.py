@@ -324,13 +324,24 @@ class Relation(BaseModel):
 
 
 class AuthorityGrant(BaseModel):
-    """Demo authority grant: an actor may approve up to an amount, per work."""
+    """Demo authority grant: an actor may decide up to limits, per work.
+
+    ``max_settlement_vnd`` bounds the settlement amount (net paid/collected);
+    the v2 fields bound the employee cost and an optional work-cost exception.
+    A missing limit is NOT unlimited: a grant that does not cover a needed
+    limit simply does not cover that content (Rulebook R8).
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     actor_ref: str
     work_ref: str | None = None
     max_settlement_vnd: StrictInt
+    employee_ref: str | None = None
+    max_employee_cost_vnd: StrictInt | None = None
+    max_exception_work_cost_vnd: StrictInt | None = None
+    effective_from: AwareDatetime | None = None
+    effective_until: AwareDatetime | None = None
 
 
 class RunInput(BaseModel):

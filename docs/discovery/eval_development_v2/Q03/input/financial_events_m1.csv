@@ -1,0 +1,3 @@
+source_record_ref,event_ref,event_type,event_date,payer,payee,related_employee,work_ref,amount_vnd,currency,raw_status,business_ref,receipt_source
+FIN-ROW-AIR-03,TX-AIR-03,COMPANY_TO_VENDOR,2026-10-04,ORG-DEMO-01,VENDOR-AIR-03,NV-DEMO-03,CT-DEMO-03,3000000,VND,SETTLED,BOOK-DEMO-03,expense_and_payment_sources.md#air-receipt
+FIN-ROW-ADV-03,TX-ADV-03,ADVANCE_TO_EMPLOYEE,2026-10-04,ORG-DEMO-01,NV-DEMO-03,NV-DEMO-03,CT-DEMO-03,4000000,VND,SETTLED,DEC-PRE-03,expense_and_payment_sources.md#advance-receipt

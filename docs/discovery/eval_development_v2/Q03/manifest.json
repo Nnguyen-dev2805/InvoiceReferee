@@ -1,0 +1,98 @@
+{
+  "author_hints_removed": false,
+  "business_story_id": "CT-DEMO-03",
+  "context_file": {
+    "path": "context.json",
+    "sha256": "8ce52d8da4dbb1482794584b7acb18af932f0db0006d87c3c24735aa00cee285"
+  },
+  "currency": "VND",
+  "dataset_role": "DEVELOPMENT_ONLY",
+  "evaluation_case_id": "Q03",
+  "expected_files": [
+    {
+      "path": "expected/initial.json",
+      "sha256": "bbe6bc2500e5a146ac28f4584fe88b3f3b43f0ffdc50470a0b39c755e67de220"
+    }
+  ],
+  "expected_is_input": false,
+  "expected_path": "expected/initial.json",
+  "expected_sha256": "bbe6bc2500e5a146ac28f4584fe88b3f3b43f0ffdc50470a0b39c755e67de220",
+  "family_id": "WORK_BUDGET_TEMPLATE_01",
+  "followup_is_initial_input": false,
+  "independent_gold_validated": false,
+  "initial_input_files": [
+    {
+      "path": "input/employee_claim.md",
+      "sha256": "c1c8892b1b8ca13f1f4a01bcb110dc4fbb2887b05a1144098435cf0a9d9db1a7"
+    },
+    {
+      "path": "input/authority_and_pretrip.md",
+      "sha256": "4307cca3273c3a68b54645ee512c49ed7654328f81bfa7d2f69b18c377b008b7"
+    },
+    {
+      "path": "input/expense_and_payment_sources.md",
+      "sha256": "63b230f2dfec7b828950d5faab2662ce9732d21cd723a22f8c70abb64d990a5f"
+    },
+    {
+      "path": "input/financial_events_m1.csv",
+      "sha256": "907d9d09f3a173f1f2eb27bc5b13c90531611df340fd72d71e36839ab5117ee5"
+    },
+    {
+      "path": "input/coverage_m1.md",
+      "sha256": "c4f0b4d338514b24a34c5d2c6b990fa09c003fe2dc89f5002682dc3edf7f4e29"
+    }
+  ],
+  "job": "B7",
+  "origin_manifest": {
+    "path": "origin/manifest.json",
+    "sha256": "9abc2378586354cbf4f60310239e2c849b07222b22a5ae2b596345bd825365e1"
+  },
+  "policy_files": [
+    {
+      "path": "policy_bundle/R4_WORK_BUDGET_POLICY.md",
+      "sha256": "2dd31c343fc6a2fbc908c1b6624a8fcb83e5cb94fdae4baf8cdd668300a9674f",
+      "snapshot_path": "policy_bundle/R4_WORK_BUDGET_POLICY.md",
+      "source_path": "docs/discovery/R4_WORK_BUDGET_POLICY.md"
+    },
+    {
+      "path": "policy_bundle/R4_EVIDENCE_RULES_DRAFT.md",
+      "sha256": "9adb49595ed75e18ddbbea6f4589e171b707b57bde507f4e1505d82975d65a55",
+      "snapshot_path": "policy_bundle/R4_EVIDENCE_RULES_DRAFT.md",
+      "source_path": "docs/discovery/R4_EVIDENCE_RULES_DRAFT.md"
+    },
+    {
+      "path": "policy_bundle/R4_ROLES_HANDOFF_POLICY.md",
+      "sha256": "4125944dbdb04114559c0225501073c3ff39366cb60a4f83220959273f84ddc9",
+      "snapshot_path": "policy_bundle/R4_ROLES_HANDOFF_POLICY.md",
+      "source_path": "docs/discovery/R4_ROLES_HANDOFF_POLICY.md"
+    },
+    {
+      "path": "policy_bundle/R4_SOURCE_INTAKE_CONTRACT.md",
+      "sha256": "86e8dd340485c88a0726a2f3e0352edcf86b152d62133acf78bed16785b67355",
+      "snapshot_path": "policy_bundle/R4_SOURCE_INTAKE_CONTRACT.md",
+      "source_path": "docs/discovery/R4_SOURCE_INTAKE_CONTRACT.md"
+    },
+    {
+      "path": "policy_bundle/B8_B9_MVP_PROPOSAL.md",
+      "sha256": "8fea65ab5f01586bd2742e850c6ae6be929a85b8e0b1bf7e1ab828051731c1d3",
+      "snapshot_path": "policy_bundle/B8_B9_MVP_PROPOSAL.md",
+      "source_path": "docs/discovery/B8_B9_MVP_PROPOSAL.md"
+    },
+    {
+      "path": "policy_bundle/R3_MVP_SCOPE_DRAFT.md",
+      "sha256": "8e13dfe2402ddc28ffd3c7459728a17e5bd70f590e06d61bca144735b63cac10",
+      "snapshot_path": "policy_bundle/R3_MVP_SCOPE_DRAFT.md",
+      "source_path": "docs/discovery/R3_MVP_SCOPE_DRAFT.md"
+    }
+  ],
+  "replay_observations_file": {
+    "path": "replay/observations.json",
+    "sha256": "0d93beec9b80b1a53e0564f94173c1d95326b230acdc276b43f421edf725eae7"
+  },
+  "replay_relations_file": {
+    "path": "replay/relations.json",
+    "sha256": "2f11677878c9c6bffd192a52f4562a8be9730b17f3cdf5a311ec3b2430c03649"
+  },
+  "schema_version": "settlement-packet-v2",
+  "synthetic_only": true
+}

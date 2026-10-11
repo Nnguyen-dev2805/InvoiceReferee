@@ -1,0 +1,492 @@
+[
+  {
+    "basis": "SOURCE_QUOTE",
+    "derivation_refs": [],
+    "fact_id": "001-air-amt",
+    "key": "expense.INV-AIR-001.amount",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "3.000.000",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": 3000000
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/expense_and_payment_sources.md"
+    ],
+    "fact_id": "001-air-purp",
+    "key": "expense.INV-AIR-001.purpose",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "BUSINESS",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": "BUSINESS"
+  },
+  {
+    "basis": "SOURCE_QUOTE",
+    "derivation_refs": [],
+    "fact_id": "001-air-pay-amt",
+    "key": "payment.TX-AIR-001.amount",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "3000000",
+    "read_state": "READ",
+    "source_file": "financial_events_m1.csv",
+    "source_sha256": "2db04b0f9d2894b028d449dee4c49c0a12e8fcfdd8d259f0b112d92d0cf9357e",
+    "usability": "USABLE",
+    "value": 3000000
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/expense_and_payment_sources.md"
+    ],
+    "fact_id": "001-air-pay-payer",
+    "key": "payment.TX-AIR-001.payer",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "COMPANY",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": "COMPANY"
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/expense_and_payment_sources.md"
+    ],
+    "fact_id": "001-air-pay-st",
+    "key": "payment.TX-AIR-001.status",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "RECEIVED",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": "RECEIVED"
+  },
+  {
+    "basis": "SOURCE_QUOTE",
+    "derivation_refs": [],
+    "fact_id": "001-air-recv",
+    "key": "payment.PAY-AIR-001.amount",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "3.000.000",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": 3000000
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/expense_and_payment_sources.md"
+    ],
+    "fact_id": "001-air-recv-payer",
+    "key": "payment.PAY-AIR-001.payer",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "COMPANY",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": "COMPANY"
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/expense_and_payment_sources.md"
+    ],
+    "fact_id": "001-air-recv-st",
+    "key": "payment.PAY-AIR-001.status",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "RECEIVED",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": "RECEIVED"
+  },
+  {
+    "basis": "SOURCE_QUOTE",
+    "derivation_refs": [],
+    "fact_id": "001-hotel-amt",
+    "key": "expense.INV-HOTEL-001.amount",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "3.000.000",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": 3000000
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/expense_and_payment_sources.md"
+    ],
+    "fact_id": "001-hotel-purp",
+    "key": "expense.INV-HOTEL-001.purpose",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "BUSINESS",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": "BUSINESS"
+  },
+  {
+    "basis": "SOURCE_QUOTE",
+    "derivation_refs": [],
+    "fact_id": "001-hotel-pay-amt",
+    "key": "payment.PAY-HOTEL-001.amount",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "3.000.000",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": 3000000
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/expense_and_payment_sources.md"
+    ],
+    "fact_id": "001-hotel-pay-payer",
+    "key": "payment.PAY-HOTEL-001.payer",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "EMPLOYEE",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": "EMPLOYEE"
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/expense_and_payment_sources.md"
+    ],
+    "fact_id": "001-hotel-pay-st",
+    "key": "payment.PAY-HOTEL-001.status",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "RECEIVED",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": "RECEIVED"
+  },
+  {
+    "basis": "SOURCE_QUOTE",
+    "derivation_refs": [],
+    "fact_id": "001-meal-amt",
+    "key": "expense.RCPT-MEAL-001.amount",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "1.000.000",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": 1000000
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/expense_and_payment_sources.md"
+    ],
+    "fact_id": "001-meal-purp",
+    "key": "expense.RCPT-MEAL-001.purpose",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "BUSINESS",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": "BUSINESS"
+  },
+  {
+    "basis": "SOURCE_QUOTE",
+    "derivation_refs": [],
+    "fact_id": "001-meal-pay-amt",
+    "key": "payment.RCPT-MEAL-001-cash.amount",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "1.000.000",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": 1000000
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/employee_claim.md#cash-attestation"
+    ],
+    "fact_id": "001-meal-pay-payer",
+    "key": "payment.RCPT-MEAL-001-cash.payer",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "EMPLOYEE",
+    "read_state": "READ",
+    "source_file": "employee_claim.md",
+    "source_sha256": "5a94952deaf2e328bb1f66e79fba54ff30d5a52cf1646a6850175f7af989067c",
+    "usability": "USABLE",
+    "value": "EMPLOYEE"
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/expense_and_payment_sources.md"
+    ],
+    "fact_id": "001-meal-pay-st",
+    "key": "payment.RCPT-MEAL-001-cash.status",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "RECEIVED",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": "RECEIVED"
+  },
+  {
+    "basis": "SOURCE_QUOTE",
+    "derivation_refs": [],
+    "fact_id": "001-ground-amt",
+    "key": "expense.RCPT-GROUND-001.amount",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "1.000.000",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": 1000000
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/expense_and_payment_sources.md"
+    ],
+    "fact_id": "001-ground-purp",
+    "key": "expense.RCPT-GROUND-001.purpose",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "BUSINESS",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": "BUSINESS"
+  },
+  {
+    "basis": "SOURCE_QUOTE",
+    "derivation_refs": [],
+    "fact_id": "001-ground-pay-amt",
+    "key": "payment.RCPT-GROUND-001-cash.amount",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "1.000.000",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": 1000000
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/expense_and_payment_sources.md"
+    ],
+    "fact_id": "001-ground-pay-payer",
+    "key": "payment.RCPT-GROUND-001-cash.payer",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "EMPLOYEE",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": "EMPLOYEE"
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/expense_and_payment_sources.md"
+    ],
+    "fact_id": "001-ground-pay-st",
+    "key": "payment.RCPT-GROUND-001-cash.status",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "RECEIVED",
+    "read_state": "READ",
+    "source_file": "expense_and_payment_sources.md",
+    "source_sha256": "6dd0791e75e01e16ee1961882885fa1e5bbe47dcef8b7d53919dfe5fe909399b",
+    "usability": "USABLE",
+    "value": "RECEIVED"
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/coverage_m1.md"
+    ],
+    "fact_id": "hist-ra",
+    "key": "history.advance.returned",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "0",
+    "read_state": "READ",
+    "source_file": "coverage_m1.md",
+    "source_sha256": "ba479737d666327997fd0b5c773dc0c43dd3f2c78cbde14e73436b6941dc9df2",
+    "usability": "USABLE",
+    "value": 0
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/coverage_m1.md"
+    ],
+    "fact_id": "hist-p",
+    "key": "history.reimbursement.received",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "0",
+    "read_state": "READ",
+    "source_file": "coverage_m1.md",
+    "source_sha256": "ba479737d666327997fd0b5c773dc0c43dd3f2c78cbde14e73436b6941dc9df2",
+    "usability": "USABLE",
+    "value": 0
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/coverage_m1.md"
+    ],
+    "fact_id": "hist-rp",
+    "key": "history.reimbursement.returned",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "0",
+    "read_state": "READ",
+    "source_file": "coverage_m1.md",
+    "source_sha256": "ba479737d666327997fd0b5c773dc0c43dd3f2c78cbde14e73436b6941dc9df2",
+    "usability": "USABLE",
+    "value": 0
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/authority_and_pretrip.md"
+    ],
+    "fact_id": "budget",
+    "key": "budget.approved",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "8000000",
+    "read_state": "READ",
+    "source_file": "authority_and_pretrip.md",
+    "source_sha256": "3c528045f913dd9d65b0e0242e72e32152c07d7cfb9b10f25fdb58c2ce1d8842",
+    "usability": "USABLE",
+    "value": 8000000
+  },
+  {
+    "basis": "SOURCE_QUOTE",
+    "derivation_refs": [],
+    "fact_id": "adv-attempt",
+    "key": "advance.attempt.TX-ADV-001.raw_status",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "SUBMITTED",
+    "read_state": "READ",
+    "source_file": "payment_attempts.md",
+    "source_sha256": "ddc9d2b089555193e207eae6b9fab1b04570088f51cc5ab69c6de077a4cd1a9b",
+    "usability": "USABLE",
+    "value": "SUBMITTED"
+  },
+  {
+    "basis": "SOURCE_QUOTE",
+    "derivation_refs": [],
+    "fact_id": "adv-ev-ref",
+    "key": "history.advance_event.TX-ADV-001.amount",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "2.000.000",
+    "read_state": "READ",
+    "source_file": "payment_attempts.md",
+    "source_sha256": "ddc9d2b089555193e207eae6b9fab1b04570088f51cc5ab69c6de077a4cd1a9b",
+    "usability": "USABLE",
+    "value": 2000000
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/payment_attempts.md"
+    ],
+    "fact_id": "adv-ev-recv",
+    "key": "history.advance_event.TX-ADV-001.receiver_ref",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "NV-DEMO-01",
+    "read_state": "READ",
+    "source_file": "payment_attempts.md",
+    "source_sha256": "ddc9d2b089555193e207eae6b9fab1b04570088f51cc5ab69c6de077a4cd1a9b",
+    "usability": "USABLE",
+    "value": "NV-DEMO-01"
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/payment_attempts.md"
+    ],
+    "fact_id": "adv-ev-dec",
+    "key": "history.advance_event.TX-ADV-001.decision_ref",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "DEC-PRE-DEMO-01",
+    "read_state": "READ",
+    "source_file": "payment_attempts.md",
+    "source_sha256": "ddc9d2b089555193e207eae6b9fab1b04570088f51cc5ab69c6de077a4cd1a9b",
+    "usability": "USABLE",
+    "value": "DEC-PRE-DEMO-01"
+  },
+  {
+    "basis": "DERIVED_WITH_POLICY",
+    "derivation_refs": [
+      "input/payment_attempts.md"
+    ],
+    "fact_id": "adv-ev-out",
+    "key": "history.advance_event.TX-ADV-001.outcome",
+    "locator": "page 1",
+    "page": 1,
+    "raw": "UNCONFIRMED",
+    "read_state": "READ",
+    "source_file": "payment_attempts.md",
+    "source_sha256": "ddc9d2b089555193e207eae6b9fab1b04570088f51cc5ab69c6de077a4cd1a9b",
+    "usability": "USABLE",
+    "value": "UNCONFIRMED"
+  }
+]

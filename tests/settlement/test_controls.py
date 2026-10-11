@@ -70,7 +70,9 @@ def service(tmp_path, barrier_reader):
     store = Store(tmp_path / "cases.sqlite", tmp_path / "artifacts")
     return Service(store, barrier_reader, config=ServiceConfig(authority=[
         AuthorityGrant(actor_ref="P-DEMO", work_ref=None,
-                       max_settlement_vnd=100_000_000),
+                       employee_ref=None,
+                       max_settlement_vnd=100_000_000,
+                       max_employee_cost_vnd=100_000_000),
     ]))
 
 

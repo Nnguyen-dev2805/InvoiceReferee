@@ -185,6 +185,8 @@ def test_b7_personal_expense_excluded_but_kept_in_rows():
 
 
 def test_b7_budget_over_needs_exception_and_keeps_conditional():
+    # Task 3 contract: T>B is a POLICY breach; final E/S stay unknown (the
+    # accept-all amount is a CONDITIONAL result), never a decided number.
     facts = (b.expense_facts("EXP-1", 9_000_000, source_id="S1")
              + b.payment_facts("PAY-1", 9_000_000, "EMPLOYEE", source_id="S2")
              + b.history_facts(a=2_000_000, ra=0, p=0, rp=0)
@@ -192,13 +194,14 @@ def test_b7_budget_over_needs_exception_and_keeps_conditional():
     run_input, facts, relations = b.run_input(
         facts=facts, relations=[b.expense_payment("R1", "EXP-1", "PAY-1")])
     report = evaluate(run_input, facts, relations)
-    assert report.components.t.value == 9_000_000
+    assert report.components.t.value == 9_000_000  # actual T kept
     assert report.components.b.value == 8_000_000
-    assert report.calculated_net_vnd == 7_000_000
+    assert report.components.e.value is None  # final E undecided
+    assert report.calculated_net_vnd is None
     assert report.proposed_net_vnd is None
     budget_check = next(c for c in report.checks if c.rule == "budget")
     assert budget_check.status == "FAIL"
-    assert any(i.type == "AUTHORITY" and i.owner == "APPROVER" for i in report.issues)
+    assert any(i.type == "POLICY" and i.owner == "APPROVER" for i in report.issues)
     assert report.conditional_results, "phải có kịch bản điều kiện cho exception"
     assert report.completion == "INCOMPLETE"
 

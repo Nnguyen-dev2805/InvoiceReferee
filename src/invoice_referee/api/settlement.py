@@ -60,8 +60,9 @@ from invoice_referee.settlement.store import Store
 DEFAULT_DATA_DIR = Path("data") / "settlement"
 
 DEMO_AUTHORITY = [
-    AuthorityGrant(actor_ref="P-DEMO", work_ref=None,
-                   max_settlement_vnd=100_000_000),
+    AuthorityGrant(actor_ref="P-DEMO", work_ref=None, employee_ref=None,
+                   max_settlement_vnd=100_000_000,
+                   max_employee_cost_vnd=100_000_000),
 ]
 
 _STATUS_BY_CODE = {
@@ -211,6 +212,7 @@ class VerifyRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     packets: list[str] | None = None
+    mode: Literal["configured", "policy-replay"] | None = None
 
 
 class CreateB3CaseRequest(BaseModel):
@@ -595,7 +597,15 @@ def create_runtime_app(*, db_path: Path | None = None,
     ) -> JSONResponse:
         corpus = Path(os.environ.get("SETTLEMENT_EVAL_CORPUS",
                                      DEFAULT_EVAL_CORPUS))
-        report = run_suite(corpus, _evaluation_service(), request.packets)
+        mode = request.mode or os.environ.get("SETTLEMENT_EVAL_MODE",
+                                              "configured").strip()
+        if mode not in ("configured", "policy-replay"):
+            raise DomainError(
+                "INVALID_INPUT",
+                f"mode phải là configured hoặc policy-replay, nhận {mode!r}.",
+            )
+        report = run_suite(corpus, _evaluation_service(), request.packets,
+                           execution_mode=mode)
         return JSONResponse(report.model_dump(mode="json"))
 
     @app.get("/api/cases/{case_id}/history", response_model=None)

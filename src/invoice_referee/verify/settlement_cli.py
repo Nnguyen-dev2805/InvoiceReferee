@@ -48,6 +48,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="Nơi ghi artifact SuiteReport JSON.")
     parser.add_argument("--packets", type=str, default=None,
                         help="Danh sách case id phân cách phẩy (mặc định: tất cả).")
+    parser.add_argument("--mode", choices=["configured", "policy-replay"],
+                        default="configured",
+                        help="configured: reader thật; policy-replay: sidecar v2.")
     parser.add_argument("--db-path", type=Path, default=None,
                         help="SQLite riêng của verify (mặc định trong out-dir).")
     parser.add_argument("--artifact-root", type=Path, default=None,
@@ -63,7 +66,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         service = build_service(db_path, artifact_root)
-        report = run_suite(args.corpus, service, packet_ids)
+        report = run_suite(args.corpus, service, packet_ids,
+                           execution_mode=args.mode)
     except DomainError as error:
         print(f"DATASET_ERROR {error.code}: {error.message}", file=sys.stderr)
         return 2

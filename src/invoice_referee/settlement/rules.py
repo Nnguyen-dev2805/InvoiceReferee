@@ -104,6 +104,89 @@ def _is_money_key(key: str) -> bool:
     return any(key.endswith(suffix) or key == suffix for suffix in MONEY_KEY_SUFFIXES)
 
 
+def _advance_event_refs(observations: list[Observation]) -> dict[str, Any]:
+    """Collect sourced advance-event metadata (plan Task 3.3 reader keys).
+
+    Recognises ``history.advance_event.<event_ref>.<field>`` where field is
+    amount / receiver_ref / decision_ref / outcome / event_at. Missing metadata
+    yields None fields (never guessed), and refs fall back to the fact sources.
+    """
+    info: dict[str, Any] = {"event_ref": None, "amount": None,
+                            "receiver_ref": None, "decision_ref": None,
+                            "outcome": None, "event_at": None, "refs": []}
+    for observation in observations:
+        parts = observation.key.split(".")
+        if len(parts) == 4 and parts[0] == "history" \
+                and parts[1] == "advance_event":
+            event_ref, field = parts[2], parts[3]
+            info["event_ref"] = event_ref
+            if field in ("amount", "receiver_ref", "decision_ref", "outcome",
+                         "event_at"):
+                info[field] = observation.value
+            for ref in (observation.source_id, observation.fact_id):
+                if ref and ref not in info["refs"]:
+                    info["refs"].append(ref)
+    return info
+
+
+def _advance_question(info: Mapping[str, Any], run_input: RunInput) -> str:
+    """A specific advance-receipt question with event/amount/decision/cutoff."""
+    cutoff = run_input.submission.money_as_of.isoformat()
+    event_ref = info.get("event_ref") or "lệnh ứng"
+    amount = info.get("amount")
+    amount_txt = f"{amount:,} đ".replace(",", ".") if isinstance(amount, int) \
+        else "số tiền đề nghị"
+    decision = info.get("decision_ref")
+    receiver = info.get("receiver_ref") or run_input.submission.employee_ref
+    decision_txt = f" theo {decision}" if decision else ""
+    return (f"Lệnh ứng {event_ref}, số đề nghị {amount_txt} cho {receiver}"
+            f"{decision_txt}, chưa xác định tiền đã tới người nhận trước "
+            f"{cutoff}. Vui lòng bổ sung biên nhận phía nhận hoặc kết quả đối "
+            f"chiếu xác định số thực nhận/trạng thái cuối.")
+
+
+def covering_grant(authority: list, employee_ref: str, work_ref: str,
+                   effective_at: datetime, employee_cost_vnd: int | None,
+                   settlement_vnd: int | None,
+                   total_work_cost_vnd: int | None,
+                   exception_required: bool = False):
+    """Return a grant that covers the content, or None (Rulebook R8).
+
+    A grant covers only when: the work/employee scope matches, the grant is
+    effective at ``effective_at``, the employee cost is within
+    ``max_employee_cost_vnd`` (a missing limit does NOT cover), and the absolute
+    settlement is within ``max_settlement_vnd``. When ``exception_required``,
+    the total work cost must be within ``max_exception_work_cost_vnd`` (a null
+    exception limit does not cover). No limit is treated as unlimited.
+    """
+    for grant in authority:
+        if grant.work_ref is not None and grant.work_ref != work_ref:
+            continue
+        if getattr(grant, "employee_ref", None) is not None \
+                and grant.employee_ref != employee_ref:
+            continue
+        start = getattr(grant, "effective_from", None)
+        end = getattr(grant, "effective_until", None)
+        if start is not None and effective_at < start:
+            continue
+        if end is not None and effective_at > end:
+            continue
+        if employee_cost_vnd is not None:
+            cap = getattr(grant, "max_employee_cost_vnd", None)
+            if cap is None or employee_cost_vnd > cap:
+                continue
+        if settlement_vnd is not None:
+            if abs(settlement_vnd) > grant.max_settlement_vnd:
+                continue
+        if exception_required:
+            exc = getattr(grant, "max_exception_work_cost_vnd", None)
+            if exc is None or total_work_cost_vnd is None \
+                    or total_work_cost_vnd > exc:
+                continue
+        return grant
+    return None
+
+
 # --- fact resolution: quality, contradictions, no silent pick ---------------
 
 def _usable_entries(observations: list[Observation],
@@ -369,9 +452,10 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
     canonical = _dedup_payments(payments, relations, issues, checks)
 
     # Expense rows: eligibility split by ESTABLISHED payment evidence (R3/R5).
+    # No expense entries is NOT a verified zero: T/E stay None (INCOMPLETE).
     rows: list[ExpenseRow] = []
-    employee_total: int | None = 0
-    company_total: int | None = 0
+    employee_total: int | None = 0 if expenses else None
+    company_total: int | None = 0 if expenses else None
     eligibility_unknown: list[str] = []
     portion_overflows: list[str] = []
     for expense_id in sorted(expenses):
@@ -446,7 +530,17 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
             state=state, refs=refs, reason=reason,
         ))
 
-    if eligibility_unknown:
+    if not expenses:
+        # No expense entry read at all: T/E unknown, ask for the expense source.
+        checks.append(CheckResult(
+            rule="eligibility", status="UNRESOLVED", refs=[],
+            reason="Không có khoản chi nào đọc được; T/E unknown, không phải 0."))
+        issues.append(Issue(
+            issue_id="I-ELIGIBILITY", type="FACT", owner="EMPLOYEE",
+            message="Chưa đọc được khoản chi nào (thiếu nguồn/bảng kê); không suy 0.",
+            refs=[], blocked="components",
+        ))
+    elif eligibility_unknown:
         checks.append(CheckResult(rule="eligibility", status="UNRESOLVED",
                                   refs=eligibility_unknown,
                                   reason="Có khoản chưa đủ căn cứ eligibility/payer."))
@@ -486,12 +580,23 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
         checks.append(CheckResult(rule="history_coverage", status="UNRESOLVED",
                                   refs=[f"history.{n}" for n in missing_history],
                                   reason="Thiếu lịch sử tiền trong scope; không suy bằng 0."))
-        issues.append(Issue(
-            issue_id="I-HISTORY", type="FACT", owner="ACCOUNTANT",
-            message="Thiếu lịch sử tiền (advance/reimbursement) trong scope đã khai báo; "
-                    "cần nguồn company-side, không suy bằng 0.",
-            refs=[f"history.{n}" for n in missing_history], blocked="net",
-        ))
+        # If an advance attempt event is present, ask specifically about it
+        # (event ref / amount / decision / cutoff) with source refs, instead of
+        # a generic "missing history" question (plan Task 3.3).
+        advance_refs = _advance_event_refs(observations)
+        if "advance.received" in missing_history and advance_refs["event_ref"]:
+            issues.append(Issue(
+                issue_id="I-HISTORY", type="FACT", owner="ACCOUNTANT",
+                message=_advance_question(advance_refs, run_input),
+                refs=advance_refs["refs"], blocked="net",
+            ))
+        else:
+            issues.append(Issue(
+                issue_id="I-HISTORY", type="FACT", owner="ACCOUNTANT",
+                message="Thiếu lịch sử tiền (advance/reimbursement) trong scope đã khai báo; "
+                        "cần nguồn company-side, không suy bằng 0.",
+                refs=[f"history.{n}" for n in missing_history], blocked="net",
+            ))
     else:
         checks.append(CheckResult(rule="history_coverage", status="PASS",
                                   refs=a_refs + ra_refs + p_refs + rp_refs,
@@ -502,6 +607,9 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
     t = None
     if employee_total is not None:
         t = employee_total + (company_total or 0)
+    # ``final_e`` is the amount that feeds the decided net. T>B (or unresolved
+    # budget) keeps it unknown: E is not decided until the exception is.
+    final_e = employee_total
     conditional: list[ConditionalResult] = []
     if b is None:
         checks.append(CheckResult(rule="budget", status="UNRESOLVED", refs=[],
@@ -511,13 +619,19 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
             message="Chưa có ngân sách B được duyệt cho work; cần decision đúng scope.",
             blocked="budget",
         ))
+        # Missing B does not by itself undecide E: E is a verified expense
+        # total. Only an undecided exception (T>B) keeps the final E unknown.
     elif t is not None and t > b:
+        # T>B is a POLICY breach: surface it, do not clip, and keep the final
+        # E/S unknown — the accept-all amount is a CONDITIONAL result, not a
+        # decided one. A scoped exception authority only routes the review.
         checks.append(CheckResult(
             rule="budget", status="FAIL", refs=b_refs,
             reason=f"T={t} vượt B={b}; xin exception, không cắt T về B."))
         issues.append(Issue(
-            issue_id="I-BUDGET", type="AUTHORITY", owner="APPROVER",
-            message=f"Tổng chi {t} vượt ngân sách {b}; cần exception decision, không tự nâng B.",
+            issue_id="I-BUDGET", type="POLICY", owner="APPROVER",
+            message=f"Tổng chi {t} vượt ngân sách {b} là {t - b}; cần quyết định "
+                    f"ngoại lệ (khoản/phần/lý do), không tự nâng B.",
             refs=b_refs, blocked="proposal",
         ))
         net = calculate_net(MoneyComponents(e=employee_total, a=a, ra=ra, p=p, rp=rp))
@@ -526,36 +640,49 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
             net_vnd=net,
             components=MoneyComponents(e=employee_total, a=a, ra=ra, p=p, rp=rp),
         ))
+        final_e = None  # E not decided while the exception is undecided
     else:
         checks.append(CheckResult(rule="budget", status="PASS", refs=b_refs,
                                   reason="T trong ngân sách (kể cả bằng B)."))
 
-    calculated = calculate_net(MoneyComponents(e=employee_total, a=a, ra=ra, p=p, rp=rp))
+    calculated = calculate_net(MoneyComponents(e=final_e, a=a, ra=ra, p=p, rp=rp))
 
-    # Authority routing (R8): proposed only when a grant covers the amount and
-    # nothing unresolved remains (không đề nghị khi còn mâu thuẫn/issue mở).
+    # Authority routing (R8): a grant must cover the employee cost AND the
+    # settlement amount, in scope/time. T<=B is a POLICY concern, not part of
+    # the authority check. No grant covers => AUTHORITY issue; the raw grant
+    # that covers the net is not proof of covering E/exception.
     work_ref = run_input.submission.work_ref
-    covering = [g for g in run_input.authority
-                if g.work_ref is None or g.work_ref == work_ref]
-    authority_ok = (calculated is not None and b is not None and
-                    t is not None and t <= b and
-                    any(g.max_settlement_vnd >= abs(calculated) for g in covering))
+    employee_ref = run_input.submission.employee_ref
+    effective_at = run_input.submission.money_as_of
+    authority_grant = None
+    if calculated is not None:
+        authority_grant = covering_grant(
+            run_input.authority, employee_ref, work_ref, effective_at,
+            employee_cost_vnd=employee_total,
+            settlement_vnd=calculated,
+            total_work_cost_vnd=t,
+            exception_required=False,
+        )
+    authority_ok = authority_grant is not None
     if calculated is None:
         checks.append(CheckResult(rule="authority", status="NOT_APPLICABLE", refs=[],
                                   reason="Chưa có net để xét quyền."))
     elif authority_ok:
         checks.append(CheckResult(
             rule="authority", status="PASS",
-            refs=[g.actor_ref for g in covering
-                  if g.max_settlement_vnd >= abs(calculated)],
-            reason="Có người có quyền đủ hạn mức cho số đề nghị."))
+            refs=[authority_grant.actor_ref],
+            reason="Có người có quyền đủ hạn mức (employee cost + settlement) "
+                   "trong scope/thời hạn cho số đề nghị."))
     else:
-        checks.append(CheckResult(rule="authority", status="UNRESOLVED",
-                                  refs=[g.actor_ref for g in covering],
-                                  reason="Chưa có quyền đủ hạn mức; giữ calculated, chưa đề nghị."))
+        checks.append(CheckResult(
+            rule="authority", status="UNRESOLVED",
+            refs=[g.actor_ref for g in run_input.authority],
+            reason="Chưa có quyền đủ hạn mức (employee cost/settlement) trong "
+                   "scope; giữ calculated, chưa đề nghị."))
         issues.append(Issue(
             issue_id="I-AUTHORITY", type="AUTHORITY", owner="APPROVER",
-            message="Chưa có người có quyền duyệt mức này trong scope; cần decision/quyền đúng scope.",
+            message="Chưa có người có quyền duyệt mức này trong scope; cần "
+                    "decision/quyền đúng scope.",
             blocked="proposal",
         ))
 
@@ -595,8 +722,8 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
                             refs=[r.expense_id for r in rows]),
             b=ComponentSlot(value=b, state="KNOWN" if b is not None else "UNKNOWN",
                             refs=b_refs),
-            e=ComponentSlot(value=employee_total,
-                             state="KNOWN" if employee_total is not None else "UNKNOWN",
+            e=ComponentSlot(value=final_e,
+                             state="KNOWN" if final_e is not None else "UNKNOWN",
                              refs=[r.expense_id for r in rows if r.state == "ELIGIBLE"]),
             a=ComponentSlot(value=a, state="KNOWN" if a is not None else "UNKNOWN",
                             refs=a_refs),

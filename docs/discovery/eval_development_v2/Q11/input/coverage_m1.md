@@ -1,0 +1,5 @@
+Tài liệu synthetic, issuer ORG-DEMO-01, uploader/owner ACC-DEMO-01. Công việc CT-DEMO-01, employee NV-DEMO-01. Kế toán quan sát đúng bank/card/cash công ty, các requests/approvals và source thuộc scope được nêu; nguồn phíaemployee không được xác nhận thay bởi role kế toán. Rawstatus không tự actualreceipt. Không tạo các events0; source đến muộn lưu phiên bản, không overwrite.
+
+## company-scope
+
+Scope03–08/10/2026 18:00 +07:00. Companydirect vé3triệu có vendorreceipt; không companypayment khác cho hotel/meal/ground. Một lệnh ứng TX-ADV-001 đã gửi, amount đềnghị2triệu; source hiện có không xác định actualreceipt hoặc outcome cuối của lệnh này. Owner chỉ xác nhận đủ phạm vi các sự kiện khác, không dùng checkboxcomplete để bao gồm field thiếu đó. Không ứng khác, hoànchi/returns/vendorrefundcompany hoặc event/sự cố khác liênquan; không claim đãhoàn/pending khác. Quyếtđịnh công việc/B/approvalứng không đổi/hủy. Trạng thái chính lệnh ứng cần đốichiếu, không khẳng định no-pending vôđiềukiện cho nó.
