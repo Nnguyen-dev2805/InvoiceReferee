@@ -5,9 +5,10 @@ export interface EvidenceLinksProps {
   refs: string[];
   sources?: SourceView[];
   diagnostics?: boolean;
+  label?: string;
 }
 
-export function EvidenceLinks({ refs, sources = [], diagnostics = false }: EvidenceLinksProps) {
+export function EvidenceLinks({ refs, sources = [], diagnostics = false, label }: EvidenceLinksProps) {
   if (!refs || refs.length === 0) return null;
 
   const sourceMap = new Map<string, SourceView>();
@@ -64,17 +65,17 @@ export function EvidenceLinks({ refs, sources = [], diagnostics = false }: Evide
           className="evidence-link"
           title={`Tài liệu: ${source.filename} (${source.id})${subRefs.length > 1 ? ` — ${subRefs.length} căn cứ` : ''}`}
         >
-          {source.filename || source.id}
+          {label || source.filename || source.id}
         </a>
       ))}
-      {formRefs.length > 0 && (
+      {(!label || matchedSources.size === 0) && formRefs.length > 0 && (
         <span className="evidence-form-ref" title={formRefs.join(', ')}>
-          Khai báo từ form
+          {label || 'Khai báo từ form'}
         </span>
       )}
-      {otherRefs.map((ref) => (
+      {(!label || (matchedSources.size === 0 && formRefs.length === 0)) && otherRefs.map((ref) => (
         <code key={ref} className="evidence-other-ref" title={ref}>
-          {ref}
+          {label || ref}
         </code>
       ))}
       {diagnostics && refs.length > 0 && (

@@ -56,6 +56,33 @@ function isB3V1Form(form: Record<string, unknown> | undefined): boolean {
   return form?.schema_version === 'b3-intake-v1';
 }
 
+function formatTripDates(startStr?: unknown, endStr?: unknown): string | null {
+  if (!startStr && !endStr) return null;
+  const parseYMD = (s: string) => {
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    return { y: m[1], m: m[2], d: m[3] };
+  };
+  const start = typeof startStr === 'string' ? parseYMD(startStr) : null;
+  const end = typeof endStr === 'string' ? parseYMD(endStr) : null;
+
+  if (start && end) {
+    if (start.y === end.y && start.m === end.m) {
+      if (start.d === end.d) {
+        return `${start.d}/${start.m}/${start.y}`;
+      }
+      return `${start.d}–${end.d}/${start.m}/${start.y}`;
+    }
+    if (start.y === end.y) {
+      return `${start.d}/${start.m} – ${end.d}/${end.m}/${start.y}`;
+    }
+    return `${start.d}/${start.m}/${start.y} – ${end.d}/${end.m}/${end.y}`;
+  }
+  if (start) return `${start.d}/${start.m}/${start.y}`;
+  if (end) return `${end.d}/${end.m}/${end.y}`;
+  return null;
+}
+
 export function App() {
   const [role, setRole] = useState<DemoRole>('EMPLOYEE');
   const [actorId, setActorId] = useState('NV-01');
@@ -96,21 +123,58 @@ export function App() {
   const [activeIntakeTab, setActiveIntakeTab] = useState<'B3' | 'B7'>('B3');
   const [caseTab, setCaseTab] = useState<'report' | 'draft' | 'sources' | 'questions' | 'history'>('report');
   const [caseSearch, setCaseSearch] = useState('');
+  const [employeeFilter, setEmployeeFilter] = useState<'all' | 'mine'>('all');
+  const [stageFilter, setStageFilter] = useState<'ALL' | 'CHECKING' | 'DECISION_MONEY' | 'CLOSED'>('ALL');
+  const [isCreatingB3, setIsCreatingB3] = useState(false);
   const [importFiles, setImportFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
+  const [copiedCaseId, setCopiedCaseId] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const handleCopyCaseId = useCallback(async (id: string) => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(id);
+      }
+    } catch {
+      // Bỏ qua lỗi sao chép trong môi trường không cấp quyền clipboard
+    }
+    setCopiedCaseId(true);
+    setTimeout(() => setCopiedCaseId(false), 2000);
+  }, []);
+
   const filteredCases = useMemo(() => {
+    let list = cases;
+    if (role === 'EMPLOYEE' && employeeFilter === 'mine') {
+      list = list.filter((c) => c.employee_ref === actorId.trim());
+    } else if (role !== 'EMPLOYEE') {
+      if (stageFilter === 'CHECKING') {
+        list = list.filter((c) => c.stage === 'CHECKING' || c.stage === 'ACCOUNTING_REVIEW');
+      } else if (stageFilter === 'DECISION_MONEY') {
+        list = list.filter((c) =>
+          c.stage === 'AWAITING_DECISION' ||
+          c.stage === 'AWAITING_MONEY' ||
+          c.stage === 'AWAITING_WORK_SETTLEMENT' ||
+          c.stage === 'RESOLVING_OBLIGATIONS'
+        );
+      } else if (stageFilter === 'CLOSED') {
+        list = list.filter((c) =>
+          c.stage === 'SETTLEMENT_CLOSED' ||
+          c.stage === 'REJECTED_REQUEST_ENDED'
+        );
+      }
+    }
+
     const q = caseSearch.trim().toLowerCase();
-    if (!q) return cases;
-    return cases.filter((c) =>
+    if (!q) return list;
+    return list.filter((c) =>
       c.id.toLowerCase().includes(q) ||
       c.work_ref.toLowerCase().includes(q) ||
       c.employee_ref.toLowerCase().includes(q) ||
       (STAGE_LABELS[c.stage] ?? '').toLowerCase().includes(q)
     );
-  }, [cases, caseSearch]);
+  }, [cases, caseSearch, role, employeeFilter, actorId, stageFilter]);
 
   const handleAddImportFiles = (files: FileList | File[] | null) => {
     if (!files) return;
@@ -239,12 +303,24 @@ export function App() {
     }
   }, [employees, b3PersonaRef]);
 
-  useEffect(() => {
-    if (b3PersonaRef) {
-      setActorId(b3PersonaRef);
-      setRole('EMPLOYEE');
+  const handleRoleChange = (newRole: DemoRole) => {
+    setRole(newRole);
+    if (newRole === 'ACCOUNTANT') {
+      const accountant = demoContext?.people.find((p) => p.role === 'ACCOUNTANT');
+      setActorId(accountant?.actor_ref ?? 'ACC-DEMO-01');
+    } else if (newRole === 'APPROVER') {
+      const approver = demoContext?.people.find((p) => p.role === 'APPROVER');
+      setActorId(approver?.actor_ref ?? 'APR-DEMO-01');
+    } else if (newRole === 'EMPLOYEE') {
+      setActorId(b3PersonaRef || 'NV-DEMO-01');
     }
-  }, [b3PersonaRef]);
+  };
+
+  useEffect(() => {
+    if (b3PersonaRef && role === 'EMPLOYEE') {
+      setActorId(b3PersonaRef);
+    }
+  }, [b3PersonaRef, role]);
 
   const handleCreate = async () => {
     if (!workRef.trim() || !purpose.trim()) {
@@ -300,6 +376,7 @@ export function App() {
       intake_method: b3Method,
       confirmed: b3Method === 'WEB',
     };
+    setIsCreatingB3(true);
     try {
       const created = await api.createB3Case(b3PersonaRef || actorId.trim(), intake);
       setView(created);
@@ -317,15 +394,22 @@ export function App() {
       } else if (b3Method === 'IMPORT' && importFiles.length > 0) {
         let currentCase = created;
         for (const file of importFiles) {
-          await api.addSource(
-            currentCase.id,
-            file,
-            currentCase.case_version,
-            b3PersonaRef || actorId.trim(),
-            role,
-            `Tệp đề nghị B3 (${file.name})`,
-          );
-          currentCase = await api.getCase(currentCase.id);
+          try {
+            await api.addSource(
+              currentCase.id,
+              file,
+              currentCase.case_version,
+              b3PersonaRef || actorId.trim(),
+              role,
+              `Tệp đề nghị B3 (${file.name})`,
+            );
+            currentCase = await api.getCase(currentCase.id);
+          } catch (fileErr) {
+            setError(`Tải lên tệp "${file.name}" không thành công: ${fileErr instanceof Error ? fileErr.message : String(fileErr)}. Hồ sơ ${created.id} đã được tạo.`);
+            await loadCase(currentCase.id);
+            await loadCases();
+            return;
+          }
         }
         setImportFiles([]);
         await startRunFor(currentCase.id, currentCase.case_version);
@@ -336,6 +420,8 @@ export function App() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không tạo được hồ sơ B3.');
+    } finally {
+      setIsCreatingB3(false);
     }
   };
 
@@ -496,10 +582,45 @@ export function App() {
     && view.allowed_actions.some((a) => a.action === 'START_RUN')
     && !runActive;
 
-  const viewIsB3 = view !== null && isB3V1Form(view.submission.form);
+  const viewIsB3 = view !== null && (view.job === 'B3' || isB3V1Form(view.submission.form));
   const b3DraftReadyForFill = report?.b3 !== null
     && report?.b3.readiness === 'DRAFT_CONFIRMATION_REQUIRED';
   const caseSummary = view ? summarizeCase(view, run, report) : null;
+
+  const latestReview = useMemo(() => {
+    return history.filter(
+      (h) => h.kind === 'REVIEW_RECORDED' || h.operation === 'RECORD_REVIEW'
+    ).slice(-1)[0] ?? null;
+  }, [history]);
+
+  const employeeName = view
+    ? demoContext?.people.find((p) => p.actor_ref === view.submission.employee_ref)?.name || view.submission.employee_ref
+    : '';
+
+  const jobTitlePrefix = viewIsB3 ? 'Đề nghị tạm ứng' : 'Quyết toán';
+  const mainTitle = view ? `${jobTitlePrefix} — ${employeeName}` : '';
+
+  const sublineText = useMemo(() => {
+    if (!view) return '';
+    const form = (view.submission.form || {}) as Record<string, unknown>;
+    const parts: string[] = [];
+    if (form.destination) {
+      parts.push(String(form.destination));
+    }
+    const tripDates = formatTripDates(form.trip_start, form.trip_end);
+    if (tripDates) {
+      parts.push(tripDates);
+    }
+    if (form.request_amount_vnd != null) {
+      parts.push(`Đề nghị ${Number(form.request_amount_vnd).toLocaleString('vi-VN')} đ`);
+    } else if (view.money_summary?.approved_vnd != null) {
+      parts.push(`Đã duyệt ${Number(view.money_summary.approved_vnd).toLocaleString('vi-VN')} đ`);
+    }
+    if (parts.length === 0) {
+      parts.push(`Công việc: ${view.submission.work_ref}`);
+    }
+    return parts.join(' · ');
+  }, [view]);
 
   return (
     <div className="app">
@@ -524,7 +645,7 @@ export function App() {
         <div className="settlement-topbar">
           <div className="field-topbar">
             <label htmlFor="demo-role">Vai trò demo</label>
-            <select id="demo-role" value={role} onChange={(e) => setRole(e.target.value as DemoRole)}>
+            <select id="demo-role" value={role} onChange={(e) => handleRoleChange(e.target.value as DemoRole)}>
               {Object.entries(ROLE_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
@@ -554,7 +675,11 @@ export function App() {
           <div className="new-case-banner">
             <button
               type="button"
-              className={`btn ${view === null ? 'btn-primary btn-new-case-active' : ''}`}
+              className={`btn ${
+                role === 'ACCOUNTANT'
+                  ? `btn-sm btn-new-case-accountant ${view === null ? 'btn-new-case-accountant-active' : ''}`
+                  : `${view === null ? 'btn-primary btn-new-case-active' : ''}`
+              }`}
               style={{ width: '100%', justifyContent: 'center', gap: '6px' }}
               onClick={() => {
                 setView(null);
@@ -577,6 +702,62 @@ export function App() {
               <h2 style={{ margin: 0, fontSize: '1.05rem' }}>Hồ sơ</h2>
               <span className="badge">{filteredCases.length}</span>
             </div>
+
+            {role === 'EMPLOYEE' ? (
+              <div className="case-filter-tabs" style={{ display: 'flex', gap: '4px', marginBottom: 'var(--space-2)' }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${employeeFilter === 'all' ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ flex: 1, padding: '3px 6px', fontSize: '0.78rem' }}
+                  onClick={() => setEmployeeFilter('all')}
+                >
+                  Tất cả ({cases.length})
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${employeeFilter === 'mine' ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ flex: 1, padding: '3px 6px', fontSize: '0.78rem' }}
+                  onClick={() => setEmployeeFilter('mine')}
+                >
+                  Của tôi ({cases.filter(c => c.employee_ref === actorId.trim()).length})
+                </button>
+              </div>
+            ) : (
+              <div className="case-stage-filter-pills" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${stageFilter === 'ALL' ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                  onClick={() => setStageFilter('ALL')}
+                >
+                  Tất cả
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${stageFilter === 'CHECKING' ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                  onClick={() => setStageFilter('CHECKING')}
+                >
+                  Cần rà soát
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${stageFilter === 'DECISION_MONEY' ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                  onClick={() => setStageFilter('DECISION_MONEY')}
+                >
+                  Chờ duyệt/tiền
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${stageFilter === 'CLOSED' ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                  onClick={() => setStageFilter('CLOSED')}
+                >
+                  Đã đóng
+                </button>
+              </div>
+            )}
 
             {cases.length > 5 && (
               <div className="case-search-box">
@@ -852,12 +1033,14 @@ export function App() {
                       </>
                     )}
                     <button className="btn btn-primary" onClick={() => void handleCreateB3()}
-                            disabled={!b3PersonaRef}>
-                      {b3Method === 'WEB'
-                        ? 'Nộp đề nghị B3 (web)'
-                        : (importFiles.length > 0
-                            ? 'Tải lên & Tạo hồ sơ nháp B3'
-                            : 'Tạo hồ sơ nháp B3 (chưa xác nhận)')}
+                            disabled={!b3PersonaRef || isCreatingB3}>
+                      {isCreatingB3
+                        ? 'Đang tạo hồ sơ...'
+                        : b3Method === 'WEB'
+                          ? 'Nộp đề nghị B3 (web)'
+                          : (importFiles.length > 0
+                              ? 'Tải lên & Tạo hồ sơ nháp B3'
+                              : 'Tạo hồ sơ nháp B3 (chưa xác nhận)')}
                     </button>
                     {b3Method === 'IMPORT' && (
                       <p className="muted">
@@ -939,64 +1122,193 @@ export function App() {
           <section className="col col-main case-detail-col">
             {/* Case Header Card */}
             <div className="panel case-header-panel">
-              <div className="case-header-top">
-                <div className="case-header-title-group">
-                  <div className="case-header-badge-row">
-                    <span className="badge badge-job">{view.job} — {viewIsB3 ? 'Đề nghị tạm ứng' : 'Quyết toán'}</span>
-                    <span className={`status-pill status-${view.stage.toLowerCase()}`}>
-                      {STAGE_LABELS[view.stage]}
-                    </span>
-                    {viewIsB3 && (
-                      view.submission.form.confirmed ? (
-                        <span className="pill-badge pill-badge-green">Đã xác nhận</span>
+              <div className="case-header-top-bar">
+                <div className="case-header-badge-row">
+                  {/* Mã hồ sơ dạng badge nhỏ gọn có nút sao chép */}
+                  <div className="case-id-badge" title="Mã hồ sơ" data-testid="case-id-badge">
+                    <span className="case-id-badge-label">Mã:</span>
+                    <code className="case-id-badge-code">{view.id}</code>
+                    <button
+                      type="button"
+                      className="btn-copy-case-id"
+                      onClick={() => void handleCopyCaseId(view.id)}
+                      title={copiedCaseId ? 'Đã sao chép vào bộ nhớ tạm' : 'Sao chép mã hồ sơ'}
+                      aria-label="Sao chép mã hồ sơ"
+                    >
+                      {copiedCaseId ? (
+                        <span className="copy-status-text">Đã chép</span>
                       ) : (
-                        <span className="pill-badge pill-badge-amber">Bản nháp chưa gửi</span>
-                      )
-                    )}
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
+                      )}
+                    </button>
                   </div>
-                  <h2 className="case-header-id">{view.id}</h2>
+                  <span className="badge badge-job">{view.job} — {viewIsB3 ? 'Đề nghị tạm ứng' : 'Quyết toán'}</span>
+                  {viewIsB3 && (
+                    view.submission.form.confirmed ? (
+                      <span className="pill-badge pill-badge-green" title="Nhân viên đã xác nhận thông tin đề nghị">
+                        Nhân viên đã xác nhận thông tin đề nghị
+                      </span>
+                    ) : (
+                      <span className="pill-badge pill-badge-amber">Bản nháp chưa gửi</span>
+                    )
+                  )}
                 </div>
-                {viewIsB3 && view.submission.form.request_amount_vnd != null && (
+                {viewIsB3 && (view.submission.form as Record<string, unknown>)?.request_amount_vnd != null && (
                   <div className="case-header-amount-box">
                     <span className="case-header-amount-label">Số tiền đề nghị:</span>
                     <span className="case-header-amount-val">
-                      {Number(view.submission.form.request_amount_vnd).toLocaleString('vi-VN')} VND
+                      {Number((view.submission.form as Record<string, unknown>).request_amount_vnd).toLocaleString('vi-VN')} VND
                     </span>
                   </div>
                 )}
               </div>
-              <div className="case-header-meta">
-                <span>Mã NV: <strong>{view.submission.employee_ref}</strong></span>
+
+              {/* Tiêu đề chính to rõ: Đề nghị tạm ứng — [Tên nhân viên] */}
+              <div className="case-header-title-section">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h2 className="case-main-title">{mainTitle}</h2>
+                  {actorId.trim() === view.submission.employee_ref ? (
+                    <span className="badge" style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1' }}>của bạn</span>
+                  ) : role === 'EMPLOYEE' ? (
+                    <span className="badge" style={{ fontSize: '0.72rem', background: '#fef3c7', color: '#b45309' }}>hồ sơ khác</span>
+                  ) : null}
+                </div>
+                {/* Dòng phụ ngay dưới: [Địa điểm] · [Thời gian chuyến đi] · Đề nghị [Số tiền VND] */}
+                <div className="case-sub-meta">{sublineText}</div>
+              </div>
+
+              {/* MỘT trạng thái nghiệp vụ thống nhất trên cùng */}
+              {role === 'ACCOUNTANT' ? (
+                <div
+                  className={`business-status-card ${latestReview ? 'business-status-reviewed' : 'business-status-pending-review'}`}
+                  data-testid="accountant-status-card"
+                >
+                  <div className="business-status-title-row">
+                    <span className={`status-pill ${latestReview ? 'status-pill-success' : 'status-pill-warning'}`}>
+                      {latestReview ? 'Đã lưu kết quả rà soát' : 'Chờ kế toán rà soát'}
+                    </span>
+                  </div>
+                  <div className="business-status-desc">
+                    {latestReview ? (
+                      <>
+                        Đã lưu kết quả rà soát bởi <strong>{latestReview.actor_id}</strong> lúc {new Date(latestReview.occurred_at).toLocaleString('vi-VN')}
+                        {latestReview.detail?.note ? ` — Ghi chú: “${String(latestReview.detail.note)}”` : ''}
+                      </>
+                    ) : (
+                      'Nhân viên đã xác nhận thông tin đề nghị. Hệ thống đã hoàn tất kiểm tra tự động. Chưa phê duyệt hoặc chi ứng.'
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="business-status-card business-status-general" data-testid="business-status-card">
+                  <div className="business-status-title-row">
+                    <span className={`status-pill status-${view.stage.toLowerCase()}`}>
+                      {STAGE_LABELS[view.stage]}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Chi tiết kỹ thuật tinh gọn */}
+              <div className="case-header-tech-footer">
+                <span>Mã NV: <code>{view.submission.employee_ref}</code></span>
                 <span>·</span>
                 <span>Công việc: <code>{view.submission.work_ref}</code></span>
                 <span>·</span>
                 <span>Phiên bản: <strong>v{view.case_version}</strong> (rev {view.input_revision}, epoch {view.control_epoch})</span>
+                {run && (
+                  <>
+                    <span>·</span>
+                    <span>Run: <code>{run.id}</code> ({run.mode})</span>
+                  </>
+                )}
               </div>
             </div>
 
             {/* Contextual Notice: Bổ sung câu hỏi giải trình */}
-            {questions.length > 0 && (
-              <div className="case-notice-bar case-notice-warning">
-                <div className="case-notice-body">
-                  <svg className="icon-notice" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                  <div>
-                    <strong>Cần bổ sung giải trình ({questions.length} câu hỏi)</strong>
-                    <span className="case-notice-subtext">Có thông tin hoặc mâu thuẫn chứng từ cần làm rõ trước khi hoàn tất kiểm tra.</span>
+            {questions.length > 0 && (() => {
+              const myPending = questions.filter(q => q.owner === role && q.status === 'OPEN');
+              const otherPending = questions.filter(q => q.owner !== role && q.status === 'OPEN');
+              const answered = questions.filter(q => q.status === 'ANSWERED');
+
+              if (myPending.length > 0) {
+                return (
+                  <div className="case-notice-bar case-notice-warning">
+                    <div className="case-notice-body">
+                      <svg className="icon-notice" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <div>
+                        <strong>Bạn có {myPending.length} câu hỏi cần giải trình</strong>
+                        <span className="case-notice-subtext">Cần cung cấp thông tin hoặc tài liệu bổ sung để giải quyết vấn đề.</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setCaseTab('questions')}
+                    >
+                      Trả lời câu hỏi ({myPending.length})
+                    </button>
                   </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setCaseTab('questions')}
-                >
-                  Xem câu hỏi ({questions.length})
-                </button>
-              </div>
-            )}
+                );
+              }
+
+              if (otherPending.length > 0) {
+                return (
+                  <div className="case-notice-bar case-notice-info">
+                    <div className="case-notice-body">
+                      <svg className="icon-notice" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <div>
+                        <strong>Đang chờ vai trò khác giải trình ({otherPending.length} câu hỏi)</strong>
+                        <span className="case-notice-subtext">Đã phân công cho {Array.from(new Set(otherPending.map(q => ROLE_LABELS[q.owner] ?? q.owner))).join(', ')}.</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setCaseTab('questions')}
+                    >
+                      Xem câu hỏi ({questions.length})
+                    </button>
+                  </div>
+                );
+              }
+
+              if (answered.length > 0) {
+                return (
+                  <div className="case-notice-bar case-notice-info">
+                    <div className="case-notice-body">
+                      <svg className="icon-notice" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <div>
+                        <strong>Đã gửi phản hồi ({answered.length} câu hỏi) — Chờ kiểm tra lại</strong>
+                        <span className="case-notice-subtext">Phản hồi đã được ghi nhận; kết quả sẽ cập nhật sau lần chạy kiểm tra kế tiếp.</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setCaseTab('questions')}
+                    >
+                      Xem câu hỏi ({questions.length})
+                    </button>
+                  </div>
+                );
+              }
+
+              return null;
+            })()}
 
             {caseSummary && (
               <div className={`panel summary-card summary-${caseSummary.tone}`}>
@@ -1023,6 +1335,18 @@ export function App() {
                               el.focus();
                             }
                           }, 0);
+                        } else if (caseSummary.primaryTarget === 'issues') {
+                          if (questions.some(q => q.owner === role && q.status === 'OPEN')) {
+                            setCaseTab('questions');
+                          } else {
+                            setCaseTab('report');
+                            setTimeout(() => {
+                              const el = document.querySelector('.report-issues-top, .issues, #report-panel');
+                              if (el instanceof HTMLElement) {
+                                el.scrollIntoView({ behavior: 'smooth' });
+                              }
+                            }, 0);
+                          }
                         } else if (caseSummary.primaryTarget) {
                           const el = document.querySelector(caseSummary.primaryTarget);
                           if (el instanceof HTMLElement) {
@@ -1031,7 +1355,11 @@ export function App() {
                         }
                       }}
                     >
-                      Kiểm tra bản nháp
+                      {caseSummary.primaryTarget === 'draft-editor'
+                        ? 'Kiểm tra bản nháp'
+                        : caseSummary.primaryTarget === 'issues'
+                          ? 'Xem việc cần làm rõ'
+                          : 'Kiểm tra lại hồ sơ'}
                     </button>
                   )}
                 </div>
@@ -1097,11 +1425,16 @@ export function App() {
                 onClick={() => setCaseTab('questions')}
               >
                 Câu hỏi
-                {questions.length > 0 ? (
-                  <span className="tab-count-badge badge-danger">{questions.length}</span>
-                ) : (
-                  <span className="tab-count-badge">0</span>
-                )}
+                {(() => {
+                  const myCount = questions.filter(q => q.owner === role && q.status === 'OPEN').length;
+                  if (myCount > 0) {
+                    return <span className="tab-count-badge badge-danger">{myCount}</span>;
+                  }
+                  if (questions.length > 0) {
+                    return <span className="tab-count-badge">{questions.length}</span>;
+                  }
+                  return <span className="tab-count-badge">0</span>;
+                })()}
               </button>
               <button
                 type="button"
@@ -1169,6 +1502,22 @@ export function App() {
                       )}
                     </div>
                     <div className="run-actions">
+                      {role === 'ACCOUNTANT' && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={() => {
+                            const el = document.getElementById('accountant-review-section') || document.getElementById('review-note');
+                            if (el) {
+                              el.scrollIntoView({ behavior: 'smooth' });
+                              const input = document.getElementById('review-note');
+                              if (input instanceof HTMLElement) input.focus();
+                            }
+                          }}
+                        >
+                          Đi đến Rà soát kế toán ↓
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn btn-sm btn-ghost"
@@ -1198,6 +1547,8 @@ export function App() {
                 actorId={actorId}
                 decisionId={decisionId}
                 reportReady={report !== null}
+                report={report}
+                history={history}
                 onAction={handleAction}
               />
             </div>
@@ -1234,7 +1585,19 @@ export function App() {
                         <line x1="12" y1="8" x2="12.01" y2="8" />
                       </svg>
                       <p style={{ margin: 0 }}>
-                        <strong>AI đã trích xuất dữ liệu từ chứng từ đính kèm.</strong> Vui lòng rà soát lại thông tin bên dưới và nhấn <em>"Xác nhận và gửi đề nghị"</em> để hoàn tất nộp hồ sơ.
+                        {report ? (
+                          <>
+                            <strong>AI đã trích xuất dữ liệu từ chứng từ đính kèm{view.sources.length > 0 ? ` (${view.sources.length} tài liệu)` : ''}.</strong> Vui lòng rà soát lại thông tin bên dưới và nhấn <em>"Xác nhận và gửi đề nghị"</em> để hoàn tất nộp hồ sơ.
+                          </>
+                        ) : view.sources.length === 0 ? (
+                          <>
+                            <strong>Chưa có chứng từ đính kèm.</strong> Bạn có thể tự nhập thông tin đề nghị bên dưới hoặc tải tài liệu tại tab <em>"Chứng từ đính kèm"</em> trước khi xác nhận.
+                          </>
+                        ) : (
+                          <>
+                            <strong>Đã lưu {view.sources.length} tài liệu nhưng chưa đối soát trích xuất.</strong> Bạn có thể nhấn <em>"Kiểm tra bản nháp"</em> để trích xuất tự động hoặc tự hoàn thiện thông tin bên dưới.
+                          </>
+                        )}
                       </p>
                     </div>
                   )}

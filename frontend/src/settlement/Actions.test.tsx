@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { ActionsPanel } from './Actions';
-import type { CaseView, MoneySummary } from './types';
+import type { AuditEntry, CaseView, MoneySummary } from './types';
 
 function makeSummary(overrides: Partial<MoneySummary> = {}): MoneySummary {
   return {
@@ -108,5 +108,82 @@ test('vai EMPLOYEE chỉ thấy tình trạng tiền và thông báo, không th�
   expect(screen.queryByText(/Rà soát kế toán/)).not.toBeInTheDocument();
   expect(screen.queryByText('Ghi sự kiện tiền')).not.toBeInTheDocument();
   expect(screen.queryByText('Stop hồ sơ')).not.toBeInTheDocument();
+});
+
+test('vai ACCOUNTANT trên hồ sơ B3 thấy form rà soát kế toán và nút Lưu kết quả rà soát', () => {
+  render(<ActionsPanel view={makeView({ job: 'B3' })} role="ACCOUNTANT" actorId="ACC-01"
+    decisionId={null} reportReady onAction={noop} />);
+  expect(screen.getByText('Rà soát kế toán (không phải phê duyệt)')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Lưu kết quả rà soát' })).toBeInTheDocument();
+  expect(screen.queryByText('Ghi sự kiện tiền')).not.toBeInTheDocument();
+});
+
+test('khi chưa nhập ghi chú rà soát: nút disabled và hiển thị gợi ý thân thiện', () => {
+  render(<ActionsPanel view={makeView({ job: 'B3' })} role="ACCOUNTANT" actorId="ACC-01"
+    decisionId={null} reportReady onAction={noop} />);
+  const btn = screen.getByRole('button', { name: 'Lưu kết quả rà soát' }) as HTMLButtonElement;
+  expect(btn.disabled).toBe(true);
+  expect(screen.getByTestId('review-note-hint')).toHaveTextContent(
+    'Vui lòng nhập ghi chú rà soát để lưu kết quả.'
+  );
+
+  // Nhập ghi chú: nút enabled và gợi ý biến mất
+  fireEvent.change(screen.getByLabelText('Ghi chú rà soát'), {
+    target: { value: 'Đã đối soát xong bảng kê chi phí dự kiến.' },
+  });
+  expect(btn.disabled).toBe(false);
+  expect(screen.queryByTestId('review-note-hint')).not.toBeInTheDocument();
+});
+
+test('sau khi lưu review: hiển thị thẻ tóm tắt nổi bật Kế toán đã rà soát nếu có trong history', () => {
+  const historyEntry: AuditEntry = {
+    id: 'H-01',
+    case_id: 'C-t01',
+    kind: 'REVIEW_RECORDED',
+    operation: 'RECORD_REVIEW',
+    actor_id: 'ACC-LEAD-01',
+    command_key: 'ck-rev-1',
+    occurred_at: '2026-10-11T09:30:00Z',
+    detail: {
+      note: 'Đã đối chiếu bảng kê và vé máy bay gốc.',
+      report_id: 'R-run01',
+    },
+  };
+
+  render(<ActionsPanel view={makeView({ job: 'B3' })} role="ACCOUNTANT" actorId="ACC-01"
+    decisionId={null} reportReady history={[historyEntry]} onAction={noop} />);
+
+  const summary = screen.getByTestId('accountant-review-summary');
+  expect(summary).toBeInTheDocument();
+  expect(summary).toHaveTextContent('Kế toán đã rà soát');
+  expect(summary).toHaveTextContent('ACC-LEAD-01');
+  expect(summary).toHaveTextContent('Ghi chú: "Đã đối chiếu bảng kê và vé máy bay gốc."');
+  expect(summary).toHaveTextContent('Căn cứ report R-run01');
+});
+
+test('với hồ sơ B3: ẩn bảng tình trạng tiền, ẩn form quyết định Approver khỏi kế toán, hiển thị thông báo nghiệp vụ ngắn gọn', () => {
+  render(<ActionsPanel view={makeView({ job: 'B3' })} role="ACCOUNTANT" actorId="ACC-01"
+    decisionId={null} reportReady onAction={noop} />);
+
+  // 1. Ẩn hoàn toàn bảng tình trạng tiền
+  expect(screen.queryByTestId('money-summary')).not.toBeInTheDocument();
+  expect(screen.queryByText('Tình trạng tiền')).not.toBeInTheDocument();
+
+  // 2. Ẩn form/cảnh báo quyết định của Approver khỏi góc nhìn Kế toán
+  expect(screen.queryByText('Quyết định (người duyệt)')).not.toBeInTheDocument();
+  expect(screen.queryByText(/BEYOND_AUTHORITY/)).not.toBeInTheDocument();
+
+  // 3. Hiển thị thông báo nghiệp vụ thay vì lỗi kỹ thuật B3_REPORT_ONLY
+  expect(screen.getByText(/Chức năng hiện tại hỗ trợ rà soát đề nghị tạm ứng; chưa thực hiện duyệt và chi ứng/)).toBeInTheDocument();
+  expect(screen.queryByText(/B3_REPORT_ONLY/)).not.toBeInTheDocument();
+});
+
+test('vai APPROVER trên hồ sơ B3 hiển thị thông báo nghiệp vụ và không hiện B3_REPORT_ONLY', () => {
+  render(<ActionsPanel view={makeView({ job: 'B3' })} role="APPROVER" actorId="APR-01"
+    decisionId={null} reportReady onAction={noop} />);
+
+  expect(screen.getByText(/Chức năng hiện tại hỗ trợ rà soát đề nghị tạm ứng; chưa thực hiện duyệt và chi ứng/)).toBeInTheDocument();
+  expect(screen.queryByText(/B3_REPORT_ONLY/)).not.toBeInTheDocument();
+  expect(screen.queryByTestId('money-summary')).not.toBeInTheDocument();
 });
 

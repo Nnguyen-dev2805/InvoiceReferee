@@ -151,7 +151,7 @@ test('report B3 dùng section proposal, không dùng bảng S; pending không l�
   render(<ReportPanel report={makeB3Report()} />);
   expect(screen.queryByText(/S = E/)).not.toBeInTheDocument();
   expect(screen.getAllByText(/Đang chờ quyết định/).length).toBeGreaterThan(0);
-  expect(screen.getByText(/2[.,]000[.,]000/)).toBeInTheDocument();
+  expect(screen.getAllByText(/2[.,]000[.,]000/).length).toBeGreaterThan(0);
   const text = screen.getByTestId('report-panel').textContent ?? '';
   expect(text).toContain('Tổng dự toán');
   expect(text).toContain('8.000.000 VND');
@@ -195,3 +195,119 @@ test('report B7 không có section B3 proposal', () => {
   expect(screen.queryByTestId('b3-proposal')).not.toBeInTheDocument();
   expect(screen.getByText(/S = E/)).toBeInTheDocument();
 });
+
+test('điều kiện NOT_APPLICABLE hiển thị Không áp dụng, không phải CHỜ XỬ LÝ', () => {
+  render(<ReportPanel report={makeReport({
+    checks: [
+      { rule: 'advance_limit', status: 'NOT_APPLICABLE', refs: [], reason: 'Không có hạn mức' },
+    ],
+  })} />);
+  const panel = screen.getByTestId('report-panel');
+  expect(panel.textContent).toContain('KHÔNG ÁP DỤNG');
+  expect(panel.textContent).not.toContain('CHỜ XỬ LÝ (NOT_APPLICABLE)');
+});
+
+test('Task 3: bảng dự toán tinh gọn với các tiêu đề chuẩn và nút căn cứ "Xem dự toán"', () => {
+  render(<ReportPanel report={makeB3Report()} />);
+  const table = screen.getByTestId('b3-estimate-report');
+  expect(table).toBeInTheDocument();
+  expect(table.textContent).toContain('Nội dung chi phí');
+  expect(table.textContent).toContain('Cơ sở tính toán');
+  expect(table.textContent).toContain('Công ty dự kiến trả');
+  expect(table.textContent).toContain('Nhân viên dự kiến trả');
+  expect(table.textContent).toContain('Căn cứ');
+  expect(table.textContent).toContain('Xem dự toán');
+});
+
+test('Task 4: bảng đối chiếu nghiệp vụ B3 hiển thị 4 dòng nghiệp vụ và critical facts dạng accordion', () => {
+  const b3Report = makeB3Report();
+  b3Report.checks = [
+    { rule: 'amount_words_consistency', status: 'PASS', refs: ['S-B3-REQ'], reason: 'Khớp số và chữ' },
+    { rule: 'estimate_arithmetic', status: 'PASS', refs: ['S-B3-FC'], reason: 'Khớp tổng dòng' },
+    { rule: 'proposal_relation', status: 'PASS', refs: ['S-B3-REQ', 'S-B3-FC'], reason: 'Cùng chuyến đi' },
+  ];
+  b3Report.critical_facts = [
+    { key: 'document.role', value: 'ADVANCE_REQUEST, FORECAST', state: 'KNOWN', refs: ['S-B3-REQ', 'S-B3-FC'] },
+    { key: 'advance.request.amount', value: 2_000_000, state: 'KNOWN', refs: ['S-B3-REQ'] },
+  ];
+
+  render(<ReportPanel report={b3Report} sources={[
+    { id: 'S-B3-REQ', filename: '01_giay_de_nghi_tam_ung.pdf', media_type: 'application/pdf', sha256: 'h1', size_bytes: 100, status: 'ACCEPTED', uploader_actor_id: 'NV-1', received_at: '', supersedes_source_id: null, provenance: {} },
+    { id: 'S-B3-FC', filename: '02_bang_du_toan.pdf', media_type: 'application/pdf', sha256: 'h2', size_bytes: 100, status: 'ACCEPTED', uploader_actor_id: 'NV-1', received_at: '', supersedes_source_id: null, provenance: {} },
+  ]} />);
+
+  const crossCheckTable = screen.getByTestId('business-cross-check-table');
+  expect(crossCheckTable).toBeInTheDocument();
+
+  // Dòng 1: Số xin ứng và số bằng chữ
+  const row1 = screen.getByTestId('cross-check-words');
+  expect(row1.textContent).toContain('Số xin ứng và số bằng chữ');
+  expect(row1.textContent).toContain('Khớp: 2.000.000 VND');
+  expect(row1.textContent).toContain('Xem giấy đề nghị');
+
+  // Dòng 2: Tổng dự toán và chi tiết các dòng
+  const row2 = screen.getByTestId('cross-check-arithmetic');
+  expect(row2.textContent).toContain('Tổng dự toán và chi tiết các dòng');
+  expect(row2.textContent).toContain('Khớp: 8.000.000 VND');
+  expect(row2.textContent).toContain('Xem bảng dự toán');
+
+  // Dòng 3: Thông tin chuyến đi giữa hai giấy
+  const row3 = screen.getByTestId('cross-check-trip');
+  expect(row3.textContent).toContain('Thông tin chuyến đi giữa hai giấy');
+  expect(row3.textContent).toContain('Khớp thông tin chuyến đi');
+  expect(row3.textContent).toContain('Xem hai giấy');
+
+  // Dòng 4: Loại chứng từ & Phân vai hồ sơ
+  const row4 = screen.getByTestId('cross-check-role');
+  expect(row4.textContent).toContain('Loại chứng từ & Phân vai hồ sơ');
+  expect(row4.textContent).toContain('Đầy đủ 2 chứng từ theo quy định');
+  expect(row4.textContent).toContain('Xem hồ sơ nguồn');
+
+  // Critical facts nằm trong accordion collapsible
+  const accordion = screen.getByTestId('critical-facts-accordion');
+  expect(accordion).toBeInTheDocument();
+  expect(accordion.textContent).toContain('Chi tiết kỹ thuật: Dữ liệu đã trích xuất từ hồ sơ (Critical facts)');
+});
+
+test('Task 4: đối chiếu nghiệp vụ phản ánh đúng trạng thái khi mâu thuẫn hoặc lệch số', () => {
+  const b3Report = makeB3Report();
+  b3Report.checks = [
+    { rule: 'amount_words_consistency', status: 'FAIL', refs: ['S-B3-REQ'], reason: 'Chữ ghi Ba triệu' },
+    { rule: 'estimate_arithmetic', status: 'FAIL', refs: ['S-B3-FC'], reason: 'Lệch 1 triệu' },
+    { rule: 'proposal_relation', status: 'UNRESOLVED', refs: [], reason: 'Khác địa điểm' },
+  ];
+
+  render(<ReportPanel report={b3Report} />);
+  const row1 = screen.getByTestId('cross-check-words');
+  expect(row1.textContent).toContain('Mâu thuẫn');
+
+  const row2 = screen.getByTestId('cross-check-arithmetic');
+  expect(row2.textContent).toContain('Lệch phép tính');
+
+  const row3 = screen.getByTestId('cross-check-trip');
+  expect(row3.textContent).toContain('Cần làm rõ');
+});
+
+test('Task 5: checklist chính sách hiển thị tiêu đề gọn gàng, mã tag nhỏ và không lặp lại reason', () => {
+  const report = makeReport({
+    checks: [
+      { rule: 'destination_scope', status: 'PASS', refs: [], reason: 'Địa điểm công tác nằm trong phạm vi phê duyệt.' },
+      { rule: 'advance_limit', status: 'PASS', refs: [], reason: 'Số tiền tạm ứng không vượt hạn mức công ty.' },
+    ],
+  });
+
+  render(<ReportPanel report={report} />);
+  const panel = screen.getByTestId('report-panel');
+
+  // Header tiêu đề mới: "[passCount] mục kiểm tra tự động đã đạt. Hồ sơ chờ kế toán rà soát."
+  expect(panel.textContent).toContain('2 mục kiểm tra tự động đã đạt. Hồ sơ chờ kế toán rà soát.');
+  expect(panel.textContent).not.toContain('2/2 điều kiện tuân thủ quy chế tài chính');
+
+  // Tag mã rule nhỏ
+  expect(panel.textContent).toContain('(mã: destination_scope)');
+  expect(panel.textContent).toContain('(mã: advance_limit)');
+
+  // Kiểm tra không lặp lại câu {rule}: {status} — {reason}
+  expect(panel.textContent).not.toContain('destination_scope: PASS — Địa điểm công tác nằm trong phạm vi phê duyệt.');
+});
+

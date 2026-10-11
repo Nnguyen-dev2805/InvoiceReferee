@@ -284,16 +284,16 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
               </svg>
               <span>Tổng hợp dự toán chi phí</span>
             </div>
-            <span className="b3-totals-audit-badge">Đối soát tự động (backend kiểm lại theo chứng từ gốc)</span>
+            <span className="b3-totals-audit-badge">Tổng hợp dự toán kê khai (chưa phê duyệt, chưa chi tiền)</span>
           </div>
 
           <div className="b3-totals-cards">
             <div className="b3-totals-card">
-              <span className="b3-totals-card-label">Công ty chi trả</span>
+              <span className="b3-totals-card-label">Công ty dự kiến</span>
               <span className="b3-totals-card-val">{vnd(companyTotal)}</span>
             </div>
             <div className="b3-totals-card">
-              <span className="b3-totals-card-label">Nhân viên chi trả</span>
+              <span className="b3-totals-card-label">Nhân viên dự kiến</span>
               <span className="b3-totals-card-val">{vnd(employeeTotal)}</span>
             </div>
             <div className="b3-totals-card b3-totals-card-highlight">
@@ -303,7 +303,7 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
           </div>
 
           <div className="b3-totals-inline-summary">
-            công ty {vnd(companyTotal)} · nhân viên {vnd(employeeTotal)} · tổng {vnd(totalPreview)} (backend kiểm lại)
+            công ty {vnd(companyTotal)} · nhân viên {vnd(employeeTotal)} · tổng {vnd(totalPreview)} (chưa duyệt, backend kiểm lại)
           </div>
         </div>
       </div>

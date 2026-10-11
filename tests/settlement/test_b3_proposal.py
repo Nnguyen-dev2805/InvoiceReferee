@@ -583,6 +583,15 @@ def test_t15_person_name_mismatch_with_persona_asks_employee():
     assert check_of(report, "proposal_relation").status != "PASS"
 
 
+def test_document_role_across_request_and_forecast_not_contradicted():
+    observations = make_b3_observations()
+    report = evaluate(make_b3_run(form=import_form()), observations)
+    role_fact = next(f for f in report.critical_facts if f.key == "document.role")
+    assert role_fact.state == "KNOWN"
+    assert "ADVANCE_REQUEST" in str(role_fact.value)
+    assert "FORECAST" in str(role_fact.value)
+
+
 # --- dispatch (rules) ---------------------------------------------------------------
 
 def test_rules_dispatch_b3_v1_to_proposal():

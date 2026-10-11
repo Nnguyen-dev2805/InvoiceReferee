@@ -359,5 +359,117 @@ test('không xoá khi người dùng huỷ hộp thoại xác nhận', async () 
   expect(deleteSpy).not.toHaveBeenCalled();
 });
 
+test('chuyển vai trò demo cập nhật đúng actorId theo roster demo context', async () => {
+  const user = userEvent.setup();
+  vi.spyOn(api, 'getDemoContext').mockResolvedValue(DEMO_CONTEXT);
+  vi.spyOn(api, 'getHistory').mockResolvedValue([]);
+  vi.spyOn(api, 'getQuestions').mockResolvedValue([]);
+  vi.spyOn(api, 'listCases').mockResolvedValue([]);
+
+  render(<App />);
+
+  // Khởi đầu là EMPLOYEE -> actor NV-DEMO-01
+  expect(await screen.findByDisplayValue('NV-DEMO-01')).toBeInTheDocument();
+
+  // Đổi sang ACCOUNTANT -> actor tự động cập nhật ACC-DEMO-01
+  await user.selectOptions(screen.getByLabelText('Vai trò demo'), 'ACCOUNTANT');
+  expect(screen.getByDisplayValue('ACC-DEMO-01')).toBeInTheDocument();
+
+  // Đổi sang APPROVER -> actor tự động cập nhật APR-DEMO-01
+  await user.selectOptions(screen.getByLabelText('Vai trò demo'), 'APPROVER');
+  expect(screen.getByDisplayValue('APR-DEMO-01')).toBeInTheDocument();
+});
+
+test('header nhận diện công việc: tiêu đề chính to rõ, dòng phụ hành trình, và nhãn xác nhận', async () => {
+  const user = userEvent.setup();
+  setup(caseView(true), true);
+
+  await user.click(await screen.findByText(/C-b3test01/));
+
+  // 1. Tiêu đề chính to rõ: Đề nghị tạm ứng — Nguyễn An (lấy tên từ demoContext)
+  const mainHeading = await screen.findByRole('heading', { level: 2, name: /Đề nghị tạm ứng — Nguyễn An/ });
+  expect(mainHeading).toHaveTextContent('Đề nghị tạm ứng — Nguyễn An');
+
+  // 2. Dòng phụ: [Địa điểm] · [Thời gian chuyến đi] · Đề nghị [Số tiền VND]
+  expect(screen.getByText(/Hà Nội · 12–13\/10\/2026 · Đề nghị 2\.000\.000 đ/)).toBeInTheDocument();
+
+  // 3. Nhãn xác nhận
+  expect(screen.getByText('Nhân viên đã xác nhận thông tin đề nghị')).toBeInTheDocument();
+});
+
+test('mã hồ sơ hiển thị dạng badge nhỏ gọn có nút sao chép clipboard', async () => {
+  const user = userEvent.setup();
+  const writeTextMock = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: writeTextMock },
+    writable: true,
+    configurable: true,
+  });
+
+  setup(caseView(true), true);
+  await user.click(await screen.findByText(/C-b3test01/));
+
+  // Kiểm tra badge mã hồ sơ
+  const badge = await screen.findByTestId('case-id-badge');
+  expect(badge).toBeInTheDocument();
+  expect(badge).toHaveTextContent('C-b3test01');
+
+  // Bấm nút sao chép
+  const copyBtn = screen.getByLabelText('Sao chép mã hồ sơ');
+  await user.click(copyBtn);
+
+  expect(writeTextMock).toHaveBeenCalledWith('C-b3test01');
+  expect(await screen.findByText('Đã chép')).toBeInTheDocument();
+});
+
+test('kế toán thấy trạng thái "Chờ kế toán rà soát" và nút Tạo hồ sơ mới dạng thứ cấp', async () => {
+  const user = userEvent.setup();
+  setup(caseView(true), true);
+
+  // Đổi vai sang ACCOUNTANT
+  await user.selectOptions(screen.getByLabelText('Vai trò demo'), 'ACCOUNTANT');
+
+  // Nút Tạo hồ sơ mới chuyển sang dạng thứ cấp (gọn hơn, không chiếm spotlight)
+  const newCaseBtn = screen.getByRole('button', { name: /Tạo hồ sơ mới/ });
+  expect(newCaseBtn).toHaveClass('btn-new-case-accountant');
+
+  // Mở hồ sơ
+  await user.click(await screen.findByText(/C-b3test01/));
+
+  // Trạng thái nghiệp vụ thống nhất trên cùng khi chưa có review
+  const statusCard = await screen.findByTestId('accountant-status-card');
+  expect(statusCard).toHaveTextContent('Chờ kế toán rà soát');
+  expect(statusCard).toHaveTextContent(
+    'Nhân viên đã xác nhận thông tin đề nghị. Hệ thống đã hoàn tất kiểm tra tự động. Chưa phê duyệt hoặc chi ứng.'
+  );
+});
+
+test('kế toán thấy trạng thái "Đã lưu kết quả rà soát" khi có bản ghi review trong history', async () => {
+  const user = userEvent.setup();
+  setup(caseView(true), true);
+
+  vi.spyOn(api, 'getHistory').mockResolvedValue([
+    {
+      id: 'H-01',
+      case_id: 'C-b3test01',
+      kind: 'REVIEW_RECORDED',
+      operation: 'RECORD_REVIEW',
+      actor_id: 'ACC-DEMO-01',
+      command_key: 'ck-1',
+      occurred_at: '2026-10-10T10:00:00+07:00',
+      detail: { note: 'Đã đối chiếu bảng kê và vé máy bay.' },
+    },
+  ]);
+
+  await user.selectOptions(screen.getByLabelText('Vai trò demo'), 'ACCOUNTANT');
+  await user.click(await screen.findByText(/C-b3test01/));
+
+  const statusCard = await screen.findByTestId('accountant-status-card');
+  expect(statusCard).toHaveTextContent('Đã lưu kết quả rà soát');
+  expect(statusCard).toHaveTextContent('ACC-DEMO-01');
+  expect(statusCard).toHaveTextContent('Đã đối chiếu bảng kê và vé máy bay.');
+});
+
+
 
 

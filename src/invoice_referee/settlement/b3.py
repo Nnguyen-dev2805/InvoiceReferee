@@ -492,6 +492,7 @@ def evaluate_b3_proposal(run_input, observations, *, run_id: str, mode: str,
     from invoice_referee.settlement.models import (
         CheckResult,
         ComponentSlot,
+        CriticalFact,
         Issue,
         Report,
         ReportComponents,
@@ -1295,8 +1296,37 @@ def evaluate_b3_proposal(run_input, observations, *, run_id: str, mode: str,
                 accountant_ref = route.accountant_ref
                 approver_ref = route.approver_ref
 
+    def _doc_role_fact_state() -> CriticalFact:
+        role_contra = [refs for k, refs in contradictions if k == "document.role"]
+        if role_contra:
+            all_refs = sorted({r for refs_list in role_contra for r in refs_list})
+            return CriticalFact(
+                key="document.role", value=None, state="CONTRADICTED", refs=all_refs
+            )
+        roles = []
+        r_refs = []
+        if request_units:
+            roles.append("ADVANCE_REQUEST")
+            for _, u in request_units:
+                _, u_refs, _ = unit_value(u, "document.role")
+                r_refs.extend(u_refs)
+        if forecast_units:
+            roles.append("FORECAST")
+            for _, u in forecast_units:
+                _, u_refs, _ = unit_value(u, "document.role")
+                r_refs.extend(u_refs)
+        if not roles:
+            return rules._fact_state(observations, "document.role")
+        return CriticalFact(
+            key="document.role",
+            value=", ".join(roles),
+            state="KNOWN",
+            refs=sorted(set(r_refs)),
+        )
+
     critical_facts = [
-        (_request_words_fact_state(request_observations, key)
+        (_doc_role_fact_state() if key == "document.role"
+         else _request_words_fact_state(request_observations, key)
          if key in _WORDS_KEYS else rules._fact_state(observations, key))
         for key in sorted(k for k in all_keys if _is_b3_grammar_key(k))]
 

@@ -67,8 +67,8 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
     }
   }
 
-  const refs = (list: string[]) => (
-    <EvidenceLinks refs={list} sources={effectiveSources} />
+  const refs = (list: string[], label?: string) => (
+    <EvidenceLinks refs={list} sources={effectiveSources} label={label} />
   );
 
   return (
@@ -102,9 +102,23 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
         </div>
       </div>
 
+      {report.issues.length > 0 && (
+        <div className="report-clean-section report-issues-top" style={{ marginBottom: 'var(--space-4)' }}>
+          <h3 className="section-title" style={{ color: 'var(--color-destructive, #dc2626)' }}>Issues cần làm rõ ({report.issues.length})</h3>
+          <ul className="issues">
+            {report.issues.map((issue) => (
+              <li key={issue.issue_id}>
+                <strong>{issue.type}</strong> → {OWNER_LABELS[issue.owner]}: {issue.message}
+                {issue.refs.length > 0 && <> (refs: {refs(issue.refs)})</>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {report.b3 ? (
         <B3ProposalSection proposal={report.b3} b3Context={b3Context}
-                            refs={refs} />
+                            refs={refs} effectiveSources={effectiveSources} />
       ) : (
         <>
           <h3>Components (S = E − (A − RA) − (P − RP))</h3>
@@ -167,57 +181,82 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
         </div>
       )}
 
-      {report.critical_facts.length > 0 && (
+      {report.b3 && (
         <div className="report-clean-section">
           <div className="section-head-clean">
-            <h3 className="section-title">Dữ liệu đối soát từ chứng từ (Critical facts)</h3>
-            <span className="section-subtitle">Đối chiếu dữ liệu trích xuất tự động từ hồ sơ nguồn</span>
+            <h3 className="section-title">Bảng đối chiếu nghiệp vụ chứng từ</h3>
+            <span className="section-subtitle">
+              Đối soát tự động giữa Giấy đề nghị tạm ứng và Bảng dự toán
+            </span>
           </div>
-          <div className="table-responsive">
-            <table data-testid="critical-facts" className="facts-table-clean">
-              <thead>
-                <tr>
-                  <th>Trường dữ liệu</th>
-                  <th>Giá trị trích xuất</th>
-                  <th>Trạng thái đối soát</th>
-                  <th>Chứng từ gốc</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.critical_facts.map((fact) => (
-                  <tr key={fact.key}>
-                    <td>
-                      <div className="fact-title-cell">
-                        <span className="fact-title-main">{factLabel(fact.key)}</span>
-                        <span className="fact-title-code">{fact.key}</span>
-                      </div>
-                    </td>
-                    <td className="fact-value-clean">
-                      {fact.value === null
-                        ? '—'
-                        : typeof fact.value === 'number'
-                          ? vnd(fact.value)
-                          : String(fact.value)}
-                    </td>
-                    <td>
-                      <span className={`fact-status-pill fact-status-${fact.state.toLowerCase()}`}>
-                        {fact.state === 'KNOWN'
-                          ? 'đã đọc rõ'
-                          : fact.state === 'CONTRADICTED'
-                            ? 'MÂU THUẪN — hai nguồn khác nhau, không chọn một'
-                            : fact.state === 'UNUSABLE'
-                              ? 'chất lượng không đủ'
-                              : fact.state === 'UNCLEAR'
-                                ? 'không đọc được'
-                                : 'chưa có'}
-                      </span>
-                    </td>
-                    <td>{refs(fact.refs)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <BusinessCrossCheckTable
+            report={report}
+            proposal={report.b3}
+            sources={effectiveSources}
+            refs={refs}
+          />
+        </div>
+      )}
+
+      {report.critical_facts.length > 0 && (
+        <div className="report-clean-section">
+          <details className="tech-context-accordion" data-testid="critical-facts-accordion">
+            <summary className="tech-context-summary">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+              <span>Chi tiết kỹ thuật: Dữ liệu đã trích xuất từ hồ sơ (Critical facts)</span>
+            </summary>
+            <div className="tech-context-body">
+              <div className="table-responsive">
+                <table data-testid="critical-facts" className="facts-table-clean">
+                  <thead>
+                    <tr>
+                      <th>Trường dữ liệu</th>
+                      <th>Giá trị trích xuất</th>
+                      <th>Trạng thái đối soát</th>
+                      <th>Chứng từ gốc</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.critical_facts.map((fact) => (
+                      <tr key={fact.key}>
+                        <td>
+                          <div className="fact-title-cell">
+                            <span className="fact-title-main">{factLabel(fact.key)}</span>
+                            <span className="fact-title-code">{fact.key}</span>
+                          </div>
+                        </td>
+                        <td className="fact-value-clean">
+                          {fact.value === null
+                            ? '—'
+                            : typeof fact.value === 'number'
+                              ? vnd(fact.value)
+                              : String(fact.value)}
+                        </td>
+                        <td>
+                          <span className={`fact-status-pill fact-status-${fact.state.toLowerCase()}`}>
+                            {fact.state === 'KNOWN'
+                              ? 'đã đọc rõ'
+                              : fact.state === 'CONTRADICTED'
+                                ? 'MÂU THUẪN — hai nguồn khác nhau, không chọn một'
+                                : fact.state === 'UNUSABLE'
+                                  ? 'chất lượng không đủ'
+                                  : fact.state === 'UNCLEAR'
+                                    ? 'không đọc được'
+                                    : 'chưa có'}
+                          </span>
+                        </td>
+                        <td>{refs(fact.refs)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </details>
         </div>
       )}
 
@@ -266,7 +305,7 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
             <div>
               <h3 className="section-title" style={{ margin: 0 }}>Kiểm tra điều kiện chính sách</h3>
               <span className="section-subtitle">
-                {report.checks.filter((c) => c.status === 'PASS').length}/{report.checks.length} điều kiện tuân thủ quy chế tài chính
+                {report.checks.filter((c) => c.status === 'PASS').length} mục kiểm tra tự động đã đạt. Hồ sơ chờ kế toán rà soát.
               </span>
             </div>
           </div>
@@ -276,27 +315,37 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
           {report.checks.map((check) => {
             const isPass = check.status === 'PASS';
             const isFail = check.status === 'FAIL';
+            const isNA = check.status === 'NOT_APPLICABLE';
             return (
               <li key={check.rule} className="policy-check-flat-item">
-                <span className={`policy-check-icon-circle ${isPass ? 'circle-pass' : isFail ? 'circle-fail' : 'circle-unresolved'}`}>
+                <span className={`policy-check-icon-circle ${isPass ? 'circle-pass' : isFail ? 'circle-fail' : isNA ? 'circle-na' : 'circle-unresolved'}`}>
                   {isPass ? (
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
+                  ) : isNA ? (
+                    <span className="circle-text">—</span>
                   ) : (
                     <span className="circle-text">!</span>
                   )}
                 </span>
                 <div className="policy-check-content">
                   <div className="policy-check-title-bar">
-                    <strong className="policy-check-name">{checkLabel(check.rule)}</strong>
-                    <span className={`policy-check-status-tag ${isPass ? 'tag-pass' : 'tag-unresolved'}`}>
-                      {isPass ? 'ĐẠT' : isFail ? 'KHÔNG ĐẠT' : 'CHỜ XỬ LÝ'} ({check.status})
+                    <div className="policy-check-title-left">
+                      <strong className="policy-check-name">{checkLabel(check.rule)}</strong>
+                      <span className="policy-check-rule-id">
+                        (mã: <code>{check.rule}</code>)
+                      </span>
+                    </div>
+                    <span className={`policy-check-status-tag ${isPass ? 'tag-pass' : isFail ? 'tag-fail' : isNA ? 'tag-na' : 'tag-unresolved'}`}>
+                      {isPass ? 'ĐẠT' : isFail ? 'KHÔNG ĐẠT' : isNA ? 'KHÔNG ÁP DỤNG' : 'CHỜ XỬ LÝ'} ({check.status})
                     </span>
                   </div>
                   <div className="policy-check-desc">
                     {check.reason}
-                    <span className="policy-check-rule-id"> ({check.rule}): {check.status} — {check.reason}</span>
+                    {check.refs && check.refs.length > 0 && (
+                      <span className="policy-check-refs"> (Căn cứ: {refs(check.refs)})</span>
+                    )}
                   </div>
                 </div>
               </li>
@@ -304,20 +353,6 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
           })}
         </ul>
       </div>
-
-      {report.issues.length > 0 && (
-        <div className="report-clean-section">
-          <h3 className="section-title">Issues cần làm rõ</h3>
-          <ul className="issues">
-            {report.issues.map((issue) => (
-              <li key={issue.issue_id}>
-                <strong>{issue.type}</strong> → {OWNER_LABELS[issue.owner]}: {issue.message}
-                {issue.refs.length > 0 && <> (refs: {refs(issue.refs)})</>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
 
       <div className="report-footer-section">
         <p className="next-step-line">
@@ -332,16 +367,264 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
   );
 }
 
-function B3ProposalSection({ proposal, b3Context, refs }: {
+function BusinessCrossCheckTable({
+  report,
+  proposal,
+  sources,
+  refs,
+}: {
+  report: Report;
+  proposal: B3Proposal;
+  sources: SourceView[];
+  refs: (list: string[], label?: string) => React.ReactNode;
+}) {
+  const intake = proposal.intake;
+
+  // Find document sources
+  const requestSource = sources.find((s) =>
+    s.id.toLowerCase().includes('req') ||
+    s.id.toLowerCase().includes('de-nghi') ||
+    s.filename.toLowerCase().includes('de_nghi') ||
+    s.filename.toLowerCase().includes('de-nghi')
+  );
+  const forecastSource = sources.find((s) =>
+    s.id.toLowerCase().includes('fc') ||
+    s.id.toLowerCase().includes('du-toan') ||
+    s.filename.toLowerCase().includes('du_toan') ||
+    s.filename.toLowerCase().includes('du-toan')
+  );
+
+  // Row 1: Số xin ứng và số bằng chữ
+  const wordsCheck = report.checks.find((c) => c.rule === 'amount_words_consistency');
+  const wordsFact = report.critical_facts.find((f) => f.key === 'advance.request.amount_words');
+  let row1StatusText = `Khớp: ${vnd(intake.request_amount_vnd)}`;
+  let row1PillClass = 'fact-status-known';
+
+  if (wordsCheck) {
+    if (wordsCheck.status === 'PASS') {
+      row1StatusText = `Khớp: ${vnd(intake.request_amount_vnd)}`;
+      row1PillClass = 'fact-status-known';
+    } else if (wordsCheck.status === 'FAIL') {
+      row1StatusText = 'Mâu thuẫn';
+      row1PillClass = 'fact-status-contradicted';
+    } else if (wordsCheck.status === 'NOT_APPLICABLE') {
+      row1StatusText = 'Không áp dụng (không có chữ)';
+      row1PillClass = 'fact-status-na';
+    } else {
+      row1StatusText = 'Cần làm rõ';
+      row1PillClass = 'fact-status-unclear';
+    }
+  } else if (wordsFact && wordsFact.state === 'CONTRADICTED') {
+    row1StatusText = 'Mâu thuẫn';
+    row1PillClass = 'fact-status-contradicted';
+  } else if (wordsFact && wordsFact.state === 'UNCLEAR') {
+    row1StatusText = 'Cần làm rõ';
+    row1PillClass = 'fact-status-unclear';
+  }
+
+  const row1RefsCandidates = [
+    ...(wordsCheck?.refs ?? []),
+    ...(proposal.field_refs['request_amount_vnd'] ?? []),
+    ...(wordsFact?.refs ?? []),
+  ];
+  const row1Refs = row1RefsCandidates.length > 0
+    ? row1RefsCandidates
+    : requestSource
+      ? [requestSource.id]
+      : (report.source_refs[0] ? [report.source_refs[0]] : []);
+
+  // Row 2: Tổng dự toán và chi tiết các dòng
+  const arithCheck = report.checks.find((c) => c.rule === 'estimate_arithmetic');
+  const totalFact = report.critical_facts.find((f) => f.key === 'forecast.total');
+  let row2StatusText = `Khớp: ${vnd(proposal.forecast_total_vnd)}`;
+  let row2PillClass = 'fact-status-known';
+
+  if (arithCheck) {
+    if (arithCheck.status === 'PASS') {
+      row2StatusText = `Khớp: ${vnd(proposal.forecast_total_vnd)}`;
+      row2PillClass = 'fact-status-known';
+    } else if (arithCheck.status === 'FAIL') {
+      row2StatusText = 'Lệch phép tính';
+      row2PillClass = 'fact-status-contradicted';
+    } else {
+      row2StatusText = 'Cần làm rõ';
+      row2PillClass = 'fact-status-unclear';
+    }
+  } else if (totalFact && totalFact.state === 'CONTRADICTED') {
+    row2StatusText = 'Lệch phép tính';
+    row2PillClass = 'fact-status-contradicted';
+  } else if (proposal.forecast_total_vnd === null || proposal.forecast_total_vnd === undefined) {
+    row2StatusText = 'Cần làm rõ';
+    row2PillClass = 'fact-status-unclear';
+  }
+
+  const row2RefsCandidates = [
+    ...(arithCheck?.refs ?? []),
+    ...(proposal.field_refs['forecast_total_vnd'] ?? []),
+    ...(totalFact?.refs ?? []),
+  ];
+  const row2Refs = row2RefsCandidates.length > 0
+    ? row2RefsCandidates
+    : forecastSource
+      ? [forecastSource.id]
+      : (report.source_refs.find((r) => r.toLowerCase().includes('fc') || r.toLowerCase().includes('du-toan'))
+         ? [report.source_refs.find((r) => r.toLowerCase().includes('fc') || r.toLowerCase().includes('du-toan'))!]
+         : (report.source_refs[1] ? [report.source_refs[1]] : (report.source_refs[0] ? [report.source_refs[0]] : [])));
+
+  // Row 3: Thông tin chuyến đi giữa hai giấy
+  const relationCheck = report.checks.find((c) => c.rule === 'proposal_relation');
+  let row3StatusText = 'Khớp thông tin chuyến đi';
+  let row3PillClass = 'fact-status-known';
+
+  if (relationCheck) {
+    if (relationCheck.status === 'PASS') {
+      row3StatusText = 'Khớp thông tin chuyến đi';
+      row3PillClass = 'fact-status-known';
+    } else {
+      row3StatusText = 'Cần làm rõ';
+      row3PillClass = 'fact-status-unclear';
+    }
+  } else if (!intake.destination) {
+    row3StatusText = 'Cần làm rõ';
+    row3PillClass = 'fact-status-unclear';
+  }
+
+  const row3RefsCandidates = relationCheck?.refs?.length
+    ? relationCheck.refs
+    : [
+        ...(requestSource ? [requestSource.id] : []),
+        ...(forecastSource ? [forecastSource.id] : []),
+      ];
+  const row3Refs = row3RefsCandidates.length > 0
+    ? row3RefsCandidates
+    : report.source_refs.slice(0, 2);
+
+  // Row 4: Loại chứng từ & Phân vai hồ sơ
+  const roleFact = report.critical_facts.find((f) => f.key === 'document.role');
+  let row4StatusText = 'Đầy đủ 2 chứng từ theo quy định';
+  let row4PillClass = 'fact-status-known';
+
+  const roleStr = roleFact?.value ? String(roleFact.value) : '';
+  const hasBothRoles = (roleStr.includes('ADVANCE_REQUEST') && roleStr.includes('FORECAST'))
+    || (requestSource && forecastSource)
+    || (report.source_refs.length >= 2);
+
+  if (roleFact && roleFact.state === 'CONTRADICTED') {
+    row4StatusText = 'Mâu thuẫn phân vai chứng từ';
+    row4PillClass = 'fact-status-contradicted';
+  } else if (!hasBothRoles && report.completion === 'INCOMPLETE') {
+    row4StatusText = 'Cần bổ sung';
+    row4PillClass = 'fact-status-unclear';
+  } else {
+    row4StatusText = 'Đầy đủ 2 chứng từ theo quy định';
+    row4PillClass = 'fact-status-known';
+  }
+
+  const row4RefsCandidates = roleFact?.refs?.length
+    ? roleFact.refs
+    : report.source_refs;
+  const row4Refs = row4RefsCandidates.length > 0
+    ? row4RefsCandidates
+    : (requestSource ? [requestSource.id] : []);
+
+  return (
+    <div className="table-responsive">
+      <table data-testid="business-cross-check-table" className="facts-table-clean business-cross-check-table">
+        <thead>
+          <tr>
+            <th style={{ width: '38%' }}>Nội dung đối chiếu</th>
+            <th style={{ width: '34%' }}>Kết quả đối soát</th>
+            <th style={{ width: '28%' }}>Căn cứ chứng từ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-testid="cross-check-words">
+            <td>
+              <div className="fact-title-cell">
+                <span className="fact-title-main">Số xin ứng và số bằng chữ</span>
+                <span className="cross-check-desc">So sánh số tiền số và số tiền chữ trích xuất từ Giấy đề nghị</span>
+              </div>
+            </td>
+            <td>
+              <span className={`fact-status-pill ${row1PillClass}`}>
+                {row1StatusText}
+              </span>
+            </td>
+            <td>
+              {row1Refs.length > 0 ? refs(row1Refs, 'Xem giấy đề nghị') : '—'}
+            </td>
+          </tr>
+          <tr data-testid="cross-check-arithmetic">
+            <td>
+              <div className="fact-title-cell">
+                <span className="fact-title-main">Tổng dự toán và chi tiết các dòng</span>
+                <span className="cross-check-desc">So sánh tổng dự toán ghi trên giấy với tổng các dòng chi phí</span>
+              </div>
+            </td>
+            <td>
+              <span className={`fact-status-pill ${row2PillClass}`}>
+                {row2StatusText}
+              </span>
+            </td>
+            <td>
+              {row2Refs.length > 0 ? refs(row2Refs, 'Xem bảng dự toán') : '—'}
+            </td>
+          </tr>
+          <tr data-testid="cross-check-trip">
+            <td>
+              <div className="fact-title-cell">
+                <span className="fact-title-main">Thông tin chuyến đi giữa hai giấy</span>
+                <span className="cross-check-desc">Đối chiếu nơi đến và thời gian giữa Giấy đề nghị và Dự toán</span>
+              </div>
+            </td>
+            <td>
+              <span className={`fact-status-pill ${row3PillClass}`}>
+                {row3StatusText}
+              </span>
+            </td>
+            <td>
+              {row3Refs.length > 0 ? refs(row3Refs, 'Xem hai giấy') : '—'}
+            </td>
+          </tr>
+          <tr data-testid="cross-check-role">
+            <td>
+              <div className="fact-title-cell">
+                <span className="fact-title-main">Loại chứng từ &amp; Phân vai hồ sơ</span>
+                <span className="cross-check-desc">Giấy đề nghị tạm ứng &amp; Bảng dự toán</span>
+              </div>
+            </td>
+            <td>
+              <span className={`fact-status-pill ${row4PillClass}`}>
+                {row4StatusText}
+              </span>
+            </td>
+            <td>
+              {row4Refs.length > 0 ? refs(row4Refs, 'Xem hồ sơ nguồn') : '—'}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function B3ProposalSection({ proposal, b3Context, refs, effectiveSources = [] }: {
   proposal: B3Proposal;
   b3Context: B3RunContext | null;
-  refs: (list: string[]) => React.ReactNode;
+  refs: (list: string[], label?: string) => React.ReactNode;
+  effectiveSources?: SourceView[];
 }) {
   const intake = proposal.intake;
   const decisionLabel = (state: B3Proposal['work_permission']) =>
     state === 'PENDING_DECISION'
       ? 'Đang chờ quyết định (chưa duyệt)'
       : 'Cần rà soát thêm trước khi quyết';
+  const forecastSource = effectiveSources.find((s) =>
+    s.id.toLowerCase().includes('fc') ||
+    s.id.toLowerCase().includes('du-toan') ||
+    s.filename.toLowerCase().includes('du_toan') ||
+    s.filename.toLowerCase().includes('du-toan')
+  );
   return (
     <div data-testid="b3-proposal" className="b3-proposal-root">
       {/* 3 Bold, Minimalist Hero KPI Cards (No legal clutter) */}
@@ -410,28 +693,35 @@ function B3ProposalSection({ proposal, b3Context, refs }: {
           <table data-testid="b3-estimate-report" className="estimate-table estimate-table-modern">
             <thead>
               <tr>
-                <th style={{ width: '32%' }}>Nội dung</th>
-                <th style={{ width: '22%' }}>Cơ sở</th>
-                <th className="text-right" style={{ width: '18%' }}>Công ty</th>
-                <th className="text-right" style={{ width: '18%' }}>Nhân viên</th>
+                <th style={{ width: '30%' }}>Nội dung chi phí</th>
+                <th style={{ width: '20%' }}>Cơ sở tính toán</th>
+                <th className="text-right" style={{ width: '20%' }}>Công ty dự kiến trả</th>
+                <th className="text-right" style={{ width: '20%' }}>Nhân viên dự kiến trả</th>
                 <th style={{ width: '10%' }}>Căn cứ</th>
               </tr>
             </thead>
             <tbody>
-              {intake.estimate_rows.map((row) => (
-                <tr key={row.row_id}>
-                  <td>{row.description}</td>
-                  <td>{row.basis ?? '—'}</td>
-                  <td className="text-right">{vnd(row.company_vnd)}</td>
-                  <td className="text-right">{vnd(row.employee_vnd)}</td>
-                  <td>
-                    {refs([
-                      ...(proposal.field_refs[`estimate_rows.${row.row_id}.company_vnd`] ?? []),
-                      ...(proposal.field_refs[`estimate_rows.${row.row_id}.employee_vnd`] ?? []),
-                    ])}
-                  </td>
-                </tr>
-              ))}
+              {intake.estimate_rows.map((row) => {
+                const rowFieldRefs = [
+                  ...(proposal.field_refs[`estimate_rows.${row.row_id}.company_vnd`] ?? []),
+                  ...(proposal.field_refs[`estimate_rows.${row.row_id}.employee_vnd`] ?? []),
+                ];
+                const targetRefs = rowFieldRefs.length > 0
+                  ? rowFieldRefs
+                  : (proposal.field_refs['forecast_total_vnd'] ??
+                     (forecastSource ? [forecastSource.id] : (effectiveSources[0] ? [effectiveSources[0].id] : [])));
+                return (
+                  <tr key={row.row_id}>
+                    <td>{row.description}</td>
+                    <td>{row.basis ?? '—'}</td>
+                    <td className="text-right">{vnd(row.company_vnd)}</td>
+                    <td className="text-right">{vnd(row.employee_vnd)}</td>
+                    <td>
+                      {targetRefs.length > 0 ? refs(targetRefs, 'Xem dự toán') : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
               <tr className="b3-estimate-total-row">
                 <td><strong>Tổng</strong></td>
                 <td></td>
