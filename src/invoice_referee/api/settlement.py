@@ -25,6 +25,7 @@ from invoice_referee.env import load_repo_env
 from invoice_referee.settlement.b3 import B3Intake, load_b3_context
 from invoice_referee.settlement.models import (
     AuthorityGrant,
+    B3AdvanceEventView,
     B3DecisionView,
     B3PresentationView,
     CaseSummary,
@@ -258,6 +259,29 @@ class B3DecisionRequest(BaseModel):
     advance_vnd: StrictInt | None = None
 
 
+class B3AdvanceEventRequest(BaseModel):
+    """Accountant's actual advance money event over HTTP (envelope + payload)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    decision_id: str | None = None
+    event_namespace: str | None = None
+    event_ref: str | None = None
+    method: Literal["BANK_TRANSFER", "CASH"]
+    gross_vnd: StrictInt | None = None
+    payer_side: Literal["COMPANY", "EMPLOYEE", "OTHER", "UNKNOWN"]
+    payee_ref: str | None = None
+    event_at: str | None = None
+    reported_status: Literal[
+        "RECEIVED", "PENDING", "FAILED", "CANCELLED", "UNCONFIRMED"]
+    evidence: list[dict[str, Any]] = []
+    allocation_note: str
+    supersedes_event_id: str | None = None
+
+
 DEFAULT_EVAL_CORPUS = Path("docs/discovery/eval_development")
 DEFAULT_VERIFY_DIR = DEFAULT_DATA_DIR / "verify"
 _verify_service: dict[str, Service] = {}
@@ -445,6 +469,55 @@ def create_runtime_app(*, db_path: Path | None = None,
             return JSONResponse(status_code=200,
                                 content=decision.model_dump(mode="json"))
         return decision
+
+    @app.post("/api/cases/{case_id}/b3-advance-proofs",
+              response_model=SourceView, status_code=201)
+    async def add_b3_advance_proof(
+        case_id: str,
+        file: UploadFile = File(...),
+        actor_id: str = Form(...),
+        demo_role: str = Form(...),
+        expected_case_version: int = Form(...),
+        note: str = Form(""),
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | SourceView:
+        content = await file.read()
+        upload = Upload(filename=file.filename or "proof",
+                        content=content,
+                        provenance={"note": note} if note else {})
+        command = _command(idempotency_key, actor_id, demo_role,
+                           expected_case_version, {})
+        record = service.add_b3_advance_proof(case_id, upload, command)
+        if record.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=_source_view(record).model_dump(mode="json"))
+        return _source_view(record)
+
+    @app.post("/api/cases/{case_id}/b3-advance-events",
+              response_model=B3AdvanceEventView, status_code=201)
+    async def record_b3_advance(
+        case_id: str,
+        request: B3AdvanceEventRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | B3AdvanceEventView:
+        payload = {
+            "decision_id": request.decision_id,
+            "event_namespace": request.event_namespace,
+            "event_ref": request.event_ref, "method": request.method,
+            "gross_vnd": request.gross_vnd, "payer_side": request.payer_side,
+            "payee_ref": request.payee_ref, "event_at": request.event_at,
+            "reported_status": request.reported_status,
+            "evidence": request.evidence,
+            "allocation_note": request.allocation_note,
+            "supersedes_event_id": request.supersedes_event_id,
+        }
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        event = service.record_b3_advance(case_id, payload, command)
+        if event.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=event.model_dump(mode="json"))
+        return event
 
     @app.get("/api/cases/{case_id}", response_model=CaseView)
     async def get_case(case_id: str) -> CaseView:

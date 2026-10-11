@@ -53,6 +53,17 @@ và ứng trong một quyết định có nội dung/phạm vi riêng. Không y�
   REFUSE thêm stage `ADVANCE_REQUEST_REFUSED`. **Phê duyệt KHÔNG phải thực nhận**:
   không tạo money event, handoff, closure hay B7 money_summary; chưa có đường chi
   ứng. Điều chỉnh/mở lại sau quyết định là capability chưa mở.
+- Ghi tiền ứng thực nhận (B5, IMPLEMENTED, chưa nghiệm thu nghiệp vụ): sau khi
+  duyệt, **kế toán** đính kèm chứng từ ứng qua route riêng (source-use
+  `B3_ADVANCE_PROOF`, không tăng `input_revision`, không làm decision stale) và
+  **ghi sự kiện tiền** bằng HUMAN_SOURCE_REVIEW — đọc nguồn rồi lưu từng field
+  kèm source/locator/raw/value. Chương trình đối chiếu actual với số đã duyệt:
+  RECEIVED đủ → stage `AWAITING_WORK_SETTLEMENT`; nhận một phần/pending/unknown →
+  `AWAITING_MONEY`; wrong recipient/overpaid/conflict → `RESOLVING_OBLIGATIONS`.
+  Giữ gross thật (không clip), unknown/pending không thành 0, một giao dịch kinh
+  tế không đếm hai lần. **Không** chuyển tiền/ngân hàng, không tự thu hồi, không
+  closure, không tạo B7 tự động. B7 `money_summary` lọc kind trước mọi sum/pending
+  nên advance không thành reimbursement.
 
 Gói mẫu: `data/settlement/b3-verbal-v2.zip` (synthetic, local, chưa đo baseline).
 Hai tài liệu nhân viên: đề nghị và dự toán; dữ liệu công ty và oracle tách riêng.
@@ -60,11 +71,12 @@ Mẫu giấy đã chốt: Công ty InvoiceReferee, tiền có hậu tố đ, kh�
 số giấy giả định/thông tin giao việc/trạng thái/nhãn thử nghiệm; trip context gộp
 trong lý do hoặc nội dung công tác. Web vẫn lưu place/dates/purpose riêng, mã hồ
 sơ backend cấp; giấy ngoài không bị buộc có employee_ref/work_ref/mã DN nội bộ.
-[Plan intake/report B3](../superpowers/plans/2026-10-10-b3-verbal-intake.md) và
+[Plan intake/report B3](../superpowers/plans/2026-10-10-b3-verbal-intake.md),
 [plan trình duyệt/quyết định ứng](../superpowers/plans/2026-10-11-b3-present-and-approve.md)
-thực hiện nhánh khởi tạo + trình duyệt này. **Chưa** có actual ứng (ghi tiền),
-liên kết nhập B3→B7, mở lại refusal hoặc đóng lifecycle; không dùng action
-SETTLEMENT/record_money/handoff/closure cho B3.
+và [plan ghi tiền ứng B5](../superpowers/plans/2026-10-11-b5-advance-receipts.md)
+thực hiện nhánh khởi tạo + trình duyệt + ghi tiền ứng này. **Chưa** có chuyển
+tiền ngân hàng, liên kết nhập B3→B7, mở lại refusal, xử lý return/reversal hoặc
+đóng lifecycle; không dùng action SETTLEMENT/record_money/handoff/closure cho B3.
 
 ## P3. Ba vai và ranh giới quyết định
 

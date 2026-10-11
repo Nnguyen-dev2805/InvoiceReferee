@@ -17,8 +17,11 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError
 
 from invoice_referee.domain.models import DomainError
 from invoice_referee.settlement.b3 import B3CompanyContext, B3Intake, is_b3_v1
+from invoice_referee.settlement.b3_workflow import b3_route_for
 from invoice_referee.settlement.models import (
     AuthorityGrant,
+    B3AdvanceEventPayload,
+    B3AdvanceEventView,
     B3DecisionPayload,
     B3DecisionView,
     B3PresentPayload,
@@ -94,6 +97,31 @@ def _merge_b3_decision_into_history(
     ]
     merged = context.model_copy(update={"history": [*context.history, *records]})
     return merged, f"{namespace}:advance"
+
+
+def _merge_b3_advances_into_history(
+        context: B3CompanyContext, events) -> B3CompanyContext:
+    """Fold confirmed RECEIVED advance events into company history as ADVANCE.
+
+    So a re-run of the same case sees the recorded advance (kind ADVANCE/
+    RECEIVED) in its company history under a ``b3advance:<id>`` namespace. Only
+    confirmed events count; pending/unknown are not fabricated as ADVANCE 0.
+    """
+    from invoice_referee.settlement.b3 import B3HistoryRecord
+
+    records = [
+        B3HistoryRecord(
+            event_ref=f"b3advance:{event.id}", employee_ref=event.employee_ref,
+            work_ref=event.work_ref, kind="ADVANCE", amount_vnd=event.gross_vnd,
+            event_at=event.event_at or event.created_at,
+            known_at=event.created_at, status="RECEIVED",
+            ref=f"b3advance:{event.id}")
+        for event in events
+    ]
+    if not records:
+        return context
+    return context.model_copy(
+        update={"history": [*context.history, *records]})
 
 
 class ServiceConfig(BaseModel):
@@ -217,6 +245,12 @@ class Service:
         context = self.config.b3_context if b3_v1 else None
         config: dict[str, Any] = {"reader_mode": self.reader.mode}
         sources = snapshot.sources
+        if b3_v1:
+            # B5 advance-proof sources are fulfillment evidence, not proposal
+            # input: they never enter the B3 Reader/basis. Filtered by the
+            # backend-owned audit source-use, never by filename/provenance text.
+            proof_ids = self.store._b3_proof_source_ids(case_id)
+            sources = [s for s in sources if s.id not in proof_ids]
         if (b3_v1 and context is not None and context.activated
                 and context.synthetic and context.demo_clock is not None):
             # Clock mô phỏng là mốc business/knowledge của fixture; audit nhận
@@ -233,6 +267,10 @@ class Service:
             if own is not None:
                 context, own_ref = _merge_b3_decision_into_history(context, own)
                 config["b3_current_decision_ref"] = own_ref
+            # Fold confirmed RECEIVED advance events so a re-run sees them as
+            # company history (kind ADVANCE/RECEIVED) rather than absence.
+            confirmed = self.store.confirmed_b3_advances(case_id)
+            context = _merge_b3_advances_into_history(context, confirmed)
         run_input = RunInput(
             case_id=snapshot.case_id,
             case_version=snapshot.case_version,
@@ -503,6 +541,41 @@ class Service:
         return self.store.record_b3_decision(
             case_id, decision, command, context, self.policy,
             grant.ref, effective_at)
+
+    # --- B5: advance receipts (actual money to employee) ---------------------
+
+    def add_b3_advance_proof(self, case_id: str, upload: Upload,
+                             command: Command) -> SourceRecord:
+        """Attach a receiver/cash proof source for a B3 advance.
+
+        Backend-owned source use (B3_ADVANCE_PROOF), accountant-only; this is
+        bookkeeping evidence, not a proposal input — it bumps case_version but
+        not input_revision, so an approved proposal does not go stale merely
+        because a receipt arrived.
+        """
+        context = self._b3_context()
+        case = self.store.get_case(case_id)
+        if case.b3_workflow is None:
+            raise DomainError(
+                "B3_WORKFLOW_BLOCKED",
+                "Chứng từ ứng chỉ áp dụng cho hồ sơ b3-intake-v1.",
+            )
+        route = b3_route_for(context, case.submission.employee_ref)
+        if (command.demo_role != "ACCOUNTANT" or route is None
+                or route.accountant_ref != command.actor_id):
+            raise DomainError(
+                "BEYOND_AUTHORITY",
+                f"Vai {command.demo_role}/{command.actor_id} không phải kế toán "
+                f"được phân công; không tải chứng từ ứng.",
+            )
+        return self.store.add_source(case_id, upload, command,
+                                     source_use="B3_ADVANCE_PROOF")
+
+    def record_b3_advance(self, case_id: str, payload: dict[str, Any],
+                          command: Command) -> B3AdvanceEventView:
+        context = self._b3_context()
+        event = self._parse_payload(B3AdvanceEventPayload, payload)
+        return self.store.record_b3_advance(case_id, event, command, context)
 
     def record_money(self, case_id: str, payload: dict[str, Any],
                      command: Command) -> MoneyEventView:

@@ -46,11 +46,14 @@ def _ready_case(client, key_prefix="wf"):
         headers={"Idempotency-Key": f"{key_prefix}-run"})
     assert run.status_code == 202, run.text
     run_id = run.json()["id"]
-    # fake reader runs synchronously enough via wait; poll the run
-    for _ in range(50):
+    # The worker runs on a background thread; poll with a bounded wait.
+    import time
+    deadline = time.monotonic() + 10.0
+    current = client.get(f"/api/runs/{run_id}").json()
+    while current["status"] not in ("SUCCEEDED", "FAILED", "STOPPED") \
+            and time.monotonic() < deadline:
+        time.sleep(0.02)
         current = client.get(f"/api/runs/{run_id}").json()
-        if current["status"] in ("SUCCEEDED", "FAILED", "STOPPED"):
-            break
     assert current["status"] == "SUCCEEDED", current
     view = client.get(f"/api/cases/{case['id']}").json()
     return view, run_id

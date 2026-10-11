@@ -37,8 +37,11 @@ from invoice_referee.settlement.models import (
     MAX_SOURCE_BYTES,
     AllowedAction,
     AuditEntry,
+    B3AdvanceEventPayload,
+    B3AdvanceEventView,
     B3DecisionPayload,
     B3DecisionView,
+    B3FundingIncident,
     B3PresentPayload,
     B3PresentationView,
     B3WorkflowView,
@@ -89,6 +92,8 @@ _HANDOFF = "HANDOFF"
 _CLOSE_CASE = "CLOSE_CASE"
 _B3_PRESENT = "B3_PRESENT"
 _B3_DECIDE = "B3_DECIDE"
+_B3_ADD_ADVANCE_PROOF = "B3_ADD_ADVANCE_PROOF"
+_B3_RECORD_ADVANCE = "B3_RECORD_ADVANCE"
 
 _NONTERMINAL_STATUSES = ("QUEUED", "RUNNING")
 _TERMINAL_STATUSES = ("SUCCEEDED", "FAILED", "TIMED_OUT", "STOPPED",
@@ -426,17 +431,21 @@ class Store:
 
     # --- sources -----------------------------------------------------------
 
-    def add_source(self, case_id: str, upload: Upload, command: Command) -> SourceRecord:
+    def add_source(self, case_id: str, upload: Upload, command: Command,
+                   *, source_use: str = "PROPOSAL") -> SourceRecord:
         sha = hashlib.sha256(upload.content).hexdigest()
-        payload_fp = fingerprint(_ADD_SOURCE, {
+        operation = (_B3_ADD_ADVANCE_PROOF if source_use == "B3_ADVANCE_PROOF"
+                     else _ADD_SOURCE)
+        payload_fp = fingerprint(operation, {
             "filename": upload.filename,
             "sha256": sha,
             "size": len(upload.content),
             "provenance": upload.provenance,
+            "source_use": source_use,
         })
         stored_path: Path | None = None
         with self._write() as conn:
-            row = self._lookup_command(conn, _ADD_SOURCE, command, scope_key=case_id)
+            row = self._lookup_command(conn, operation, command, scope_key=case_id)
             if row is not None:
                 self._check_replay(row, payload_fp)
                 record = self._source_record(
@@ -463,6 +472,13 @@ class Store:
             self._check_version(case, command)
             source_id = f"S-{uuid.uuid4().hex[:12]}"
             now = _iso(utcnow())
+            # Reserved source-use metadata is backend-owned: a client-supplied
+            # provenance key of the same name is dropped so it cannot fake a
+            # proof role. Only the Service B5 branch sets B3_ADVANCE_PROOF.
+            provenance = dict(upload.provenance)
+            provenance.pop("source_use", None)
+            if source_use == "B3_ADVANCE_PROOF":
+                provenance["source_use"] = "B3_ADVANCE_PROOF"
             stored_path = put_artifact(self.artifact_root, case_id, "sources",
                                        source_id, upload.content)
             try:
@@ -473,18 +489,31 @@ class Store:
                     "VALUES (?, ?, ?, ?, ?, ?, 'ACCEPTED', NULL, ?, ?, ?, ?)",
                     (source_id, case_id, upload.filename, media_type, sha,
                      len(upload.content), command.actor_id, now,
-                     _dump(upload.provenance),
+                     _dump(provenance),
                      str(stored_path.relative_to(self.artifact_root))),
                 )
                 new_version = case["case_version"] + 1
-                conn.execute(
-                    "UPDATE cases SET case_version = ?, input_revision = ?, updated_at = ? "
-                    "WHERE id = ?",
-                    (new_version, case["input_revision"] + 1, now, case_id),
-                )
-                self._record_command(conn, case_id, case_id, "SOURCE_ADDED",
-                                     _ADD_SOURCE, command, payload_fp,
+                if source_use == "B3_ADVANCE_PROOF":
+                    # Proof is fulfillment evidence, not proposal input: bump
+                    # case_version only, never input_revision, so an approved
+                    # proposal does not go stale just because a receipt arrived.
+                    conn.execute(
+                        "UPDATE cases SET case_version = ?, updated_at = ? "
+                        "WHERE id = ?",
+                        (new_version, now, case_id),
+                    )
+                    kind = "B3_ADVANCE_PROOF_ADDED"
+                else:
+                    conn.execute(
+                        "UPDATE cases SET case_version = ?, input_revision = ?, "
+                        "updated_at = ? WHERE id = ?",
+                        (new_version, case["input_revision"] + 1, now, case_id),
+                    )
+                    kind = "SOURCE_ADDED"
+                self._record_command(conn, case_id, case_id, kind,
+                                     operation, command, payload_fp,
                                      {"source_id": source_id, "sha256": sha,
+                                      "source_use": source_use,
                                       "case_version": new_version}, now)
             except BaseException:
                 stored_path.unlink(missing_ok=True)
@@ -1144,6 +1173,15 @@ class Store:
                 status = "REFUSED"
         elif presentation is not None:
             status = "PENDING" if basis_current else "NEEDS_RECHECK"
+        from invoice_referee.settlement.b3_funding import project_b3_funding
+
+        events = self._b3_advance_events(conn, case_id)
+        funding = None
+        has_approval = (decision_for_status is not None
+                        and decision_for_status.outcome == "APPROVE")
+        if has_approval or events:
+            funding = project_b3_funding(decision_for_status, events,
+                                         bool(case["stop_active"]))
         return B3WorkflowView(
             status=status,
             presentation=presentation,
@@ -1153,6 +1191,8 @@ class Store:
             accountant_ref=(presentation.accountant_ref
                             if presentation else None),
             approver_ref=(presentation.approver_ref if presentation else None),
+            funding=funding,
+            advance_events=events,
         )
 
     def current_b3_decision(self, case_id: str) -> B3DecisionView | None:
@@ -1442,6 +1482,195 @@ class Store:
                                  {"decision": decision}, now)
             return B3DecisionView.model_validate(decision)
 
+    # --- B5: advance receipts (actual money to employee) ---------------------
+
+    def _b3_advance_events(self, conn: sqlite3.Connection,
+                           case_id: str) -> list[B3AdvanceEventView]:
+        """All persisted B3 advance events for a case, oldest first."""
+        events: list[B3AdvanceEventView] = []
+        for row in conn.execute(
+                "SELECT payload_json FROM money_events WHERE case_id = ? "
+                "ORDER BY rowid", (case_id,)):
+            payload = _load(row["payload_json"])
+            if payload.get("kind") != "ADVANCE_TO_EMPLOYEE":
+                continue
+            events.append(B3AdvanceEventView.model_validate(payload))
+        return events
+
+    def _b3_advance_proof_source_ids(self, conn: sqlite3.Connection,
+                                     case_id: str) -> set[str]:
+        """Source ids the backend recorded as B5 advance proof (audit-backed).
+
+        Trusted by the audit operation's recorded ``source_id`` — not by a
+        client-supplied provenance string or filename.
+        """
+        ids: set[str] = set()
+        for row in conn.execute(
+                "SELECT payload_json FROM audit_events WHERE case_id = ? "
+                "AND operation = ?", (case_id, _B3_ADD_ADVANCE_PROOF)):
+            source_id = _load(row["payload_json"]).get("source_id")
+            if source_id:
+                ids.add(source_id)
+        return ids
+
+    def _b3_proof_source_ids(self, case_id: str) -> set[str]:
+        with self._read() as conn:
+            return self._b3_advance_proof_source_ids(conn, case_id)
+
+    def confirmed_b3_advances(self, case_id: str) -> list[B3AdvanceEventView]:
+        """Confirmed RECEIVED advance events for a case (for history merge)."""
+        with self._read() as conn:
+            events = self._b3_advance_events(conn, case_id)
+        return [e for e in events if e.classification == "CONFIRMED_RECEIPT"
+                and e.reported_status == "RECEIVED" and e.gross_vnd is not None]
+
+    def record_b3_advance(self, case_id: str, payload: B3AdvanceEventPayload,
+                          command: Command,
+                          context: B3CompanyContext) -> B3AdvanceEventView:
+        """Record an actual advance money event with human-source evidence.
+
+        Allowed under Stop/stale (the fact already happened) but never opens a
+        new payment right or advances the stage past Stop. Records are immutable
+        and append-only; a pending/nonfinal record is superseded by a new one,
+        never overwritten. The raw gross is kept, never clipped to approval.
+        """
+        from invoice_referee.settlement.b3_funding import (
+            derive_classification, project_b3_funding,
+        )
+
+        payload_fp = fingerprint(_B3_RECORD_ADVANCE, {
+            "case_id": case_id, "payload": payload.model_dump(mode="json")})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _B3_RECORD_ADVANCE, command,
+                                       scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                stored = _load(row["payload_json"])["event"]
+                return B3AdvanceEventView.model_validate(stored).model_copy(
+                    update={"idempotent_replay": True})
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            self._b3_case_form(case)
+            self._check_version(case, command)
+            submission = Submission.model_validate(_load(case["submission_json"]))
+            route = b3_route_for(context, submission.employee_ref)
+            if (command.demo_role != "ACCOUNTANT" or route is None
+                    or route.accountant_ref != command.actor_id):
+                raise DomainError(
+                    "BEYOND_AUTHORITY",
+                    f"Vai {command.demo_role}/{command.actor_id} không phải kế "
+                    f"toán được phân công cho {submission.employee_ref}; không "
+                    f"ghi sự kiện ứng.",
+                )
+            # Evidence sources must resolve to this case's retained sources.
+            case_source_ids = {s.id for s in self._source_records(conn, case_id)}
+            for field in payload.evidence:
+                if field.source_id not in case_source_ids:
+                    raise DomainError(
+                        "BASIS_MISMATCH",
+                        f"Nguồn căn cứ {field.source_id} không thuộc hồ sơ "
+                        f"{case_id}.",
+                    )
+            # A decision_id, when given, must belong to this case/employee/work.
+            decision = None
+            if payload.decision_id is not None:
+                dec_row = conn.execute(
+                    "SELECT payload_json FROM decisions WHERE id = ? AND case_id = ?",
+                    (payload.decision_id, case_id)).fetchone()
+                if dec_row is not None:
+                    candidate = _load(dec_row["payload_json"])
+                    if candidate.get("kind") == "B3_ADVANCE" \
+                            and candidate.get("employee_ref") == submission.employee_ref \
+                            and candidate.get("work_ref") == submission.work_ref:
+                        decision = B3DecisionView.model_validate(candidate)
+            incidents: list[B3FundingIncident] = []
+            if payload.decision_id is not None and decision is None:
+                incidents.append(B3FundingIncident(
+                    kind="UNAUTHORIZED_OR_UNALLOCATED", event_ids=[], refs=[],
+                    amount_vnd=payload.gross_vnd,
+                    reason="decision_id không thuộc hồ sơ/người/công việc này."))
+            # Wrong recipient: money reached someone other than the employee.
+            if (payload.reported_status == "RECEIVED"
+                    and payload.payee_ref is not None
+                    and payload.payee_ref != submission.employee_ref):
+                incidents.append(B3FundingIncident(
+                    kind="WRONG_RECIPIENT", event_ids=[], refs=[],
+                    amount_vnd=payload.gross_vnd,
+                    reason=(f"Người nhận {payload.payee_ref} không phải nhân viên "
+                            f"{submission.employee_ref}; giữ raw, không tính "
+                            f"thực nhận cho nhân viên.")))
+            classification = derive_classification(
+                payload, submission.employee_ref, incidents)
+            existing = self._b3_advance_events(conn, case_id)
+            # Same economic event (namespace+ref) already confirmed RECEIVED:
+            # a new RECEIVED for the same identity is a conflicting outcome, not
+            # a second payment.
+            if (payload.reported_status == "RECEIVED"
+                    and payload.event_namespace is not None
+                    and payload.event_ref is not None):
+                for prior in existing:
+                    if (prior.event_namespace == payload.event_namespace
+                            and prior.event_ref == payload.event_ref
+                            and prior.reported_status == "RECEIVED"
+                            and prior.classification == "CONFIRMED_RECEIPT"):
+                        incidents.append(B3FundingIncident(
+                            kind="CONFLICTING_OUTCOME",
+                            event_ids=[prior.id], refs=[],
+                            amount_vnd=payload.gross_vnd,
+                            reason=("Cùng giao dịch đã có kết quả RECEIVED xác "
+                                    "nhận; giữ cả hai, cần kế toán xử lý.")))
+                        classification = "CONFLICT"
+            now = _iso(utcnow())
+            event = {
+                "id": f"AE-{uuid.uuid4().hex[:12]}", "case_id": case_id,
+                "kind": "ADVANCE_TO_EMPLOYEE",
+                "decision_id": payload.decision_id,
+                "event_namespace": payload.event_namespace,
+                "event_ref": payload.event_ref, "method": payload.method,
+                "gross_vnd": payload.gross_vnd, "payer_side": payload.payer_side,
+                "payee_ref": payload.payee_ref,
+                "event_at": _iso(payload.event_at) if payload.event_at else None,
+                "reported_status": payload.reported_status,
+                "evidence": [e.model_dump(mode="json") for e in payload.evidence],
+                "allocation_note": payload.allocation_note,
+                "supersedes_event_id": payload.supersedes_event_id,
+                "employee_ref": submission.employee_ref,
+                "work_ref": submission.work_ref,
+                "classification": classification,
+                "actor_id": command.actor_id, "created_at": now,
+                "after_money_cutoff": bool(
+                    payload.event_at is not None
+                    and payload.event_at > submission.money_as_of),
+                "incidents": [i.model_dump(mode="json") for i in incidents],
+            }
+            conn.execute(
+                "INSERT INTO money_events (id, case_id, payload_json, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (event["id"], case_id, _dump(event), now),
+            )
+            # Stage projection: only advance when the funding state is clean.
+            view_events = existing + [B3AdvanceEventView.model_validate(event)]
+            summary = project_b3_funding(decision, view_events,
+                                         bool(case["stop_active"]))
+            new_stage: CaseStage = case["stage"]
+            if decision is not None and not case["stop_active"]:
+                if summary.status == "FULFILLED":
+                    new_stage = "AWAITING_WORK_SETTLEMENT"
+                elif summary.status == "NEEDS_RESOLUTION":
+                    new_stage = "RESOLVING_OBLIGATIONS"
+                elif summary.status in ("PARTIAL", "PENDING", "UNCONFIRMED",
+                                        "NOT_RECORDED"):
+                    new_stage = "AWAITING_MONEY"
+            conn.execute(
+                "UPDATE cases SET stage = ?, case_version = ?, updated_at = ? "
+                "WHERE id = ?",
+                (new_stage, case["case_version"] + 1, now, case_id),
+            )
+            self._record_command(conn, case_id, case_id,
+                                 "B3_ADVANCE_EVENT_RECORDED", _B3_RECORD_ADVANCE,
+                                 command, payload_fp, {"event": event}, now)
+            return B3AdvanceEventView.model_validate(event)
+
     def record_money(self, case_id: str, payload: MoneyEventPayload,
                      after_cutoff: bool, command: Command) -> MoneyEventView:
         """Record an actual money event; allowed under Stop, deduped by event_ref."""
@@ -1693,6 +1922,12 @@ class Store:
                 "SELECT payload_json FROM money_events WHERE case_id = ? "
                 "ORDER BY rowid", (case["id"],)):
             event = _load(event_row["payload_json"])
+            # B5 advance events (kind ADVANCE_TO_EMPLOYEE) are a separate
+            # lifecycle: they must never count as a B7 reimbursement, not even
+            # in the pending count. Filter by kind BEFORE any sum/count.
+            if event["kind"] not in ("PAYMENT_TO_EMPLOYEE",
+                                     "PAYMENT_FROM_EMPLOYEE"):
+                continue
             if event["reported_status"] == "PENDING":
                 pending += 1
             if direction == "COLLECT_FROM_EMPLOYEE":

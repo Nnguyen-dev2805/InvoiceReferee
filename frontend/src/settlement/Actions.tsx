@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import * as api from './api';
 import { B3ApprovalPanel } from './B3Approval';
+import { B3FundingPanel } from './B3Funding';
 import type { AuditEntry, CaseView, DemoRole, Report } from './types';
 
 function formatVnd(value: number | null): string {
@@ -133,6 +134,15 @@ export function ActionsPanel({
           view={view}
           report={report ?? null}
           history={history ?? []}
+          role={role}
+          actorId={actorId}
+          onAction={onAction}
+        />
+      )}
+
+      {b3V1 && view.b3_workflow?.decision?.outcome === 'APPROVE' && (
+        <B3FundingPanel
+          view={view}
           role={role}
           actorId={actorId}
           onAction={onAction}

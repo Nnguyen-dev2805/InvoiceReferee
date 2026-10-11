@@ -2,6 +2,8 @@
 // `{code, message}` envelope; no decision logic lives here.
 import type {
   AuditEntry,
+  B3AdvanceEventPayload,
+  B3AdvanceEventView,
   B3DecisionPayload,
   B3DecisionView,
   B3DemoContext,
@@ -267,6 +269,36 @@ export function decideB3(
 ): Promise<B3DecisionView> {
   return postCommand<B3DecisionView>(
     `/api/cases/${encodeURIComponent(caseId)}/b3-decisions`, payload);
+}
+
+export function uploadB3AdvanceProof(
+  caseId: string,
+  file: File,
+  expectedCaseVersion: number,
+  actorId: string,
+  demoRole: string,
+  note: string,
+): Promise<SourceView> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('actor_id', actorId);
+  form.append('demo_role', demoRole);
+  form.append('expected_case_version', String(expectedCaseVersion));
+  if (note) form.append('note', note);
+  return request<SourceView>(
+    `/api/cases/${encodeURIComponent(caseId)}/b3-advance-proofs`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': crypto.randomUUID() },
+      body: form,
+    });
+}
+
+export function recordB3Advance(
+  caseId: string,
+  payload: B3AdvanceEventPayload,
+): Promise<B3AdvanceEventView> {
+  return postCommand<B3AdvanceEventView>(
+    `/api/cases/${encodeURIComponent(caseId)}/b3-advance-events`, payload);
 }
 
 export function runSettlementVerify(

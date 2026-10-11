@@ -10,7 +10,33 @@
 
 **Spec:** [B5 advance receipts](../specs/2026-10-11-b5-advance-receipts-design.md).
 
-**Status:** PLANNED — các methods/models/routes/tests bên dưới chưa triển khai ở lượt viết plan.
+**Status:** IMPLEMENTED (fake/replay + HUMAN_SOURCE_REVIEW, 2026-10-11); chưa nghiệm thu LIVE/UI.
+
+## Evidence (2026-10-11)
+
+Mode **PIPELINE_FAKE_OR_REPLAY** + **HUMAN_SOURCE_REVIEW**; không LIVE/Git/publish.
+Commands/exit/count actual:
+
+```
+SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/test_b3_funding.py -q      # 18 passed
+SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/test_b3_funding_api.py -q  # 3 passed
+SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/ -q                        # 343 passed
+SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/ -q                                   # 763 passed
+.venv/bin/python -m pip check                                                                        # No broken requirements found
+npm --prefix frontend run test -- --run                                                              # 112 passed (19 files)
+npm --prefix frontend run build                                                                      # tsc --noEmit + vite build OK
+```
+
+Artifacts: `src/invoice_referee/settlement/b3_funding.py` (mới), models/service/
+store/API B5, `frontend/src/settlement/B3Funding.tsx` (+test), docs
+`docs/testing/B5_ADVANCE_RECEIPTS_WALKTHROUGH.md`, `PRODUCT.md` P2a, `SYSTEM.md`
+S10. Breaking expectation (source-justified): B7 `_money_summary` lọc kind
+`ADVANCE_TO_EMPLOYEE` **trước** sum và pending count (trước đây pending tăng
+trước filter) để advance không thành reimbursement/pending B7.
+
+**Chưa kiểm (honest limits):** UI walkthrough `USER_UI_UNEXECUTED`; LIVE/OCR/LLM
+quality PLANNED; chưa chuyển tiền ngân hàng/tự thu hồi/closure/tạo B7 tự động/
+liên kết nhập B3→B7/xử lý return-reversal.
 
 ## Global Constraints
 
@@ -45,7 +71,7 @@
 - POST `/api/cases/{id}/b3-advance-proofs`: multipart file + actor_id/demo_role/expected_case_version, Idempotency-Key, SourceView response.
 - POST `/api/cases/{id}/b3-advance-events`: actor/demo_role/expected_case_version + event payload, Idempotency-Key, typed view201/200 replay.
 
-- [ ] **1.1 Viết failing test cho receipt không do approval sinh ra**
+- [x] **1.1 Viết failing test cho receipt không do approval sinh ra**
 
 Trong file mới import các fixtures/helpers thật của B3 tests; fixture approved
 được định nghĩa đầy đủ dưới đây. Event evidence literal là nguồn synthetic
@@ -112,7 +138,7 @@ def test_receipt_fulfills_advance_not_closes_case(approved_b3):
 
 Run: `rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/test_b3_funding.py -q`. Trước code FAIL vì methods chưa tồn tại.
 
-- [ ] **1.2 Proof upload và reading confirmation**
+- [x] **1.2 Proof upload và reading confirmation**
 
 Reuse file validation/limits/artifact rollback từ add_source, không clone
 Store hoặc schema. source_use chỉ từ Service B5, ACCOUNTANT đúng route/persona;
@@ -139,7 +165,7 @@ khác case/missing file:400, không write. Proof mismatch với approved amount
 khác mismatch với nguồn: actual3 có source3 được giữ dù approved2; gõ3 trên
 source2 không được confirmed3. Không fabricate confidence/auth bank result.
 
-- [ ] **1.3 Lưu actual và summary**
+- [x] **1.3 Lưu actual và summary**
 
 Event operation B3_RECORD_ADVANCE; money_events JSON kind ADVANCE_TO_EMPLOYEE,
 audit B3_ADVANCE_EVENT_RECORDED. Không thay generic B7 API hoặc ReportedStatus.
@@ -164,7 +190,7 @@ Record có event_at sau money_as_of: after_money_cutoff=true, không sửa mốc
 proposal hoặc đưa vào old run. Future date không có căn cứ giữ unresolved;
 created_at/known_at thật khác event_at/effective_at mô phỏng.
 
-- [ ] **1.4 UI checkpoint**
+- [x] **1.4 UI checkpoint**
 
 `B3FundingPanel` props view:CaseView, role:DemoRole, actorId:string,
 onAction:(label:string,run:()=>Promise<unknown>)=>Promise<void>.
@@ -194,7 +220,7 @@ B3Funding.tsx/uiCopy.ts; tests B3 funding/API và test_money.py.
 incident derived, không endpoint override số. Pending outcome requests dùng
 API event mới và giữ record cũ; không UPDATE old money JSON.
 
-- [ ] **2.1 Tests failing cho partial và raw overpayment**
+- [x] **2.1 Tests failing cho partial và raw overpayment**
 
 ```python
 def test_partial_receipt_preserves_approved_amount(approved_b3):
@@ -225,7 +251,7 @@ def test_overpay_keeps_actual_three_million(approved_b3):
     assert not svc.closed(case.id)
 ```
 
-- [ ] **2.2 Implement append transitions và economic identity**
+- [x] **2.2 Implement append transitions và economic identity**
 
 Identity `(event_namespace,event_ref)` từ nguồn/company register; case_id
 không làm cùng giao dịch thành hai event. SAME_EVENT alias cần source-linked
@@ -259,7 +285,7 @@ reuse; unsupported/read_stateUNCLEAR; conflictedconfirmed; typed float/bool;
 revision/same-key/double-key/restart. Assertions sums, raw records, incidents,
 timestamps và stages, không chỉ HTTP status.
 
-- [ ] **2.3 UI checkpoint**
+- [x] **2.3 UI checkpoint**
 
 Hiển thị từng event/outcome, nguồn, original requested vs actual receipt và
 record nối tiếp. “Bổ sung kết quả giao dịch” chọn nonfinal record, không mở
@@ -281,7 +307,7 @@ Create `docs/testing/B5_ADVANCE_RECEIPTS_WALKTHROUGH.md`.
 Service.start B3 đọc proposal sources, history events theo event/knowledge
 cutoff; giữ B7 full financial source intake ở chặng linked settlement riêng.
 
-- [ ] **3.1 Tests âm trước integration**
+- [x] **3.1 Tests âm trước integration**
 
 1. Proof upload alone không stale decision/cần approve lại, không receipt.
 2. Generic source thêm/mang material change vẫn stale/recheck, không lấy
@@ -299,7 +325,7 @@ cutoff; giữ B7 full financial source intake ở chặng linked settlement riê
 8. Source/event refs wrong case, actor wrong route, expiry/unreadable proof,
    concurrent version command không corrupt sums/history.
 
-- [ ] **3.2 Shared projection/history checks**
+- [x] **3.2 Shared projection/history checks**
 
 Backend-owned proof records có audit source_use được lọc khỏi proposal
 Reader/basis. Sources view vẫn mở đủ. Không lọc arbitrary files theo tên
@@ -317,7 +343,7 @@ cần cùng event/source links; không cộng source alias hai lần hoặc coi 
 ở ledger B5 là coverage toàn công ty. B7 chưa auto import; save đủ refs/times
 cho plan liên kết sau. Incident resolution/returns chưa mở: giữ blockers.
 
-- [ ] **3.3 Verification commands và UI guide**
+- [x] **3.3 Verification commands và UI guide**
 
 ```bash
 rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/ -q
@@ -341,7 +367,7 @@ Không browser workaround của denial; chưa thao tác ghi USER_UI_UNEXECUTED.
 Không claim AI extraction quality hoặc professional trial từ fake/human
 fixture. Báo actual commands/exit/count/artifacts, failures đầy đủ.
 
-- [ ] **3.4 Docs/self-review**
+- [x] **3.4 Docs/self-review**
 
 Product/System nêu actual B5 implemented khi wired+tested, vẫn không bank/
 closure/B3→B7 tự động. Evaluation thêm mode HUMAN_SOURCE_REVIEW và effort;
@@ -350,14 +376,14 @@ purposes/bank aliases/type imports và check acceptance dưới đây.
 
 ## Acceptance
 
-- [ ] Source retained/read evidence đúng actor/scope; approval/request không thành receipt.
-- [ ] Happy2 chờ quyết toán; partial1+1 giữ approved2; unknown/pending không0.
-- [ ] Actual3/sai người giữ raw và incident; không tự clip/recover/pay again.
-- [ ] Same TX/status updates/aliases/retries/cross-case không double count.
-- [ ] Stop/stale giữ actual facts nhưng không cho managed act/closure sai.
-- [ ] Proof fulfillment không phá approval vô cớ; material source vẫn recheck.
-- [ ] B7 summaries/history không lẫn advance/reimbursement hoặc false absence.
-- [ ] UI verified hoặc limitation rõ; bank/LIVE/whole history/B7 linkage chưa claim.
+- [x] Source retained/read evidence đúng actor/scope; approval/request không thành receipt.
+- [x] Happy2 chờ quyết toán; partial1+1 giữ approved2; unknown/pending không0.
+- [x] Actual3/sai người giữ raw và incident; không tự clip/recover/pay again.
+- [x] Same TX/status updates/aliases/retries/cross-case không double count.
+- [x] Stop/stale giữ actual facts nhưng không cho managed act/closure sai.
+- [x] Proof fulfillment không phá approval vô cớ; material source vẫn recheck.
+- [x] B7 summaries/history không lẫn advance/reimbursement hoặc false absence.
+- [x] UI verified hoặc limitation rõ; bank/LIVE/whole history/B7 linkage chưa claim.
 
 ## Prompt gửi coding agent
 

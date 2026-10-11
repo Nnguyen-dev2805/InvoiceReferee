@@ -267,6 +267,30 @@ gọi generic payment matcher B7. Rule IDs: `trip_context`, `request_positive`,
 `proposal_relation`, `source_form_consistency`, `history_coverage`,
 `prior_advance_state`, `decision_route`. Nguồn tham chiếu form:
 `form:<input_revision>:<field-path>`; không form-wins — form và nguồn khác
-nhau là mâu thuẫn giữ cả hai refs. Duyệt work/B/advance và trình duyệt nay có
-trên app; chi ứng (actual money), liên kết B3→B7 và closure là lifecycle riêng
-chưa mở ở nhánh này.
+nhau là mâu thuẫn giữ cả hai refs.
+
+**B5 ghi tiền ứng thực nhận** (plan
+[2026-10-11-b5-advance-receipts](../superpowers/plans/2026-10-11-b5-advance-receipts.md))
+thêm hai endpoint chuyên biệt, **không** mở generic financial path:
+`POST /api/cases/{id}/b3-advance-proofs` (multipart; kế toán đúng route tải
+chứng từ ứng; `Store.add_source(..., source_use="B3_ADVANCE_PROOF")` ghi audit
+operation `B3_ADD_ADVANCE_PROOF` + `provenance.source_use` backend-owned, tăng
+`case_version` nhưng **không** `input_revision` nên decision không stale) và
+`POST /api/cases/{id}/b3-advance-events` (`B3AdvanceEventPayload`: decision_id/
+namespace/ref/method/gross_vnd/payer_side/payee_ref/event_at/reported_status
+RECEIVED|PENDING|FAILED|CANCELLED|UNCONFIRMED/evidence `B3MoneyFieldEvidence`
+`HUMAN_SOURCE_REVIEW`/allocation_note/supersedes_event_id; lưu `money_events`
+JSON kind `ADVANCE_TO_EMPLOYEE`, audit `B3_ADVANCE_EVENT_RECORDED`).
+`B3WorkflowView` thêm `funding:B3FundingSummary` và `advance_events`. Projection
+`b3_funding.project_b3_funding` chỉ cộng RECEIVED xác nhận đúng employee,
+payer COMPANY; giữ gross (không clip), OVERPAY/WRONG_RECIPIENT/
+UNAUTHORIZED_OR_UNALLOCATED/CONFLICTING_OUTCOME thành incident; pending/unknown
+làm `remaining_vnd` null (giữ subtotal đã biết); event sau `money_as_of` ghi
+`after_money_cutoff`. Một giao dịch kinh tế (namespace+ref) không đếm hai lần;
+final outcome supersede nonfinal cùng identity. Stage: FULFILLED →
+`AWAITING_WORK_SETTLEMENT`, NEEDS_RESOLUTION → `RESOLVING_OBLIGATIONS`, còn lại
+→ `AWAITING_MONEY`; **Stop không tự tiến stage** (fact vẫn lưu). B7
+`_money_summary` lọc kind trước sum/pending nên advance không thành
+reimbursement. Error codes dùng lại `BASIS_MISMATCH`/`BEYOND_AUTHORITY`/
+`INVALID_PAYLOAD`. **Chưa** có chuyển tiền ngân hàng, tự thu hồi, closure, tạo
+B7 tự động hoặc liên kết nhập B3→B7.

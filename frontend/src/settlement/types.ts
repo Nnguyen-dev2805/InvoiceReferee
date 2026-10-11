@@ -382,6 +382,8 @@ export interface B3WorkflowView {
   blocked_reason: string | null;
   accountant_ref: string | null;
   approver_ref: string | null;
+  funding?: B3FundingSummary | null;
+  advance_events?: B3AdvanceEventView[];
 }
 
 export interface B3PresentPayload {
@@ -403,6 +405,99 @@ export interface B3DecisionPayload {
   work_allowed?: boolean | null;
   budget_vnd?: number | null;
   advance_vnd?: number | null;
+}
+
+// --- B5: advance receipts (actual money to employee) --------------------------
+
+export type B3MoneyFieldName =
+  | 'amount_vnd' | 'currency' | 'payer_side' | 'payee_ref' | 'event_at'
+  | 'receiver_outcome' | 'event_namespace' | 'event_ref' | 'method';
+
+export type B3AdvanceReportedStatus =
+  | 'RECEIVED' | 'PENDING' | 'FAILED' | 'CANCELLED' | 'UNCONFIRMED';
+
+export type B3FundingClassification =
+  | 'CONFIRMED_RECEIPT' | 'PENDING' | 'NO_RECEIPT' | 'UNCONFIRMED' | 'CONFLICT';
+
+export type B3FundingIncidentKind =
+  | 'OVERPAY' | 'WRONG_RECIPIENT' | 'UNAUTHORIZED_OR_UNALLOCATED'
+  | 'AMBIGUOUS_EVENT_REF' | 'CONFLICTING_OUTCOME';
+
+export interface B3MoneyFieldEvidence {
+  field: B3MoneyFieldName;
+  source_id: string;
+  locator: string;
+  raw: string | null;
+  value: number | string | null;
+  read_state: 'READ' | 'UNCLEAR' | 'NOT_FOUND';
+  origin: 'HUMAN_SOURCE_REVIEW';
+}
+
+export interface B3FundingIncident {
+  kind: B3FundingIncidentKind;
+  event_ids: string[];
+  refs: string[];
+  amount_vnd: number | null;
+  reason: string;
+}
+
+export interface B3AdvanceEventView {
+  id: string;
+  case_id: string;
+  kind: 'ADVANCE_TO_EMPLOYEE';
+  decision_id: string | null;
+  event_namespace: string | null;
+  event_ref: string | null;
+  method: 'BANK_TRANSFER' | 'CASH';
+  gross_vnd: number | null;
+  payer_side: 'COMPANY' | 'EMPLOYEE' | 'OTHER' | 'UNKNOWN';
+  payee_ref: string | null;
+  event_at: string | null;
+  reported_status: B3AdvanceReportedStatus;
+  evidence: B3MoneyFieldEvidence[];
+  allocation_note: string;
+  supersedes_event_id: string | null;
+  employee_ref: string;
+  work_ref: string;
+  classification: B3FundingClassification;
+  actor_id: string;
+  created_at: string;
+  after_money_cutoff: boolean;
+  incidents: B3FundingIncident[];
+  idempotent_replay: boolean;
+}
+
+export interface B3FundingSummary {
+  decision_id: string | null;
+  approved_vnd: number | null;
+  recorded_received_vnd: number | null;
+  fulfilled_vnd: number | null;
+  remaining_vnd: number | null;
+  pending_count: number;
+  unknown_count: number;
+  incidents: B3FundingIncident[];
+  status: 'NOT_RECORDED' | 'PARTIAL' | 'PENDING' | 'UNCONFIRMED'
+    | 'FULFILLED' | 'NEEDS_RESOLUTION';
+  scope: string;
+  as_of: string | null;
+}
+
+export interface B3AdvanceEventPayload {
+  actor_id: string;
+  demo_role: DemoRole;
+  expected_case_version: number;
+  decision_id: string | null;
+  event_namespace: string | null;
+  event_ref: string | null;
+  method: 'BANK_TRANSFER' | 'CASH';
+  gross_vnd: number | null;
+  payer_side: 'COMPANY' | 'EMPLOYEE' | 'OTHER' | 'UNKNOWN';
+  payee_ref: string | null;
+  event_at: string | null;
+  reported_status: B3AdvanceReportedStatus;
+  evidence: B3MoneyFieldEvidence[];
+  allocation_note: string;
+  supersedes_event_id: string | null;
 }
 
 export type CriticalFactState =
