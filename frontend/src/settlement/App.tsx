@@ -846,9 +846,8 @@ export function App() {
                       <>
                         <B3IntakeForm value={b3Intake} onChange={setB3Intake}
                                       disabled={false} />
-                        <p className="muted">
-                          Không nhập người duyệt/mã nội bộ/mốc thời gian trên form nghiệp
-                          vụ; backend cấp mã hồ sơ, clocks lấy từ cấu hình.
+                        <p className="muted" style={{ fontSize: '0.85rem', marginTop: 'var(--space-2)' }}>
+                          * Người duyệt, số hiệu hồ sơ và mốc thời gian được hệ thống tự động gán theo định danh và cấu hình chính sách.
                         </p>
                       </>
                     )}
@@ -1117,18 +1116,22 @@ export function App() {
 
             {/* TAB 1: Kết quả & Báo cáo */}
             <div style={{ display: caseTab === 'report' ? 'block' : 'none' }}>
-              <div className="panel" data-testid="run-panel" style={{ marginBottom: 'var(--space-4)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-                  <div>
-                    <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Kiểm tra &amp; Chạy đối soát</h2>
-                    {run && (
-                      <p style={{ margin: 'var(--space-1) 0 0', fontSize: '0.9rem' }} className="muted">
-                        Run <code>{run.id}</code> — <strong className={run.status === 'SUCCEEDED' ? 'status-succeeded' : ''}>{run.status}</strong>
-                        {run.completion ? ` (${run.completion})` : ''} · chế độ <strong>{run.mode}</strong>
-                        {run.stage ? ` · stage: ${run.stage}` : ''}
-                      </p>
-                    )}
+              {!report ? (
+                <div className="panel" data-testid="run-panel" style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-4)', marginBottom: 'var(--space-4)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.5 }}>
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
                   </div>
+                  <h3 style={{ margin: '0 0 var(--space-2)' }}>Chưa có báo cáo kết quả</h3>
+                  <p className="muted" style={{ maxWidth: '500px', margin: '0 auto var(--space-4)', fontSize: '0.9rem' }}>
+                    {runActive
+                      ? 'Hệ thống đang tiến hành đọc tài liệu và kiểm tra các điều kiện chính sách. Báo cáo kết quả sẽ hiển thị ngay khi hoàn tất.'
+                      : (viewIsB3 && !view.submission.form.confirmed
+                          ? 'Hồ sơ đã tải lên tài liệu đính kèm. Nhấn nút bên dưới để hệ thống trích xuất thông tin thành bản nháp.'
+                          : 'Nhấn nút bên dưới để hệ thống tiến hành đối soát chính sách và đưa ra báo cáo đề xuất.')}
+                  </p>
                   <div>
                     <button
                       className="btn btn-primary"
@@ -1142,44 +1145,50 @@ export function App() {
                         : 'Chạy kiểm tra'}
                     </button>
                   </div>
-                </div>
-                {!canStartRun && runActive && (
-                  <p className="muted" style={{ margin: 'var(--space-2) 0 0', fontSize: '0.85rem' }}>
-                    Đang chạy; không nhận run mới cho hồ sơ này.
-                  </p>
-                )}
-                {viewIsB3 && b3DraftReadyForFill && (
-                  <div className="field" style={{ marginTop: 'var(--space-3)' }}>
-                    <button className="btn" onClick={handleFillFromDraft}>
-                      Điền form từ bản nháp report
-                    </button>
-                    <p className="muted" style={{ fontSize: '0.85rem', margin: 'var(--space-1) 0 0' }}>
-                      Report vẫn là bản nháp chưa nộp: sau khi chỉnh, chuyển sang tab Bản nháp để xác nhận và chạy lại.
+                  {!canStartRun && runActive && (
+                    <p className="muted" style={{ margin: 'var(--space-2) 0 0', fontSize: '0.85rem' }}>
+                      Đang xử lý dữ liệu hồ sơ...
                     </p>
-                  </div>
-                )}
-              </div>
-
-              {report ? (
-                <ReportPanel
-                  report={report}
-                  b3Context={b3RunContext}
-                  sources={view.sources}
-                />
+                  )}
+                </div>
               ) : (
-                <div className="panel" style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-4)', marginBottom: 'var(--space-4)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
-                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.5 }}>
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
+                <div data-testid="run-panel" style={{ marginBottom: 'var(--space-4)' }}>
+                  <div className="run-status-strip">
+                    <div className="run-status-meta">
+                      <span className="run-pill-id">Run <code>{run?.id}</code></span>
+                      {run?.status && (
+                        <span className={`run-pill-status ${run.status === 'SUCCEEDED' ? 'run-pill-succeeded' : ''}`}>
+                          {run.status} {run.completion ? `(${run.completion})` : ''}
+                        </span>
+                      )}
+                      {run?.mode && (
+                        <span className="run-pill-mode">Chế độ: <strong>{run.mode}</strong></span>
+                      )}
+                      {run?.stage && (
+                        <span className="run-pill-stage">Giai đoạn: <code>{run.stage}</code></span>
+                      )}
+                    </div>
+                    <div className="run-actions">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-ghost"
+                        disabled={!canStartRun}
+                        title="Chạy lại đối soát khi có tài liệu mới"
+                        onClick={() => void handleStartRun()}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ marginRight: 4 }}>
+                          <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
+                        </svg>
+                        Chạy lại đối soát
+                      </button>
+                    </div>
                   </div>
-                  <h3 style={{ margin: '0 0 var(--space-2)' }}>Chưa có báo cáo kết quả</h3>
-                  <p className="muted" style={{ maxWidth: '500px', margin: '0 auto' }}>
-                    {runActive
-                      ? 'Hệ thống đang tiến hành đọc tài liệu và kiểm tra các điều kiện chính sách. Báo cáo kết quả sẽ hiển thị ngay khi hoàn tất.'
-                      : 'Nhấn nút "Gửi kiểm tra B3" ở trên để hệ thống tiến hành đối soát chính sách và đưa ra báo cáo đề xuất.'}
-                  </p>
+
+                  <ReportPanel
+                    report={report}
+                    b3Context={b3RunContext}
+                    sources={view.sources}
+                  />
                 </div>
               )}
 
@@ -1197,11 +1206,26 @@ export function App() {
             <div style={{ display: caseTab === 'draft' ? 'block' : 'none' }}>
               {viewIsB3 && b3ReviseIntake && (
                 <div className="panel" data-testid="b3-revise-panel">
-                  <h2>
-                    {view.submission.form.confirmed
-                      ? 'Sửa khai báo đề nghị B3'
-                      : 'Kiểm tra & Xác nhận bản nháp B3'}
-                  </h2>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: 'var(--space-3)' }}>
+                    <h2 style={{ margin: 0 }}>
+                      {view.submission.form.confirmed
+                        ? 'Sửa khai báo đề nghị B3'
+                        : 'Kiểm tra & Xác nhận bản nháp B3'}
+                    </h2>
+                    {b3DraftReadyForFill && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={handleFillFromDraft}
+                        title="Đồng bộ lại toàn bộ dữ liệu tự động trích xuất từ báo cáo đối soát"
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ marginRight: 4 }}>
+                          <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
+                        </svg>
+                        Điền form từ bản nháp report
+                      </button>
+                    )}
+                  </div>
                   {!view.submission.form.confirmed && (
                     <div className="notice notice-info" style={{ marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, marginTop: '2px' }}>
@@ -1261,10 +1285,16 @@ export function App() {
                       </button>
                     )}
                   </div>
-                  <p className="muted" style={{ marginTop: 'var(--space-2)', fontSize: '0.85rem' }}>
-                    Sửa không xóa giấy đã nộp: form và giấy khác nhau vẫn là
-                    mâu thuẫn phải làm rõ, không lấy form đè nguồn.
-                  </p>
+                  <div className="form-audit-footer-note">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="16" x2="12" y2="12" />
+                      <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                    <span>
+                      <strong>Nguyên tắc đối soát chứng từ:</strong> Thông tin khai báo cần khớp với hồ sơ giấy đính kèm. Mọi sai lệch giữa tờ khai và chứng từ gốc sẽ được hệ thống gắn cờ để kế toán đối chiếu, không ghi đè dữ liệu gốc.
+                    </span>
+                  </div>
                 </div>
               )}
 

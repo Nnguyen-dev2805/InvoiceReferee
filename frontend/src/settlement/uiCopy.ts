@@ -82,8 +82,15 @@ const FACT_LABELS: Record<string, string> = {
   'history.reimbursement.returned': 'Nhận lại từ khoản hoàn trả (RP)',
   'budget.approved': 'Ngân sách được duyệt (B)',
   'advance.request.amount': 'Số tiền xin tạm ứng',
+  'advance.request.amount_words': 'Số tiền bằng chữ',
+  'advance.request.amount_words_value': 'Giá trị số tiền bằng chữ',
+  'advance.settlement_due': 'Hạn thanh toán / hoàn ứng',
+  'document.role': 'Vai trò chứng từ',
   'forecast.employee': 'Dự toán nhân viên tự chi',
   'forecast.company': 'Dự toán công ty chi trả',
+  'forecast.total': 'Tổng dự toán kinh phí',
+  'person.employee_ref': 'Mã định danh nhân viên',
+  'person.name': 'Họ và tên nhân viên',
   'trip.destination': 'Nơi đến',
   'trip.start': 'Ngày bắt đầu công tác',
   'trip.end': 'Ngày kết thúc công tác',
@@ -92,6 +99,22 @@ const FACT_LABELS: Record<string, string> = {
 
 export function factLabel(key: string): string {
   if (FACT_LABELS[key]) return FACT_LABELS[key];
+  if (key.startsWith('forecast.row.') && key.endsWith('.description')) {
+    const match = key.match(/r(\d+)/);
+    return match ? `Nội dung chi (dòng ${match[1]})` : 'Nội dung chi dự toán';
+  }
+  if (key.startsWith('forecast.row.') && key.endsWith('.basis')) {
+    const match = key.match(/r(\d+)/);
+    return match ? `Cơ sở tính (dòng ${match[1]})` : 'Cơ sở dự toán';
+  }
+  if (key.startsWith('forecast.row.') && key.endsWith('.company')) {
+    const match = key.match(/r(\d+)/);
+    return match ? `Công ty chi (dòng ${match[1]})` : 'Công ty chi trả';
+  }
+  if (key.startsWith('forecast.row.') && key.endsWith('.employee')) {
+    const match = key.match(/r(\d+)/);
+    return match ? `Nhân viên chi (dòng ${match[1]})` : 'Nhân viên chi trả';
+  }
   if (key.startsWith('expense.') && key.endsWith('.amount')) return 'Số tiền chi phí';
   if (key.startsWith('expense.') && key.endsWith('.purpose')) return 'Mục đích chi tiêu';
   if (key.startsWith('payment.') && key.endsWith('.amount')) return 'Số tiền thanh toán';

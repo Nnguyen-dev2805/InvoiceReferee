@@ -405,6 +405,76 @@ def _form_ref(input_revision: int, path: str) -> str:
     return f"form:{input_revision}:{path}"
 
 
+# Request-scoped words keys. ``advance.request.amount_words`` is the requested
+# advance amount spelled out — NOT a forecast sheet's total. These keys resolve
+# over the ADVANCE_REQUEST document(s) only, so a forecast's own total words can
+# never be read as the request words (regression R-bd833b4af3d7).
+_WORDS_KEYS = ("advance.request.amount_words",
+               "advance.request.amount_words_value")
+
+
+def _words_signature(value: Any) -> Any:
+    """Presentation-insensitive form of a words string.
+
+    Collapses case/whitespace and trailing punctuation so "Hai triệu đồng." and
+    "hai  triệu đồng" are the same for conflict detection. This is NOT a
+    Vietnamese number parser: it never interprets a value, only compares shape.
+    """
+    if not isinstance(value, str):
+        return value
+    return " ".join(value.split()).strip().lower().rstrip(".,;:")
+
+
+def _resolve_request_words(request_observations: list, key: str
+                           ) -> tuple[Any, list[str], bool]:
+    """Resolve one request-words key over REQUEST documents only.
+
+    Returns ``(value, refs, contradicted)``. ``value`` is the first usable raw
+    value (never normalized) so display keeps source wording; ``contradicted``
+    compares normalized signatures only.
+    """
+    entries = [o for o in request_observations
+               if o.key == key and o.read_state == "READ"
+               and o.usability == "USABLE"]
+    refs = [ref for o in entries for ref in (o.source_id, o.fact_id)]
+    if not entries:
+        return None, [], False
+    signatures: list[Any] = []
+    for entry in entries:
+        signature = _words_signature(entry.value)
+        if signature not in signatures:
+            signatures.append(signature)
+    if len(signatures) > 1:
+        return None, refs, True
+    return entries[0].value, refs, False
+
+
+def _request_words_fact_state(request_observations: list, key: str):
+    """Critical-fact state for a request-words key, request-scoped."""
+    from invoice_referee.settlement.models import CriticalFact
+
+    value, refs, contradicted = _resolve_request_words(
+        request_observations, key)
+    if contradicted:
+        return CriticalFact(key=key, value=None, state="CONTRADICTED", refs=refs)
+    if value is not None:
+        return CriticalFact(key=key, value=value, state="KNOWN", refs=refs)
+    unusable = [o for o in request_observations
+                if o.key == key and o.read_state == "READ"
+                and o.usability != "USABLE"]
+    if unusable:
+        return CriticalFact(key=key, value=None, state="UNUSABLE",
+                            refs=[ref for o in unusable
+                                  for ref in (o.source_id, o.fact_id)])
+    unclear = [o for o in request_observations
+               if o.key == key and o.read_state == "UNCLEAR"]
+    if unclear:
+        return CriticalFact(key=key, value=None, state="UNCLEAR",
+                            refs=[ref for o in unclear
+                                  for ref in (o.source_id, o.fact_id)])
+    return CriticalFact(key=key, value=None, state="UNKNOWN", refs=refs)
+
+
 def evaluate_b3_proposal(run_input, observations, *, run_id: str, mode: str,
                         technical_issues=None):
     """Initial B3 proposal từ lời khai + nguồn + company context (P2a).
@@ -493,13 +563,26 @@ def evaluate_b3_proposal(run_input, observations, *, run_id: str, mode: str,
 
     # --- scalar resolution with contradiction detection -----------------------
     all_keys = {o.key for o in observations}
+    # Request-words keys are resolved over REQUEST documents only (a forecast
+    # sheet's total in words is a different quantity, not a request-words
+    # conflict). Every other key resolves over the whole dossier.
+    request_observations = [o for _, unit in request_units for o in unit]
     resolved: dict[str, tuple[Any, list[str], bool]] = {}
     for key in sorted(all_keys):
+        if key in _WORDS_KEYS:
+            continue  # handled below, request-scoped
         resolved[key] = rules._resolve(observations, key)
         # document.role là key theo từng tài liệu/trang: khác nhau giữa các
         # giấy là bình thường, không phải mâu thuẫn toàn hồ sơ.
         if resolved[key][2] and _is_b3_grammar_key(key) and key != "document.role":
             contradictions.append((key, resolved[key][1]))
+    for key in _WORDS_KEYS:
+        if key not in all_keys:
+            continue
+        value, refs, contra = _resolve_request_words(request_observations, key)
+        resolved[key] = (value, refs, contra)
+        if contra:
+            contradictions.append((key, refs))
 
     def value_of(key):
         return resolved.get(key, (None, [], False))
@@ -665,11 +748,35 @@ def evaluate_b3_proposal(run_input, observations, *, run_id: str, mode: str,
 
     # amount_words_consistency: Python so số, không để LLM kết luận check.
     if request_units:
-        words_raw, words_refs, _ = value_of("advance.request.amount_words")
+        words_raw, words_refs, words_contra = value_of(
+            "advance.request.amount_words")
         words_value, words_value_refs, _ = value_of(
             "advance.request.amount_words_value")
         refs = words_refs + words_value_refs + request_refs
-        if words_raw is None:
+        # A missing field is NOT the same as "the request has no words line":
+        # only an explicit NOT_FOUND (or genuinely absent key) is NOT_APPLICABLE.
+        words_entries = [o for o in request_observations
+                         if o.key == "advance.request.amount_words"]
+        words_unclear = [o for o in words_entries
+                         if o.read_state == "UNCLEAR" or
+                         (o.read_state == "READ" and o.usability != "USABLE")]
+        if words_contra:
+            status = "UNRESOLVED"
+            reason = ("Hai giấy đề nghị ghi số xin ứng bằng chữ khác nhau; "
+                      "giữ cả hai, không chọn một.")
+        elif words_raw is None and words_unclear:
+            status = "UNRESOLVED"
+            reason = ("Chưa đọc được dòng số bằng chữ trên giấy đề nghị; "
+                      "không suy là giấy không có.")
+            issues.append(Issue(
+                issue_id="I-B3-WORDS", type="FACT", owner="EMPLOYEE",
+                message=("Dòng số bằng chữ chưa đọc được/mờ; cần nguồn rõ, "
+                         "không suy là không có."),
+                refs=refs, blocked="request",
+            ))
+        elif words_raw is None:
+            # No readable words line and no unreadable evidence: the request
+            # genuinely has no words line (NOT_FOUND or key absent).
             status = "NOT_APPLICABLE"
             reason = "Giấy đề nghị không có dòng số bằng chữ."
         elif words_value is None:
@@ -1188,9 +1295,10 @@ def evaluate_b3_proposal(run_input, observations, *, run_id: str, mode: str,
                 accountant_ref = route.accountant_ref
                 approver_ref = route.approver_ref
 
-    critical_facts = [rules._fact_state(observations, key)
-                      for key in sorted(k for k in all_keys
-                                        if _is_b3_grammar_key(k))]
+    critical_facts = [
+        (_request_words_fact_state(request_observations, key)
+         if key in _WORDS_KEYS else rules._fact_state(observations, key))
+        for key in sorted(k for k in all_keys if _is_b3_grammar_key(k))]
 
     # Draft IMPORT: proposal.intake mang facts trích xuất (kèm refs ở
     # field_refs) để người nộp xem/sửa rồi xác nhận; bản confirmed giữ

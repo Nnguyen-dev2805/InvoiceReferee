@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from invoice_referee.settlement.b3 import evaluate_b3_proposal
-from invoice_referee.settlement.models import Issue
+from invoice_referee.settlement.models import Issue, Observation
 from invoice_referee.settlement.rules import evaluate as engine_evaluate
 from tests.settlement.b3_builders import (
     CONTEXT,
@@ -233,6 +233,93 @@ def test_t03_unclear_words_value_unresolved_not_guessed():
     report = evaluate(make_b3_run(form=import_form()), observations)
     assert check_of(report, "amount_words_consistency").status == "UNRESOLVED"
     assert report.b3.readiness == "NEEDS_INFORMATION"
+
+
+# --- amount_words scope: request words vs forecast total (R-bd833b4af3d7) -------
+
+def _fact(fact_id, key, value, source_id, page=1):
+    return Observation(
+        fact_id=fact_id, key=key, raw=str(value), read_state="READ",
+        value=value, source_id=source_id, page=page, locator=f"page {page}",
+        basis=f"fixture {source_id} page {page}")
+
+
+def _second_request_doc(source_id, words, words_value):
+    """A second ADVANCE_REQUEST document for the same dossier."""
+    return [
+        _fact(f"{source_id}-role", "document.role", "ADVANCE_REQUEST", source_id),
+        _fact(f"{source_id}-amount", "advance.request.amount", 2_000_000, source_id),
+        _fact(f"{source_id}-words", "advance.request.amount_words", words, source_id),
+        _fact(f"{source_id}-wv", "advance.request.amount_words_value",
+              words_value, source_id),
+    ]
+
+
+def test_forecast_total_words_do_not_contradict_request_words():
+    # 02-du-toan reports its TOTAL (8M) in words; that is NOT the request amount
+    # in words. It must not create a false request-words contradiction, and the
+    # consistency check must still run (PASS), never NOT_APPLICABLE.
+    observations = make_b3_observations() + [
+        _fact("FC-stray-words", "advance.request.amount_words",
+              "Tám triệu đồng.", "S-B3-FC"),
+    ]
+    report = evaluate(make_b3_run(form=import_form()), observations)
+    assert check_of(report, "amount_words_consistency").status == "PASS"
+    fact = next(f for f in report.critical_facts
+                if f.key == "advance.request.amount_words")
+    assert fact.state == "KNOWN"  # not CONTRADICTED
+    assert not [i for i in report.issues if i.issue_id == "I-CONTRADICTION"]
+
+
+def test_two_request_docs_disagreeing_on_words_keep_contradiction():
+    # Two REQUEST documents genuinely writing different request words: keep the
+    # conflict, never NOT_APPLICABLE, never silently pick one.
+    observations = make_b3_observations() + _second_request_doc(
+        "S-B3-REQ2", "Ba triệu đồng.", 3_000_000)
+    report = evaluate(make_b3_run(form=import_form()), observations)
+    check = check_of(report, "amount_words_consistency")
+    assert check.status == "UNRESOLVED"
+    assert any(i.issue_id == "I-CONTRADICTION" for i in report.issues)
+    assert report.b3.readiness == "NEEDS_INFORMATION"
+
+
+def test_words_differing_only_in_presentation_are_not_contradicted():
+    # Same value, different case/whitespace/trailing period → not a financial
+    # contradiction, and the check still passes.
+    observations = make_b3_observations() + _second_request_doc(
+        "S-B3-REQ2", "hai  triệu đồng", 2_000_000)
+    report = evaluate(make_b3_run(form=import_form()), observations)
+    assert not [i for i in report.issues if i.issue_id == "I-CONTRADICTION"]
+    assert check_of(report, "amount_words_consistency").status == "PASS"
+
+
+def test_missing_words_field_is_unresolved_not_not_applicable():
+    # Field omitted from output (reader marks UNCLEAR) must not be read as
+    # "the request has no words line" → UNRESOLVED, not NOT_APPLICABLE.
+    observations = [o for o in make_b3_observations()
+                    if o.key != "advance.request.amount_words"]
+    observations.append(Observation(
+        fact_id="REQ-missing-words", key="advance.request.amount_words",
+        raw=None, read_state="UNCLEAR", value=None, source_id="S-B3-REQ",
+        page=1, locator="page 1", usability="UNCERTAIN",
+        basis="không có trong output; không suy NOT_FOUND"))
+    report = evaluate(make_b3_run(form=import_form()), observations)
+    check = check_of(report, "amount_words_consistency")
+    assert check.status == "UNRESOLVED"
+    assert report.b3.readiness == "NEEDS_INFORMATION"
+
+
+def test_explicit_not_found_words_is_not_applicable():
+    # Only a genuine NOT_FOUND on the request doc means "no words line".
+    observations = [o for o in make_b3_observations()
+                    if o.key not in ("advance.request.amount_words",
+                                     "advance.request.amount_words_value")]
+    observations.append(Observation(
+        fact_id="REQ-nf", key="advance.request.amount_words", raw=None,
+        read_state="NOT_FOUND", value=None, source_id="S-B3-REQ",
+        page=1, locator="page 1", basis="không thấy dòng số bằng chữ"))
+    report = evaluate(make_b3_run(form=import_form()), observations)
+    assert check_of(report, "amount_words_consistency").status == "NOT_APPLICABLE"
 
 
 # --- T04: printed total vs row sum ---------------------------------------------

@@ -4,7 +4,7 @@
 // không phải kết quả chính của bước đề nghị ứng (Product P2a).
 import type { B3Proposal, B3RunContext, Report, SourceView } from './types';
 import { EvidenceLinks } from './EvidenceLinks';
-import { checkLabel } from './uiCopy';
+import { checkLabel, factLabel } from './uiCopy';
 
 const COMPONENT_LABELS: Record<string, string> = {
   t: 'T — tổng chi công việc',
@@ -72,21 +72,35 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
   );
 
   return (
-    <div className="panel" data-testid="report-panel">
-      <h2>Report {report.run_id}</h2>
-      <p>
-        <strong>Hoàn thành report:</strong>{' '}
-        <span className={report.completion === 'COMPLETE' ? 'status-succeeded' : 'status-failed'}>
-          {report.completion === 'COMPLETE' ? 'COMPLETE' : 'INCOMPLETE'}
-        </span>
-        {' · '}
-        <strong>Chế độ nguồn:</strong>{' '}
-        <span className="notice-warn">
-          {report.mode === 'FAKE_OR_REPLAY'
-            ? 'FAKE_OR_REPLAY — reader giả lập/offline, không phải chất lượng OCR/LLM thật'
-            : report.mode}
-        </span>
-      </p>
+    <div className="report-panel-container" data-testid="report-panel">
+      {/* Executive Report Header */}
+      <div className="report-clean-header">
+        <div className="report-header-main">
+          <div className="report-header-badge-row">
+            <span className="report-badge-brand">Thẩm định tài chính</span>
+            <span className={`status-badge-clean ${report.completion === 'COMPLETE' ? 'status-badge-success' : 'status-badge-warning'}`}>
+              {report.completion === 'COMPLETE' ? 'Đã đủ căn cứ rà soát' : 'Cần bổ sung thông tin'}
+            </span>
+          </div>
+          <h2 className="report-header-title">Report {report.run_id}</h2>
+        </div>
+        <div className="report-header-meta">
+          <span className="meta-item">
+            <strong>Hoàn thành report:</strong>{' '}
+            <span className={report.completion === 'COMPLETE' ? 'status-succeeded' : 'status-failed'}>
+              {report.completion === 'COMPLETE' ? 'COMPLETE' : 'INCOMPLETE'}
+            </span>
+          </span>
+          <span className="meta-item">
+            <strong>Chế độ nguồn:</strong>{' '}
+            <span className="notice-warn meta-mode-tag">
+              {report.mode === 'FAKE_OR_REPLAY'
+                ? 'FAKE_OR_REPLAY — reader giả lập/offline, không phải chất lượng OCR/LLM thật'
+                : report.mode}
+            </span>
+          </span>
+        </div>
+      </div>
 
       {report.b3 ? (
         <B3ProposalSection proposal={report.b3} b3Context={b3Context}
@@ -131,8 +145,8 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
       )}
 
       {report.links.length > 0 && (
-        <>
-          <h3>Quan hệ đối chiếu</h3>
+        <div className="report-clean-section">
+          <h3 className="section-title">Quan hệ đối chiếu</h3>
           <table data-testid="report-links">
             <thead>
               <tr><th>Quan hệ</th><th> Từ → tới</th><th>Phần</th><th>Trạng thái</th></tr>
@@ -150,41 +164,63 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
               ))}
             </tbody>
           </table>
-        </>
+        </div>
       )}
 
       {report.critical_facts.length > 0 && (
-        <>
-          <h3>Critical facts (chất lượng nguồn)</h3>
-          <table data-testid="critical-facts">
-            <thead>
-              <tr><th>Fact</th><th>Giá trị</th><th>Trạng thái</th><th>Refs</th></tr>
-            </thead>
-            <tbody>
-              {report.critical_facts.map((fact) => (
-                <tr key={fact.key}>
-                  <td><code>{fact.key}</code></td>
-                  <td>{fact.value === null
-                    ? '—'
-                    : typeof fact.value === 'number'
-                      ? vnd(fact.value)
-                      : String(fact.value)}</td>
-                  <td>{fact.state === 'KNOWN'
-                    ? 'đã đọc rõ'
-                    : fact.state === 'CONTRADICTED'
-                      ? 'MÂU THUẪN — hai nguồn khác nhau, không chọn một'
-                      : fact.state === 'UNUSABLE'
-                        ? 'chất lượng không đủ'
-                        : fact.state === 'UNCLEAR'
-                          ? 'không đọc được'
-                          : 'chưa có'}</td>
-                  <td>{refs(fact.refs)}</td>
+        <div className="report-clean-section">
+          <div className="section-head-clean">
+            <h3 className="section-title">Dữ liệu đối soát từ chứng từ (Critical facts)</h3>
+            <span className="section-subtitle">Đối chiếu dữ liệu trích xuất tự động từ hồ sơ nguồn</span>
+          </div>
+          <div className="table-responsive">
+            <table data-testid="critical-facts" className="facts-table-clean">
+              <thead>
+                <tr>
+                  <th>Trường dữ liệu</th>
+                  <th>Giá trị trích xuất</th>
+                  <th>Trạng thái đối soát</th>
+                  <th>Chứng từ gốc</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
+              </thead>
+              <tbody>
+                {report.critical_facts.map((fact) => (
+                  <tr key={fact.key}>
+                    <td>
+                      <div className="fact-title-cell">
+                        <span className="fact-title-main">{factLabel(fact.key)}</span>
+                        <span className="fact-title-code">{fact.key}</span>
+                      </div>
+                    </td>
+                    <td className="fact-value-clean">
+                      {fact.value === null
+                        ? '—'
+                        : typeof fact.value === 'number'
+                          ? vnd(fact.value)
+                          : String(fact.value)}
+                    </td>
+                    <td>
+                      <span className={`fact-status-pill fact-status-${fact.state.toLowerCase()}`}>
+                        {fact.state === 'KNOWN'
+                          ? 'đã đọc rõ'
+                          : fact.state === 'CONTRADICTED'
+                            ? 'MÂU THUẪN — hai nguồn khác nhau, không chọn một'
+                            : fact.state === 'UNUSABLE'
+                              ? 'chất lượng không đủ'
+                              : fact.state === 'UNCLEAR'
+                                ? 'không đọc được'
+                                : 'chưa có'}
+                      </span>
+                    </td>
+                    <td>{refs(fact.refs)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
+
       {report.conditional_results.length > 0 && (
         <ul className="reasons">
           {report.conditional_results.map((c) => (
@@ -196,8 +232,8 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
       )}
 
       {report.expense_rows.length > 0 && (
-        <>
-          <h3>Khoản chi</h3>
+        <div className="report-clean-section">
+          <h3 className="section-title">Khoản chi</h3>
           <table>
             <thead>
               <tr><th>Khoản</th><th>Khai báo</th><th>Nhân viên</th><th>Công ty trực tiếp</th><th>Trạng thái</th><th>Căn cứ</th></tr>
@@ -215,21 +251,63 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
               ))}
             </tbody>
           </table>
-        </>
+        </div>
       )}
 
-      <h3>Mục kiểm tra</h3>
-      <ul className="reasons">
-        {report.checks.map((check) => (
-          <li key={check.rule}>
-            <strong>{checkLabel(check.rule)}</strong> ({check.rule}): {check.status} — {check.reason}
-          </li>
-        ))}
-      </ul>
+      {/* Human-Grade Policy Checks Checklist */}
+      <div className="report-clean-section">
+        <div className="policy-checklist-summary-row">
+          <div className="policy-summary-left">
+            <span className="policy-summary-icon-check">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </span>
+            <div>
+              <h3 className="section-title" style={{ margin: 0 }}>Kiểm tra điều kiện chính sách</h3>
+              <span className="section-subtitle">
+                {report.checks.filter((c) => c.status === 'PASS').length}/{report.checks.length} điều kiện tuân thủ quy chế tài chính
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <ul className="reasons policy-checks-flat-list">
+          {report.checks.map((check) => {
+            const isPass = check.status === 'PASS';
+            const isFail = check.status === 'FAIL';
+            return (
+              <li key={check.rule} className="policy-check-flat-item">
+                <span className={`policy-check-icon-circle ${isPass ? 'circle-pass' : isFail ? 'circle-fail' : 'circle-unresolved'}`}>
+                  {isPass ? (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : (
+                    <span className="circle-text">!</span>
+                  )}
+                </span>
+                <div className="policy-check-content">
+                  <div className="policy-check-title-bar">
+                    <strong className="policy-check-name">{checkLabel(check.rule)}</strong>
+                    <span className={`policy-check-status-tag ${isPass ? 'tag-pass' : 'tag-unresolved'}`}>
+                      {isPass ? 'ĐẠT' : isFail ? 'KHÔNG ĐẠT' : 'CHỜ XỬ LÝ'} ({check.status})
+                    </span>
+                  </div>
+                  <div className="policy-check-desc">
+                    {check.reason}
+                    <span className="policy-check-rule-id"> ({check.rule}): {check.status} — {check.reason}</span>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
 
       {report.issues.length > 0 && (
-        <>
-          <h3>Issues cần làm rõ</h3>
+        <div className="report-clean-section">
+          <h3 className="section-title">Issues cần làm rõ</h3>
           <ul className="issues">
             {report.issues.map((issue) => (
               <li key={issue.issue_id}>
@@ -238,16 +316,18 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
               </li>
             ))}
           </ul>
-        </>
+        </div>
       )}
 
-      <p>
-        <strong>Bước tiếp theo:</strong> {report.next_step}
-      </p>
-      <p className="muted">
-        Report là kiểm tra có căn cứ, chưa phê duyệt tài chính, chưa ghi nhận
-        thực nhận và chưa đóng hồ sơ.
-      </p>
+      <div className="report-footer-section">
+        <p className="next-step-line">
+          <strong>Bước tiếp theo:</strong> {report.next_step}
+        </p>
+        <p className="muted report-closing-note">
+          Report là kiểm tra có căn cứ, chưa phê duyệt tài chính, chưa ghi nhận
+          thực nhận và chưa đóng hồ sơ.
+        </p>
+      </div>
     </div>
   );
 }
@@ -263,125 +343,209 @@ function B3ProposalSection({ proposal, b3Context, refs }: {
       ? 'Đang chờ quyết định (chưa duyệt)'
       : 'Cần rà soát thêm trước khi quyết';
   return (
-    <div data-testid="b3-proposal">
-      <h3>Đề nghị tạm ứng B3 — proposal</h3>
-      <p>
-        <strong>Trạng thái:</strong> {READINESS_LABELS[proposal.readiness]}{' '}
-        (<code>{proposal.readiness}</code>)
-      </p>
-      <p>
-        <strong>Số xin ứng:</strong> {vnd(intake.request_amount_vnd)}{' '}
-        {proposal.field_refs['request_amount_vnd'] &&
-          <>— căn cứ: {refs(proposal.field_refs['request_amount_vnd'])}</>}
-      </p>
-      <p>
-        <strong>Công tác:</strong> {intake.destination ?? '—'} ·{' '}
-        {intake.trip_start ?? '—'} → {intake.trip_end ?? '—'} ·{' '}
-        hạn quyết toán {intake.settlement_due ?? '—'}
-        {' · '}<strong>Mục đích:</strong> {intake.purpose ?? '—'}
-      </p>
-
-      <h4>Dự toán (phần công ty / nhân viên giữ riêng)</h4>
-      <table data-testid="b3-estimate-report">
-        <thead>
-          <tr><th>Nội dung</th><th>Cơ sở</th><th>Công ty</th><th>Nhân viên</th><th>Căn cứ</th></tr>
-        </thead>
-        <tbody>
-          {intake.estimate_rows.map((row) => (
-            <tr key={row.row_id}>
-              <td>{row.description}</td>
-              <td>{row.basis ?? '—'}</td>
-              <td>{vnd(row.company_vnd)}</td>
-              <td>{vnd(row.employee_vnd)}</td>
-              <td>
-                {refs([
-                  ...(proposal.field_refs[`estimate_rows.${row.row_id}.company_vnd`] ?? []),
-                  ...(proposal.field_refs[`estimate_rows.${row.row_id}.employee_vnd`] ?? []),
-                ])}
-              </td>
-            </tr>
-          ))}
-          <tr>
-            <td><strong>Tổng</strong></td>
-            <td></td>
-            <td><strong>{vnd(proposal.forecast_company_vnd)}</strong></td>
-            <td><strong>{vnd(proposal.forecast_employee_vnd)}</strong></td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
-      <p>
-        <strong>Tổng dự toán:</strong> {vnd(proposal.forecast_total_vnd)} —
-        dự toán không phải ngân sách đã duyệt; phần dự kiến công ty trả không
-        phải actual payer.
-      </p>
-
-      <h4>Nội dung cần người có quyền quyết định</h4>
-      <ul className="reasons">
-        <li>
-          <strong>Cho phép công tác (work):</strong> {decisionLabel(proposal.work_permission)}
-        </li>
-        <li>
-          <strong>Duyệt ngân sách (B):</strong> {decisionLabel(proposal.work_permission)}
-        </li>
-        <li>
-          <strong>Duyệt ứng:</strong> {decisionLabel(proposal.advance_approval)}
-        </li>
-      </ul>
-      <p>
-        <strong>Tuyến xử lý:</strong> kế toán {proposal.accountant_ref ?? '— (chưa cấu hình)'}{' '}
-        · người duyệt {proposal.approver_ref ?? '— (chưa cấu hình)'} (readonly theo
-        cấu hình công ty, không nhập trên form).
-      </p>
-
-      {b3Context && (
-        <div data-testid="b3-run-context">
-          <h4>Company context của run (snapshot)</h4>
-          <p className="muted">
-            {b3Context.synthetic
-              ? `Fixture mô phỏng "${b3Context.version}"${
-                  b3Context.demo_clock
-                    ? ` — mốc mô phỏng ${b3Context.demo_clock}`
-                    : ''}`
-              : `Context "${b3Context.version}"`}
-          </p>
-          <ul className="reasons">
-            {b3Context.grants.map((grant) => (
-              <li key={grant.ref}>
-                <code>{grant.ref}</code>: {grant.actor_ref} được phép work={
-                  grant.allow_work ? 'có' : 'không'}, ngân sách ≤{' '}
-                {vnd(grant.max_budget_vnd)}, ứng ≤ {vnd(grant.max_advance_vnd)}{' '}
-                cho {grant.employee_ref}
-                {grant.work_ref ? ` (work ${grant.work_ref})` : ' (mọi work)'}
-              </li>
-            ))}
-            {b3Context.coverage.map((record) => (
-              <li key={record.ref}>
-                <code>{record.ref}</code>: coverage {record.employee_ref}
-                {record.work_ref ? ` (work ${record.work_ref})` : ' (mọi work)'}{' '}
-                {record.from} → {record.to}
-                {record.complete_prior_history
-                  ? ' — gồm mở sổ/tồn trước kỳ' : ' — không gồm số dư đầu kỳ'}
-                {' '}(owner {record.owner_ref})
-              </li>
-            ))}
-            {b3Context.history.length === 0
-              ? <li>Lịch sử company-side: trống (theo coverage đã khai báo).</li>
-              : b3Context.history.map((event) => (
-                <li key={event.event_ref}>
-                  <code>{event.event_ref}</code>: {event.kind}/{event.status}{' '}
-                  {vnd(event.amount_vnd)} — {event.event_at} (work {event.work_ref})
-                </li>
-              ))}
-          </ul>
+    <div data-testid="b3-proposal" className="b3-proposal-root">
+      {/* 3 Bold, Minimalist Hero KPI Cards (No legal clutter) */}
+      <div className="report-hero-kpi-grid">
+        <div className="hero-kpi-card">
+          <span className="hero-kpi-label">Số tiền đề nghị tạm ứng</span>
+          <div className="hero-kpi-num">
+            {vnd(intake.request_amount_vnd)}
+            {proposal.field_refs['request_amount_vnd'] && (
+              <span className="hero-kpi-ref"> (căn cứ: {refs(proposal.field_refs['request_amount_vnd'])})</span>
+            )}
+          </div>
+          <span className="hero-kpi-sub">
+            Căn cứ theo tờ khai giấy &amp; dự toán đính kèm
+          </span>
         </div>
-      )}
 
-      <p className="notice-warn" role="alert">
-        B3 v1 chỉ tạo report đề nghị: chưa có hành động duyệt ứng/chi tiền/đóng
-        hồ sơ trong nhánh này. Complete nghĩa là đủ căn cứ rà soát, không nghĩa
-        đã duyệt.
-      </p>
+        <div className="hero-kpi-card">
+          <span className="hero-kpi-label">Tổng dự toán kinh phí</span>
+          <div className="hero-kpi-num">{vnd(proposal.forecast_total_vnd)}</div>
+          <span className="hero-kpi-sub">
+            Công ty {vnd(proposal.forecast_company_vnd)} · Nhân viên {vnd(proposal.forecast_employee_vnd)}
+          </span>
+        </div>
+
+        <div className="hero-kpi-card hero-kpi-card-highlight">
+          <span className="hero-kpi-label">Trạng thái thẩm định</span>
+          <div className="hero-kpi-num hero-kpi-status-text">
+            {READINESS_LABELS[proposal.readiness]}
+          </div>
+          <span className="hero-kpi-sub">
+            (<code>{proposal.readiness}</code>)
+          </span>
+        </div>
+      </div>
+
+      {/* Clean Subtle Disclaimer Bar */}
+      <div className="hero-kpi-audit-note">
+        <span>Tổng dự toán: {vnd(proposal.forecast_total_vnd)} — dự toán không phải ngân sách đã duyệt; phần dự kiến công ty trả không phải actual payer.</span>
+      </div>
+
+      <div className="b3-proposal-body">
+        <div className="b3-trip-context-strip">
+          <div className="b3-strip-item">
+            <span className="b3-strip-label">Địa điểm:</span>
+            <strong>{intake.destination ?? '—'}</strong>
+          </div>
+          <div className="b3-strip-item">
+            <span className="b3-strip-label">Thời gian:</span>
+            <strong>{intake.trip_start ?? '—'} → {intake.trip_end ?? '—'}</strong>
+          </div>
+          <div className="b3-strip-item">
+            <span className="b3-strip-label">Hạn quyết toán:</span>
+            <strong>{intake.settlement_due ?? '—'}</strong>
+          </div>
+          <div className="b3-strip-item b3-strip-purpose">
+            <span className="b3-strip-label">Mục đích:</span>
+            <span>{intake.purpose ?? '—'}</span>
+          </div>
+        </div>
+
+        <h3 className="section-title">Đề nghị tạm ứng B3 — proposal</h3>
+
+        <h4>Dự toán (phần công ty / nhân viên giữ riêng)</h4>
+        <div className="table-responsive">
+          <table data-testid="b3-estimate-report" className="estimate-table estimate-table-modern">
+            <thead>
+              <tr>
+                <th style={{ width: '32%' }}>Nội dung</th>
+                <th style={{ width: '22%' }}>Cơ sở</th>
+                <th className="text-right" style={{ width: '18%' }}>Công ty</th>
+                <th className="text-right" style={{ width: '18%' }}>Nhân viên</th>
+                <th style={{ width: '10%' }}>Căn cứ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {intake.estimate_rows.map((row) => (
+                <tr key={row.row_id}>
+                  <td>{row.description}</td>
+                  <td>{row.basis ?? '—'}</td>
+                  <td className="text-right">{vnd(row.company_vnd)}</td>
+                  <td className="text-right">{vnd(row.employee_vnd)}</td>
+                  <td>
+                    {refs([
+                      ...(proposal.field_refs[`estimate_rows.${row.row_id}.company_vnd`] ?? []),
+                      ...(proposal.field_refs[`estimate_rows.${row.row_id}.employee_vnd`] ?? []),
+                    ])}
+                  </td>
+                </tr>
+              ))}
+              <tr className="b3-estimate-total-row">
+                <td><strong>Tổng</strong></td>
+                <td></td>
+                <td className="text-right"><strong>{vnd(proposal.forecast_company_vnd)}</strong></td>
+                <td className="text-right"><strong>{vnd(proposal.forecast_employee_vnd)}</strong></td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Human-designed Approval Stepper Workflow */}
+        <div className="b3-approval-stepper-box">
+          <div className="stepper-box-head">
+            <h4 style={{ margin: 0 }}>Nội dung cần người có quyền quyết định</h4>
+            <span className="stepper-route-pill">
+              Tuyến xử lý: kế toán {proposal.accountant_ref ?? '— (chưa cấu hình)'} · người duyệt {proposal.approver_ref ?? '— (chưa cấu hình)'}
+            </span>
+          </div>
+
+          <div className="stepper-track-horizontal">
+            <div className="stepper-node">
+              <div className="stepper-circle">1</div>
+              <div className="stepper-info">
+                <span className="stepper-step-title">Cho phép công tác (work)</span>
+                <span className="stepper-step-status">{decisionLabel(proposal.work_permission)}</span>
+              </div>
+            </div>
+
+            <div className="stepper-line" />
+
+            <div className="stepper-node">
+              <div className="stepper-circle">2</div>
+              <div className="stepper-info">
+                <span className="stepper-step-title">Duyệt ngân sách (B)</span>
+                <span className="stepper-step-status">{decisionLabel(proposal.work_permission)}</span>
+              </div>
+            </div>
+
+            <div className="stepper-line" />
+
+            <div className="stepper-node">
+              <div className="stepper-circle">3</div>
+              <div className="stepper-info">
+                <span className="stepper-step-title">Duyệt ứng</span>
+                <span className="stepper-step-status">{decisionLabel(proposal.advance_approval)}</span>
+              </div>
+            </div>
+          </div>
+
+          <p className="muted" style={{ margin: 'var(--space-2) 0 0', fontSize: '0.8rem' }}>
+            (readonly theo cấu hình công ty, không nhập trên form).
+          </p>
+        </div>
+
+        {b3Context && (
+          <details className="tech-context-accordion" data-testid="b3-run-context">
+            <summary className="tech-context-summary">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+              <span>Company context của run (snapshot)</span>
+            </summary>
+            <div className="tech-context-body">
+              <h4>Company context của run (snapshot)</h4>
+              <p className="muted">
+                {b3Context.synthetic
+                  ? `Fixture mô phỏng "${b3Context.version}"${
+                      b3Context.demo_clock
+                        ? ` — mốc mô phỏng ${b3Context.demo_clock}`
+                        : ''}`
+                  : `Context "${b3Context.version}"`}
+              </p>
+              <ul className="reasons">
+                {b3Context.grants.map((grant) => (
+                  <li key={grant.ref}>
+                    <code>{grant.ref}</code>: {grant.actor_ref} được phép work={
+                      grant.allow_work ? 'có' : 'không'}, ngân sách ≤{' '}
+                    {vnd(grant.max_budget_vnd)}, ứng ≤ {vnd(grant.max_advance_vnd)}{' '}
+                    cho {grant.employee_ref}
+                    {grant.work_ref ? ` (work ${grant.work_ref})` : ' (mọi work)'}
+                  </li>
+                ))}
+                {b3Context.coverage.map((record) => (
+                  <li key={record.ref}>
+                    <code>{record.ref}</code>: coverage {record.employee_ref}
+                    {record.work_ref ? ` (work ${record.work_ref})` : ' (mọi work)'}{' '}
+                    {record.from} → {record.to}
+                    {record.complete_prior_history
+                      ? ' — gồm mở sổ/tồn trước kỳ' : ' — không gồm số dư đầu kỳ'}
+                    {' '}(owner {record.owner_ref})
+                  </li>
+                ))}
+                {b3Context.history.length === 0
+                  ? <li>Lịch sử company-side: trống (theo coverage đã khai báo).</li>
+                  : b3Context.history.map((event) => (
+                    <li key={event.event_ref}>
+                      <code>{event.event_ref}</code>: {event.kind}/{event.status}{' '}
+                      {vnd(event.amount_vnd)} — {event.event_at} (work {event.work_ref})
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          </details>
+        )}
+
+        <p className="notice-warn" role="alert" style={{ marginTop: 'var(--space-3)' }}>
+          B3 v1 chỉ tạo report đề nghị: chưa có hành động duyệt ứng/chi tiền/đóng
+          hồ sơ trong nhánh này. Complete nghĩa là đủ căn cứ rà soát, không nghĩa
+          đã duyệt.
+        </p>
+      </div>
     </div>
   );
 }
