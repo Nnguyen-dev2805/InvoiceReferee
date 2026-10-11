@@ -57,7 +57,7 @@ def test_complete_routine_case_is_ready_for_accounting() -> None:
 
     decision = build_settlement_decision(findings)
 
-    assert decision.automation_decision == AutomationDecision.AUTO_PROCESS
+    assert decision.automation_decision == AutomationDecision.READY_FOR_APPROVAL
     assert decision.uncertainty_type == UncertaintyType.NONE
 
 
@@ -72,7 +72,7 @@ def test_pending_signature_approval_does_not_block_a_clear_case() -> None:
         ]
     )
 
-    assert decision.automation_decision == AutomationDecision.AUTO_PROCESS
+    assert decision.automation_decision == AutomationDecision.READY_FOR_APPROVAL
     assert decision.uncertainty_type == UncertaintyType.NONE
 
 
@@ -117,7 +117,7 @@ def test_missing_context_and_evidence_requests_information() -> None:
     assert decision.target.value == "EMPLOYEE"
 
 
-def test_clear_personal_expense_escalates_outside_policy() -> None:
+def test_clear_personal_expense_is_recommended_for_rejection() -> None:
     findings = evaluate_settlement_policy(
         _draft(
             category=ExpenseCategory.PERSONAL,
@@ -128,7 +128,7 @@ def test_clear_personal_expense_escalates_outside_policy() -> None:
 
     decision = build_settlement_decision(findings)
 
-    assert decision.automation_decision == AutomationDecision.ESCALATE
+    assert decision.automation_decision == AutomationDecision.RECOMMEND_REJECT
     assert decision.uncertainty_type == UncertaintyType.OUTSIDE_POLICY
 
 
@@ -162,7 +162,7 @@ def test_alternative_evidence_is_routed_to_accountant_for_exception_review() -> 
 
     decision = build_settlement_decision(findings)
 
-    assert decision.automation_decision == AutomationDecision.ESCALATE
+    assert decision.automation_decision == AutomationDecision.ACCOUNTANT_REVIEW
     assert decision.primary_finding_code == "SET_ALT_EVIDENCE_001"
     assert decision.target.value == "ACCOUNTANT"
 
@@ -178,8 +178,60 @@ def test_no_evidence_with_reason_is_routed_to_accountant() -> None:
 
     decision = build_settlement_decision(findings)
 
-    assert decision.automation_decision == AutomationDecision.ESCALATE
+    assert decision.automation_decision == AutomationDecision.ACCOUNTANT_REVIEW
     assert decision.primary_finding_code == "SET_NO_EVIDENCE_001"
+
+
+def test_wrong_company_tax_code_is_recommended_for_rejection() -> None:
+    decision = build_settlement_decision(
+        [
+            SettlementFinding(
+                rule_id="SET_BUYER_IDENTITY_001",
+                status="FAIL",
+                message="MST người mua thuộc doanh nghiệp khác.",
+                uncertainty_type=UncertaintyType.OUTSIDE_POLICY,
+            )
+        ]
+    )
+
+    assert decision.automation_decision == AutomationDecision.RECOMMEND_REJECT
+
+
+def test_suspicious_document_is_routed_to_accountant_review() -> None:
+    decision = build_settlement_decision(
+        [
+            SettlementFinding(
+                rule_id="SET_DOCUMENT_VALIDITY_001",
+                status="FAIL",
+                message="Chứng từ có dấu hiệu bị chỉnh sửa.",
+                uncertainty_type=UncertaintyType.SUSPICIOUS,
+            )
+        ]
+    )
+
+    assert decision.automation_decision == AutomationDecision.ACCOUNTANT_REVIEW
+
+
+def test_missing_fact_is_resolved_before_a_routine_policy_exception() -> None:
+    decision = build_settlement_decision(
+        [
+            SettlementFinding(
+                rule_id="SET_ALT_EVIDENCE_001",
+                status="FAIL",
+                message="Khoản chi sử dụng bằng chứng thay thế.",
+                uncertainty_type=UncertaintyType.OUTSIDE_POLICY,
+            ),
+            SettlementFinding(
+                rule_id="SET_CONTEXT_001",
+                status="FAIL",
+                message="Hồ sơ chưa có mục đích công việc.",
+                uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
+            ),
+        ]
+    )
+
+    assert decision.automation_decision == AutomationDecision.REQUEST_INFO
+    assert decision.primary_finding_code == "SET_CONTEXT_001"
 
 
 def test_alternative_or_missing_evidence_requires_reason() -> None:

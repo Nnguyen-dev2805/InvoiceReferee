@@ -30,6 +30,7 @@ from invoice_referee.domain import (
 )
 from invoice_referee.extraction import (
     DEFAULT_WORD_REVIEW_THRESHOLD,
+    ExternalServiceUnavailableError,
     collect_low_confidence_blocks,
     restructure_mistral_ocr,
 )
@@ -477,6 +478,8 @@ class SettlementProcessingService:
                         paper_facts = extracted_paper
                     else:
                         facts.append(extracted)
+            except ExternalServiceUnavailableError:
+                raise
             except Exception as exc:
                 findings.append(
                     SettlementFinding(

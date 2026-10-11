@@ -87,6 +87,76 @@ FINDING_STATUS_LABELS = {
     "PENDING_APPROVAL": "Chờ phê duyệt",
 }
 
+OUTCOME_LABELS = {
+    "READY_FOR_APPROVAL": "Sẵn sàng phê duyệt",
+    "REQUEST_INFO": "Cần nhân viên bổ sung",
+    "ACCOUNTANT_REVIEW": "Kế toán xem xét",
+    "ESCALATE": "Vượt thẩm quyền",
+    "RECOMMEND_REJECT": "Đề xuất từ chối",
+    "PROCESSING_FAILED": "Lỗi xử lý",
+    "PROCESSING": "Đang xử lý",
+}
+
+SETTLEMENT_TYPE_LABELS = {
+    "ADVANCE_SETTLEMENT": "Quyết toán tạm ứng",
+    "EMPLOYEE_REIMBURSEMENT": "Hoàn ứng nhân viên",
+}
+
+OUTCOME_PRIORITY = {
+    "RECOMMEND_REJECT": 0,
+    "PROCESSING_FAILED": 1,
+    "ACCOUNTANT_REVIEW": 2,
+    "REQUEST_INFO": 3,
+    "ESCALATE": 4,
+    "PROCESSING": 5,
+    "READY_FOR_APPROVAL": 6,
+}
+
+LEGACY_REJECTION_RULES = {
+    "SET_CATEGORY_001",
+    "SET_BUYER_IDENTITY_001",
+    "SET_DUPLICATE_001",
+}
+
+LEGACY_ESCALATION_RULES = {
+    "SET_AUTH_001",
+    "SET_LIMIT_001",
+}
+
+
+def _case_outcome_key(case: dict[str, Any]) -> str:
+    decision = case.get("automation_decision")
+    if decision == "AUTO_PROCESS":
+        return "READY_FOR_APPROVAL"
+    if decision == "ESCALATE":
+        primary_code = case.get("primary_finding_code")
+        uncertainty = case.get("uncertainty_type")
+        if primary_code in LEGACY_REJECTION_RULES:
+            return "RECOMMEND_REJECT"
+        if uncertainty == "SUSPICIOUS":
+            return "ACCOUNTANT_REVIEW"
+        if (
+            uncertainty == "OUTSIDE_POLICY"
+            and primary_code not in LEGACY_ESCALATION_RULES
+        ):
+            return "ACCOUNTANT_REVIEW"
+    if decision in OUTCOME_LABELS:
+        return str(decision)
+    if case.get("processing_status") == "PROCESSING_ERROR":
+        return "PROCESSING_FAILED"
+    return "PROCESSING"
+
+
+def _decorate_case_outcome(case: dict[str, Any]) -> dict[str, Any]:
+    outcome_key = _case_outcome_key(case)
+    case["outcome_key"] = outcome_key
+    case["outcome_label"] = OUTCOME_LABELS[outcome_key]
+    settlement_type = str(case.get("settlement_type") or "")
+    case["settlement_type_label"] = SETTLEMENT_TYPE_LABELS.get(
+        settlement_type, settlement_type or "Chưa xác định"
+    )
+    return case
+
 
 def _document_preview_kind(mime_type: str, filename: str) -> str:
     normalized = mime_type.lower()
@@ -234,6 +304,7 @@ def _decorate_accounting_case(
 ) -> dict[str, Any]:
     """Resolve stored source references into links suitable for audit review."""
 
+    _decorate_case_outcome(case)
     case["business_summary"] = build_settlement_business_summary(case)
 
     documents_by_id: dict[str, dict[str, Any]] = {}
@@ -378,8 +449,18 @@ def _decorate_accounting_case(
         finding for finding in case["findings"] if finding["status"] == "PASS"
     ]
     if case["decision"]:
-        if case["decision"].get("automation_decision") == "AUTO_PROCESS":
+        decision_key = case["decision"].get("automation_decision")
+        if decision_key in {"AUTO_PROCESS", "READY_FOR_APPROVAL"}:
             case["decision"]["reason"] = build_settlement_success_reason(case)
+        case["decision"]["outcome_key"] = _case_outcome_key(
+            {
+                **case["decision"],
+                "processing_status": case.get("processing_status"),
+            }
+        )
+        case["decision"]["outcome_label"] = OUTCOME_LABELS.get(
+            case["decision"]["outcome_key"], decision_key
+        )
         case["decision"]["evidence_refs"] = [
             resolve(source_ref)
             for source_ref in case["decision"]["source_refs"]
@@ -440,22 +521,21 @@ def build_router(templates_root: Path) -> APIRouter:
         repository = _runtime(request).repository
         all_cases = repository.list_cases()
         for case in all_cases:
-            if case["automation_decision"] == "AUTO_PROCESS":
+            _decorate_case_outcome(case)
+            if case["outcome_key"] == "READY_FOR_APPROVAL":
                 case["decision_reason"] = build_settlement_success_reason(case)
+        all_cases.sort(
+            key=lambda case: OUTCOME_PRIORITY[case["outcome_key"]]
+        )
         cases = [
             case
             for case in all_cases
-            if decision is None or case["automation_decision"] == decision
+            if decision is None or case["outcome_key"] == decision
         ]
         counts = {
-            key: len(
-                [case for case in all_cases if case["automation_decision"] == key]
-            )
-            for key in ("AUTO_PROCESS", "REQUEST_INFO", "ESCALATE")
+            key: len([case for case in all_cases if case["outcome_key"] == key])
+            for key in OUTCOME_LABELS
         }
-        counts["PROCESSING"] = len(
-            [case for case in all_cases if not case["automation_decision"]]
-        )
         return templates.TemplateResponse(
             request=request,
             name="accounting/queue.html",

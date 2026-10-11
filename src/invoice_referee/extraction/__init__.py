@@ -15,6 +15,11 @@ from .ocr_quality import (
     collect_low_confidence_blocks,
     is_meaningful_ocr_word,
 )
+from .network_resilience import (
+    ExternalServiceUnavailableError,
+    call_with_service_retry,
+    is_transient_service_error,
+)
 
 __all__ = [
     "LOW_CONFIDENCE_THRESHOLD",
@@ -30,4 +35,7 @@ __all__ = [
     "extract_word_confidence_rows",
     "is_meaningful_ocr_word",
     "restructure_mistral_ocr",
+    "ExternalServiceUnavailableError",
+    "call_with_service_retry",
+    "is_transient_service_error",
 ]

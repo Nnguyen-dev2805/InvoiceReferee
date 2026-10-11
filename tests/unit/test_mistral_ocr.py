@@ -23,6 +23,18 @@ class FakeClient:
         self.ocr = FakeOcrEndpoint()
 
 
+class FlakyOcrEndpoint(FakeOcrEndpoint):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+
+    def process(self, **kwargs):
+        self.calls += 1
+        if self.calls == 1:
+            raise OSError(10013, "socket access forbidden")
+        return super().process(**kwargs)
+
+
 def test_adapter_encodes_image_and_requests_word_confidence(tmp_path: Path) -> None:
     image_path = tmp_path / "bill.jpg"
     image_path.write_bytes(b"image-bytes")
@@ -51,3 +63,20 @@ def test_adapter_uses_document_url_for_pdf(tmp_path: Path) -> None:
     adapter.process(pdf_path, "application/pdf")
 
     assert client.ocr.request["document"]["type"] == "document_url"
+
+
+def test_adapter_retries_transient_windows_socket_error(tmp_path: Path) -> None:
+    image_path = tmp_path / "bill.jpg"
+    image_path.write_bytes(b"image-bytes")
+    client = FakeClient()
+    client.ocr = FlakyOcrEndpoint()
+    adapter = MistralOcrAdapter(
+        api_key="test",
+        client=client,
+        retry_delays=(0,),
+    )
+
+    execution = adapter.process(image_path, "image/jpeg")
+
+    assert client.ocr.calls == 2
+    assert execution.response["pages"][0]["index"] == 0

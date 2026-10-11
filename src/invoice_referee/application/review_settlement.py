@@ -57,16 +57,22 @@ class ReviewSettlementService:
         elif action_type == "OVERRIDE_DECISION":
             if override_decision not in {
                 AutomationDecision.AUTO_PROCESS.value,
+                AutomationDecision.READY_FOR_APPROVAL.value,
                 AutomationDecision.REQUEST_INFO.value,
+                AutomationDecision.ACCOUNTANT_REVIEW.value,
                 AutomationDecision.ESCALATE.value,
+                AutomationDecision.RECOMMEND_REJECT.value,
             }:
                 raise ValueError("Quyết định override không hợp lệ.")
             automation_decision = AutomationDecision(override_decision)
-            uncertainty = (
-                UncertaintyType.NONE
-                if automation_decision == AutomationDecision.AUTO_PROCESS
-                else UncertaintyType.FACTUAL_UNKNOWN
-            )
+            uncertainty = {
+                AutomationDecision.AUTO_PROCESS: UncertaintyType.NONE,
+                AutomationDecision.READY_FOR_APPROVAL: UncertaintyType.NONE,
+                AutomationDecision.REQUEST_INFO: UncertaintyType.FACTUAL_UNKNOWN,
+                AutomationDecision.ACCOUNTANT_REVIEW: UncertaintyType.OUTSIDE_POLICY,
+                AutomationDecision.ESCALATE: UncertaintyType.BEYOND_AUTHORITY,
+                AutomationDecision.RECOMMEND_REJECT: UncertaintyType.OUTSIDE_POLICY,
+            }[automation_decision]
             decision = SettlementDecision(
                 automation_decision=automation_decision,
                 uncertainty_type=uncertainty,
@@ -74,7 +80,11 @@ class ReviewSettlementService:
                 target=DecisionTarget.ACCOUNTANT,
                 reason=normalized_reason,
             )
-            workflow_status = "UNDER_REVIEW"
+            workflow_status = {
+                AutomationDecision.REQUEST_INFO: "WAITING_EMPLOYEE",
+                AutomationDecision.ESCALATE: "ESCALATED",
+                AutomationDecision.RECOMMEND_REJECT: "REJECTION_RECOMMENDED",
+            }.get(automation_decision, "UNDER_REVIEW")
         elif action_type == "STOP_PROCESSING":
             decision = None
             workflow_status = "STOPPED"

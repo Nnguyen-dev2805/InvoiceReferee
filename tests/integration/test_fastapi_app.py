@@ -30,8 +30,13 @@ def test_fastapi_employee_and_accounting_pages_render(
         assert "Có bằng chứng thay thế" in script.text
         assert "Không có chứng từ" in script.text
         assert "Mã ngoại lệ" not in script.text
-        assert client.get("/accounting/cases").status_code == 200
-        assert "Hàng đợi hồ sơ" in client.get("/accounting/cases").text
+        accounting_page = client.get("/accounting/cases")
+        assert accounting_page.status_code == 200
+        assert "Hàng đợi hồ sơ" in accounting_page.text
+        assert "Kế toán xem xét" in accounting_page.text
+        assert "Đề xuất từ chối" in accounting_page.text
+        assert "Sẵn sàng phê duyệt" in accounting_page.text
+        assert "Lỗi xử lý" in accounting_page.text
 
 
 def test_multipart_submission_is_visible_to_accounting(
@@ -75,7 +80,7 @@ def test_multipart_submission_is_visible_to_accounting(
         assert client.post("/internal/process-next").json() == {"processed": True}
         case_response = client.get(f"/api/v1/cases/{case_id}")
         assert case_response.status_code == 200
-        assert case_response.json()["automation_decision"] == "AUTO_PROCESS"
+        assert case_response.json()["automation_decision"] == "READY_FOR_APPROVAL"
         detail = client.get(f"/accounting/cases/{case_id}")
         assert detail.status_code == 200
         assert "Bữa trưa với khách hàng" in detail.text
@@ -93,6 +98,12 @@ def test_multipart_submission_is_visible_to_accounting(
         assert "Lý do chính" in queue.text
         assert "Công ty hoàn lại cho nhân viên 1.200.000 VND" in queue.text
         assert "Tiếp khách dự án Demo" in queue.text
+        assert "Sẵn sàng phê duyệt" in queue.text
+        ready_queue = client.get(
+            "/accounting/cases?decision=READY_FOR_APPROVAL"
+        )
+        assert ready_queue.status_code == 200
+        assert case_id in ready_queue.text
 
         action = client.post(
             f"/accounting/cases/{case_id}/actions",
@@ -217,7 +228,7 @@ def test_paper_submission_accepts_form_and_unlinked_evidence_without_items(
         )
 
 
-def test_digital_form_accepts_explicit_no_evidence_reason_and_escalates(
+def test_digital_form_routes_explicit_no_evidence_reason_to_accountant(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -257,5 +268,5 @@ def test_digital_form_accepts_explicit_no_evidence_reason_and_escalates(
 
         assert client.post("/internal/process-next").json() == {"processed": True}
         processed = client.get(f"/api/v1/cases/{case_id}").json()
-        assert processed["automation_decision"] == "ESCALATE"
+        assert processed["automation_decision"] == "ACCOUNTANT_REVIEW"
         assert processed["primary_finding_code"] == "SET_NO_EVIDENCE_001"

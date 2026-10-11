@@ -9,8 +9,8 @@
     <p>{{ case.employee_name }} · {{ case.department }} · {{ case.submitted_at }}</p>
   </div>
   <div class="header-actions">
-    <span class="status large status-{{ (case.automation_decision or case.processing_status)|lower }}">
-      {{ case.automation_decision or case.processing_status }}
+    <span class="status large status-{{ (case.outcome_key or case.processing_status or 'processing')|lower }}">
+      {{ case.outcome_label or case.automation_decision or case.processing_status or "Đang xử lý" }}
     </span>
     <form method="post" action="/accounting/cases/{{ case.case_id }}/delete"
           onsubmit="return confirm('Xóa vĩnh viễn hồ sơ {{ case.case_id }} và toàn bộ chứng từ?');">
@@ -19,9 +19,9 @@
   </div>
 </header>
 {% if case.decision %}
-<section class="decision-banner decision-{{ case.decision.automation_decision|lower }}">
+<section class="decision-banner decision-{{ case.decision.outcome_key|lower }}">
   <div>
-    <span>Quyết định đề xuất và lý do chính</span>
+    <span>{{ case.decision.outcome_label }} · Lý do chính</span>
     <h2>{{ case.decision.reason }}</h2>
     {% if case.decision.question %}<p>{{ case.decision.question }}</p>{% endif %}
     {% if case.decision.evidence_refs %}
@@ -41,6 +41,18 @@
     <dt>Mã kiểm tra chính</dt><dd>{{ case.decision.primary_finding_code or "Không có lỗi" }}</dd>
     <dt>Nhóm</dt><dd>{{ case.decision.uncertainty_type }}</dd>
     <dt>Chuyển đến</dt><dd>{{ case.decision.target }}</dd>
+  </dl>
+</section>
+{% elif case.processing_error %}
+<section class="decision-banner decision-processing_failed">
+  <div>
+    <span>Lỗi xử lý kỹ thuật</span>
+    <h2>Hệ thống chưa hoàn thành việc đọc chứng từ</h2>
+    <p>{{ case.processing_error }}</p>
+  </div>
+  <dl>
+    <dt>Hành động</dt><dd>Chạy lại hồ sơ</dd>
+    <dt>Trách nhiệm</dt><dd>Hệ thống / Kế toán</dd>
   </dl>
 </section>
 {% endif %}
@@ -63,7 +75,7 @@
   </dl>
 </section>
 <section class="summary-band">
-  <div><span>Loại hồ sơ</span><strong>{{ case.settlement_type }}</strong></div>
+  <div><span>Loại hồ sơ</span><strong>{{ case.settlement_type_label or case.settlement_type }}</strong></div>
   <div><span>Nguồn</span><strong>{{ case.source_type }}</strong></div>
   <div><span>Tổng khai báo</span><strong>{{ case.claimed_total }} {{ case.currency }}</strong></div>
   <div><span>Tạm ứng</span><strong>{{ case.allocated_advance_amount }} {{ case.currency }}</strong></div>
@@ -90,9 +102,11 @@
         <label for="override_decision">Quyết định thay thế</label>
         <select id="override_decision" name="override_decision">
           <option value="">Không áp dụng</option>
-          <option value="AUTO_PROCESS">Sẵn sàng xử lý</option>
+          <option value="READY_FOR_APPROVAL">Sẵn sàng phê duyệt</option>
           <option value="REQUEST_INFO">Cần bổ sung</option>
-          <option value="ESCALATE">Chuyển cấp</option>
+          <option value="ACCOUNTANT_REVIEW">Kế toán xem xét</option>
+          <option value="ESCALATE">Vượt thẩm quyền</option>
+          <option value="RECOMMEND_REJECT">Đề xuất từ chối</option>
         </select>
       </div>
       <div class="field span-2">
@@ -194,14 +208,14 @@
 </section>
 <section class="detail-section">
   <h2>Các khoản chi</h2>
-  <div class="table-scroll">
-    <table>
+  <div class="table-scroll expense-table-scroll">
+    <table class="expense-table">
       <thead><tr><th>Mã</th><th>Nội dung</th><th>Danh mục</th><th>Ngày</th><th>Trạng thái chứng từ</th><th>Evidence</th><th class="money">Khai báo</th></tr></thead>
       <tbody>
       {% for item in case.expense_items %}
-        <tr><td>{{ item.item_id }}</td><td>{{ item.description }}</td><td>{{ item.category }}</td>
-          <td>{{ item.expense_date or "Không có" }}</td>
-          <td>
+        <tr><td data-label="Mã">{{ item.item_id }}</td><td data-label="Nội dung">{{ item.description }}</td><td data-label="Danh mục">{{ item.category }}</td>
+          <td data-label="Ngày">{{ item.expense_date or "Không có" }}</td>
+          <td data-label="Trạng thái chứng từ">
             {% if item.evidence_status == "ORIGINAL_EVIDENCE" %}
               Chứng từ gốc
             {% elif item.evidence_status == "ALTERNATIVE_EVIDENCE" %}
@@ -213,7 +227,7 @@
               <small>{{ item.evidence_exception_reason or "Chưa có lý do" }}</small>
             {% endif %}
           </td>
-          <td class="item-evidence-links">
+          <td class="item-evidence-links" data-label="Evidence">
             {% for match in item.document_matches %}
               {% if match.document %}
               <a href="{{ match.document.url }}" target="_blank">{{ match.document.original_name }}</a>
@@ -227,7 +241,7 @@
               {% endfor %}
             {% endfor %}
           </td>
-          <td class="money">{{ item.claimed_amount }} {{ item.currency }}</td></tr>
+          <td class="money" data-label="Khai báo">{{ item.claimed_amount }} {{ item.currency }}</td></tr>
       {% endfor %}
       </tbody>
     </table>

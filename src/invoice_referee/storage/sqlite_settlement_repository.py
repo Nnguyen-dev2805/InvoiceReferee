@@ -867,14 +867,24 @@ class SQLiteSettlementRepository:
                    currency, workflow_status,
                    processing_status, automation_decision, uncertainty_type,
                    primary_finding_code, submitted_at,
-                   CASE WHEN automation_decision IS NOT NULL THEN (
-                       SELECT reason
-                       FROM settlement_decisions AS latest_decision
-                       WHERE latest_decision.case_id = settlement_cases.case_id
-                       ORDER BY latest_decision.created_at DESC,
-                                latest_decision.rowid DESC
-                       LIMIT 1
-                   ) END AS decision_reason
+                   CASE
+                       WHEN automation_decision IS NOT NULL THEN (
+                           SELECT reason
+                           FROM settlement_decisions AS latest_decision
+                           WHERE latest_decision.case_id = settlement_cases.case_id
+                           ORDER BY latest_decision.created_at DESC,
+                                    latest_decision.rowid DESC
+                           LIMIT 1
+                       )
+                       WHEN processing_status = 'PROCESSING_ERROR' THEN (
+                           SELECT error_message
+                           FROM processing_jobs AS latest_job
+                           WHERE latest_job.case_id = settlement_cases.case_id
+                           ORDER BY latest_job.finished_at DESC,
+                                    latest_job.rowid DESC
+                           LIMIT 1
+                       )
+                   END AS decision_reason
             FROM settlement_cases
         """
         params: tuple[Any, ...] = ()
@@ -957,6 +967,19 @@ class SQLiteSettlementRepository:
                 }
             else:
                 result["decision"] = None
+            failed_job = connection.execute(
+                """
+                SELECT error_message
+                FROM processing_jobs
+                WHERE case_id = ? AND status = 'FAILED'
+                ORDER BY finished_at DESC, rowid DESC
+                LIMIT 1
+                """,
+                (case_id,),
+            ).fetchone()
+            result["processing_error"] = (
+                failed_job["error_message"] if failed_job is not None else None
+            )
             result["audit_events"] = [
                 {**dict(row), "payload": json.loads(row["payload_json"])}
                 for row in connection.execute(

@@ -15,6 +15,7 @@ from invoice_referee.domain import (
 )
 
 from .conflict_reasoning import CONFLICT_SYSTEM_PROMPT
+from .network_resilience import call_with_service_retry
 
 MAX_OUTPUT_TOKENS = 8192
 MAX_REPAIR_CONTEXT_CHARS = 16_000
@@ -333,6 +334,7 @@ class KimiReasoningAdapter:
         base_url: str,
         model: str = "moonshotai/Kimi-K3",
         client: Any | None = None,
+        retry_delays: tuple[float, ...] = (0.75, 2.0),
     ) -> None:
         if not token or not secret or not base_url or not model:
             raise ValueError("Cấu hình Kimi chưa đầy đủ.")
@@ -342,16 +344,21 @@ class KimiReasoningAdapter:
             client = OpenAI(base_url=base_url, api_key=f"{token}.{secret}")
         self.client = client
         self.model = model
+        self.retry_delays = retry_delays
 
     def _complete(self, messages: list[dict[str, str]]) -> tuple[str, str]:
-        completion = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.1,
-            max_tokens=MAX_OUTPUT_TOKENS,
-            top_p=0.95,
-            stream=False,
-            extra_body={"reasoning_effort": "low"},
+        completion = call_with_service_retry(
+            lambda: self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=MAX_OUTPUT_TOKENS,
+                top_p=0.95,
+                stream=False,
+                extra_body={"reasoning_effort": "low"},
+            ),
+            service="Kimi/Modal",
+            retry_delays=self.retry_delays,
         )
         choice = completion.choices[0]
         content = choice.message.content

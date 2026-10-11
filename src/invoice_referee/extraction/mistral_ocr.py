@@ -9,6 +9,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from .network_resilience import call_with_service_retry
+
 VIETNAM_TZ = timezone(timedelta(hours=7))
 
 
@@ -36,6 +38,7 @@ class MistralOcrAdapter:
         api_key: str,
         model: str = "mistral-ocr-latest",
         client: Any | None = None,
+        retry_delays: tuple[float, ...] = (0.75, 2.0),
     ) -> None:
         if not api_key:
             raise ValueError("MISTRAL_API_KEY chưa được cấu hình.")
@@ -45,6 +48,7 @@ class MistralOcrAdapter:
             client = Mistral(api_key=api_key)
         self.client = client
         self.model = model
+        self.retry_delays = retry_delays
 
     def process(self, file_path: Path, mime_type: str | None = None) -> OcrExecution:
         path = Path(file_path)
@@ -61,13 +65,17 @@ class MistralOcrAdapter:
         else:
             document = {"type": "image_url", "image_url": data_url}
 
-        response = self.client.ocr.process(
-            model=self.model,
-            document=document,
-            include_image_base64=False,
-            include_blocks=True,
-            confidence_scores_granularity="word",
-            timeout_ms=120_000,
+        response = call_with_service_retry(
+            lambda: self.client.ocr.process(
+                model=self.model,
+                document=document,
+                include_image_base64=False,
+                include_blocks=True,
+                confidence_scores_granularity="word",
+                timeout_ms=120_000,
+            ),
+            service="Mistral OCR",
+            retry_delays=self.retry_delays,
         )
         raw_response = response.model_dump(mode="json", exclude_none=True)
         return OcrExecution(

@@ -11,6 +11,48 @@ from invoice_referee.domain import (
 )
 
 
+CLEAR_REJECTION_RULES = frozenset(
+    {
+        "SET_CATEGORY_001",
+        "SET_BUYER_IDENTITY_001",
+        "SET_DUPLICATE_001",
+    }
+)
+
+
+def _decision_for_finding(finding: SettlementFinding) -> AutomationDecision:
+    if finding.rule_id in CLEAR_REJECTION_RULES:
+        return AutomationDecision.RECOMMEND_REJECT
+    if finding.uncertainty_type == UncertaintyType.SUSPICIOUS:
+        return AutomationDecision.ACCOUNTANT_REVIEW
+    if finding.uncertainty_type == UncertaintyType.FACTUAL_UNKNOWN:
+        return AutomationDecision.REQUEST_INFO
+    if (
+        finding.uncertainty_type == UncertaintyType.BEYOND_AUTHORITY
+        or finding.target
+        in {
+            DecisionTarget.DEPARTMENT_MANAGER,
+            DecisionTarget.CHIEF_ACCOUNTANT,
+            DecisionTarget.DIRECTOR,
+        }
+    ):
+        return AutomationDecision.ESCALATE
+    return AutomationDecision.ACCOUNTANT_REVIEW
+
+
+def _finding_priority(finding: SettlementFinding) -> int:
+    decision = _decision_for_finding(finding)
+    if decision == AutomationDecision.RECOMMEND_REJECT:
+        return 0
+    if finding.uncertainty_type == UncertaintyType.SUSPICIOUS:
+        return 1
+    if decision == AutomationDecision.REQUEST_INFO:
+        return 2
+    if decision == AutomationDecision.ESCALATE:
+        return 3
+    return 4
+
+
 def build_settlement_decision(
     findings: list[SettlementFinding],
     *,
@@ -26,7 +68,7 @@ def build_settlement_decision(
             )
         )
         return SettlementDecision(
-            automation_decision=AutomationDecision.AUTO_PROCESS,
+            automation_decision=AutomationDecision.READY_FOR_APPROVAL,
             uncertainty_type=UncertaintyType.NONE,
             target=DecisionTarget.ACCOUNTANT,
             reason=success_reason or (
@@ -36,25 +78,9 @@ def build_settlement_decision(
             source_refs=source_refs,
         )
 
-    priority = (
-        UncertaintyType.OUTSIDE_POLICY,
-        UncertaintyType.SUSPICIOUS,
-        UncertaintyType.FACTUAL_UNKNOWN,
-        UncertaintyType.BEYOND_AUTHORITY,
-    )
-    primary = next(
-        finding
-        for uncertainty in priority
-        for finding in blocking
-        if finding.uncertainty_type == uncertainty
-    )
-    decision = (
-        AutomationDecision.REQUEST_INFO
-        if primary.uncertainty_type == UncertaintyType.FACTUAL_UNKNOWN
-        else AutomationDecision.ESCALATE
-    )
+    primary = min(blocking, key=_finding_priority)
     return SettlementDecision(
-        automation_decision=decision,
+        automation_decision=_decision_for_finding(primary),
         uncertainty_type=primary.uncertainty_type,
         primary_finding_code=primary.rule_id,
         target=primary.target,

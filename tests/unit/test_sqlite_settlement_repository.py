@@ -25,7 +25,7 @@ from invoice_referee.domain import (
     SettlementUpload,
     SubmissionSourceType,
 )
-from invoice_referee.extraction import OcrExecution
+from invoice_referee.extraction import ExternalServiceUnavailableError, OcrExecution
 from invoice_referee.storage import SQLiteSettlementRepository
 
 
@@ -89,6 +89,15 @@ class _ClearOcr:
                     }
                 ]
             },
+        )
+
+
+class _UnavailableOcr:
+    def process(self, _path, _mime_type):
+        raise ExternalServiceUnavailableError(
+            "Mistral OCR",
+            3,
+            OSError(10013, "socket access forbidden"),
         )
 
 
@@ -274,7 +283,7 @@ def test_repository_persists_case_processes_job_and_audit(tmp_path: Path) -> Non
     assert SettlementProcessingService(repository).run_once() is True
 
     case = repository.get_case(receipt.case_id)
-    assert case["automation_decision"] == "AUTO_PROCESS"
+    assert case["automation_decision"] == "READY_FOR_APPROVAL"
     assert case["processing_status"] == "COMPLETED"
     assert case["expense_items"][0]["claimed_amount"] == "1200000"
     assert repository.document_path(
@@ -285,6 +294,33 @@ def test_repository_persists_case_processes_job_and_audit(tmp_path: Path) -> Non
         "CASE_CREATED",
         "CASE_PROCESSED",
     ]
+
+
+def test_external_service_failure_is_a_processing_error_not_request_info(
+    tmp_path: Path,
+) -> None:
+    repository = SQLiteSettlementRepository(
+        tmp_path / "invoice_referee.sqlite3",
+        tmp_path / "cases",
+        id_factory=lambda: "SET-TEST-NETWORK-ERROR",
+    )
+    receipt = SubmitSettlementService(repository).submit(_draft(), [_upload()])
+
+    SettlementProcessingService(
+        repository,
+        ocr_adapter=_UnavailableOcr(),
+        reasoning_adapter=_ExpenseExtractor(),
+        enable_document_pipeline=True,
+    ).run_once()
+
+    case = repository.get_case(receipt.case_id)
+    listed = repository.list_cases()[0]
+    assert case["processing_status"] == "PROCESSING_ERROR"
+    assert case["automation_decision"] is None
+    assert "Mistral OCR" in case["processing_error"]
+    assert "WinError 10013" in case["processing_error"]
+    assert listed["decision_reason"] == case["processing_error"]
+    assert case["audit_events"][-1]["event_type"] == "PROCESSING_FAILED"
 
 
 def test_same_uploaded_file_in_later_case_does_not_trigger_duplicate_policy(
@@ -305,7 +341,7 @@ def test_same_uploaded_file_in_later_case_does_not_trigger_duplicate_policy(
     processor.run_once()
 
     case = repository.get_case(second.case_id)
-    assert case["automation_decision"] == "AUTO_PROCESS"
+    assert case["automation_decision"] == "READY_FOR_APPROVAL"
     assert all(finding["rule_id"] != "SET_DUP_001" for finding in case["findings"])
 
 
@@ -328,7 +364,7 @@ def test_accountant_override_is_versioned_and_audited(tmp_path: Path) -> None:
     case = repository.get_case(receipt.case_id)
     assert case["automation_decision"] == "REQUEST_INFO"
     assert case["decision"]["primary_finding_code"] == "HUMAN_OVERRIDE"
-    assert case["human_actions"][0]["previous_decision"] == "AUTO_PROCESS"
+    assert case["human_actions"][0]["previous_decision"] == "READY_FOR_APPROVAL"
     assert case["audit_events"][-1]["event_type"] == "OVERRIDE_DECISION"
 
 
@@ -349,7 +385,7 @@ def test_document_pipeline_extracts_and_reconciles_total(tmp_path: Path) -> None
     processor.run_once()
 
     case = repository.get_case(receipt.case_id)
-    assert case["automation_decision"] == "AUTO_PROCESS"
+    assert case["automation_decision"] == "READY_FOR_APPROVAL"
     assert any(
         finding["rule_id"] == "SET_TOTAL_001"
         and finding["status"] == "PASS"
@@ -473,7 +509,7 @@ def test_clear_paper_form_is_ready_for_accounting_approval(tmp_path: Path) -> No
         for finding in case["findings"]
         if finding["rule_id"] == "SET_APPROVAL_001"
     )
-    assert case["automation_decision"] == "AUTO_PROCESS"
+    assert case["automation_decision"] == "READY_FOR_APPROVAL"
     assert case["beneficiary_name"] == "NGUYỄN MINH AN"
     assert case["bank_account_number"] == "0123456789"
     assert "Thông tin tài khoản trên hồ sơ: 0123456789" in case["decision"]["reason"]
@@ -627,7 +663,7 @@ def test_ticket_is_classified_before_confidence_and_does_not_require_tax_codes(
     ]
     assert validity["status"] == "CLEAR"
     assert validity["eligible_for_matching"] is True
-    assert case["automation_decision"] == "AUTO_PROCESS"
+    assert case["automation_decision"] == "READY_FOR_APPROVAL"
     assert not any(
         finding["status"] == "FAIL"
         and finding["rule_id"] in {

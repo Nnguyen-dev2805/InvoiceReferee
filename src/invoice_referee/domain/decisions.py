@@ -8,9 +8,12 @@ from pydantic import BaseModel, Field
 
 
 class AutomationDecision(StrEnum):
+    READY_FOR_APPROVAL = "READY_FOR_APPROVAL"
     AUTO_PROCESS = "AUTO_PROCESS"
     REQUEST_INFO = "REQUEST_INFO"
+    ACCOUNTANT_REVIEW = "ACCOUNTANT_REVIEW"
     ESCALATE = "ESCALATE"
+    RECOMMEND_REJECT = "RECOMMEND_REJECT"
 
 
 class UncertaintyType(StrEnum):
@@ -47,4 +50,3 @@ class SettlementDecision(BaseModel):
     question: str | None = None
     reason: str
     source_refs: list[str] = Field(default_factory=list)
-

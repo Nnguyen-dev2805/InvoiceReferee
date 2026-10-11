@@ -188,7 +188,9 @@ def test_item_description_typo_is_non_blocking_warning() -> None:
     findings = _validity_findings(result, filename="hoa_don_ve_may_bay.pdf")
     assert [finding.status for finding in findings] == ["WARN", "PASS"]
     assert findings[0].question is None
-    assert build_settlement_decision(findings).automation_decision == "AUTO_PROCESS"
+    assert build_settlement_decision(findings).automation_decision == (
+        "READY_FOR_APPROVAL"
+    )
 
 
 def test_unclear_total_warning_still_blocks_matching() -> None:

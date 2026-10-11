@@ -24,6 +24,18 @@ class FakeCompletions:
         )
 
 
+class FlakyCompletions(FakeCompletions):
+    def __init__(self, *contents: str) -> None:
+        super().__init__(*contents)
+        self.attempts = 0
+
+    def create(self, **kwargs):
+        self.attempts += 1
+        if self.attempts == 1:
+            raise OSError(10013, "socket access forbidden")
+        return super().create(**kwargs)
+
+
 CONFIDENCE_JSON = """{
   "block_assessments": [
     {
@@ -141,6 +153,17 @@ def build_adapter(completions: FakeCompletions) -> KimiReasoningAdapter:
         base_url="https://example.test/v1",
         client=client,
     )
+
+
+def test_kimi_adapter_retries_transient_windows_socket_error() -> None:
+    completions = FlakyCompletions(CONFIDENCE_JSON)
+    adapter = build_adapter(completions)
+    adapter.retry_delays = (0,)
+
+    result = adapter.analyze_confidence({"evidence": {}})
+
+    assert completions.attempts == 2
+    assert result.block_assessments[0].quality_state == "UNCERTAIN"
 
 
 def test_confidence_agent_uses_its_dedicated_prompt() -> None:

@@ -1,4 +1,4 @@
-from app.web.routes import _decorate_accounting_case
+from app.web.routes import _case_outcome_key, _decorate_accounting_case
 
 
 class _OcrRepository:
@@ -38,6 +38,45 @@ class _OcrRepository:
                 ]
             },
         }
+
+
+def test_legacy_and_processing_error_cases_use_new_queue_taxonomy() -> None:
+    assert _case_outcome_key(
+        {
+            "automation_decision": "AUTO_PROCESS",
+            "processing_status": "COMPLETED",
+        }
+    ) == "READY_FOR_APPROVAL"
+    assert _case_outcome_key(
+        {
+            "automation_decision": None,
+            "processing_status": "PROCESSING_ERROR",
+        }
+    ) == "PROCESSING_FAILED"
+    assert _case_outcome_key(
+        {
+            "automation_decision": "ESCALATE",
+            "uncertainty_type": "OUTSIDE_POLICY",
+            "primary_finding_code": "SET_NO_EVIDENCE_001",
+            "processing_status": "COMPLETED",
+        }
+    ) == "ACCOUNTANT_REVIEW"
+    assert _case_outcome_key(
+        {
+            "automation_decision": "ESCALATE",
+            "uncertainty_type": "OUTSIDE_POLICY",
+            "primary_finding_code": "SET_CATEGORY_001",
+            "processing_status": "COMPLETED",
+        }
+    ) == "RECOMMEND_REJECT"
+    assert _case_outcome_key(
+        {
+            "automation_decision": "ESCALATE",
+            "uncertainty_type": "OUTSIDE_POLICY",
+            "primary_finding_code": "SET_LIMIT_001",
+            "processing_status": "COMPLETED",
+        }
+    ) == "ESCALATE"
 
 
 def test_accounting_case_resolves_ocr_block_as_annotated_evidence() -> None:
