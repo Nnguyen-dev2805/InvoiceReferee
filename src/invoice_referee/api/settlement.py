@@ -90,6 +90,10 @@ _STATUS_BY_CODE = {
     "B3_WORKFLOW_BLOCKED": 409,
     "B3_DECISION_EXISTS": 409,
     "BASIS_MISMATCH": 400,
+    "LINKED_B7_INVALID": 400,
+    "LINKED_B7_REPORT_ONLY": 409,
+    "LINKED_CASE_EXISTS": 409,
+    "ORIGIN_STOP_ACTIVE": 409,
     "FILE_TOO_LARGE": 413,
     "SOURCE_LIMIT_REACHED": 413,
     "UNSUPPORTED_FORMAT": 415,
@@ -280,6 +284,48 @@ class B3AdvanceEventRequest(BaseModel):
     evidence: list[dict[str, Any]] = []
     allocation_note: str
     supersedes_event_id: str | None = None
+
+
+class PrepareLinkedB7Request(BaseModel):
+    """Open a linked B7 child from a B3 parent (parent version envelope)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+
+
+class LinkedB7SubmissionRequest(BaseModel):
+    """Save/confirm a linked B7 child's declarations (child version envelope)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    intake: dict[str, Any]
+
+
+class B7CompanyContextRequest(BaseModel):
+    """Accountant records the source-backed company packet for a child."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    packet: dict[str, Any]
+
+
+class LinkedContextRefreshRequest(BaseModel):
+    """Refresh the linked context from the latest company packet."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
 
 
 DEFAULT_EVAL_CORPUS = Path("docs/discovery/eval_development")
@@ -518,6 +564,79 @@ def create_runtime_app(*, db_path: Path | None = None,
             return JSONResponse(status_code=200,
                                 content=event.model_dump(mode="json"))
         return event
+
+    @app.post("/api/cases/{case_id}/settlements", response_model=CaseView,
+              status_code=201)
+    async def prepare_linked_b7(
+        case_id: str,
+        request: PrepareLinkedB7Request,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | CaseView:
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        child = service.prepare_linked_b7(case_id, command)
+        if child.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=child.model_dump(mode="json"))
+        return child
+
+    @app.put("/api/cases/{case_id}/settlement-submission",
+             response_model=CaseView, status_code=200)
+    async def revise_linked_b7(
+        case_id: str,
+        request: LinkedB7SubmissionRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | CaseView:
+        from pydantic import ValidationError
+
+        from invoice_referee.settlement.b7_linked import load_b7_linked_intake
+
+        try:
+            intake = load_b7_linked_intake(request.intake)
+        except DomainError:
+            raise
+        except ValidationError as error:
+            raise DomainError(
+                "INVALID_PAYLOAD",
+                f"Khai báo quyết toán không hợp lệ: {error}",
+            ) from error
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        view = service.revise_linked_b7(case_id, intake, command)
+        if view.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=view.model_dump(mode="json"))
+        return view
+
+    @app.post("/api/cases/{case_id}/settlement-company-context",
+              response_model=CaseView, status_code=201)
+    async def record_b7_company_packet(
+        case_id: str,
+        request: B7CompanyContextRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | CaseView:
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        view = service.record_b7_company_packet(case_id, request.packet, command)
+        if view.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=view.model_dump(mode="json"))
+        return view
+
+    @app.post("/api/cases/{case_id}/settlement-context/refresh",
+              response_model=CaseView, status_code=200)
+    async def refresh_linked_b7_context(
+        case_id: str,
+        request: LinkedContextRefreshRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | CaseView:
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        view = service.refresh_linked_b7_context(case_id, command)
+        if view.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=view.model_dump(mode="json"))
+        return view
 
     @app.get("/api/cases/{case_id}", response_model=CaseView)
     async def get_case(case_id: str) -> CaseView:

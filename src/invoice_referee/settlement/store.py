@@ -45,6 +45,8 @@ from invoice_referee.settlement.models import (
     B3PresentPayload,
     B3PresentationView,
     B3WorkflowView,
+    B7LinkedIntake,
+    B7OriginLink,
     CaseSnapshot,
     CaseStage,
     CaseSummary,
@@ -94,6 +96,10 @@ _B3_PRESENT = "B3_PRESENT"
 _B3_DECIDE = "B3_DECIDE"
 _B3_ADD_ADVANCE_PROOF = "B3_ADD_ADVANCE_PROOF"
 _B3_RECORD_ADVANCE = "B3_RECORD_ADVANCE"
+_PREPARE_LINKED_B7 = "PREPARE_LINKED_B7"
+_REVISE_LINKED_B7 = "REVISE_LINKED_B7"
+_B7_CONTEXT_REFRESH = "B7_CONTEXT_REFRESH"
+_LINKED_B7_CONTEXT_USE = "LINKED_B7_CONTEXT"
 
 _NONTERMINAL_STATUSES = ("QUEUED", "RUNNING")
 _TERMINAL_STATUSES = ("SUCCEEDED", "FAILED", "TIMED_OUT", "STOPPED",
@@ -398,6 +404,14 @@ class Store:
         """
         with self._write() as conn:
             self._case_row(conn, case_id)  # CASE_NOT_FOUND when absent
+            linked = self._find_linked_child(conn, case_id)
+            if linked is not None:
+                raise DomainError(
+                    "LINKED_CASE_EXISTS",
+                    f"Hồ sơ {case_id} có hồ sơ quyết toán liên kết "
+                    f"({linked['id']}); xoá hồ sơ con trước để không mất "
+                    f"dependency.",
+                )
             active = conn.execute(
                 "SELECT COUNT(*) FROM runs WHERE case_id = ? AND status IN (?, ?)",
                 (case_id, *_NONTERMINAL_STATUSES),
@@ -894,6 +908,21 @@ class Store:
             f"lifecycle riêng.",
         )
 
+    def _check_linked_b7_action(self, case: sqlite3.Row, action: str) -> None:
+        """Linked B7 là report-only: generic decision/money/handoff/closure bị
+        chặn ở transaction guard cho tới khi mở B8/B9 (backend code, không chỉ
+        ẩn UI). Review vẫn được phép."""
+        if self._b7_origin_link(case) is None:
+            return
+        if action == "REVIEW":
+            return
+        raise DomainError(
+            "LINKED_B7_REPORT_ONLY",
+            f"Hồ sơ quyết toán liên kết (b7-linked-intake-v1) mới hỗ trợ "
+            f"report/questions/review; hành động {action} chưa mở (B8/B9 là "
+            f"lát cắt sau).",
+        )
+
     def _latest_decision_payload(self, conn: sqlite3.Connection,
                                   case_id: str) -> dict[str, Any] | None:
         """Latest B7 SETTLEMENT decision only.
@@ -923,6 +952,7 @@ class Store:
                     update={"idempotent_replay": True})
             case = self._case_row(conn, case_id)
             self._check_b3_v1_action(case, "DECISION")
+            self._check_linked_b7_action(case, "DECISION")
             self._check_open(case)
             if case["stop_active"]:
                 raise DomainError(
@@ -994,6 +1024,7 @@ class Store:
                     update={"idempotent_replay": True})
             case = self._case_row(conn, case_id)
             self._check_b3_v1_action(case, "REVIEW")
+            self._check_linked_b7_action(case, "REVIEW")
             self._check_open(case)
             self._check_version(case, command)
             self._run_row(conn, payload.report_id)  # review phải chỉ vào run có thật
@@ -1671,6 +1702,307 @@ class Store:
                                  command, payload_fp, {"event": event}, now)
             return B3AdvanceEventView.model_validate(event)
 
+    # --- B6→B7 linked settlement (b7-linked-intake-v1) -----------------------
+
+    @staticmethod
+    def _b7_origin_link(case: sqlite3.Row) -> dict[str, Any] | None:
+        form = _load(case["submission_json"]).get("form") or {}
+        link = form.get("origin_link")
+        return link if isinstance(link, dict) else None
+
+    def _find_linked_child(self, conn: sqlite3.Connection,
+                           parent_id: str) -> sqlite3.Row | None:
+        """The active linked B7 child for a parent, if one exists."""
+        for row in conn.execute("SELECT * FROM cases ORDER BY rowid"):
+            if row["id"] == parent_id:
+                continue
+            submission = _load(row["submission_json"])
+            if submission.get("job") != "B7":
+                continue
+            link = (submission.get("form") or {}).get("origin_link")
+            if isinstance(link, dict) and link.get("origin_case_id") == parent_id:
+                return row
+        return None
+
+    def prepare_linked_b7(self, parent_id: str, command: Command,
+                          origin: str = "USER") -> CaseView:
+        """Create (or reuse) the single active linked B7 child for a B3 parent.
+
+        Server-owned link/employee/work; the parent is never mutated. A draft
+        child is created with ``confirmed=False``; no run is started here.
+        """
+        payload_fp = fingerprint(_PREPARE_LINKED_B7, {"parent_id": parent_id})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _PREPARE_LINKED_B7, command,
+                                       scope_key=parent_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                return self._case_view(
+                    conn, _load(row["payload_json"])["child_id"]).model_copy(
+                    update={"idempotent_replay": True})
+            parent = self._case_row(conn, parent_id)
+            self._check_version(parent, command)
+            if _load(parent["submission_json"]).get("job") != "B3":
+                raise DomainError(
+                    "LINKED_B7_INVALID",
+                    "Chỉ hồ sơ B3 mới mở được hồ sơ quyết toán liên kết.",
+                )
+            existing = self._find_linked_child(conn, parent_id)
+            if existing is not None:
+                return self._case_view(conn, existing["id"])
+            now_dt = utcnow()
+            now = _iso(now_dt)
+            child_id = f"C-{uuid.uuid4().hex[:12]}"
+            link = {
+                "origin_case_id": parent_id,
+                "employee_ref": _load(parent["submission_json"])["employee_ref"],
+                "work_ref": _load(parent["submission_json"])["work_ref"],
+                "created_at": now,
+            }
+            form = {"schema_version": "b7-linked-intake-v1", "confirmed": False,
+                    "expense_rows": [], "note": None, "origin_link": link}
+            submission = Submission(
+                employee_ref=link["employee_ref"], work_ref=link["work_ref"],
+                job="B7", money_as_of=now_dt, knowledge_cutoff=now_dt, form=form)
+            stage: CaseStage = "CHECKING"
+            conn.execute(
+                "INSERT INTO cases (id, case_version, input_revision, control_epoch, "
+                "stop_active, stage, current_run_id, submission_json, origin, "
+                "created_at, updated_at) "
+                "VALUES (?, 1, 1, 1, 0, ?, NULL, ?, ?, ?, ?)",
+                (child_id, stage, _dump(submission.model_dump(mode="json")),
+                 origin, now, now),
+            )
+            conn.execute(
+                "INSERT INTO case_revisions (id, case_id, revision, submission_json, "
+                "reason, actor_id, command_key, created_at) VALUES (?, ?, 1, ?, '', ?, ?, ?)",
+                (f"R-{uuid.uuid4().hex[:12]}", child_id,
+                 _dump(submission.model_dump(mode="json")), command.actor_id,
+                 command.key, now),
+            )
+            self._record_command(conn, child_id, parent_id, "LINKED_B7_PREPARED",
+                                 _PREPARE_LINKED_B7, command, payload_fp,
+                                 {"child_id": child_id, "parent_id": parent_id},
+                                 now)
+            return self._case_view(conn, child_id)
+
+    def revise_linked_b7(self, case_id: str, intake: B7LinkedIntake,
+                         command: Command) -> CaseView:
+        """Update a linked child's declarations; link/employee/work immutable."""
+        payload_fp = fingerprint(_REVISE_LINKED_B7, {
+            "intake": intake.model_dump(mode="json")})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _REVISE_LINKED_B7, command,
+                                       scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                return self._case_view(conn, case_id).model_copy(
+                    update={"idempotent_replay": True})
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            self._check_version(case, command)
+            submission = Submission.model_validate(_load(case["submission_json"]))
+            link = self._b7_origin_link(case)
+            if link is None:
+                raise DomainError(
+                    "LINKED_B7_INVALID",
+                    "Hồ sơ này không phải hồ sơ quyết toán liên kết.",
+                )
+            form = intake.model_dump(mode="json")
+            form["origin_link"] = link  # server-owned, cannot be client-set
+            merged = submission.model_copy(update={"form": form})
+            now = _iso(utcnow())
+            conn.execute(
+                "UPDATE cases SET case_version = ?, input_revision = ?, "
+                "submission_json = ?, updated_at = ? WHERE id = ?",
+                (case["case_version"] + 1, case["input_revision"] + 1,
+                 _dump(merged.model_dump(mode="json")), now, case_id),
+            )
+            self._record_command(conn, case_id, case_id, "LINKED_B7_REVISED",
+                                 _REVISE_LINKED_B7, command, payload_fp,
+                                 {"confirmed": intake.confirmed}, now)
+            return self._case_view(conn, case_id)
+
+    def _store_linked_context_source(self, conn: sqlite3.Connection,
+                                     case_id: str, snapshot,
+                                     command: Command) -> str:
+        """Persist the linked context snapshot as a backend-owned system source.
+
+        Source-use ``LINKED_B7_CONTEXT`` is recorded in the audit operation, so
+        the snapshot is trusted by audit — never by a client-supplied string.
+        """
+        source_id = f"S-{uuid.uuid4().hex[:12]}"
+        now = _iso(utcnow())
+        content = _dump(snapshot.model_dump(mode="json")).encode("utf-8")
+        stored_path = put_artifact(self.artifact_root, case_id, "sources",
+                                   source_id, content)
+        sha = hashlib.sha256(content).hexdigest()
+        conn.execute(
+            "INSERT INTO sources (id, case_id, filename, media_type, sha256, "
+            "size_bytes, status, supersedes_source_id, uploader_actor_id, "
+            "received_at, provenance_json, original_path) "
+            "VALUES (?, ?, 'linked-context.json', 'application/json', ?, ?, "
+            "'ACCEPTED', NULL, ?, ?, ?, ?)",
+            (source_id, case_id, sha, len(content), command.actor_id, now,
+             _dump({"source_use": _LINKED_B7_CONTEXT_USE}),
+             str(stored_path.relative_to(self.artifact_root))),
+        )
+        return source_id
+
+    def record_b7_company_packet(self, case_id: str, payload: dict,
+                                 command: Command, policy: dict,
+                                 authority_version: str | None) -> CaseView:
+        """Accountant records a source-backed company packet; build context.
+
+        Persists the snapshot as a system source, bumps input_revision (a
+        material context change), and keeps old run/source history.
+        """
+        from invoice_referee.settlement.b7_linked import (
+            build_linked_context, load_b7_company_packet,
+        )
+
+        packet = load_b7_company_packet(payload)
+        payload_fp = fingerprint(_B7_CONTEXT_REFRESH, {
+            "case_id": case_id, "packet": packet.model_dump(mode="json")})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _B7_CONTEXT_REFRESH, command,
+                                       scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                return self._case_view(conn, case_id).model_copy(
+                    update={"idempotent_replay": True})
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            self._check_version(case, command)
+            link = self._b7_origin_link(case)
+            if link is None:
+                raise DomainError(
+                    "LINKED_B7_INVALID",
+                    "Company packet chỉ áp dụng cho hồ sơ quyết toán liên kết.",
+                )
+            submission = Submission.model_validate(_load(case["submission_json"]))
+            parent_id = link["origin_case_id"]
+            decision = None
+            parent_wf = self._b3_workflow(conn, parent_id)
+            if parent_wf is not None and parent_wf.decision is not None:
+                decision = parent_wf.decision
+            managed = self._b3_advance_events(conn, parent_id)
+            snapshot = build_linked_context(
+                origin_case_id=parent_id,
+                parent_fingerprint=self._linked_parent_fingerprint(conn, parent_id),
+                decision=decision, managed_events=managed, packet=packet,
+                policy=policy, authority_version=authority_version,
+                money_as_of=submission.money_as_of,
+                knowledge_cutoff=submission.knowledge_cutoff)
+            # Identical snapshot (same packet, same parent dependency): reuse the
+            # existing source and do NOT bump input_revision.
+            snapshot_fp = fingerprint("LINKED_CONTEXT",
+                                      snapshot.model_dump(mode="json"))
+            prior_ids = self._linked_context_source_ids(conn, case_id)
+            if prior_ids:
+                prior = self._source_record(conn.execute(
+                    "SELECT * FROM sources WHERE id = ?",
+                    (prior_ids[-1],)).fetchone())
+                prior_data = (self.artifact_root / prior.original_path
+                              ).read_text(encoding="utf-8")
+                if fingerprint("LINKED_CONTEXT", json.loads(prior_data)) \
+                        == snapshot_fp:
+                    return self._case_view(conn, case_id).model_copy(
+                        update={"idempotent_replay": True})
+            source_id = self._store_linked_context_source(
+                conn, case_id, snapshot, command)
+            now = _iso(utcnow())
+            conn.execute(
+                "UPDATE cases SET case_version = ?, input_revision = ?, "
+                "updated_at = ? WHERE id = ?",
+                (case["case_version"] + 1, case["input_revision"] + 1, now,
+                 case_id),
+            )
+            self._record_command(conn, case_id, case_id, "B7_CONTEXT_REFRESHED",
+                                 _B7_CONTEXT_REFRESH, command, payload_fp,
+                                 {"source_id": source_id,
+                                  "context_version": snapshot.context_version},
+                                 now)
+            return self._case_view(conn, case_id)
+
+    def _linked_parent_fingerprint(self, conn: sqlite3.Connection,
+                                   parent_id: str) -> str:
+        """Fingerprint of parent case/decision/managed events (dependency)."""
+        case = self._case_row(conn, parent_id)
+        decision = None
+        wf = self._b3_workflow(conn, parent_id)
+        if wf is not None and wf.decision is not None:
+            decision = wf.decision.model_dump(mode="json")
+        events = [e.model_dump(mode="json")
+                  for e in self._b3_advance_events(conn, parent_id)]
+        return fingerprint("LINKED_PARENT", {
+            "case_version": case["case_version"],
+            "input_revision": case["input_revision"],
+            "stop_active": bool(case["stop_active"]),
+            "control_epoch": case["control_epoch"],
+            "decision": decision, "events": events})
+
+    def linked_b7_dependency_fingerprint(self, child_id: str) -> str:
+        """Current dependency fingerprint of a linked child's parent chain."""
+        with self._read() as conn:
+            case = self._case_row(conn, child_id)
+            link = self._b7_origin_link(case)
+            if link is None:
+                raise DomainError(
+                    "LINKED_B7_INVALID",
+                    "Hồ sơ này không phải hồ sơ quyết toán liên kết.",
+                )
+            return self._linked_parent_fingerprint(
+                conn, link["origin_case_id"])
+
+    def get_linked_b7_context(self, case_id: str) -> "LinkedB7ContextSnapshot":
+        """Latest persisted linked context snapshot for a child (or raise)."""
+        from invoice_referee.settlement.models import LinkedB7ContextSnapshot
+
+        with self._read() as conn:
+            source_ids = self._linked_context_source_ids(conn, case_id)
+            if not source_ids:
+                raise DomainError(
+                    "BASIS_MISMATCH",
+                    "Hồ sơ chưa có company context snapshot.",
+                )
+            row = conn.execute("SELECT * FROM sources WHERE id = ?",
+                               (source_ids[-1],)).fetchone()
+            record = self._source_record(row)
+            data = json.loads((self.artifact_root / record.original_path)
+                              .read_text(encoding="utf-8"))
+        return LinkedB7ContextSnapshot.model_validate(data)
+
+    def _linked_context_source_ids(self, conn: sqlite3.Connection,
+                                   case_id: str) -> list[str]:
+        ids: list[str] = []
+        for row in conn.execute(
+                "SELECT payload_json FROM audit_events WHERE case_id = ? "
+                "AND operation = ? ORDER BY rowid", (case_id, _B7_CONTEXT_REFRESH)):
+            source_id = _load(row["payload_json"]).get("source_id")
+            if source_id:
+                ids.append(source_id)
+        return ids
+
+    def refresh_linked_b7_context(self, case_id: str, command: Command,
+                                  policy: dict,
+                                  authority_version: str | None) -> CaseView:
+        """Rebuild the context from the stored company packet; reuse if same.
+
+        The exact packet is reused from the last snapshot, so a refresh
+        re-evaluates against current parent dependencies without fabricating
+        coverage.
+        """
+        snapshot = self.get_linked_b7_context(case_id)
+        if snapshot.company_packet is None:
+            raise DomainError(
+                "BASIS_MISMATCH",
+                "Chưa có company packet để làm mới context.",
+            )
+        return self.record_b7_company_packet(
+            case_id, snapshot.company_packet.model_dump(mode="json"), command,
+            policy, authority_version)
+
     def record_money(self, case_id: str, payload: MoneyEventPayload,
                      after_cutoff: bool, command: Command) -> MoneyEventView:
         """Record an actual money event; allowed under Stop, deduped by event_ref."""
@@ -1685,6 +2017,7 @@ class Store:
                     update={"idempotent_replay": True})
             case = self._case_row(conn, case_id)
             self._check_b3_v1_action(case, "MONEY_EVENT")
+            self._check_linked_b7_action(case, "MONEY_EVENT")
             self._check_open(case)
             for event_row in conn.execute(
                     "SELECT payload_json FROM money_events WHERE case_id = ?",
@@ -1784,6 +2117,7 @@ class Store:
                 return dict(stored, idempotent_replay=True)
             case = self._case_row(conn, case_id)
             self._check_b3_v1_action(case, "HANDOFF")
+            self._check_linked_b7_action(case, "HANDOFF")
             self._check_open(case)
             if case["stop_active"]:
                 raise DomainError(
@@ -1853,6 +2187,7 @@ class Store:
                 )
             self._check_version(case, command)
             self._check_b3_v1_action(case, "CLOSURE")
+            self._check_linked_b7_action(case, "CLOSURE")
             blockers = self._closure_blockers(conn, case, payload.kind)
             if blockers:
                 raise DomainError(
@@ -2089,6 +2424,7 @@ class Store:
             ))
         b3_v1_form = self._b3_v1_form(case)
         b3_v1 = bool(b3_v1_form)
+        linked_b7 = self._b7_origin_link(case) is not None
         if case["stage"] in _CLOSED_STAGES:
             actions.append(AllowedAction(
                 action="NONE",
@@ -2103,7 +2439,7 @@ class Store:
                         "Resume mở epoch mới; run cũ không tự hồi phục."),
             ))
             if current_run is not None and current_run["status"] == "SUCCEEDED":
-                if not b3_v1:
+                if not b3_v1 and not linked_b7:
                     actions.append(AllowedAction(
                         action="DECIDE",
                         reason="Report đã có; người có quyền duyệt hoặc từ chối.",
@@ -2123,13 +2459,13 @@ class Store:
                             reason="Kế toán trình duyệt đề nghị tạm ứng cho "
                                    "người có quyền.",
                         ))
-            if case["stage"] == "AWAITING_MONEY" and not b3_v1:
+            if case["stage"] == "AWAITING_MONEY" and not b3_v1 and not linked_b7:
                 actions.append(AllowedAction(
                     action="RECORD_MONEY",
                     reason="Ghi nhận thực nhận/thực chi; gross giữ nguyên, "
                            "không clip theo mức duyệt.",
                 ))
-            if not b3_v1:
+            if not b3_v1 and not linked_b7:
                 actions.append(AllowedAction(
                     action="CLOSE_CASE",
                     reason="Đóng hồ sơ khi các gate (remaining/pending/incident/"
@@ -2145,8 +2481,53 @@ class Store:
             money_summary=self._money_summary(conn, case).model_dump(mode="json"),
             origin=case["origin"],
             b3_workflow=self._b3_workflow(conn, case_id),
+            linked_b7=self._linked_b7_view(conn, case),
             created_at=datetime.fromisoformat(case["created_at"]),
             updated_at=datetime.fromisoformat(case["updated_at"]),
+        )
+
+    def _linked_b7_view(self, conn: sqlite3.Connection,
+                        case: sqlite3.Row) -> "LinkedB7View | None":
+        """Projection for a linked B7 child: origin + managed advance subtotal."""
+        from invoice_referee.settlement.models import LinkedB7View
+
+        link = self._b7_origin_link(case)
+        if link is None:
+            return None
+        origin = B7OriginLink.model_validate(link)
+        parent = conn.execute("SELECT * FROM cases WHERE id = ?",
+                              (origin.origin_case_id,)).fetchone()
+        parent_events = (self._b3_advance_events(conn, origin.origin_case_id)
+                         if parent is not None else [])
+        confirmed = [e for e in parent_events
+                     if e.classification == "CONFIRMED_RECEIPT"
+                     and e.reported_status == "RECEIVED" and e.gross_vnd is not None]
+        subtotal = sum(e.gross_vnd for e in confirmed) if confirmed else None
+        context_ids = self._linked_context_source_ids(conn, case["id"])
+        context_current = False
+        if context_ids:
+            latest = conn.execute(
+                "SELECT * FROM sources WHERE id = ?", (context_ids[-1],)).fetchone()
+            if latest is not None:
+                try:
+                    data = json.loads((self.artifact_root
+                                       / Path(latest["original_path"])
+                                       ).read_text(encoding="utf-8"))
+                    from invoice_referee.settlement.models import (
+                        LinkedB7ContextSnapshot,
+                    )
+                    snap = LinkedB7ContextSnapshot.model_validate(data)
+                    current_fp = self._linked_parent_fingerprint(
+                        conn, origin.origin_case_id)
+                    context_current = snap.parent_fingerprint == current_fp
+                except (OSError, ValueError):
+                    context_current = False
+        return LinkedB7View(
+            origin=origin,
+            context_source_id=context_ids[-1] if context_ids else None,
+            context_current=context_current,
+            blocked_reasons=[],
+            managed_advance_subtotal_vnd=subtotal,
         )
 
     def _source_records(self, conn: sqlite3.Connection, case_id: str) -> list[SourceRecord]:

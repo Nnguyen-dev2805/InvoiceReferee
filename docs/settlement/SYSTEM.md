@@ -292,5 +292,28 @@ final outcome supersede nonfinal cùng identity. Stage: FULFILLED →
 → `AWAITING_MONEY`; **Stop không tự tiến stage** (fact vẫn lưu). B7
 `_money_summary` lọc kind trước sum/pending nên advance không thành
 reimbursement. Error codes dùng lại `BASIS_MISMATCH`/`BEYOND_AUTHORITY`/
-`INVALID_PAYLOAD`. **Chưa** có chuyển tiền ngân hàng, tự thu hồi, closure, tạo
-B7 tự động hoặc liên kết nhập B3→B7.
+`INVALID_PAYLOAD`.
+
+**B6→B7 quyết toán liên kết** (plan
+[2026-10-11-b6-linked-settlement](../superpowers/plans/2026-10-11-b6-linked-settlement.md))
+tạo **hồ sơ B7 riêng** cùng employee/work (không đổi job B3) qua
+`POST /api/cases/{b3_id}/settlements` (envelope version của **parent**; link/
+employee/work do backend cấp trong `form.origin_link`, server-appended) và lưu
+khai báo qua `PUT /api/cases/{b7_id}/settlement-submission` (schema
+`b7-linked-intake-v1`; claim rows là **declarations**, không phải payment facts;
+`Service.submit`/`revise` generic từ chối spoof schema/link). Company context:
+`POST .../settlement-company-context` (ACCOUNTANT; `B7CompanyPacket` source-backed
+coverage/events/expenses) và `POST .../settlement-context/refresh`; snapshot lưu
+như system source audit `B7_CONTEXT_REFRESH` (source-use `LINKED_B7_CONTEXT`),
+tăng `input_revision` khi đổi. `LinkedB7ContextSnapshot` build bằng Python từ
+typed parent decision/events + packet (không LLM đọc lại số): history a/ra/p/rp
+KNOWN chỉ khi coverage đủ group; `None` không thành 0. Run linked dùng **B7 rights
+riêng** (`ServiceConfig.b7_context` grants; thiếu = AUTHORITY, không fallback
+P-DEMO), nạp context observations/relations qua `process(..., linked_snapshot=)`.
+`RelationKind` thêm `CLAIM_EXPENSE`; `Report.claim_comparisons` so khai↔chi phí
+thực tế (MATCHED/CONFLICT/UNRESOLVED; mismatch không dùng forecast). Guards:
+`LINKED_B7_REPORT_ONLY` chặn generic decision/money/handoff/closure (review vẫn
+được); `linked_b7_dependency_fingerprint` cho publish/review stale; parent Stop →
+child context `context_current=False`; `delete_case` parent có child →
+`LINKED_CASE_EXISTS`. **Chưa** có B8/B9, handoff/closure, tạo B7 tự động hoặc
+import bảng kê.

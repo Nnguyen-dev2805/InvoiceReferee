@@ -11,6 +11,7 @@ import type {
   B3PresentPayload,
   B3PresentationView,
   B3RunContext,
+  B7LinkedIntake,
   CaseSummary,
   CaseView,
   ClosurePayload,
@@ -19,6 +20,7 @@ import type {
   CreateCasePayload,
   DecidePayload,
   DecisionView,
+  DemoRole,
   HandoffPayload,
   MoneyEventPayload,
   MoneyEventView,
@@ -299,6 +301,48 @@ export function recordB3Advance(
 ): Promise<B3AdvanceEventView> {
   return postCommand<B3AdvanceEventView>(
     `/api/cases/${encodeURIComponent(caseId)}/b3-advance-events`, payload);
+}
+
+export function prepareLinkedB7(
+  parentCaseId: string,
+  payload: { actor_id: string; demo_role: DemoRole;
+             expected_case_version: number },
+): Promise<CaseView> {
+  return postCommand<CaseView>(
+    `/api/cases/${encodeURIComponent(parentCaseId)}/settlements`, payload);
+}
+
+export function reviseLinkedB7(
+  childCaseId: string,
+  payload: { actor_id: string; demo_role: DemoRole;
+             expected_case_version: number; intake: B7LinkedIntake },
+): Promise<CaseView> {
+  return request<CaseView>(
+    `/api/cases/${encodeURIComponent(childCaseId)}/settlement-submission`, {
+      method: 'PUT',
+      headers: { ...JSON_HEADERS, 'Idempotency-Key': crypto.randomUUID() },
+      body: JSON.stringify(payload),
+    });
+}
+
+export function recordB7CompanyPacket(
+  childCaseId: string,
+  payload: { actor_id: string; demo_role: DemoRole;
+             expected_case_version: number; packet: unknown },
+): Promise<CaseView> {
+  return postCommand<CaseView>(
+    `/api/cases/${encodeURIComponent(childCaseId)}/settlement-company-context`,
+    payload);
+}
+
+export function refreshLinkedB7Context(
+  childCaseId: string,
+  payload: { actor_id: string; demo_role: DemoRole;
+             expected_case_version: number },
+): Promise<CaseView> {
+  return postCommand<CaseView>(
+    `/api/cases/${encodeURIComponent(childCaseId)}/settlement-context/refresh`,
+    payload);
 }
 
 export function runSettlementVerify(

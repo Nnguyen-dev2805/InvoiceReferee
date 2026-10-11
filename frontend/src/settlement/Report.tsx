@@ -293,6 +293,30 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
         </div>
       )}
 
+      {(report.claim_comparisons?.length ?? 0) > 0 && (
+        <div className="report-clean-section" data-testid="claim-comparisons">
+          <h3 className="section-title">Đối chiếu khoản khai &amp; nguồn</h3>
+          <table>
+            <thead>
+              <tr><th>Khoản khai</th><th>Số khai</th><th>Số thực tế</th>
+                  <th>Bên trả khai</th><th>Trạng thái</th><th>Căn cứ</th></tr>
+            </thead>
+            <tbody>
+              {report.claim_comparisons!.map((c) => (
+                <tr key={c.claim_id}>
+                  <td>{c.claim_id}</td>
+                  <td>{vnd(c.declared_amount_vnd)}</td>
+                  <td>{vnd(c.verified_amount_vnd)}</td>
+                  <td>{c.payer_declaration ?? '—'}</td>
+                  <td title={c.reason}>{c.status}</td>
+                  <td>{refs(c.refs)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* Human-Grade Policy Checks Checklist */}
       <div className="report-clean-section">
         <div className="policy-checklist-summary-row">

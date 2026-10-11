@@ -41,8 +41,14 @@ def _technical_issue(source_id: str | None, error: DomainError,
 
 
 def process(run_input: RunInput, reader: Reader, budget: RunBudget,
-            checkpoint, run_id: str = "R-PIPELINE") -> Report:
-    """Run one job over the snapshot; checkpoint guards Stop/revision/epoch."""
+            checkpoint, run_id: str = "R-PIPELINE",
+            linked_snapshot=None) -> Report:
+    """Run one job over the snapshot; checkpoint guards Stop/revision/epoch.
+
+    For a linked B7 child, ``linked_snapshot`` supplies Python-derived
+    observations/relations from the persisted context source (no LLM re-read);
+    employee originals still flow through the Reader/matcher.
+    """
     b3_v1 = is_b3_v1(run_input.submission.form)
     keys = (B3_V1_KEYS if b3_v1
             else REQUIRED_KEYS.get(run_input.submission.job, []))
@@ -68,6 +74,16 @@ def process(run_input: RunInput, reader: Reader, budget: RunBudget,
             if not is_per_source_error(error.code):
                 raise
             technical.append(_technical_issue(None, error, len(technical) + 1))
+    if linked_snapshot is not None:
+        # Company context facts come from typed persisted records, not the LLM.
+        from invoice_referee.settlement.b7_linked import (
+            linked_context_observations,
+        )
+        ctx_obs, ctx_rel, ctx_issues = linked_context_observations(
+            linked_snapshot, f"linkedctx:{linked_snapshot.origin_case_id}")
+        observations = list(ctx_obs) + observations
+        relations = list(ctx_rel) + relations
+        technical = list(ctx_issues) + technical
     checkpoint("evaluating")
     report = evaluate(run_input, observations, relations, run_id=run_id,
                       mode=reader.mode, technical_issues=technical)

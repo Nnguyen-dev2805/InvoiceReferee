@@ -72,11 +72,17 @@ số giấy giả định/thông tin giao việc/trạng thái/nhãn thử nghi�
 trong lý do hoặc nội dung công tác. Web vẫn lưu place/dates/purpose riêng, mã hồ
 sơ backend cấp; giấy ngoài không bị buộc có employee_ref/work_ref/mã DN nội bộ.
 [Plan intake/report B3](../superpowers/plans/2026-10-10-b3-verbal-intake.md),
-[plan trình duyệt/quyết định ứng](../superpowers/plans/2026-10-11-b3-present-and-approve.md)
-và [plan ghi tiền ứng B5](../superpowers/plans/2026-10-11-b5-advance-receipts.md)
-thực hiện nhánh khởi tạo + trình duyệt + ghi tiền ứng này. **Chưa** có chuyển
-tiền ngân hàng, liên kết nhập B3→B7, mở lại refusal, xử lý return/reversal hoặc
-đóng lifecycle; không dùng action SETTLEMENT/record_money/handoff/closure cho B3.
+[plan trình duyệt/quyết định ứng](../superpowers/plans/2026-10-11-b3-present-and-approve.md),
+[plan ghi tiền ứng B5](../superpowers/plans/2026-10-11-b5-advance-receipts.md) và
+[plan quyết toán liên kết B6→B7](../superpowers/plans/2026-10-11-b6-linked-settlement.md)
+thực hiện nhánh khởi tạo + trình duyệt + ghi tiền ứng + **quyết toán liên kết**:
+từ công việc B3/B5, nhân viên mở **hồ sơ B7 riêng cùng employee/work** (không đổi
+job B3), khai chi phí **thực tế**, kế toán cung cấp **company context có căn cứ**
+(coverage/events/expenses), chạy cùng pipeline B7 tới report/questions/review.
+Forecast/approved advance/khai PERSONAL **không** thành fact; claims↔expense cần
+nguồn; B7 rights riêng (không kế thừa B3Grant). Lát cắt **report-only**. **Chưa**
+có chuyển tiền ngân hàng, mở lại refusal, xử lý return/reversal, B8/B9 hoặc đóng
+lifecycle; không dùng action SETTLEMENT/record_money/handoff/closure cho B3/linked.
 
 ## P3. Ba vai và ranh giới quyết định
 

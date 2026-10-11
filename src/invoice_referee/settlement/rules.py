@@ -317,7 +317,8 @@ def _link_issues(relations: list[Relation], issues: list[Issue],
 
 
 def _validate_relations(relations: list[Relation],
-                       expense_ids: set[str], payment_ids: set[str]) -> None:
+                       expense_ids: set[str], payment_ids: set[str],
+                       claim_ids: set[str] | None = None) -> None:
     seen: set[str] = set()
     known = expense_ids | payment_ids
     for relation in relations:
@@ -333,6 +334,13 @@ def _validate_relations(relations: list[Relation],
                     raise DomainError(
                         "UNKNOWN_REF",
                         f"Relation {relation.relation_id} tham chiếu đối tượng không có trong facts ({ref}).",
+                    )
+            elif relation.kind == "CLAIM_EXPENSE":
+                if claim_ids is None or relation.from_id not in claim_ids \
+                        or relation.to_id not in expense_ids:
+                    raise DomainError(
+                        "UNKNOWN_REF",
+                        f"Relation {relation.relation_id} tham chiếu claim/expense không có trong facts ({ref}).",
                     )
             elif relation.from_id not in known or relation.to_id not in known:
                 raise DomainError(
@@ -445,7 +453,18 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
             if contradicted:
                 contradictions.append((key, refs))
 
-    _validate_relations(relations, set(expenses), set(payments))
+    # Declared claims from a linked intake form (statements, not facts).
+    claim_rows = []
+    form = run_input.submission.form or {}
+    if isinstance(form, dict) and form.get("schema_version") == "b7-linked-intake-v1":
+        from invoice_referee.settlement.b7_linked import (
+            claim_comparisons as _claim_comparisons,
+            load_b7_linked_intake,
+        )
+        intake = load_b7_linked_intake(form)
+        claim_rows = intake.expense_rows
+    claim_ids = {row.claim_id for row in claim_rows}
+    _validate_relations(relations, set(expenses), set(payments), claim_ids)
     _contradiction_issues(contradictions, issues, checks)
     _quality_issues(observations, sorted(all_keys), issues, checks)
     _link_issues(relations, issues, checks)
@@ -713,6 +732,12 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
     links = [ReportLink(relation_id=r.relation_id, kind=r.kind, from_id=r.from_id,
                         to_id=r.to_id, portion_vnd=r.portion_vnd, status=r.status)
              for r in relations]
+    comparisons = []
+    if claim_rows:
+        from invoice_referee.settlement.b7_linked import (
+            claim_comparisons as _claim_comparisons,
+        )
+        comparisons = _claim_comparisons(claim_rows, relations, expenses)
 
     return Report(
         run_id=run_id, job="B7", completion=completion, mode=mode,
@@ -738,6 +763,7 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
         direction=direction,
         conditional_results=conditional, expense_rows=rows, checks=checks,
         issues=issues, critical_facts=critical_facts, links=links,
+        claim_comparisons=comparisons,
         next_step=next_step,
         source_refs=sorted({s.id for s in run_input.sources}),
     )

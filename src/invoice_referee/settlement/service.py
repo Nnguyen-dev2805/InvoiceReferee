@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError
 from invoice_referee.domain.models import DomainError
 from invoice_referee.settlement.b3 import B3CompanyContext, B3Intake, is_b3_v1
 from invoice_referee.settlement.b3_workflow import b3_route_for
+from invoice_referee.settlement.b7_linked import is_linked_b7
 from invoice_referee.settlement.models import (
     AuthorityGrant,
     B3AdvanceEventPayload,
@@ -26,6 +27,8 @@ from invoice_referee.settlement.models import (
     B3DecisionView,
     B3PresentPayload,
     B3PresentationView,
+    B7CompanyConfig,
+    B7LinkedIntake,
     CaseView,
     ClosurePayload,
     ClosureView,
@@ -135,6 +138,7 @@ class ServiceConfig(BaseModel):
     max_provider_calls_per_run: StrictInt = 32
     authority: list[AuthorityGrant] = Field(default_factory=list)
     b3_context: B3CompanyContext | None = None
+    b7_context: "B7CompanyConfig | None" = None
     policy: dict[str, Any] = Field(default_factory=lambda: {
         "version": "settlement-demo-v0", "activated": True,
         "origin": "RULEBOOK 2026-10-09 (demo, not company law)",
@@ -164,6 +168,13 @@ class Service:
                 "INVALID_PAYLOAD",
                 "Hồ sơ B3 v1 phải tạo qua POST /api/b3-cases; employee/work/"
                 "clock do backend cap, không tự nhập.",
+            )
+        if is_linked_b7(submission.form):
+            raise DomainError(
+                "INVALID_PAYLOAD",
+                "Hồ sơ quyết toán liên kết phải tạo qua "
+                "POST /api/cases/{b3_id}/settlements; link/employee/work do "
+                "backend cấp, không tự nhập.",
             )
         return self.store.create_case(submission, command, origin=origin)
 
@@ -231,7 +242,111 @@ class Service:
             merged = case.submission.model_copy(
                 update={"form": intake.model_dump(mode="json")})
             return self.store.revise(case_id, merged, command)
+        if is_linked_b7(case.submission.form) or is_linked_b7(submission.form):
+            raise DomainError(
+                "INVALID_PAYLOAD",
+                "Hồ sơ quyết toán liên kết phải sửa qua "
+                "PUT /api/cases/{id}/settlement-submission; không đổi "
+                "link/employee/work.",
+            )
         return self.store.revise(case_id, submission, command)
+
+    # --- B6→B7 linked settlement ---------------------------------------------
+
+    def prepare_linked_b7(self, origin_case_id: str,
+                          command: Command) -> CaseView:
+        """Employee opens a linked B7 settlement child for their B3 parent."""
+        context = self._b3_context()
+        parent = self.store.get_case(origin_case_id)
+        if not is_b3_v1(parent.submission.form):
+            raise DomainError(
+                "LINKED_B7_INVALID",
+                "Chỉ hồ sơ B3 v1 mới mở được hồ sơ quyết toán liên kết.",
+            )
+        route = b3_route_for(context, parent.submission.employee_ref)
+        if (command.demo_role != "EMPLOYEE"
+                or command.actor_id != parent.submission.employee_ref):
+            raise DomainError(
+                "BEYOND_AUTHORITY",
+                f"Vai {command.demo_role}/{command.actor_id} không phải nhân "
+                f"viên {parent.submission.employee_ref}; không mở hồ sơ quyết "
+                f"toán liên kết.",
+            )
+        return self.store.prepare_linked_b7(origin_case_id, command)
+
+    def revise_linked_b7(self, case_id: str, intake: B7LinkedIntake,
+                         command: Command) -> CaseView:
+        """Employee saves/confirms the linked child's declarations."""
+        case = self.store.get_case(case_id)
+        if not is_linked_b7(case.submission.form):
+            raise DomainError(
+                "LINKED_B7_INVALID",
+                "Hồ sơ này không phải hồ sơ quyết toán liên kết.",
+            )
+        if (command.demo_role != "EMPLOYEE"
+                or command.actor_id != case.submission.employee_ref):
+            raise DomainError(
+                "BEYOND_AUTHORITY",
+                f"Vai {command.demo_role}/{command.actor_id} không phải nhân "
+                f"viên {case.submission.employee_ref}; không sửa khai báo.",
+            )
+        # Every claim source must resolve to a retained source of this child.
+        case_source_ids = {s.id for s in case.sources}
+        for row in intake.expense_rows:
+            for source_id in row.source_ids:
+                if source_id not in case_source_ids:
+                    raise DomainError(
+                        "BASIS_MISMATCH",
+                        f"Nguồn {source_id} của khoản {row.claim_id} không "
+                        f"thuộc hồ sơ {case_id}.",
+                    )
+        return self.store.revise_linked_b7(case_id, intake, command)
+
+    def record_b7_company_packet(self, case_id: str, payload: dict,
+                                 command: Command) -> CaseView:
+        """Accountant records the source-backed company packet for a child."""
+        case = self.store.get_case(case_id)
+        if case.linked_b7 is None:
+            raise DomainError(
+                "LINKED_B7_INVALID",
+                "Company packet chỉ áp dụng cho hồ sơ quyết toán liên kết.",
+            )
+        if command.demo_role != "ACCOUNTANT":
+            raise DomainError(
+                "BEYOND_AUTHORITY",
+                f"Vai {command.demo_role} không phải kế toán; company packet "
+                f"thuộc ACCOUNTANT.",
+            )
+        context = self.config.b7_context
+        authority_version = (context.version
+                             if context is not None and context.activated
+                             else None)
+        return self.store.record_b7_company_packet(
+            case_id, payload, command, self.policy, authority_version)
+
+    def refresh_linked_b7_context(self, case_id: str,
+                                  command: Command) -> CaseView:
+        case = self.store.get_case(case_id)
+        if case.linked_b7 is None:
+            raise DomainError(
+                "LINKED_B7_INVALID",
+                "Refresh context chỉ áp dụng cho hồ sơ quyết toán liên kết.",
+            )
+        allowed = (command.demo_role == "ACCOUNTANT"
+                   or (command.demo_role == "EMPLOYEE"
+                       and command.actor_id == case.submission.employee_ref))
+        if not allowed:
+            raise DomainError(
+                "BEYOND_AUTHORITY",
+                f"Vai {command.demo_role}/{command.actor_id} không được refresh "
+                f"context của hồ sơ này.",
+            )
+        context = self.config.b7_context
+        authority_version = (context.version
+                             if context is not None and context.activated
+                             else None)
+        return self.store.refresh_linked_b7_context(
+            case_id, command, self.policy, authority_version)
 
     def add_source(self, case_id: str, upload: Upload,
                    command: Command) -> SourceRecord:
@@ -242,9 +357,22 @@ class Service:
     def start(self, case_id: str, command: Command) -> RunView:
         snapshot = self.store.snapshot(case_id)
         b3_v1 = is_b3_v1(snapshot.submission.form)
+        linked_b7 = is_linked_b7(snapshot.submission.form)
         context = self.config.b3_context if b3_v1 else None
         config: dict[str, Any] = {"reader_mode": self.reader.mode}
         sources = snapshot.sources
+        if linked_b7:
+            # A linked B7 run uses B7 rights only — never the broad generic
+            # authority, and never the B3 advance grant. Missing B7 config means
+            # no authority (an unresolved AUTHORITY issue), not a fallback.
+            b7 = self.config.b7_context
+            linked_authority = (list(b7.grants)
+                                if b7 is not None and b7.activated else [])
+            if b7 is not None and b7.activated and b7.synthetic \
+                    and b7.demo_clock is not None:
+                config["simulation_clock"] = b7.demo_clock.isoformat()
+        else:
+            linked_authority = list(self.config.authority)
         if b3_v1:
             # B5 advance-proof sources are fulfillment evidence, not proposal
             # input: they never enter the B3 Reader/basis. Filtered by the
@@ -280,7 +408,7 @@ class Service:
             sources=sources,
             coverage=None,
             policy=self.policy,
-            authority=self.config.authority,
+            authority=linked_authority,
             response_refs=[],
             config=config,
             b3_context=context,
@@ -292,7 +420,7 @@ class Service:
                 "submission": snapshot.submission.model_dump(mode="json"),
                 "policy": self.policy,
                 "authority": [g.model_dump(mode="json")
-                              for g in self.config.authority],
+                              for g in linked_authority],
                 "b3_context": (context.model_dump(mode="json")
                                if context is not None else None),
                 "reader_mode": self.reader.mode,
@@ -321,8 +449,15 @@ class Service:
                 if hasattr(self.reader, "reset_trace"):
                     self.reader.reset_trace()
                 checkpoint = self._checkpoint(run_id, run_input)
+                linked_snapshot = None
+                if is_linked_b7(run_input.submission.form):
+                    try:
+                        linked_snapshot = self.store.get_linked_b7_context(
+                            run_input.case_id)
+                    except DomainError:
+                        linked_snapshot = None  # no context yet: report-only
                 report = process(run_input, self.reader, budget, checkpoint,
-                                 run_id=run_id)
+                                 run_id=run_id, linked_snapshot=linked_snapshot)
                 published = self.store.publish(run_id, report)
                 if published.status == "SUCCEEDED":
                     self._sync_questions(run_id, report)

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import date
 from pathlib import Path
 from time import monotonic as _monotonic
 from typing import Any, Literal
@@ -24,7 +25,7 @@ from pydantic import (
 )
 
 from invoice_referee.domain.models import DomainError
-from invoice_referee.settlement.b3 import B3CompanyContext, B3Proposal
+from invoice_referee.settlement.b3 import B3CompanyContext, B3Coverage, B3Proposal
 
 Job = Literal["B3", "B7"]
 DemoRole = Literal["EMPLOYEE", "ACCOUNTANT", "APPROVER"]
@@ -421,6 +422,218 @@ class B3FundingSummary(BaseModel):
     as_of: AwareDatetime | None = None
 
 
+# --- B6→B7 linked settlement (b7-linked-intake-v1) ---------------------------
+#
+# A linked child is a NEW B7 case that shares the parent B3's employee/work and
+# carries an immutable origin link. Declarations (claim rows) are statements,
+# never payment facts; forecast/approved-advance never become actual expense.
+# This slice is report-only: no B8 decision, payment, handoff or closure.
+
+B7LinkedSchema = "b7-linked-intake-v1"
+B7DeclaredPayer = Literal["PERSONAL", "COMPANY", "UNKNOWN"]
+B7ClaimStatus = Literal["MATCHED", "CONFLICT", "UNRESOLVED"]
+B7CompanyEventKind = Literal[
+    "ADVANCE_RECEIVED", "ADVANCE_RETURN", "REIMBURSEMENT_RECEIVED",
+    "REIMBURSEMENT_RETURN", "COMPANY_DIRECT",
+]
+B7CompanyEventOutcome = Literal[
+    "RECEIVED", "PENDING", "FAILED", "CANCELLED", "UNKNOWN",
+]
+B7ExpensePurpose = Literal["BUSINESS", "PERSONAL", "UNKNOWN"]
+
+
+class B7OriginLink(BaseModel):
+    """Immutable server-owned link from a B7 child back to its B3 parent."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    origin_case_id: str
+    employee_ref: str
+    work_ref: str
+    created_at: AwareDatetime
+
+
+class B7ClaimRow(BaseModel):
+    """One declared actual expense row; a statement, never a payment fact.
+
+    ``claim_id`` is a claim-namespace id (never an invoice/payment id).
+    Unknown amount stays ``None`` (never 0); declared payer is a declaration.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    claim_id: str
+    description: str
+    expense_date: date | None = None
+    declared_amount_vnd: StrictInt | None = None
+    purpose: str
+    declared_payer: B7DeclaredPayer
+    source_ids: list[str] = Field(default_factory=list)
+    payment_statement: str | None = None
+
+    @model_validator(mode="after")
+    def _shape(self) -> "B7ClaimRow":
+        if not self.description.strip():
+            raise ValueError("Mô tả khoản chi không được để trắng.")
+        if self.declared_amount_vnd is not None and self.declared_amount_vnd < 0:
+            raise ValueError("declared_amount_vnd không được âm; unknown để null.")
+        return self
+
+
+class B7LinkedIntake(BaseModel):
+    """Employee declaration form for a linked B7 settlement (WEB)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["b7-linked-intake-v1"]
+    confirmed: bool = False
+    expense_rows: list[B7ClaimRow] = Field(default_factory=list)
+    note: str | None = None
+
+    @model_validator(mode="after")
+    def _unique_claims(self) -> "B7LinkedIntake":
+        ids = [row.claim_id for row in self.expense_rows]
+        if len(ids) != len(set(ids)):
+            raise ValueError("claim_id trùng trong khai báo.")
+        if self.confirmed and not self.expense_rows:
+            raise ValueError(
+                "Xác nhận nộp cần ít nhất một khoản chi khai báo.")
+        return self
+
+
+class LinkedB7View(BaseModel):
+    """Projection of a linked B7 case's origin/context/limits for API/UI."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    origin: B7OriginLink
+    context_source_id: str | None = None
+    context_current: bool = False
+    blocked_reasons: list[str] = Field(default_factory=list)
+    managed_advance_subtotal_vnd: StrictInt | None = None
+
+
+class B7CompanyConfig(BaseModel):
+    """Backend-owned B7 settlement authority config (separate from B3Grant).
+
+    B7 rights are distinct from the B3 advance grant: never inherit B3
+    max_budget/max_advance, and never fall back to a broad demo grant when this
+    config is absent.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["b7-company-config-v1"]
+    version: str
+    activated: bool
+    synthetic: bool
+    demo_clock: AwareDatetime | None = None
+    grants: list[AuthorityGrant] = Field(default_factory=list)
+    ref: str
+
+    @model_validator(mode="after")
+    def _clock_scope(self) -> "B7CompanyConfig":
+        if self.demo_clock is not None and not (self.activated and self.synthetic):
+            raise ValueError(
+                "Clock cố định chỉ áp dụng cho B7 config synthetic đã activated; "
+                "config thật dùng giờ máy.")
+        return self
+
+
+class B7CompanyEvent(BaseModel):
+    """A company-side actual money event (semantic, not a status string)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    event_namespace: str
+    event_ref: str
+    kind: B7CompanyEventKind
+    amount_vnd: StrictInt | None = None
+    payer_ref: str | None = None
+    payee_ref: str | None = None
+    outcome: B7CompanyEventOutcome
+    event_at: AwareDatetime | None = None
+    refs: list[str] = Field(default_factory=list)
+
+
+class B7CompanyExpense(BaseModel):
+    """A company-side actual expense (not a money event; no forecast field)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    expense_ref: str
+    issuer_ref: str
+    document_ref: str
+    amount_vnd: StrictInt | None = None
+    purpose: B7ExpensePurpose
+    expense_date: date | None = None
+    refs: list[str] = Field(default_factory=list)
+    payment_event_refs: list[str] = Field(default_factory=list)
+
+
+class B7CompanyPacket(BaseModel):
+    """Source-backed company register for whole-work settlement checks.
+
+    Provided by the accountant; the employee cannot edit it. Absence of a row
+    is never silently zero — coverage groups/opening balances decide.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["b7-company-packet-v1"]
+    coverage: "B3Coverage"  # noqa: F821 — imported from b3 at module load
+    events: list[B7CompanyEvent] = Field(default_factory=list)
+    expenses: list[B7CompanyExpense] = Field(default_factory=list)
+    refs: list[str] = Field(default_factory=list)
+    reading_note: str
+
+    @model_validator(mode="after")
+    def _identity_unique(self) -> "B7CompanyPacket":
+        keys = [(e.event_namespace, e.event_ref) for e in self.events]
+        if len(keys) != len(set(keys)):
+            raise ValueError("event namespace/ref trùng trong company packet.")
+        return self
+
+
+class LinkedB7ContextSnapshot(BaseModel):
+    """Server-built linked context: imported facts, no final S/outcome."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    origin_case_id: str
+    parent_fingerprint: str
+    decision_ref: str | None = None
+    managed_advance_refs: list[str] = Field(default_factory=list)
+    company_packet_ref: str | None = None
+    context_version: str | None = None
+    policy: dict[str, Any] = Field(default_factory=dict)
+    b7_authority_version: str | None = None
+    history: dict[str, StrictInt | None] = Field(default_factory=dict)
+    budget_vnd: StrictInt | None = None
+    company_packet: "B7CompanyPacket | None" = None
+    company_events: list[B7CompanyEvent] = Field(default_factory=list)
+    company_expenses: list[B7CompanyExpense] = Field(default_factory=list)
+    issues: list[Issue] = Field(default_factory=list)
+    money_as_of: AwareDatetime | None = None
+    knowledge_cutoff: AwareDatetime | None = None
+
+
+class B7ClaimComparison(BaseModel):
+    """Comparison of one declared claim against its matched actual expense."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    claim_id: str
+    expense_id: str | None = None
+    declared_amount_vnd: StrictInt | None = None
+    verified_amount_vnd: StrictInt | None = None
+    payer_declaration: B7DeclaredPayer | None = None
+    verified_payer: str | None = None
+    status: B7ClaimStatus
+    refs: list[str] = Field(default_factory=list)
+    reason: str = ""
+
+
 class CaseView(BaseModel):
     """Projection of a case for API/UI: versions, stage, sources, actions."""
 
@@ -440,6 +653,7 @@ class CaseView(BaseModel):
     money_summary: dict[str, Any] = Field(default_factory=dict)
     origin: CaseOrigin = "USER"
     b3_workflow: B3WorkflowView | None = None
+    linked_b7: LinkedB7View | None = None
     created_at: AwareDatetime
     updated_at: AwareDatetime
     idempotent_replay: bool = False
@@ -552,7 +766,7 @@ def fingerprint(operation: str, payload: dict[str, Any]) -> str:
 
 ReadState = Literal["READ", "NOT_FOUND", "UNCLEAR"]
 Usability = Literal["USABLE", "UNCERTAIN", "UNUSABLE"]
-RelationKind = Literal["EXPENSE_PAYMENT", "SAME_EVENT"]
+RelationKind = Literal["EXPENSE_PAYMENT", "SAME_EVENT", "CLAIM_EXPENSE"]
 RelationStatus = Literal["ESTABLISHED", "PROPOSED", "UNCLEAR"]
 RunStatus = Literal[
     "QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "TIMED_OUT",
@@ -799,6 +1013,7 @@ class Report(BaseModel):
     critical_facts: list[CriticalFact] = Field(default_factory=list)
     links: list[ReportLink] = Field(default_factory=list)
     b3: B3Proposal | None = None
+    claim_comparisons: list[B7ClaimComparison] = Field(default_factory=list)
     next_step: str = ""
     source_refs: list[str] = Field(default_factory=list)
 

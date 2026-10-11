@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import * as api from './api';
 import { B3ApprovalPanel } from './B3Approval';
 import { B3FundingPanel } from './B3Funding';
+import { B7IntakePanel } from './B7Intake';
+import { B7CompanyContextPanel } from './B7CompanyContext';
 import type { AuditEntry, CaseView, DemoRole, Report } from './types';
 
 function formatVnd(value: number | null): string {
@@ -142,6 +144,44 @@ export function ActionsPanel({
 
       {b3V1 && view.b3_workflow?.decision?.outcome === 'APPROVE' && (
         <B3FundingPanel
+          view={view}
+          role={role}
+          actorId={actorId}
+          onAction={onAction}
+        />
+      )}
+
+      {b3V1 && view.b3_workflow?.decision?.outcome === 'APPROVE'
+        && role === 'EMPLOYEE'
+        && actorId.trim() === view.submission.employee_ref && (
+        <div className="field" data-testid="b7-prepare-block">
+          <h3>Quyết toán</h3>
+          <p className="muted">
+            Mở hồ sơ quyết toán liên kết cho công việc này để khai chi phí thực tế.
+          </p>
+          <button className="btn btn-primary"
+                  onClick={() => void onAction('B7_PREPARE',
+                    () => api.prepareLinkedB7(view.id, {
+                      actor_id: actorId.trim(), demo_role: role,
+                      expected_case_version: view.case_version,
+                    }))}>
+            Chuẩn bị hồ sơ quyết toán
+          </button>
+        </div>
+      )}
+
+      {view.linked_b7 && (
+        <B7IntakePanel
+          view={view}
+          report={report ?? null}
+          role={role}
+          actorId={actorId}
+          onAction={onAction}
+        />
+      )}
+
+      {view.linked_b7 && (
+        <B7CompanyContextPanel
           view={view}
           role={role}
           actorId={actorId}

@@ -311,3 +311,20 @@ test('Task 5: checklist chính sách hiển thị tiêu đề gọn gàng, mã t
   expect(panel.textContent).not.toContain('destination_scope: PASS — Địa điểm công tác nằm trong phạm vi phê duyệt.');
 });
 
+
+test('hiển thị bảng đối chiếu claim↔expense khi có claim_comparisons', () => {
+  const report = makeReport({
+    claim_comparisons: [{
+      claim_id: 'CL-hotel', expense_id: 'EXP-hotel',
+      declared_amount_vnd: 3_000_000, verified_amount_vnd: 2_500_000,
+      payer_declaration: 'PERSONAL', verified_payer: 'COMPANY',
+      status: 'CONFLICT', refs: ['company:INV-H'],
+      reason: 'Số khai khác chi phí thực tế.',
+    }],
+  });
+  render(<ReportPanel report={report} />);
+  const table = screen.getByTestId('claim-comparisons');
+  expect(table).toHaveTextContent('CL-hotel');
+  expect(table).toHaveTextContent('CONFLICT');
+  expect(table).toHaveTextContent('2.500.000');
+});

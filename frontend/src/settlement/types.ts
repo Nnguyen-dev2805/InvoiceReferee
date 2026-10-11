@@ -71,6 +71,7 @@ export interface CaseView {
   allowed_actions: AllowedAction[];
   money_summary: MoneySummary;
   b3_workflow?: B3WorkflowView | null;
+  linked_b7?: LinkedB7View | null;
   created_at: string;
   updated_at: string;
 }
@@ -208,6 +209,7 @@ export interface Report {
   critical_facts: CriticalFact[];
   links: ReportLink[];
   b3: B3Proposal | null;
+  claim_comparisons?: B7ClaimComparison[];
   next_step: string;
   source_refs: string[];
 }
@@ -498,6 +500,56 @@ export interface B3AdvanceEventPayload {
   evidence: B3MoneyFieldEvidence[];
   allocation_note: string;
   supersedes_event_id: string | null;
+}
+
+// --- B6→B7 linked settlement (b7-linked-intake-v1) ---------------------------
+
+export type B7DeclaredPayer = 'PERSONAL' | 'COMPANY' | 'UNKNOWN';
+export type B7ClaimStatus = 'MATCHED' | 'CONFLICT' | 'UNRESOLVED';
+
+export interface B7OriginLink {
+  origin_case_id: string;
+  employee_ref: string;
+  work_ref: string;
+  created_at: string;
+}
+
+export interface B7ClaimRow {
+  claim_id: string;
+  description: string;
+  expense_date: string | null;
+  declared_amount_vnd: number | null;
+  purpose: string;
+  declared_payer: B7DeclaredPayer;
+  source_ids: string[];
+  payment_statement: string | null;
+}
+
+export interface B7LinkedIntake {
+  schema_version: 'b7-linked-intake-v1';
+  confirmed: boolean;
+  expense_rows: B7ClaimRow[];
+  note: string | null;
+}
+
+export interface LinkedB7View {
+  origin: B7OriginLink;
+  context_source_id: string | null;
+  context_current: boolean;
+  blocked_reasons: string[];
+  managed_advance_subtotal_vnd: number | null;
+}
+
+export interface B7ClaimComparison {
+  claim_id: string;
+  expense_id: string | null;
+  declared_amount_vnd: number | null;
+  verified_amount_vnd: number | null;
+  payer_declaration: B7DeclaredPayer | null;
+  verified_payer: string | null;
+  status: B7ClaimStatus;
+  refs: string[];
+  reason: string;
 }
 
 export type CriticalFactState =
