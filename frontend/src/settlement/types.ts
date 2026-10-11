@@ -12,6 +12,8 @@ export type CaseStage =
   | 'AWAITING_WORK_SETTLEMENT'
   | 'RESOLVING_OBLIGATIONS'
   | 'ADVANCE_REQUEST_REFUSED'
+  | 'SETTLEMENT_REQUEST_REFUSED'
+  | 'READY_TO_CLOSE'
   | 'REJECTED_REQUEST_ENDED'
   | 'SETTLEMENT_CLOSED';
 
@@ -72,6 +74,7 @@ export interface CaseView {
   money_summary: MoneySummary;
   b3_workflow?: B3WorkflowView | null;
   linked_b7?: LinkedB7View | null;
+  b7_workflow?: B7WorkflowView | null;
   created_at: string;
   updated_at: string;
 }
@@ -158,6 +161,14 @@ export interface ComponentSlot {
 export interface ReportComponents {
   t: ComponentSlot; b: ComponentSlot; e: ComponentSlot; a: ComponentSlot;
   ra: ComponentSlot; p: ComponentSlot; rp: ComponentSlot;
+}
+
+export interface MoneyComponents {
+  e: number | null;
+  a: number | null;
+  ra: number | null;
+  p: number | null;
+  rp: number | null;
 }
 
 export interface ExpenseRow {
@@ -549,6 +560,264 @@ export interface B7ClaimComparison {
   verified_payer: string | null;
   status: B7ClaimStatus;
   refs: string[];
+  reason: string;
+}
+
+// --- B8: settlement decision (b7-linked-intake-v1) ---------------------------
+
+export type B7WorkflowStatus =
+  | 'NOT_PRESENTED' | 'PENDING' | 'RETURNED' | 'REFUSED' | 'APPROVED'
+  | 'NEEDS_RECHECK';
+
+export type B7DecisionOutcome = 'APPROVE' | 'RETURN' | 'REFUSE';
+
+export type B7DecisionDirection =
+  | 'PAY_EMPLOYEE' | 'COLLECT_FROM_EMPLOYEE' | 'BALANCED';
+
+export interface B7DecisionTarget {
+  employee_cost_vnd: number;
+  total_work_cost_vnd: number;
+  budget_vnd: number;
+  signed_net_vnd: number;
+  direction: B7DecisionDirection;
+  amount_vnd: number;
+}
+
+export interface B7PresentationView {
+  id: string;
+  case_id: string;
+  employee_ref: string;
+  work_ref: string;
+  basis_report_id: string;
+  basis_review_id: string;
+  accountant_ref: string;
+  approver_ref: string;
+  basis_input_revision: number;
+  control_epoch: number;
+  business_signature: string;
+  parent_fingerprint: string;
+  config_signature: string;
+  target: B7DecisionTarget;
+  created_at: string;
+  idempotent_replay: boolean;
+}
+
+export interface B7DecisionView {
+  id: string;
+  case_id: string;
+  kind: 'B7_SETTLEMENT';
+  outcome: B7DecisionOutcome;
+  reason: string;
+  presentation_id: string;
+  basis_report_id: string;
+  basis_review_id: string;
+  employee_ref: string;
+  work_ref: string;
+  actor_id: string;
+  effective_at: string;
+  created_at: string;
+  basis_input_revision: number;
+  control_epoch: number;
+  business_signature: string;
+  parent_fingerprint: string;
+  config_signature: string;
+  authority_signature: string;
+  target: B7DecisionTarget | null;
+  history_baseline: MoneyComponents | null;
+  supersedes_decision_id: string | null;
+  idempotent_replay: boolean;
+}
+
+export interface B7WorkflowView {
+  status: B7WorkflowStatus;
+  presentation: B7PresentationView | null;
+  decision: B7DecisionView | null;
+  basis_current: boolean;
+  blocked_reasons: string[];
+  accountant_ref: string | null;
+  approver_ref: string | null;
+  fulfillment?: B7FulfillmentSummary | null;
+  revalidation?: B7RevalidationView | null;
+  current_handoff?: B7HandoffView | null;
+  closure?: B7ClosureView | null;
+}
+
+// --- B9: settlement fulfillment & closure (b7-linked-intake-v1) ---------------
+
+export type B7MoneyFieldName =
+  | 'amount_vnd' | 'currency' | 'payer_ref' | 'payee_ref' | 'event_at'
+  | 'receiver_outcome' | 'event_namespace' | 'event_ref' | 'method'
+  | 'purpose' | 'work_ref';
+
+export type B7ReportedStatus =
+  | 'RECEIVED' | 'PENDING' | 'FAILED' | 'CANCELLED' | 'UNCONFIRMED';
+
+export type B7MoneyPurpose =
+  | 'REIMBURSEMENT_RECEIVED' | 'ADVANCE_RETURN' | 'REIMBURSEMENT_RETURN'
+  | 'UNKNOWN';
+
+export type B7MoneyClassification =
+  | 'CONFIRMED_RECEIPT' | 'PENDING' | 'FAILED' | 'CANCELLED' | 'UNCONFIRMED'
+  | 'INCIDENT';
+
+export type B7MoneyIncidentKind =
+  | 'WRONG_RECIPIENT' | 'WRONG_PAYER' | 'OVERPAY' | 'CONFLICTING_EVENT'
+  | 'UNALLOCATED' | 'REVERSAL' | 'AFTER_CUTOFF' | 'SOURCE_UNRESOLVED';
+
+export interface B7MoneyFieldEvidence {
+  field: B7MoneyFieldName;
+  source_id: string;
+  locator: string;
+  raw: string | null;
+  value: number | string | null;
+  read_state: 'READ' | 'UNCERTAIN' | 'MISSING';
+  origin: 'HUMAN_SOURCE_REVIEW';
+}
+
+export interface B7MoneyIncident {
+  code: B7MoneyIncidentKind;
+  event_ids: string[];
+  excess_vnd: number | null;
+  refs: string[];
+  reason: string;
+}
+
+export interface B7MoneyEventView {
+  id: string;
+  case_id: string;
+  kind: 'B7_SETTLEMENT_EVENT';
+  decision_id: string | null;
+  event_namespace: string | null;
+  event_ref: string | null;
+  method: 'BANK_TRANSFER' | 'CASH';
+  gross_vnd: number | null;
+  payer_ref: string | null;
+  payee_ref: string | null;
+  event_at: string | null;
+  reported_status: B7ReportedStatus;
+  purpose: B7MoneyPurpose;
+  evidence: B7MoneyFieldEvidence[];
+  allocation_note: string;
+  supersedes_event_id: string | null;
+  employee_ref: string;
+  work_ref: string;
+  actor_id: string;
+  created_at: string;
+  known_at: string | null;
+  classification: B7MoneyClassification;
+  after_cutoff: boolean;
+  incidents: B7MoneyIncident[];
+  idempotent_replay: boolean;
+}
+
+export interface B7FulfillmentSummary {
+  decision_id: string;
+  direction: B7DecisionDirection;
+  approved_vnd: number;
+  recorded_received_vnd: number | null;
+  fulfilled_vnd: number | null;
+  remaining_vnd: number | null;
+  known_remaining_vnd: number | null;
+  pending_count: number;
+  unknown_count: number;
+  incidents: B7MoneyIncident[];
+  status: 'WAITING' | 'PARTIAL' | 'FULFILLED' | 'BLOCKED' | 'BALANCED';
+  managed_scope: string;
+  as_of: string;
+  knowledge_cutoff: string;
+}
+
+export interface B7RevalidationView {
+  original_decision_id: string;
+  current_report_id: string;
+  status: 'VALID' | 'NEEDS_RECHECK';
+  cost_signature: string;
+  receipt_history_signature: string;
+  qualifying_event_ids: string[];
+  blocked_reasons: string[];
+  refs: string[];
+  created_at: string;
+}
+
+export interface B7HandoffView {
+  id: string;
+  case_id: string;
+  decision_id: string;
+  report_id: string;
+  employee_ref: string;
+  work_ref: string;
+  actor_id: string;
+  direction: string;
+  remaining_vnd: number;
+  obligation_signature: string;
+  business_signature: string;
+  receipt_history_signature: string;
+  refs: string[];
+  created_at: string;
+  valid_until: string | null;
+  idempotent_replay: boolean;
+}
+
+export interface B7ClosureView {
+  id: string;
+  case_id: string;
+  decision_id: string;
+  current_report_id: string;
+  actor_id: string;
+  kind: 'SETTLEMENT_COMPLETE';
+  employee_ref: string;
+  work_ref: string;
+  close_as_of: string;
+  knowledge_cutoff: string;
+  created_at: string;
+  input_revision: number;
+  control_epoch: number;
+  business_signature: string;
+  receipt_history_signature: string;
+  parent_fingerprint: string;
+  source_refs: string[];
+  event_ids: string[];
+  original_decision_id: string;
+  revalidation_ref: string | null;
+  reason: string;
+  idempotent_replay: boolean;
+}
+
+export interface B7MoneyEventPayload {
+  actor_id: string;
+  demo_role: DemoRole;
+  expected_case_version: number;
+  decision_id: string | null;
+  event_namespace: string | null;
+  event_ref: string | null;
+  method: 'BANK_TRANSFER' | 'CASH';
+  gross_vnd: number | null;
+  payer_ref: string | null;
+  payee_ref: string | null;
+  event_at: string | null;
+  reported_status: B7ReportedStatus;
+  purpose: B7MoneyPurpose;
+  evidence: B7MoneyFieldEvidence[];
+  allocation_note: string;
+  supersedes_event_id: string | null;
+}
+
+export interface B7PresentPayload {
+  actor_id: string;
+  demo_role: DemoRole;
+  expected_case_version: number;
+  basis_report_id: string;
+  review_id?: string | null;
+  review?: { report_id: string; note: string; refs: string[] } | null;
+  supersedes_decision_id?: string | null;
+}
+
+export interface B7DecisionPayload {
+  actor_id: string;
+  demo_role: DemoRole;
+  expected_case_version: number;
+  presentation_id: string;
+  outcome: B7DecisionOutcome;
   reason: string;
 }
 

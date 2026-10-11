@@ -315,5 +315,60 @@ thực tế (MATCHED/CONFLICT/UNRESOLVED; mismatch không dùng forecast). Guard
 `LINKED_B7_REPORT_ONLY` chặn generic decision/money/handoff/closure (review vẫn
 được); `linked_b7_dependency_fingerprint` cho publish/review stale; parent Stop →
 child context `context_current=False`; `delete_case` parent có child →
-`LINKED_CASE_EXISTS`. **Chưa** có B8/B9, handoff/closure, tạo B7 tự động hoặc
-import bảng kê.
+`LINKED_CASE_EXISTS`.
+
+**B8 duyệt quyết toán** (plan
+[2026-10-11-b8-settlement-decision](../superpowers/plans/2026-10-11-b8-settlement-decision.md))
+thêm hai endpoint chuyên biệt cho hồ sơ `b7-linked-intake-v1`, **không** mở generic
+W05: `POST /api/cases/{id}/settlement-presentations` (kế toán trình: `B7PresentPayload`
+basis_report_id + đúng một review_id/review; lưu audit `B7_PRESENT` + presentation;
+stage `AWAITING_DECISION`) và `POST /api/cases/{id}/settlement-decisions`
+(`B7DecisionPayload` presentation_id/outcome APPROVE|RETURN|REFUSE/reason; audit
+`B7_DECIDE`; decisions JSON kind `B7_SETTLEMENT`). `CaseView.b7_workflow`
+(`B7WorkflowView`) là projection derive từ records/basis. Target quyết toán
+(`B7DecisionTarget` E/T/B/signed_net/direction/amount) do **Python** dựng
+(`b7_workflow.settlement_target`) chỉ khi current COMPLETE report, không material
+issue, claim không CONFLICT/UNRESOLVED, đủ required routine checks và component
+KNOWN/int; `amount=abs(net)`, direction theo dấu (BALANCED=0). Quyền:
+`authorize_b7_decision` dùng **một** B7 grant scoped (B7CompanyConfig riêng, không
+kế thừa B3Grant/P-DEMO) cover cả E và abs(S) tại `effective_b7_time`; RETURN/REFUSE
+chỉ cần grant scoped hiệu lực. Stage: APPROVE nonzero → `AWAITING_MONEY`; BALANCED
+→ `READY_TO_CLOSE`; RETURN → `CHECKING`; REFUSE → `SETTLEMENT_REQUEST_REFUSED`
+(không đóng). Presentation/decision bind business/parent/config/authority
+signatures; đổi context/version/Stop → `BASIS_STALE`/`B7_WORKFLOW_BLOCKED`;
+same-key replay trước version; `B7_ALREADY_DECIDED` cho presentation đã quyết.
+Generic money/handoff/closure vẫn `LINKED_B7_REPORT_ONLY`; `B7_SETTLEMENT` không
+vào B7 `_money_summary`. **Chưa** có B9 chi/thu, handoff/closure, override ngoại lệ
+hoặc tạo B7 tự động.
+
+**B9 chi/thu và đóng quyết toán** (plan
+[2026-10-11-b9-settlement-fulfillment](../superpowers/plans/2026-10-11-b9-settlement-fulfillment.md),
+IMPLEMENTED fake/replay; chưa nghiệm thu UI/LIVE) tiếp tục hai lớp tiền tách biệt:
+whole-work S từ canonical history (có coverage/refs/as-of) và **decision
+fulfillment** (`B7FulfillmentSummary` approved/recorded/fulfilled/remaining, do
+`b7_fulfillment.project_b7_fulfillment` tính). Kế toán ghi sự kiện tiền thực tế
+(`B7MoneyEventPayload`, kind `B7_SETTLEMENT_EVENT` trong `money_events`, employee/
+work/classification do server suy từ `classify_b7_money`) cùng chứng từ
+`B7_SETTLEMENT_PROOF` (audit-backed, bump case_version không input_revision). Số
+thực nhận **không clip**: overpay giữ gross + incident `OVERPAY`; wrong
+recipient/payer, purpose UNKNOWN, source unresolved giữ raw + incident; pending/
+unknown → remaining null; một economic identity (namespace:ref) không đếm hai lần;
+pending→final supersede đúng thứ tự; receipt→return là event mới. Bốn endpoint
+chuyên biệt: `POST .../settlement-money-proofs` (multipart),
+`.../settlement-money-events` (typed), `.../settlement-money-context/refresh`
+(server clock, fold canonical B9 events vào packet events theo identity — không
+auto mở rộng external coverage), `.../settlement-revalidations`
+(`revalidate_b7_decision`: E/T/B không đổi và history delta = đúng qualifying
+receipts → `VALID`, giữ decision gốc, không tạo approval mới). Handoff
+(`B7HandoffView`, audit `B7_HANDOFF`) chỉ là tham chiếu phần remaining>0, đúng
+direction, không BALANCED, không entity payment-request. Closure
+(`B7ClosureView`, audit `B7_CLOSE`) chỉ khi mọi gate trong một transaction:
+decision APPROVE hiện hành, revalidation `VALID`, fulfillment FULFILLED/BALANCED
+không remaining/pending/unknown/incident, report hiện hành COMPLETE S=0, scope/
+coverage hiện hành, không Stop parent/child, không câu hỏi mở; `S0`/refusal một
+mình không đủ. Sau đóng, `POST .../settlement-adjustments` mở child B7 mới cùng
+employee/work/B3 với `B7OriginLink.adjustment_of_case_id`; closure cũ bất biến,
+một active settlement trong scope. `B7OriginLink` thêm `adjustment_of_case_id`
+(nullable, server-owned). `B7WorkflowView` thêm `fulfillment/revalidation/
+current_handoff/closure`. Generic money/handoff/closure **vẫn**
+`LINKED_B7_REPORT_ONLY`; `B7_SETTLEMENT_EVENT` không vào B7 `_money_summary`.

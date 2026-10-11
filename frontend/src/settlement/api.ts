@@ -11,7 +11,16 @@ import type {
   B3PresentPayload,
   B3PresentationView,
   B3RunContext,
+  B7DecisionPayload,
+  B7DecisionView,
+  B7HandoffView,
   B7LinkedIntake,
+  B7MoneyEventPayload,
+  B7MoneyEventView,
+  B7PresentPayload,
+  B7PresentationView,
+  B7RevalidationView,
+  B7ClosureView,
   CaseSummary,
   CaseView,
   ClosurePayload,
@@ -342,6 +351,102 @@ export function refreshLinkedB7Context(
 ): Promise<CaseView> {
   return postCommand<CaseView>(
     `/api/cases/${encodeURIComponent(childCaseId)}/settlement-context/refresh`,
+    payload);
+}
+
+export function presentB7(
+  childCaseId: string,
+  payload: B7PresentPayload,
+): Promise<B7PresentationView> {
+  return postCommand<B7PresentationView>(
+    `/api/cases/${encodeURIComponent(childCaseId)}/settlement-presentations`,
+    payload);
+}
+
+export function decideB7(
+  childCaseId: string,
+  payload: B7DecisionPayload,
+): Promise<B7DecisionView> {
+  return postCommand<B7DecisionView>(
+    `/api/cases/${encodeURIComponent(childCaseId)}/settlement-decisions`,
+    payload);
+}
+
+// --- B9: settlement fulfillment & closure -------------------------------------
+
+export function uploadB7Proof(
+  caseId: string,
+  file: File,
+  expectedCaseVersion: number,
+  actorId: string,
+  demoRole: string,
+  note: string,
+): Promise<SourceView> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('actor_id', actorId);
+  form.append('demo_role', demoRole);
+  form.append('expected_case_version', String(expectedCaseVersion));
+  if (note) form.append('note', note);
+  return request<SourceView>(
+    `/api/cases/${encodeURIComponent(caseId)}/settlement-money-proofs`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': crypto.randomUUID() },
+      body: form,
+    });
+}
+
+export function recordB7Money(
+  caseId: string,
+  payload: B7MoneyEventPayload,
+): Promise<B7MoneyEventView> {
+  return postCommand<B7MoneyEventView>(
+    `/api/cases/${encodeURIComponent(caseId)}/settlement-money-events`, payload);
+}
+
+export function refreshB7MoneyContext(
+  caseId: string,
+  payload: { actor_id: string; demo_role: DemoRole; expected_case_version: number },
+): Promise<CaseView> {
+  return postCommand<CaseView>(
+    `/api/cases/${encodeURIComponent(caseId)}/settlement-money-context/refresh`,
+    payload);
+}
+
+export function revalidateB7(
+  caseId: string,
+  payload: { actor_id: string; demo_role: DemoRole; expected_case_version: number },
+): Promise<B7RevalidationView> {
+  return postCommand<B7RevalidationView>(
+    `/api/cases/${encodeURIComponent(caseId)}/settlement-revalidations`, payload);
+}
+
+export function handoffB7(
+  caseId: string,
+  payload: { actor_id: string; demo_role: DemoRole;
+             expected_case_version: number; decision_id: string; reason: string },
+): Promise<B7HandoffView> {
+  return postCommand<B7HandoffView>(
+    `/api/cases/${encodeURIComponent(caseId)}/settlement-handoffs`, payload);
+}
+
+export function closeB7(
+  caseId: string,
+  payload: { actor_id: string; demo_role: DemoRole;
+             expected_case_version: number; decision_id: string;
+             current_report_id: string; reason: string },
+): Promise<B7ClosureView> {
+  return postCommand<B7ClosureView>(
+    `/api/cases/${encodeURIComponent(caseId)}/settlement-closures`, payload);
+}
+
+export function prepareB7Adjustment(
+  closedCaseId: string,
+  payload: { actor_id: string; demo_role: DemoRole;
+             expected_case_version: number; reason: string },
+): Promise<CaseView> {
+  return postCommand<CaseView>(
+    `/api/cases/${encodeURIComponent(closedCaseId)}/settlement-adjustments`,
     payload);
 }
 

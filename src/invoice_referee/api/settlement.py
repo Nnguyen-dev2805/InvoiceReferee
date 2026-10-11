@@ -28,6 +28,12 @@ from invoice_referee.settlement.models import (
     B3AdvanceEventView,
     B3DecisionView,
     B3PresentationView,
+    B7ClosureView,
+    B7DecisionView,
+    B7HandoffView,
+    B7MoneyEventView,
+    B7PresentationView,
+    B7RevalidationView,
     CaseSummary,
     CaseView,
     ClosureView,
@@ -94,6 +100,10 @@ _STATUS_BY_CODE = {
     "LINKED_B7_REPORT_ONLY": 409,
     "LINKED_CASE_EXISTS": 409,
     "ORIGIN_STOP_ACTIVE": 409,
+    "B7_WORKFLOW_BLOCKED": 409,
+    "B7_ALREADY_DECIDED": 409,
+    "B7_CLOSURE_BLOCKED": 409,
+    "B7_CLOSED_ADJUSTMENT_REQUIRED": 409,
     "FILE_TOO_LARGE": 413,
     "SOURCE_LIMIT_REACHED": 413,
     "UNSUPPORTED_FORMAT": 415,
@@ -326,6 +336,114 @@ class LinkedContextRefreshRequest(BaseModel):
     actor_id: str
     demo_role: DemoRole
     expected_case_version: StrictInt
+
+
+class B7PresentRequest(BaseModel):
+    """Accountant presents the linked settlement (envelope + payload)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    basis_report_id: str
+    review_id: str | None = None
+    review: dict[str, Any] | None = None
+    supersedes_decision_id: str | None = None
+
+
+class B7DecisionRequest(BaseModel):
+    """Approver settlement outcome (envelope + payload); no client amount."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    presentation_id: str
+    outcome: Literal["APPROVE", "RETURN", "REFUSE"]
+    reason: str
+
+
+class B7MoneyEventRequest(BaseModel):
+    """Accountant settlement money event (envelope + typed payload)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    decision_id: str | None = None
+    event_namespace: str | None = None
+    event_ref: str | None = None
+    method: Literal["BANK_TRANSFER", "CASH"]
+    gross_vnd: StrictInt | None = None
+    payer_ref: str | None = None
+    payee_ref: str | None = None
+    event_at: str | None = None
+    reported_status: Literal["RECEIVED", "PENDING", "FAILED", "CANCELLED",
+                             "UNCONFIRMED"]
+    purpose: Literal["REIMBURSEMENT_RECEIVED", "ADVANCE_RETURN",
+                     "REIMBURSEMENT_RETURN", "UNKNOWN"]
+    evidence: list[dict[str, Any]] = []
+    allocation_note: str
+    supersedes_event_id: str | None = None
+
+
+class B7MoneyContextRefreshRequest(BaseModel):
+    """Advance the money as-of cutoff and rebuild the linked context."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+
+
+class B7RevalidateRequest(BaseModel):
+    """Revalidate a decision against a correct fulfillment."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+
+
+class B7HandoffRequest(BaseModel):
+    """Create a stage-A handoff for the remaining obligation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    decision_id: str
+    reason: str
+
+
+class B7ClosureRequest(BaseModel):
+    """Close a linked settlement; gates are checked before acceptance."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    decision_id: str
+    current_report_id: str
+    reason: str
+
+
+class B7AdjustmentRequest(BaseModel):
+    """Open a post-closure adjustment child for a closed settlement."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    reason: str
 
 
 DEFAULT_EVAL_CORPUS = Path("docs/discovery/eval_development")
@@ -637,6 +755,172 @@ def create_runtime_app(*, db_path: Path | None = None,
             return JSONResponse(status_code=200,
                                 content=view.model_dump(mode="json"))
         return view
+
+    @app.post("/api/cases/{case_id}/settlement-presentations",
+              response_model=B7PresentationView, status_code=201)
+    async def present_b7(
+        case_id: str,
+        request: B7PresentRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | B7PresentationView:
+        payload: dict[str, Any] = {"basis_report_id": request.basis_report_id}
+        if request.review_id is not None:
+            payload["review_id"] = request.review_id
+        if request.review is not None:
+            payload["review"] = request.review
+        if request.supersedes_decision_id is not None:
+            payload["supersedes_decision_id"] = request.supersedes_decision_id
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        presentation = service.present_b7(case_id, payload, command)
+        if presentation.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=presentation.model_dump(mode="json"))
+        return presentation
+
+    @app.post("/api/cases/{case_id}/settlement-decisions",
+              response_model=B7DecisionView, status_code=201)
+    async def decide_b7(
+        case_id: str,
+        request: B7DecisionRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | B7DecisionView:
+        payload = {
+            "presentation_id": request.presentation_id,
+            "outcome": request.outcome, "reason": request.reason,
+        }
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        decision = service.decide_b7(case_id, payload, command)
+        if decision.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=decision.model_dump(mode="json"))
+        return decision
+
+    @app.post("/api/cases/{case_id}/settlement-money-proofs",
+              response_model=None, status_code=201)
+    async def add_b7_settlement_proof(
+        case_id: str,
+        file: UploadFile = File(...),
+        actor_id: str = Form(...),
+        demo_role: str = Form(...),
+        expected_case_version: int = Form(...),
+        note: str = Form(""),
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | SourceView:
+        content = await file.read()
+        upload = Upload(filename=file.filename or "settlement-proof",
+                        content=content,
+                        provenance={"note": note} if note else {})
+        command = _command(idempotency_key, actor_id, demo_role,
+                           expected_case_version, {})
+        record = service.add_b7_settlement_proof(case_id, upload, command)
+        if record.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=_source_view(record).model_dump(mode="json"))
+        return _source_view(record)
+
+    @app.post("/api/cases/{case_id}/settlement-money-events",
+              response_model=B7MoneyEventView, status_code=201)
+    async def record_b7_money(
+        case_id: str,
+        request: B7MoneyEventRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | B7MoneyEventView:
+        payload = {
+            "decision_id": request.decision_id,
+            "event_namespace": request.event_namespace,
+            "event_ref": request.event_ref, "method": request.method,
+            "gross_vnd": request.gross_vnd, "payer_ref": request.payer_ref,
+            "payee_ref": request.payee_ref, "event_at": request.event_at,
+            "reported_status": request.reported_status, "purpose": request.purpose,
+            "evidence": request.evidence,
+            "allocation_note": request.allocation_note,
+            "supersedes_event_id": request.supersedes_event_id,
+        }
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        event = service.record_b7_settlement_money(case_id, payload, command)
+        if event.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=event.model_dump(mode="json"))
+        return event
+
+    @app.post("/api/cases/{case_id}/settlement-money-context/refresh",
+              response_model=CaseView, status_code=200)
+    async def refresh_b7_money_context(
+        case_id: str,
+        request: B7MoneyContextRefreshRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | CaseView:
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        view = service.refresh_b7_money_context(case_id, command)
+        if view.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=view.model_dump(mode="json"))
+        return view
+
+    @app.post("/api/cases/{case_id}/settlement-revalidations",
+              response_model=B7RevalidationView, status_code=201)
+    async def revalidate_b7(
+        case_id: str,
+        request: B7RevalidateRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> B7RevalidationView:
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        return service.revalidate_b7(case_id, command)
+
+    @app.post("/api/cases/{case_id}/settlement-handoffs",
+              response_model=B7HandoffView, status_code=201)
+    async def handoff_b7(
+        case_id: str,
+        request: B7HandoffRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | B7HandoffView:
+        payload = {"decision_id": request.decision_id, "reason": request.reason}
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        handoff = service.handoff_b7(case_id, payload, command)
+        if handoff.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=handoff.model_dump(mode="json"))
+        return handoff
+
+    @app.post("/api/cases/{case_id}/settlement-closures",
+              response_model=B7ClosureView, status_code=201)
+    async def close_b7(
+        case_id: str,
+        request: B7ClosureRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | B7ClosureView:
+        payload = {"decision_id": request.decision_id,
+                   "current_report_id": request.current_report_id,
+                   "reason": request.reason}
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        closure = service.close_b7(case_id, payload, command)
+        if closure.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=closure.model_dump(mode="json"))
+        return closure
+
+    @app.post("/api/cases/{case_id}/settlement-adjustments",
+              response_model=CaseView, status_code=201)
+    async def prepare_b7_adjustment(
+        case_id: str,
+        request: B7AdjustmentRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | CaseView:
+        payload = {"reason": request.reason}
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        child = service.prepare_b7_adjustment(case_id, payload, command)
+        if child.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=child.model_dump(mode="json"))
+        return child
 
     @app.get("/api/cases/{case_id}", response_model=CaseView)
     async def get_case(case_id: str) -> CaseView:

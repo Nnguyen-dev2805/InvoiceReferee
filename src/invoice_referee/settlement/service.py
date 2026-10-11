@@ -27,8 +27,20 @@ from invoice_referee.settlement.models import (
     B3DecisionView,
     B3PresentPayload,
     B3PresentationView,
+    B7AdjustmentPayload,
+    B7ClosurePayload,
+    B7ClosureView,
     B7CompanyConfig,
+    B7DecisionPayload,
+    B7DecisionView,
+    B7HandoffPayload,
+    B7HandoffView,
     B7LinkedIntake,
+    B7MoneyEventPayload,
+    B7MoneyEventView,
+    B7PresentPayload,
+    B7PresentationView,
+    B7RevalidationView,
     CaseView,
     ClosurePayload,
     ClosureView,
@@ -324,6 +336,135 @@ class Service:
         return self.store.record_b7_company_packet(
             case_id, payload, command, self.policy, authority_version)
 
+    def present_b7(self, case_id: str, payload: dict[str, Any],
+                   command: Command) -> B7PresentationView:
+        """Accountant presents the current linked settlement to the approver."""
+        present = self._parse_payload(B7PresentPayload, payload)
+        b7 = self.config.b7_context
+        return self.store.record_b7_presentation(
+            case_id, present, command, b7, self.config.b3_context, self.policy)
+
+    def decide_b7(self, case_id: str, payload: dict[str, Any],
+                  command: Command) -> B7DecisionView:
+        """Approver records APPROVE/RETURN/REFUSE on a current presentation."""
+        decision = self._parse_payload(B7DecisionPayload, payload)
+        b7 = self.config.b7_context
+        return self.store.record_b7_decision(
+            case_id, decision, command, b7, self.config.b3_context, self.policy)
+
+    # --- B9: settlement fulfillment & closure --------------------------------
+
+    def add_b7_settlement_proof(self, case_id: str, upload: Upload,
+                                command: Command) -> SourceRecord:
+        """Accountant attaches a receiver/cash proof source for a settlement.
+
+        Backend-owned source use (B7_SETTLEMENT_PROOF); bumps case_version but
+        not input_revision, so an approved decision does not go stale.
+        """
+        case = self.store.get_case(case_id)
+        if case.linked_b7 is None:
+            raise DomainError(
+                "LINKED_B7_INVALID",
+                "Chứng từ quyết toán chỉ áp dụng cho hồ sơ liên kết.",
+            )
+        self._require_accountant_route(case, command)
+        return self.store.add_b7_settlement_proof(case_id, upload, command)
+
+    def record_b7_settlement_money(self, case_id: str, payload: dict[str, Any],
+                                   command: Command) -> B7MoneyEventView:
+        """Accountant records an actual settlement money event from a source."""
+        case = self.store.get_case(case_id)
+        if case.linked_b7 is None:
+            raise DomainError(
+                "LINKED_B7_INVALID",
+                "Sự kiện tiền quyết toán chỉ áp dụng cho hồ sơ liên kết.",
+            )
+        self._require_accountant_route(case, command)
+        event = self._parse_payload(B7MoneyEventPayload, payload)
+        b7 = self.config.b7_context
+        return self.store.record_b7_money(
+            case_id, event, command, b7, self.config.b3_context, self.policy)
+
+    def refresh_b7_money_context(self, case_id: str,
+                                 command: Command) -> CaseView:
+        """Accountant advances the money as-of cutoff and rebuilds the context."""
+        case = self.store.get_case(case_id)
+        if case.linked_b7 is None:
+            raise DomainError(
+                "LINKED_B7_INVALID",
+                "Cập nhật đối chiếu tiền chỉ áp dụng cho hồ sơ liên kết.",
+            )
+        self._require_accountant_route(case, command)
+        b7 = self.config.b7_context
+        authority_version = (b7.version
+                             if b7 is not None and b7.activated else None)
+        return self.store.refresh_b7_money_context(
+            case_id, command, b7, self.policy, authority_version)
+
+    def revalidate_b7(self, case_id: str, command: Command) -> B7RevalidationView:
+        """Accountant revalidates that correct fulfillment keeps the decision."""
+        case = self.store.get_case(case_id)
+        if case.linked_b7 is None:
+            raise DomainError(
+                "LINKED_B7_INVALID",
+                "Revalidate chỉ áp dụng cho hồ sơ quyết toán liên kết.",
+            )
+        self._require_accountant_route(case, command)
+        return self.store.revalidate_b7(case_id, command, self.policy)
+
+    def handoff_b7(self, case_id: str, payload: dict[str, Any],
+                   command: Command) -> B7HandoffView:
+        """Accountant creates the stage-A handoff for the remaining obligation."""
+        case = self.store.get_case(case_id)
+        if case.linked_b7 is None:
+            raise DomainError(
+                "LINKED_B7_INVALID", "Handoff chỉ áp dụng cho hồ sơ liên kết.")
+        self._require_accountant_route(case, command)
+        handoff = self._parse_payload(B7HandoffPayload, payload)
+        b7 = self.config.b7_context
+        return self.store.handoff_b7(
+            case_id, handoff, command, b7, self.config.b3_context, self.policy)
+
+    def close_b7(self, case_id: str, payload: dict[str, Any],
+                 command: Command) -> B7ClosureView:
+        """Accountant closes the linked settlement when every gate holds."""
+        case = self.store.get_case(case_id)
+        if case.linked_b7 is None:
+            raise DomainError(
+                "LINKED_B7_INVALID",
+                "Đóng chỉ áp dụng cho hồ sơ quyết toán liên kết.")
+        self._require_accountant_route(case, command)
+        closure = self._parse_payload(B7ClosurePayload, payload)
+        return self.store.close_b7(
+            case_id, closure, command, self.config.b3_context, self.policy)
+
+    def _require_accountant_route(self, case: CaseView,
+                                  command: Command) -> None:
+        """Only the assigned accountant may record fulfillment/close/handoff."""
+        context = self.config.b3_context
+        route = (b3_route_for(context, case.submission.employee_ref)
+                 if context is not None else None)
+        if (command.demo_role != "ACCOUNTANT" or route is None
+                or route.accountant_ref != command.actor_id):
+            raise DomainError(
+                "BEYOND_AUTHORITY",
+                f"Vai {command.demo_role}/{command.actor_id} không phải kế toán "
+                f"được phân công cho {case.submission.employee_ref}.",
+            )
+
+    def prepare_b7_adjustment(self, closed_case_id: str, payload: dict[str, Any],
+                              command: Command) -> CaseView:
+        """Accountant opens a post-closure adjustment child for a closed case."""
+        case = self.store.get_case(closed_case_id)
+        if case.linked_b7 is None:
+            raise DomainError(
+                "LINKED_B7_INVALID",
+                "Điều chỉnh chỉ áp dụng cho hồ sơ quyết toán liên kết.")
+        self._require_accountant_route(case, command)
+        adjustment = self._parse_payload(B7AdjustmentPayload, payload)
+        return self.store.prepare_b7_adjustment(
+            closed_case_id, adjustment, command, self.config.b3_context)
+
     def refresh_linked_b7_context(self, case_id: str,
                                   command: Command) -> CaseView:
         case = self.store.get_case(case_id)
@@ -371,6 +512,20 @@ class Service:
             if b7 is not None and b7.activated and b7.synthetic \
                     and b7.demo_clock is not None:
                 config["simulation_clock"] = b7.demo_clock.isoformat()
+            # The linked-context snapshot is a Python-derived source, not a
+            # document: it must not be fed to the Reader (no spurious parse
+            # failure). Company facts come from linked_context_observations.
+            # Exclude ALL retained context sources (packet + money refresh),
+            # not just the latest, so an older snapshot is never re-parsed.
+            context_source_ids = set(
+                self.store._linked_context_source_ids_read(case_id))
+            if context_source_ids:
+                sources = [s for s in sources if s.id not in context_source_ids]
+            # B9 settlement-proof sources are fulfillment evidence, not proposal
+            # input: they never enter the Reader/basis (audit-backed source use).
+            proof_ids = self.store.b7_settlement_proof_source_ids(case_id)
+            if proof_ids:
+                sources = [s for s in sources if s.id not in proof_ids]
         else:
             linked_authority = list(self.config.authority)
         if b3_v1:
@@ -450,14 +605,18 @@ class Service:
                     self.reader.reset_trace()
                 checkpoint = self._checkpoint(run_id, run_input)
                 linked_snapshot = None
+                linked_context_source_id = None
                 if is_linked_b7(run_input.submission.form):
                     try:
                         linked_snapshot = self.store.get_linked_b7_context(
                             run_input.case_id)
+                        linked_context_source_id = \
+                            self.store.linked_context_source_id(run_input.case_id)
                     except DomainError:
                         linked_snapshot = None  # no context yet: report-only
                 report = process(run_input, self.reader, budget, checkpoint,
-                                 run_id=run_id, linked_snapshot=linked_snapshot)
+                                 run_id=run_id, linked_snapshot=linked_snapshot,
+                                 linked_context_source_id=linked_context_source_id)
                 published = self.store.publish(run_id, report)
                 if published.status == "SUCCEEDED":
                     self._sync_questions(run_id, report)

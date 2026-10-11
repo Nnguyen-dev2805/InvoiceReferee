@@ -25,6 +25,8 @@ const STAGE_LABELS: Record<CaseStage, string> = {
   AWAITING_WORK_SETTLEMENT: 'Chờ quyết toán công việc',
   RESOLVING_OBLIGATIONS: 'Đang xử lý nghĩa vụ',
   ADVANCE_REQUEST_REFUSED: 'Đề nghị tạm ứng bị từ chối',
+  SETTLEMENT_REQUEST_REFUSED: 'Đề nghị quyết toán bị từ chối',
+  READY_TO_CLOSE: 'Đã duyệt cân bằng — chờ kiểm tra đóng',
   REJECTED_REQUEST_ENDED: 'Yêu cầu bị từ chối đã kết thúc',
   SETTLEMENT_CLOSED: 'Hồ sơ đã đóng',
 };

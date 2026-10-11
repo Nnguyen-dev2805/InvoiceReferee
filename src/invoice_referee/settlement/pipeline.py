@@ -42,7 +42,7 @@ def _technical_issue(source_id: str | None, error: DomainError,
 
 def process(run_input: RunInput, reader: Reader, budget: RunBudget,
             checkpoint, run_id: str = "R-PIPELINE",
-            linked_snapshot=None) -> Report:
+            linked_snapshot=None, linked_context_source_id: str | None = None) -> Report:
     """Run one job over the snapshot; checkpoint guards Stop/revision/epoch.
 
     For a linked B7 child, ``linked_snapshot`` supplies Python-derived
@@ -80,7 +80,8 @@ def process(run_input: RunInput, reader: Reader, budget: RunBudget,
             linked_context_observations,
         )
         ctx_obs, ctx_rel, ctx_issues = linked_context_observations(
-            linked_snapshot, f"linkedctx:{linked_snapshot.origin_case_id}")
+            linked_snapshot, linked_context_source_id or
+            f"linkedctx:{linked_snapshot.origin_case_id}")
         observations = list(ctx_obs) + observations
         relations = list(ctx_rel) + relations
         technical = list(ctx_issues) + technical

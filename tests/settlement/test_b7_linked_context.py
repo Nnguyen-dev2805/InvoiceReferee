@@ -126,3 +126,76 @@ def test_context_refresh_identical_hash_reuses(approved_b3):
         command("ref", "ACC-DEMO-01", "ACCOUNTANT", before.case_version))
     # Identical packet: no new input_revision.
     assert after.input_revision == before.input_revision
+
+
+# --- Task 1.3 negative prerequisites (assert slot/history, not HTTP only) ----
+
+def _scoped_event(**over):
+    event = _event(**{k: v for k, v in over.items()
+                      if k in ("namespace", "ref", "kind", "amount", "outcome",
+                               "payee")})
+    event["employee_ref"] = over.get("employee_ref", "NV-DEMO-01")
+    return event
+
+
+def test_wrong_employee_coverage_keeps_history_unknown(approved_b3):
+    svc, parent, decision = approved_b3
+    child = _linked_child(svc, parent)
+    packet = _packet(events=[_scoped_event(amount=2_000_000)])
+    packet["coverage"]["employee_ref"] = "NV-KHAC-99"
+    svc.record_b7_company_packet(child.id, packet,
+        command("pkt", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
+    snap = svc.store.get_linked_b7_context(child.id)
+    assert snap.history["history.advance.received"] is None
+
+
+def test_missing_group_keeps_that_history_unknown(approved_b3):
+    svc, parent, decision = approved_b3
+    child = _linked_child(svc, parent)
+    # Coverage present but the ADVANCE_RETURN group is not claimed.
+    packet = _packet(events=[_scoped_event(amount=2_000_000)],
+                     groups=["ADVANCE", "REIMBURSEMENT_RECEIVED",
+                             "REIMBURSEMENT_RETURN", "COMPANY_DIRECT",
+                             "DUPLICATE_CLAIMS"])
+    svc.record_b7_company_packet(child.id, packet,
+        command("pkt", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
+    snap = svc.store.get_linked_b7_context(child.id)
+    assert snap.history["history.advance.received"] == 2_000_000
+    assert snap.history["history.advance.returned"] is None  # group missing
+
+
+def test_event_after_cutoff_not_counted(approved_b3):
+    svc, parent, decision = approved_b3
+    child = _linked_child(svc, parent)
+    event = _scoped_event(amount=2_000_000)
+    event["event_at"] = "2026-11-01T00:00:00+07:00"  # after settlement clock
+    packet = _packet(events=[event])
+    packet["coverage"]["to"] = "2026-10-14T09:00:00+07:00"
+    svc.record_b7_company_packet(child.id, packet,
+        command("pkt", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
+    snap = svc.store.get_linked_b7_context(child.id)
+    assert snap.history["history.advance.received"] == 0  # not counted
+
+
+def test_pending_event_not_counted_as_received(approved_b3):
+    svc, parent, decision = approved_b3
+    child = _linked_child(svc, parent)
+    packet = _packet(events=[_scoped_event(amount=2_000_000,
+                                           outcome="PENDING")])
+    svc.record_b7_company_packet(child.id, packet,
+        command("pkt", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
+    snap = svc.store.get_linked_b7_context(child.id)
+    # A pending advance is not a received advance.
+    assert snap.history["history.advance.received"] == 0
+
+
+def test_same_event_ref_not_double_counted(approved_b3):
+    svc, parent, decision = approved_b3
+    child = _linked_child(svc, parent)
+    # Two events with the SAME namespace+ref: the packet validator rejects.
+    with pytest.raises(DomainError) as exc:
+        svc.record_b7_company_packet(child.id,
+            _packet(events=[_scoped_event(amount=2_000_000),
+                            _scoped_event(amount=2_000_000)]),
+            command("pkt", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
+    assert exc.value.code == "INVALID_PAYLOAD"

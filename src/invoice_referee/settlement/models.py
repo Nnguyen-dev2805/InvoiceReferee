@@ -39,6 +39,8 @@ CaseStage = Literal[
     "AWAITING_WORK_SETTLEMENT",
     "RESOLVING_OBLIGATIONS",
     "ADVANCE_REQUEST_REFUSED",
+    "SETTLEMENT_REQUEST_REFUSED",
+    "READY_TO_CLOSE",
     "REJECTED_REQUEST_ENDED",
     "SETTLEMENT_CLOSED",
 ]
@@ -451,6 +453,8 @@ class B7OriginLink(BaseModel):
     employee_ref: str
     work_ref: str
     created_at: AwareDatetime
+    # B9: server-owned pointer to a closed settlement this child adjusts.
+    adjustment_of_case_id: str | None = None
 
 
 class B7ClaimRow(BaseModel):
@@ -530,6 +534,10 @@ class B7CompanyConfig(BaseModel):
     demo_clock: AwareDatetime | None = None
     grants: list[AuthorityGrant] = Field(default_factory=list)
     ref: str
+    # Backend-owned company identity for collection receipts. When None, an
+    # unknown payee is never normalized to "the company": a return can only be
+    # classified as company-received when this ref is configured and matches.
+    company_ref: str | None = None
 
     @model_validator(mode="after")
     def _clock_scope(self) -> "B7CompanyConfig":
@@ -551,8 +559,11 @@ class B7CompanyEvent(BaseModel):
     amount_vnd: StrictInt | None = None
     payer_ref: str | None = None
     payee_ref: str | None = None
+    employee_ref: str | None = None
+    work_ref: str | None = None
     outcome: B7CompanyEventOutcome
     event_at: AwareDatetime | None = None
+    known_at: AwareDatetime | None = None
     refs: list[str] = Field(default_factory=list)
 
 
@@ -634,6 +645,435 @@ class B7ClaimComparison(BaseModel):
     reason: str = ""
 
 
+# --- B8: settlement decision (b7-linked-intake-v1) ---------------------------
+#
+# The accountant presents a current report; the approver APPROVES/RETURNS/
+# REFUSES on the exact basis. The target (E/S/direction/amount) is server-derived
+# and never client-supplied. Approval is NOT receipt.
+
+B7WorkflowStatus = Literal[
+    "NOT_PRESENTED", "PENDING", "RETURNED", "REFUSED", "APPROVED",
+    "NEEDS_RECHECK",
+]
+B7DecisionOutcome = Literal["APPROVE", "RETURN", "REFUSE"]
+B7DecisionDirection = Literal[
+    "PAY_EMPLOYEE", "COLLECT_FROM_EMPLOYEE", "BALANCED",
+]
+
+
+class B7DecisionTarget(BaseModel):
+    """Server-derived decision target: what APPROVE commits to (no client input).
+
+    Lives in models so ``B7PresentationView``/``B7DecisionView`` resolve without
+    a models<->b7_workflow import cycle; ``b7_workflow.settlement_target`` builds
+    it.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    employee_cost_vnd: StrictInt
+    total_work_cost_vnd: StrictInt
+    budget_vnd: StrictInt
+    signed_net_vnd: StrictInt
+    direction: B7DecisionDirection
+    amount_vnd: StrictInt
+
+
+class B7PresentPayload(BaseModel):
+    """Accountant presentation input: exactly one review source, nonblank note."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    basis_report_id: str
+    review_id: str | None = None
+    review: "ReviewPayload | None" = None
+    supersedes_decision_id: str | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_review_source(self) -> "B7PresentPayload":
+        if (self.review_id is None) == (self.review is None):
+            raise ValueError(
+                "Cần đúng một trong review_id (review đã lưu) hoặc review "
+                "(note+refs mới), không cả hai hoặc không có.")
+        if self.review is not None:
+            if not self.review.note.strip():
+                raise ValueError("Ghi chú rà soát không được để trắng.")
+            if self.review.report_id != self.basis_report_id:
+                raise ValueError(
+                    "review.report_id phải bằng basis_report_id của presentation.")
+        return self
+
+
+class B7PresentationView(BaseModel):
+    """A persisted settlement presentation: basis report/review/signatures."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    case_id: str
+    employee_ref: str
+    work_ref: str
+    basis_report_id: str
+    basis_review_id: str
+    accountant_ref: str
+    approver_ref: str
+    basis_input_revision: StrictInt
+    control_epoch: StrictInt
+    business_signature: str
+    parent_fingerprint: str
+    config_signature: str
+    target: "B7DecisionTarget"
+    created_at: AwareDatetime
+    idempotent_replay: bool = False
+
+
+class B7DecisionPayload(BaseModel):
+    """Approver's settlement outcome; no client amount/rights accepted."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    presentation_id: str
+    outcome: B7DecisionOutcome
+    reason: str
+
+    @model_validator(mode="after")
+    def _reason_nonblank(self) -> "B7DecisionPayload":
+        if not self.reason.strip():
+            raise ValueError("Lý do quyết định không được để trắng.")
+        return self
+
+
+class B7DecisionView(BaseModel):
+    """A recorded settlement decision bound to its presentation basis."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    case_id: str
+    kind: Literal["B7_SETTLEMENT"]
+    outcome: B7DecisionOutcome
+    reason: str
+    presentation_id: str
+    basis_report_id: str
+    basis_review_id: str
+    employee_ref: str
+    work_ref: str
+    actor_id: str
+    effective_at: AwareDatetime
+    created_at: AwareDatetime
+    basis_input_revision: StrictInt
+    control_epoch: StrictInt
+    business_signature: str
+    parent_fingerprint: str
+    config_signature: str
+    authority_signature: str
+    target: "B7DecisionTarget | None" = None
+    history_baseline: "MoneyComponents | None" = None
+    supersedes_decision_id: str | None = None
+    idempotent_replay: bool = False
+
+
+class B7WorkflowView(BaseModel):
+    """Current settlement workflow projection from records + basis."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    status: B7WorkflowStatus
+    presentation: B7PresentationView | None = None
+    decision: B7DecisionView | None = None
+    basis_current: bool
+    blocked_reasons: list[str] = Field(default_factory=list)
+    accountant_ref: str | None = None
+    approver_ref: str | None = None
+    fulfillment: "B7FulfillmentSummary | None" = None
+    revalidation: "B7RevalidationView | None" = None
+    current_handoff: "B7HandoffView | None" = None
+    closure: "B7ClosureView | None" = None
+
+
+# --- B9: settlement fulfillment & closure (b7-linked-intake-v1) --------------
+#
+# Actual money (company pays the employee; the employee returns an advance or a
+# reimbursement) is recorded by the accountant from a retained source and
+# reconciled against the approved decision. Approval != receipt != closure.
+# These are typed B7 events, distinct from the B5 advance and generic W05 money.
+
+B7MoneyFieldName = Literal[
+    "amount_vnd", "currency", "payer_ref", "payee_ref", "event_at",
+    "receiver_outcome", "event_namespace", "event_ref", "method", "purpose",
+    "work_ref",
+]
+B7ReadState = Literal["READ", "UNCERTAIN", "MISSING"]
+B7EventMethod = Literal["BANK_TRANSFER", "CASH"]
+B7ReportedStatus = Literal[
+    "RECEIVED", "PENDING", "FAILED", "CANCELLED", "UNCONFIRMED",
+]
+B7MoneyPurpose = Literal[
+    "REIMBURSEMENT_RECEIVED", "ADVANCE_RETURN", "REIMBURSEMENT_RETURN",
+    "UNKNOWN",
+]
+B7MoneyClassification = Literal[
+    "CONFIRMED_RECEIPT", "PENDING", "FAILED", "CANCELLED", "UNCONFIRMED",
+    "INCIDENT",
+]
+B7MoneyIncidentKind = Literal[
+    "WRONG_RECIPIENT", "WRONG_PAYER", "OVERPAY", "CONFLICTING_EVENT",
+    "UNALLOCATED", "REVERSAL", "AFTER_CUTOFF", "SOURCE_UNRESOLVED",
+]
+
+
+class B7MoneyFieldEvidence(BaseModel):
+    """One money field read from a retained source by a human accountant.
+
+    HUMAN_SOURCE_REVIEW: a person read the source and recorded the raw text and
+    typed value with its locator. Not OCR/LLM output and not bank
+    authentication.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    field: B7MoneyFieldName
+    source_id: str
+    locator: str
+    raw: str | None = None
+    value: StrictInt | str | None = None
+    read_state: B7ReadState
+    origin: Literal["HUMAN_SOURCE_REVIEW"]
+
+
+class B7MoneyEventPayload(BaseModel):
+    """Accountant's record of an actual settlement money event (no bank action).
+
+    ``gross_vnd`` is strict integer VND when known, else ``None`` (unknown is
+    not 0). Employee/work/classification are server-derived, never client input.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    decision_id: str | None = None
+    event_namespace: str | None = None
+    event_ref: str | None = None
+    method: B7EventMethod
+    gross_vnd: StrictInt | None = None
+    payer_ref: str | None = None
+    payee_ref: str | None = None
+    event_at: AwareDatetime | None = None
+    reported_status: B7ReportedStatus
+    purpose: B7MoneyPurpose
+    evidence: list[B7MoneyFieldEvidence] = Field(default_factory=list)
+    allocation_note: str
+    supersedes_event_id: str | None = None
+
+    @model_validator(mode="after")
+    def _shape(self) -> "B7MoneyEventPayload":
+        if not self.allocation_note.strip():
+            raise ValueError("allocation_note không được để trắng.")
+        if self.gross_vnd is not None and self.gross_vnd <= 0:
+            raise ValueError("gross_vnd phải dương khi biết; unknown để null.")
+        return self
+
+
+class B7MoneyIncident(BaseModel):
+    """A kept money discrepancy (never clipped or auto-recovered)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    code: B7MoneyIncidentKind
+    event_ids: list[str] = Field(default_factory=list)
+    excess_vnd: StrictInt | None = None
+    refs: list[str] = Field(default_factory=list)
+    reason: str
+
+
+class B7MoneyEventView(BaseModel):
+    """A persisted settlement money event with derived classification."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    case_id: str
+    kind: Literal["B7_SETTLEMENT_EVENT"]
+    decision_id: str | None = None
+    event_namespace: str | None = None
+    event_ref: str | None = None
+    method: B7EventMethod
+    gross_vnd: StrictInt | None = None
+    payer_ref: str | None = None
+    payee_ref: str | None = None
+    event_at: AwareDatetime | None = None
+    reported_status: B7ReportedStatus
+    purpose: B7MoneyPurpose
+    evidence: list[B7MoneyFieldEvidence] = Field(default_factory=list)
+    allocation_note: str
+    supersedes_event_id: str | None = None
+    employee_ref: str
+    work_ref: str
+    actor_id: str
+    created_at: AwareDatetime
+    known_at: AwareDatetime | None = None
+    classification: B7MoneyClassification
+    after_cutoff: bool = False
+    incidents: list[B7MoneyIncident] = Field(default_factory=list)
+    idempotent_replay: bool = False
+
+
+class B7FulfillmentReceipt(BaseModel):
+    """Backend-only qualifying receipt projection for one decision.
+
+    ``qualifying`` is derived from evidence/parties/purpose/work/baseline — never
+    a request field. ``canonical_id`` is the validated economic identity/alias.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    event_id: str
+    canonical_id: str
+    decision_id: str
+    amount_vnd: StrictInt | None = None
+    state: Literal["CONFIRMED", "PENDING", "UNKNOWN", "FAILED", "CANCELLED"]
+    qualifying: bool
+    after_cutoff: bool = False
+    incidents: list[B7MoneyIncident] = Field(default_factory=list)
+
+
+class B7FulfillmentSummary(BaseModel):
+    """Decision-scoped fulfillment: approved vs confirmed receipts + remaining.
+
+    Scope is this decision and the events the store manages — never a claim
+    that whole-work A/coverage is complete. ``None`` totals mean unknown.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    decision_id: str
+    direction: B7DecisionDirection
+    approved_vnd: StrictInt
+    recorded_received_vnd: StrictInt | None = None
+    fulfilled_vnd: StrictInt | None = None
+    remaining_vnd: StrictInt | None = None
+    known_remaining_vnd: StrictInt | None = None
+    pending_count: StrictInt = 0
+    unknown_count: StrictInt = 0
+    incidents: list[B7MoneyIncident] = Field(default_factory=list)
+    status: Literal["WAITING", "PARTIAL", "FULFILLED", "BLOCKED", "BALANCED"]
+    managed_scope: str
+    as_of: AwareDatetime
+    knowledge_cutoff: AwareDatetime
+
+
+class B7RevalidationView(BaseModel):
+    """Whether a correct fulfillment keeps the original decision valid."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    original_decision_id: str
+    current_report_id: str
+    status: Literal["VALID", "NEEDS_RECHECK"]
+    cost_signature: str
+    receipt_history_signature: str
+    qualifying_event_ids: list[str] = Field(default_factory=list)
+    blocked_reasons: list[str] = Field(default_factory=list)
+    refs: list[str] = Field(default_factory=list)
+    created_at: AwareDatetime
+
+
+class B7HandoffPayload(BaseModel):
+    """Stage-A handoff request: which decision, and why."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    decision_id: str
+    reason: str
+
+    @model_validator(mode="after")
+    def _reason_nonblank(self) -> "B7HandoffPayload":
+        if not self.reason.strip():
+            raise ValueError("Lý do bàn giao không được để trắng.")
+        return self
+
+
+class B7HandoffView(BaseModel):
+    """An audit-backed handoff reference for the remaining obligation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    case_id: str
+    decision_id: str
+    report_id: str
+    employee_ref: str
+    work_ref: str
+    actor_id: str
+    direction: str
+    remaining_vnd: StrictInt
+    obligation_signature: str
+    business_signature: str
+    receipt_history_signature: str
+    refs: list[str] = Field(default_factory=list)
+    created_at: AwareDatetime
+    valid_until: AwareDatetime | None = None
+    idempotent_replay: bool = False
+
+
+class B7ClosurePayload(BaseModel):
+    """Accountant's closure request; gates are checked before acceptance."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    decision_id: str
+    current_report_id: str
+    reason: str
+
+    @model_validator(mode="after")
+    def _reason_nonblank(self) -> "B7ClosurePayload":
+        if not self.reason.strip():
+            raise ValueError("Lý do đóng không được để trắng.")
+        return self
+
+
+class B7ClosureView(BaseModel):
+    """An immutable closure snapshot for a linked settlement child."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    case_id: str
+    decision_id: str
+    current_report_id: str
+    actor_id: str
+    kind: Literal["SETTLEMENT_COMPLETE"]
+    employee_ref: str
+    work_ref: str
+    close_as_of: AwareDatetime
+    knowledge_cutoff: AwareDatetime
+    created_at: AwareDatetime
+    input_revision: StrictInt
+    control_epoch: StrictInt
+    business_signature: str
+    receipt_history_signature: str
+    parent_fingerprint: str
+    source_refs: list[str] = Field(default_factory=list)
+    event_ids: list[str] = Field(default_factory=list)
+    original_decision_id: str
+    revalidation_ref: str | None = None
+    reason: str
+    idempotent_replay: bool = False
+
+
+class B7AdjustmentPayload(BaseModel):
+    """Request to open a post-closure adjustment child (reason only)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reason: str
+
+    @model_validator(mode="after")
+    def _reason_nonblank(self) -> "B7AdjustmentPayload":
+        if not self.reason.strip():
+            raise ValueError("Lý do điều chỉnh không được để trắng.")
+        return self
+
+
 class CaseView(BaseModel):
     """Projection of a case for API/UI: versions, stage, sources, actions."""
 
@@ -654,6 +1094,7 @@ class CaseView(BaseModel):
     origin: CaseOrigin = "USER"
     b3_workflow: B3WorkflowView | None = None
     linked_b7: LinkedB7View | None = None
+    b7_workflow: B7WorkflowView | None = None
     created_at: AwareDatetime
     updated_at: AwareDatetime
     idempotent_replay: bool = False
@@ -1255,3 +1696,10 @@ class ClosureView(BaseModel):
     actor_id: str
     created_at: AwareDatetime
     idempotent_replay: bool = False
+
+
+# Resolve forward references declared above (ReviewPayload, B7DecisionTarget,
+# MoneyComponents are defined later in this module).
+for _model in (B7PresentPayload, B7PresentationView, B7DecisionView,
+               B7WorkflowView):
+    _model.model_rebuild()

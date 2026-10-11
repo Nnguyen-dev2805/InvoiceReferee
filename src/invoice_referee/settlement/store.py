@@ -45,8 +45,22 @@ from invoice_referee.settlement.models import (
     B3PresentPayload,
     B3PresentationView,
     B3WorkflowView,
+    B7ClosureView,
+    B7DecisionPayload,
+    B7DecisionView,
+    B7FulfillmentReceipt,
+    B7FulfillmentSummary,
+    B7HandoffPayload,
+    B7HandoffView,
     B7LinkedIntake,
+    B7MoneyEventPayload,
+    B7MoneyEventView,
+    B7MoneyIncident,
     B7OriginLink,
+    B7PresentPayload,
+    B7PresentationView,
+    B7RevalidationView,
+    B7WorkflowView,
     CaseSnapshot,
     CaseStage,
     CaseSummary,
@@ -59,6 +73,7 @@ from invoice_referee.settlement.models import (
     DecisionView,
     MoneyEventPayload,
     MoneyEventView,
+    MoneyComponents,
     MoneyIncident,
     MoneySummary,
     QuestionView,
@@ -100,6 +115,17 @@ _PREPARE_LINKED_B7 = "PREPARE_LINKED_B7"
 _REVISE_LINKED_B7 = "REVISE_LINKED_B7"
 _B7_CONTEXT_REFRESH = "B7_CONTEXT_REFRESH"
 _LINKED_B7_CONTEXT_USE = "LINKED_B7_CONTEXT"
+_B7_PRESENT = "B7_PRESENT"
+_B7_DECIDE = "B7_DECIDE"
+_B7_ADD_SETTLEMENT_PROOF = "B7_ADD_SETTLEMENT_PROOF"
+_B7_RECORD_MONEY = "B7_RECORD_MONEY"
+_B7_MONEY_CONTEXT_REFRESH = "B7_MONEY_CONTEXT_REFRESH"
+_B7_REVALIDATE = "B7_REVALIDATE"
+_B7_HANDOFF = "B7_HANDOFF"
+_B7_CLOSE = "B7_CLOSE"
+_B7_ADJUSTMENT = "B7_ADJUSTMENT"
+_B3_ADVANCE_PROOF_USE = "B3_ADVANCE_PROOF"
+_B7_SETTLEMENT_PROOF_USE = "B7_SETTLEMENT_PROOF"
 
 _NONTERMINAL_STATUSES = ("QUEUED", "RUNNING")
 _TERMINAL_STATUSES = ("SUCCEEDED", "FAILED", "TIMED_OUT", "STOPPED",
@@ -448,8 +474,9 @@ class Store:
     def add_source(self, case_id: str, upload: Upload, command: Command,
                    *, source_use: str = "PROPOSAL") -> SourceRecord:
         sha = hashlib.sha256(upload.content).hexdigest()
-        operation = (_B3_ADD_ADVANCE_PROOF if source_use == "B3_ADVANCE_PROOF"
-                     else _ADD_SOURCE)
+        operation = {_B3_ADVANCE_PROOF_USE: _B3_ADD_ADVANCE_PROOF,
+                     _B7_SETTLEMENT_PROOF_USE: _B7_ADD_SETTLEMENT_PROOF}.get(
+                         source_use, _ADD_SOURCE)
         payload_fp = fingerprint(operation, {
             "filename": upload.filename,
             "sha256": sha,
@@ -491,8 +518,8 @@ class Store:
             # proof role. Only the Service B5 branch sets B3_ADVANCE_PROOF.
             provenance = dict(upload.provenance)
             provenance.pop("source_use", None)
-            if source_use == "B3_ADVANCE_PROOF":
-                provenance["source_use"] = "B3_ADVANCE_PROOF"
+            if source_use in (_B3_ADVANCE_PROOF_USE, _B7_SETTLEMENT_PROOF_USE):
+                provenance["source_use"] = source_use
             stored_path = put_artifact(self.artifact_root, case_id, "sources",
                                        source_id, upload.content)
             try:
@@ -507,16 +534,19 @@ class Store:
                      str(stored_path.relative_to(self.artifact_root))),
                 )
                 new_version = case["case_version"] + 1
-                if source_use == "B3_ADVANCE_PROOF":
+                if source_use in (_B3_ADVANCE_PROOF_USE, _B7_SETTLEMENT_PROOF_USE):
                     # Proof is fulfillment evidence, not proposal input: bump
                     # case_version only, never input_revision, so an approved
-                    # proposal does not go stale just because a receipt arrived.
+                    # proposal/decision does not go stale just because a receipt
+                    # arrived.
                     conn.execute(
                         "UPDATE cases SET case_version = ?, updated_at = ? "
                         "WHERE id = ?",
                         (new_version, now, case_id),
                     )
-                    kind = "B3_ADVANCE_PROOF_ADDED"
+                    kind = ("B3_ADVANCE_PROOF_ADDED"
+                            if source_use == _B3_ADVANCE_PROOF_USE
+                            else "B7_SETTLEMENT_PROOF_ADDED")
                 else:
                     conn.execute(
                         "UPDATE cases SET case_version = ?, input_revision = ?, "
@@ -1712,9 +1742,11 @@ class Store:
 
     def _find_linked_child(self, conn: sqlite3.Connection,
                            parent_id: str) -> sqlite3.Row | None:
-        """The active linked B7 child for a parent, if one exists."""
+        """The active (not closed) linked B7 child for a parent, if one exists."""
         for row in conn.execute("SELECT * FROM cases ORDER BY rowid"):
             if row["id"] == parent_id:
+                continue
+            if row["stage"] in _CLOSED_STAGES:
                 continue
             submission = _load(row["submission_json"])
             if submission.get("job") != "B7":
@@ -1893,7 +1925,9 @@ class Store:
                 decision=decision, managed_events=managed, packet=packet,
                 policy=policy, authority_version=authority_version,
                 money_as_of=submission.money_as_of,
-                knowledge_cutoff=submission.knowledge_cutoff)
+                knowledge_cutoff=submission.knowledge_cutoff,
+                submission=submission,
+                source_records=self._source_records(conn, case_id))
             # Identical snapshot (same packet, same parent dependency): reuse the
             # existing source and do NOT bump input_revision.
             snapshot_fp = fingerprint("LINKED_CONTEXT",
@@ -1975,14 +2009,29 @@ class Store:
 
     def _linked_context_source_ids(self, conn: sqlite3.Connection,
                                    case_id: str) -> list[str]:
+        # Both the accountant packet refresh and the B9 money-context refresh
+        # retain a linked-context source; the current one is the latest of
+        # either operation.
         ids: list[str] = []
         for row in conn.execute(
                 "SELECT payload_json FROM audit_events WHERE case_id = ? "
-                "AND operation = ? ORDER BY rowid", (case_id, _B7_CONTEXT_REFRESH)):
+                "AND operation IN (?, ?) ORDER BY rowid",
+                (case_id, _B7_CONTEXT_REFRESH, _B7_MONEY_CONTEXT_REFRESH)):
             source_id = _load(row["payload_json"]).get("source_id")
             if source_id:
                 ids.append(source_id)
         return ids
+
+    def linked_context_source_id(self, case_id: str) -> str | None:
+        """Current linked-context source id (backend-owned, audit-backed)."""
+        with self._read() as conn:
+            ids = self._linked_context_source_ids(conn, case_id)
+        return ids[-1] if ids else None
+
+    def _linked_context_source_ids_read(self, case_id: str) -> list[str]:
+        """All retained linked-context source ids for a case."""
+        with self._read() as conn:
+            return self._linked_context_source_ids(conn, case_id)
 
     def refresh_linked_b7_context(self, case_id: str, command: Command,
                                   policy: dict,
@@ -2002,6 +2051,1176 @@ class Store:
         return self.record_b7_company_packet(
             case_id, snapshot.company_packet.model_dump(mode="json"), command,
             policy, authority_version)
+
+    # --- B8: settlement presentation/decision (b7-linked-intake-v1) ----------
+
+    def _b7_linked_ready(self, conn: sqlite3.Connection, case_id: str,
+                         basis_report_id: str):
+        """Resolve a current, COMPLETE, confirmed linked basis for present.
+
+        Raises BASIS_MISMATCH/BASIS_STALE/B7_WORKFLOW_BLOCKED so a presentation
+        never binds another case's report, a stale revision or an incomplete
+        context. Returns (case, run, report, snapshot, context_source_id).
+        """
+        run = conn.execute("SELECT * FROM runs WHERE id = ?",
+                           (basis_report_id,)).fetchone()
+        if run is None or run["case_id"] != case_id:
+            raise DomainError(
+                "BASIS_MISMATCH",
+                f"Report basis {basis_report_id} không thuộc hồ sơ {case_id}.",
+            )
+        case = self._case_row(conn, case_id)
+        if run["status"] != "SUCCEEDED" or not run["report_json"]:
+            raise DomainError(
+                "BASIS_MISMATCH",
+                f"Run basis {basis_report_id} chưa SUCCEEDED có report.",
+            )
+        if (case["current_run_id"] != basis_report_id
+                or run["input_revision"] != case["input_revision"]
+                or run["control_epoch"] != case["control_epoch"]):
+            raise DomainError(
+                "BASIS_STALE",
+                "Report basis đã cũ (input/epoch đã đổi hoặc run khác là "
+                "current); chạy lại và trình lại.",
+            )
+        report = Report.model_validate(_load(run["report_json"]))
+        if report.completion != "COMPLETE":
+            raise DomainError(
+                "B7_WORKFLOW_BLOCKED",
+                "Report basis chưa COMPLETE; không trình quyết toán được.",
+            )
+        form = _load(case["submission_json"]).get("form") or {}
+        if not form.get("confirmed"):
+            raise DomainError(
+                "B7_WORKFLOW_BLOCKED",
+                "Khai báo quyết toán chưa được xác nhận; chưa trình duyệt.",
+            )
+        context_ids = self._linked_context_source_ids(conn, case_id)
+        if not context_ids:
+            raise DomainError(
+                "B7_WORKFLOW_BLOCKED",
+                "Chưa có company context; không trình quyết toán được.",
+            )
+        return case, run, report, context_ids[-1]
+
+    def _b7_workflow(self, conn: sqlite3.Connection,
+                     case_id: str) -> B7WorkflowView | None:
+        """Derive the settlement workflow projection from records."""
+        case = self._case_row(conn, case_id)
+        if self._b7_origin_link(case) is None:
+            return None
+        pres_row = conn.execute(
+            "SELECT * FROM audit_events WHERE case_id = ? AND operation = ? "
+            "ORDER BY rowid DESC LIMIT 1", (case_id, _B7_PRESENT)).fetchone()
+        dec_row = conn.execute(
+            "SELECT * FROM audit_events WHERE case_id = ? AND operation = ? "
+            "ORDER BY rowid DESC LIMIT 1", (case_id, _B7_DECIDE)).fetchone()
+        presentation = None
+        if pres_row is not None:
+            presentation = B7PresentationView.model_validate(
+                _load(pres_row["payload_json"])["presentation"])
+        decision = None
+        if dec_row is not None:
+            decision = B7DecisionView.model_validate(
+                _load(dec_row["payload_json"])["decision"])
+        # A decision governs the presentation it was made on; a newer
+        # presentation supersedes an older non-REFUSE decision.
+        decision_for_status = decision
+        if decision is not None and decision.outcome != "REFUSE" \
+                and (presentation is None
+                     or decision.presentation_id != presentation.id):
+            decision_for_status = None
+        basis_current = False
+        blocked: list[str] = []
+        if presentation is not None:
+            run = conn.execute("SELECT * FROM runs WHERE id = ?",
+                               (presentation.basis_report_id,)).fetchone()
+            basis_current = bool(
+                run is not None and run["status"] == "SUCCEEDED"
+                and case["current_run_id"] == presentation.basis_report_id
+                and run["input_revision"] == case["input_revision"]
+                and run["control_epoch"] == case["control_epoch"])
+            if not basis_current:
+                blocked.append(
+                    "Căn cứ đã đổi (nguồn/revision/epoch); cần chạy và trình lại.")
+        if decision_for_status is not None \
+                and decision_for_status.outcome == "RETURN" \
+                and case["current_run_id"] != decision_for_status.basis_report_id:
+            decision_for_status = None
+        status = "NOT_PRESENTED"
+        if decision_for_status is not None:
+            if decision_for_status.outcome == "APPROVE":
+                status = "APPROVED" if basis_current else "NEEDS_RECHECK"
+            elif decision_for_status.outcome == "RETURN":
+                status = "RETURNED"
+            else:
+                status = "REFUSED"
+        elif presentation is not None:
+            status = "PENDING" if basis_current else "NEEDS_RECHECK"
+        return B7WorkflowView(
+            status=status, presentation=presentation,
+            decision=decision_for_status, basis_current=basis_current,
+            blocked_reasons=blocked,
+            accountant_ref=(presentation.accountant_ref
+                            if presentation else None),
+            approver_ref=(presentation.approver_ref if presentation else None),
+            fulfillment=self._b7_fulfillment(conn, case_id),
+            revalidation=self._b7_current_revalidation(conn, case_id),
+            current_handoff=self._b7_latest_handoff(conn, case_id),
+            closure=self._b7_closure(conn, case_id),
+        )
+
+    def record_b7_presentation(self, case_id: str, payload: B7PresentPayload,
+                               command: Command, b7, b3,
+                               policy: dict) -> B7PresentationView:
+        """Accountant presents the current linked settlement basis to approver.
+
+        Saves a new review (note+refs) or reuses a stored one, in ONE
+        transaction with the presentation. Target/signatures are server-derived;
+        route uses the inherited B3 company route. No financial action.
+        """
+        from invoice_referee.settlement.b7_workflow import (
+            b7_business_signature, b7_configuration_signature,
+            b7_cost_signature, settlement_target,
+        )
+
+        payload_fp = fingerprint(_B7_PRESENT, {
+            "case_id": case_id, "payload": payload.model_dump(mode="json")})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _B7_PRESENT, command,
+                                       scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                stored = _load(row["payload_json"])["presentation"]
+                return B7PresentationView.model_validate(stored).model_copy(
+                    update={"idempotent_replay": True})
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            if self._b7_origin_link(case) is None:
+                raise DomainError(
+                    "LINKED_B7_INVALID",
+                    "Trình quyết toán chỉ áp dụng cho hồ sơ liên kết.",
+                )
+            if case["stop_active"]:
+                raise DomainError("STOP_ACTIVE",
+                                  "Hồ sơ đang Stop; không trình quyết toán.")
+            self._check_version(case, command)
+            if b7 is None or not b7.activated:
+                raise DomainError(
+                    "CONFIG_NOT_ACTIVE",
+                    "Chưa cấu hình B7 company config; không trình quyết toán.")
+            submission = Submission.model_validate(_load(case["submission_json"]))
+            link = self._b7_origin_link(case)
+            parent_id = link["origin_case_id"]
+            self._check_origin_not_stopped(conn, parent_id)
+            route = b3_route_for(b3, submission.employee_ref) if b3 else None
+            if (command.demo_role != "ACCOUNTANT" or route is None
+                    or route.accountant_ref != command.actor_id):
+                raise DomainError(
+                    "BEYOND_AUTHORITY",
+                    f"Vai {command.demo_role}/{command.actor_id} không phải kế "
+                    f"toán được phân công cho {submission.employee_ref}.",
+                )
+            case, run, report, context_source_id = self._b7_linked_ready(
+                conn, case_id, payload.basis_report_id)
+            try:
+                target = settlement_target(report)
+            except DomainError:
+                raise
+            snapshot = self._load_linked_context(conn, context_source_id)
+            sources = self._source_records(conn, case_id)
+            business_sig = b7_business_signature(submission, sources, report,
+                                                 policy, snapshot)
+            cost_sig = b7_cost_signature(submission, sources, report, policy,
+                                         snapshot)
+            config_sig = b7_configuration_signature(b7, b3, policy)
+            parent_fp = self._linked_parent_fingerprint(conn, parent_id)
+            current = self._b7_workflow(conn, case_id)
+            # Idempotent re-present while still pending and same basis.
+            if (current is not None and current.decision is None
+                    and current.presentation is not None
+                    and current.presentation.business_signature == business_sig):
+                return current.presentation.model_copy(
+                    update={"idempotent_replay": True})
+            now = _iso(utcnow())
+            if payload.review_id is not None:
+                review = self._b3_find_review(conn, case_id, payload.review_id)
+                if review["report_id"] != payload.basis_report_id \
+                        or review["actor_id"] != command.actor_id:
+                    raise DomainError(
+                        "BASIS_MISMATCH",
+                        "Review đã lưu không thuộc basis report/kế toán này.")
+                review_id = payload.review_id
+            else:
+                review = {
+                    "id": f"RV-{uuid.uuid4().hex[:12]}", "case_id": case_id,
+                    "report_id": payload.review.report_id,
+                    "note": payload.review.note, "refs": payload.review.refs,
+                    "actor_id": command.actor_id, "created_at": now,
+                }
+                review_id = review["id"]
+                conn.execute(
+                    "INSERT INTO interactions (id, case_id, kind, payload_json, "
+                    "created_at) VALUES (?, ?, 'REVIEW', ?, ?)",
+                    (review_id, case_id, _dump(review), now),
+                )
+            presentation = {
+                "id": f"PR-{uuid.uuid4().hex[:12]}", "case_id": case_id,
+                "employee_ref": submission.employee_ref,
+                "work_ref": submission.work_ref,
+                "basis_report_id": payload.basis_report_id,
+                "basis_review_id": review_id,
+                "accountant_ref": route.accountant_ref,
+                "approver_ref": route.approver_ref,
+                "basis_input_revision": case["input_revision"],
+                "control_epoch": case["control_epoch"],
+                "business_signature": business_sig,
+                "parent_fingerprint": parent_fp,
+                "config_signature": config_sig,
+                "target": target.model_dump(mode="json"),
+                "created_at": now,
+            }
+            conn.execute(
+                "UPDATE cases SET stage = 'AWAITING_DECISION', case_version = ?, "
+                "updated_at = ? WHERE id = ?",
+                (case["case_version"] + 1, now, case_id),
+            )
+            self._record_command(conn, case_id, case_id, "B7_PRESENTED",
+                                 _B7_PRESENT, command, payload_fp,
+                                 {"presentation": presentation, "review": review,
+                                  "cost_signature": cost_sig}, now)
+            return B7PresentationView.model_validate(presentation)
+
+    def _load_linked_context(self, conn: sqlite3.Connection, source_id: str):
+        from invoice_referee.settlement.models import LinkedB7ContextSnapshot
+
+        row = conn.execute("SELECT * FROM sources WHERE id = ?",
+                           (source_id,)).fetchone()
+        record = self._source_record(row)
+        data = json.loads((self.artifact_root / record.original_path)
+                          .read_text(encoding="utf-8"))
+        return LinkedB7ContextSnapshot.model_validate(data)
+
+    def _check_origin_not_stopped(self, conn: sqlite3.Connection,
+                                  parent_id: str) -> None:
+        parent = self._case_row(conn, parent_id)
+        if parent["stop_active"]:
+            raise DomainError(
+                "ORIGIN_STOP_ACTIVE",
+                f"Hồ sơ gốc {parent_id} đang Stop; không hành động trên con.",
+            )
+
+    def record_b7_decision(self, case_id: str, payload: B7DecisionPayload,
+                           command: Command, b7, b3, policy: dict
+                           ) -> B7DecisionView:
+        """Record the approver's settlement outcome on a current presentation.
+
+        APPROVE uses a single scoped B7 grant covering E and abs(S); the target
+        is server-derived from the current report, never client-supplied.
+        RETURN/REFUSE keep the obligation and need only a scoped effective grant.
+        No money event is created.
+        """
+        from invoice_referee.settlement.b7_workflow import (
+            authorize_b7_decision, b7_business_signature,
+            b7_configuration_signature, effective_b7_time, settlement_target,
+        )
+
+        payload_fp = fingerprint(_B7_DECIDE, {
+            "case_id": case_id, "payload": payload.model_dump(mode="json")})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _B7_DECIDE, command,
+                                       scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                stored = _load(row["payload_json"])["decision"]
+                return B7DecisionView.model_validate(stored).model_copy(
+                    update={"idempotent_replay": True})
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            if self._b7_origin_link(case) is None:
+                raise DomainError(
+                    "LINKED_B7_INVALID",
+                    "Quyết định quyết toán chỉ áp dụng cho hồ sơ liên kết.",
+                )
+            if case["stop_active"]:
+                raise DomainError("STOP_ACTIVE",
+                                  "Hồ sơ đang Stop; không ghi quyết định.")
+            self._check_version(case, command)
+            if b7 is None or not b7.activated:
+                raise DomainError(
+                    "CONFIG_NOT_ACTIVE",
+                    "Chưa cấu hình B7 company config; không quyết định.")
+            submission = Submission.model_validate(_load(case["submission_json"]))
+            link = self._b7_origin_link(case)
+            parent_id = link["origin_case_id"]
+            self._check_origin_not_stopped(conn, parent_id)
+            current = self._b7_workflow(conn, case_id)
+            if current is None or current.presentation is None:
+                raise DomainError(
+                    "B7_WORKFLOW_BLOCKED",
+                    "Chưa có presentation để quyết định; kế toán phải trình trước.",
+                )
+            if current.decision is not None:
+                raise DomainError(
+                    "B7_ALREADY_DECIDED",
+                    "Đã có quyết định cho presentation này; không ghi lần hai.",
+                )
+            presentation = current.presentation
+            if presentation.id != payload.presentation_id:
+                raise DomainError(
+                    "BASIS_MISMATCH",
+                    "presentation_id không khớp presentation đang chờ.",
+                )
+            if not current.basis_current:
+                raise DomainError(
+                    "BASIS_STALE",
+                    "Căn cứ đã đổi kể từ khi trình; cần chạy và trình lại.",
+                )
+            route = b3_route_for(b3, submission.employee_ref) if b3 else None
+            if route is None or route.approver_ref != command.actor_id:
+                raise DomainError(
+                    "BEYOND_AUTHORITY",
+                    f"Vai {command.actor_id} không phải người duyệt được phân "
+                    f"công cho {submission.employee_ref}.",
+                )
+            report = Report.model_validate(
+                _load(conn.execute("SELECT * FROM runs WHERE id = ?",
+                                   (presentation.basis_report_id,)).fetchone()
+                      ["report_json"]))
+            target = None
+            if payload.outcome == "APPROVE":
+                target = settlement_target(report)
+            effective_at = effective_b7_time(b7)
+            grant = authorize_b7_decision(
+                b7, submission.employee_ref, submission.work_ref,
+                command.actor_id, effective_at, target)
+            sources = self._source_records(conn, case_id)
+            snapshot = self._load_linked_context(
+                conn, self._linked_context_source_ids(conn, case_id)[-1])
+            business_sig = b7_business_signature(submission, sources, report,
+                                                 policy, snapshot)
+            config_sig = b7_configuration_signature(b7, b3, policy)
+            authority_sig = fingerprint("B7_AUTHORITY", {
+                "grant_ref": getattr(grant, "actor_ref", None),
+                "grant": grant.model_dump(mode="json"),
+                "effective_at": _iso(effective_at)})
+            history_baseline = None
+            if target is not None:
+                history_baseline = MoneyComponents(
+                    e=report.components.e.value, a=report.components.a.value,
+                    ra=report.components.ra.value, p=report.components.p.value,
+                    rp=report.components.rp.value)
+            now = _iso(utcnow())
+            decision = {
+                "id": f"B7D-{uuid.uuid4().hex[:12]}", "case_id": case_id,
+                "kind": "B7_SETTLEMENT", "outcome": payload.outcome,
+                "reason": payload.reason,
+                "presentation_id": presentation.id,
+                "basis_report_id": presentation.basis_report_id,
+                "basis_review_id": presentation.basis_review_id,
+                "employee_ref": submission.employee_ref,
+                "work_ref": submission.work_ref, "actor_id": command.actor_id,
+                "effective_at": _iso(effective_at), "created_at": now,
+                "basis_input_revision": presentation.basis_input_revision,
+                "control_epoch": presentation.control_epoch,
+                "business_signature": business_sig,
+                "parent_fingerprint": presentation.parent_fingerprint,
+                "config_signature": config_sig,
+                "authority_signature": authority_sig,
+                "target": (target.model_dump(mode="json")
+                           if target is not None else None),
+                "history_baseline": (history_baseline.model_dump(mode="json")
+                                     if history_baseline is not None else None),
+                "supersedes_decision_id": presentation.model_dump(
+                    mode="json").get("supersedes_decision_id"),
+            }
+            conn.execute(
+                "INSERT INTO decisions (id, case_id, payload_json, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (decision["id"], case_id, _dump(decision), now),
+            )
+            if payload.outcome == "APPROVE":
+                if target is not None and target.amount_vnd == 0:
+                    new_stage: CaseStage = "READY_TO_CLOSE"
+                else:
+                    new_stage = "AWAITING_MONEY"
+            elif payload.outcome == "RETURN":
+                new_stage = "CHECKING"
+            else:
+                new_stage = "SETTLEMENT_REQUEST_REFUSED"
+            conn.execute(
+                "UPDATE cases SET stage = ?, case_version = ?, updated_at = ? "
+                "WHERE id = ?",
+                (new_stage, case["case_version"] + 1, now, case_id),
+            )
+            self._record_command(conn, case_id, case_id,
+                                 "B7_DECISION_RECORDED", _B7_DECIDE, command,
+                                 payload_fp, {"decision": decision}, now)
+            return B7DecisionView.model_validate(decision)
+
+    # --- B9: settlement fulfillment & closure (b7-linked-intake-v1) ----------
+
+    def add_b7_settlement_proof(self, case_id: str, upload: Upload,
+                                command: Command) -> SourceRecord:
+        """Attach a receiver/cash proof source for a linked settlement.
+
+        Backend-owned source use (B7_SETTLEMENT_PROOF), accountant-only at the
+        Service; bumps case_version only, never input_revision, so an approved
+        decision does not go stale merely because a receipt source arrived.
+        """
+        with self._read() as conn:
+            case = self._case_row(conn, case_id)
+        if self._b7_origin_link(case) is not None \
+                and case["stage"] in _CLOSED_STAGES:
+            raise DomainError(
+                "B7_CLOSED_ADJUSTMENT_REQUIRED",
+                "Hồ sơ quyết toán đã đóng; chứng từ mới cần hồ sơ điều chỉnh "
+                "liên kết, không sửa closure cũ.")
+        return self.add_source(case_id, upload, command,
+                               source_use=_B7_SETTLEMENT_PROOF_USE)
+
+    def _b7_settlement_proof_source_ids(self, conn: sqlite3.Connection,
+                                        case_id: str) -> set[str]:
+        """Source ids the backend recorded as B9 proof (audit-backed)."""
+        ids: set[str] = set()
+        for row in conn.execute(
+                "SELECT payload_json FROM audit_events WHERE case_id = ? "
+                "AND operation = ?", (case_id, _B7_ADD_SETTLEMENT_PROOF)):
+            source_id = _load(row["payload_json"]).get("source_id")
+            if source_id:
+                ids.add(source_id)
+        return ids
+
+    def b7_settlement_proof_source_ids(self, case_id: str) -> set[str]:
+        with self._read() as conn:
+            return self._b7_settlement_proof_source_ids(conn, case_id)
+
+    def _b7_money_events(self, conn: sqlite3.Connection,
+                         case_id: str) -> list[B7MoneyEventView]:
+        """All persisted B9 settlement money events for a case, oldest first."""
+        events: list[B7MoneyEventView] = []
+        for row in conn.execute(
+                "SELECT payload_json FROM money_events WHERE case_id = ? "
+                "ORDER BY rowid", (case_id,)):
+            payload = _load(row["payload_json"])
+            if payload.get("kind") != "B7_SETTLEMENT_EVENT":
+                continue
+            events.append(B7MoneyEventView.model_validate(payload))
+        return events
+
+    def confirmed_b7_money_events(self, case_id: str) -> list[B7MoneyEventView]:
+        """Confirmed RECEIVED settlement events (for canonical history merge)."""
+        with self._read() as conn:
+            events = self._b7_money_events(conn, case_id)
+        return [e for e in events if e.classification == "CONFIRMED_RECEIPT"]
+
+    def _b7_current_decision(self, conn: sqlite3.Connection,
+                             case_id: str) -> B7DecisionView | None:
+        """The decision governing the current presentation, if any.
+
+        Mirrors ``_b7_workflow``'s rule (a newer presentation supersedes an
+        older non-REFUSE decision) without calling it, so fulfillment can derive
+        the governing decision without a recursion cycle.
+        """
+        pres_row = conn.execute(
+            "SELECT * FROM audit_events WHERE case_id = ? AND operation = ? "
+            "ORDER BY rowid DESC LIMIT 1", (case_id, _B7_PRESENT)).fetchone()
+        dec_row = conn.execute(
+            "SELECT * FROM audit_events WHERE case_id = ? AND operation = ? "
+            "ORDER BY rowid DESC LIMIT 1", (case_id, _B7_DECIDE)).fetchone()
+        if dec_row is None:
+            return None
+        decision = B7DecisionView.model_validate(
+            _load(dec_row["payload_json"])["decision"])
+        presentation = None
+        if pres_row is not None:
+            presentation = B7PresentationView.model_validate(
+                _load(pres_row["payload_json"])["presentation"])
+        if decision.outcome != "REFUSE" \
+                and (presentation is None
+                     or decision.presentation_id != presentation.id):
+            return None
+        return decision
+
+    def _b7_fulfillment(self, conn: sqlite3.Connection, case_id: str
+                        ) -> B7FulfillmentSummary | None:
+        """Decision-scoped fulfillment projection from the store's own events."""
+        from invoice_referee.settlement.b7_fulfillment import (
+            canonical_event_id, project_b7_fulfillment, receipt_state,
+        )
+
+        decision = self._b7_current_decision(conn, case_id)
+        if decision is None or decision.outcome != "APPROVE" \
+                or decision.target is None:
+            return None
+        events = self._b7_money_events(conn, case_id)
+        scoped = [e for e in events if e.decision_id == decision.id]
+        receipts = [B7FulfillmentReceipt(
+            event_id=e.id,
+            canonical_id=canonical_event_id(e.event_namespace, e.event_ref, e.id),
+            decision_id=e.decision_id or decision.id, amount_vnd=e.gross_vnd,
+            state=receipt_state(e.classification),
+            qualifying=e.classification == "CONFIRMED_RECEIPT",
+            after_cutoff=e.after_cutoff, incidents=list(e.incidents))
+            for e in scoped]
+        case = self._case_row(conn, case_id)
+        submission = Submission.model_validate(_load(case["submission_json"]))
+        return project_b7_fulfillment(
+            decision.id, decision.target.amount_vnd, decision.target.direction,
+            receipts, as_of=submission.money_as_of,
+            knowledge_cutoff=submission.knowledge_cutoff)
+
+    def record_b7_money(self, case_id: str, payload: B7MoneyEventPayload,
+                        command: Command, b7, b3, policy: dict
+                        ) -> B7MoneyEventView:
+        """Record an actual settlement money event with human-source evidence.
+
+        Allowed under Stop/stale (the fact already happened) but never opens a
+        new payment right or advances past Stop. Records are immutable and
+        append-only; a pending record is superseded by a later final one, never
+        overwritten. The raw gross is kept, never clipped to the approval.
+        """
+        from invoice_referee.settlement.b7_fulfillment import (
+            canonical_event_id, classify_b7_money,
+        )
+
+        payload_fp = fingerprint(_B7_RECORD_MONEY, {
+            "case_id": case_id, "payload": payload.model_dump(mode="json")})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _B7_RECORD_MONEY, command,
+                                       scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                stored = _load(row["payload_json"])["event"]
+                return B7MoneyEventView.model_validate(stored).model_copy(
+                    update={"idempotent_replay": True})
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            if self._b7_origin_link(case) is None:
+                raise DomainError(
+                    "LINKED_B7_INVALID",
+                    "Sự kiện tiền quyết toán chỉ áp dụng cho hồ sơ liên kết.",
+                )
+            self._check_version(case, command)
+            submission = Submission.model_validate(_load(case["submission_json"]))
+            sources = self._source_records(conn, case_id)
+            company_ref = getattr(b7, "company_ref", None) if b7 is not None \
+                else None
+            from invoice_referee.settlement.b7_workflow import effective_b7_time
+            effective_at = effective_b7_time(b7)
+            classification, incidents = classify_b7_money(
+                payload, employee_ref=submission.employee_ref,
+                work_ref=submission.work_ref, company_ref=company_ref,
+                sources=sources, effective_at=effective_at)
+            # A decision_id, when given, must belong to this case/scope.
+            if payload.decision_id is not None:
+                dec_row = conn.execute(
+                    "SELECT payload_json FROM decisions WHERE id = ? AND case_id = ?",
+                    (payload.decision_id, case_id)).fetchone()
+                candidate = _load(dec_row["payload_json"]) if dec_row else None
+                if (candidate is None or candidate.get("kind") != "B7_SETTLEMENT"
+                        or candidate.get("employee_ref") != submission.employee_ref
+                        or candidate.get("work_ref") != submission.work_ref):
+                    incidents.append(B7MoneyIncident(
+                        code="UNALLOCATED", event_ids=[], refs=[],
+                        reason="decision_id không thuộc hồ sơ/người/công việc này."))
+                    if classification == "CONFIRMED_RECEIPT":
+                        classification = "INCIDENT"
+            # Same economic identity (namespace+ref) already confirmed: a new
+            # RECEIVED for the same identity is a conflict, not a second payment.
+            if (classification == "CONFIRMED_RECEIPT"
+                    and payload.event_namespace and payload.event_ref):
+                for prior in self._b7_money_events(conn, case_id):
+                    if (prior.event_namespace == payload.event_namespace
+                            and prior.event_ref == payload.event_ref
+                            and prior.classification == "CONFIRMED_RECEIPT"):
+                        incidents.append(B7MoneyIncident(
+                            code="CONFLICTING_EVENT", event_ids=[prior.id],
+                            refs=[], reason=("Cùng giao dịch đã có kết quả RECEIVED "
+                                             "xác nhận; giữ cả hai, cần xử lý.")))
+                        classification = "INCIDENT"
+                        break
+            after_cutoff = bool(payload.event_at is not None
+                                and payload.event_at > submission.money_as_of)
+            now = _iso(utcnow())
+            event = {
+                "id": f"BM-{uuid.uuid4().hex[:12]}", "case_id": case_id,
+                "kind": "B7_SETTLEMENT_EVENT",
+                "decision_id": payload.decision_id,
+                "event_namespace": payload.event_namespace,
+                "event_ref": payload.event_ref, "method": payload.method,
+                "gross_vnd": payload.gross_vnd, "payer_ref": payload.payer_ref,
+                "payee_ref": payload.payee_ref,
+                "event_at": _iso(payload.event_at) if payload.event_at else None,
+                "reported_status": payload.reported_status,
+                "purpose": payload.purpose,
+                "evidence": [e.model_dump(mode="json") for e in payload.evidence],
+                "allocation_note": payload.allocation_note,
+                "supersedes_event_id": payload.supersedes_event_id,
+                "employee_ref": submission.employee_ref,
+                "work_ref": submission.work_ref, "actor_id": command.actor_id,
+                "created_at": now, "known_at": now,
+                "classification": classification,
+                "after_cutoff": after_cutoff,
+                "incidents": [i.model_dump(mode="json") for i in incidents],
+            }
+            conn.execute(
+                "INSERT INTO money_events (id, case_id, payload_json, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (event["id"], case_id, _dump(event), now),
+            )
+            new_version = case["case_version"] + 1
+            new_stage: CaseStage = case["stage"]
+            if not case["stop_active"]:
+                decision = self._b7_current_decision(conn, case_id)
+                if decision is not None and decision.target is not None:
+                    fulfillment = self._b7_fulfillment(conn, case_id)
+                    if fulfillment is not None:
+                        if fulfillment.status == "FULFILLED":
+                            new_stage = "READY_TO_CLOSE"
+                        elif fulfillment.status == "BLOCKED":
+                            new_stage = "RESOLVING_OBLIGATIONS"
+                        else:
+                            new_stage = "AWAITING_MONEY"
+            conn.execute(
+                "UPDATE cases SET stage = ?, case_version = ?, updated_at = ? "
+                "WHERE id = ?",
+                (new_stage, new_version, now, case_id),
+            )
+            self._record_command(conn, case_id, case_id,
+                                 "B7_SETTLEMENT_EVENT_RECORDED", _B7_RECORD_MONEY,
+                                 command, payload_fp, {"event": event}, now)
+            return B7MoneyEventView.model_validate(event)
+
+    def _b7_build_money_context(self, conn: sqlite3.Connection, case_id: str,
+                                policy: dict, authority_version: str | None
+                                ) -> tuple[str, object]:
+        """Rebuild the linked context from the stored packet + canonical money.
+
+        The packet's coverage is kept unchanged (the accountant owns the
+        external book); the canonical B9 events are appended to the packet's
+        company events (deduped by economic identity) so a re-run sees a correct
+        fulfillment in its history without re-importing it.
+        """
+        from invoice_referee.settlement.b7_linked import build_linked_context
+
+        snapshot = self._load_linked_context(
+            conn, self._linked_context_source_ids(conn, case_id)[-1])
+        packet = snapshot.company_packet
+        if packet is None:
+            raise DomainError(
+                "BASIS_MISMATCH", "Chưa có company packet để làm mới context.")
+        case = self._case_row(conn, case_id)
+        submission = Submission.model_validate(_load(case["submission_json"]))
+        link = self._b7_origin_link(case)
+        parent_id = link["origin_case_id"]
+        decision = None
+        parent_wf = self._b3_workflow(conn, parent_id)
+        if parent_wf is not None and parent_wf.decision is not None:
+            decision = parent_wf.decision
+        managed = self._b3_advance_events(conn, parent_id)
+        augmented = self._augment_packet_with_money(conn, packet, case_id)
+        merged = build_linked_context(
+            origin_case_id=parent_id,
+            parent_fingerprint=self._linked_parent_fingerprint(conn, parent_id),
+            decision=decision, managed_events=managed, packet=augmented,
+            policy=policy, authority_version=authority_version,
+            money_as_of=submission.money_as_of,
+            knowledge_cutoff=submission.knowledge_cutoff,
+            submission=submission, source_records=self._source_records(conn, case_id))
+        return case_id, merged
+
+    def _augment_packet_with_money(self, conn, packet, case_id: str):
+        """Append canonical B9 receipts to the packet as company events.
+
+        Deduped by economic identity (namespace:ref) so a receipt already in the
+        company ledger is not double-counted. Only CONFIRMED receipts whose
+        identity is not already present are added.
+        """
+        from invoice_referee.settlement.models import B7CompanyEvent
+
+        kind_by_purpose = {
+            "ADVANCE_RETURN": "ADVANCE_RETURN",
+            "REIMBURSEMENT_RECEIVED": "REIMBURSEMENT_RECEIVED",
+            "REIMBURSEMENT_RETURN": "REIMBURSEMENT_RETURN",
+        }
+        existing = {(e.event_namespace, e.event_ref) for e in packet.events}
+        added = list(packet.events)
+        for event in self._b7_money_events(conn, case_id):
+            if event.classification != "CONFIRMED_RECEIPT" or event.gross_vnd is None:
+                continue
+            kind = kind_by_purpose.get(event.purpose)
+            if kind is None:
+                continue
+            namespace = event.event_namespace or f"b7money:{event.id}"
+            ref = event.event_ref or event.id
+            if (namespace, ref) in existing:
+                continue
+            existing.add((namespace, ref))
+            added.append(B7CompanyEvent(
+                event_namespace=namespace, event_ref=ref, kind=kind,
+                amount_vnd=event.gross_vnd, payer_ref=event.payer_ref,
+                payee_ref=event.payee_ref, employee_ref=event.employee_ref,
+                work_ref=event.work_ref, outcome="RECEIVED",
+                event_at=event.event_at or event.created_at,
+                known_at=event.known_at or event.created_at,
+                refs=[f"b7money:{event.id}"]))
+        return packet.model_copy(update={"events": added})
+
+    def refresh_b7_money_context(self, case_id: str, command: Command,
+                                 b7, policy: dict,
+                                 authority_version: str | None
+                                 ) -> CaseView:
+        """Rebuild the linked context with canonical B9 money folded in.
+
+        Advances the child's as-of/known cutoff to the server's effective B7
+        time and persists a new retained system source; the packet coverage is
+        NOT auto-extended. No provider call happens here.
+        """
+        from invoice_referee.settlement.b7_workflow import effective_b7_time
+
+        payload_fp = fingerprint(_B7_MONEY_CONTEXT_REFRESH, {"case_id": case_id})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _B7_MONEY_CONTEXT_REFRESH, command,
+                                       scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                return self._case_view(conn, case_id).model_copy(
+                    update={"idempotent_replay": True})
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            if self._b7_origin_link(case) is None:
+                raise DomainError(
+                    "LINKED_B7_INVALID",
+                    "Cập nhật đối chiếu tiền chỉ áp dụng cho hồ sơ liên kết.",
+                )
+            self._check_version(case, command)
+            self._check_origin_not_stopped(
+                conn, self._b7_origin_link(case)["origin_case_id"])
+            submission = Submission.model_validate(_load(case["submission_json"]))
+            now_dt = effective_b7_time(b7)
+            new_submission = submission.model_copy(
+                update={"money_as_of": now_dt, "knowledge_cutoff": now_dt})
+            _, merged = self._b7_build_money_context(
+                conn, case_id, policy, authority_version)
+            merged = merged.model_copy(update={
+                "money_as_of": now_dt, "knowledge_cutoff": now_dt})
+            source_id = self._store_linked_context_source(
+                conn, case_id, merged, command)
+            now = _iso(utcnow())
+            conn.execute(
+                "UPDATE cases SET case_version = ?, input_revision = ?, "
+                "submission_json = ?, updated_at = ? WHERE id = ?",
+                (case["case_version"] + 1, case["input_revision"] + 1,
+                 _dump(new_submission.model_dump(mode="json")), now, case_id),
+            )
+            self._record_command(conn, case_id, case_id,
+                                 "B7_MONEY_CONTEXT_REFRESHED",
+                                 _B7_MONEY_CONTEXT_REFRESH, command, payload_fp,
+                                 {"source_id": source_id,
+                                  "as_of": _iso(now_dt)}, now)
+            return self._case_view(conn, case_id)
+
+    def revalidate_b7(self, case_id: str, command: Command, policy: dict
+                      ) -> B7RevalidationView:
+        """Revalidate that a correct fulfillment keeps the original decision.
+
+        Compares the current report's cost basis and history delta against the
+        original decision's baseline + canonical qualifying receipts. Persists
+        an audit record; never rewrites the decision.
+        """
+        from invoice_referee.settlement.b7_fulfillment import (
+            revalidate_b7_decision,
+        )
+
+        payload_fp = fingerprint(_B7_REVALIDATE, {"case_id": case_id})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _B7_REVALIDATE, command,
+                                       scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                return B7RevalidationView.model_validate(
+                    _load(row["payload_json"])["revalidation"])
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            self._check_version(case, command)
+            if self._b7_origin_link(case) is None:
+                raise DomainError(
+                    "LINKED_B7_INVALID",
+                    "Revalidate chỉ áp dụng cho hồ sơ quyết toán liên kết.",
+                )
+            decision = self._b7_current_decision(conn, case_id)
+            report = None
+            if case["current_run_id"]:
+                run = conn.execute("SELECT * FROM runs WHERE id = ?",
+                                   (case["current_run_id"],)).fetchone()
+                if run is not None and run["status"] == "SUCCEEDED" \
+                        and run["report_json"]:
+                    report = Report.model_validate(_load(run["report_json"]))
+            if report is None or decision is None:
+                raise DomainError(
+                    "B7_WORKFLOW_BLOCKED",
+                    "Cần report hiện hành và quyết định APPROVE để revalidate.")
+            snapshot = self._load_linked_context(
+                conn, self._linked_context_source_ids(conn, case_id)[-1])
+            from invoice_referee.settlement.b7_workflow import b7_cost_signature
+            submission = Submission.model_validate(_load(case["submission_json"]))
+            current_cost = b7_cost_signature(
+                submission, self._source_records(conn, case_id), report, policy,
+                snapshot)
+            qualifying = [e for e in self._b7_money_events(conn, case_id)
+                          if e.classification == "CONFIRMED_RECEIPT"]
+            reval = revalidate_b7_decision(
+                decision, report, snapshot.history or {}, qualifying,
+                current_cost)
+            now = _iso(utcnow())
+            self._record_command(conn, case_id, case_id, "B7_REVALIDATED",
+                                 _B7_REVALIDATE, command, payload_fp,
+                                 {"revalidation": reval.model_dump(mode="json")},
+                                 now)
+            return reval
+
+    def _b7_current_revalidation(self, conn: sqlite3.Connection, case_id: str
+                                 ) -> B7RevalidationView | None:
+        row = conn.execute(
+            "SELECT payload_json FROM audit_events WHERE case_id = ? AND "
+            "operation = ? ORDER BY rowid DESC LIMIT 1",
+            (case_id, _B7_REVALIDATE)).fetchone()
+        if row is None:
+            return None
+        return B7RevalidationView.model_validate(
+            _load(row["payload_json"])["revalidation"])
+
+    def _b7_open_question_count(self, conn: sqlite3.Connection,
+                                case_id: str) -> int:
+        count = 0
+        for row in conn.execute(
+                "SELECT payload_json FROM interactions WHERE case_id = ? AND "
+                "kind = 'QUESTION'", (case_id,)):
+            if _load(row["payload_json"])["status"] in _OPEN_QUESTION_STATUSES:
+                count += 1
+        return count
+
+    def handoff_b7(self, case_id: str, payload: B7HandoffPayload,
+                   command: Command, b7, b3, policy: dict) -> B7HandoffView:
+        """Create a stage-A handoff for the remaining obligation (audit only)."""
+        from invoice_referee.settlement.b7_workflow import (
+            b7_business_signature, effective_b7_time,
+        )
+
+        payload_fp = fingerprint(_B7_HANDOFF, {
+            "case_id": case_id, "payload": payload.model_dump(mode="json")})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _B7_HANDOFF, command,
+                                       scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                return B7HandoffView.model_validate(
+                    _load(row["payload_json"])["handoff"]).model_copy(
+                    update={"idempotent_replay": True})
+            case = self._case_row(conn, case_id)
+            self._check_open(case)
+            if self._b7_origin_link(case) is None:
+                raise DomainError(
+                    "LINKED_B7_INVALID", "Handoff chỉ áp dụng cho hồ sơ liên kết.")
+            if case["stop_active"]:
+                raise DomainError("STOP_ACTIVE", "Hồ sơ đang Stop; không handoff.")
+            self._check_version(case, command)
+            self._require_accountant_route_store(conn, case, command, b3)
+            self._check_origin_not_stopped(
+                conn, self._b7_origin_link(case)["origin_case_id"])
+            decision = self._b7_current_decision(conn, case_id)
+            if decision is None or decision.outcome != "APPROVE" \
+                    or decision.target is None:
+                raise DomainError(
+                    "B7_WORKFLOW_BLOCKED",
+                    "Cần quyết định APPROVE hiện hành để bàn giao.")
+            if payload.decision_id != decision.id:
+                raise DomainError(
+                    "BASIS_MISMATCH", "decision_id không khớp quyết định hiện hành.")
+            if decision.target.direction == "BALANCED":
+                raise DomainError(
+                    "B7_WORKFLOW_BLOCKED",
+                    "Quyết toán cân bằng không có phần tiền để bàn giao.")
+            fulfillment = self._b7_fulfillment(conn, case_id)
+            if fulfillment is None or fulfillment.status == "BLOCKED":
+                raise DomainError(
+                    "B7_WORKFLOW_BLOCKED",
+                    "Còn pending/unknown/incident; không bàn giao phần còn lại.")
+            remaining = fulfillment.remaining_vnd
+            if remaining is None or remaining <= 0:
+                raise DomainError(
+                    "B7_WORKFLOW_BLOCKED",
+                    "Không còn phần nghĩa vụ để bàn giao.")
+            submission = Submission.model_validate(_load(case["submission_json"]))
+            snapshot = self._load_linked_context(
+                conn, self._linked_context_source_ids(conn, case_id)[-1])
+            business_sig = b7_business_signature(
+                submission, self._source_records(conn, case_id),
+                Report.model_validate(_load(conn.execute(
+                    "SELECT * FROM runs WHERE id = ?",
+                    (decision.basis_report_id,)).fetchone()["report_json"])),
+                policy, snapshot)
+            obligation_sig = fingerprint("B7_OBLIGATION", {
+                "decision_id": decision.id, "remaining_vnd": remaining})
+            receipt_sig = self._b7_receipt_signature(conn, case_id)
+            # One current handoff per obligation signature: reuse, else conflict.
+            prior = self._b7_latest_handoff(conn, case_id)
+            if prior is not None \
+                    and prior.obligation_signature == obligation_sig:
+                return prior.model_copy(update={"idempotent_replay": True})
+            now_dt = utcnow()
+            valid_until = None
+            grant = self._b7_grant_for(b7, decision)
+            if grant is not None:
+                valid_until = getattr(grant, "effective_until", None)
+            handoff = B7HandoffView(
+                id=f"BH-{uuid.uuid4().hex[:12]}", case_id=case_id,
+                decision_id=decision.id, report_id=case["current_run_id"] or "",
+                employee_ref=submission.employee_ref,
+                work_ref=submission.work_ref, actor_id=command.actor_id,
+                direction=decision.target.direction, remaining_vnd=remaining,
+                obligation_signature=obligation_sig,
+                business_signature=business_sig,
+                receipt_history_signature=receipt_sig,
+                refs=[decision.id, decision.basis_report_id],
+                created_at=now_dt, valid_until=valid_until)
+            self._record_command(conn, case_id, case_id, "B7_HANDOFF_RECORDED",
+                                 _B7_HANDOFF, command, payload_fp,
+                                 {"handoff": handoff.model_dump(mode="json")},
+                                 _iso(now_dt))
+            return handoff
+
+    def _b7_grant_for(self, b7, decision):
+        from invoice_referee.settlement.rules import covering_grant
+        if b7 is None or not b7.activated or decision.target is None:
+            return None
+        scoped = [g for g in b7.grants if g.actor_ref == decision.actor_id]
+        return covering_grant(
+            scoped, decision.employee_ref, decision.work_ref,
+            decision.effective_at, decision.target.employee_cost_vnd,
+            decision.target.signed_net_vnd, decision.target.total_work_cost_vnd)
+
+    def _require_accountant_route_store(self, conn: sqlite3.Connection,
+                                        case: sqlite3.Row, command: Command,
+                                        b3) -> None:
+        """Direct-Store guard: only the assigned accountant may act."""
+        submission = Submission.model_validate(_load(case["submission_json"]))
+        route = b3_route_for(b3, submission.employee_ref) if b3 else None
+        if (command.demo_role != "ACCOUNTANT" or route is None
+                or route.accountant_ref != command.actor_id):
+            raise DomainError(
+                "BEYOND_AUTHORITY",
+                f"Vai {command.demo_role}/{command.actor_id} không phải kế toán "
+                f"được phân công; không thao tác fulfillment/closure.",
+            )
+
+    def _b7_receipt_signature(self, conn: sqlite3.Connection,
+                              case_id: str) -> str:
+        from invoice_referee.settlement.b7_fulfillment import canonical_event_id
+        events = [e for e in self._b7_money_events(conn, case_id)
+                  if e.classification == "CONFIRMED_RECEIPT"]
+        ids = sorted(canonical_event_id(e.event_namespace, e.event_ref, e.id)
+                     for e in events)
+        return fingerprint("B7_RECEIPTS", {"ids": ids})
+
+    def _b7_latest_handoff(self, conn: sqlite3.Connection, case_id: str
+                           ) -> B7HandoffView | None:
+        row = conn.execute(
+            "SELECT payload_json FROM audit_events WHERE case_id = ? AND "
+            "operation = ? ORDER BY rowid DESC LIMIT 1",
+            (case_id, _B7_HANDOFF)).fetchone()
+        if row is None:
+            return None
+        return B7HandoffView.model_validate(_load(row["payload_json"])["handoff"])
+
+    def close_b7(self, case_id: str, payload, command: Command, b3,
+                 policy: dict):
+        """Close a linked settlement only when every gate holds, in the txn."""
+        from invoice_referee.settlement.b7_fulfillment import (
+            b7_closure_blockers, closure_matches,
+        )
+
+        payload_fp = fingerprint(_B7_CLOSE, {
+            "case_id": case_id, "payload": payload.model_dump(mode="json")})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _B7_CLOSE, command, scope_key=case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                return B7ClosureView.model_validate(
+                    _load(row["payload_json"])["closure"]).model_copy(
+                    update={"idempotent_replay": True})
+            case = self._case_row(conn, case_id)
+            if case["stage"] in _CLOSED_STAGES:
+                existing = conn.execute(
+                    "SELECT * FROM audit_events WHERE case_id = ? AND operation = ? "
+                    "ORDER BY rowid DESC LIMIT 1", (case_id, _B7_CLOSE)).fetchone()
+                if existing is not None:
+                    stored = B7ClosureView.model_validate(
+                        _load(existing["payload_json"])["closure"])
+                    if closure_matches(stored, payload):
+                        return stored.model_copy(update={"idempotent_replay": True})
+                raise DomainError(
+                    "CASE_CLOSED",
+                    "Hồ sơ đã đóng; nguồn mới cần hồ sơ điều chỉnh liên kết.")
+            self._check_version(case, command)
+            if self._b7_origin_link(case) is None:
+                raise DomainError(
+                    "LINKED_B7_INVALID", "Đóng chỉ áp dụng cho hồ sơ liên kết.")
+            self._require_accountant_route_store(conn, case, command, b3)
+            decision = self._b7_current_decision(conn, case_id)
+            # Closure relies on the decision's stored authority snapshot; an
+            # expired grant after a valid completed action does not erase the
+            # actuals or force a ritual re-approval to close (spec §6.2). New
+            # obligations still require a current grant at handoff time.
+            report = None
+            if payload.current_report_id:
+                run = conn.execute("SELECT * FROM runs WHERE id = ? AND case_id = ?",
+                                   (payload.current_report_id, case_id)).fetchone()
+                if run is not None and run["status"] == "SUCCEEDED" \
+                        and run["report_json"]:
+                    report = Report.model_validate(_load(run["report_json"]))
+            fulfillment = self._b7_fulfillment(conn, case_id)
+            reval = self._b7_current_revalidation(conn, case_id)
+            snapshot = self._load_linked_context(
+                conn, self._linked_context_source_ids(conn, case_id)[-1])
+            scope_current = bool(
+                report is not None and case["current_run_id"] == payload.current_report_id
+                and run["input_revision"] == case["input_revision"]
+                and run["control_epoch"] == case["control_epoch"])
+            coverage_current = bool(snapshot.company_packet is not None
+                                    and snapshot.company_packet.coverage.complete_prior_history
+                                    and not snapshot.company_packet.coverage.missing_ranges)
+            parent_stop = bool(self._case_row(
+                conn, self._b7_origin_link(case)["origin_case_id"])["stop_active"])
+            blockers = b7_closure_blockers(
+                report=report, decision=decision, fulfillment=fulfillment,
+                revalidation=reval, scope_current=scope_current,
+                coverage_current=coverage_current,
+                stop_active=bool(case["stop_active"]) or parent_stop,
+                open_question_count=self._b7_open_question_count(conn, case_id))
+            if decision is None or payload.decision_id != decision.id:
+                blockers.append("decision_id không khớp quyết định hiện hành.")
+            if blockers:
+                raise DomainError(
+                    "B7_CLOSURE_BLOCKED",
+                    "Không đóng được hồ sơ quyết toán: " + "; ".join(blockers))
+            submission = Submission.model_validate(_load(case["submission_json"]))
+            from invoice_referee.settlement.b7_workflow import b7_business_signature
+            business_sig = b7_business_signature(
+                submission, self._source_records(conn, case_id), report, policy,
+                snapshot)
+            now_dt = utcnow()
+            closure = B7ClosureView(
+                id=f"BC-{uuid.uuid4().hex[:12]}", case_id=case_id,
+                decision_id=decision.id, current_report_id=payload.current_report_id,
+                actor_id=command.actor_id, kind="SETTLEMENT_COMPLETE",
+                employee_ref=submission.employee_ref, work_ref=submission.work_ref,
+                close_as_of=submission.money_as_of,
+                knowledge_cutoff=submission.knowledge_cutoff, created_at=now_dt,
+                input_revision=case["input_revision"],
+                control_epoch=case["control_epoch"], business_signature=business_sig,
+                receipt_history_signature=self._b7_receipt_signature(conn, case_id),
+                parent_fingerprint=self._linked_parent_fingerprint(
+                    conn, self._b7_origin_link(case)["origin_case_id"]),
+                source_refs=list(report.source_refs) if report else [],
+                event_ids=[e.id for e in self._b7_money_events(conn, case_id)
+                           if e.classification == "CONFIRMED_RECEIPT"],
+                original_decision_id=decision.id,
+                revalidation_ref=(reval.current_report_id if reval else None),
+                reason=payload.reason)
+            conn.execute(
+                "UPDATE cases SET stage = 'SETTLEMENT_CLOSED', case_version = ?, "
+                "updated_at = ? WHERE id = ?",
+                (case["case_version"] + 1, _iso(now_dt), case_id),
+            )
+            self._record_command(conn, case_id, case_id, "B7_SETTLEMENT_CLOSED",
+                                 _B7_CLOSE, command, payload_fp,
+                                 {"closure": closure.model_dump(mode="json")},
+                                 _iso(now_dt))
+            return closure
+
+    def _b7_closure(self, conn: sqlite3.Connection, case_id: str
+                    ) -> B7ClosureView | None:
+        row = conn.execute(
+            "SELECT payload_json FROM audit_events WHERE case_id = ? AND "
+            "operation = ? ORDER BY rowid DESC LIMIT 1",
+            (case_id, _B7_CLOSE)).fetchone()
+        if row is None:
+            return None
+        return B7ClosureView.model_validate(_load(row["payload_json"])["closure"])
+
+    def prepare_b7_adjustment(self, closed_case_id: str, payload, command: Command,
+                              b3) -> CaseView:
+        """Open a post-closure adjustment child for a closed settlement.
+
+        The closed case is never mutated; a NEW linked B7 child is created with
+        the same employee/work/B3 and an ``adjustment_of_case_id`` origin link.
+        Only one active settlement exists per employee/work: an existing active
+        child is reused rather than duplicated.
+        """
+        payload_fp = fingerprint(_B7_ADJUSTMENT, {
+            "closed_case_id": closed_case_id,
+            "payload": payload.model_dump(mode="json")})
+        with self._write() as conn:
+            row = self._lookup_command(conn, _B7_ADJUSTMENT, command,
+                                       scope_key=closed_case_id)
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                return self._case_view(
+                    conn, _load(row["payload_json"])["child_id"]).model_copy(
+                    update={"idempotent_replay": True})
+            closed = self._case_row(conn, closed_case_id)
+            if closed["stage"] not in _CLOSED_STAGES:
+                raise DomainError(
+                    "B7_WORKFLOW_BLOCKED",
+                    "Chỉ hồ sơ đã đóng mới mở hồ sơ điều chỉnh.")
+            link = self._b7_origin_link(closed)
+            if link is None:
+                raise DomainError(
+                    "LINKED_B7_INVALID",
+                    "Điều chỉnh chỉ áp dụng cho hồ sơ quyết toán liên kết.")
+            self._check_version(closed, command)
+            self._require_accountant_route_store(conn, closed, command, b3)
+            parent_id = link["origin_case_id"]
+            # One active settlement per employee/work: reuse if one is open.
+            active = self._find_linked_child(conn, parent_id)
+            if active is not None:
+                return self._case_view(conn, active["id"])
+            now_dt = utcnow()
+            now = _iso(now_dt)
+            child_id = f"C-{uuid.uuid4().hex[:12]}"
+            new_link = {
+                "origin_case_id": parent_id,
+                "employee_ref": link["employee_ref"], "work_ref": link["work_ref"],
+                "created_at": now, "adjustment_of_case_id": closed_case_id,
+            }
+            form = {"schema_version": "b7-linked-intake-v1", "confirmed": False,
+                    "expense_rows": [], "note": payload.reason,
+                    "origin_link": new_link}
+            submission = Submission(
+                employee_ref=link["employee_ref"], work_ref=link["work_ref"],
+                job="B7", money_as_of=now_dt, knowledge_cutoff=now_dt, form=form)
+            conn.execute(
+                "INSERT INTO cases (id, case_version, input_revision, control_epoch, "
+                "stop_active, stage, current_run_id, submission_json, origin, "
+                "created_at, updated_at) "
+                "VALUES (?, 1, 1, 1, 0, 'CHECKING', NULL, ?, 'USER', ?, ?)",
+                (child_id, _dump(submission.model_dump(mode="json")), now, now),
+            )
+            conn.execute(
+                "INSERT INTO case_revisions (id, case_id, revision, submission_json, "
+                "reason, actor_id, command_key, created_at) VALUES (?, ?, 1, ?, ?, ?, ?, ?)",
+                (f"R-{uuid.uuid4().hex[:12]}", child_id,
+                 _dump(submission.model_dump(mode="json")), payload.reason,
+                 command.actor_id, command.key, now),
+            )
+            self._record_command(conn, child_id, closed_case_id,
+                                 "B7_ADJUSTMENT_PREPARED", _B7_ADJUSTMENT, command,
+                                 payload_fp,
+                                 {"child_id": child_id,
+                                  "adjustment_of_case_id": closed_case_id}, now)
+            return self._case_view(conn, child_id)
 
     def record_money(self, case_id: str, payload: MoneyEventPayload,
                      after_cutoff: bool, command: Command) -> MoneyEventView:
@@ -2459,6 +3678,43 @@ class Store:
                             reason="Kế toán trình duyệt đề nghị tạm ứng cho "
                                    "người có quyền.",
                         ))
+                if linked_b7:
+                    b7_workflow = self._b7_workflow(conn, case_id)
+                    if b7_workflow is not None and (
+                            b7_workflow.decision is None
+                            or b7_workflow.status in ("RETURNED", "NEEDS_RECHECK")):
+                        actions.append(AllowedAction(
+                            action="PRESENT_B7",
+                            reason="Kế toán trình kết quả quyết toán cho "
+                                   "người có quyền.",
+                        ))
+                    if b7_workflow is not None \
+                            and b7_workflow.status == "PENDING":
+                        actions.append(AllowedAction(
+                            action="DECIDE_B7",
+                            reason="Người có quyền phê duyệt/trả lại/từ chối "
+                                   "kết quả quyết toán.",
+                        ))
+                    if b7_workflow is not None \
+                            and b7_workflow.decision is not None \
+                            and b7_workflow.decision.outcome == "APPROVE" \
+                            and b7_workflow.fulfillment is not None:
+                        fulfillment = b7_workflow.fulfillment
+                        if fulfillment.remaining_vnd is not None \
+                                and fulfillment.remaining_vnd > 0 \
+                                and fulfillment.status != "BLOCKED":
+                            actions.append(AllowedAction(
+                                action="HANDOFF_B7",
+                                reason="Bàn giao phần nghĩa vụ còn lại (audit, "
+                                       "không phải lệnh chi).",
+                            ))
+                        if fulfillment.status in ("FULFILLED", "BALANCED"):
+                            actions.append(AllowedAction(
+                                action="CLOSE_B7",
+                                reason="Đóng quyết toán khi mọi gate "
+                                       "(remaining/revalidation/coverage/Stop) "
+                                       "đều sạch.",
+                            ))
             if case["stage"] == "AWAITING_MONEY" and not b3_v1 and not linked_b7:
                 actions.append(AllowedAction(
                     action="RECORD_MONEY",
@@ -2482,6 +3738,7 @@ class Store:
             origin=case["origin"],
             b3_workflow=self._b3_workflow(conn, case_id),
             linked_b7=self._linked_b7_view(conn, case),
+            b7_workflow=self._b7_workflow(conn, case_id),
             created_at=datetime.fromisoformat(case["created_at"]),
             updated_at=datetime.fromisoformat(case["updated_at"]),
         )

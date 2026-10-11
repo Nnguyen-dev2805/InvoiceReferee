@@ -104,21 +104,53 @@ def load_b7_company_packet(payload: dict) -> B7CompanyPacket:
 def build_linked_context(*, origin_case_id: str, parent_fingerprint: str,
                          decision, managed_events, packet: B7CompanyPacket | None,
                          policy: dict, authority_version: str | None,
-                         money_as_of, knowledge_cutoff) -> LinkedB7ContextSnapshot:
+                         money_as_of, knowledge_cutoff,
+                         submission=None, source_records=None
+                         ) -> LinkedB7ContextSnapshot:
     """Build the linked context from typed records + a validated company packet.
 
     Whole-work history is KNOWN only for groups the coverage lists and only from
-    canonical company events; unknown groups stay ``None`` (never fabricated 0).
-    Managed B5 advance subtotal is never used as whole-work A.
+    canonical company events that match the employee/work scope and fall inside
+    the settlement cutoff (``event_at``/``known_at``). Unknown groups stay
+    ``None`` (never fabricated 0). Managed B5 advance subtotal is never used as
+    whole-work A.
     """
     issues = []
     history: dict[str, int | None] = {key: None for key in _HISTORY_GROUPS.values()}
     company_events = list(packet.events) if packet is not None else []
     company_expenses = list(packet.expenses) if packet is not None else []
     coverage_groups = set(packet.coverage.groups) if packet is not None else set()
+    employee_ref = getattr(submission, "employee_ref", None)
+    work_ref = getattr(submission, "work_ref", None)
     coverage_ok = bool(packet is not None
                        and packet.coverage.complete_prior_history
                        and not packet.coverage.missing_ranges)
+    if coverage_ok and employee_ref is not None \
+            and packet.coverage.employee_ref != employee_ref:
+        coverage_ok = False  # coverage for another employee is not this scope
+    if coverage_ok and work_ref is not None \
+            and packet.coverage.work_ref is not None \
+            and packet.coverage.work_ref != work_ref:
+        coverage_ok = False
+
+    def _in_scope(event) -> bool:
+        # A missing event scope is not silently matched to the case scope.
+        if event.employee_ref is not None and employee_ref is not None \
+                and event.employee_ref != employee_ref:
+            return False
+        if event.work_ref is not None and work_ref is not None \
+                and event.work_ref != work_ref:
+            return False
+        return True
+
+    def _in_window(event) -> bool:
+        if money_as_of is not None and event.event_at is not None \
+                and event.event_at > money_as_of:
+            return False
+        if knowledge_cutoff is not None and event.known_at is not None \
+                and event.known_at > knowledge_cutoff:
+            return False
+        return True
 
     if coverage_ok:
         for group, key in _HISTORY_GROUPS.items():
@@ -127,6 +159,8 @@ def build_linked_context(*, origin_case_id: str, parent_fingerprint: str,
             total = 0
             for event in company_events:
                 if event.outcome != "RECEIVED" or event.amount_vnd is None:
+                    continue
+                if not _in_scope(event) or not _in_window(event):
                     continue
                 mapping = _EVENT_HISTORY.get(event.kind)
                 if mapping is None or mapping[0] != key:

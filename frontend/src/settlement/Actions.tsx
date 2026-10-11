@@ -7,6 +7,8 @@ import { B3ApprovalPanel } from './B3Approval';
 import { B3FundingPanel } from './B3Funding';
 import { B7IntakePanel } from './B7Intake';
 import { B7CompanyContextPanel } from './B7CompanyContext';
+import { B7ApprovalPanel } from './B7Approval';
+import { B7FundingPanel } from './B7Funding';
 import type { AuditEntry, CaseView, DemoRole, Report } from './types';
 
 function formatVnd(value: number | null): string {
@@ -182,6 +184,26 @@ export function ActionsPanel({
 
       {view.linked_b7 && (
         <B7CompanyContextPanel
+          view={view}
+          role={role}
+          actorId={actorId}
+          onAction={onAction}
+        />
+      )}
+
+      {view.linked_b7 && (
+        <B7ApprovalPanel
+          view={view}
+          report={report ?? null}
+          history={history ?? []}
+          role={role}
+          actorId={actorId}
+          onAction={onAction}
+        />
+      )}
+
+      {view.linked_b7 && view.b7_workflow?.decision?.outcome === 'APPROVE' && (
+        <B7FundingPanel
           view={view}
           role={role}
           actorId={actorId}

@@ -26,6 +26,10 @@ export function stageLabel(stage: CaseStage): string {
       return 'Đang xử lý nghĩa vụ';
     case 'ADVANCE_REQUEST_REFUSED':
       return 'Đề nghị tạm ứng bị từ chối';
+    case 'SETTLEMENT_REQUEST_REFUSED':
+      return 'Đề nghị quyết toán bị từ chối';
+    case 'READY_TO_CLOSE':
+      return 'Đã duyệt cân bằng — chờ kiểm tra đóng';
     case 'REJECTED_REQUEST_ENDED':
       return 'Yêu cầu bị từ chối đã kết thúc';
     case 'SETTLEMENT_CLOSED':
