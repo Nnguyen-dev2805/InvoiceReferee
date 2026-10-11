@@ -470,6 +470,81 @@ test('kế toán thấy trạng thái "Đã lưu kết quả rà soát" khi có 
   expect(statusCard).toHaveTextContent('Đã đối chiếu bảng kê và vé máy bay.');
 });
 
+test('tab Nguồn chứng từ cho phép chọn và tải lên nhiều tệp cùng lúc', async () => {
+  const user = userEvent.setup();
+  const initialCase = caseView(true);
+  const updatedCase1: CaseView = {
+    ...initialCase,
+    case_version: 2,
+    sources: [
+      {
+        id: 'src-1',
+        filename: 'A01.pdf',
+        media_type: 'application/pdf',
+        sha256: 'sha1',
+        size_bytes: 1024,
+        status: 'ACCEPTED',
+        uploader_actor_id: 'NV-DEMO-01',
+        received_at: '2026-10-10T09:00:00Z',
+        supersedes_source_id: null,
+        provenance: {},
+      },
+    ],
+  };
+  setup(initialCase, true);
+
+  let currentVer = 1;
+  vi.spyOn(api, 'getCase').mockImplementation(async () => ({
+    ...initialCase,
+    case_version: currentVer,
+  }));
+  const addSourceSpy = vi.spyOn(api, 'addSource').mockImplementation(async () => {
+    currentVer += 1;
+    return updatedCase1.sources[0];
+  });
+
+  await user.click(await screen.findByText(/C-b3test01/));
+
+  // Chuyển sang tab Nguồn chứng từ
+  await user.click(screen.getByRole('tab', { name: /Nguồn chứng từ/ }));
+
+  const file1 = new File(['content 1'], 'A01.pdf', { type: 'application/pdf' });
+  const file2 = new File(['content 2'], 'A02.pdf', { type: 'application/pdf' });
+
+  const fileInput = screen.getByTestId('sources-file-input') as HTMLInputElement;
+  expect(fileInput).toHaveAttribute('multiple');
+
+  await user.upload(fileInput, [file1, file2]);
+
+  expect(screen.getByText('Đã chọn 2 tệp:')).toBeInTheDocument();
+  expect(screen.getByText(/A01\.pdf/)).toBeInTheDocument();
+  expect(screen.getByText(/A02\.pdf/)).toBeInTheDocument();
+
+  const uploadBtn = screen.getByRole('button', { name: 'Tải lên 2 nguồn' });
+  await user.click(uploadBtn);
+
+  await waitFor(() => expect(addSourceSpy).toHaveBeenCalledTimes(2));
+  expect(addSourceSpy).toHaveBeenNthCalledWith(
+    1,
+    'C-b3test01',
+    file1,
+    1,
+    expect.any(String),
+    expect.any(String),
+    expect.any(String),
+  );
+  expect(addSourceSpy).toHaveBeenNthCalledWith(
+    2,
+    'C-b3test01',
+    file2,
+    2,
+    expect.any(String),
+    expect.any(String),
+    expect.any(String),
+  );
+});
+
+
 
 
 

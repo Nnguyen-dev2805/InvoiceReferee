@@ -109,7 +109,8 @@ export function App() {
   const [moneyAsOf, setMoneyAsOf] = useState(nowLocalInput());
   const [knowledgeCutoff, setKnowledgeCutoff] = useState(nowLocalInput());
 
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadingSources, setUploadingSources] = useState(false);
   const [uploadNote, setUploadNote] = useState('');
   const [revisePurpose, setRevisePurpose] = useState('');
   const [reviseScope, setReviseScope] = useState('');
@@ -194,6 +195,21 @@ export function App() {
     setImportFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleAddUploadFiles = (files: FileList | File[] | null) => {
+    if (!files) return;
+    const incoming = Array.from(files);
+    if (incoming.length === 0) return;
+    setUploadFiles((prev) => {
+      const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`));
+      const newUnique = incoming.filter((f) => !existingKeys.has(`${f.name}-${f.size}`));
+      return [...prev, ...newUnique];
+    });
+  };
+
+  const handleRemoveUploadFile = (index: number) => {
+    setUploadFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const loadCases = useCallback(async () => {
     try {
       setCases(await api.listCases());
@@ -224,6 +240,8 @@ export function App() {
       setReport(null);
       setRun(null);
       setB3RunContext(null);
+      setUploadFiles([]);
+      setUploadNote('');
       const qs = await api.getQuestions(id);
       setQuestions(qs);
       let nextReport: Report | null = null;
@@ -466,21 +484,46 @@ export function App() {
   };
 
   const handleUpload = async () => {
-    if (!view || !uploadFile) return;
+    if (!view || uploadFiles.length === 0 || uploadingSources) return;
+    setUploadingSources(true);
+    let currentCase = view;
+    const remaining = [...uploadFiles];
     try {
-      await api.addSource(view.id, uploadFile, view.case_version, actorId.trim(), role,
-        uploadNote.trim());
-      setUploadFile(null);
-      setUploadNote('');
-      setSourceError(null);
-      await loadCase(view.id);
+      for (const file of uploadFiles) {
+        const note = uploadNote.trim()
+          ? (uploadFiles.length > 1 ? `${uploadNote.trim()} (${file.name})` : uploadNote.trim())
+          : '';
+        try {
+          await api.addSource(
+            currentCase.id,
+            file,
+            currentCase.case_version,
+            actorId.trim(),
+            role,
+            note,
+          );
+          currentCase = await api.getCase(currentCase.id);
+          remaining.shift();
+        } catch (fileErr) {
+          if (fileErr instanceof ApiError && SOURCE_ERROR_CODES.has(fileErr.code)) {
+            setSourceError(`Tệp "${file.name}" bị từ chối kỹ thuật (${fileErr.code}): ${fileErr.message}`);
+          } else {
+            setError(`Tải lên tệp "${file.name}" không thành công: ${fileErr instanceof Error ? fileErr.message : String(fileErr)}.`);
+          }
+          break;
+        }
+      }
+      setUploadFiles(remaining);
+      if (remaining.length === 0) {
+        setUploadNote('');
+        setSourceError(null);
+      }
+      await loadCase(currentCase.id);
       await loadCases();
     } catch (e) {
-      if (e instanceof ApiError && SOURCE_ERROR_CODES.has(e.code)) {
-        setSourceError(`Nguồn bị từ chối kỹ thuật (${e.code}): ${e.message}`);
-      } else {
-        setError(e instanceof Error ? e.message : 'Không tải lên được nguồn.');
-      }
+      setError(e instanceof Error ? e.message : 'Không tải lên được nguồn.');
+    } finally {
+      setUploadingSources(false);
     }
   };
 
@@ -1707,21 +1750,87 @@ export function App() {
               <div className="panel">
                 <h2>Nguồn chứng từ ({view.sources.length})</h2>
                 <div className="field">
-                  <label>Thêm nguồn (JPEG/PNG/PDF/CSV/TXT/MD, tối đa 20 MiB)</label>
-                  <input type="file"
-                          onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} />
+                  <label htmlFor="sources-file-input">
+                    Thêm nguồn (JPEG/PNG/PDF/CSV/TXT/MD, tối đa 20 MiB — chọn được nhiều tệp cùng lúc)
+                  </label>
+                  <input
+                    id="sources-file-input"
+                    data-testid="sources-file-input"
+                    type="file"
+                    multiple
+                    accept="image/*,application/pdf,.csv,.txt,.md"
+                    onChange={(e) => {
+                      handleAddUploadFiles(e.target.files);
+                      e.target.value = '';
+                    }}
+                  />
                 </div>
+
+                {uploadFiles.length > 0 && (
+                  <div className="selected-files-list" style={{ marginBottom: 'var(--space-3)' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
+                      Đã chọn {uploadFiles.length} tệp:
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {uploadFiles.map((file, idx) => (
+                        <span
+                          key={`${file.name}-${idx}`}
+                          className="pill-badge"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 8px',
+                            background: 'var(--color-bg-subtle, #f1f5f9)',
+                            border: '1px solid var(--color-border, #e2e8f0)',
+                            borderRadius: '4px',
+                            fontSize: '0.82rem',
+                          }}
+                        >
+                          <span>{file.name} ({formatBytes(file.size)})</span>
+                          <button
+                            type="button"
+                            aria-label={`Xoá ${file.name}`}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              padding: 0,
+                              fontSize: '0.9rem',
+                              color: 'var(--color-muted-foreground, #64748b)',
+                              lineHeight: 1,
+                            }}
+                            onClick={() => handleRemoveUploadFile(idx)}
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="field">
                   <label htmlFor="upload-note">
                     Ghi chú nguồn (bạn nói file lấy từ đâu — không tự xác thực issuer)
                   </label>
-                  <input id="upload-note" value={uploadNote}
-                          onChange={(e) => setUploadNote(e.target.value)}
-                          placeholder="Ví dụ: sao kê do kế toán export" />
+                  <input
+                    id="upload-note"
+                    value={uploadNote}
+                    onChange={(e) => setUploadNote(e.target.value)}
+                    placeholder="Ví dụ: sao kê do kế toán export"
+                  />
                 </div>
-                <button className="btn btn-primary" disabled={!uploadFile}
-                        onClick={() => void handleUpload()}>
-                  Tải lên nguồn
+                <button
+                  className="btn btn-primary"
+                  disabled={uploadFiles.length === 0 || uploadingSources}
+                  onClick={() => void handleUpload()}
+                >
+                  {uploadingSources
+                    ? `Đang tải lên (${uploadFiles.length} tệp)...`
+                    : uploadFiles.length > 1
+                      ? `Tải lên ${uploadFiles.length} nguồn`
+                      : 'Tải lên nguồn'}
                 </button>
                 {view.sources.length > 0 && (
                   <table style={{ marginTop: 'var(--space-4)' }}>
