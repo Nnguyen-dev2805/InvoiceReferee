@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections import defaultdict
+from datetime import date, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
 from typing import Annotated, Any
@@ -102,14 +105,10 @@ SETTLEMENT_TYPE_LABELS = {
     "EMPLOYEE_REIMBURSEMENT": "Hoàn ứng nhân viên",
 }
 
-OUTCOME_PRIORITY = {
-    "RECOMMEND_REJECT": 0,
-    "PROCESSING_FAILED": 1,
-    "ACCOUNTANT_REVIEW": 2,
-    "REQUEST_INFO": 3,
-    "ESCALATE": 4,
-    "PROCESSING": 5,
-    "READY_FOR_APPROVAL": 6,
+TIME_RANGE_DAYS = {
+    "7": 7,
+    "30": 30,
+    "all": None,
 }
 
 LEGACY_REJECTION_RULES = {
@@ -156,6 +155,87 @@ def _decorate_case_outcome(case: dict[str, Any]) -> dict[str, Any]:
         settlement_type, settlement_type or "Chưa xác định"
     )
     return case
+
+
+def _submitted_at(case: dict[str, Any]) -> datetime | None:
+    """Read persisted ISO timestamps defensively so old records stay visible."""
+    raw_value = str(case.get("submitted_at") or "").strip()
+    if not raw_value:
+        return None
+    try:
+        return datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _claimed_amount(case: dict[str, Any]) -> Decimal:
+    try:
+        return Decimal(str(case.get("claimed_total") or "0"))
+    except (InvalidOperation, ValueError):
+        return Decimal("0")
+
+
+def _format_vnd(value: Decimal) -> str:
+    return f"{value:,.0f} VND"
+
+
+def _build_accounting_timeline(
+    cases: list[dict[str, Any]],
+    period: str,
+) -> dict[str, Any]:
+    """Build a time-first view model without changing stored accounting data."""
+    today = date.today()
+    days = TIME_RANGE_DAYS[period]
+    start_date = today - timedelta(days=days - 1) if days else None
+
+    dated_cases: list[tuple[datetime, dict[str, Any]]] = []
+    undated_cases: list[dict[str, Any]] = []
+    for case in cases:
+        submitted_at = _submitted_at(case)
+        if submitted_at is None:
+            undated_cases.append(case)
+            continue
+        if start_date is None or submitted_at.date() >= start_date:
+            dated_cases.append((submitted_at, case))
+
+    dated_cases.sort(key=lambda item: item[0], reverse=True)
+    visible_cases = [case for _, case in dated_cases]
+    if period == "all":
+        visible_cases.extend(undated_cases)
+
+    by_day: dict[date, list[dict[str, Any]]] = defaultdict(list)
+    for submitted_at, case in dated_cases:
+        by_day[submitted_at.date()].append(case)
+
+    total_amount = sum((_claimed_amount(case) for case in visible_cases), Decimal("0"))
+    today_cases = by_day[today]
+    seven_day_start = today - timedelta(days=6)
+    thirty_day_start = today - timedelta(days=29)
+
+    def summary_for(start: date) -> tuple[int, Decimal]:
+        selected = [
+            case
+            for submitted_at, case in dated_cases
+            if submitted_at.date() >= start
+        ]
+        return len(selected), sum((_claimed_amount(case) for case in selected), Decimal("0"))
+
+    week_count, week_amount = summary_for(seven_day_start)
+    month_count, month_amount = summary_for(thirty_day_start)
+    today_amount = sum((_claimed_amount(case) for case in today_cases), Decimal("0"))
+    return {
+        "visible_cases": visible_cases,
+        "summary": {
+            "today_count": len(today_cases),
+            "today_amount": _format_vnd(today_amount),
+            "week_count": week_count,
+            "week_amount": _format_vnd(week_amount),
+            "month_count": month_count,
+            "month_amount": _format_vnd(month_amount),
+            "visible_count": len(visible_cases),
+            "visible_amount": _format_vnd(total_amount),
+        },
+    }
 
 
 def _document_preview_kind(mime_type: str, filename: str) -> str:
@@ -515,35 +595,39 @@ def build_router(templates_root: Path) -> APIRouter:
     )
     def accounting_queue(
         request: Request,
+        period: str = "30",
         decision: str | None = None,
         deleted: str | None = None,
     ) -> HTMLResponse:
+        selected_period = period if period in TIME_RANGE_DAYS else "30"
+        selected_decision = decision if decision in OUTCOME_LABELS else None
         repository = _runtime(request).repository
         all_cases = repository.list_cases()
         for case in all_cases:
             _decorate_case_outcome(case)
             if case["outcome_key"] == "READY_FOR_APPROVAL":
                 case["decision_reason"] = build_settlement_success_reason(case)
-        all_cases.sort(
-            key=lambda case: OUTCOME_PRIORITY[case["outcome_key"]]
-        )
-        cases = [
+        visible_by_decision = [
             case
             for case in all_cases
-            if decision is None or case["outcome_key"] == decision
+            if selected_decision is None
+            or case["outcome_key"] == selected_decision
         ]
         counts = {
-            key: len([case for case in all_cases if case["outcome_key"] == key])
+            key: sum(1 for case in all_cases if case["outcome_key"] == key)
             for key in OUTCOME_LABELS
         }
+        timeline = _build_accounting_timeline(visible_by_decision, selected_period)
         return templates.TemplateResponse(
             request=request,
             name="accounting/queue.html",
             context=_template_context(
                 request,
                 active_page="accounting",
-                cases=cases,
-                selected_decision=decision,
+                cases=timeline["visible_cases"],
+                timeline_summary=timeline["summary"],
+                selected_period=selected_period,
+                selected_decision=selected_decision,
                 counts=counts,
                 deleted_case_id=deleted,
             ),

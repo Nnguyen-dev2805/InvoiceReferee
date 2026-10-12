@@ -32,11 +32,10 @@ def test_fastapi_employee_and_accounting_pages_render(
         assert "Mã ngoại lệ" not in script.text
         accounting_page = client.get("/accounting/cases")
         assert accounting_page.status_code == 200
-        assert "Hàng đợi hồ sơ" in accounting_page.text
-        assert "Kế toán xem xét" in accounting_page.text
-        assert "Đề xuất từ chối" in accounting_page.text
-        assert "Sẵn sàng phê duyệt" in accounting_page.text
-        assert "Lỗi xử lý" in accounting_page.text
+        assert "Hồ sơ theo thời gian" in accounting_page.text
+        assert "7 ngày gần nhất" in accounting_page.text
+        assert "30 ngày gần nhất" in accounting_page.text
+        assert "Hồ sơ đã nhận" in accounting_page.text
 
 
 def test_multipart_submission_is_visible_to_accounting(
@@ -100,11 +99,9 @@ def test_multipart_submission_is_visible_to_accounting(
         assert "Công ty hoàn lại cho nhân viên 1.200.000 VND" in queue.text
         assert "Tiếp khách dự án Demo" in queue.text
         assert "Sẵn sàng phê duyệt" in queue.text
-        ready_queue = client.get(
-            "/accounting/cases?decision=READY_FOR_APPROVAL"
-        )
-        assert ready_queue.status_code == 200
-        assert case_id in ready_queue.text
+        time_queue = client.get("/accounting/cases?period=7")
+        assert time_queue.status_code == 200
+        assert case_id in time_queue.text
 
         action = client.post(
             f"/accounting/cases/{case_id}/actions",
