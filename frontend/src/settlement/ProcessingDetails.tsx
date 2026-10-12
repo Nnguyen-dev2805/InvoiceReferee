@@ -11,7 +11,7 @@ interface ProcessingDetailsProps {
 export function ProcessingDetails({ run, report }: ProcessingDetailsProps) {
   if (!run) return null;
   return (
-    <details className="tech-context-summary" data-testid="processing-details">
+    <details className="tech-context-summary sr-only" data-testid="processing-details">
       <summary>Thông tin xử lý</summary>
       <ul className="reasons">
         <li>Run: <code>{run.id}</code></li>

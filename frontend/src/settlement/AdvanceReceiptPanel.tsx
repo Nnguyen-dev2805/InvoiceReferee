@@ -8,12 +8,13 @@
 // Two method branches (BANK_TRANSFER / CASH) capture the facts each source
 // actually proves. A receipt is not recordable until the proof source is
 // attached and the method-specific receiver condition is read.
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import * as api from './api';
 import { formatMoney } from './displayText';
 import type {
   B3AdvanceReportedStatus, B3BankReceiptDetails, B3CashReceiptDetails,
-  B3Person, B3ReceiptDetails, B3ReceiptSource, CaseView, DemoRole, SourceView,
+  B3Person, B3ReceiptDetails, B3ReceiptReadView, B3ReceiptSource, CaseView,
+  DemoRole, SourceView,
 } from './types';
 
 function formatVnd(value: number | null | undefined): string {
@@ -56,7 +57,6 @@ export function AdvanceReceiptPanel({
   const [receiverName, setReceiverName] = useState('');
   const [senderSide, setSenderSide] =
     useState<'COMPANY' | 'OTHER' | 'UNKNOWN'>('COMPANY');
-  const [namespace, setNamespace] = useState('');
   const [eventRef, setEventRef] = useState('');
   const [eventAt, setEventAt] = useState('');
   const [note, setNote] = useState('');
@@ -70,19 +70,37 @@ export function AdvanceReceiptPanel({
     useState<B3CashReceiptDetails['acknowledgement']>('UNCONFIRMED');
 
   const [proofId, setProofId] = useState<string | null>(null);
+  const [proofFilename, setProofFilename] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Receipt read (AI/reader draft) — separate from the confirmed event.
+  const [read, setRead] = useState<B3ReceiptReadView | null>(null);
+  const [reading, setReading] = useState(false);
+  const [readError, setReadError] = useState<string | null>(null);
+  // Bumped on every user edit so a late read result cannot overwrite edits.
+  const editSeqRef = useRef(0);
+  const readSeqRef = useRef(0);
+  // The file/source the current draft belongs to; a late read only applies when
+  // it still matches the current upload and no user edit happened since.
+  const draftKeyRef = useRef<string | null>(null);
 
   const isAccountant = role === 'ACCOUNTANT';
   const payable = decision?.outcome === 'APPROVE';
 
-  const methodSources = useMemo(
-    () => receiptSources.filter((s) => s.method === method),
+  // The company has one bank account and one cash fund, set up by the backend.
+  // The source follows the method automatically — the user never picks it.
+  const activeSource = useMemo(
+    () => receiptSources.find((s) => s.method === method) ?? null,
     [receiptSources, method]);
+  const sourceNamespace = activeSource?.namespace ?? null;
+  const sourceLabel = activeSource?.label ?? null;
 
   const grossNum = gross.trim() === '' ? null : Number(gross);
   const payeeRef = recipient === OTHER_PAYEE ? OTHER_PAYEE
     : recipient === NONE_PAYEE ? null : recipient || null;
+
+  // Any manual edit invalidates an in-flight read so its late result is dropped.
+  const touch = () => { editSeqRef.current += 1; };
 
   const canRecord = useMemo(() => {
     if (!isAccountant || !payable) return false;
@@ -95,7 +113,7 @@ export function AdvanceReceiptPanel({
       if (!proofId) return false;
       if (!recipient) return false;
       if (!receiverName.trim()) return false;
-      if (!namespace.trim() || !eventRef.trim() || !eventAt) return false;
+      if (!sourceNamespace || !eventRef.trim() || !eventAt) return false;
       if (method === 'BANK_TRANSFER' && proofScope !== 'RECEIVER_CONFIRMED') return false;
       if (method === 'CASH') {
         if (acknowledgement !== 'ACKNOWLEDGED') return false;
@@ -104,7 +122,7 @@ export function AdvanceReceiptPanel({
     }
     return true;
   }, [isAccountant, payable, grossNum, outcome, note, proofId, recipient,
-      receiverName, namespace, eventRef, eventAt, method, proofScope,
+      receiverName, sourceNamespace, eventRef, eventAt, method, proofScope,
       acknowledgement, voucherNumber]);
 
   if (!workflow || !payable) return null;
@@ -115,7 +133,7 @@ export function AdvanceReceiptPanel({
       amount_vnd: grossNum, currency: 'VND', payer_side: senderSide,
       payee_ref: payeeRef, event_at: eventAt || null,
       receiver_outcome: outcome || null,
-      event_namespace: namespace.trim() || null,
+      event_namespace: sourceNamespace,
       event_ref: eventRef.trim() || null, method,
       receiver_name: receiverName.trim() || null,
     };
@@ -139,25 +157,89 @@ export function AdvanceReceiptPanel({
     }
     return {
       kind: 'CASH', voucher_number: voucherNumber.trim() || null,
-      cashbook_label: namespace.trim() || null,
+      cashbook_label: sourceNamespace,
       handed_by_name: handedBy.trim() || null,
       receiver_name: receiverName.trim() || null,
       acknowledgement,
     };
   };
 
+  // Apply a read result to the editable draft. Only applies when it still
+  // belongs to the current upload and the user has not edited since the read
+  // started — a late/older read never overwrites newer input.
+  const applyRead = (result: B3ReceiptReadView, key: string,
+                     editSeqAtStart: number) => {
+    if (draftKeyRef.current !== key) return;      // file/method/case changed
+    if (editSeqRef.current !== editSeqAtStart) return;  // user edited since
+    setRead(result);
+    const p = result.proposal;
+    if (p.amount_vnd !== null) setGross(String(p.amount_vnd));
+    if (p.receiver_name) setReceiverName(p.receiver_name);
+    if (p.payee_ref === OTHER_PAYEE) setRecipient(OTHER_PAYEE);
+    else if (p.payee_ref && p.payee_ref !== 'OTHER') setRecipient(p.payee_ref);
+    if (p.payer_name) setSenderSide('COMPANY');
+    if (p.event_ref) setEventRef(p.event_ref);
+    if (p.event_at) setEventAt(p.event_at.slice(0, 16));
+    if (p.proof_scope) setProofScope(p.proof_scope);
+    if (p.voucher_number) setVoucherNumber(p.voucher_number);
+    if (p.handed_by_name) setHandedBy(p.handed_by_name);
+    if (p.acknowledgement) setAcknowledgement(p.acknowledgement);
+    if (p.classification_hint === 'CONFIRMED_RECEIPT') setOutcome('RECEIVED');
+    else if (result.status === 'FAILED') setOutcome('');
+  };
+
+  const runRead = async (sourceId: string, key: string) => {
+    setReading(true);
+    setReadError(null);
+    const editSeqAtStart = editSeqRef.current;
+    readSeqRef.current += 1;
+    try {
+      await onAction('B3_RECEIPT_READ', async () => {
+        const result = await api.readB3AdvanceReceipt(view.id, {
+          actor_id: actorId.trim(), demo_role: role,
+          expected_case_version: view.case_version,
+          source_id: sourceId, method,
+        });
+        applyRead(result, key, editSeqAtStart);
+        return result;
+      });
+    } catch (error) {
+      setReadError(error instanceof Error ? error.message
+        : 'Đọc chứng từ thất bại; nhập tay theo nguồn.');
+    } finally {
+      setReading(false);
+    }
+  };
+
   const handleUpload = async (file: File) => {
     setUploading(true);
+    // A new file starts a fresh draft: clear the previous read so its data is
+    // never reused for a different document.
+    setRead(null);
+    setReadError(null);
+    const key = `${file.name}:${file.size}:${file.lastModified}:${method}`;
+    draftKeyRef.current = key;
     try {
+      let uploadedId: string | null = null;
       await onAction('B3_ADVANCE_PROOF', async () => {
         const src = await api.uploadB3AdvanceProof(
           view.id, file, view.case_version, actorId.trim(), role, note.trim());
         setProofId(src.id);
+        setProofFilename(src.filename);
+        uploadedId = src.id;
         return src;
       });
+      // Auto-start the read after a successful upload (best-effort; manual
+      // entry stays available if it fails).
+      if (uploadedId) await runRead(uploadedId, key);
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleReRead = async () => {
+    if (!proofId) return;
+    await runRead(proofId, draftKeyRef.current ?? `${proofId}:${method}`);
   };
 
   const submit = async () => {
@@ -168,7 +250,7 @@ export function AdvanceReceiptPanel({
           actor_id: actorId.trim(), demo_role: role,
           expected_case_version: view.case_version,
           decision_id: decision?.id ?? null,
-          event_namespace: namespace.trim() || null,
+          event_namespace: sourceNamespace,
           event_ref: eventRef.trim() || null,
           method, gross_vnd: grossNum,
           payer_side: senderSide,
@@ -248,32 +330,81 @@ export function AdvanceReceiptPanel({
           <select id="b3-funding-method" value={method}
                   onChange={(e) => {
                     setMethod(e.target.value as 'BANK_TRANSFER' | 'CASH');
-                    // Switching method drops a support attached to the old one.
+                    // Switching method drops the support and the read draft of
+                    // the old one so evidence of the previous method is never
+                    // reused; a late read for the old method is dropped.
                     setProofId(null);
-                    setNamespace('');
+                    setProofFilename(null);
+                    setRead(null);
+                    setReadError(null);
+                    draftKeyRef.current = null;
+                    touch();
                   }}>
             <option value="BANK_TRANSFER">Chuyển khoản</option>
             <option value="CASH">Tiền mặt</option>
           </select>
 
+          <p className="muted" data-testid="b3-funding-source">
+            Nguồn chi: <strong>{sourceLabel ?? 'Chưa có nguồn chi'}</strong>
+          </p>
+
           <label htmlFor="b3-proof-file">Chứng từ ứng (biên nhận ngân hàng / phiếu chi)</label>
-          <input id="b3-proof-file" type="file" disabled={uploading}
+          <input id="b3-proof-file" type="file" disabled={uploading || reading}
                  onChange={(e) => {
                    const file = e.target.files?.[0];
                    if (file) void handleUpload(file);
                  }} />
-          {proofId && (
-            <p className="muted">Đã đính kèm chứng từ <code>{proofId}</code></p>
+          {proofFilename && (
+            <p className="muted" data-testid="b3-proof-filename">
+              Chứng từ: <strong>{proofFilename}</strong>
+            </p>
+          )}
+          {(uploading || reading) && (
+            <p className="muted" data-testid="b3-read-status">
+              {uploading ? 'Đang tải lên…' : 'Đang đọc chứng từ…'}
+            </p>
+          )}
+          {!uploading && !reading && read && (
+            <p className="muted" data-testid="b3-read-status">
+              {read.status === 'READ'
+                ? 'Đã đọc chứng từ thành bản nháp — kế toán rà soát và sửa.'
+                : read.status === 'PARTIAL'
+                  ? 'Đọc được một phần; kiểm tra và bổ sung.'
+                  : 'Không đọc được tự động; nhập tay theo nguồn.'}
+            </p>
+          )}
+          {readError && (
+            <p className="notice notice-warn" role="alert" data-testid="b3-read-error">
+              {readError}
+            </p>
+          )}
+          {read?.status === 'FAILED' && read.error && (
+            <p className="review-hint" data-testid="b3-read-detail">{read.error}</p>
+          )}
+          {proofId && !uploading && !reading && (
+            <button type="button" className="btn btn-sm btn-outline-primary"
+                    onClick={() => void handleReRead()}>
+              Đọc lại chứng từ
+            </button>
+          )}
+
+          {read && read.warnings.length > 0 && (
+            <div className="notice notice-warn" role="alert"
+                 data-testid="b3-read-warnings">
+              {read.warnings.map((warning) => (
+                <p key={warning.code}>{warning.message}</p>
+              ))}
+            </div>
           )}
 
           <label htmlFor="b3-funding-gross">Số tiền nguồn ghi (VND)</label>
           <input id="b3-funding-gross" type="number" min="0" value={gross}
-                 onChange={(e) => setGross(e.target.value)} />
+                 onChange={(e) => { touch(); setGross(e.target.value); }} />
 
           <label htmlFor="b3-funding-outcome">Kết quả giao dịch (theo nguồn)</label>
           <select id="b3-funding-outcome" value={outcome}
-                  onChange={(e) => setOutcome(
-                    e.target.value as B3AdvanceReportedStatus)}>
+                  onChange={(e) => { touch(); setOutcome(
+                    e.target.value as B3AdvanceReportedStatus); }}>
             <option value="">— Chọn theo nguồn —</option>
             <option value="RECEIVED">Đã nhận (RECEIVED)</option>
             <option value="PENDING">Đang chờ (PENDING)</option>
@@ -284,7 +415,7 @@ export function AdvanceReceiptPanel({
 
           <label htmlFor="b3-funding-recipient">Người nhận thực tế (đọc từ nguồn)</label>
           <select id="b3-funding-recipient" value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}>
+                  onChange={(e) => { touch(); setRecipient(e.target.value); }}>
             <option value="">— Chọn theo nguồn —</option>
             {people.map((p) => (
               <option key={p.actor_ref} value={p.actor_ref}>
@@ -297,29 +428,21 @@ export function AdvanceReceiptPanel({
 
           <label htmlFor="b3-funding-receiver-name">Tên người nhận (theo nguồn)</label>
           <input id="b3-funding-receiver-name" value={receiverName}
-                 onChange={(e) => setReceiverName(e.target.value)}
+                 onChange={(e) => { touch(); setReceiverName(e.target.value); }}
                  placeholder="Giữ nguyên văn tên đọc được trên chứng từ" />
 
           <label htmlFor="b3-funding-sender">Bên chi (theo nguồn)</label>
           <select id="b3-funding-sender" value={senderSide}
-                  onChange={(e) => setSenderSide(
-                    e.target.value as 'COMPANY' | 'OTHER' | 'UNKNOWN')}>
+                  onChange={(e) => { touch(); setSenderSide(
+                    e.target.value as 'COMPANY' | 'OTHER' | 'UNKNOWN'); }}>
             <option value="COMPANY">Công ty</option>
             <option value="OTHER">Người khác</option>
             <option value="UNKNOWN">Chưa rõ</option>
           </select>
 
-          <label htmlFor="b3-funding-namespace">Nguồn chi (theo cấu hình)</label>
-          <select id="b3-funding-namespace" value={namespace}
-                  onChange={(e) => setNamespace(e.target.value)}>
-            <option value="">— Chọn nguồn chi —</option>
-            {methodSources.map((s) => (
-              <option key={s.namespace} value={s.namespace}>{s.label}</option>
-            ))}
-          </select>
-          {methodSources.length === 0 && (
+          {!sourceNamespace && (
             <p className="review-hint">
-              Chưa cấu hình nguồn chi cho phương thức này; không ghi nhận mới.
+              Chưa có nguồn chi cho phương thức này; không ghi nhận mới.
             </p>
           )}
 
@@ -327,18 +450,18 @@ export function AdvanceReceiptPanel({
             {method === 'CASH' ? 'Mã sự kiện / số phiếu (event_ref)' : 'Mã giao dịch (event_ref)'}
           </label>
           <input id="b3-funding-ref" value={eventRef}
-                 onChange={(e) => setEventRef(e.target.value)} />
+                 onChange={(e) => { touch(); setEventRef(e.target.value); }} />
 
           <label htmlFor="b3-funding-time">Thời điểm giao dịch</label>
           <input id="b3-funding-time" type="datetime-local" value={eventAt}
-                 onChange={(e) => setEventAt(e.target.value)} />
+                 onChange={(e) => { touch(); setEventAt(e.target.value); }} />
 
           {method === 'BANK_TRANSFER' ? (
             <>
               <label htmlFor="b3-funding-proof-scope">Phạm vi nguồn xác nhận</label>
               <select id="b3-funding-proof-scope" value={proofScope}
-                      onChange={(e) => setProofScope(
-                        e.target.value as B3BankReceiptDetails['proof_scope'])}>
+                      onChange={(e) => { touch(); setProofScope(
+                        e.target.value as B3BankReceiptDetails['proof_scope']); }}>
                 <option value="UNCONFIRMED">— Chưa rõ —</option>
                 <option value="ORDER_ONLY">Lệnh mới tạo</option>
                 <option value="SENDER_DEBIT">Chỉ trích nợ bên gửi</option>
@@ -349,14 +472,14 @@ export function AdvanceReceiptPanel({
             <>
               <label htmlFor="b3-funding-voucher">Số phiếu chi</label>
               <input id="b3-funding-voucher" value={voucherNumber}
-                     onChange={(e) => setVoucherNumber(e.target.value)} />
+                     onChange={(e) => { touch(); setVoucherNumber(e.target.value); }} />
               <label htmlFor="b3-funding-handed-by">Người giao tiền (theo nguồn)</label>
               <input id="b3-funding-handed-by" value={handedBy}
-                     onChange={(e) => setHandedBy(e.target.value)} />
+                     onChange={(e) => { touch(); setHandedBy(e.target.value); }} />
               <label htmlFor="b3-funding-ack">Kết quả giao/nhận tiền mặt</label>
               <select id="b3-funding-ack" value={acknowledgement}
-                      onChange={(e) => setAcknowledgement(
-                        e.target.value as B3CashReceiptDetails['acknowledgement'])}>
+                      onChange={(e) => { touch(); setAcknowledgement(
+                        e.target.value as B3CashReceiptDetails['acknowledgement']); }}>
                 <option value="UNCONFIRMED">— Chưa đủ căn cứ —</option>
                 <option value="ACKNOWLEDGED">Đã giao, có xác nhận nhận tiền</option>
                 <option value="NOT_HANDED">Chưa giao</option>

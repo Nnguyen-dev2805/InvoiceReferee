@@ -109,12 +109,12 @@ def test_record_receipt_fulfills_and_isolates_from_b7(b3_client):
     values = {"amount_vnd": 2_000_000, "currency": "VND",
               "payer_side": "COMPANY", "payee_ref": "NV-DEMO-01",
               "event_at": event_at.isoformat(), "receiver_outcome": "RECEIVED",
-              "event_namespace": "BANK:DEMO-ACCOUNT", "event_ref": "TX-ADV-API",
+              "event_namespace": "BANK:L01-COMPANY", "event_ref": "TX-ADV-API",
               "method": "BANK_TRANSFER", "receiver_name": "Nguyễn An"}
     body = {
         "actor_id": "ACC-DEMO-01", "demo_role": "ACCOUNTANT",
         "expected_case_version": case["case_version"],
-        "decision_id": decision["id"], "event_namespace": "BANK:DEMO-ACCOUNT",
+        "decision_id": decision["id"], "event_namespace": "BANK:L01-COMPANY",
         "event_ref": "TX-ADV-API", "method": "BANK_TRANSFER",
         "gross_vnd": 2_000_000, "payer_side": "COMPANY",
         "payee_ref": "NV-DEMO-01", "event_at": event_at.isoformat(),
@@ -180,3 +180,57 @@ def test_event_same_key_replays(b3_client):
                             json=body, headers={"Idempotency-Key": "ev-same"})
     assert replay.status_code == 200, replay.text
     assert replay.json()["id"] == first.json()["id"]
+
+
+def test_receipt_read_endpoint_creates_draft_not_event(b3_client):
+    """POST b3-advance-receipt-reads returns a draft; no money event exists."""
+    case, decision = _ready(b3_client)
+    proof = b3_client.post(
+        f"/api/cases/{case['id']}/b3-advance-proofs",
+        data={"actor_id": "ACC-DEMO-01", "demo_role": "ACCOUNTANT",
+              "expected_case_version": case["case_version"]},
+        files={"file": ("r.txt", b"x", "text/plain")},
+        headers={"Idempotency-Key": "pf-read"})
+    assert proof.status_code == 201, proof.text
+    source_id = proof.json()["id"]
+    case = b3_client.get(f"/api/cases/{case['id']}").json()
+    read = b3_client.post(
+        f"/api/cases/{case['id']}/b3-advance-receipt-reads",
+        json={"actor_id": "ACC-DEMO-01", "demo_role": "ACCOUNTANT",
+              "expected_case_version": case["case_version"],
+              "source_id": source_id, "method": "BANK_TRANSFER"},
+        headers={"Idempotency-Key": "read-1"})
+    assert read.status_code == 201, read.text
+    body = read.json()
+    assert body["source_id"] == source_id
+    assert body["filename"] == "r.txt"
+    # The fake reader cannot read a text blob as a receipt → FAILED draft, but
+    # the read is retained and no money event/stage change happened.
+    assert body["status"] in {"READ", "PARTIAL", "FAILED"}
+    after = b3_client.get(f"/api/cases/{case['id']}").json()
+    assert after["b3_workflow"]["funding"]["recorded_received_vnd"] is None
+    assert after["b3_workflow"]["advance_events"] == []
+    listed = b3_client.get(
+        f"/api/cases/{case['id']}/b3-advance-receipt-reads").json()
+    assert len(listed) == 1
+    assert listed[0]["id"] == body["id"]
+
+
+def test_receipt_read_requires_accountant(b3_client):
+    case, decision = _ready(b3_client)
+    proof = b3_client.post(
+        f"/api/cases/{case['id']}/b3-advance-proofs",
+        data={"actor_id": "ACC-DEMO-01", "demo_role": "ACCOUNTANT",
+              "expected_case_version": case["case_version"]},
+        files={"file": ("r.txt", b"x", "text/plain")},
+        headers={"Idempotency-Key": "pf-read2"})
+    source_id = proof.json()["id"]
+    case = b3_client.get(f"/api/cases/{case['id']}").json()
+    read = b3_client.post(
+        f"/api/cases/{case['id']}/b3-advance-receipt-reads",
+        json={"actor_id": "NV-DEMO-01", "demo_role": "EMPLOYEE",
+              "expected_case_version": case["case_version"],
+              "source_id": source_id, "method": "BANK_TRANSFER"},
+        headers={"Idempotency-Key": "read-bad"})
+    assert read.status_code == 403, read.text
+    assert read.json()["code"] == "BEYOND_AUTHORITY"

@@ -295,7 +295,8 @@ def prepare_adjustment(conn: sqlite3.Connection, closed_case_id: str, payload,
         return active["id"], False
     now_dt = clock.utcnow()
     now = clock.iso(now_dt)
-    child_id = _rec.new_id("C-")
+    prefix = f"QT-{now_dt.strftime('%y%m')}-"
+    child_id = _rec.new_case_id(conn, prefix)
     new_link = {
         "origin_case_id": parent_id,
         "employee_ref": link["employee_ref"], "work_ref": link["work_ref"],

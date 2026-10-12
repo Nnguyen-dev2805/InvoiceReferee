@@ -46,6 +46,7 @@ from invoice_referee.settlement.contracts.b3_contracts import (
     B3DecisionState,
     B3Proposal,
     B3ReceiptSource,
+    DEMO_RECEIPT_SOURCES,
 )
 from invoice_referee.settlement.contracts.advance import (
     B3WorkflowStatus,
@@ -172,6 +173,17 @@ from invoice_referee.settlement.contracts.case import (
     ResponseView,
     CaseSnapshot,
 )
+from invoice_referee.settlement.contracts.receipt import (
+    RECEIPT_KEYS,
+    RECEIPT_SCALAR_KEYS,
+    ReceiptReadStatus,
+    ReceiptProofScope,
+    ReceiptAcknowledgement,
+    B3ReceiptFact,
+    B3ReceiptProposal,
+    B3ReceiptWarning,
+    B3ReceiptReadView,
+)
 from invoice_referee.settlement.contracts.fingerprint import (
     canonical_json,
     fingerprint,
@@ -209,6 +221,7 @@ __all__ = [
     "B3DecisionState",
     "B3Proposal",
     "B3ReceiptSource",
+    "DEMO_RECEIPT_SOURCES",
     "B3WorkflowStatus",
     "B3DecisionOutcome",
     "B3DecisionValidity",
@@ -324,6 +337,15 @@ __all__ = [
     "QuestionView",
     "ResponseView",
     "CaseSnapshot",
+    "RECEIPT_KEYS",
+    "RECEIPT_SCALAR_KEYS",
+    "ReceiptReadStatus",
+    "ReceiptProofScope",
+    "ReceiptAcknowledgement",
+    "B3ReceiptFact",
+    "B3ReceiptProposal",
+    "B3ReceiptWarning",
+    "B3ReceiptReadView",
     "canonical_json",
     "fingerprint",
 ]
@@ -339,6 +361,7 @@ from invoice_referee.settlement.contracts import (  # noqa: E402
     base as _base,
     case as _case,
     fingerprint as _fingerprint,
+    receipt as _receipt,
     report as _report,
     run as _run,
     settlement as _settlement,
@@ -354,7 +377,7 @@ def _rebuild_contracts() -> None:
     """
     namespace: dict[str, object] = {}
     for module in (_base, _b3_contracts, _advance, _run, _report, _settlement,
-                   _case, _fingerprint):
+                   _case, _receipt, _fingerprint):
         namespace.update(vars(module))
     for obj in tuple(namespace.values()):
         if (isinstance(obj, type) and issubclass(obj, BaseModel)
@@ -367,5 +390,5 @@ def _rebuild_contracts() -> None:
 _rebuild_contracts()
 del (
     _rebuild_contracts, _advance, _base, _b3_contracts, _case, _fingerprint,
-    _report, _run, _settlement,
+    _receipt, _report, _run, _settlement,
 )

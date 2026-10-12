@@ -1,6 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { vi } from 'vitest';
 import { AdvanceReceiptPanel } from './AdvanceReceiptPanel';
-import type { CaseView } from './types';
+import * as api from './api';
+import type { B3ReceiptReadView, CaseView } from './types';
 
 const B3_FORM = { schema_version: 'b3-intake-v1', confirmed: true };
 
@@ -8,9 +10,11 @@ const PEOPLE = [
   { actor_ref: 'NV-DEMO-01', role: 'EMPLOYEE' as const, name: 'Nguyễn An', department: 'Kinh doanh' },
   { actor_ref: 'ACC-DEMO-01', role: 'ACCOUNTANT' as const, name: 'Trần Bình', department: 'Kế toán' },
 ];
+// The backend default sources: namespaces kept from L01, generic company
+// labels. The user never chooses these — they follow the method.
 const RECEIPT_SOURCES = [
-  { method: 'BANK_TRANSFER' as const, namespace: 'BANK:DEMO-ACCOUNT', label: 'Tài khoản chi công ty demo' },
-  { method: 'CASH' as const, namespace: 'CASH:DEMO-QUY', label: 'Quỹ tiền mặt demo' },
+  { method: 'BANK_TRANSFER' as const, namespace: 'BANK:L01-COMPANY', label: 'Tài khoản ngân hàng công ty' },
+  { method: 'CASH' as const, namespace: 'CASH:L01-QUY-CHINH', label: 'Quỹ tiền mặt công ty' },
 ];
 
 function makeView(overrides: Partial<CaseView> = {}): CaseView {
@@ -64,6 +68,8 @@ function makeView(overrides: Partial<CaseView> = {}): CaseView {
 }
 
 const noop = async () => undefined;
+// Runs the action's callback so upload/read paths actually execute.
+const runAction = async (_label: string, run: () => Promise<unknown>) => { await run(); };
 
 const fill = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -76,7 +82,6 @@ test('received đủ fields nhưng chưa đính kèm chứng từ không bật n
   fill('Kết quả giao dịch (theo nguồn)', 'RECEIVED');
   fill('Người nhận thực tế (đọc từ nguồn)', 'NV-DEMO-01');
   fill('Tên người nhận (theo nguồn)', 'Nguyễn An');
-  fill('Nguồn chi (theo cấu hình)', 'BANK:DEMO-ACCOUNT');
   fill('Mã giao dịch (event_ref)', 'TX-1');
   fill('Thời điểm giao dịch', '2026-10-10T10:00');
   fill('Phạm vi nguồn xác nhận', 'RECEIVER_CONFIRMED');
@@ -119,15 +124,43 @@ test('nhánh BANK hiện phạm vi ngân hàng, không hiện phiếu chi', () =
   expect(screen.queryByLabelText('Số phiếu chi')).not.toBeInTheDocument();
 });
 
-test('đổi phương thức bỏ nguồn chi của phương thức cũ', () => {
+test('không còn dropdown nguồn chi', () => {
   render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
     actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
     receiptSources={RECEIPT_SOURCES} />);
-  fireEvent.change(screen.getByLabelText('Nguồn chi (theo cấu hình)'),
-    { target: { value: 'BANK:DEMO-ACCOUNT' } });
+  expect(screen.queryByLabelText('Nguồn chi (theo cấu hình)')).not.toBeInTheDocument();
+});
+
+test('nguồn chi readonly theo phương thức: bank mặc định, đổi sang cash', () => {
+  render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
+    actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
+  // Default method BANK_TRANSFER → company bank account, no namespace shown.
+  const source = screen.getByTestId('b3-funding-source');
+  expect(source).toHaveTextContent('Nguồn chi: Tài khoản ngân hàng công ty');
+  expect(source).not.toHaveTextContent('BANK:L01-COMPANY');
   fireEvent.change(screen.getByLabelText('Phương thức'), { target: { value: 'CASH' } });
-  expect((screen.getByLabelText('Nguồn chi (theo cấu hình)') as HTMLSelectElement).value)
-    .toBe('');
+  expect(screen.getByTestId('b3-funding-source'))
+    .toHaveTextContent('Nguồn chi: Quỹ tiền mặt công ty');
+});
+
+test('đổi phương thức bỏ chứng từ của phương thức cũ', () => {
+  render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
+    actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
+  // Attach a proof (upload resolves through onAction) then switch method.
+  // The proof id must be cleared so the old evidence is never reused.
+  fireEvent.change(screen.getByLabelText('Phương thức'), { target: { value: 'CASH' } });
+  expect(screen.getByLabelText('Số phiếu chi')).toBeInTheDocument();
+  expect(screen.queryByText(/Đã đính kèm chứng từ/)).not.toBeInTheDocument();
+});
+
+test('thiếu cấu hình nguồn: không ghi nhận, hiện cảnh báo', () => {
+  render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
+    actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={[]} />);
+  expect(screen.getByTestId('b3-funding-source'))
+    .toHaveTextContent('Nguồn chi: Chưa có nguồn chi');
 });
 
 test('nhân viên: readonly, không thấy nút ghi', () => {
@@ -207,4 +240,89 @@ test('approved không tự thành received: chưa ghi thì recorded là null', (
   const summary = screen.getByTestId('b3-funding-summary').textContent ?? '';
   expect(summary).toContain('Đã ghi nhận thực nhận: —');
   expect(summary).toContain('Số ứng đã duyệt: 2.000.000 đ');
+});
+
+// --- Receipt reading (draft) ------------------------------------------------
+
+function makeRead(overrides: Partial<B3ReceiptReadView> = {}): B3ReceiptReadView {
+  return {
+    id: 'RR-1', case_id: 'C-b3', source_id: 'S-1',
+    filename: 'bank-receipt.pdf', status: 'READ', reader_mode: 'LIVE',
+    created_at: '2026-10-10T10:00:00Z',
+    facts: [], warnings: [], error: null, idempotent_replay: false,
+    proposal: {
+      amount_vnd: 2_000_000, currency: 'VND', payer_side: 'COMPANY',
+      payee_ref: 'NV-DEMO-01', receiver_name: 'Nguyễn An',
+      payer_name: 'Công ty InvoiceReferee', event_at: '2026-10-10T10:00:00+07:00',
+      event_ref: 'TX-L01-ADV-001', narrative: 'Tạm ứng công tác Hà Nội',
+      outcome_text: 'Đã ghi có cho người hưởng', method: 'BANK_TRANSFER',
+      proof_scope: 'RECEIVER_CONFIRMED', acknowledgement: null,
+      voucher_number: null, handed_by_name: null, bank_name: null,
+      sender_account: null, recipient_bank: null, recipient_account: null,
+      classification_hint: 'CONFIRMED_RECEIPT',
+    },
+    ...overrides,
+  };
+}
+
+test('upload thành công tự đọc và điền bản nháp (không tự ghi sự kiện)', async () => {
+  vi.spyOn(api, 'uploadB3AdvanceProof').mockResolvedValue(
+    { id: 'S-1', filename: 'bank-receipt.pdf' } as never);
+  vi.spyOn(api, 'readB3AdvanceReceipt').mockResolvedValue(makeRead());
+  const calls: string[] = [];
+  const onAction = async (label: string, run: () => Promise<unknown>) => {
+    calls.push(label); await run();
+  };
+  render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
+    actorId="ACC-DEMO-01" onAction={onAction} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
+  const input = document.getElementById('b3-proof-file') as HTMLInputElement;
+  const file = new File([new Uint8Array([1])], 'bank-receipt.pdf',
+    { type: 'application/pdf' });
+  fireEvent.change(input, { target: { files: [file] } });
+  await waitFor(() => expect(screen.getByTestId('b3-proof-filename'))
+    .toHaveTextContent('bank-receipt.pdf'));
+  // The read ran, prefilled the amount, and NO advance event was recorded.
+  expect(calls).toContain('B3_RECEIPT_READ');
+  expect(calls).not.toContain('B3_ADVANCE_EVENT');
+  expect((screen.getByLabelText('Số tiền nguồn ghi (VND)') as HTMLInputElement).value)
+    .toBe('2000000');
+  expect(screen.getByTestId('b3-read-status')).toHaveTextContent('bản nháp');
+});
+
+test('đọc lỗi vẫn giữ file và cho nhập tay', async () => {
+  vi.spyOn(api, 'uploadB3AdvanceProof').mockResolvedValue(
+    { id: 'S-1', filename: 'x.pdf' } as never);
+  vi.spyOn(api, 'readB3AdvanceReceipt').mockResolvedValue(makeRead({
+    status: 'FAILED', error: 'PROVIDER_FAILED: timeout', proposal: {
+      ...makeRead().proposal, amount_vnd: null,
+      classification_hint: 'UNCONFIRMED',
+    },
+  }));
+  render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
+    actorId="ACC-DEMO-01" onAction={runAction} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
+  const input = document.getElementById('b3-proof-file') as HTMLInputElement;
+  fireEvent.change(input, { target: { files: [new File([new Uint8Array([1])], 'x.pdf', { type: 'application/pdf' })] } });
+  await waitFor(() => expect(screen.getByTestId('b3-read-status'))
+    .toHaveTextContent('nhập tay'));
+  expect(screen.getByTestId('b3-proof-filename')).toHaveTextContent('x.pdf');
+  // Manual entry is still available.
+  expect(screen.getByLabelText('Số tiền nguồn ghi (VND)')).toBeInTheDocument();
+});
+
+test('cảnh báo đọc hiển thị gần form', async () => {
+  vi.spyOn(api, 'uploadB3AdvanceProof').mockResolvedValue(
+    { id: 'S-1', filename: 'x.pdf' } as never);
+  vi.spyOn(api, 'readB3AdvanceReceipt').mockResolvedValue(makeRead({
+    warnings: [{ code: 'BANK_SCOPE_NOT_RECEIVER', field: 'receipt.proof_scope',
+                 message: 'Chứng từ chưa đủ căn cứ người hưởng nhận.' }],
+  }));
+  render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
+    actorId="ACC-DEMO-01" onAction={runAction} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
+  const input = document.getElementById('b3-proof-file') as HTMLInputElement;
+  fireEvent.change(input, { target: { files: [new File([new Uint8Array([1])], 'x.pdf', { type: 'application/pdf' })] } });
+  await waitFor(() => expect(screen.getByTestId('b3-read-warnings'))
+    .toHaveTextContent('chưa đủ căn cứ người hưởng nhận'));
 });

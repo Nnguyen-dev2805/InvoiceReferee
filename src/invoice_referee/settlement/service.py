@@ -9,6 +9,7 @@ the store transaction, so late output never becomes current.
 from __future__ import annotations
 
 import threading
+import uuid
 from datetime import datetime, timezone
 from time import monotonic
 from typing import Any, Callable
@@ -27,6 +28,7 @@ from invoice_referee.settlement.models import (
     B3DecisionView,
     B3PresentPayload,
     B3PresentationView,
+    B3ReceiptReadView,
     B7AdjustmentPayload,
     B7ClosurePayload,
     B7ClosureView,
@@ -918,6 +920,92 @@ class Service:
         context = self._b3_context()
         event = self._parse_payload(B3AdvanceEventPayload, payload)
         return self.store.record_b3_advance(case_id, event, command, context)
+
+    def read_b3_advance_receipt(self, case_id: str, source_id: str,
+                                method: str,
+                                command: Command) -> "B3ReceiptReadView":
+        """Read an uploaded advance receipt into a reviewable draft.
+
+        This is a SEPARATE step from the B3 proposal pipeline: it reads only the
+        receipt keys from the retained proof source, builds a deterministic
+        proposal + warnings, and persists a draft. It NEVER creates a money
+        event, never changes the decision, and never bumps input_revision.
+        """
+        from datetime import timezone as _tz
+
+        from invoice_referee.settlement.receipt_reading import (
+            build_receipt_draft,
+        )
+        from invoice_referee.settlement.contracts.receipt import RECEIPT_KEYS
+        from invoice_referee.settlement.contracts.advance import (
+            B3AdvanceEventView,
+        )
+
+        if method not in ("BANK_TRANSFER", "CASH"):
+            raise DomainError(
+                "INVALID_PAYLOAD",
+                f"Phương thức phải là BANK_TRANSFER hoặc CASH, nhận {method!r}.",
+            )
+        context = self._b3_context()
+        case = self.store.get_case(case_id)
+        if case.b3_workflow is None or case.b3_workflow.decision is None \
+                or case.b3_workflow.decision.outcome != "APPROVE":
+            raise DomainError(
+                "B3_WORKFLOW_BLOCKED",
+                "Chỉ đọc biên nhận sau khi đề nghị ứng đã được duyệt.",
+            )
+        route = b3_route_for(context, case.submission.employee_ref)
+        if (command.demo_role != "ACCOUNTANT" or route is None
+                or route.accountant_ref != command.actor_id):
+            raise DomainError(
+                "BEYOND_AUTHORITY",
+                f"Vai {command.demo_role}/{command.actor_id} không phải kế toán "
+                f"được phân công; không đọc biên nhận.",
+            )
+        # The source must be this case's own B5 proof (backend-owned audit use),
+        # never an arbitrary retained source or a client-supplied provenance.
+        proof_ids = self.store._b3_proof_source_ids(case_id)
+        if source_id not in proof_ids:
+            raise DomainError(
+                "BASIS_MISMATCH",
+                f"Nguồn {source_id} không phải chứng từ ứng của hồ sơ {case_id}.",
+            )
+        source = self.store.get_source(source_id)
+        # One read budget for this small unit; the reader's own per-page limits
+        # still apply. Reserve a couple of calls (OCR + extract).
+        budget = RunBudget(deadline=monotonic() + self.config.run_deadline_seconds,
+                           max_calls=8)
+        error: str | None = None
+        observations = []
+        try:
+            observations = self.reader.read(source, list(RECEIPT_KEYS), budget)
+        except DomainError as exc:
+            # A read failure is kept as a FAILED draft (file retained); the
+            # accountant can still enter fields manually. Never a fake success.
+            error = f"{exc.code}: {exc.message}"
+        decision = case.b3_workflow.decision
+        funding = case.b3_workflow.funding
+        employee_name = None
+        for person in context.people:
+            if person.actor_ref == case.submission.employee_ref:
+                employee_name = person.name
+                break
+        read = build_receipt_draft(
+            read_id=f"RR-{uuid.uuid4().hex[:12]}", case_id=case_id,
+            source_id=source_id,
+            filename=source.filename, reader_mode=self.reader.mode,
+            created_at=datetime.now(_tz.utc), observations=observations,
+            method=method, employee_ref=case.submission.employee_ref,
+            employee_name=employee_name,
+            approved_vnd=decision.advance_vnd,
+            remaining_vnd=(funding.remaining_vnd if funding else None),
+            recorded_received_vnd=(funding.recorded_received_vnd
+                                   if funding else None),
+        )
+        if error is not None:
+            read = read.model_copy(update={"status": "FAILED", "error": error})
+        return self.store.save_receipt_read(case_id, source_id, method, read,
+                                            command)
 
     def record_money(self, case_id: str, payload: dict[str, Any],
                      command: Command) -> MoneyEventView:

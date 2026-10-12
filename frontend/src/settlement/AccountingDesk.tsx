@@ -91,7 +91,7 @@ export function AccountingDesk({
                       <code style={{ fontWeight: 600 }} title={c.id}>#{c.id.replace(/^C-/, '')}</code>
                     </td>
                     <td>{getActorName(c.employee_ref)}</td>
-                    <td>{c.work_ref}</td>
+                    <td>{c.work_ref && c.work_ref !== c.id ? c.work_ref : '—'}</td>
                     <td>
                       <span className={`case-item-job-badge badge-${c.job.toLowerCase()}`}>
                         {c.job === 'B3' ? 'B3 · Tạm ứng' : 'B7 · Quyết toán'}

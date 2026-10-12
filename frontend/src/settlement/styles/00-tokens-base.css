@@ -190,9 +190,14 @@ pre {
 
   .grid.grid-split,
   .grid.grid-master-detail {
-    grid-template-columns: 340px minmax(0, 1fr);
+    grid-template-columns: 280px minmax(0, 1fr);
     align-items: start;
-    gap: var(--space-6);
+    gap: var(--space-4);
+    transition: grid-template-columns 200ms ease;
+  }
+
+  .grid.grid-master-detail.sidebar-collapsed {
+    grid-template-columns: 56px minmax(0, 1fr);
   }
 
   .grid.grid-single {

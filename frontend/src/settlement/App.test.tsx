@@ -209,7 +209,7 @@ test('IMPORT creation không render form rỗng và tạo draft chưa confirm', 
   expect(startSpy).not.toHaveBeenCalled();
 });
 
-test('preview CTA focus editor và xác nhận gửi đề nghị dùng audit reason mặc định', async () => {
+test('mở bản nháp trực tiếp và xác nhận gửi đề nghị dùng audit reason mặc định', async () => {
   const user = userEvent.setup();
   const reviseSpy = vi.spyOn(api, 'reviseSubmission')
     .mockResolvedValue(caseView(true));
@@ -218,12 +218,7 @@ test('preview CTA focus editor và xác nhận gửi đề nghị dùng audit re
   setup(caseView(false), true);
   await user.click(await screen.findByText(/C-b3test01/));
 
-  expect(await screen.findByText('Kiểm tra bản nháp trước khi gửi')).toBeInTheDocument();
-  const checkBtn = screen.getByRole('button', { name: 'Kiểm tra bản nháp' });
-  await user.click(checkBtn);
-  expect(screen.getByLabelText('Nơi đến')).toHaveFocus();
-
-  const confirmBtn = screen.getByText('Xác nhận và gửi đề nghị');
+  const confirmBtn = await screen.findByText('Xác nhận và gửi đề nghị');
   await user.click(confirmBtn);
 
   await waitFor(() => expect(reviseSpy).toHaveBeenCalledTimes(1));
@@ -328,7 +323,6 @@ test('hồ sơ IMPORT tự động nạp AI draft data vào form xác nhận khi
   await user.click(await screen.findByText(/C-b3test01/));
 
   expect(await screen.findByTestId('b3-revise-panel')).toBeInTheDocument();
-  expect(screen.getByText(/AI đã trích xuất dữ liệu từ chứng từ đính kèm/)).toBeInTheDocument();
   const destInput = screen.getByLabelText('Nơi đến') as HTMLInputElement;
   expect(destInput.value).toBe('Hà Nội');
 });
@@ -399,21 +393,15 @@ test('chọn người dùng demo cập nhật role/actor theo roster context', a
   expect((picker as HTMLSelectElement).value).toBe('APR-DEMO-01');
 });
 
-test('header nhận diện công việc: tiêu đề chính to rõ, dòng phụ hành trình, và nhãn xác nhận', async () => {
+test('header hiển thị nút Debug thanh lịch', async () => {
   const user = userEvent.setup();
   setup(caseView(true), true);
 
   await user.click(await screen.findByText(/C-b3test01/));
 
-  // 1. Tiêu đề chính to rõ: Đề nghị tạm ứng — Nguyễn An (lấy tên từ demoContext)
-  const mainHeading = await screen.findByRole('heading', { level: 2, name: /Đề nghị tạm ứng — Nguyễn An/ });
-  expect(mainHeading).toHaveTextContent('Đề nghị tạm ứng — Nguyễn An');
-
-  // 2. Dòng phụ: [Địa điểm] · [Thời gian chuyến đi] · Đề nghị [Số tiền VND]
-  expect(screen.getByText(/Hà Nội · 12–13\/10\/2026 · Đề nghị 2\.000\.000 đ/)).toBeInTheDocument();
-
-  // 3. Nhãn xác nhận
-  expect(screen.getByText('Nhân viên đã xác nhận thông tin đề nghị')).toBeInTheDocument();
+  const debugBtn = await screen.findByRole('button', { name: 'Debug' });
+  expect(debugBtn).toBeInTheDocument();
+  expect(debugBtn).toHaveClass('btn', 'btn-secondary');
 });
 
 test('mã hồ sơ hiển thị dạng badge nhỏ gọn có nút sao chép clipboard', async () => {
@@ -733,7 +721,7 @@ test('Kế toán và Người duyệt không thấy bản nháp B3 chưa gửi t
   expect(screen.queryByText(/C-draft01/)).not.toBeInTheDocument();
 });
 
-test('Kế toán mở hồ sơ nháp thấy thông báo bản nháp của nhân viên, không có nút nộp/sửa thay', async () => {
+test('Kế toán không hiển thị đơn tạm ứng chưa gửi của nhân viên khi đổi vai trò, tự động chuyển về Bàn làm việc Kế toán', async () => {
   const user = userEvent.setup();
   const draft = caseView(false);
   setup(draft, true);
@@ -746,16 +734,12 @@ test('Kế toán mở hồ sơ nháp thấy thông báo bản nháp của nhân 
   const picker = screen.getByLabelText('Người dùng demo') as HTMLSelectElement;
   await user.selectOptions(picker, 'ACC-DEMO-01');
 
-  // Thẻ trạng thái kế toán ghi đúng là bản nháp của nhân viên, không báo "Nhân viên đã xác nhận..."
-  expect(await screen.findByText('Bản nháp của nhân viên (Chưa nộp)')).toBeInTheDocument();
-  expect(screen.getByText(/Nhân viên chưa gửi đề nghị chính thức/)).toBeInTheDocument();
-
-  // Chuyển sang tab Bản nháp B3
-  await user.click(screen.getByRole('tab', { name: /Bản nháp B3/ }));
-
-  // Không có nút "Xác nhận và gửi đề nghị" hay "Lưu bản nháp" cho Kế toán
+  // Kế toán KHÔNG hiển thị bản nháp chưa gửi của nhân viên
   expect(screen.queryByText('Xác nhận và gửi đề nghị')).not.toBeInTheDocument();
-  expect(screen.queryByText('Lưu bản nháp (chưa gửi)')).not.toBeInTheDocument();
-  // Có thông báo cảnh báo bản nháp của nhân viên
-  expect(screen.getByText(/Hồ sơ đang ở trạng thái bản nháp của nhân viên \(chưa nộp\)/)).toBeInTheDocument();
+  expect(screen.queryByText('Bản nháp của nhân viên (Chưa nộp)')).not.toBeInTheDocument();
+  expect(screen.queryByText('Kiểm tra & Xác nhận bản nháp B3')).not.toBeInTheDocument();
+
+  // Kế toán tự động trở về Bàn làm việc Kế toán
+  expect(await screen.findByTestId('accounting-desk')).toBeInTheDocument();
+  expect(screen.getByText('Bàn làm việc Kế toán')).toBeInTheDocument();
 });

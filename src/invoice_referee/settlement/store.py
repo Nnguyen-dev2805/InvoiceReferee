@@ -37,6 +37,7 @@ from invoice_referee.settlement.models import (
     B3DecisionView,
     B3PresentPayload,
     B3PresentationView,
+    B3ReceiptReadView,
     B3WorkflowView,
     B7DecisionPayload,
     B7DecisionView,
@@ -270,8 +271,17 @@ class Store:
                 self._check_replay(row, payload_fp)
                 view = self._case_view(conn, row["case_id"])
                 return view.model_copy(update={"idempotent_replay": True})
-            case_id = _rec.new_id("C-")
-            now = clock.iso(utcnow())
+            now_dt = utcnow()
+            now = clock.iso(now_dt)
+            yymm = now_dt.strftime("%y%m")
+            if submission.job == "B3":
+                prefix = f"TU-{yymm}-"
+            elif submission.job == "B7":
+                form = submission.form or {}
+                prefix = f"QT-{yymm}-" if isinstance(form, dict) and "origin_link" in form else f"TC-{yymm}-"
+            else:
+                prefix = f"C-{yymm}-"
+            case_id = _rec.new_case_id(conn, prefix)
             stage: CaseStage = "CHECKING"
             conn.execute(
                 "INSERT INTO cases (id, case_version, input_revision, control_epoch, "
@@ -349,9 +359,11 @@ class Store:
                 self._check_replay(row, payload_fp)
                 return self._case_view(conn, row["case_id"]).model_copy(
                     update={"idempotent_replay": True})
-            case_id = _rec.new_id("C-")
+            now_dt = utcnow()
+            now = clock.iso(now_dt)
+            prefix = f"TU-{now_dt.strftime('%y%m')}-"
+            case_id = _rec.new_case_id(conn, prefix)
             submission = build_submission(case_id)
-            now = clock.iso(utcnow())
             stage: CaseStage = "CHECKING"
             conn.execute(
                 "INSERT INTO cases (id, case_version, input_revision, control_epoch, "
@@ -390,9 +402,11 @@ class Store:
                 self._check_replay(row, payload_fp)
                 return self._case_view(conn, row["case_id"]).model_copy(
                     update={"idempotent_replay": True})
-            case_id = _rec.new_id("C-")
+            now_dt = utcnow()
+            now = clock.iso(now_dt)
+            prefix = f"TC-{now_dt.strftime('%y%m')}-"
+            case_id = _rec.new_case_id(conn, prefix)
             submission = build_submission(case_id)
-            now = clock.iso(utcnow())
             stage: CaseStage = "CHECKING"
             conn.execute(
                 "INSERT INTO cases (id, case_version, input_revision, control_epoch, "
@@ -1147,6 +1161,41 @@ class Store:
                           context: B3CompanyContext) -> B3AdvanceEventView:
         with self._write() as conn:
             return _adv.record_receipt(conn, case_id, payload, command, context)
+
+    def save_receipt_read(self, case_id: str, source_id: str, method: str,
+                          read: "B3ReceiptReadView",
+                          command: Command) -> "B3ReceiptReadView":
+        """Persist a receipt read draft (not a money event)."""
+        with self._write() as conn:
+            self._check_open(self._case_row(conn, case_id))
+            self._check_version(self._case_row(conn, case_id), command)
+            now = clock.iso(utcnow())
+            conn.execute(
+                "INSERT INTO receipt_reads (id, case_id, source_id, method, "
+                "payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (read.id, case_id, source_id, method,
+                 _rec.dump(read.model_dump(mode="json")), now),
+            )
+        return read
+
+    def latest_receipt_read(self, case_id: str,
+                            source_id: str) -> "B3ReceiptReadView | None":
+        with self._read() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM receipt_reads WHERE case_id = ? "
+                "AND source_id = ? ORDER BY rowid DESC LIMIT 1",
+                (case_id, source_id)).fetchone()
+            if row is None:
+                return None
+            return B3ReceiptReadView.model_validate(_rec.load(row["payload_json"]))
+
+    def receipt_reads(self, case_id: str) -> list["B3ReceiptReadView"]:
+        with self._read() as conn:
+            rows = conn.execute(
+                "SELECT payload_json FROM receipt_reads WHERE case_id = ? "
+                "ORDER BY rowid", (case_id,)).fetchall()
+            return [B3ReceiptReadView.model_validate(_rec.load(r["payload_json"]))
+                    for r in rows]
 
     # --- B6→B7 linked settlement (b7-linked-intake-v1) -----------------------
 

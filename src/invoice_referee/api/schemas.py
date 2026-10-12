@@ -210,6 +210,18 @@ class B3AdvanceEventRequest(BaseModel):
     receipt_details: (B3BankReceiptDetails | B3CashReceiptDetails | None) = None
 
 
+class B3ReceiptReadRequest(BaseModel):
+    """Ask the reader to read an uploaded advance receipt into a draft."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    demo_role: DemoRole
+    expected_case_version: StrictInt
+    source_id: str
+    method: Literal["BANK_TRANSFER", "CASH"]
+
+
 class PrepareLinkedB7Request(BaseModel):
     """Open a linked B7 child from a B3 parent (parent version envelope)."""
 

@@ -27,6 +27,7 @@ from invoice_referee.settlement.models import (
     B3AdvanceEventView,
     B3DecisionView,
     B3PresentationView,
+    B3ReceiptReadView,
     B7ClosureView,
     B7DecisionView,
     B7HandoffView,
@@ -129,6 +130,7 @@ from invoice_referee.api.schemas import (  # noqa: E402
     B3PresentRequest,
     B3DecisionRequest,
     B3AdvanceEventRequest,
+    B3ReceiptReadRequest,
     PrepareLinkedB7Request,
     LinkedB7SubmissionRequest,
     B7CompanyContextRequest,
@@ -274,7 +276,7 @@ def create_runtime_app(*, db_path: Path | None = None,
             "people": [p.model_dump(mode="json") for p in context.people],
             "routes": [r.model_dump(mode="json") for r in context.routes],
             "receipt_sources": [s.model_dump(mode="json")
-                                for s in context.receipt_sources],
+                                for s in context.effective_receipt_sources()],
         })
 
     @app.post("/api/b3-cases", response_model=None, status_code=201)
@@ -415,6 +417,26 @@ def create_runtime_app(*, db_path: Path | None = None,
             return JSONResponse(status_code=200,
                                 content=event.model_dump(mode="json"))
         return event
+
+    @app.post("/api/cases/{case_id}/b3-advance-receipt-reads",
+              response_model=B3ReceiptReadView, status_code=201)
+    async def read_b3_advance_receipt(
+        case_id: str,
+        request: B3ReceiptReadRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> B3ReceiptReadView:
+        """Read an uploaded receipt into a reviewable draft (no money event)."""
+        command = _command(idempotency_key, request.actor_id, request.demo_role,
+                           request.expected_case_version, {})
+        return service.read_b3_advance_receipt(
+            case_id, request.source_id, request.method, command)
+
+    @app.get("/api/cases/{case_id}/b3-advance-receipt-reads",
+             response_model=list[B3ReceiptReadView])
+    async def list_b3_advance_receipt_reads(
+        case_id: str,
+    ) -> list[B3ReceiptReadView]:
+        return service.store.receipt_reads(case_id)
 
     @app.post("/api/cases/{case_id}/settlements", response_model=CaseView,
               status_code=201)

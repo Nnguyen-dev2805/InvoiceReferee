@@ -105,12 +105,8 @@ CONTEXT = {
          "ref": "company:coverage-01"},
     ],
     "history": [],
-    "receipt_sources": [
-        {"method": "BANK_TRANSFER", "namespace": "BANK:DEMO-ACCOUNT",
-         "label": "Tài khoản chi công ty demo"},
-        {"method": "CASH", "namespace": "CASH:DEMO-QUY",
-         "label": "Quỹ tiền mặt demo"},
-    ],
+    # receipt_sources intentionally omitted: the demo defaults (one company
+    # bank account + one cash fund) apply, matching the real demo context.
 }
 
 

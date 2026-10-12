@@ -244,8 +244,7 @@ class B3ReceiptSource(BaseModel):
 
     Two options for the pilot — not an account-management/treasury store. The
     ``namespace`` is the backend-configured value the money event carries; the
-    ``label`` is what the accountant sees. A missing config keeps readonly
-    history and blocks new records; no fallback namespace is invented.
+    ``label`` is what the accountant sees.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -260,6 +259,22 @@ class B3ReceiptSource(BaseModel):
         if not value.strip():
             raise ValueError("namespace/label nguồn chi không được để trắng.")
         return value
+
+
+# The demo company has exactly one bank account and one cash fund, set up once
+# and shared by every case. This is the single responsible place for those two
+# sources: the namespaces are the ones already used by the L01 documents, so
+# existing transaction links are preserved; the labels are the generic company
+# names shown in the UI. A valid activated context that omits ``receipt_sources``
+# resolves to these defaults (see ``effective_receipt_sources``) instead of
+# forcing a per-case config edit. This is simulated source setup, not a bank
+# connection and not proof that a transaction happened.
+DEMO_RECEIPT_SOURCES: tuple[B3ReceiptSource, ...] = (
+    B3ReceiptSource(method="BANK_TRANSFER", namespace="BANK:L01-COMPANY",
+                    label="Tài khoản ngân hàng công ty"),
+    B3ReceiptSource(method="CASH", namespace="CASH:L01-QUY-CHINH",
+                    label="Quỹ tiền mặt công ty"),
+)
 
 
 class B3CompanyContext(BaseModel):
@@ -298,6 +313,16 @@ class B3CompanyContext(BaseModel):
         if len(namespaces) != len(set(namespaces)):
             raise ValueError("namespace trùng trong receipt_sources.")
         return self
+
+    def effective_receipt_sources(self) -> list["B3ReceiptSource"]:
+        """Receipt sources to use: the explicit config, else the demo defaults.
+
+        A valid context that declares none resolves to ``DEMO_RECEIPT_SOURCES``
+        so the demo does not need a per-case config just for the two sources.
+        This is derived at read time and is NOT stored on the model, so it does
+        not change the context signature or invalidate existing decisions.
+        """
+        return list(self.receipt_sources) or list(DEMO_RECEIPT_SOURCES)
 
 
 # --- proposal contract (Report.b3) ---------------------------------------------

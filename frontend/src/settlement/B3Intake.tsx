@@ -75,27 +75,28 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
           <h3 className="swiss-section-title">1. Thông tin chuyến công tác</h3>
         </div>
 
-        <div className="swiss-grid-2">
-          <div className="swiss-field">
-            <label htmlFor="b3-destination" className="swiss-label">Nơi đến</label>
-            <input
-              id="b3-destination"
-              className="swiss-input"
-              value={value.destination ?? ''}
-              disabled={disabled}
-              onChange={(e) => update({ destination: e.target.value })}
-            />
-          </div>
-          <div className="swiss-field">
-            <label htmlFor="b3-purpose" className="swiss-label">Mục đích công tác</label>
-            <input
-              id="b3-purpose"
-              className="swiss-input"
-              value={value.purpose ?? ''}
-              disabled={disabled}
-              onChange={(e) => update({ purpose: e.target.value })}
-            />
-          </div>
+        <div className="swiss-field" style={{ marginBottom: '10px' }}>
+          <label htmlFor="b3-purpose" className="swiss-label">Mục đích công tác</label>
+          <input
+            id="b3-purpose"
+            className="swiss-input"
+            value={value.purpose ?? ''}
+            disabled={disabled}
+            onChange={(e) => update({ purpose: e.target.value })}
+            placeholder="Ví dụ: Khảo sát thực địa và thống nhất yêu cầu triển khai..."
+          />
+        </div>
+
+        <div className="swiss-field" style={{ marginBottom: '10px' }}>
+          <label htmlFor="b3-destination" className="swiss-label">Nơi đến</label>
+          <input
+            id="b3-destination"
+            className="swiss-input"
+            value={value.destination ?? ''}
+            disabled={disabled}
+            onChange={(e) => update({ destination: e.target.value })}
+            placeholder="Ví dụ: Hà Nội, TP. Hồ Chí Minh..."
+          />
         </div>
 
         <div className="swiss-grid-2">
@@ -145,11 +146,6 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
               />
               <span className="swiss-currency-badge">VND</span>
             </div>
-            {value.request_amount_vnd !== null && value.request_amount_vnd > 0 && (
-              <span className="swiss-field-hint" data-testid="b3-request-hint">
-                {value.request_amount_vnd.toLocaleString('vi-VN')} đ
-              </span>
-            )}
           </div>
           <div className="swiss-field">
             <label htmlFor="b3-settlement-due" className="swiss-label">Hạn thanh toán tạm ứng</label>

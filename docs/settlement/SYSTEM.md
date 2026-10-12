@@ -310,14 +310,39 @@ một RECEIVED chỉ thành `CONFIRMED_RECEIPT` khi
 `advance_reconciliation.validate_advance_receipt` thấy **mọi** field bắt buộc
 (9 core + `receiver_name`) đọc từ **một** nguồn `B3_ADVANCE_PROOF` của đúng hồ sơ,
 `origin=HUMAN_SOURCE_REVIEW`, `read_state=READ`, locator/raw nonblank, value khớp
-payload, **và** nguồn chi thuộc `B3CompanyContext.receipt_sources` đúng method
-(**bank** `proof_scope=RECEIVER_CONFIRMED`; **cash** `acknowledgement=ACKNOWLEDGED`
-và `voucher_number=event_ref`). Guard trả `evidence_issues`; thiếu căn cứ →
-`UNCONFIRMED` (giữ raw + issues, **không** cộng fulfillment). `derive_classification`
-nhận `evidence_ok` tường minh, **không** default True. `receipt_details`/
-`evidence_issues` lưu trong money JSON; view cũ thiếu field vẫn parse (default
-None/[]). `GET /api/demo-context` trả thêm `receipt_sources` read-only; thiếu cấu
-hình → không ghi nhận mới (không sinh namespace fallback).
+payload, **và** nguồn chi thuộc `B3CompanyContext.effective_receipt_sources()`
+đúng method (**bank** `proof_scope=RECEIVER_CONFIRMED`; **cash**
+`acknowledgement=ACKNOWLEDGED` và `voucher_number=event_ref`). Guard trả
+`evidence_issues`; thiếu căn cứ → `UNCONFIRMED` (giữ raw + issues, **không** cộng
+fulfillment). `derive_classification` nhận `evidence_ok` tường minh, **không**
+default True. `receipt_details`/`evidence_issues` lưu trong money JSON; view cũ
+thiếu field vẫn parse (default None/[]).
+
+**Nguồn chi demo mặc định**: công ty demo có đúng một tài khoản ngân hàng và một
+quỹ tiền mặt, khai một lần ở `contracts/b3_contracts.py::DEMO_RECEIPT_SOURCES`
+(namespace giữ nguyên `BANK:L01-COMPANY`/`CASH:L01-QUY-CHINH` để không phá liên
+kết giao dịch; nhãn chung “Tài khoản ngân hàng công ty”/“Quỹ tiền mặt công ty”).
+`B3CompanyContext.effective_receipt_sources()` trả config khai báo nếu có, **ngược
+lại** hai nguồn mặc định — nên context demo hợp lệ không khai báo `receipt_sources`
+vẫn có đủ hai nguồn, không cần file cấu hình riêng cho L01. Hàm này chỉ **suy ra
+lúc đọc**, **không** ghi vào model → **không** đổi context signature/quyết định cũ.
+UI (`GET /api/demo-context`) nhận `receipt_sources` read-only và tự gắn nguồn theo
+phương thức; backend vẫn kiểm tra đúng phương thức (không dựa vào UI).
+
+**Đọc biên nhận thành bản nháp** (plan
+[2026-10-12-receipt-draft-reading](../superpowers/plans/2026-10-12-receipt-draft-reading.md)):
+`POST /api/cases/{id}/b3-advance-receipt-reads` (ACCOUNTANT, `Idempotency-Key`)
+nhận `source_id` + `method`, đọc **chỉ** grammar `receipt.*` (prompt
+`settlement-receipt-extract.txt`) qua reader hiện có, rồi
+`receipt_reading.build_receipt_draft` dựng `B3ReceiptReadView` (facts có
+source/locator/quote; proposal; warnings) và lưu vào bảng `receipt_reads`
+(append-only). Đây là **bước riêng**: **không** tạo money event, **không** đổi
+stage/decision/`input_revision` (chỉ `case_version`). `GET .../b3-advance-receipt-reads`
+liệt kê draft cũ→mới. Đọc lỗi → draft `FAILED` giữ file + `error`; kế toán nhập
+tay. AI/reader chỉ trích xuất + đề xuất (`payee_ref`/`classification_hint`); tên
+giống không tự chứng minh cùng người (`RECEIVER_NOT_MATCHED`); "lập lệnh/trích
+nợ" không thành `RECEIVER_CONFIRMED`; cash chưa giao không thành đã nhận. Xác nhận
+vẫn qua `record_b3_advance` (guard cũ).
 
 **B6→B7 quyết toán liên kết** (plan
 [2026-10-11-b6-linked-settlement](../superpowers/plans/2026-10-11-b6-linked-settlement.md))

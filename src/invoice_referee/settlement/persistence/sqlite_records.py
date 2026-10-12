@@ -34,6 +34,21 @@ def new_id(prefix: str) -> str:
     return f"{prefix}{uuid.uuid4().hex[:12]}"
 
 
+def new_case_id(conn: sqlite3.Connection, prefix: str) -> str:
+    """Generate sequential case ID per month/prefix: e.g. TU-2610-001, QT-2610-001, TC-2610-001.
+
+    Queries existing cases matching ``prefix%`` in the current transaction,
+    extracts the maximum numeric suffix, and returns ``prefix`` + 3-digit zero-padded number.
+    """
+    rows = conn.execute("SELECT id FROM cases WHERE id LIKE ?", (f"{prefix}%",)).fetchall()
+    max_seq = 0
+    for row in rows:
+        suffix = row["id"][len(prefix):]
+        if suffix.isdigit():
+            max_seq = max(max_seq, int(suffix))
+    return f"{prefix}{max_seq + 1:03d}"
+
+
 def case_row(conn: sqlite3.Connection, case_id: str) -> sqlite3.Row:
     row = conn.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()
     if row is None:

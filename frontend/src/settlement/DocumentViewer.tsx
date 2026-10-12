@@ -8,6 +8,7 @@ interface DocumentViewerProps {
   onSelectSource: (sourceId: string) => void;
   onUpload?: (files: FileList | File[]) => void;
   isUploading?: boolean;
+  onToggleFormOnly?: () => void;
 }
 
 export function DocumentViewer({
@@ -16,6 +17,7 @@ export function DocumentViewer({
   onSelectSource,
   onUpload,
   isUploading = false,
+  onToggleFormOnly,
 }: DocumentViewerProps) {
   const [zoom, setZoom] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -119,6 +121,18 @@ export function DocumentViewer({
                 {isUploading ? 'Đang tải...' : '+ Thêm tệp'}
               </button>
             </>
+          )}
+
+          {onToggleFormOnly && (
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              onClick={onToggleFormOnly}
+              title="Ẩn cột tài liệu để chỉ xem toàn bộ biểu mẫu"
+              style={{ padding: '3px 8px', fontSize: '0.75rem', color: '#64748b' }}
+            >
+              Chỉ xem biểu mẫu ⛶
+            </button>
           )}
         </div>
       </div>

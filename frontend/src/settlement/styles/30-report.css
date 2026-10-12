@@ -325,11 +325,23 @@
 
 .report-header-title {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--color-foreground);
-  font-family: var(--font-mono);
   letter-spacing: -0.01em;
+}
+
+.report-run-id-subtle {
+  font-size: 0.78rem;
+  color: var(--color-muted-foreground);
+}
+
+.report-run-id-subtle code {
+  font-family: var(--font-mono);
+  background: var(--color-muted, #f4f4f5);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.75rem;
 }
 
 .report-header-meta {
@@ -464,11 +476,22 @@
 .hero-kpi-audit-note {
   font-size: 0.78rem;
   color: #64748b;
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  padding: 8px 12px;
-  border-radius: 6px;
-  line-height: 1.45;
+  padding: 4px 0 2px 0;
+  line-height: 1.4;
+}
+
+.hero-kpi-evidence-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.evidence-caption {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  font-weight: 500;
 }
 
 /* Proposal Content Body */

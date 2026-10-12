@@ -11,8 +11,6 @@ interface StickyActionBarProps {
   caseTab: CaseTab;
   role: DemoRole;
   canStartRun: boolean;
-  b3ReviseReason: string;
-  onReviseB3: (confirm: boolean) => void;
   onStartRun: () => void;
 }
 
@@ -27,8 +25,8 @@ function scrollToReview(): void {
 }
 
 export function StickyActionBar({
-  view, viewIsB3, caseTab, role, canStartRun, b3ReviseReason,
-  onReviseB3, onStartRun,
+  view, viewIsB3, caseTab, role, canStartRun,
+  onStartRun,
 }: StickyActionBarProps) {
   return (
     <div className="workbench-sticky-bar" data-testid="workbench-sticky-bar">
@@ -46,34 +44,6 @@ export function StickyActionBar({
         )}
       </div>
       <div className="workbench-sticky-actions">
-        {caseTab === 'draft' && viewIsB3 && !view.submission.form.confirmed && role === 'EMPLOYEE' && (
-          <>
-            <button
-              type="button"
-              className="swiss-btn swiss-btn-secondary swiss-btn-sm"
-              onClick={() => onReviseB3(false)}
-            >
-              Lưu nháp
-            </button>
-            <button
-              type="button"
-              className="swiss-btn swiss-btn-primary swiss-btn-sm"
-              onClick={() => onReviseB3(true)}
-            >
-              Gửi đề nghị
-            </button>
-          </>
-        )}
-        {caseTab === 'draft' && viewIsB3 && Boolean(view.submission.form.confirmed) && role === 'EMPLOYEE' && (
-          <button
-            type="button"
-            className="swiss-btn swiss-btn-primary swiss-btn-sm"
-            disabled={!b3ReviseReason.trim()}
-            onClick={() => onReviseB3(true)}
-          >
-            Lưu cập nhật
-          </button>
-        )}
         {caseTab === 'report' && canStartRun && (
           <button
             type="button"

@@ -98,3 +98,16 @@ CREATE TABLE IF NOT EXISTS audit_events (
 
 CREATE UNIQUE INDEX IF NOT EXISTS audit_events_command_key
     ON audit_events (operation, actor_id, scope_key, command_key);
+
+-- B5 receipt reads: an AI/reader draft the accountant reviews and edits. This
+-- is NOT a money event; the confirmed event still goes through money_events and
+-- the record_receipt guard. Append-only; a re-read for a source supersedes the
+-- earlier draft by rowid order, never by overwrite.
+CREATE TABLE IF NOT EXISTS receipt_reads (
+    id TEXT PRIMARY KEY,
+    case_id TEXT NOT NULL REFERENCES cases(id),
+    source_id TEXT NOT NULL REFERENCES sources(id),
+    method TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);

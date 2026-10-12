@@ -17,7 +17,8 @@ from tests.settlement.test_b3_workflow import (
     command, ready_b3, presented_b3, _approve,
 )
 
-# Context with no configured receipt source (for the missing-config case).
+# A valid activated context that declares NO receipt_sources: the demo defaults
+# (one company bank account + one cash fund) must still apply.
 CONTEXT_NO_SOURCES = {**_CONTEXT, "receipt_sources": []}
 
 
@@ -30,7 +31,7 @@ def approved_b3(presented_b3):
 
 def receipt_payload(source_id, decision, *, amount=2_000_000,
                     payee="NV-DEMO-01", event_ref="TX-ADV-01",
-                    method="BANK_TRANSFER", namespace="BANK:DEMO-ACCOUNT",
+                    method="BANK_TRANSFER", namespace="BANK:L01-COMPANY",
                     receipt_details=None):
     event_at = decision.effective_at + timedelta(hours=1)
     values = {"amount_vnd": amount, "currency": "VND",
@@ -59,7 +60,7 @@ def upload_receipt(svc, case, decision, amount=2_000_000,
     text = (f"amount_vnd={amount}\ncurrency=VND\npayer_side=COMPANY\n"
             f"payee_ref={payee}\nevent_at={at.isoformat()}\n"
             "receiver_outcome=RECEIVED\n"
-            "event_namespace=BANK:DEMO-ACCOUNT\n"
+            "event_namespace=BANK:L01-COMPANY\n"
             f"event_ref={event_ref}\n"
             "method=BANK_TRANSFER\nreceiver_name=Nguyễn An\n")
     return svc.add_b3_advance_proof(case.id,
@@ -76,7 +77,7 @@ def test_received_without_evidence_never_fulfills(approved_b3):
     """
     svc, case, decision = approved_b3
     event = svc.record_b3_advance(case.id, {
-        "decision_id": decision.id, "event_namespace": "BANK:DEMO-ACCOUNT",
+        "decision_id": decision.id, "event_namespace": "BANK:L01-COMPANY",
         "event_ref": "NO-PROOF", "method": "BANK_TRANSFER",
         "gross_vnd": 2_000_000, "payer_side": "COMPANY",
         "payee_ref": "NV-DEMO-01", "event_at": "2026-10-10T10:00:00+07:00",
@@ -428,7 +429,7 @@ def test_cash_acknowledged_receives(approved_b3):
         Upload(filename="cash-receipt.txt", content=text.encode()),
         command("cash-proof", "ACC-DEMO-01", "ACCOUNTANT", _next_version(svc, case.id)))
     payload = receipt_payload(
-        proof.id, decision, method="CASH", namespace="CASH:DEMO-QUY",
+        proof.id, decision, method="CASH", namespace="CASH:L01-QUY-CHINH",
         event_ref="PC-001",
         receipt_details={"kind": "CASH", "voucher_number": "PC-001",
                          "acknowledgement": "ACKNOWLEDGED",
@@ -449,7 +450,7 @@ def test_cash_unsigned_not_received(approved_b3):
         command("cash-unsigned-proof", "ACC-DEMO-01", "ACCOUNTANT",
                 _next_version(svc, case.id)))
     payload = receipt_payload(
-        proof.id, decision, method="CASH", namespace="CASH:DEMO-QUY",
+        proof.id, decision, method="CASH", namespace="CASH:L01-QUY-CHINH",
         event_ref="PC-002",
         receipt_details={"kind": "CASH", "voucher_number": "PC-002",
                          "acknowledgement": "UNCONFIRMED",
@@ -478,22 +479,40 @@ def test_proposal_source_in_evidence_not_confirmed(approved_b3):
     assert svc.get_case(case.id).b3_workflow.funding.recorded_received_vnd is None
 
 
-def test_missing_configured_source_blocks_new_record(approved_b3, monkeypatch):
-    """No configured receipt source for the method → new record stays unconfirmed."""
+def test_context_without_receipt_sources_uses_demo_defaults(approved_b3):
+    """A valid context that omits receipt_sources still has the two defaults."""
     from invoice_referee.settlement.b3_intake import B3CompanyContext
     svc, case, decision = approved_b3
-    # Strip receipt_sources on the context used by the service.
     ctx = B3CompanyContext.model_validate({**CONTEXT_NO_SOURCES})
     svc.config = svc.config.model_copy(update={"b3_context": ctx})
+    # The default bank source applies, so a fully-sourced RECEIVED confirms.
     proof = svc.add_b3_advance_proof(case.id,
         Upload(filename="p.txt", content=b"x"),
-        command("nosrc-proof", "ACC-DEMO-01", "ACCOUNTANT",
+        command("def-proof", "ACC-DEMO-01", "ACCOUNTANT",
                 _next_version(svc, case.id)))
     event = svc.record_b3_advance(case.id,
-        receipt_payload(proof.id, decision, event_ref="TX-NOSRC"),
-        command("nosrc", "ACC-DEMO-01", "ACCOUNTANT", _next_version(svc, case.id)))
+        receipt_payload(proof.id, decision, event_ref="TX-DEF"),
+        command("def", "ACC-DEMO-01", "ACCOUNTANT", _next_version(svc, case.id)))
+    assert event.classification == "CONFIRMED_RECEIPT", event.evidence_issues
+    assert svc.get_case(case.id).b3_workflow.funding.recorded_received_vnd \
+        == 2_000_000
+
+
+def test_wrong_method_source_not_confirmed(approved_b3):
+    """A cash namespace on a bank event (or vice versa) is not a valid source."""
+    svc, case, decision = approved_b3
+    proof = upload_receipt(svc, case, decision)
+    # Bank method carrying the cash namespace → wrong source for the method.
+    payload = receipt_payload(proof.id, decision, event_ref="TX-WRONGSRC")
+    payload["event_namespace"] = "CASH:L01-QUY-CHINH"
+    for f in payload["evidence"]:
+        if f["field"] == "event_namespace":
+            f["value"] = "CASH:L01-QUY-CHINH"
+    event = svc.record_b3_advance(case.id, payload,
+        command("wrongsrc", "ACC-DEMO-01", "ACCOUNTANT",
+                _next_version(svc, case.id)))
     assert event.classification == "UNCONFIRMED"
-    assert any("cấu hình" in i for i in event.evidence_issues)
+    assert any("phương thức" in i for i in event.evidence_issues)
     assert svc.get_case(case.id).b3_workflow.funding.recorded_received_vnd is None
 
 
@@ -515,7 +534,7 @@ def test_receipt_details_kind_must_match_method(approved_b3):
     svc, case, decision = approved_b3
     proof = upload_receipt(svc, case, decision)
     payload = receipt_payload(proof.id, decision, method="CASH",
-        namespace="CASH:DEMO-QUY", event_ref="PC-BAD",
+        namespace="CASH:L01-QUY-CHINH", event_ref="PC-BAD",
         receipt_details={"kind": "BANK_TRANSFER",
                          "proof_scope": "RECEIVER_CONFIRMED"})
     with pytest.raises(DomainError):

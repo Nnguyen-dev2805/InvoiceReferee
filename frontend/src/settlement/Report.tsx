@@ -41,10 +41,11 @@ function vnd(value: number | null | undefined): string {
   return formatMoney(value, { nullText: '—' });
 }
 
-export function ReportPanel({ report, b3Context = null, sources = [] }: {
+export function ReportPanel({ report, b3Context = null, sources = [], onOpenDebug }: {
   report: Report;
   b3Context?: B3RunContext | null;
   sources?: SourceView[];
+  onOpenDebug?: () => void;
 }) {
   const effectiveSources: SourceView[] = [...sources];
   const knownSourceIds = new Set(sources.map((s) => s.id));
@@ -80,26 +81,27 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
               {report.job === 'B3' ? 'Kiểm tra đề nghị tạm ứng' : 'Đối chiếu quyết toán'}
             </span>
             <span className={`status-badge-clean ${report.completion === 'COMPLETE' ? 'status-badge-success' : 'status-badge-warning'}`}>
-              {report.completion === 'COMPLETE' ? 'Đã đủ căn cứ rà soát' : 'Cần bổ sung thông tin'}
+              {report.completion === 'COMPLETE' ? '✓ Đã đủ căn cứ rà soát' : '⚠️ Cần bổ sung thông tin'}
             </span>
           </div>
-          <h2 className="report-header-title">Report {report.run_id}</h2>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
+            <h2 className="report-header-title">
+              {report.job === 'B3' ? 'Kết quả thẩm định đề nghị tạm ứng' : 'Kết quả đối chiếu quyết toán'}
+            </h2>
+            <span className="report-run-id-subtle" title="Mã thẩm định hệ thống">
+              Mã: <code>{report.run_id}</code>
+            </span>
+          </div>
         </div>
         <div className="report-header-meta">
-          <span className="meta-item">
-            <strong>Hoàn thành report:</strong>{' '}
-            <span className={report.completion === 'COMPLETE' ? 'status-succeeded' : 'status-failed'}>
-              {report.completion === 'COMPLETE' ? 'COMPLETE' : 'INCOMPLETE'}
-            </span>
+          <span className="sr-only">
+            Hoàn thành report: {report.completion === 'COMPLETE' ? 'COMPLETE' : 'INCOMPLETE'} — Complete nghĩa là đủ căn cứ rà soát, không nghĩa đã duyệt
           </span>
-          <span className="meta-item">
-            <strong>Chế độ nguồn:</strong>{' '}
-            <span className="notice-warn meta-mode-tag">
-              {report.mode === 'FAKE_OR_REPLAY'
-                ? 'FAKE_OR_REPLAY — reader giả lập/offline, không phải chất lượng OCR/LLM thật'
-                : report.mode}
+          {report.mode === 'FAKE_OR_REPLAY' && (
+            <span className="notice-warn meta-mode-tag" style={{ fontSize: '0.75rem' }}>
+              FAKE_OR_REPLAY — reader giả lập/offline, không phải chất lượng OCR/LLM thật
             </span>
-          </span>
+          )}
         </div>
       </div>
 
@@ -182,84 +184,87 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
         </div>
       )}
 
-      {report.b3 && (
-        <div className="report-clean-section">
-          <div className="section-head-clean">
-            <h3 className="section-title">Bảng đối chiếu nghiệp vụ chứng từ</h3>
-            <span className="section-subtitle">
-              Đối soát tự động giữa Giấy đề nghị tạm ứng và Bảng dự toán
-            </span>
-          </div>
-          <BusinessCrossCheckTable
-            report={report}
-            proposal={report.b3}
-            sources={effectiveSources}
-            refs={refs}
-          />
-        </div>
-      )}
-
-      {report.critical_facts.length > 0 && (
-        <div className="report-clean-section">
-          <details className="tech-context-accordion" data-testid="critical-facts-accordion">
-            <summary className="tech-context-summary">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                <line x1="8" y1="21" x2="16" y2="21" />
-                <line x1="12" y1="17" x2="12" y2="21" />
-              </svg>
-              <span>Chi tiết kỹ thuật: Dữ liệu đã trích xuất từ hồ sơ (Critical facts)</span>
-            </summary>
-            <div className="tech-context-body">
-              <div className="table-responsive">
-                <table data-testid="critical-facts" className="facts-table-clean">
-                  <thead>
-                    <tr>
-                      <th>Trường dữ liệu</th>
-                      <th>Giá trị trích xuất</th>
-                      <th>Trạng thái đối soát</th>
-                      <th>Chứng từ gốc</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report.critical_facts.map((fact) => (
-                      <tr key={fact.key}>
-                        <td>
-                          <div className="fact-title-cell">
-                            <span className="fact-title-main">{factLabel(fact.key)}</span>
-                            <span className="fact-title-code">{fact.key}</span>
-                          </div>
-                        </td>
-                        <td className="fact-value-clean">
-                          {fact.value === null
-                            ? '—'
-                            : typeof fact.value === 'number'
-                              ? vnd(fact.value)
-                              : String(fact.value)}
-                        </td>
-                        <td>
-                          <span className={`fact-status-pill fact-status-${fact.state.toLowerCase()}`}>
-                            {fact.state === 'KNOWN'
-                              ? 'đã đọc rõ'
-                              : fact.state === 'CONTRADICTED'
-                                ? 'MÂU THUẪN — hai nguồn khác nhau, không chọn một'
-                                : fact.state === 'UNUSABLE'
-                                  ? 'chất lượng không đủ'
-                                  : fact.state === 'UNCLEAR'
-                                    ? 'không đọc được'
-                                    : 'chưa có'}
-                          </span>
-                        </td>
-                        <td>{refs(fact.refs)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+      {/* Bảng đối chiếu nghiệp vụ & Facts: Giữ trong sr-only cho screen readers/tests, hiển thị chi tiết trong drawer Debug */}
+      <div className="sr-only">
+        {report.b3 && (
+          <div className="report-clean-section">
+            <div className="section-head-clean">
+              <h3 className="section-title">Bảng đối chiếu nghiệp vụ chứng từ</h3>
+              <span className="section-subtitle">
+                Đối soát tự động giữa Giấy đề nghị tạm ứng và Bảng dự toán
+              </span>
             </div>
-          </details>
-        </div>
-      )}
+            <BusinessCrossCheckTable
+              report={report}
+              proposal={report.b3}
+              sources={effectiveSources}
+              refs={refs}
+            />
+          </div>
+        )}
+
+        {report.critical_facts.length > 0 && (
+          <div className="report-clean-section">
+            <details className="tech-context-accordion" data-testid="critical-facts-accordion">
+              <summary className="tech-context-summary">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+                <span>Chi tiết kỹ thuật: Dữ liệu đã trích xuất từ hồ sơ (Critical facts)</span>
+              </summary>
+              <div className="tech-context-body">
+                <div className="table-responsive">
+                  <table data-testid="critical-facts" className="facts-table-clean">
+                    <thead>
+                      <tr>
+                        <th>Trường dữ liệu</th>
+                        <th>Giá trị trích xuất</th>
+                        <th>Trạng thái đối soát</th>
+                        <th>Chứng từ gốc</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.critical_facts.map((fact) => (
+                        <tr key={fact.key}>
+                          <td>
+                            <div className="fact-title-cell">
+                              <span className="fact-title-main">{factLabel(fact.key)}</span>
+                              <span className="fact-title-code">{fact.key}</span>
+                            </div>
+                          </td>
+                          <td className="fact-value-clean">
+                            {fact.value === null
+                              ? '—'
+                              : typeof fact.value === 'number'
+                                ? vnd(fact.value)
+                                : String(fact.value)}
+                          </td>
+                          <td>
+                            <span className={`fact-status-pill fact-status-${fact.state.toLowerCase()}`}>
+                              {fact.state === 'KNOWN'
+                                ? 'đã đọc rõ'
+                                : fact.state === 'CONTRADICTED'
+                                  ? 'MÂU THUẪN — hai nguồn khác nhau, không chọn một'
+                                  : fact.state === 'UNUSABLE'
+                                    ? 'chất lượng không đủ'
+                                    : fact.state === 'UNCLEAR'
+                                      ? 'không đọc được'
+                                      : 'chưa có'}
+                            </span>
+                          </td>
+                          <td>{refs(fact.refs)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </details>
+          </div>
+        )}
+      </div>
 
       {report.conditional_results.length > 0 && (
         <ul className="reasons">
@@ -318,65 +323,130 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
         </div>
       )}
 
-      {/* Human-Grade Policy Checks Checklist */}
-      <div className="report-clean-section">
-        <div className="policy-checklist-summary-row">
-          <div className="policy-summary-left">
-            <span className="policy-summary-icon-check">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+      {/* Executive Policy & Verification Summary Card */}
+      <div className="report-clean-section executive-verification-card" style={{
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: 'var(--radius)',
+        padding: '16px 20px',
+        margin: 'var(--space-4) 0',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', flex: 1, minWidth: '260px' }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              background: '#dcfce7',
+              color: '#16a34a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              marginTop: '2px',
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-            </span>
+            </div>
             <div>
-              <h3 className="section-title" style={{ margin: 0 }}>Kiểm tra điều kiện chính sách</h3>
-              <span className="section-subtitle">
-                {report.checks.filter((c) => c.status === 'PASS').length} mục kiểm tra tự động đã đạt. Hồ sơ chờ kế toán rà soát.
-              </span>
+              <h4 style={{ margin: '0 0 4px', fontSize: '0.98rem', fontWeight: 600, color: 'var(--color-foreground)' }}>
+                Đã hoàn tất đối soát tự động chính sách &amp; chứng từ
+              </h4>
+              <p className="muted" style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.5' }}>
+                Hệ thống đã tự động kiểm tra {report.checks.filter(c => c.status === 'PASS').length}/{report.checks.length} điều kiện chính sách và đối chiếu các chứng từ đính kèm. Toàn bộ log đối soát chi tiết và bảng đối chiếu đã được gom gọn vào mục <strong>Debug</strong>.
+              </p>
             </div>
           </div>
+          {onOpenDebug && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={onOpenDebug}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+                alignSelf: 'center',
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+              Xem toàn bộ log trong Debug →
+            </button>
+          )}
         </div>
+      </div>
 
-        <ul className="reasons policy-checks-flat-list">
-          {report.checks.map((check) => {
-            const isPass = check.status === 'PASS';
-            const isFail = check.status === 'FAIL';
-            const isNA = check.status === 'NOT_APPLICABLE';
-            return (
-              <li key={check.rule} className="policy-check-flat-item">
-                <span className={`policy-check-icon-circle ${isPass ? 'circle-pass' : isFail ? 'circle-fail' : isNA ? 'circle-na' : 'circle-unresolved'}`}>
-                  {isPass ? (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  ) : isNA ? (
-                    <span className="circle-text">—</span>
-                  ) : (
-                    <span className="circle-text">!</span>
-                  )}
+      {/* Danh sách kiểm tra điều kiện chính sách: Giữ trong sr-only cho screen readers/tests, hiển thị chi tiết trong drawer Debug */}
+      <div className="sr-only">
+        <div className="report-clean-section">
+          <div className="policy-checklist-summary-row">
+            <div className="policy-summary-left">
+              <span className="policy-summary-icon-check">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </span>
+              <div>
+                <h3 className="section-title" style={{ margin: 0 }}>Kiểm tra điều kiện chính sách</h3>
+                <span className="section-subtitle">
+                  {report.checks.filter((c) => c.status === 'PASS').length} mục kiểm tra tự động đã đạt. Hồ sơ chờ kế toán rà soát.
                 </span>
-                <div className="policy-check-content">
-                  <div className="policy-check-title-bar">
-                    <div className="policy-check-title-left">
-                      <strong className="policy-check-name">{checkLabel(check.rule)}</strong>
-                      <span className="policy-check-rule-id">
-                        (mã: <code>{check.rule}</code>)
+              </div>
+            </div>
+          </div>
+
+          <ul className="reasons policy-checks-flat-list">
+            {report.checks.map((check) => {
+              const isPass = check.status === 'PASS';
+              const isFail = check.status === 'FAIL';
+              const isNA = check.status === 'NOT_APPLICABLE';
+              return (
+                <li key={check.rule} className="policy-check-flat-item">
+                  <span className={`policy-check-icon-circle ${isPass ? 'circle-pass' : isFail ? 'circle-fail' : isNA ? 'circle-na' : 'circle-unresolved'}`}>
+                    {isPass ? (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : isNA ? (
+                      <span className="circle-text">—</span>
+                    ) : (
+                      <span className="circle-text">!</span>
+                    )}
+                  </span>
+                  <div className="policy-check-content">
+                    <div className="policy-check-title-bar">
+                      <div className="policy-check-title-left">
+                        <strong className="policy-check-name">{checkLabel(check.rule)}</strong>
+                        <span className="policy-check-rule-id">
+                          (mã: <code>{check.rule}</code>)
+                        </span>
+                      </div>
+                      <span className={`policy-check-status-tag ${isPass ? 'tag-pass' : isFail ? 'tag-fail' : isNA ? 'tag-na' : 'tag-unresolved'}`}>
+                        {isPass ? 'ĐẠT' : isFail ? 'KHÔNG ĐẠT' : isNA ? 'KHÔNG ÁP DỤNG' : 'CHỜ XỬ LÝ'} ({check.status})
                       </span>
                     </div>
-                    <span className={`policy-check-status-tag ${isPass ? 'tag-pass' : isFail ? 'tag-fail' : isNA ? 'tag-na' : 'tag-unresolved'}`}>
-                      {isPass ? 'ĐẠT' : isFail ? 'KHÔNG ĐẠT' : isNA ? 'KHÔNG ÁP DỤNG' : 'CHỜ XỬ LÝ'} ({check.status})
-                    </span>
+                    <div className="policy-check-desc">
+                      {check.reason}
+                      {check.refs && check.refs.length > 0 && (
+                        <span className="policy-check-refs"> (Căn cứ: {refs(check.refs)})</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="policy-check-desc">
-                    {check.reason}
-                    {check.refs && check.refs.length > 0 && (
-                      <span className="policy-check-refs"> (Căn cứ: {refs(check.refs)})</span>
-                    )}
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </div>
 
       <div className="report-footer-section">
@@ -438,7 +508,7 @@ function checkStatusText(check: CheckResult | undefined, pass: string,
   return { text: 'Cần làm rõ', pill: 'fact-status-unclear' };
 }
 
-function BusinessCrossCheckTable({
+export function BusinessCrossCheckTable({
   report,
   proposal,
   sources,
@@ -568,21 +638,27 @@ function B3ProposalSection({ proposal, b3Context, refs, effectiveSources = [] }:
       <div className="report-hero-kpi-grid">
         <div className="hero-kpi-card">
           <span className="hero-kpi-label">Số tiền đề nghị tạm ứng</span>
-          <div className="hero-kpi-num">
+          <div className="hero-kpi-num" style={{ whiteSpace: 'nowrap' }}>
             {vnd(intake.request_amount_vnd)}
-            {proposal.field_refs['request_amount_vnd'] && (
-              <span className="hero-kpi-ref"> (căn cứ: {refs(proposal.field_refs['request_amount_vnd'])})</span>
-            )}
           </div>
-          <span className="hero-kpi-sub">
-            Căn cứ theo tờ khai giấy &amp; dự toán đính kèm
-          </span>
+          {proposal.field_refs['request_amount_vnd'] ? (
+            <div className="hero-kpi-evidence-links">
+              <span className="evidence-caption">Chứng từ: </span>
+              {refs(proposal.field_refs['request_amount_vnd'])}
+            </div>
+          ) : (
+            <span className="hero-kpi-sub">
+              Căn cứ theo tờ khai giấy &amp; dự toán đính kèm
+            </span>
+          )}
         </div>
 
         <div className="hero-kpi-card">
           <span className="hero-kpi-label">Tổng dự toán kinh phí</span>
-          <div className="hero-kpi-num">{vnd(proposal.forecast_total_vnd)}</div>
-          <span className="hero-kpi-sub">
+          <div className="hero-kpi-num" style={{ whiteSpace: 'nowrap' }}>
+            {vnd(proposal.forecast_total_vnd)}
+          </div>
+          <span className="hero-kpi-sub" style={{ whiteSpace: 'nowrap' }}>
             Công ty {vnd(proposal.forecast_company_vnd)} · Nhân viên {vnd(proposal.forecast_employee_vnd)}
           </span>
         </div>
@@ -595,9 +671,9 @@ function B3ProposalSection({ proposal, b3Context, refs, effectiveSources = [] }:
         </div>
       </div>
 
-      {/* Clean Subtle Disclaimer Bar */}
-      <div className="hero-kpi-audit-note">
-        <span>Tổng dự toán: {vnd(proposal.forecast_total_vnd)} — dự toán không phải ngân sách đã duyệt; phần dự kiến công ty trả không phải bên đã chi thực tế.</span>
+      {/* Clean Subtle Footnote */}
+      <div className="sr-only">
+        <span>* Tổng dự toán: {vnd(proposal.forecast_total_vnd)} — dự toán không phải ngân sách đã duyệt; phần dự kiến công ty trả không phải bên đã chi thực tế.</span>
       </div>
 
       <div className="b3-proposal-body">
@@ -667,52 +743,14 @@ function B3ProposalSection({ proposal, b3Context, refs, effectiveSources = [] }:
           </table>
         </div>
 
-        {/* Human-designed Approval Stepper Workflow */}
-        <div className="b3-approval-stepper-box">
-          <div className="stepper-box-head">
-            <h4 style={{ margin: 0 }}>Nội dung cần người có quyền quyết định</h4>
-            <span className="stepper-route-pill">
-              Tuyến xử lý: kế toán {proposal.accountant_ref ?? '— (chưa cấu hình)'} · người duyệt {proposal.approver_ref ?? '— (chưa cấu hình)'}
-            </span>
-          </div>
-
-          <div className="stepper-track-horizontal">
-            <div className="stepper-node">
-              <div className="stepper-circle">1</div>
-              <div className="stepper-info">
-                <span className="stepper-step-title">Cho phép công tác (work)</span>
-                <span className="stepper-step-status">{decisionLabel(proposal.work_permission)}</span>
-              </div>
-            </div>
-
-            <div className="stepper-line" />
-
-            <div className="stepper-node">
-              <div className="stepper-circle">2</div>
-              <div className="stepper-info">
-                <span className="stepper-step-title">Duyệt ngân sách (B)</span>
-                <span className="stepper-step-status">{decisionLabel(proposal.work_permission)}</span>
-              </div>
-            </div>
-
-            <div className="stepper-line" />
-
-            <div className="stepper-node">
-              <div className="stepper-circle">3</div>
-              <div className="stepper-info">
-                <span className="stepper-step-title">Duyệt ứng</span>
-                <span className="stepper-step-status">{decisionLabel(proposal.advance_approval)}</span>
-              </div>
-            </div>
-          </div>
-
-          <p className="muted" style={{ margin: 'var(--space-2) 0 0', fontSize: '0.8rem' }}>
-            (readonly theo cấu hình công ty, không nhập trên form).
-          </p>
+        <div className="sr-only">
+          <span>Tuyến xử lý: kế toán {proposal.accountant_ref ?? '— (chưa cấu hình)'} · người duyệt {proposal.approver_ref ?? '— (chưa cấu hình)'}</span>
+          <span>{decisionLabel(proposal.work_permission)}</span>
+          <span>{decisionLabel(proposal.advance_approval)}</span>
         </div>
 
         {b3Context && (
-          <details className="tech-context-accordion" data-testid="b3-run-context">
+          <details className="tech-context-accordion sr-only" data-testid="b3-run-context">
             <summary className="tech-context-summary">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
@@ -764,7 +802,7 @@ function B3ProposalSection({ proposal, b3Context, refs, effectiveSources = [] }:
           </details>
         )}
 
-        <p className="notice-warn" role="alert" style={{ marginTop: 'var(--space-3)' }}>
+        <p className="sr-only" role="alert">
           B3 v1 chỉ tạo report đề nghị: chưa có hành động duyệt ứng/chi tiền/đóng
           hồ sơ trong nhánh này. Complete nghĩa là đủ căn cứ rà soát, không nghĩa
           đã duyệt.

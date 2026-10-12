@@ -49,7 +49,7 @@ def test_cash_acknowledged_fulfills(approved_b3):
         command("cproof", "ACC-DEMO-01", "ACCOUNTANT", _v(svc, case.id)))
     svc.record_b3_advance(case.id,
         receipt_payload(proof.id, decision, method="CASH",
-                        namespace="CASH:DEMO-QUY", event_ref="PC-L01-001",
+                        namespace="CASH:L01-QUY-CHINH", event_ref="PC-L01-001",
                         receipt_details={"kind": "CASH",
                                          "voucher_number": "PC-L01-001",
                                          "acknowledgement": "ACKNOWLEDGED",
@@ -68,7 +68,7 @@ def test_cash_wrong_voucher_number_not_confirmed(approved_b3):
         command("cproof2", "ACC-DEMO-01", "ACCOUNTANT", _v(svc, case.id)))
     event = svc.record_b3_advance(case.id,
         receipt_payload(proof.id, decision, method="CASH",
-                        namespace="CASH:DEMO-QUY", event_ref="PC-999",
+                        namespace="CASH:L01-QUY-CHINH", event_ref="PC-999",
                         receipt_details={"kind": "CASH",
                                          "voucher_number": "PC-OTHER",
                                          "acknowledgement": "ACKNOWLEDGED",

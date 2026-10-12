@@ -1,116 +1,165 @@
-// Case detail header: dossier badge + copy, job/status pills, main title and
-// the unified business-status card. Extracted from App.tsx; props-only.
-import { STAGE_LABELS, dossierReference, formatMoney } from '../displayText';
+// Case detail header: Sleek integrated workspace bar with Case ID, title, amount, and Debug button.
+import { dossierReference, formatMoney } from '../displayText';
 import type { AuditEntry, CaseView, DemoRole } from '../types';
 
 interface CaseHeaderCardProps {
   view: CaseView;
   viewIsB3: boolean;
   role: DemoRole;
-  actorId: string;
-  mainTitle: string;
-  sublineText: string;
-  b3WorkflowPending: boolean;
-  latestReview: AuditEntry | undefined;
+  actorId?: string;
+  mainTitle?: string;
+  sublineText?: string;
+  b3WorkflowPending?: boolean;
+  latestReview?: AuditEntry | undefined;
   copiedCaseId: boolean;
   onCopyCaseId: (caseId: string) => void;
-  onOpenTech: () => void;
+  onOpenTech?: () => void;
+  workbenchMode?: 'split' | 'doc' | 'form';
+  onWorkbenchModeChange?: (mode: 'split' | 'doc' | 'form') => void;
+  onBackToDesk?: () => void;
 }
 
 export function CaseHeaderCard({
-  view, viewIsB3, role, actorId, mainTitle, sublineText,
-  b3WorkflowPending, latestReview, copiedCaseId, onCopyCaseId, onOpenTech,
+  view, viewIsB3, role, mainTitle, sublineText,
+  b3WorkflowPending, latestReview, copiedCaseId,
+  onCopyCaseId, onOpenTech: _onOpenTech, workbenchMode, onWorkbenchModeChange,
+  onBackToDesk,
 }: CaseHeaderCardProps) {
-  const requestAmount = (view.submission.form as Record<string, unknown>)?.request_amount_vnd;
+  const isDraft = viewIsB3 && !view.submission.form.confirmed;
+  const form = view.submission?.form as Record<string, unknown> | undefined;
+  const requestAmount = viewIsB3
+    ? (form?.request_amount_vnd ?? view.money_summary?.approved_vnd ?? null)
+    : (form?.claim_total_amount_vnd ?? view.money_summary?.approved_vnd ?? null);
+
   return (
-    <div className="panel case-header-panel">
-      <div className="case-header-top-bar">
-        <div className="case-header-badge-row">
-          {/* Mã hồ sơ chung (dossier root) dạng badge có nút sao chép */}
-          <div className="case-id-badge" title="Mã hồ sơ" data-testid="case-id-badge">
-            <span className="case-id-badge-label">Mã hồ sơ:</span>
-            <code className="case-id-badge-code">{dossierReference(view) ?? 'Chưa xác định hồ sơ gốc'}</code>
+    <div className="case-header-container">
+      {/* Sleek integrated header bar */}
+      <div className="case-header-actions-bar sr-only">
+        <div className="case-header-left">
+          {onBackToDesk && (role === 'ACCOUNTANT' || role === 'APPROVER') && (
+            <button
+              type="button"
+              className="btn-toggle-sidebar"
+              onClick={onBackToDesk}
+              title="Quay về Bàn làm việc"
+              aria-label="Quay về Bàn làm việc"
+            >
+              ←
+            </button>
+          )}
+
+          {/* Case ID badge with copy action */}
+          <div className="case-id-badge" data-testid="case-id-badge">
+            <code className="case-id-badge-code">{dossierReference(view) ?? view.id}</code>
             <button
               type="button"
               className="btn-copy-case-id"
               onClick={() => onCopyCaseId(dossierReference(view) ?? view.id)}
-              title={copiedCaseId ? 'Đã sao chép vào bộ nhớ tạm' : 'Sao chép mã hồ sơ'}
               aria-label="Sao chép mã hồ sơ"
+              title="Sao chép mã hồ sơ"
             >
-              {copiedCaseId ? (
-                <span className="copy-status-text">Đã chép</span>
-              ) : (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-              )}
+              {copiedCaseId ? 'Đã chép' : 'Sao chép'}
             </button>
           </div>
-          <span className="badge badge-job">{view.job} — {viewIsB3 ? 'Đề nghị tạm ứng' : 'Quyết toán'}</span>
-          {viewIsB3 && (
-            view.submission.form.confirmed ? (
-              <span className="pill-badge pill-badge-green" title="Nhân viên đã xác nhận thông tin đề nghị">
-                Nhân viên đã xác nhận thông tin đề nghị
+
+          {/* Context title & subline */}
+          <div className="case-header-info">
+            <span className="case-header-title">
+              {mainTitle ?? (viewIsB3 ? 'Đề nghị tạm ứng' : 'Quyết toán')}
+            </span>
+            {sublineText && (
+              <span className="case-header-subline" title={sublineText}>
+                {sublineText}
               </span>
-            ) : (
-              <span className="pill-badge pill-badge-amber">Bản nháp chưa gửi</span>
-            )
-          )}
+            )}
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {viewIsB3 && requestAmount != null && (
-            <div className="case-header-amount-box">
-              <span className="case-header-amount-label">Số tiền đề nghị:</span>
-              <span className="case-header-amount-val">
-                {formatMoney(Number(requestAmount))}
-              </span>
+
+        <div className="case-header-right">
+          {/* View mode toggles integrated right in the header bar */}
+          {workbenchMode && onWorkbenchModeChange && (
+            <div className="view-mode-btn-group" role="group" aria-label="Chế độ hiển thị">
+              <button
+                type="button"
+                className={`view-mode-btn ${workbenchMode === 'split' ? 'active' : ''}`}
+                onClick={() => onWorkbenchModeChange('split')}
+                title="Chia đôi cân bằng (50:50)"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                Chia đôi
+              </button>
+              <button
+                type="button"
+                className={`view-mode-btn ${workbenchMode === 'doc' ? 'active' : ''}`}
+                onClick={() => onWorkbenchModeChange('doc')}
+                title="Phóng to chứng từ (70:30)"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="16" y1="3" x2="16" y2="21"/></svg>
+                Ưu tiên chứng từ
+              </button>
+              <button
+                type="button"
+                className={`view-mode-btn ${workbenchMode === 'form' ? 'active' : ''}`}
+                onClick={() => onWorkbenchModeChange('form')}
+                title="Phóng to biểu mẫu (30:70)"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="3" x2="8" y2="21"/></svg>
+                Ưu tiên biểu mẫu
+              </button>
             </div>
           )}
-          <button
-            type="button"
-            className="swiss-btn swiss-btn-secondary swiss-btn-sm"
-            style={{ fontSize: '0.78rem', padding: '3px 8px' }}
-            onClick={onOpenTech}
-            title="Xem chi tiết kỹ thuật & kiểm toán"
-          >
-            ℹ️ Kỹ thuật
-          </button>
+
+          {/* Prominent financial amount badge */}
+          {requestAmount != null && Number(requestAmount) > 0 && (
+            <div className="case-header-amount-pill">
+              <span className="amount-label">{viewIsB3 ? 'Đề nghị:' : 'Quyết toán:'}</span>
+              <span className="amount-value">{formatMoney(Number(requestAmount))}</span>
+            </div>
+          )}
+
+          {/* Debug button moved to case tabs header row */}
         </div>
       </div>
 
-      {/* Tiêu đề chính to rõ: Đề nghị tạm ứng — [Tên nhân viên] */}
-      <div className="case-header-title-section">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <h2 className="case-main-title">{mainTitle}</h2>
-          {actorId.trim() === view.submission.employee_ref ? (
-            <span className="badge" style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1' }}>của bạn</span>
-          ) : role === 'EMPLOYEE' ? (
-            <span className="badge" style={{ fontSize: '0.72rem', background: '#fef3c7', color: '#b45309' }}>hồ sơ khác</span>
-          ) : null}
-        </div>
-        {/* Dòng phụ ngay dưới: [Địa điểm] · [Thời gian chuyến đi] · Đề nghị [Số tiền VND] */}
-        <div className="case-sub-meta">{sublineText}</div>
-      </div>
-
-      {/* MỘT trạng thái nghiệp vụ thống nhất trên cùng */}
-      {role === 'ACCOUNTANT' ? (
+      {/* Accountant review status (Only shown for Accountant) */}
+      {role === 'ACCOUNTANT' && (
         <div
-          className={`business-status-card ${viewIsB3 && !view.submission.form.confirmed ? 'business-status-pending-review' : b3WorkflowPending ? 'business-status-reviewed' : latestReview ? 'business-status-reviewed' : 'business-status-pending-review'}`}
+          className={`business-status-card ${isDraft ? 'business-status-pending-review' : b3WorkflowPending ? 'business-status-reviewed' : latestReview ? 'business-status-reviewed' : 'business-status-pending-review'}`}
           data-testid="accountant-status-card"
         >
           <div className="business-status-title-row">
-            <span className={`status-pill ${viewIsB3 && !view.submission.form.confirmed ? 'status-pill-warning' : b3WorkflowPending || latestReview ? 'status-pill-success' : 'status-pill-warning'}`}>
-              {viewIsB3 && !view.submission.form.confirmed
+            <span className={`status-pill ${isDraft ? 'status-pill-warning' : b3WorkflowPending || latestReview ? 'status-pill-success' : 'status-pill-warning'}`}>
+              {isDraft
                 ? 'Bản nháp của nhân viên (Chưa nộp)'
                 : b3WorkflowPending
                   ? 'Chờ người duyệt tạm ứng'
                   : latestReview ? 'Đã lưu kết quả rà soát' : 'Chờ kế toán rà soát'}
             </span>
+            {!isDraft && onBackToDesk && (
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onClick={onBackToDesk}
+                style={{ marginLeft: 'auto' }}
+              >
+                ← Về Bàn làm việc
+              </button>
+            )}
           </div>
           <div className="business-status-desc">
-            {viewIsB3 && !view.submission.form.confirmed ? (
-              'Nhân viên chưa gửi đề nghị chính thức. Hồ sơ đang ở trạng thái bản nháp của nhân viên, kế toán chưa thực hiện rà soát.'
+            {isDraft ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <span>Nhân viên chưa gửi đề nghị chính thức. Hồ sơ đang ở trạng thái bản nháp của nhân viên, kế toán chưa thực hiện rà soát.</span>
+                {onBackToDesk && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    onClick={onBackToDesk}
+                  >
+                    ← Về Bàn làm việc Kế toán
+                  </button>
+                )}
+              </div>
             ) : b3WorkflowPending ? (
               <>
                 Đã trình người có quyền <strong>{view.b3_workflow?.approver_ref}</strong> quyết định; chưa ghi nhận tiền thực nhận.
@@ -125,33 +174,7 @@ export function CaseHeaderCard({
             )}
           </div>
         </div>
-      ) : (
-        <div className="business-status-card business-status-general" data-testid="business-status-card" style={{ padding: '6px 12px', background: '#fafafa' }}>
-          <div className="business-status-title-row" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--color-muted-foreground)', fontWeight: 600 }}>Trạng thái xử lý:</span>
-            <span className={`status-pill status-${view.stage.toLowerCase()}`}>
-              {viewIsB3 && view.b3_workflow?.status === 'APPROVED'
-                ? 'Đã duyệt tạm ứng — chờ chi ứng'
-                : viewIsB3 && view.b3_workflow?.status === 'PENDING'
-                  ? 'Chờ người duyệt tạm ứng'
-                  : STAGE_LABELS[view.stage]}
-            </span>
-          </div>
-        </div>
       )}
-
-      {/* Thông tin hồ sơ gọn gàng */}
-      <div className="case-header-tech-footer">
-        <span>Mã NV: <code>{view.submission.employee_ref}</code></span>
-        {view.submission.work_ref && view.submission.work_ref !== view.id && (
-          <>
-            <span>·</span>
-            <span>Mã công việc: <code>{view.submission.work_ref}</code></span>
-          </>
-        )}
-        <span>·</span>
-        <span>Phiên bản: <strong>v{view.case_version}</strong></span>
-      </div>
     </div>
   );
 }

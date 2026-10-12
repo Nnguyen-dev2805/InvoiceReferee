@@ -596,7 +596,7 @@ def record_receipt(conn: sqlite3.Connection, case_id: str,
     # keeps the raw event UNCONFIRMED with reasons, never a fabricated receipt.
     evidence_issues = validate_advance_receipt(
         payload, advance_proof_source_ids(conn, case_id),
-        context.receipt_sources)
+        context.effective_receipt_sources())
     classification = derive_classification(
         payload, submission.employee_ref, incidents,
         evidence_ok=not evidence_issues)

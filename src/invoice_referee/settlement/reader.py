@@ -558,11 +558,14 @@ class SettlementReader:
     def _extract_from_text(self, source: SourceRecord, text: str,
                            page: int | None, keys: list[str],
                            budget: RunBudget) -> list[Observation]:
-        # B3 v1 dùng grammar riêng (document.role/forecast.row.*...); B7/B3
-        # legacy giữ prompt extraction chung.
-        prompt = load_prompt(
-            "settlement-b3-extract.txt" if "document.role" in keys
-            else "settlement-extract.txt")
+        # B3 v1 dùng grammar riêng (document.role/forecast.row.*...); B5 receipt
+        # đọc biên nhận dùng grammar receipt.*; B7/B3 legacy giữ prompt chung.
+        if any(k.startswith("receipt.") for k in keys):
+            prompt = load_prompt("settlement-receipt-extract.txt")
+        elif "document.role" in keys:
+            prompt = load_prompt("settlement-b3-extract.txt")
+        else:
+            prompt = load_prompt("settlement-extract.txt")
         payload = {
             "source_id": source.id,
             "filename": source.filename,

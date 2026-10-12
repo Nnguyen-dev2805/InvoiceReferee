@@ -4,6 +4,7 @@ import type {
   AuditEntry,
   B3AdvanceEventPayload,
   B3AdvanceEventView,
+  B3ReceiptReadView,
   B3DecisionPayload,
   B3DecisionView,
   B3DemoContext,
@@ -323,6 +324,18 @@ export function recordB3Advance(
 ): Promise<B3AdvanceEventView> {
   return postCommand<B3AdvanceEventView>(
     `/api/cases/${encodeURIComponent(caseId)}/b3-advance-events`, payload);
+}
+
+export function readB3AdvanceReceipt(
+  caseId: string,
+  payload: {
+    actor_id: string; demo_role: DemoRole; expected_case_version: number;
+    source_id: string; method: 'BANK_TRANSFER' | 'CASH';
+  },
+): Promise<B3ReceiptReadView> {
+  return postCommand<B3ReceiptReadView>(
+    `/api/cases/${encodeURIComponent(caseId)}/b3-advance-receipt-reads`,
+    payload);
 }
 
 export function prepareLinkedB7(

@@ -12,7 +12,7 @@ interface CaseListItemProps {
 }
 
 export function CaseListItem({
-  item, isActive, actorName, onOpen, onDelete,
+  item, isActive, actorName: _actorName, onOpen, onDelete,
 }: CaseListItemProps) {
   return (
     <div className={`case-item-card ${isActive ? 'case-item-card-active' : ''}`}>
@@ -27,19 +27,16 @@ export function CaseListItem({
             {item.origin === 'SYSTEM' && (
               <span className="case-item-system-badge">Hệ thống</span>
             )}
-            <span className={`case-item-job-badge badge-${item.job.toLowerCase()}`}>{item.job}</span>
+            <span className={`case-item-job-badge badge-${item.job.toLowerCase()}`}>
+              {item.job === 'B3' ? 'Tạm ứng' : 'Quyết toán'}
+            </span>
           </span>
         </div>
         <div className="case-item-stage">
           <span className="case-stage-pill">{STAGE_LABELS[item.stage]}</span>
-          <span className="case-version-text">v{item.case_version}</span>
-        </div>
-        <div className="case-item-bottom">
-          <span className="case-item-actor">
-            {actorName ? `${actorName} (${item.employee_ref})` : item.employee_ref}
-          </span>
-          <span>/</span>
-          <span className="case-item-work">{item.work_ref}</span>
+          {item.work_ref && item.work_ref !== item.id && (
+            <span className="case-item-work-tag">{item.work_ref}</span>
+          )}
         </div>
       </button>
       <button

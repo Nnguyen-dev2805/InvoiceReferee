@@ -93,7 +93,8 @@ def prepare_linked_child(conn: sqlite3.Connection, parent_id: str,
         return existing["id"], False
     now_dt = clock.utcnow()
     now = clock.iso(now_dt)
-    child_id = _rec.new_id("C-")
+    prefix = f"QT-{now_dt.strftime('%y%m')}-"
+    child_id = _rec.new_case_id(conn, prefix)
     link = {
         "origin_case_id": parent_id,
         "employee_ref": _rec.load(parent["submission_json"])["employee_ref"],

@@ -464,6 +464,62 @@ export interface B3ReceiptSource {
   label: string;
 }
 
+// B5 receipt READING: an AI/reader draft the accountant reviews and edits.
+export interface B3ReceiptFact {
+  key: string;
+  raw: string | null;
+  value: number | string | null;
+  read_state: 'READ' | 'NOT_FOUND' | 'UNCLEAR';
+  locator: string | null;
+  page: number | null;
+  quote: string | null;
+}
+
+export interface B3ReceiptProposal {
+  amount_vnd: number | null;
+  currency: string | null;
+  payer_side: 'COMPANY' | 'EMPLOYEE' | 'OTHER' | 'UNKNOWN';
+  payee_ref: string | null;
+  receiver_name: string | null;
+  payer_name: string | null;
+  event_at: string | null;
+  event_ref: string | null;
+  narrative: string | null;
+  outcome_text: string | null;
+  method: 'BANK_TRANSFER' | 'CASH' | null;
+  proof_scope: 'ORDER_ONLY' | 'SENDER_DEBIT' | 'RECEIVER_CONFIRMED'
+    | 'UNCONFIRMED' | null;
+  acknowledgement: 'ACKNOWLEDGED' | 'NOT_HANDED' | 'UNCONFIRMED' | null;
+  voucher_number: string | null;
+  handed_by_name: string | null;
+  bank_name: string | null;
+  sender_account: string | null;
+  recipient_bank: string | null;
+  recipient_account: string | null;
+  classification_hint: B3FundingClassification | null;
+}
+
+export interface B3ReceiptWarning {
+  code: string;
+  message: string;
+  field: string | null;
+}
+
+export interface B3ReceiptReadView {
+  id: string;
+  case_id: string;
+  source_id: string;
+  filename: string;
+  status: 'READ' | 'PARTIAL' | 'FAILED';
+  reader_mode: string;
+  created_at: string;
+  facts: B3ReceiptFact[];
+  proposal: B3ReceiptProposal;
+  warnings: B3ReceiptWarning[];
+  error: string | null;
+  idempotent_replay: boolean;
+}
+
 export type B3AdvanceReportedStatus =
   | 'RECEIVED' | 'PENDING' | 'FAILED' | 'CANCELLED' | 'UNCONFIRMED';
 

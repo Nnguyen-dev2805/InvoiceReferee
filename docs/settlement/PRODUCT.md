@@ -59,7 +59,13 @@ và ứng trong một quyết định có nội dung/phạm vi riêng. Không y�
   **ghi sự kiện tiền** bằng HUMAN_SOURCE_REVIEW — đọc nguồn rồi lưu từng field
   kèm source/locator/raw/value. Hai nhánh phương thức: **chuyển khoản** (phạm vi
   nguồn phải đủ căn cứ người hưởng nhận, không chỉ lệnh mới tạo/trích nợ bên gửi)
-  và **tiền mặt** (phiếu chi có xác nhận giao/nhận, số phiếu khớp sự kiện). Một
+  và **tiền mặt** (phiếu chi có xác nhận giao/nhận, số phiếu khớp sự kiện). Nguồn
+  chi đặt sẵn dùng chung cho công ty demo (một tài khoản ngân hàng + một quỹ tiền
+  mặt); UI tự gắn nguồn theo phương thức, người dùng không chọn và không phải đổi
+  cấu hình riêng cho từng hồ sơ. Sau khi tải chứng từ, hệ thống **đọc thành bản
+  nháp** (trường + căn cứ) để kế toán rà soát/sửa; **upload/đọc thành công không
+  tự tạo sự kiện tiền** — kế toán vẫn bấm “Ghi nhận kết quả thực tế”. AI chỉ trích
+  xuất/đề xuất, Python kiểm nghiệp vụ, kế toán xác nhận. Một
   RECEIVED chỉ thành thực nhận khi **mọi** field bắt buộc đã đọc từ nguồn; thiếu
   chứng từ/căn cứ giữ UNCONFIRMED, không tự thành đã nhận. Chương trình đối chiếu
   actual với số đã duyệt: RECEIVED đủ → stage `AWAITING_WORK_SETTLEMENT`; nhận một

@@ -14,15 +14,12 @@ import { SourceUploadPanel } from './SourceUploadPanel';
 import { DocumentViewer } from './DocumentViewer';
 import { AccountingDesk } from './AccountingDesk';
 import { ApprovalDesk } from './ApprovalDesk';
-import { summarizeCase } from './caseSummary';
 import { STAGE_LABELS, formatMoney, roleLabel } from './displayText';
 import { formatTripDates, isB3V1Form } from './lib/b3Form';
 import { TechDrawer } from './components/TechDrawer';
 import { PersonaPicker } from './components/PersonaPicker';
 import { CaseListItem } from './components/CaseListItem';
 import { HistoryTab } from './components/HistoryTab';
-import { StickyActionBar } from './components/StickyActionBar';
-import { SummaryCard } from './components/SummaryCard';
 import { CaseHeaderCard } from './components/CaseHeaderCard';
 import { useCaseWorkspace } from './useCaseWorkspace';
 import type {
@@ -76,6 +73,8 @@ export function App() {
   const [showTechDrawer, setShowTechDrawer] = useState(false);
   const [activeDocSourceId, setActiveDocSourceId] = useState<string | null>(null);
   const [isUploadingSource, setIsUploadingSource] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [workbenchMode, setWorkbenchMode] = useState<'split' | 'doc' | 'form'>('split');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleCopyCaseId = useCallback(async (id: string) => {
@@ -136,6 +135,7 @@ export function App() {
     setStageFilter('ALL');
     setB3Intake(emptyB3Intake(b3Method));
     setImportFiles([]);
+    setSelectedCaseId(null);
   };
 
   const filteredCases = useMemo(() => {
@@ -223,23 +223,32 @@ export function App() {
   };
 
   const loadCase = useCallback(async (id: string) => {
+    const summary = cases.find((c) => c.id === id);
+    if ((role === 'ACCOUNTANT' || role === 'APPROVER') && summary?.confirmed === false) {
+      setSelectedCaseId(null);
+      return;
+    }
     // Select the case (drives the workspace hook) and await the guarded load so
     // callers can read the committed workspace right after.
     setSelectedCaseId(id);
     await loadWorkspace(id);
-  }, [loadWorkspace]);
+  }, [cases, role, loadWorkspace]);
 
   // Derive the tab + revise/draft fields from the committed workspace (so a
   // case switch resets them consistently with the loaded data).
   useEffect(() => {
     if (!workspace) return;
     const next = workspace.view;
-    setRevisePurpose(String(next.submission.form.purpose ?? ''));
-    setReviseScope(String(next.submission.form.scope ?? ''));
-    setReviseReason('');
     const b3Form = isB3V1Form(next.submission.form)
       ? (next.submission.form as unknown as B3Intake)
       : null;
+    if ((role === 'ACCOUNTANT' || role === 'APPROVER') && b3Form && !b3Form.confirmed) {
+      setSelectedCaseId(null);
+      return;
+    }
+    setRevisePurpose(String(next.submission.form.purpose ?? ''));
+    setReviseScope(String(next.submission.form.scope ?? ''));
+    setReviseReason('');
     const isUnconfirmedDraft = b3Form !== null
       && !b3Form.confirmed
       && !b3Form.destination
@@ -371,16 +380,11 @@ export function App() {
     }
   };
 
-  const handleFillFromDraft = () => {
-    if (!report?.b3) return;
-    const filled = {...report.b3.intake, confirmed: false};
-    setB3ReviseIntake(filled);
-  };
-
   const handleReviseB3 = async (confirmed: boolean) => {
     if (!view || !b3ReviseIntake) return;
     const isFirstConfirm = confirmed && !view.submission.form.confirmed;
-    const reason = b3ReviseReason.trim() || (isFirstConfirm ? 'Xác nhận bản nháp từ tài liệu đính kèm' : '');
+    const reason = b3ReviseReason.trim()
+      || (isFirstConfirm ? 'Xác nhận bản nháp từ tài liệu đính kèm' : !confirmed ? 'Lưu bản nháp đề nghị tạm ứng' : '');
     if (!reason) {
       setError('Cần lý do sửa/xác nhận để ghi history.');
       return;
@@ -534,11 +538,6 @@ export function App() {
     && !runActive;
 
   const viewIsB3 = view !== null && (view.job === 'B3' || isB3V1Form(view.submission.form));
-  const b3DraftReadyForFill = report?.b3 !== null
-    && report?.b3.readiness === 'DRAFT_CONFIRMATION_REQUIRED';
-  const caseSummary = view
-    ? summarizeCase(view, run, report, { role, actorId: actorId.trim() })
-    : null;
 
   const b3EligibleCases = useMemo(() => {
     return cases.filter((c) => {
@@ -563,12 +562,8 @@ export function App() {
     return demoContext?.people.find((p) => p.actor_ref === ref)?.name || ref;
   }, [demoContext]);
 
-  const employeeName = view
-    ? getActorName(view.submission.employee_ref)
-    : '';
-
   const jobTitlePrefix = viewIsB3 ? 'Đề nghị tạm ứng' : 'Quyết toán';
-  const mainTitle = view ? `${jobTitlePrefix} — ${employeeName}` : '';
+  const mainTitle = view ? jobTitlePrefix : '';
 
   const sublineText = useMemo(() => {
     if (!view) return '';
@@ -581,13 +576,12 @@ export function App() {
     if (tripDates) {
       parts.push(tripDates);
     }
-    if (form.request_amount_vnd != null) {
-      parts.push(`Đề nghị ${formatMoney(Number(form.request_amount_vnd))}`);
-    } else if (view.money_summary?.approved_vnd != null) {
-      parts.push(`Đã duyệt ${formatMoney(Number(view.money_summary.approved_vnd))}`);
-    }
     if (parts.length === 0) {
-      if (view.submission.work_ref && view.submission.work_ref !== view.id) {
+      if (form.request_amount_vnd != null) {
+        parts.push(`Đề nghị ${formatMoney(Number(form.request_amount_vnd))}`);
+      } else if (view.money_summary?.approved_vnd != null) {
+        parts.push(`Đã duyệt ${formatMoney(Number(view.money_summary.approved_vnd))}`);
+      } else if (view.submission.work_ref && view.submission.work_ref !== view.id) {
         parts.push(`Công việc: ${view.submission.work_ref}`);
       } else {
         parts.push('Chờ hoàn thiện thông tin');
@@ -602,15 +596,86 @@ export function App() {
         <div className="app-brand">
           <h1 className="app-brand-heading">InvoiceReferee</h1>
         </div>
-        <PersonaPicker
-          role={role}
-          selectedPersonName={selectedPerson?.name ?? null}
-          selectedActorRef={selectedActorRef}
-          people={people.map(({ person, label }) => ({
-            actorRef: person.actor_ref, label,
-          }))}
-          onChange={handlePersonChange}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {view && (
+            <>
+              <button
+                type="button"
+                className={`btn ${workbenchMode === 'form' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                data-testid="toggle-full-form-btn"
+                onClick={() => setWorkbenchMode(workbenchMode === 'form' ? 'split' : 'form')}
+                title={workbenchMode === 'form' ? 'Chia đôi màn hình để xem cùng chứng từ' : 'Ẩn cột chứng từ để chỉ xem toàn bộ biểu mẫu'}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  height: '36px',
+                  borderRadius: 'var(--radius)',
+                }}
+              >
+                {workbenchMode === 'form' ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <line x1="12" y1="3" x2="12" y2="21" />
+                    </svg>
+                    Xem cùng chứng từ
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <polyline points="9 21 3 21 3 15" />
+                      <line x1="21" y1="3" x2="14" y2="10" />
+                      <line x1="3" y1="21" x2="10" y2="14" />
+                    </svg>
+                    Chỉ xem toàn bộ biểu mẫu
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                data-testid="debug-btn"
+              onClick={() => setShowTechDrawer(true)}
+              title="Mở bảng log hệ thống & kiểm toán (Debug)"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+                height: '36px',
+                borderRadius: 'var(--radius)',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+              Debug
+            </button>
+          </>
+        )}
+          <PersonaPicker
+            role={role}
+            selectedPersonName={selectedPerson?.name ?? null}
+            selectedActorRef={selectedActorRef}
+            people={people.map(({ person, label }) => ({
+              actorRef: person.actor_ref, label,
+            }))}
+            onChange={handlePersonChange}
+          />
+        </div>
       </header>
 
       {error && <div className="notice notice-error" role="alert">{error}</div>}
@@ -618,37 +683,98 @@ export function App() {
         <div className="notice notice-error" role="alert">{workspaceError}</div>
       )}
 
-      <div className="grid grid-master-detail">
+      <div className={`grid grid-master-detail ${sidebarCollapsed && view !== null ? 'sidebar-collapsed' : ''}`}>
         {/* ==================================================================
-            CỘT TRÁI (SIDEBAR CỐ ĐỊNH 340px)
+            CỘT TRÁI (SIDEBAR CÓ HỖ TRỢ THU GỌN)
             ================================================================== */}
-        <section className="col col-sidebar">
-          {/* Nút Tạo hồ sơ mới chỉ dành cho Nhân viên nộp hồ sơ */}
-          {role === 'EMPLOYEE' && (
-            <div className="new-case-banner">
+        {sidebarCollapsed && view !== null ? (
+          <section className="col col-sidebar is-collapsed">
+            <button
+              type="button"
+              className="btn-toggle-sidebar btn-expand-sidebar"
+              onClick={() => setSidebarCollapsed(false)}
+              title="Mở rộng danh sách hồ sơ"
+              aria-label="Mở rộng danh sách hồ sơ"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="13 17 18 12 13 7" />
+                <polyline points="6 17 11 12 6 7" />
+              </svg>
+              <span className="collapsed-badge">{filteredCases.length}</span>
+            </button>
+            {role === 'EMPLOYEE' && (
               <button
                 type="button"
-                className={`btn ${view === null ? 'btn-primary btn-new-case-active' : ''}`}
-                style={{ width: '100%', justifyContent: 'center', gap: '6px' }}
+                className="btn btn-primary btn-mini-new-case"
                 onClick={() => setSelectedCaseId(null)}
+                title="Tạo hồ sơ mới"
+                aria-label="Tạo hồ sơ mới"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Tạo hồ sơ mới
+                +
               </button>
-            </div>
-          )}
+            )}
+          </section>
+        ) : (
+          <section className="col col-sidebar">
+            {/* Nút Tạo hồ sơ mới cho Nhân viên, hoặc Nút Bàn làm việc cho Kế toán / Người duyệt */}
+            {role === 'EMPLOYEE' ? (
+              <div className="new-case-banner">
+                <button
+                  type="button"
+                  className={`btn ${view === null ? 'btn-primary btn-new-case-active' : ''}`}
+                  style={{ width: '100%', justifyContent: 'center', gap: '6px' }}
+                  onClick={() => setSelectedCaseId(null)}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  Tạo hồ sơ mới
+                </button>
+              </div>
+            ) : (
+              <div className="new-case-banner">
+                <button
+                  type="button"
+                  className={`btn ${view === null ? 'btn-primary btn-new-case-active' : 'btn-outline-secondary'}`}
+                  style={{ width: '100%', justifyContent: 'center', gap: '6px' }}
+                  onClick={() => setSelectedCaseId(null)}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="7" height="7"/>
+                    <rect x="14" y="3" width="7" height="7"/>
+                    <rect x="14" y="14" width="7" height="7"/>
+                    <rect x="3" y="14" width="7" height="7"/>
+                  </svg>
+                  {role === 'ACCOUNTANT' ? 'Bàn làm việc Kế toán' : 'Bàn làm việc Người duyệt'}
+                </button>
+              </div>
+            )}
 
-          {/* Danh sách 24 hồ sơ có bộ lọc tìm kiếm nhanh và thanh cuộn độc lập */}
-          <div className="panel case-list-panel">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-              <h2 style={{ margin: 0, fontSize: '1.05rem' }}>
-                {role === 'EMPLOYEE' ? 'Hồ sơ của tôi' : 'Danh sách hồ sơ'}
-              </h2>
-              {filteredCases.length > 0 && <span className="badge">{filteredCases.length}</span>}
-            </div>
+            {/* Danh sách 24 hồ sơ có bộ lọc tìm kiếm nhanh và thanh cuộn độc lập */}
+            <div className="panel case-list-panel">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h2 style={{ margin: 0, fontSize: '1.05rem' }}>
+                    {role === 'EMPLOYEE' ? 'Hồ sơ của tôi' : 'Danh sách hồ sơ'}
+                  </h2>
+                  {filteredCases.length > 0 && <span className="badge">{filteredCases.length}</span>}
+                </div>
+                {view !== null && (
+                  <button
+                    type="button"
+                    className="btn-toggle-sidebar"
+                    onClick={() => setSidebarCollapsed(true)}
+                    title="Thu gọn danh sách để mở rộng khu vực làm việc"
+                    aria-label="Thu gọn danh sách hồ sơ"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="11 17 6 12 11 7" />
+                      <polyline points="18 17 13 12 18 7" />
+                    </svg>
+                  </button>
+                )}
+              </div>
 
             {role === 'EMPLOYEE' ? null : cases.length > 0 ? (
               role === 'ACCOUNTANT' ? (
@@ -773,6 +899,7 @@ export function App() {
             )}
           </div>
         </section>
+        )}
 
         {/* ==================================================================
             CỘT PHẢI (WORKSPACE: FORM TẠO HỒ SƠ HOẶC CHI TIẾT HỒ SƠ ĐANG XEM)
@@ -1043,7 +1170,6 @@ export function App() {
                             <input
                               id="purpose"
                               value={purpose}
-                              placeholder="Ví dụ: Công tác Hà Nội gặp đối tác"
                               onChange={(e) => setPurpose(e.target.value)}
                             />
                           </div>
@@ -1052,7 +1178,6 @@ export function App() {
                             <input
                               id="scope"
                               value={scope}
-                              placeholder="Ví dụ: Vé máy bay, khách sạn, di chuyển"
                               onChange={(e) => setScope(e.target.value)}
                             />
                           </div>
@@ -1071,24 +1196,12 @@ export function App() {
                   </>
                 ) : (
                   <div className="b7-standalone-container" style={{ maxWidth: '640px' }}>
-                    <div style={{
-                      padding: '10px 14px',
-                      background: 'var(--color-muted, #f4f4f5)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 'var(--radius)',
-                      fontSize: '0.86rem',
-                      color: 'var(--color-muted-foreground)',
-                      marginBottom: 'var(--space-4)',
-                    }}>
-                      Không có khoản tạm ứng nào đang chờ quyết toán. Bạn có thể tạo hồ sơ quyết toán trực tiếp cho chi phí tự chi:
-                    </div>
                     <div className="b7-direct-form" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                       <div className="field">
                         <label htmlFor="purpose">Mục đích công tác</label>
                         <input
                           id="purpose"
                           value={purpose}
-                          placeholder="Ví dụ: Công tác Hà Nội gặp đối tác"
                           onChange={(e) => setPurpose(e.target.value)}
                         />
                       </div>
@@ -1097,7 +1210,6 @@ export function App() {
                         <input
                           id="scope"
                           value={scope}
-                          placeholder="Ví dụ: Vé máy bay, khách sạn, di chuyển"
                           onChange={(e) => setScope(e.target.value)}
                         />
                       </div>
@@ -1134,6 +1246,9 @@ export function App() {
               copiedCaseId={copiedCaseId}
               onCopyCaseId={(id) => void handleCopyCaseId(id)}
               onOpenTech={() => setShowTechDrawer(true)}
+              workbenchMode={workbenchMode}
+              onWorkbenchModeChange={setWorkbenchMode}
+              onBackToDesk={() => setSelectedCaseId(null)}
             />
 
             {/* Contextual Notice: Bổ sung câu hỏi giải trình */}
@@ -1218,12 +1333,10 @@ export function App() {
               return null;
             })()}
 
-            {caseSummary && (
-              <SummaryCard summary={caseSummary} onSelectTab={setCaseTab} />
-            )}
+
 
             {/* WORKBENCH SPLIT-SCREEN LAYOUT */}
-            <div className="workbench-split" data-testid="workbench-split">
+            <div className={`workbench-split mode-${workbenchMode}`} data-testid="workbench-split">
               {/* CỘT TRÁI: DOCUMENT VIEWER */}
               <div className="workbench-doc-pane">
                 <DocumentViewer
@@ -1232,85 +1345,115 @@ export function App() {
                   onSelectSource={setActiveDocSourceId}
                   onUpload={handleUploadWorkbenchSource}
                   isUploading={isUploadingSource}
+                  onToggleFormOnly={() => setWorkbenchMode('form')}
                 />
               </div>
 
               {/* CỘT PHẢI: FORM / REPORT / TABS */}
               <div className="workbench-content-pane">
+                {workbenchMode === 'form' && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 14px',
+                    marginBottom: 'var(--space-3)',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 'var(--radius)',
+                    fontSize: '0.82rem',
+                  }}>
+                    <span style={{ color: '#475569', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                      </svg>
+                      Đang xem toàn bộ biểu mẫu (Đã ẩn cột chứng từ)
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setWorkbenchMode('split')}
+                      style={{ padding: '3px 10px', fontSize: '0.78rem' }}
+                    >
+                      ◫ Xem cùng chứng từ
+                    </button>
+                  </div>
+                )}
+
                 {/* Case Tabs Navigation */}
                 <div className="case-tabs-nav" role="tablist" aria-label="Các phần chi tiết của hồ sơ">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={caseTab === 'report'}
-                className={`case-tab-btn ${caseTab === 'report' ? 'case-tab-active' : ''}`}
-                onClick={() => setCaseTab('report')}
-              >
-                Kết quả &amp; Báo cáo
-              </button>
-              {viewIsB3 ? (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={caseTab === 'draft'}
-                  className={`case-tab-btn ${caseTab === 'draft' ? 'case-tab-active' : ''}`}
-                  onClick={() => setCaseTab('draft')}
-                >
-                  Bản nháp B3
-                  {!view.submission.form.confirmed && (
-                    <span className="tab-count-badge badge-warning">Chưa gửi</span>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={caseTab === 'report'}
+                    className={`case-tab-btn ${caseTab === 'report' ? 'case-tab-active' : ''}`}
+                    onClick={() => setCaseTab('report')}
+                  >
+                    Kết quả &amp; Báo cáo
+                  </button>
+                  {viewIsB3 ? (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={caseTab === 'draft'}
+                      className={`case-tab-btn ${caseTab === 'draft' ? 'case-tab-active' : ''}`}
+                      onClick={() => setCaseTab('draft')}
+                    >
+                      Bản nháp B3
+                      {!view.submission.form.confirmed && (
+                        <span className="tab-count-badge badge-warning">Chưa gửi</span>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={caseTab === 'draft'}
+                      className={`case-tab-btn ${caseTab === 'draft' ? 'case-tab-active' : ''}`}
+                      onClick={() => setCaseTab('draft')}
+                    >
+                      Sửa khai báo
+                    </button>
                   )}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={caseTab === 'draft'}
-                  className={`case-tab-btn ${caseTab === 'draft' ? 'case-tab-active' : ''}`}
-                  onClick={() => setCaseTab('draft')}
-                >
-                  Sửa khai báo
-                </button>
-              )}
-              <button
-                type="button"
-                role="tab"
-                aria-selected={caseTab === 'sources'}
-                className={`case-tab-btn ${caseTab === 'sources' ? 'case-tab-active' : ''}`}
-                onClick={() => setCaseTab('sources')}
-              >
-                Nguồn chứng từ
-                <span className="tab-count-badge">{view.sources.length}</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={caseTab === 'questions'}
-                className={`case-tab-btn ${caseTab === 'questions' ? 'case-tab-active' : ''}`}
-                onClick={() => setCaseTab('questions')}
-              >
-                Câu hỏi
-                {(() => {
-                  const myCount = questions.filter(q => q.owner === role && q.status === 'OPEN').length;
-                  if (myCount > 0) {
-                    return <span className="tab-count-badge badge-danger">{myCount}</span>;
-                  }
-                  if (questions.length > 0) {
-                    return <span className="tab-count-badge">{questions.length}</span>;
-                  }
-                  return <span className="tab-count-badge">0</span>;
-                })()}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={caseTab === 'history'}
-                className={`case-tab-btn ${caseTab === 'history' ? 'case-tab-active' : ''}`}
-                onClick={() => setCaseTab('history')}
-              >
-                Lịch sử &amp; Kỹ thuật
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={caseTab === 'sources'}
+                    className={`case-tab-btn ${caseTab === 'sources' ? 'case-tab-active' : ''}`}
+                    onClick={() => setCaseTab('sources')}
+                  >
+                    Nguồn chứng từ
+                    <span className="tab-count-badge">{view.sources.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={caseTab === 'questions'}
+                    className={`case-tab-btn ${caseTab === 'questions' ? 'case-tab-active' : ''}`}
+                    onClick={() => setCaseTab('questions')}
+                  >
+                    Câu hỏi
+                    {(() => {
+                      const myCount = questions.filter(q => q.owner === role && q.status === 'OPEN').length;
+                      if (myCount > 0) {
+                        return <span className="tab-count-badge badge-danger">{myCount}</span>;
+                      }
+                      if (questions.length > 0) {
+                        return <span className="tab-count-badge">{questions.length}</span>;
+                      }
+                      return <span className="tab-count-badge">0</span>;
+                    })()}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={caseTab === 'history'}
+                    className={`case-tab-btn ${caseTab === 'history' ? 'case-tab-active' : ''}`}
+                    onClick={() => setCaseTab('history')}
+                  >
+                    Lịch sử
+                  </button>
+                </div>
 
             {/* TAB 1: Kết quả & Báo cáo */}
             <div style={{ display: caseTab === 'report' ? 'block' : 'none' }}>
@@ -1351,55 +1494,18 @@ export function App() {
                 </div>
               ) : (
                 <div data-testid="run-panel" style={{ marginBottom: 'var(--space-4)' }}>
-                  <div className="run-status-strip">
-                    <div className="run-status-meta">
-                      {/* Một nhãn mô phỏng dễ thấy; raw run id/status/stage
-                          chuyển vào "Thông tin xử lý" bên dưới. */}
-                      {run?.mode && (
-                        <span className="run-pill-mode">
-                          {run.mode === 'FAKE_OR_REPLAY'
-                            ? 'Chế độ mô phỏng/replay — không phải chất lượng OCR/LLM thật'
-                            : `Chế độ: ${run.mode}`}
-                        </span>
-                      )}
-                    </div>
-                    <div className="run-actions">
-                      {role === 'ACCOUNTANT' && (
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-primary"
-                          onClick={() => {
-                            const el = document.getElementById('accountant-review-section') || document.getElementById('review-note');
-                            if (el) {
-                              el.scrollIntoView?.({ behavior: 'smooth' });
-                              const input = document.getElementById('review-note');
-                              if (input instanceof HTMLElement) input.focus();
-                            }
-                          }}
-                        >
-                          Đi đến Rà soát kế toán ↓
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-ghost"
-                        disabled={!canStartRun}
-                        title="Chạy lại đối soát khi có tài liệu mới"
-                        onClick={() => void handleStartRun()}
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ marginRight: 4 }}>
-                          <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
-                        </svg>
-                        Chạy lại đối soát
-                      </button>
-                    </div>
-                  </div>
+                  <span className="sr-only">
+                    {run?.mode === 'FAKE_OR_REPLAY'
+                      ? 'Chế độ mô phỏng/replay — không phải chất lượng OCR/LLM thật'
+                      : (run?.mode ? `Chế độ: ${run.mode}` : '')}
+                  </span>
                   <ProcessingDetails run={run} report={report} />
 
                   <ReportPanel
                     report={report}
                     b3Context={b3RunContext}
                     sources={view.sources}
+                    onOpenDebug={() => setShowTechDrawer(true)}
                   />
                 </div>
               )}
@@ -1425,82 +1531,26 @@ export function App() {
             <div style={{ display: caseTab === 'draft' ? 'block' : 'none' }}>
               {viewIsB3 && b3ReviseIntake && (
                 <div className="panel" data-testid="b3-revise-panel">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: 'var(--space-3)' }}>
+                  <div style={{ marginBottom: 'var(--space-3)' }}>
                     <h2 style={{ margin: 0 }}>
                       {view.submission.form.confirmed
                         ? 'Sửa khai báo đề nghị B3'
                         : 'Kiểm tra & Xác nhận bản nháp B3'}
                     </h2>
-                    {b3DraftReadyForFill && (
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-primary"
-                        onClick={handleFillFromDraft}
-                        title="Đồng bộ lại toàn bộ dữ liệu tự động trích xuất từ báo cáo đối soát"
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ marginRight: 4 }}>
-                          <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
-                        </svg>
-                        Điền form từ bản nháp report
-                      </button>
-                    )}
                   </div>
-                  {!view.submission.form.confirmed && (
-                    <div className="notice notice-info" style={{ marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flex: 1 }}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, marginTop: '2px' }}>
-                          <circle cx="12" cy="12" r="10" />
-                          <line x1="12" y1="16" x2="12" y2="12" />
-                          <line x1="12" y1="8" x2="12.01" y2="8" />
-                        </svg>
-                        <p style={{ margin: 0, fontSize: '0.86rem', lineHeight: 1.45 }}>
-                          {report ? (
-                            <>
-                              <strong>AI đã trích xuất dữ liệu từ chứng từ đính kèm{view.sources.length > 0 ? ` (${view.sources.length} tài liệu)` : ''}.</strong> Vui lòng rà soát lại thông tin bên dưới và nhấn <em>"Xác nhận và gửi đề nghị"</em> để hoàn tất nộp hồ sơ.
-                            </>
-                          ) : view.sources.length === 0 ? (
-                            <>
-                              <strong>Chưa có chứng từ đính kèm.</strong> Bạn có thể tự nhập thông tin đề nghị bên dưới hoặc tải tài liệu tại tab <em>"Nguồn chứng từ"</em> trước khi xác nhận.
-                            </>
-                          ) : (
-                            <>
-                              <strong>Đã lưu {view.sources.length} tài liệu nhưng chưa đối soát trích xuất.</strong> Bạn có thể nhấn nút bên cạnh để AI trích xuất tự động hoặc tự hoàn thiện thông tin bên dưới.
-                            </>
-                          )}
-                        </p>
-                      </div>
-                      {!report && view.sources.length > 0 && canStartRun && (
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-primary"
-                          style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
-                          onClick={() => void handleStartRun()}
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ marginRight: 4 }}>
-                            <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
-                          </svg>
-                          Trích xuất bằng AI
-                        </button>
-                      )}
-                    </div>
-                  )}
                   <B3IntakeForm
                     value={b3ReviseIntake}
                     onChange={setB3ReviseIntake}
                     disabled={role !== 'EMPLOYEE'}
                   />
-                  {role === 'EMPLOYEE' && (
-                    <div className="field">
-                      <label htmlFor="b3-revise-reason">Lý do sửa / xác nhận</label>
+                  {role === 'EMPLOYEE' && Boolean(view.submission.form.confirmed) && (
+                    <div className="field" style={{ marginTop: 'var(--space-3)' }}>
+                      <label htmlFor="b3-revise-reason">Lý do điều chỉnh thông tin</label>
                       <input
                         id="b3-revise-reason"
                         value={b3ReviseReason}
                         onChange={(e) => setB3ReviseReason(e.target.value)}
-                        placeholder={
-                          view.submission.form.confirmed
-                            ? 'Lý do điều chỉnh thông tin...'
-                            : 'Mặc định: Xác nhận bản nháp từ tài liệu đính kèm'
-                        }
+                        placeholder="Ví dụ: Bổ sung chi phí công tác theo kế hoạch mới..."
                       />
                     </div>
                   )}
@@ -1539,16 +1589,6 @@ export function App() {
                       Hồ sơ đang ở trạng thái bản nháp của nhân viên (chưa nộp). Kế toán / Người duyệt chỉ xem tham khảo, không thể gửi hoặc sửa bản nháp thay nhân viên.
                     </div>
                   ) : null}
-                  <div className="form-audit-footer-note">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="16" x2="12" y2="12" />
-                      <line x1="12" y1="8" x2="12.01" y2="8" />
-                    </svg>
-                    <span>
-                      <strong>Nguyên tắc đối soát chứng từ:</strong> Thông tin khai báo cần khớp với hồ sơ giấy đính kèm. Mọi sai lệch giữa tờ khai và chứng từ gốc sẽ được hệ thống gắn cờ để kế toán đối chiếu, không ghi đè dữ liệu gốc.
-                    </span>
-                  </div>
                 </div>
               )}
 
@@ -1611,22 +1651,16 @@ export function App() {
           </div>
         </div>
 
-        {/* STICKY BOTTOM ACTION BAR */}
-        <StickyActionBar
-          view={view}
-          viewIsB3={viewIsB3}
-          caseTab={caseTab}
-          role={role}
-          canStartRun={canStartRun}
-          b3ReviseReason={b3ReviseReason}
-          onReviseB3={(confirm) => void handleReviseB3(confirm)}
-          onStartRun={() => void handleStartRun()}
-        />
-
         {/* TECHNICAL DETAILS DRAWER */}
         {showTechDrawer && (
-          <TechDrawer view={view} run={run} report={report}
-            onClose={() => setShowTechDrawer(false)} />
+          <TechDrawer
+            view={view}
+            run={run}
+            report={report}
+            sources={view.sources}
+            b3Context={b3RunContext}
+            onClose={() => setShowTechDrawer(false)}
+          />
         )}
       </section>
         )}

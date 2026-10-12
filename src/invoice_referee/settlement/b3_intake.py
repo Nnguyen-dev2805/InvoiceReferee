@@ -36,6 +36,7 @@ from invoice_referee.settlement.contracts.b3_contracts import (
     B3Readiness,
     B3ReceiptSource,
     B3Route,
+    DEMO_RECEIPT_SOURCES,
 )
 from invoice_referee.settlement.b3_evaluation import (
     B3_ROW_KEY_TEMPLATES,

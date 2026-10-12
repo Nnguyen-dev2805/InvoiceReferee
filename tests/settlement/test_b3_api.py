@@ -60,6 +60,20 @@ def test_demo_context_lists_people_routes(b3_client):
     assert "grants" not in body
 
 
+def test_demo_context_default_receipt_sources(b3_client):
+    """Context thiếu receipt_sources vẫn có đúng hai nguồn chi demo mặc định."""
+    body = b3_client.get("/api/demo-context").json()
+    sources = body["receipt_sources"]
+    assert {s["method"] for s in sources} == {"BANK_TRANSFER", "CASH"}
+    by_method = {s["method"]: s for s in sources}
+    # Namespaces giữ nguyên mã đang dùng cho L01 để không phá liên kết giao dịch.
+    assert by_method["BANK_TRANSFER"]["namespace"] == "BANK:L01-COMPANY"
+    assert by_method["CASH"]["namespace"] == "CASH:L01-QUY-CHINH"
+    # Nhãn hiển thị là tên công ty chung, không phải mã kỹ thuật.
+    assert by_method["BANK_TRANSFER"]["label"] == "Tài khoản ngân hàng công ty"
+    assert by_method["CASH"]["label"] == "Quỹ tiền mặt công ty"
+
+
 # --- POST /api/b3-cases -------------------------------------------------------
 
 def test_new_b3_uses_own_id_as_dossier_scope(b3_client):
