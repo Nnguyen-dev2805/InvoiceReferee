@@ -13,16 +13,15 @@
     ]
   },
   "expected": {
-    "automation_decision": "ESCALATE",
+    "automation_decision": "ACCOUNTANT_REVIEW",
     "uncertainty_type": "OUTSIDE_POLICY",
-    "primary_rule": "SET_NO_INVOICE_EXCEPTION_001",
+    "primary_rule": "SET_PAPER_EVIDENCE_EXCEPTION",
     "findings": [
-      "SET_ALTERNATIVE_DOCUMENT_001",
-      "SET_NO_INVOICE_EXCEPTION_001"
+      "SET_PAPER_EVIDENCE_EXCEPTION"
     ],
     "followup": null
   },
-  "implementation_status": "GAP_EXPECTED",
+  "implementation_status": "COVERED",
   "accounting_facts": {
     "report_lines": [
       {

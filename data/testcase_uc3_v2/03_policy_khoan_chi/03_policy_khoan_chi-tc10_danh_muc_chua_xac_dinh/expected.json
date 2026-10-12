@@ -36,7 +36,7 @@
   "line_support_expectations": [
     {
       "item_id": "L01",
-      "description": "Chi phí khác trên chứng từ",
+      "description": "Thanh toán dịch vụ tại đơn vị đối tác",
       "amount_vnd": 1100000,
       "reference": "0001910",
       "note": "Đính kèm hóa đơn"

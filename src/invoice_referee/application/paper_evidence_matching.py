@@ -256,7 +256,10 @@ def match_paper_evidence(
                 )
             )
 
-        if line.requires_evidence and not auto_links:
+        # `requires_evidence` records what the paper form explicitly says. It is
+        # not a policy exemption: every expense row still needs evidence or a
+        # per-line exception reason before it can pass.
+        if not auto_links:
             if suggested_links:
                 findings.append(
                     SettlementFinding(
@@ -278,8 +281,8 @@ def match_paper_evidence(
                         rule_id="SET_PAPER_EVIDENCE_EXCEPTION",
                         status="FAIL",
                         message=(
-                            f"Khoản '{line.description}' yêu cầu evidence nhưng "
-                            f"chỉ có giải trình: {reason}"
+                            f"Khoản '{line.description}' chưa có evidence được ghép "
+                            f"và có giải trình: {reason}"
                         ),
                         uncertainty_type=UncertaintyType.OUTSIDE_POLICY,
                         target=DecisionTarget.ACCOUNTANT,
@@ -298,8 +301,8 @@ def match_paper_evidence(
                         rule_id="SET_PAPER_EVIDENCE_REQUIRED",
                         status="FAIL",
                         message=(
-                            f"Khoản '{line.description}' ghi cần tài liệu đính kèm "
-                            "nhưng chưa có evidence phù hợp hoặc giải trình riêng."
+                            f"Khoản '{line.description}' chưa có evidence phù hợp "
+                            "hoặc giải trình riêng."
                             + detail
                         ),
                         uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
@@ -311,26 +314,6 @@ def match_paper_evidence(
                         source_refs=source_refs,
                     )
                 )
-            continue
-
-        if not line.requires_evidence and reason and not auto_links:
-            findings.append(
-                SettlementFinding(
-                    rule_id="SET_PAPER_EVIDENCE_EXCEPTION",
-                    status="FAIL",
-                    message=(
-                        f"Khoản '{line.description}' được ghi chú không có "
-                        f"chứng từ: {reason}"
-                    ),
-                    uncertainty_type=UncertaintyType.OUTSIDE_POLICY,
-                    target=DecisionTarget.ACCOUNTANT,
-                    question=(
-                        "Vui lòng xác nhận ghi chú trên đơn có đủ căn cứ để "
-                        "chấp nhận khoản không có chứng từ này hay không."
-                    ),
-                    source_refs=source_refs,
-                )
-            )
             continue
 
         if auto_links:

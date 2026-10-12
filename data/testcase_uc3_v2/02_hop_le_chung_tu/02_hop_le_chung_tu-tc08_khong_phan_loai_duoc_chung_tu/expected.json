@@ -36,7 +36,7 @@
   "line_support_expectations": [
     {
       "item_id": "L01",
-      "description": "Khoản chi không rõ loại",
+      "description": "Thanh toán dịch vụ tại đối tác",
       "amount_vnd": 720000,
       "reference": "DOC-1808",
       "note": "Đính kèm hóa đơn"

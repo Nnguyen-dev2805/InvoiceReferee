@@ -15,13 +15,13 @@
   "expected": {
     "automation_decision": "REQUEST_INFO",
     "uncertainty_type": "FACTUAL_UNKNOWN",
-    "primary_rule": "SET_EVIDENCE_REASON_001",
+    "primary_rule": "SET_PAPER_EVIDENCE_REQUIRED",
     "findings": [
-      "SET_EVIDENCE_REASON_001"
+      "SET_PAPER_EVIDENCE_REQUIRED"
     ],
     "followup": null
   },
-  "implementation_status": "GAP_EXPECTED",
+  "implementation_status": "COVERED",
   "accounting_facts": {
     "report_lines": [
       {

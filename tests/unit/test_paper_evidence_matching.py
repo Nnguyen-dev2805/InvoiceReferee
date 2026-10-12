@@ -76,6 +76,25 @@ def test_required_evidence_without_match_or_reason_requests_employee() -> None:
     assert finding.target.value == "EMPLOYEE"
 
 
+def test_unstated_evidence_requirement_without_document_or_reason_requests_employee() -> None:
+    """Regression for UC-03 TC19: blank note must not imply an exemption."""
+    paper = _paper()
+    line = paper.lines[0]
+    line.requires_evidence = False
+    line.invoice_refs = []
+    line.note = None
+    line.no_evidence_reason = None
+
+    _, _, findings = match_paper_evidence(paper, [], [])
+
+    finding = next(
+        item for item in findings if item.rule_id == "SET_PAPER_EVIDENCE_REQUIRED"
+    )
+    assert finding.status == "FAIL"
+    assert finding.uncertainty_type.value == "FACTUAL_UNKNOWN"
+    assert finding.target.value == "EMPLOYEE"
+
+
 def test_required_evidence_with_reason_routes_exception_to_accountant() -> None:
     _, _, findings = match_paper_evidence(
         _paper(reason="Nhà cung cấp không xuất hóa đơn"),

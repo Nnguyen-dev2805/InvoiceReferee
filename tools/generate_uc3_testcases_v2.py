@@ -185,6 +185,13 @@ def vietnamese_money_words(value: int) -> str:
     return phrase[:1].upper() + phrase[1:] + " đồng"
 
 
+def report_business_purpose(case_spec: "Case") -> str:
+    """Use a natural business purpose instead of exposing testcase assertions."""
+    if case_spec.settlement_type == "EMPLOYEE_REIMBURSEMENT":
+        return "Đề nghị hoàn ứng các khoản chi đã chi trả phục vụ công việc theo bảng kê đính kèm."
+    return "Quyết toán các khoản chi phục vụ công việc theo bảng kê và chứng từ đính kèm."
+
+
 def case(
     group_id: str,
     group_name: str,
@@ -298,7 +305,7 @@ def build_cases() -> tuple[Case, ...]:
         case(g2, g2n, 5, "mst_nguoi_ban_sai_dinh_dang", "Không hợp lệ - MST người bán sai định dạng", lines=(Line("L01", "Sửa máy in", 1_950_000, "OPERATIONS", reference="0001805"),), evidence=(invoice("0001805", "Sửa máy in", 1_950_000, seller_tax_code="01012A4567"),), advance_amount=2_000_000, settlement_amount=50_000, settlement_direction="Nhân viên hoàn trả công ty", expected_decision="REQUEST_INFO", expected_rule="SET_DOCUMENT_REQUIRED_FIELDS_001", expected_findings=("INVALID_TAX_CODE_FORMAT:issuer_tax_code",)),
         case(g2, g2n, 6, "ve_may_bay_hop_le", "Hợp lệ - vé máy bay điện tử là chứng từ gốc", lines=(Line("L01", "Vé máy bay công tác Hà Nội Đà Nẵng", 2_850_000, "TRAVEL", reference="VN-ABC123"),), evidence=(receipt("VN-ABC123", "Vé máy bay công tác Hà Nội Đà Nẵng", 2_850_000, doc_type="TRANSPORT_TICKET", seller_name="Vietnam Airlines", seller_tax_code="0100107518", buyer_name=EMPLOYEE_NAME, buyer_tax_code=None, template_number=None, serial_number=None),), advance_amount=3_000_000, settlement_amount=150_000, settlement_direction="Nhân viên hoàn trả công ty"),
         case(g2, g2n, 7, "chuyen_khoan_chua_thanh_cong", "Không hợp lệ - bằng chứng chuyển khoản chưa hoàn tất", lines=(Line("L01", "Phí gửi hồ sơ", 450_000, "OPERATIONS", reference="GD-1807", note="Chứng từ chuyển khoản thay thế"),), evidence=(receipt("GD-1807", "Chuyển khoản phí gửi hồ sơ", 450_000, doc_type="PAYMENT_PROOF", seller_name="Ngân hàng Demo", seller_tax_code=None, buyer_name=None, buyer_tax_code=None, template_number=None, serial_number=None, note="Trạng thái: Đang xử lý"),), settlement_type="EMPLOYEE_REIMBURSEMENT", expected_decision="REQUEST_INFO", expected_rule="SET_DOCUMENT_VALIDITY_001", expected_findings=("PAYMENT_NOT_CONFIRMED",)),
-        case(g2, g2n, 8, "khong_phan_loai_duoc_chung_tu", "Không hợp lệ - không phân loại được chứng từ", lines=(Line("L01", "Khoản chi không rõ loại", 720_000, "OTHER", reference="DOC-1808"),), evidence=(receipt("DOC-1808", "Tài liệu không rõ loại", 720_000, doc_type="UNKNOWN", seller_name="Đơn vị không xác định", seller_tax_code=None, buyer_name=None, buyer_tax_code=None, template_number=None, serial_number=None),), settlement_type="EMPLOYEE_REIMBURSEMENT", expected_decision="REQUEST_INFO", expected_rule="SET_DOCUMENT_CLASSIFICATION_001", implementation_status="COVERED", expected_findings=("DOCUMENT_TYPE_UNCLEAR",)),
+        case(g2, g2n, 8, "khong_phan_loai_duoc_chung_tu", "Không hợp lệ - không phân loại được chứng từ", lines=(Line("L01", "Thanh toán dịch vụ tại đối tác", 720_000, "OTHER", reference="DOC-1808"),), evidence=(receipt("DOC-1808", "Giấy xác nhận thanh toán dịch vụ", 720_000, doc_type="UNKNOWN", seller_name="Đơn vị đối tác", seller_tax_code=None, buyer_name=None, buyer_tax_code=None, template_number=None, serial_number=None),), settlement_type="EMPLOYEE_REIMBURSEMENT", expected_decision="REQUEST_INFO", expected_rule="SET_DOCUMENT_CLASSIFICATION_001", implementation_status="COVERED", expected_findings=("DOCUMENT_TYPE_UNCLEAR",)),
         case(g2, g2n, 9, "hoa_don_so_hoc_khong_khop", "Không hợp lệ - tiền hàng và tổng thanh toán không nhất quán", lines=(Line("L01", "Mua dây cáp", 1_100_000, "OFFICE_SUPPLIES", reference="0001809"),), evidence=(invoice("0001809", "Mua dây cáp", 1_100_000, note="Tiền hàng 1.000.000 đồng, thuế GTGT 100.000 đồng, tổng thanh toán 1.100.000 đồng"),), advance_amount=1_500_000, settlement_amount=400_000, settlement_direction="Nhân viên hoàn trả công ty", expected_decision="REQUEST_INFO", expected_rule="SET_DOCUMENT_CONSISTENCY_001", implementation_status="PLANNED", expected_findings=("DOCUMENT_ARITHMETIC_MISMATCH",)),
         case(g2, g2n, 10, "nguoi_mua_khach_le", "Không hợp lệ - hóa đơn ghi người mua là khách lẻ", lines=(Line("L01", "Mua vật tư sửa chữa", 2_200_000, "OPERATIONS", reference="0001810"),), evidence=(invoice("0001810", "Mua vật tư sửa chữa", 2_200_000, buyer_name="Khách lẻ", buyer_tax_code=None),), advance_amount=2_500_000, settlement_amount=300_000, settlement_direction="Nhân viên hoàn trả công ty", expected_decision="REQUEST_INFO", expected_rule="SET_DOCUMENT_REQUIRED_FIELDS_001", expected_findings=("BUYER_IDENTITY_UNCLEAR",)),
 
@@ -307,12 +314,12 @@ def build_cases() -> tuple[Case, ...]:
         case(g3, g3n, 2, "taxi_vuot_han_muc", "Vượt policy - taxi trên hạn mức", lines=(Line("L01", "Taxi đi gặp khách hàng", 2_300_000, "TAXI", reference="0001902"),), evidence=(invoice("0001902", "Taxi đi gặp khách hàng", 2_300_000),), advance_amount=2_500_000, settlement_amount=200_000, settlement_direction="Nhân viên hoàn trả công ty", expected_decision="ESCALATE", expected_rule="SET_LIMIT_001", expected_findings=("SET_LIMIT_001",)),
         case(g3, g3n, 3, "tiep_khach_trong_han_muc", "Hợp lệ - tiếp khách trong hạn mức", lines=(Line("L01", "Tiếp khách dự án Bắc Nam", 4_800_000, "CLIENT_MEAL", reference="0001903"),), evidence=(invoice("0001903", "Tiếp khách dự án Bắc Nam", 4_800_000),), advance_amount=5_000_000, settlement_amount=200_000, settlement_direction="Nhân viên hoàn trả công ty"),
         case(g3, g3n, 4, "tiep_khach_vuot_han_muc", "Vượt policy - tiếp khách trên hạn mức", lines=(Line("L01", "Tiếp khách dự án Bắc Nam", 5_600_000, "CLIENT_MEAL", reference="0001904"),), evidence=(invoice("0001904", "Tiếp khách dự án Bắc Nam", 5_600_000),), advance_amount=6_000_000, settlement_amount=400_000, settlement_direction="Nhân viên hoàn trả công ty", expected_decision="ESCALATE", expected_rule="SET_LIMIT_001", expected_findings=("SET_LIMIT_001",)),
-        case(g3, g3n, 5, "chi_tieu_ca_nhan", "Không hợp lệ - khoản chi cá nhân", lines=(Line("L01", "Mua quà cá nhân", 1_200_000, "PERSONAL", reference="0001905"),), evidence=(invoice("0001905", "Mua quà cá nhân", 1_200_000),), settlement_type="EMPLOYEE_REIMBURSEMENT", expected_decision="RECOMMEND_REJECT", expected_rule="SET_CATEGORY_001", expected_findings=("SET_CATEGORY_001",)),
+        case(g3, g3n, 5, "chi_tieu_ca_nhan", "Không hợp lệ - khoản chi cá nhân", lines=(Line("L01", "Mua nước hoa", 1_200_000, "PERSONAL", reference="0001905"),), evidence=(invoice("0001905", "Mua nước hoa", 1_200_000),), settlement_type="EMPLOYEE_REIMBURSEMENT", expected_decision="RECOMMEND_REJECT", expected_rule="SET_CATEGORY_001", expected_findings=("SET_CATEGORY_001",)),
         case(g3, g3n, 6, "ruou_bia_theo_chinh_sach", "Ngoại lệ policy - rượu bia tiếp khách", lines=(Line("L01", "Rượu vang tiếp khách", 1_650_000, "CLIENT_MEAL", reference="0001906"),), evidence=(invoice("0001906", "Rượu vang tiếp khách", 1_650_000),), advance_amount=2_000_000, settlement_amount=350_000, settlement_direction="Nhân viên hoàn trả công ty", expected_decision="ACCOUNTANT_REVIEW", expected_rule="SET_PROHIBITED_ITEM_001", implementation_status="PLANNED", expected_findings=("PROHIBITED_OR_RESTRICTED_ITEM",)),
         case(g3, g3n, 7, "nop_dung_han_30_ngay", "Hợp lệ - khoản chi đúng hạn 30 ngày", lines=(Line("L01", "Phí vận chuyển hàng hóa", 900_000, "OPERATIONS", date="2026-09-12", reference="0001907"),), evidence=(invoice("0001907", "Phí vận chuyển hàng hóa", 900_000, document_date="2026-09-12"),), advance_amount=1_000_000, settlement_amount=100_000, settlement_direction="Nhân viên hoàn trả công ty"),
         case(g3, g3n, 8, "nop_qua_han_31_ngay", "Ngoại lệ policy - nộp hồ sơ quá 30 ngày", lines=(Line("L01", "Phí vận chuyển hàng hóa", 900_000, "OPERATIONS", date="2026-09-11", reference="0001908"),), evidence=(invoice("0001908", "Phí vận chuyển hàng hóa", 900_000, document_date="2026-09-11"),), advance_amount=1_000_000, settlement_amount=100_000, settlement_direction="Nhân viên hoàn trả công ty", expected_decision="ACCOUNTANT_REVIEW", expected_rule="SET_DEADLINE_001", expected_findings=("SET_DEADLINE_001",)),
         case(g3, g3n, 9, "ngay_chi_chua_xac_dinh", "Không hợp lệ - chưa xác định ngày chi", lines=(Line("L01", "Phí dịch vụ kỹ thuật", 1_400_000, "OPERATIONS", date="", reference="0001909"),), evidence=(invoice("0001909", "Phí dịch vụ kỹ thuật", 1_400_000, document_date=""),), advance_amount=1_500_000, settlement_amount=100_000, settlement_direction="Nhân viên hoàn trả công ty", expected_decision="REQUEST_INFO", expected_rule="SET_EXPENSE_DATE_001", expected_findings=("SET_EXPENSE_DATE_001",)),
-        case(g3, g3n, 10, "danh_muc_chua_xac_dinh", "Không hợp lệ - chưa xác định danh mục khoản chi", lines=(Line("L01", "Chi phí khác trên chứng từ", 1_100_000, "UNKNOWN", reference="0001910"),), evidence=(invoice("0001910", "Chi phí khác trên chứng từ", 1_100_000),), advance_amount=1_300_000, settlement_amount=200_000, settlement_direction="Nhân viên hoàn trả công ty", expected_decision="REQUEST_INFO", expected_rule="SET_CATEGORY_UNKNOWN_001", expected_findings=("SET_CATEGORY_UNKNOWN_001",)),
+        case(g3, g3n, 10, "danh_muc_chua_xac_dinh", "Không hợp lệ - chưa xác định danh mục khoản chi", lines=(Line("L01", "Thanh toán dịch vụ tại đơn vị đối tác", 1_100_000, "UNKNOWN", reference="0001910"),), evidence=(invoice("0001910", "Thanh toán dịch vụ tại đơn vị đối tác", 1_100_000),), advance_amount=1_300_000, settlement_amount=200_000, settlement_direction="Nhân viên hoàn trả công ty", expected_decision="REQUEST_INFO", expected_rule="SET_CATEGORY_UNKNOWN_001", expected_findings=("SET_CATEGORY_UNKNOWN_001",)),
 
         # Group 04: evidence declarations and matching.
         case(g4, g4n, 1, "khop_so_hoa_don_va_so_tien", "Hợp lệ - số hóa đơn và số tiền khớp", lines=(Line("L01", "Ăn uống tiếp khách khách hàng ABC", 3_240_000, "CLIENT_MEAL", reference="0002001"),), evidence=(invoice("0002001", "Ăn uống tiếp khách khách hàng ABC", 3_240_000),), advance_amount=4_000_000, settlement_amount=760_000, settlement_direction="Nhân viên hoàn trả công ty"),
@@ -399,7 +406,7 @@ def create_report_docx(case_spec: Case, output_path: Path) -> None:
     document.add_paragraph(f"Người đề nghị: {EMPLOYEE_NAME}")
     document.add_paragraph(f"Chức vụ: {EMPLOYEE_POSITION}")
     document.add_paragraph(f"Bộ phận: {EMPLOYEE_DEPARTMENT}")
-    document.add_paragraph(f"Nội dung: {case_spec.title}.")
+    document.add_paragraph(f"Nội dung: {report_business_purpose(case_spec)}")
     document.add_paragraph("")
     add_docx_table(
         document,
@@ -559,11 +566,10 @@ def create_invoice_docx(evidence: Evidence, output_path: Path) -> None:
             for run in cell.paragraphs[0].runs:
                 run.font.size = Pt(9)
     document.add_paragraph(
-        f"Mã tra cứu hóa đơn: BN-{evidence.document_number or 'CHUA_CO_SO'} | "
-        "DỮ LIỆU GIẢ LẬP DÙNG CHO KIỂM THỬ - KHÔNG CÓ GIÁ TRỊ PHÁP LÝ"
+        f"Mã tra cứu hóa đơn: BN-{evidence.document_number or 'CHUA_CO_SO'}"
     ).alignment = WD_ALIGN_PARAGRAPH.CENTER
     if evidence.note:
-        document.add_paragraph(f"Ghi chú kiểm thử: {evidence.note}")
+        document.add_paragraph(f"Ghi chú: {evidence.note}")
     document.save(output_path)
 
 
@@ -611,7 +617,7 @@ def create_report_pdf(case_spec: Case, output_path: Path, font_name: str) -> Non
         "Kính gửi: Ban Giám đốc và Phòng Kế toán",
         f"Người đề nghị: {EMPLOYEE_NAME}",
         f"Chức vụ: {EMPLOYEE_POSITION} - Bộ phận: {EMPLOYEE_DEPARTMENT}",
-        f"Nội dung: {case_spec.title}.",
+        f"Nội dung: {report_business_purpose(case_spec)}",
     ):
         flow.append(Paragraph(escape(text), styles["body"]))
     flow.append(Spacer(1, 8))
@@ -822,11 +828,11 @@ def create_invoice_pdf(evidence: Evidence, output_path: Path, font_name: str) ->
     ]))
     flow.append(signatures)
     flow.append(Paragraph(
-        escape(f"Mã tra cứu hóa đơn: BN-{evidence.document_number or 'CHUA_CO_SO'} | DỮ LIỆU GIẢ LẬP DÙNG CHO KIỂM THỬ - KHÔNG CÓ GIÁ TRỊ PHÁP LÝ"),
+        escape(f"Mã tra cứu hóa đơn: BN-{evidence.document_number or 'CHUA_CO_SO'}"),
         ParagraphStyle("InvoiceFooter", parent=small, alignment=TA_CENTER, fontSize=6.8, leading=8),
     ))
     if evidence.note:
-        flow.append(Paragraph(escape(f"Ghi chú kiểm thử: {evidence.note}"), ParagraphStyle("InvoiceNote", parent=small, fontSize=6.8, leading=8)))
+        flow.append(Paragraph(escape(f"Ghi chú: {evidence.note}"), ParagraphStyle("InvoiceNote", parent=small, fontSize=6.8, leading=8)))
     document.build(flow)
 
 

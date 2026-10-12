@@ -210,6 +210,9 @@ Phải giữ nguyên nội dung cột ghi chú trong note.
   nội dung ghi chú nhìn thấy trên đơn.
 - Khi ghi chú trống và không có số chứng từ: requires_evidence=false và
   no_evidence_reason=null.
+  Giá trị false này chỉ phản ánh đơn không ghi rõ việc đính kèm; không có nghĩa
+  dòng chi được miễn chứng từ. Policy engine sẽ yêu cầu evidence hoặc giải
+  trình riêng cho mọi dòng chi.
 Không tự suy đoán lý do không xuất hiện trên đơn.
 
 Quy tắc số tiền quyết toán:
