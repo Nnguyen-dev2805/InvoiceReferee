@@ -21,7 +21,7 @@ from invoice_referee.domain import (
 @dataclass(frozen=True, slots=True)
 class SettlementPolicyConfig:
     policy_id: str = "DEMO-EXPENSE-2026"
-    policy_version: str = "1.2"
+    policy_version: str = "1.3"
     data_classification: str = "SYNTHETIC"
     submission_window_days: int = 30
     authority_amount_vnd: Decimal = Decimal("100000000")
@@ -138,7 +138,11 @@ def evaluate_settlement_policy(
     for item in draft.expense_items:
         item_ref = f"FORM:EXPENSE_ITEM:{item.item_id}"
         if (
-            item.evidence_status == ExpenseEvidenceStatus.ORIGINAL_EVIDENCE
+            item.evidence_status
+            in {
+                ExpenseEvidenceStatus.ORIGINAL_EVIDENCE,
+                ExpenseEvidenceStatus.UNMATCHED_EVIDENCE,
+            }
             and not item.evidence_names
             and not item.policy_exception_code
         ):
@@ -146,7 +150,10 @@ def evaluate_settlement_policy(
                 SettlementFinding(
                     rule_id="SET_DOC_001",
                     status="FAIL",
-                    message=f"Khoản '{item.description}' chưa có chứng từ.",
+                    message=(
+                        f"Khoản '{item.description}' chưa có chứng từ "
+                        "đã được ghép/xác nhận."
+                    ),
                     uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
                     target=DecisionTarget.EMPLOYEE,
                     question=(
@@ -213,7 +220,26 @@ def evaluate_settlement_policy(
                 )
             )
 
-        if item.category in policy.prohibited_categories:
+        if item.category == ExpenseCategory.UNKNOWN:
+            findings.append(
+                SettlementFinding(
+                    rule_id="SET_CATEGORY_UNKNOWN_001",
+                    status="FAIL",
+                    message=(
+                        f"Chưa xác định được danh mục của khoản "
+                        f"'{item.description}', nên chưa thể kiểm tra hạn mức "
+                        "hoặc danh mục bị cấm."
+                    ),
+                    uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
+                    target=DecisionTarget.EMPLOYEE,
+                    question=(
+                        f"Vui lòng xác nhận danh mục nghiệp vụ cho khoản "
+                        f"'{item.description}'."
+                    ),
+                    source_refs=[item_ref],
+                )
+            )
+        elif item.category in policy.prohibited_categories:
             findings.append(
                 SettlementFinding(
                     rule_id="SET_CATEGORY_001",
@@ -241,7 +267,25 @@ def evaluate_settlement_policy(
                 )
             )
 
-        if item.expense_date:
+        if item.expense_date is None:
+            findings.append(
+                SettlementFinding(
+                    rule_id="SET_EXPENSE_DATE_001",
+                    status="FAIL",
+                    message=(
+                        f"Chưa xác định được ngày chi của khoản "
+                        f"'{item.description}', nên chưa thể kiểm tra thời hạn nộp hồ sơ."
+                    ),
+                    uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
+                    target=DecisionTarget.EMPLOYEE,
+                    question=(
+                        f"Vui lòng bổ sung hoặc xác nhận ngày chi của khoản "
+                        f"'{item.description}'."
+                    ),
+                    source_refs=[item_ref],
+                )
+            )
+        else:
             age_days = (current_date - item.expense_date).days
             if age_days > policy.submission_window_days:
                 findings.append(
@@ -258,12 +302,15 @@ def evaluate_settlement_policy(
                     )
                 )
 
-    if not any(
+    categories_known = all(
+        item.category != ExpenseCategory.UNKNOWN for item in draft.expense_items
+    )
+    if categories_known and not any(
         item.category in policy.prohibited_categories
         for item in draft.expense_items
     ):
         findings.append(_pass("SET_CATEGORY_001", "Không có danh mục bị cấm rõ ràng."))
-    if not any(
+    if categories_known and not any(
         policy.category_limits.get(item.category) is not None
         and item.claimed_amount > policy.category_limits[item.category]
         for item in draft.expense_items

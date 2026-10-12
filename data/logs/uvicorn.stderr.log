@@ -4,3 +4,4 @@ INFO:     Started reloader process [18020] using WatchFiles
 INFO:     Started server process [22872]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'src\invoice_referee\policy\document_validity.py'. Reloading...

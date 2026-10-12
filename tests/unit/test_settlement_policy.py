@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import date
 
 import pytest
 from pydantic import ValidationError
@@ -29,6 +30,7 @@ def _draft(
     evidence_status: ExpenseEvidenceStatus = ExpenseEvidenceStatus.ORIGINAL_EVIDENCE,
     alternative_evidence_type: AlternativeEvidenceType | None = None,
     evidence_exception_reason: str | None = None,
+    expense_date: date | None = date(2026, 10, 1),
 ) -> SettlementDraft:
     return SettlementDraft(
         settlement_type=SettlementType.EMPLOYEE_REIMBURSEMENT,
@@ -39,6 +41,7 @@ def _draft(
                 item_id="ITEM-001",
                 category=category,
                 description="Tiếp khách",
+                expense_date=expense_date,
                 claimed_amount=Decimal(amount),
                 evidence_names=evidence_names or [],
                 evidence_status=evidence_status,
@@ -242,3 +245,47 @@ def test_alternative_or_missing_evidence_requires_reason() -> None:
         )
     with pytest.raises(ValidationError):
         _draft(evidence_status=ExpenseEvidenceStatus.NO_EVIDENCE)
+
+
+def test_unknown_category_requests_confirmation_before_policy_can_pass() -> None:
+    findings = evaluate_settlement_policy(
+        _draft(
+            category=ExpenseCategory.UNKNOWN,
+            evidence_names=["bill.jpg"],
+        ),
+        has_paper_form=False,
+    )
+
+    decision = build_settlement_decision(findings)
+
+    assert decision.automation_decision == AutomationDecision.REQUEST_INFO
+    assert decision.primary_finding_code == "SET_CATEGORY_UNKNOWN_001"
+    assert not any(
+        finding.rule_id == "SET_CATEGORY_001" and finding.status == "PASS"
+        for finding in findings
+    )
+
+
+def test_missing_expense_date_requests_information() -> None:
+    findings = evaluate_settlement_policy(
+        _draft(evidence_names=["bill.jpg"], expense_date=None),
+        has_paper_form=False,
+    )
+
+    decision = build_settlement_decision(findings)
+
+    assert decision.automation_decision == AutomationDecision.REQUEST_INFO
+    assert decision.primary_finding_code == "SET_EXPENSE_DATE_001"
+
+
+def test_unmatched_evidence_is_not_treated_as_original_evidence() -> None:
+    findings = evaluate_settlement_policy(
+        _draft(
+            evidence_status=ExpenseEvidenceStatus.UNMATCHED_EVIDENCE,
+            evidence_names=[],
+        ),
+        has_paper_form=False,
+    )
+
+    finding = next(finding for finding in findings if finding.rule_id == "SET_DOC_001")
+    assert finding.status == "FAIL"

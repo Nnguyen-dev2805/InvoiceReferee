@@ -54,9 +54,10 @@ def test_multipart_submission_is_visible_to_accounting(
         "expense_items": [
             {
                 "item_id": "ITEM-001",
-                "category": "CLIENT_MEAL",
-                "description": "Bữa trưa với khách hàng",
-                "claimed_amount": "1200000",
+                    "category": "CLIENT_MEAL",
+                    "description": "Bữa trưa với khách hàng",
+                    "expense_date": "2026-10-01",
+                    "claimed_amount": "1200000",
                 "currency": "VND",
                 "evidence_names": ["bill.jpg"],
             }
@@ -240,9 +241,10 @@ def test_digital_form_routes_explicit_no_evidence_reason_to_accountant(
         "expense_items": [
             {
                 "item_id": "ITEM-001",
-                "category": "OPERATIONS",
-                "description": "Thuê nhân công sửa đường ống",
-                "claimed_amount": "800000",
+                    "category": "OPERATIONS",
+                    "description": "Thuê nhân công sửa đường ống",
+                    "expense_date": "2026-10-01",
+                    "claimed_amount": "800000",
                 "currency": "VND",
                 "evidence_names": [],
                 "evidence_status": "NO_EVIDENCE",

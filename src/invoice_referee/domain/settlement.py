@@ -94,6 +94,7 @@ SUPPORTING_EXPENSE_DOCUMENT_TYPES = frozenset(
 
 
 class ExpenseCategory(StrEnum):
+    UNKNOWN = "UNKNOWN"
     CLIENT_MEAL = "CLIENT_MEAL"
     TRAVEL = "TRAVEL"
     HOTEL = "HOTEL"
@@ -107,6 +108,7 @@ class ExpenseCategory(StrEnum):
 class ExpenseEvidenceStatus(StrEnum):
     ORIGINAL_EVIDENCE = "ORIGINAL_EVIDENCE"
     ALTERNATIVE_EVIDENCE = "ALTERNATIVE_EVIDENCE"
+    UNMATCHED_EVIDENCE = "UNMATCHED_EVIDENCE"
     NO_EVIDENCE = "NO_EVIDENCE"
 
 

@@ -39,6 +39,7 @@ def _draft(filename: str = "bill.jpg") -> SettlementDraft:
                 item_id="ITEM-001",
                 category=ExpenseCategory.CLIENT_MEAL,
                 description="Bữa trưa với khách hàng",
+                expense_date=date(2026, 10, 1),
                 claimed_amount=Decimal("1200000"),
                 evidence_names=[filename],
             )
