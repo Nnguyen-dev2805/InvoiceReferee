@@ -113,18 +113,42 @@ export function B7ApprovalPanel({
     })).finally(() => setBusy(false));
   };
 
-  // --- Approved ---
+  // --- Approved: reflect the actual fulfillment/closure state, not a fixed
+  // "not yet received" message. Unknown is not received 0; BALANCED is not a
+  // fake 0 payment.
   if (decision && decision.outcome === 'APPROVE') {
+    const fulfillment = workflow.fulfillment;
+    const closureView = workflow.closure;
+    const isBalanced = decision.target?.direction === 'BALANCED';
+    const received = fulfillment?.recorded_received_vnd;
     return (
       <div className="panel" id="b7-approval-panel" data-testid="b7-approval-panel">
-        <h2>Đã duyệt quyết toán — chờ chi/thu</h2>
+        <h2>{closureView ? 'Quyết toán đã đóng'
+          : isBalanced ? 'Đã duyệt quyết toán — cân bằng'
+            : 'Đã duyệt quyết toán — theo dõi chi/thu'}</h2>
         <B7DecisionSummary target={decision.target} />
-        <ul className="reasons">
+        <ul className="reasons" data-testid="b7-approved-summary">
           <li><strong>Chi phí nhân viên được duyệt (E):</strong> {formatVnd(decision.target?.employee_cost_vnd)}</li>
-          <li><strong>Thực nhận tiền mặt:</strong> Chưa ghi nhận</li>
+          <li><strong>Đã đối chiếu thực nhận:</strong> {
+            isBalanced
+              ? 'Cân bằng — không cần chi/thu'
+              : (received === null || received === undefined
+                  ? 'Chưa ghi nhận' : formatVnd(received))}</li>
+          {fulfillment && !isBalanced && (
+            <li><strong>Còn lại:</strong> {
+              fulfillment.remaining_vnd === null
+                ? 'Chưa xác định (còn pending/unknown)'
+                : formatVnd(fulfillment.remaining_vnd)}</li>
+          )}
         </ul>
         <p className="muted">{decision.reason}</p>
-        <p className="muted">Chưa ghi nhận tiền thực tế và chưa có đường chi/thu trong lát cắt này.</p>
+        <p className="muted">
+          {closureView
+            ? 'Hồ sơ quyết toán đã đóng; nguồn mới có ảnh hưởng mở hồ sơ điều chỉnh liên kết.'
+            : isBalanced
+              ? 'Quyết toán cân bằng: đủ gate để đóng mà không tạo sự kiện tiền 0.'
+              : 'Kế toán ghi nhận chi/thu thực tế theo nguồn; receipt đúng giảm phần còn lại nhưng không hủy quyết định.'}
+        </p>
       </div>
     );
   }

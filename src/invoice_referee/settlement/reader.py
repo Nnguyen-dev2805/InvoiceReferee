@@ -43,7 +43,9 @@ from invoice_referee.settlement.models import (
     SourceRecord,
 )
 
-PROMPTS_DIR = Path(__file__).parents[1] / "extraction" / "prompts"
+# Prompt text files are shared data; they live with the extraction package
+# (moved to legacy/extraction). The current reader reads them by path.
+PROMPTS_DIR = Path(__file__).parents[1] / "legacy" / "extraction" / "prompts"
 
 MISTRAL_OCR_BASE_URL = "https://api.mistral.ai/v1"
 MISTRAL_OCR_MODEL = "mistral-ocr-latest"

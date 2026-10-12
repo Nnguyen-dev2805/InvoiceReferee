@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Any
 
 from invoice_referee.domain.models import DomainError
-from invoice_referee.settlement import sqlite_records as _rec
+from invoice_referee.settlement.persistence import sqlite_records as _rec
 from invoice_referee.settlement.advance_workflow import (
     b3_basis_signature,
     b3_context_signature,
@@ -50,8 +50,8 @@ def _iso(value: datetime) -> str:
 
 
 def _now_iso() -> str:
-    from invoice_referee.settlement.store import utcnow
-    return _iso(utcnow())
+    from invoice_referee.shared import clock
+    return _iso(clock.utcnow())
 
 
 def b3_case_form(case: sqlite3.Row) -> dict[str, Any]:

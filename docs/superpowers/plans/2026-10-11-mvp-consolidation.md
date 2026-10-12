@@ -1,206 +1,288 @@
-# Hợp nhất MVP — UI, code và dữ liệu
+# Hợp nhất MVP — plan nghiệm thu sau review
 
-> **For agentic workers:** Dùng `executing-plans`, tuần tự bốn task; một writer giữ shared contracts. Không tự subagent/Git/LIVE/publish. Mỗi task phải có checkpoint chạy được trước khi sang task tiếp.
+> **For agentic workers:** Dùng executing-plans; tuần tự R1–R6, một writer shared contracts. Không tự subagent/Git/LIVE/publish. Sửa hành vi và kiểm regression trước khi di chuyển code.
 
-**Goal:** Người dùng đi đúng luồng tạm ứng→quyết toán và hiểu trạng thái/hành động; coding agent tìm được đúng nghiệp vụ/tài liệu/dữ liệu mà không cần đọc cả repo.
+**Goal:** Sửa các lỗi đã xác minh, thống nhất hiệu lực quyết định/trạng thái UI, hoàn thiện ranh giới code và phân biệt current/shared/legacy.
+**Architecture:** Giữ một application path, SQLite và transaction hiện có. UI trình bày dữ liệu có căn cứ; lifecycle dùng cùng decision selector và action-basis checks. Tách trách nhiệm và chuyển code lịch sử sau khi regression ổn định.
+**Tech Stack:** Python/Pydantic/FastAPI/sqlite3/pytest; React/TypeScript/Vitest; stdlib và dependency hiện có.
+**Spec:** Thiết kế sửa lỗi trong plan này, theo [Product](../../settlement/PRODUCT.md), [Rulebook R8–R10](../../settlement/RULEBOOK.md), [System](../../settlement/SYSTEM.md), [Evaluation](../../settlement/EVALUATION.md).
+**Status:** **REMEDIATION IMPLEMENTED (R1–R5), R6 checks green**, 12/10/2026.
+Không viết lại ứng dụng. GUI/browser chưa thao tác thật (USER_UI_UNEXECUTED).
 
-**Architecture:** Giữ application/policy path, SQLite và các contracts tiền hiện hành. Sửa projection/copy/navigation, tách persistence theo nghiệp vụ trong cùng transaction, đổi tên module nội bộ và hợp nhất điểm hướng dẫn. Không rebuild hoặc tạo framework mới.
-
-**Tech Stack:** React/TypeScript/Vitest; Python/Pydantic/FastAPI/SQLite/pytest và stdlib hiện có.
-
-**Spec:** Thiết kế giới hạn ngay trong plan này; [Product](../../settlement/PRODUCT.md), [Rulebook](../../settlement/RULEBOOK.md), [System](../../settlement/SYSTEM.md), [Evaluation](../../settlement/EVALUATION.md) giữ thẩm quyền nghiệp vụ. Không tạo thêm spec/review Markdown.
-
-**Status:** IMPLEMENTED, 12/10/2026 (Task 1–4). Không là nghiệm thu B3–B9/LIVE.
-Nhánh rebuild; kiểm lại status/diff trước execution và giữ mọi thay đổi của người khác.
-
-**Evidence (fake mode, không LIVE/Git/publish):**
+**Evidence (fake, không LIVE/Git/publish) — sau remediation, source revision hiện tại:**
 
 ```
-SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/ -q   # 891 passed
+SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/ -q   # 898 passed (exit 0)
 .venv/bin/python -m pip check                                       # No broken requirements found
-npm --prefix frontend run test -- --run                             # 157 passed (25 files)
+npm --prefix frontend run test -- --run                             # 166 passed (25 files)
 npm --prefix frontend run build                                     # tsc --noEmit + vite build OK
 ```
 
-Regression đỏ→xanh “đã nhận ứng nhưng UI báo chưa phê duyệt” trong
-`frontend/src/settlement/uiState.test.ts`. Store façade 3809→1997 dòng; SQL
-lifecycle tách sang `sqlite_records.py`/`advance_records.py`/
-`linked_context_records.py`/`settlement_records.py` (cùng transaction, không
-mở connection riêng). Rename module nội bộ; wire values/persisted codes/DB/
-API path giữ nguyên. Demo recipe `data/settlement/travel-demo-v1/` sinh bởi
-`scripts/build_travel_demo.py` (input/company/followup/expected tách riêng).
-Inventory: `output/maintenance/consolidation-inventory.json` (ignored).
-**UI walkthrough: USER_UI_UNEXECUTED** — phiên agent chưa thao tác browser.
-Frozen corpus/gold/DB/uploaded originals không đổi.
+Focused đỏ→xanh: `test_handoff_blocks_material_source_added_after_approval`,
+`test_noop_context_key_is_bound_to_its_payload` (DID NOT RAISE trước patch).
+Regression R1.4: same E/T/B nhưng cost source đổi → NEEDS_RECHECK; handoff reuse
+khác receipt → handoff mới; no-op key replay/conflict; revalidation VALID cũ hết
+hiệu lực sau source change. R2: queue giữ mọi file; report không tự PASS; case
+A→B race; linked B7 chỉ dedicated actions. R3: `settlement/persistence/*`,
+`shared/clock`, `useCaseWorkspace`. R4: legacy move + shim. R5: README + inventory.
+Frozen corpus/gold/DB/originals không đổi.
+
+## Lịch sử triển khai và review
+
+Implementation tại commit c72fe2b5190b189b65ca0dbc27848209269b3223: Store3809→1997 dòng; SQL records đã tách; SourceUploadPanel/ProcessingDetails và recipe demo đã có. Giữ các kết quả worker báo như lịch sử, không coi là acceptance:
+
+| Bằng chứng cũ | Kết quả được worker báo |
+| --- | --- |
+| Fake pytest toàn repo | 891 passed |
+| Frontend tests | 157 passed, 25 files |
+| pip check / frontend build | Thành công |
+| UI thực tế / LIVE | Chưa kiểm |
+
+Review độc lập GPT6Web High và lead source checks đã tái hiện:
+- Fake pipeline/DB tạm: workflow NEEDS_RECHECK/basis_current=False vẫn nhận handoff3M.
+- Fake pipeline/DB tạm: no-op context trả replay flag nhưng cùng key/body khác được nhận, version7→8.
+- Đoạn logic UI gốc: hai refs chưa có document roles vẫn báo đủ hai chứng từ.
+- Đoạn queue UI gốc: hai file cùng tên/size, bytes khác nhau bị giữ còn một.
+Các rủi ro draft/race và các đường UI generic trùng chưa được browser reproduce. Không khẳng định lỗi do refactor tạo ra.
+
+| Task cũ | Nghiệm thu sau review |
+| --- | --- |
+| 1 UI/state/navigation | Mở lại: kết luận tự suy diễn, trạng thái lặp, draft/race/generic forms |
+| 2 boundaries/naming | Mở lại: clock import ngược, refresh còn trong Store, current decision nhân đôi |
+| 3 demo/docs | Một phần đã có; cần lệnh tái tạo từ clone mới và phân loại lịch sử |
+| 4 inventory/final checks | Mở lại: inventory13 mục chưa đầy đủ, UI chưa chạy, còn lỗi đã tái hiện |
+
+Nguyên bản plan/worker evidence còn trong Git tại c72fe2b; không sửa dataset/gold để đổi lịch sử.
 
 ## Global constraints
 
-- Không thêm nghiệp vụ, login, quyền/hạn mức, payment request, ngân hàng, microservice hoặc dependency.
-- Không thay formula, unknown/pending-as-null, evidence/authority/Stop/stale/duplicate/closure gates để làm UI đơn giản.
-- CaseView workflow là tiến độ hiện hành; Report là kết quả một snapshot; Run là execution. Không lấy READY/COMPLETE làm approval/receipt/closure.
-- UI không tính quyền hoặc net; action navigation không cấp quyền, endpoint kiểm lại khi ghi.
-- Không đổi giá trị Job/schema/API/DB/audit/persisted IDs vì đổi tên file. Legacy backend giữ cho đến khi xác minh caller và tương thích.
-- Persistence helpers không mở connection/commit riêng; mọi financial checks + writes tiếp tục atomic trong một `BEGIN IMMEDIATE`.
-- Không xóa DB, uploaded originals, frozen corpus/gold/policy snapshots hoặc run artifacts trong plan này. Bản sao muốn bỏ cần chứng minh generator/references/retention trước.
-- Không chạy LIVE/publish/Git. Fake tests khác chất lượng AI; UI chưa thao tác ghi USER_UI_UNEXECUTED, không bypass browser denial.
-- Một plan này là đủ. Cập nhật README/canonical docs hiện có; inventories/evidence dùng JSON/CSV dưới output/data ignored, không thêm các lớp Markdown.
+- Không thêm nghiệp vụ, bank transfer/payment request, auth/tenancy, ORM/queue/framework/dependency.
+- Giữ API public paths, wire values, schema version và eight-table DB; không đổi Job/operation codes vì đổi folder.
+- Approval≠receipt≠closure; unknown/pending không0; gross không clip; sources/rights/Stop/stale/duplicate/closure gates giữ nguyên.
+- Correct partial fulfillment giữ approval gốc; material changes cần recheck. Không chặn mọi case chỉ vì report mới khác run ID.
+- Decision/action guards và writes trong cùng BEGIN IMMEDIATE; không provider wait, connection hoặc commit lồng nhau.
+- UI không suy facts từ filename/ref count, tính lại net hoặc tự cấp quyền. Tài liệu đã upload khác căn cứ đã xác lập.
+- Same command key/body replay trước stale version; key/body khác409. Business reuse khác command replay.
+- Không xóa/di chuyển DB, uploaded originals, frozen corpus/policy/gold, runtime evidence trong plan này. Di chuyển code không di chuyển dữ liệu.
+- Fake tests khác LIVE quality/trials. Browser denial không bypass; chưa thao tác UI ghi USER_UI_UNEXECUTED.
+- Chỉ cập nhật plan/README/canonical docs có sẵn; evidence/inventory JSON/CSV ignored. Không thêm một loạt Markdown.
+- Trước execution kiểm branch/status/diff; giữ mọi thay đổi người khác. Không auto Git/LIVE/publish.
 
-## Thiết kế UI được triển khai
+## R1 — Sửa handoff, revalidation và command idempotency
 
-**Màn mặc định:** tên hồ sơ/người/công việc → một trạng thái hiện hành + owner → số tiền đúng nghĩa → một hành động phù hợp vai → đối chiếu/vướng mắc → nguồn/lịch sử. Thông tin kỹ thuật nằm trong vùng mở rộng. Nhãn mô phỏng/replay vẫn hiện rõ khi áp dụng, không lặp raw mode ở ba nơi.
+**Files:** settlement_records.py, linked_context_records.py, settlement_workflow.py, settlement_reconciliation.py, sqlite_records.py, Store/Service callers cần thiết. Tests hiện có test_b7_closure.py, test_b7_money_revalidation.py, test_b7_linked_context.py, test_b7_workflow.py/test_b7_workflow_api.py.
 
-| Trạng thái có căn cứ | Nhân viên | Kế toán | Người duyệt |
-| --- | --- | --- | --- |
-| Draft | Kiểm tra và gửi | Xem tiến độ | Xem tiến độ |
-| Report current đủ, chưa trình | Chờ kế toán | Rà soát và trình | Chờ kế toán trình |
-| Đã trình, chờ quyết định | Chờ người duyệt | Theo dõi hồ sơ | Xem và quyết định |
-| Ứng đã duyệt, chưa ghi nhận nhận đủ | Xem tiến độ nhận tiền | Ghi nhận tiền thực tế | Xem quyết định |
-| Đã nhận ứng, chờ quyết toán | Chuẩn bị hồ sơ quyết toán | Chờ chứng từ | Xem tiến độ |
-| Quyết toán đã duyệt | Xem số cần nhận/hoàn | Đối chiếu chi/thu | Xem quyết định |
-| Đã đóng | Xem lịch sử | Xem lịch sử/điều chỉnh theo quyền | Xem lịch sử |
-| Stop/stale/incident/thiếu nguồn | Nêu đúng vướng mắc/owner, không dùng lời chung “nhân viên bổ sung” cho mọi lỗi | Xử lý phần thuộc mình | Xử lý phần thuộc mình |
+**Interfaces:**
+- Pure governing_decision(presentation:B7PresentationView|None,decision:B7DecisionView|None,current_run_id:str|None)->B7DecisionView|None trong settlement_workflow.py; workflow_view/current_decision dùng chung.
+- require_handoff_basis(conn,artifact_root:Path,case_id:str,decision:B7DecisionView,b7,b3,policy:dict)->tuple[Report,LinkedB7ContextSnapshot] trong settlement_records.py; transaction caller giữ nguyên.
+- grant_for_action(b7,decision:B7DecisionView,effective_at:datetime) dùng current effective_b7_time, một scoped grant đủ E/approved settlement; không tái dùng decision-time check cho new action. Closure chứng minh quyền tại decision/action times vẫn khác new-action authorization.
+- revalidate_b7_decision thêm original_cost_signature:str|None. Lưu cost signature server-derived trong B7_DECIDE audit metadata, không client field. Decision cũ phục hồi từ immutable run/context/source snapshot nếu đủ; thiếu không đoán VALID.
 
-Số xin ứng, dự toán, ngân sách được duyệt, actual và remaining có nhãn riêng; null ghi “Chưa xác định/chưa ghi nhận” đúng ngữ cảnh, không0. Link căn cứ đặt ở bảng đối chiếu hoặc nút “Xem căn cứ”, không chen vào chữ số KPI. Report lịch sử ghi thời điểm/snapshot, không tuyên bố tiến độ hiện hành.
+- [x] **R1.1 Tests đỏ từ hai probe đã tái hiện**
+Trong test_b7_closure.py dùng fixture approved_linked_b7 và command đã import; thêm Upload import:
+```python
+def test_handoff_blocks_material_source_added_after_approval(approved_linked_b7):
+    from invoice_referee.settlement.models import Upload
+    svc, child, report, decision = approved_linked_b7
+    expense_id = report.expense_rows[0].expense_id
+    svc.add_source(child.id, Upload(filename="changed-cost.txt",
+        content=f"fact CHANGED expense.{expense_id}.amount 6000000\n".encode()),
+        command("changed", "NV-DEMO-01", "EMPLOYEE",
+                svc.get_case(child.id).case_version))
+    view = svc.get_case(child.id)
+    assert view.b7_workflow.basis_current is False
+    with pytest.raises(DomainError) as error:
+        svc.handoff_b7(child.id, {"decision_id": decision.id, "reason": "Bàn giao"},
+            command("handoff-new", "ACC-DEMO-01", "ACCOUNTANT", view.case_version))
+    assert error.value.code == "BASIS_STALE"
+```
+Trong test_b7_linked_context.py import ready_linked_b7 từ test_b7_workflow và dùng fixture chain hiện có:
+```python
+def test_noop_context_key_is_bound_to_its_payload(ready_linked_b7):
+    svc, child, _ = ready_linked_b7
+    packet = svc.store.get_linked_b7_context(child.id).company_packet.model_dump(mode="json")
+    cmd = command("noop-key", "ACC-DEMO-01", "ACCOUNTANT",
+                  svc.get_case(child.id).case_version)
+    first = svc.record_b7_company_packet(child.id, packet, cmd)
+    changed = dict(packet)
+    changed["reading_note"] += " Different request body."
+    with pytest.raises(DomainError) as error:
+        svc.record_b7_company_packet(child.id, changed, cmd)
+    assert error.value.code == "IDEMPOTENCY_CONFLICT"
+    assert svc.get_case(child.id).input_revision == first.input_revision
+```
+Run focused tests trước patch, ghi behavioral failures (không collection/import failure):
+```bash
+rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/test_b7_closure.py tests/settlement/test_b7_linked_context.py -q
+```
 
-## Task 1 — Sửa trạng thái và điều hướng trước khi trang trí
+- [x] **R1.2 Implement guards, không đóng đường partial fulfillment**
+Handoff chỉ dùng original current basis hợp lệ hoặc current VALID revalidation của cùng decision. Đọc current successful report đúng input_revision/epoch, child+parent controls/dependency, policy/config/rights/source coverage/material issues trong transaction. Không lấy old decision.basis_report làm report hiện hành khi input đã đổi.
+Revalidation phải so cost basis/source support/eligibility/payer/relations, không chỉ E/T/B bằng số. Helper hiện nhận current_cost_signature nhưng chưa so original; sửa điểm này. History delta chỉ đúng canonical qualifying receipts; extra advance/refund/contradiction không VALID.
+Duyệt3→nhận2→refresh/coverage/rerun/revalidate hợp lệ: handoff còn1, original approval3. Không yêu cầu duyệt lại chỉ vì đúng receipt. Old VALID audit không đủ nếu source/context/receipt/config thay đổi sau nó.
+Handoff reuse chỉ khi obligation, business/cost basis, receipt history, parent/config/control/cutoff còn tương đương. Same remaining không sufficient. Chữ ký lấy current validated report/context, không chỉ snapshot tại approval; run ID/usage churn không tự new entitlement.
 
-**Files:** Modify `frontend/src/settlement/uiState.ts`, `uiCopy.ts`, `App.tsx`, `Actions.tsx`, `Report.tsx`, `B7Intake.tsx`; tests `uiState.test.ts`, `uiCopy.test.ts`, `App.test.tsx`, `Actions.test.tsx`, `Report.test.tsx`, `B7Intake.test.tsx`.
+- [x] **R1.3 Ghi mọi accepted command kể cả no-op/business reuse**
+No-op context và handoff reuse vẫn lưu command fingerprint/result trong transaction. Giữ input_revision/source snapshot khi không material; new accepted command tăng case_version theo S6, replay cùng key không tăng lần nữa. Lookup trước version/gates cho retry; historical result không bảo đảm current validity.
+Rà các early returns ở prepare linked child, presentation reuse, context, handoff và closure: không bỏ command registry. Không upsert/dedup money theo command key; economic identity riêng.
+Governing selector giữ APPROVE sau correct receipt để fulfillment tính phần còn; REFUSE giữ hiệu lực; newer presentation thay non-REFUSE; RETURN sau run mới không còn governing. Selector không thay freshness validator, không recursion với fulfillment.
 
-**Interfaces:** Mở rộng `summarizeCase(view,run,report,context?:{role:DemoRole;actorId:string}):UiSummary` hiện có; giữ three-argument callers cho tới khi migrate. UiSummary thêm `nextOwner:DemoRole|null`, `primaryLabel:string|null`; mở primaryTarget union hiện có với `sources`, `accountant-review`, `advance-decision`, `advance-receipt`, `prepare-settlement`, `settlement-intake`, `settlement-decision`, `settlement-receipt`, `case-history`. Target chỉ điều hướng/focus, không POST. Không thêm second state engine.
+- [x] **R1.4 Regression matrix và API persistence**
+Thêm cases: changed policy/grant/parent/source; current partial revalidation positive; same E/T/B nhưng cost source/payer link đổi; old revalidation badge; handoff reuse cùng amount khác receipt/basis; no-op key replay/conflict; concurrent Stop/handoff và version writers. Assert audit/records/no action khi rejected. Tests same signatures cho harmless rerun.
+```bash
+rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/test_b7_closure.py tests/settlement/test_b7_money_revalidation.py tests/settlement/test_b7_linked_context.py tests/settlement/test_b7_workflow_api.py -q
+```
 
-- [x] **1.1 Regression đỏ cho trạng thái trái nghiệp vụ**
-Đặt test dưới trong uiState.test.ts, dùng builders `createCase/createRun/createReport` đã có cùng file:
-```ts
-test('đã nhận ứng không bị report cũ đưa về chưa phê duyệt', () => {
-  const base = createCase();
-  const view = createCase({
-    stage: 'AWAITING_WORK_SETTLEMENT',
-    submission: { ...base.submission, form: { ...base.submission.form, confirmed: true } },
-  });
-  const baseReport = createReport();
-  const report = createReport({ b3: { ...baseReport.b3!,
-    intake: { ...baseReport.b3!.intake, confirmed: true } } });
-  const summary = summarizeCase(view, createRun(), report,
-    { role: 'EMPLOYEE', actorId: 'NV-01' });
-  expect(summary.title).toBe('Đã nhận ứng — chờ nộp quyết toán');
-  expect(summary.description).not.toContain('chưa phê duyệt');
-  expect(summary.primaryTarget).toBe('prepare-settlement');
+## R2 — Sửa evidence UI, draft/race và luồng generic trùng
+
+**Files:** frontend settlement Report/Actions/B7Intake/B7Approval/SourceUploadPanel/App/uiState/uiCopy và các tests tương ứng. Không sửa net/eligibility backend để khớp UI.
+
+**Interfaces:** Report rows chỉ consume CheckResult/CriticalFact/B3Proposal.field_refs và source ownership đã có. Case workspace async commits thuộc selected case/request generation. Linked actions và legacy actions render mutually exclusive, không đổi endpoint.
+
+- [x] **R2.1 Queue regression đỏ, giữ mọi file được chọn**
+Đặt trong SourceUploadPanel.test.tsx dùng makeView và imports hiện có:
+```tsx
+test('không bỏ file khác bytes chỉ vì trùng tên và size', () => {
+  render(<SourceUploadPanel view={makeView()} role="EMPLOYEE" actorId="NV-01"
+    onChanged={vi.fn().mockResolvedValue(undefined)} onError={vi.fn()} />);
+  const input = screen.getByTestId('sources-file-input');
+  const a = new File(['aa'], 'bill.pdf', { type: 'application/pdf' });
+  const b = new File(['bb'], 'bill.pdf', { type: 'application/pdf' });
+  fireEvent.change(input, { target: { files: [a] } });
+  fireEvent.change(input, { target: { files: [b] } });
+  expect(screen.getByText(/Đã chọn 2 tệp/)).toBeTruthy();
 });
 ```
-Nguồn bằng chứng: pure synthetic UI probe của hàm hiện tại trả “Đủ thông tin để kế toán rà soát; chưa phê duyệt và chưa chi ứng” với stage AWAITING_WORK_SETTLEMENT/workflow APPROVED/funding FULFILLED. Không là UI/browser test.
+Remove name+size filtering trong SourceUploadPanel và B3 import queue ở App; append incoming, người dùng chủ động bỏ. Không thêm content hash infrastructure để giải một queue nhỏ. Backend type/size limits và economic dedup vẫn áp dụng.
 
-- [x] **1.2 Sửa projection từ workflow, không sửa backend facts**
-Closed/Stop/material blockers ưu tiên; sau đó dùng b3_workflow/b7_workflow, fulfillment/revalidation/linked context, stage là fallback khi projection thiếu. Report/run chỉ được coi current khi IDs/case/input_revision/control_epoch khớp. Rerun cùng facts không reset approval; raw FAILED của run cũ không xóa receipt/quyết định hiện hành. Chỉ unresolved issues còn áp dụng mới tạo vướng mắc. Role/actor quyết định hành động điều hướng phù hợp; không quyết định quyền tài chính.
-Tests thêm: approved nhưng chưa receipt; nhận một phần/pending; REFUSE giữ nghĩa vụ; B7 approved/BALANCED/closed; parent Stop/context stale; historical report không tạo current-success; resolved issue không giữ hồ sơ chờ; actor khác owner không có CTA thao tác; missing workflow fallback không giả actual.
+- [x] **R2.2 Report không tạo fact/check/căn cứ**
+Bỏ source_refs.length>=2, filename/index fallback làm căn cứ một check. Thiếu backend result/supporting refs: “Chưa có kết quả kiểm tra/căn cứ cho mục này”, không xanh/khớp từ default value. General document links để vùng tài liệu, không gọi là proof của rule.
+Hai forecast PDFs không là request+forecast; web form đủ dữ liệu không bị đòi hai giấy. Giữ amount_words/estimate/proposal checks từ backend; không bắt document.role gộp toàn dossier thành một scalar.
+Render tests: two same-role sources, zero refs, renamed/misleading filename, missing check, contradiction, web-native, unreadable field; known value không tự PASS, không invent locator/bbox. Không thêm UI-only escalation.
 
-- [x] **1.3 Làm rõ report và mở đúng linked child**
-Chuyển Run ID/status/stage/usage vào details “Thông tin xử lý”; giữ một nhãn mô phỏng dễ thấy. Bỏ raw readiness và thuật ngữ actual payer khỏi màn mặc định. Đổi tiêu đề chung “Thẩm định tài chính” thành kiểm tra đề nghị/đối chiếu quyết toán phù hợp job. Bỏ duplicate success/amount blocks, giữ nguồn và con số chưa rõ. Unknown backend code vẫn lưu trong details, không render raw làm tiêu đề người dùng.
-App nhận kết quả `prepareLinkedB7` và mở child.id, refetch list; không reload parent rồi bắt người dùng tìm child. App/Actions thêm callback dedicated `onPrepareSettlement():Promise<void>`; không đoán child ID từ tên hoặc amount. Existing `onAction` giữ cho mutations khác. Button confirm của B7Intake hiện chỉ save: đổi nhãn “Xác nhận nộp” và đặt chạy kiểm tra kế bên, không hứa auto-run chưa có.
-Các target navigation được App map sang caseTab tương ứng và ID panel thực; bổ sung ID ở B3Approval/B3Funding/B7Approval/B7Funding nếu cần. `sources` mở tab nguồn, `prepare-settlement` mở phần chuẩn bị ở parent, các review/decision/receipt target mở panel của đúng vai; không đưa tên enum thẳng vào querySelector và im lặng khi không tìm thấy element. CTA mở panel, financial POST vẫn là thao tác có guards riêng.
-Normal creation là B3 hoặc tiếp tục B7 từ công việc; generic legacy form nằm trong vùng công cụ mở rộng, giữ chức năng nhưng không quảng bá như intake chuẩn cho tự chi. Không tự tạo fake B3 ứng0. Nguồn chứng từ có đường điều hướng rõ ngay trong intake/summary.
+- [x] **R2.3 Draft và async state thuộc đúng case**
+Key intake theo case.id; server revision/save response được sync khi không dirty hoặc sau accepted save. Dirty draft chưa lưu: cho save/discard/cancel trước đổi case hoặc giữ draft per case; không tự save vào case mới.
+loadCase/polling dùng generation token và captured case ID; tải view/run/report/questions/history vào một workspace rồi commit nếu request còn current. A→B, A trả muộn không overwrite B. B loading không render viewB+reportA. Refetch cùng case không mất queue/draft.
+Regression với deferred API promises trả đảo thứ tự, case switch giữa polling/upload, B7 A→B với rows/confirmed khác nhau, reload sau save, dirty revision conflict; giữ expected_case_version từ đúng view.
 
-- [x] **1.4 Verify và UI checkpoint ba vai**
+- [x] **R2.4 Một trạng thái chính, đúng một contract thao tác**
+Actions phân b3/linked_b7/legacy_b7 rõ: linked chỉ B7Approval/SettlementReceipt, không generic money/decision/handoff/close. Legacy giữ dưới chế độ explicit, không xóa backend.
+App headline lấy UiSummary; review history là lịch sử phụ. B7Approval sau APPROVE đọc fulfillment/closure, không luôn nói chưa ghi nhận tiền/chờ chi. BALANCED không giả đã chi0; unknown không received0. Current frontend rights vẫn không financial authority.
 ```bash
 rtk proxy npm --prefix frontend run test -- --run
 rtk proxy npm --prefix frontend run build
 ```
-Test default screen không có raw readiness/SUCCEEDED/publishing; mở details vẫn truy vết được. Case run lỗi, source mâu thuẫn và action blocked vẫn có thông tin thực chất. Trên UI: B3 submit→review→approve→receipt→prepare child→upload→confirm B7; accountant/approver không thấy form employee edit; next-step navigation mở đúng panel/case. Không claim UI VERIFIED từ render tests. Không cần backend refactor để hoàn thành task1.
+Checkpoint UI: linked chuẩn bị→upload→confirm→review→approve→partial/full; switch hai case và ba vai; kỹ thuật expandable, source mở đúng, không duplicate forms. Chưa thao tác thật vẫn USER_UI_UNEXECUTED.
 
-## Task 2 — Tách trách nhiệm code và đặt tên theo nghiệp vụ
+## R3 — Hoàn thiện boundaries sau khi lỗi đã xanh
 
-**Files:** Modify `src/invoice_referee/settlement/store.py`, `service.py`, imports/callers/tests trực tiếp; create `sqlite_records.py`, `advance_records.py`, `linked_context_records.py`, `settlement_records.py`. Rename `b3_funding.py→advance_reconciliation.py`, `b3_workflow.py→advance_workflow.py`, `b7_linked.py→linked_context.py`, `b7_workflow.py→settlement_workflow.py`, `b7_fulfillment.py→settlement_reconciliation.py`; TS `B3Funding.tsx→AdvanceReceiptPanel.tsx`, `B7Funding.tsx→SettlementReceiptPanel.tsx` cùng export/import/test names. Không đổi B3/B7 models/Job/schema. Không chia models/types chỉ để giảm số dòng ở lượt này.
+**Files/target map:** Giữ Store/Service/API public locations. Tạo settlement/persistence/{queries.py,decision_records.py,money_records.py,action_records.py}; chuyển sqlite_records/advance_records/linked_context_records cùng vào persistence. Tạo shared/{__init__.py,clock.py}. Frontend thêm useCaseWorkspace.ts và CaseWorkspaceView.tsx; giữ các panel đã có.
 
-**Boundaries:** Store là public façade giữ signatures đang được Service/API/tests dùng và owns connection/transaction. SQL lifecycle functions nhận `conn:sqlite3.Connection`, không Store/callback quay lại façade, không tự `_write`/commit. Pure reconciliation/workflow modules giữ tính toán/basis/grants, không SQL. Không mixins/base repository/plugin registry.
+**Interfaces:** clock.utcnow()->datetime aware UTC (record time), không thay effective_b3_time/effective_b7_time (business time). Store.refresh_b7_money_context façade gọi money_records.refresh_context(conn,artifact_root,case_id,command,b7,policy,authority_version)->None; Store dựng CaseView trong cùng txn.
+useCaseWorkspace(caseId:string|null)->{workspace:CaseWorkspace|null,loading:boolean,error:string|null,reload:()=>Promise<void>}; CaseWorkspace gồm view/run/report/questions/history/b3Context theo types hiện có. CaseWorkspaceView nhận workspace,role,actorId,onAction,onPrepareSettlement,onStartRun,onNavigate theo signatures hiện hành, không 20 callbacks hoặc form framework.
 
-**Interfaces mới:**
-- sqlite_records chuyển private common helpers hiện có thành module functions: `case_row(conn,case_id)->sqlite3.Row`, `run_row(conn,run_id)->sqlite3.Row`, `source_records(conn,case_id)->list[SourceRecord]`, `lookup_command(conn,operation,command,scope_key)->sqlite3.Row|None`, `check_replay(row,payload_fp)->None`, `check_version(case,command)->None`, `check_open(case)->None`, `record_command(conn,case_id,scope_key,kind,operation,command,payload_fp,detail,now)->None`. Chuyển SQL/serialization nguyên semantics; không helper này đọc financial policy.
-- advance_records: `workflow_view(conn,case_id)->B3WorkflowView|None`, `advance_events(conn,case_id)->list[B3AdvanceEventView]`, `record_presentation(conn,case_id,payload,command,context,policy)->B3PresentationView`, `record_decision(conn,case_id,payload,command,context,policy,grant_ref,effective_at)->B3DecisionView`, `record_receipt(conn,case_id,payload,command,context)->B3AdvanceEventView`. Types theo Store public signatures hiện có.
-- linked_context_records nhận conn + artifact_root:Path cho prepare/revise/company packet/context source/parent fingerprint. Case mutations trả `(case_id:str,idempotent_replay:bool)`; Store dựng `_case_view` trong cùng transaction. Context read trả LinkedB7ContextSnapshot/SourceRecord như hiện có, không mở connection thứ hai.
-- settlement_records chứa B7 presentation/decision/receipt/revalidation/handoff/closure/adjustment và read projections. Các hàm giữ tên/public args/return types của Store tương ứng, thêm conn và artifact_root khi cần file; bỏ self. Shared parent/B3 reads gọi advance_records, context gọi linked_context_records. CaseView update returns tuple như trên; typed record actions trả View hiện có. Không dependencies ngược từ advance_records sang settlement_records.
+- [x] **R3.1 Tách theo responsibilities có consumers**
+queries: đọc records/projection, dùng pure governing selector; decisions: presentation/decision guards/writes; money: records/history/refresh/revalidation; actions: handoff/closure/adjustment. Shared lookups/serialization trong sqlite_records. Mỗi existing function giữ args/return type, thêm conn/artifact_root nếu cần, không lấy Store hoặc callback gọi ngược façade.
+Store owns _write/_read; records không connection/commit riêng. Di chuyển refresh logic khỏi Store; không đổi transaction order/idempotency/hashes/persisted kinds vì split.
+clock nằm ở shared, records gọi clock.utcnow; chuyển monkeypatch test sang owner đúng. Không lazy import store nữa, không Clock interface/factory.
+App giữ persona/case navigation/global actions; hook owns verified request lifecycle, view owns case tabs/layout; forms stays panels. Không tách component từng div.
 
-- [x] **2.1 Baseline regression trước chuyển code**
-```bash
-rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/ -q
-```
-Ghi actual failures/count, không dùng counts walkthrough cũ. Bổ sung regression cần thiết nếu chưa có: rollback presentation giữ REVIEW count; receipt đúng không mất approval; pending/overpay/wrong recipient không đóng; Stop/stale giữa read/commit; idempotent replay trước version; same-event aliases không double count. Scope assertions trên DB/audit và View, không chỉ HTTP.
-
-- [x] **2.2 Extract lần lượt advance→linked context→settlement**
-Mỗi nhóm move cùng read helpers/callers; Store wrapper mở transaction một lần. Ví dụ wrapper sau khi chuyển nguyên receipt guards vào advance_records:
-```python
-def record_b3_advance(self, case_id, payload, command, context):
-    with self._write() as conn:
-        return advance_records.record_receipt(conn, case_id, payload, command, context)
-```
-Không chẻ checks ra ngoài transaction. Các lookup/fingerprint/source/write/order/unknown semantics giữ nguyên. Không sửa bug nghiệp vụ mới lẫn mechanical extraction: phát hiện thì ghi vấn đề riêng, không đổi oracle để pass. Thin façade wrappers có consumer thật Service/API nên giữ; không nhân thêm façade song song.
-Chạy focused B3 tests sau nhóm advance; linked tests sau context; B7 workflow/fulfillment/revalidation/closure/adjustment sau settlement. Sửa direct Store callers và signatures trong cùng nhóm, không để đoạn code dead hoặc dual writers. Các operations generic cũ ở Store giữ guard và đánh dấu internal legacy; chưa xóa khi chưa xác minh consumers.
-
-- [x] **2.3 Extract frontend theo việc người dùng**
-Create `SourceUploadPanel.tsx` (queue/upload/provenance/progress/error) và `ProcessingDetails.tsx` (run trace/debug); move trạng thái/handlers tương ứng ra khỏi App. SourceUploadPanel props `{view,role,actorId,onChanged:(caseId:string)=>Promise<void>,onError:(message:string)=>void}`; giữ multi-upload đã có, sequential versions/idempotency/partial failures. Case đổi reset queue; upload thành công một phần phải giữ file chưa upload, không để refetch làm mất queue. Không dedup theo name+size rồi bỏ file khác bytes; muốn skip file phải có căn cứ hoặc người dùng chủ động bỏ.
-ProcessingDetails props `{run:RunView|null,report:Report|null}`; không fetch/provider side effects. App giữ selected case/loading/navigation/persona, không toàn bộ source workflow. Các panel nghiệp vụ đang có tiếp tục dùng, không làm component framework/schema-driven form. Đổi tên tiền ứng/quyết toán trong imports/copy theo scope, không rename wire values.
-
-- [x] **2.4 Integration checks và checkpoint**
+- [x] **R3.2 Xác minh boundaries và regression**
+Static import check: persistence không import Store/API, pure money/workflow không SQL/API, no import cycle; include function-local imports. Alias façade wrappers có consumer giữ, internal migration shims không consumer loại khỏi code mới.
 ```bash
 rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/ -q
 rtk proxy npm --prefix frontend run test -- --run
 rtk proxy npm --prefix frontend run build
 ```
-Test mixed upload success/failure/retry/reload/case switch. Run B3→B9 fake qua same Service/Store/API, compare money/stages/records trước-sau; không snapshot expected từ engine. Báo responsibility đã chuyển, số dòng/call dependencies trước-sau, không đặt tùy tiện mọi file phải <300 dòng. File nhỏ nhưng cyclic imports/transaction bị phá là FAIL.
+Báo responsibility/call directions trước-sau; không arbitrary300-line ceiling. models/types/b3 còn lớn không tự fail; tách contracts chỉ khi có seam/import graph riêng đã chứng minh, ngoài scope lượt này.
 
-## Task 3 — Một điểm hướng dẫn và một recipe demo nhất quán
+## R4 — Current/shared/legacy có đường tìm rõ
 
-**Files:** Update README.md, docs/settlement/PRODUCT.md/SYSTEM.md/EVALUATION.md capability sections, docs/testing guides cần sửa, packet README metadata. Reuse `data/settlement/worked-example-v1/build_packet.py` và b3-verbal-v2 generator đã có làm nguồn tham khảo; nếu cần tracked generator mới, tạo `scripts/build_travel_demo.py`, không đưa demo generator vào application.
+**Target:** src/invoice_referee/settlement hiện hành; shared chỉ errors/artifacts/clock/loader có consumers thật; legacy chứa claim-processing cũ. Frontend/src/settlement hiện hành, frontend/src/legacy code cũ; main/styles/test setup giữ vị trí chung cần thiết.
 
-**Recipe contract:** Demo mới ở `data/settlement/travel-demo-v1/`, không ghi đè worked-example/frozen datasets. Generator args `--work-ref`, `--output-dir`, `--settlement-as-of`; employee NV-DEMO-01/company/personas hiện có. employee-input/company-input/followup/expected tách riêng; manifest filename/doc role/work/actor/date/hash/duplicate variants. File tên nghiệp vụ, không chỉ K01/X02. Source IDs do API cấp sau upload: company packet template có doc references và hướng dẫn bind retained IDs, không fake `company:ref` thành source tự tin.
+- [x] **R4.1 Dependency map trước di chuyển**
+AST/import map + text references phân runtime/import-only/test/history/data. domain.models.DomainError có17 current consumers; storage.artifacts.put_artifact cócurrent+legacy consumers. Tách hai phần dùng chung trước, không chuyển cả domain/storage vào legacy.
+Mapping trong output/maintenance/consolidation-inventory.json mở rộng existing artifact, không Markdown mới. Private helper/hardcoded ROOT và dynamic imports phải được kiểm trực tiếp; không claim unused từ graph lỗi.
 
-- [x] **3.1 Cập nhật điều hướng thay vì thêm guide**
-README một bảng “hiểu nghiệp vụ / chạy demo / đánh giá / lịch sử” và entrypoint hiện hành duy nhất ở hướng dẫn chính. Commands legacy ở section lịch sử; B7 development20/replay5/LIVE mục đích khác nhau ghi rõ. Packet B3 v2 README phân biệt metadata lúc tạo với current capabilities. Completed plans là lịch sử triển khai, không second rulebook; cập nhật nhãn/links, không rewrite frozen policy theo rules hôm nay. System mô tả module map thực sau task2, không append tiếp một bài giải thích dài.
+- [x] **R4.2 Move code lịch sử, giữ public entry compatibility**
+Đường chuyển code (không chuyển data):
+| Hiện tại | Target |
+| --- | --- |
+| application/, extraction/, policy/ | legacy/application/, legacy/extraction/, legacy/policy/ |
+| domain/models.py (model bodies cũ) | legacy/domain/models.py; shared/errors.py giữ error dùng chung |
+| storage/repository.py | legacy/storage/repository.py |
+| storage/artifacts.py | shared/artifacts.py, consumers cả hai cập nhật |
+| config.py / api/app.py implementation | legacy/config.py / legacy/api/app.py |
+| verify/jobs,manifest,metrics,replay,runner | legacy/verify/ cùng tên; settlement_cli/settlement_replay giữ current |
+| frontend/src old App/api/types và các component cũ | frontend/src/legacy/ cùng tên, shared assets giữ khi còn consumers |
+Tạo shared/errors.py chứa cùng DomainError class; shared/artifacts.py cùng file IO helpers; loader env hiện có giữ hoặc move chỉ khi imports ổn định. Legacy domain.models re-export cùng Error identity, không hai exception classes.
+Move application/, extraction/, policy/, storage/repository.py, old domain model bodies/config.py/api app implementation và verify runner cũ sang legacy tương ứng sau map. Current settlement không fallback legacy.
+Public api.app:create_runtime_app và python -m invoice_referee.verify old contracts giữ thin explicit compatibility entry nếu còn consumer; current verify code riêng khỏi legacy implementation. Không wildcard re-exports/all-symbol shim hoặc parallel writer.
+Frontend old App/CaseDetail/CaseForm/HumanActions/Inbox/Verify và old api/types/builders/tests chuyển legacy; shared assets/helpers chỉ khi được cả hai dùng. main vẫn mount settlement. Cập nhật relative imports/test discovery, không accidentally mount legacy.
+Không move tests/fixtures hoặc frozen corpora. Có reference chưa giải quyết thì giữ path/mark legacy và báo blocker của item đó, không ghi toàn R4 DONE. Sửa ROOT/path resolution tại caller khi move, kiểm clone/install context, không giả parents[3] vẫn đúng.
 
-- [x] **3.2 Chuẩn bị demo theo đúng case thực hiện**
-Xuất nguồn synthetic cho 3 khoản nhân viên 3M/1M/1M, receipts phù hợp, company flight3M, advance receipt2M cùng identity dùng ở B5, company coverage tới mốc sau chuyến đi và B7 rights riêng. JSON/proofs/form profile consistent employee/work/trip/time; không gộp followup reimbursement3M vào initial B7. Expected literal T8/E5/A2/RA0/P0/RP0/S3; sau receipt3 và gates S0. Không tự gán absence0 thiếu coverage.
-Native/scan/PDF/text paths giữ các mục đích riêng. Fake demo dùng structured ledger/typed sources được Reader hiện có hỗ trợ; PDF/image demo dùng đường LIVE chỉ khi user cho phép, không gọi provider trong task này. Generator không nhét expected/net vào prompt inputs. Tái tạo giữ nghĩa/tính hash minh bạch; PDF metadata timestamp không được coi hash ổn định nếu chưa chứng minh. Người dùng nhập work-ref của hồ sơ liên kết, không sửa mã work trên server để khớp bộ cũ.
-Không thêm dependency vào app vì generator; tái sử dụng tool/runtime PDF có sẵn khi cần, ghi requirement trên command. Manifest là index, không thêm nhiều README riêng cho từng file.
+- [x] **R4.3 Import/entry smoke + integration**
+API current và explicit legacy factory import được; CLI --help không gọi provider; frontend normal entry đúng. Tests/gold bytes/API schema/operation codes giữ, direct Store/API tests không mất do chỉ đổi path. Trường hợp alias public cần giữ liệt kê rõ owner/consumer, không tồn tại hai business implementations.
+```bash
+rtk proxy env SETTLEMENT_PROVIDER_MODE=fake PROVIDER_MODE=fake .venv/bin/python -c "from invoice_referee.api.settlement import create_runtime_app; from invoice_referee.api.app import create_runtime_app as legacy_factory; print('entry imports OK')"
+rtk proxy env SETTLEMENT_PROVIDER_MODE=fake PROVIDER_MODE=fake .venv/bin/python -m invoice_referee.verify --help
+rtk proxy env SETTLEMENT_PROVIDER_MODE=fake PROVIDER_MODE=fake .venv/bin/python -m invoice_referee.verify.settlement_cli --help
+```
 
-- [x] **3.3 Checkpoint: một người có thể test theo guide**
-Trong guide B6/B7 hiện có, ghi exact file nào nhân viên upload, field nào khai, nguồn nào kế toán quản lý, thời điểm phải refresh/run và bước người duyệt. Template không là verified facts; HUMAN_SOURCE_REVIEW/preparation effort vẫn ghi nhận. Kiểm links/file roles/dates/owning refs/hash; không benchmark AI từ fake PDF failure. Giữ corpus đánh giá độc lập khỏi demo khi đo.
+## R5 — Docs/demo/inventory thực sự tái tạo được
 
-## Task 4 — Kiểm kê và tinh gọn có giới hạn, rồi nghiệm thu
+**Files:** README/AGENTS routing, canonical System/Product/Evaluation, docs/testing/understanding metadata, scripts/build_travel_demo.py nếu cần, existing inventory JSON. Không thêm dataset mới hoặc rewrite frozen snapshots.
 
-**Files:** Existing README/guides/links; inventory `output/maintenance/consolidation-inventory.json` (ignored). Không thêm report/spec Markdown. Không sửa corpus/gold/DB.
+- [x] **R5.1 Một đường hiện hành, lịch sử rõ**
+README đặt command generator trước link recipe Git-ignored, ghi mode fake và config/setup cụ thể. P01/P02 hiểu code cũ có legacy/snapshot label; lịch sử có commit không coi sai, không dùng làm current architecture. Cập nhật module map và commands theo R3/R4; không append nhiều bản kiến trúc vào System.
+Dữ liệu đánh giá tại docs/discovery giữ original path/hash, DEFAULT_CORPUS và manifests không move lúc này; phân loại DATASET để agent không coi là policy toàn app.
 
-- [x] **4.1 Inventory phân loại trước mọi đề xuất bỏ**
-Ghi path/tracked-or-ignored/size/hash/owner/purpose/generator/references/lifecycle và KEEP/ARCHIVE/REGENERATE_CANDIDATE. Exclude .git/.venv/node_modules/.agents và private source content; metadata đủ cho bước này. Exact byte copies khác native/scan variants. Không đổi scope từ cognitive cleanup thành xóa mọi “file rác”.
-Ưu tiên PDF output/input trùng byte và latest pointers có thể regenerate; xác minh references như WORKED_EXAMPLE trước khi đề xuất bỏ. Runtime artifacts giữ source ID/run association, frozen data giữ nguyên bytes. Bản có reference hoặc chưa chứng minh regeneration giữ KEEP. File không rõ owner/lifecycle giữ REVIEW_REQUIRED.
+- [x] **R5.2 Inventory từ filesystem/references, không chỉ danh sách13 mục**
+Đo file sizes/SHA256/ownership/tracked/generator+basepath/references/retention; directory ghi aggregated bytes/file count, hash là manifest-entry digest hoặc explicit N/A, không dùng null che “chưa đo”. Metadata-only cho private records; không in content hồ sơ/key.
+KEEP/ARCHIVE/REGENERATE_CANDIDATE/REVIEW_REQUIRED; verify generator path và bản trùngbyte, scan/native khácpurpose. Chứng minh references/regeneration trước removal proposal. Không xóa bất kỳ data/evidence/frozen item trong plan.
+Tạo recipe vào temp output với work-ref chỉ định để kiểm file roles/date/hash/expected separation; đừng overwrite bộ demo đang test. Recipe fake không chứng minh OCR/LLM hay professional trials.
 
-- [x] **4.2 Giảm context hoạt động, giữ provenance**
-Update README/AGENTS routing nếu paths đổi thật; task chỉ load canonical + assigned plan + selected packet. Đánh dấu superseded guides/plans ở metadata hoặc links hiện có; không tự load archive. Không archive/delete cả thư mục đang có caller. Plan này không authorize xóa DB/uploaded evidence/frozen files; danh sách removal cần review riêng. Chọn một bộ demo mặc định không biến nó thành holdout hoặc baseline chất lượng.
+## R6 — Nghiệm thu có đối chứng, không đóng bằng checkbox
 
-- [x] **4.3 Final checks**
+- [x] **R6.1 Required checks cuối**
 ```bash
 rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/ -q
 rtk proxy .venv/bin/python -m pip check
 rtk proxy npm --prefix frontend run test -- --run
 rtk proxy npm --prefix frontend run build
 ```
-So frozen input/policy/gold hashes trước-sau, kiểm link/command docs và persisted B3/B7/API regression. GUI/browser được phép: employee→accountant→approver từng checkpoint, nguồn mở được, action có reason, Stop/partial/incident đúng. Nếu chưa thao tác thật ghi USER_UI_UNEXECUTED; không gọi screenshots/tests là professional trial. Ghi evidence trong plan này và JSON inventory; không claim cải thiện effort/quality nếu chưa đo với người thực.
+Chạy focused đỏ→xanh trước broad checks; repeat chỉ change/failure. Record command/exit/count/mode và source revision, không dùng891/157 cũ làm evidence mới.
+So hashes frozen/input/policy/gold và API contracts, import graph cảlazy imports, no data loss/no new current financial action khi stale/Stop.
 
-## Done và giới hạn
+- [x] **R6.2 Acceptance matrix bắt buộc**
+| Case | Expected |
+| --- | --- |
+| Material source sau approval | Handoff bị chặn, no new audit handoff |
+| Duyệt3, receipt2, current VALID revalidation | Same approval, handoff remaining1 |
+| Same E/T/B nhưng cost evidence/relations đổi | NEEDS_RECHECK, không waive vì tổng tiền bằng |
+| No-op/business reuse new key rồi body khác |409 conflict; accepted command có registry |
+| Hai nguồn cùng loại/refs thiếu | UI không invented đầy đủ/khớp/căn cứ |
+| Hai files metadata giống, bytes khác | Cả hai nằm queue |
+| CaseA→B, requestA trả muộn | Workspace/draft B, không mix data |
+| Linked B7 ở ba vai | Chỉ dedicated actions, state thống nhất |
+| Fresh checkout với generator | Demo recipe có, commands/refs resolve, không expected vào inputs |
 
-Done khi current workflow không bị report cũ phủ định; normal UI không phơi raw engine enum nhưng debug truy vết còn; linked child mở đúng và upload cạnh intake; các vai có next step rõ; Store façade có boundaries không phá transaction; tên nội bộ theo nghiệp vụ/wire values stable; một recipe demo đúng scope; docs navigation không dẫn người mới vào legacy; frozen/evidence không mất; tests + UI evidence được báo đúng mode.
-Không coi giảm số file/dòng là mục tiêu tự thân. Shared models/types còn lớn không tự fail; không có deletion được chứng minh thì giữ. LIVE quality/holdout/trials và thay đổi core nghiệp vụ nằm ngoài lượt hợp nhất này.
+UI do user/permitted tool thực hiện: lưu steps/screens/actual failures trong evidence JSON, không đòi screenshot tự chứng minh nghiệp vụ. Không browser permission thì không bypass và không tick GUI acceptance; báo implementation verified scope riêng.
+Đợt này DONE chỉ khi R1–R5 và regression/gates đạt; GUI còn thiếu giữ nghiệm thu UI chưa hoàn tất. Không claim LIVE/baseline/trial hoặc toàn project hết nợ kỹ thuật.
 
-## Prompt cho coding agent
+## Prompt giao coding agent
 
 ```text
-Thực hiện docs/superpowers/plans/2026-10-11-mvp-consolidation.md theo task1–4.
-Đọc AGENTS.md và các sections canonical cần cho task, không nạp cả docs/archive.
-Sửa trạng thái và navigation trước; chứng minh regression “đã nhận ứng nhưng UI
-báo chưa phê duyệt” rồi triển khai. Review checkpoint UI trước refactor lớn.
-Giữ API/schema/policy/financial gates; tách SQL lifecycle theo cùng connection/
-transaction, không viết framework hoặc bỏ guard để giản lược. Giữ multi-upload
-đã có và partial failure queue. Chuẩn hóa tên module, không rename persisted codes.
-Hợp nhất README/docs và tạo một demo recipe đúng work/time/source identity;
-không trộn gold/followup vào inputs. Inventory trước cleanup, không xóa DB,
-originals/frozen data/run evidence. Không LIVE/Git/publish/subagent tự động.
-Chạy checks theo task, báo actual mode/exit/count và UI chưa kiểm; không dùng
-green unit tests để claim người dùng thao tác được hoặc AI đã đạt baseline.
+Đọc AGENTS.md và triển khai phần R1–R6 của
+docs/superpowers/plans/2026-10-11-mvp-consolidation.md.
+Đây là remediation sau review c72fe2b, không làm lại task cũ hoặc tin checkbox.
+Sửa tests stale handoff/no-op conflict và UI evidence/queue/draft/race trước.
+Giữ correct partial fulfillment, signature/source/authority/Stop/closure gates;
+không chỉ block mọi basis_current=False hoặc waive bằng E/T/B bằng số.
+Sau regression xanh mới hoàn thiện records/clock/App boundaries và move legacy
+theo dependency map, giữ public contracts/eight tables/transaction.
+Không chuyển hoặc xóa DB/originals/frozen corpus/gold/evidence; không LIVE,
+Git/publish/subagent tự động, không thêm framework/dependency.
+Cập nhật chính plan/README/docs hiện có và inventory JSON; báo actual checks,
+các alias/blocker/UI chưa kiểm. Không tuyên bố complete từ line count hay test cũ.
 ```

@@ -13,11 +13,11 @@ import json
 import sys
 from pathlib import Path
 
-from invoice_referee.application.service import CaseService
-from invoice_referee.storage.repository import Repository
-from invoice_referee.verify.manifest import VerifyManifest, load_manifest
-from invoice_referee.verify.replay import ReplayProviders
-from invoice_referee.verify.runner import VerifyRunner
+from invoice_referee.legacy.application.service import CaseService
+from invoice_referee.legacy.storage.repository import Repository
+from invoice_referee.legacy.verify.manifest import VerifyManifest, load_manifest
+from invoice_referee.legacy.verify.replay import ReplayProviders
+from invoice_referee.legacy.verify.runner import VerifyRunner
 
 ROOT = Path(__file__).resolve().parents[3]
 FIXTURES = ROOT / 'tests' / 'fixtures'
@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     repo = Repository(db_path, out_root / 'artifacts')
     service = CaseService(repo, ReplayProviders(), repo.get_active_policy() or _inactive_policy())
     # Activate the proposed demo policy for the replay run (recorded as SYSTEM).
-    from invoice_referee.config import activate_demo_policy
+    from invoice_referee.legacy.config import activate_demo_policy
 
     service.activate_policy(activate_demo_policy(service.policy, 'Verify replay corpus'),
                             reason='Verify replay corpus')
@@ -78,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _inactive_policy():
-    from invoice_referee.config import load_policy
+    from invoice_referee.legacy.config import load_policy
 
     return load_policy(ROOT / 'config' / 'demo-policy.json')
 

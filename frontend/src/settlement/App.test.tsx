@@ -562,3 +562,50 @@ test('tab Nguồn chứng từ cho phép chọn và tải lên nhiều tệp cù
 
 
 
+
+test('R2.3: case A trả muộn không ghi đè workspace case B', async () => {
+  const user = userEvent.setup();
+  vi.spyOn(api, 'getDemoContext').mockResolvedValue(DEMO_CONTEXT);
+  vi.spyOn(api, 'listCases').mockResolvedValue([
+    {id: 'C-aaa', job: 'B3' as const, employee_ref: 'NV-DEMO-01',
+     work_ref: 'WORK-a', stage: 'CHECKING' as const, case_version: 1,
+     updated_at: '2026-10-10T09:00:00+07:00', origin: 'USER' as const},
+    {id: 'C-bbb', job: 'B3' as const, employee_ref: 'NV-DEMO-01',
+     work_ref: 'WORK-b', stage: 'CHECKING' as const, case_version: 1,
+     updated_at: '2026-10-10T09:00:00+07:00', origin: 'USER' as const},
+  ]);
+  vi.spyOn(api, 'getHistory').mockResolvedValue([]);
+  vi.spyOn(api, 'getQuestions').mockResolvedValue([]);
+  vi.spyOn(api, 'getRun').mockResolvedValue(
+    {...RUN, status: 'SUCCEEDED', completion: 'COMPLETE'});
+  vi.spyOn(api, 'getReport').mockResolvedValue(b3Report('READY_FOR_ACCOUNTANT_REVIEW'));
+  vi.spyOn(api, 'getB3RunContext').mockResolvedValue({
+    version: 'synthetic-verbal-v2', synthetic: true,
+    demo_clock: '2026-10-10T09:00:00+07:00', grants: [], coverage: [], history: [],
+  });
+
+  // Case A resolves slowly; case B resolves fast.
+  let resolveA: (v: CaseView) => void = () => {};
+  const aPromise = new Promise<CaseView>((res) => { resolveA = res; });
+  const caseB: CaseView = {
+    ...caseView(true), id: 'C-bbb',
+    submission: {...caseView(true).submission, work_ref: 'WORK-b'},
+  };
+  vi.spyOn(api, 'getCase').mockImplementation((id: string) => {
+    if (id === 'C-aaa') return aPromise;
+    return Promise.resolve(caseB);
+  });
+
+  render(<App />);
+  await user.click(await screen.findByText(/C-aaa/));
+  await user.click(await screen.findByText(/C-bbb/));
+
+  // B is shown.
+  await waitFor(() =>
+    expect(screen.getByTestId('case-id-badge')).toHaveTextContent('C-bbb'));
+
+  // A's late response must NOT overwrite B's workspace.
+  resolveA({...caseView(true), id: 'C-aaa'});
+  await new Promise((r) => setTimeout(r, 20));
+  expect(screen.getByTestId('case-id-badge')).toHaveTextContent('C-bbb');
+});

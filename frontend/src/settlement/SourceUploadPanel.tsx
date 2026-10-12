@@ -40,11 +40,10 @@ export function SourceUploadPanel({
     if (!incoming) return;
     const list = Array.from(incoming);
     if (list.length === 0) return;
-    setFiles((prev) => {
-      const existing = new Set(prev.map((f) => `${f.name}-${f.size}`));
-      const unique = list.filter((f) => !existing.has(`${f.name}-${f.size}`));
-      return [...prev, ...unique];
-    });
+    // Append every selected file. Two files with the same name and size may
+    // still differ in bytes; dropping one by name+size would silently lose a
+    // real document. The user removes a file explicitly instead.
+    setFiles((prev) => [...prev, ...list]);
   };
 
   const removeFile = (index: number) => {

@@ -83,11 +83,15 @@ from invoice_referee.settlement.models import (
     Upload,
     fingerprint,
 )
-from invoice_referee.storage.artifacts import put_artifact
-from invoice_referee.settlement import sqlite_records as _rec
-from invoice_referee.settlement import advance_records as _adv
-from invoice_referee.settlement import linked_context_records as _lc
-from invoice_referee.settlement import settlement_records as _st
+from invoice_referee.shared.artifacts import put_artifact
+from invoice_referee.shared import clock
+from invoice_referee.settlement.persistence import sqlite_records as _rec
+from invoice_referee.settlement.persistence import advance_records as _adv
+from invoice_referee.settlement.persistence import linked_context_records as _lc
+from invoice_referee.settlement.persistence import decision_records as _decision
+from invoice_referee.settlement.persistence import money_records as _money
+from invoice_referee.settlement.persistence import action_records as _action
+from invoice_referee.settlement.persistence import queries as _queries
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
@@ -127,7 +131,9 @@ def _is_system_work_ref(work_ref: str) -> bool:
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    # Re-exported for callers/tests that used ``store.utcnow`` historically; the
+    # single owner is ``shared.clock``. The records call clock.utcnow directly.
+    return clock.utcnow()
 
 
 def detect_media_type(content: bytes, filename: str) -> str:
@@ -1238,20 +1244,20 @@ class Store:
 
     def _b7_workflow(self, conn: sqlite3.Connection,
                      case_id: str) -> B7WorkflowView | None:
-        return _st.workflow_view(conn, case_id)
+        return _queries.workflow_view(conn, case_id)
 
     def record_b7_presentation(self, case_id: str, payload: B7PresentPayload,
                                command: Command, b7, b3,
                                policy: dict) -> B7PresentationView:
         with self._write() as conn:
-            return _st.record_presentation(conn, self.artifact_root, case_id,
+            return _decision.record_presentation(conn, self.artifact_root, case_id,
                                            payload, command, b7, b3, policy)
 
     def record_b7_decision(self, case_id: str, payload: B7DecisionPayload,
                            command: Command, b7, b3, policy: dict
                            ) -> B7DecisionView:
         with self._write() as conn:
-            return _st.record_decision(conn, self.artifact_root, case_id,
+            return _decision.record_decision(conn, self.artifact_root, case_id,
                                        payload, command, b7, b3, policy)
 
     def _store_linked_context_source(self, conn: sqlite3.Connection,
@@ -1288,7 +1294,7 @@ class Store:
 
     def _b7_settlement_proof_source_ids(self, conn: sqlite3.Connection,
                                         case_id: str) -> set[str]:
-        return _st.settlement_proof_source_ids(conn, case_id)
+        return _queries.settlement_proof_source_ids(conn, case_id)
 
     def b7_settlement_proof_source_ids(self, case_id: str) -> set[str]:
         with self._read() as conn:
@@ -1296,7 +1302,7 @@ class Store:
 
     def _b7_money_events(self, conn: sqlite3.Connection,
                          case_id: str) -> list[B7MoneyEventView]:
-        return _st.money_events(conn, case_id)
+        return _queries.money_events(conn, case_id)
 
     def confirmed_b7_money_events(self, case_id: str) -> list[B7MoneyEventView]:
         """Confirmed RECEIVED settlement events (for canonical history merge)."""
@@ -1306,27 +1312,27 @@ class Store:
 
     def _b7_current_decision(self, conn: sqlite3.Connection,
                              case_id: str) -> B7DecisionView | None:
-        return _st.current_decision(conn, case_id)
+        return _queries.current_decision(conn, case_id)
 
     def _b7_fulfillment(self, conn: sqlite3.Connection, case_id: str
                         ) -> B7FulfillmentSummary | None:
-        return _st.fulfillment(conn, case_id)
+        return _queries.fulfillment(conn, case_id)
 
     def record_b7_money(self, case_id: str, payload: B7MoneyEventPayload,
                         command: Command, b7, b3, policy: dict
                         ) -> B7MoneyEventView:
         with self._write() as conn:
-            return _st.record_money(conn, case_id, payload, command, b7, b3,
+            return _money.record_money(conn, case_id, payload, command, b7, b3,
                                     policy)
 
     def _b7_build_money_context(self, conn: sqlite3.Connection, case_id: str,
                                 policy: dict, authority_version: str | None
                                 ) -> tuple[str, object]:
-        return _st.build_money_context(conn, self.artifact_root, case_id,
+        return _queries.build_money_context(conn, self.artifact_root, case_id,
                                        policy, authority_version)
 
     def _augment_packet_with_money(self, conn, packet, case_id: str):
-        return _st.augment_packet_with_money(conn, packet, case_id)
+        return _queries.augment_packet_with_money(conn, packet, case_id)
 
     def refresh_b7_money_context(self, case_id: str, command: Command,
                                  b7, policy: dict,
@@ -1385,53 +1391,53 @@ class Store:
     def revalidate_b7(self, case_id: str, command: Command, policy: dict
                       ) -> B7RevalidationView:
         with self._write() as conn:
-            return _st.revalidate(conn, self.artifact_root, case_id, command,
+            return _money.revalidate(conn, self.artifact_root, case_id, command,
                                   policy)
 
     def _b7_current_revalidation(self, conn: sqlite3.Connection, case_id: str
                                  ) -> B7RevalidationView | None:
-        return _st.current_revalidation(conn, case_id)
+        return _queries.current_revalidation(conn, case_id)
 
     def _b7_open_question_count(self, conn: sqlite3.Connection,
                                 case_id: str) -> int:
-        return _st.open_question_count(conn, case_id)
+        return _queries.open_question_count(conn, case_id)
 
     def handoff_b7(self, case_id: str, payload: B7HandoffPayload,
                    command: Command, b7, b3, policy: dict) -> B7HandoffView:
         with self._write() as conn:
-            return _st.handoff(conn, self.artifact_root, case_id, payload,
+            return _action.handoff(conn, self.artifact_root, case_id, payload,
                                command, b7, b3, policy)
 
     def _b7_grant_for(self, b7, decision):
-        return _st.grant_for(b7, decision)
+        return _queries.grant_for(b7, decision)
 
     def _require_accountant_route_store(self, conn: sqlite3.Connection,
                                         case: sqlite3.Row, command: Command,
                                         b3) -> None:
-        _st.require_accountant_route(conn, case, command, b3)
+        _queries.require_accountant_route(conn, case, command, b3)
 
     def _b7_receipt_signature(self, conn: sqlite3.Connection,
                               case_id: str) -> str:
-        return _st.receipt_signature(conn, case_id)
+        return _queries.receipt_signature(conn, case_id)
 
     def _b7_latest_handoff(self, conn: sqlite3.Connection, case_id: str
                            ) -> B7HandoffView | None:
-        return _st.latest_handoff(conn, case_id)
+        return _queries.latest_handoff(conn, case_id)
 
     def close_b7(self, case_id: str, payload, command: Command, b3,
                  policy: dict):
         with self._write() as conn:
-            return _st.close(conn, self.artifact_root, case_id, payload, command,
+            return _action.close(conn, self.artifact_root, case_id, payload, command,
                              b3, policy)
 
     def _b7_closure(self, conn: sqlite3.Connection, case_id: str
                     ) -> B7ClosureView | None:
-        return _st.closure(conn, case_id)
+        return _queries.closure(conn, case_id)
 
     def prepare_b7_adjustment(self, closed_case_id: str, payload, command: Command,
                               b3) -> CaseView:
         with self._write() as conn:
-            child_id, replay = _st.prepare_adjustment(
+            child_id, replay = _action.prepare_adjustment(
                 conn, closed_case_id, payload, command, b3)
             return self._case_view(conn, child_id).model_copy(
                 update={"idempotent_replay": replay})

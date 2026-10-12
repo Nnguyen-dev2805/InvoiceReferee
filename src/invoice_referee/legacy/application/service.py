@@ -48,10 +48,10 @@ from concurrent.futures import Future
 from datetime import datetime, timezone
 from pathlib import Path
 
-from invoice_referee.application.executor import RunExecutor
-from invoice_referee.application.human import validate_human_action
-from invoice_referee.application.pipeline import process
-from invoice_referee.domain.models import (
+from invoice_referee.legacy.application.executor import RunExecutor
+from invoice_referee.legacy.application.human import validate_human_action
+from invoice_referee.legacy.application.pipeline import process
+from invoice_referee.legacy.domain.models import (
     AuditEvent,
     CaseRecord,
     CaseSnapshot,
@@ -71,11 +71,11 @@ from invoice_referee.domain.models import (
     StoppedRun,
     Upload,
 )
-from invoice_referee.extraction.providers import Providers
-from invoice_referee.extraction.validation import check_ref
-from invoice_referee.policy.numeric import UNIT_FACTORS
+from invoice_referee.legacy.extraction.providers import Providers
+from invoice_referee.legacy.extraction.validation import check_ref
+from invoice_referee.legacy.policy.numeric import UNIT_FACTORS
 from invoice_referee.storage.artifacts import put_artifact
-from invoice_referee.storage.repository import Repository
+from invoice_referee.legacy.storage.repository import Repository
 
 # A run that is no longer in flight; a new run may start.
 _TERMINAL = {'STOPPED', 'SUCCEEDED', 'FAILED'}

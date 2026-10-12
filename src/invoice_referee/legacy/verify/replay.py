@@ -12,13 +12,13 @@ by the evidence ROLE of the case being run.
 """
 from __future__ import annotations
 
-from invoice_referee.domain.models import (
+from invoice_referee.legacy.domain.models import (
     DocumentFacts,
     EvidenceBundle,
     MappingProposal,
     SourceRegistry,
 )
-from invoice_referee.extraction.providers import FakeProviders
+from invoice_referee.legacy.extraction.providers import FakeProviders
 
 # The replay artifact evidence ids are ROLE NAMES so the runner can map them to
 # the real assigned ids by role (which is stable across runs).

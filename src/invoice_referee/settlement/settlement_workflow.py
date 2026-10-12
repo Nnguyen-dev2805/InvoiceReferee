@@ -40,6 +40,30 @@ def _known_int(slot, name: str) -> int:
     return slot.value
 
 
+def governing_decision(presentation, decision, current_run_id: str | None):
+    """The decision that currently governs a linked settlement, or None.
+
+    A decision only governs the presentation it was made on. A newer
+    presentation supersedes an older non-REFUSE decision; REFUSE stays effective
+    until a separate reopen. A RETURN stops governing once a newer run has become
+    current (the case needs a fresh presentation).
+
+    Shared by the workflow projection and the fulfillment/revalidation selector;
+    it is a freshness *selector*, not a validator and not a recursion with
+    fulfillment.
+    """
+    if decision is None:
+        return None
+    if decision.outcome != "REFUSE" \
+            and (presentation is None
+                 or decision.presentation_id != presentation.id):
+        return None
+    if decision.outcome == "RETURN" \
+            and current_run_id != decision.basis_report_id:
+        return None
+    return decision
+
+
 def settlement_target(report: Report) -> B7DecisionTarget:
     """Derive the decision target from a current report, or raise.
 
@@ -148,19 +172,33 @@ def b7_business_signature(submission: Submission, sources: list[SourceRecord],
     return fingerprint("B7_BUSINESS", payload)
 
 
+# Backend-owned source uses that carry fulfillment/context snapshots, not
+# employee cost evidence. They change as receipts are folded in, so they must
+# not invalidate the accepted cost basis (a correct receipt keeps it VALID).
+_FULFILLMENT_SOURCE_USES = ("LINKED_B7_CONTEXT", "B7_SETTLEMENT_PROOF")
+
+
+def _cost_evidence_sources(sources: list[SourceRecord]) -> list[SourceRecord]:
+    return [source for source in sources
+            if source.provenance.get("source_use")
+            not in _FULFILLMENT_SOURCE_USES]
+
+
 def b7_cost_signature(submission: Submission, sources: list[SourceRecord],
                       report: Report, policy: dict, linked_context) -> str:
-    """Cost-only basis: excludes A/RA/P/RP and generated context-source IDs.
+    """Cost-only basis: excludes A/RA/P/RP and backend fulfillment sources.
 
     So a new receipt (history delta) does not invalidate the accepted cost
     basis. Resolves cost facts by owning-document hash, not the whole context
-    JSON (which changes when a receipt arrives).
+    JSON (which changes when a receipt arrives). Backend-owned context/proof
+    sources are excluded so only employee cost evidence can change the basis.
     """
+    evidence = _cost_evidence_sources(sources)
     payload = {
         "scope": {"employee_ref": submission.employee_ref,
                   "work_ref": submission.work_ref},
         "form": submission.form,
-        "sources": sorted(source.sha256 for source in sources),
+        "sources": sorted(source.sha256 for source in evidence),
         "policy": policy,
         "cost_components": {"e": report.components.e.value,
                             "t": report.components.t.value,

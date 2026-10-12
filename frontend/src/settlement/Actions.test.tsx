@@ -248,3 +248,42 @@ test('B3 refused: employee thấy lý do, không có form mở lại', () => {
     .not.toBeInTheDocument();
 });
 
+
+// --- R2.4: linked B7 dùng dedicated actions, không generic lifecycle ---------
+
+function linkedB7View(overrides: Partial<CaseView> = {}): CaseView {
+  return makeView({
+    job: 'B7',
+    linked_b7: {
+      origin: { origin_case_id: 'C-parent', employee_ref: 'NV-01',
+                work_ref: 'CT-01', created_at: '2026-10-11T10:00:00Z' },
+      context_source_id: 'S-1', context_current: true, blocked_reasons: [],
+      managed_advance_subtotal_vnd: 2_000_000,
+    },
+    b7_workflow: {
+      status: 'NOT_PRESENTED', presentation: null, decision: null,
+      basis_current: false, blocked_reasons: [], accountant_ref: 'ACC-01',
+      approver_ref: 'APR-01',
+    },
+    ...overrides,
+  });
+}
+
+test('R2.4: linked B7 kế toán không thấy form quyết định/chi generic', () => {
+  render(<ActionsPanel view={linkedB7View()} role="ACCOUNTANT" actorId="ACC-01"
+    decisionId="D-1" reportReady onAction={noop} />);
+  expect(screen.getByTestId('b7-approval-panel')).toBeInTheDocument();
+  // Generic W05 forms are blocked by the backend for linked B7 → not rendered.
+  expect(screen.queryByTestId('money-summary')).not.toBeInTheDocument();
+  expect(screen.queryByText('Ghi sự kiện tiền')).not.toBeInTheDocument();
+  expect(screen.queryByText('Quyết định (người duyệt)')).not.toBeInTheDocument();
+  expect(screen.queryByText('Đóng hồ sơ')).not.toBeInTheDocument();
+  expect(screen.queryByText(/Bàn giao thủ quỹ/)).not.toBeInTheDocument();
+});
+
+test('R2.4: legacy B7 (không link) vẫn giữ generic lifecycle', () => {
+  render(<ActionsPanel view={makeView()} role="ACCOUNTANT" actorId="ACC-01"
+    decisionId="D-1" reportReady onAction={noop} />);
+  expect(screen.getByTestId('money-summary')).toBeInTheDocument();
+  expect(screen.getByText('Ghi sự kiện tiền')).toBeInTheDocument();
+});

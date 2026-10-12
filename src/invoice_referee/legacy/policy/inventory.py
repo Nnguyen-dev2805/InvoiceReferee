@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP, localcontext
 
-from invoice_referee.domain.models import (
+from invoice_referee.legacy.domain.models import (
     CheckResult,
     DocumentFacts,
     EvidenceBundle,
@@ -27,8 +27,8 @@ from invoice_referee.domain.models import (
     PolicyConfig,
     SourceRegistry,
 )
-from invoice_referee.policy.numeric import DECIMAL_CONTEXT, UNIT_FACTORS
-from invoice_referee.policy.quality import derive_fact
+from invoice_referee.legacy.policy.numeric import DECIMAL_CONTEXT, UNIT_FACTORS
+from invoice_referee.legacy.policy.quality import derive_fact
 
 _PROFILE_REQUIRES_RECEIPT = {'WORK_PURCHASE'}
 

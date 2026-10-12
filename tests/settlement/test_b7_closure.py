@@ -283,6 +283,22 @@ def test_handoff_same_key_replays(approved_linked_b7):
     assert replay.idempotent_replay is True
 
 
+def test_handoff_blocks_material_source_added_after_approval(approved_linked_b7):
+    from invoice_referee.settlement.models import Upload
+    svc, child, report, decision = approved_linked_b7
+    expense_id = report.expense_rows[0].expense_id
+    svc.add_source(child.id, Upload(filename="changed-cost.txt",
+        content=f"fact CHANGED expense.{expense_id}.amount 6000000\n".encode()),
+        command("changed", "NV-DEMO-01", "EMPLOYEE",
+                svc.get_case(child.id).case_version))
+    view = svc.get_case(child.id)
+    assert view.b7_workflow.basis_current is False
+    with pytest.raises(DomainError) as error:
+        svc.handoff_b7(child.id, {"decision_id": decision.id, "reason": "Bàn giao"},
+            command("handoff-new", "ACC-DEMO-01", "ACCOUNTANT", view.case_version))
+    assert error.value.code == "BASIS_STALE"
+
+
 # --- regression: generic guard stays blocked, races, history parsing ---------
 
 def test_generic_close_and_handoff_remain_blocked_linked(approved_linked_b7):
@@ -336,3 +352,115 @@ def test_history_parses_after_closure(approved_linked_b7):
     assert any(e.operation == "B7_CLOSE" for e in entries)
     assert any(e.operation == "B7_RECORD_MONEY" for e in entries)
 
+
+
+# --- R1.4 regression matrix ---------------------------------------------------
+
+def test_same_totals_but_changed_cost_source_needs_recheck(approved_linked_b7):
+    """Same E/T/B numbers but a changed cost source/relations → NEEDS_RECHECK.
+
+    The cost basis is compared by the full signature, not by totals, so an
+    equal total must not waive a changed cost evidence/relations.
+    """
+    svc, child, report, decision = approved_linked_b7
+    expense_id = report.expense_rows[0].expense_id
+    # A new cost fact for the same expense changes the cost signature while the
+    # employee total stays 5.0M (the original amount is superseded by the doc).
+    svc.add_source(child.id,
+        __import__("invoice_referee.settlement.models", fromlist=["Upload"]).Upload(
+            filename="restated-cost.txt",
+            content=f"fact CHANGED expense.{expense_id}.amount 5000000\n".encode()),
+        command("restate", "NV-DEMO-01", "EMPLOYEE",
+                svc.get_case(child.id).case_version))
+    child = svc.get_case(child.id)
+    run = svc.start(child.id,
+        command("run-restate", "NV-DEMO-01", "EMPLOYEE", child.case_version))
+    assert svc.wait(run.id).status == "SUCCEEDED"
+    child = svc.get_case(child.id)
+    reval = svc.revalidate_b7(child.id,
+        command("reval-restate", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
+    assert reval.status == "NEEDS_RECHECK"
+
+
+def test_handoff_reuse_requires_same_receipt_history(approved_linked_b7):
+    """Same remaining amount with a different receipt history is a new handoff.
+
+    The obligation signature binds cost basis + receipt history, so a new
+    receipt that keeps the same remaining is not a silent reuse.
+    """
+    svc, child, report, decision = approved_linked_b7
+    _receipt(svc, child, decision, 1_000_000, "TX-1", "1")
+    child = svc.get_case(child.id)
+    first = svc.handoff_b7(child.id,
+        {"decision_id": decision.id, "reason": "Bàn giao phần còn lại"},
+        command("ho-a", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
+    assert first.remaining_vnd == 2_000_000
+    # A different, additional receipt changes the receipt history.
+    _receipt(svc, child, decision, 1_000_000, "TX-2", "2")
+    child = svc.get_case(child.id)
+    second = svc.handoff_b7(child.id,
+        {"decision_id": decision.id, "reason": "Bàn giao phần còn lại"},
+        command("ho-b", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
+    assert second.id != first.id
+    assert second.remaining_vnd == 1_000_000
+    assert second.receipt_history_signature != first.receipt_history_signature
+
+
+def test_noop_handoff_key_replay_then_conflict(approved_linked_b7):
+    """A no-op handoff registers its command: same key replays, other body 409."""
+    svc, child, report, decision = approved_linked_b7
+    _receipt(svc, child, decision, 1_000_000, "TX-1", "1")
+    child = svc.get_case(child.id)
+    body = {"decision_id": decision.id, "reason": "Bàn giao phần còn lại"}
+    first = svc.handoff_b7(child.id, body,
+        command("noop-ho", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
+    # Same key + same body → idempotent replay.
+    replay = svc.handoff_b7(child.id, body,
+        command("noop-ho", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
+    assert replay.id == first.id
+    assert replay.idempotent_replay is True
+    # Same key + different body → IDEMPOTENCY_CONFLICT (registry bound it).
+    child = svc.get_case(child.id)
+    with pytest.raises(DomainError) as exc:
+        svc.handoff_b7(child.id,
+            {"decision_id": decision.id, "reason": "Lý do khác"},
+            command("noop-ho", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
+    assert exc.value.code == "IDEMPOTENCY_CONFLICT"
+
+
+def test_handoff_after_revalidation_valid_when_basis_moved(approved_linked_b7):
+    """Duyệt3→receipt1→refresh/rerun/revalidate VALID → handoff remaining2."""
+    svc, child, report, decision = approved_linked_b7
+    _receipt(svc, child, decision, 1_000_000, "TX-1", "1")
+    _refresh_rerun_revalidate(svc, child.id, "1")
+    child = svc.get_case(child.id)
+    handoff = svc.handoff_b7(child.id,
+        {"decision_id": decision.id, "reason": "Bàn giao phần còn lại"},
+        command("ho-valid", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
+    assert handoff.remaining_vnd == 2_000_000
+    assert handoff.direction == "PAY_EMPLOYEE"
+    # The original approval is unchanged (still 3.0M, same decision).
+    view = svc.get_case(child.id)
+    assert view.b7_workflow.decision.id == decision.id
+    assert view.b7_workflow.decision.target.amount_vnd == 3_000_000
+
+
+def test_old_revalidation_badge_does_not_authorize_after_source_change(
+        approved_linked_b7):
+    """A VALID revalidation is not enough once a material source changes later."""
+    from invoice_referee.settlement.models import Upload
+    svc, child, report, decision = approved_linked_b7
+    _receipt(svc, child, decision, 1_000_000, "TX-1", "1")
+    _refresh_rerun_revalidate(svc, child.id, "1")
+    # Material cost source changes after the revalidation.
+    expense_id = report.expense_rows[0].expense_id
+    svc.add_source(child.id, Upload(filename="post-reval.txt",
+        content=f"fact LATE expense.{expense_id}.amount 6000000\n".encode()),
+        command("late", "NV-DEMO-01", "EMPLOYEE",
+                svc.get_case(child.id).case_version))
+    child = svc.get_case(child.id)
+    with pytest.raises(DomainError) as exc:
+        svc.handoff_b7(child.id,
+            {"decision_id": decision.id, "reason": "Bàn giao phần còn lại"},
+            command("ho-late", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
+    assert exc.value.code == "BASIS_STALE"

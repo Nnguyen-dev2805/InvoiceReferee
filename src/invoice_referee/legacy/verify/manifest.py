@@ -15,7 +15,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from invoice_referee.domain.models import Claim
+from invoice_referee.legacy.domain.models import Claim
 
 EvaluationMode = Literal['POLICY_REPLAY', 'PIPELINE_FAKE_OR_REPLAY', 'LIVE_END_TO_END']
 Verdict = Literal['PASS', 'FAIL', 'INCONCLUSIVE']

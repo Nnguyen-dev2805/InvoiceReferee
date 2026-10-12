@@ -42,7 +42,7 @@ from decimal import Decimal, InvalidOperation
 
 from pydantic import ValidationError
 
-from invoice_referee.domain.models import (
+from invoice_referee.legacy.domain.models import (
     Authorization,
     CaseSnapshot,
     Claim,

@@ -33,8 +33,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
-from invoice_referee.config import snapshot_hash
-from invoice_referee.domain.models import (
+from invoice_referee.legacy.config import snapshot_hash
+from invoice_referee.legacy.domain.models import (
     AuditEvent,
     Authorization,
     CaseRecord,
@@ -53,9 +53,15 @@ from invoice_referee.domain.models import (
     StoppedRun,
     Upload,
 )
-from invoice_referee.storage.artifacts import put_artifact, safe_name
 
 SCHEMA_PATH = Path(__file__).with_name('schema.sql')
+
+
+def _artifacts():
+    # Resolve the public shim lazily to avoid an import cycle and to honour
+    # test monkeypatches of ``invoice_referee.storage.repository.put_artifact``.
+    from invoice_referee.storage import repository as public_repo
+    return public_repo
 
 # Bump when a structural change makes an older local DB incompatible. There is no
 # migration framework; the repository asserts this on open so a dev DB created by
@@ -240,7 +246,7 @@ class Repository:
     @staticmethod
     def _safe_upload_name(original_name: str) -> str:
         base = original_name.replace('\\', '/').rsplit('/', 1)[-1]
-        return safe_name(base)
+        return _artifacts().safe_name(base)
 
     def _validate_intake(self, claim: Claim, uploads: list[Upload]) -> None:
         # A meaningful expense input needs real content, not just employee
@@ -301,7 +307,7 @@ class Repository:
         try:
             for upload, digest, size in staged:
                 name = self._safe_upload_name(upload.original_name)
-                path = put_artifact(self._artifact_root, case_id, 'evidence', name, upload.content)
+                path = _artifacts().put_artifact(self._artifact_root, case_id, 'evidence', name, upload.content)
                 written.append(path)
                 evidence_rows.append(Evidence(
                     id=f'ev-{uuid.uuid4().hex}', case_id=case_id, role=upload.role,
@@ -382,7 +388,7 @@ class Repository:
                         continue
                     seen.add(digest)
                     name = self._safe_upload_name(upload.original_name)
-                    path = put_artifact(
+                    path = _artifacts().put_artifact(
                         self._artifact_root, case_id, 'evidence', name, upload.content)
                     written.append(path)
                     evidence = Evidence(

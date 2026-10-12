@@ -95,8 +95,8 @@ def make_ready_linked(svc, parent, monkeypatch, *,
     #    child's server clocks are pinned to the synthetic settlement clock so
     #    a receipt at 14Oct08h+07 is inside the child's money_as_of window.
     svc.config = svc.config.model_copy(update={"b7_context": b7_config()})
-    import invoice_referee.settlement.store as store_module
-    monkeypatch.setattr(store_module, "utcnow", lambda: SETTLEMENT_CLOCK)
+    import invoice_referee.shared.clock as clock_module
+    monkeypatch.setattr(clock_module, "utcnow", lambda: SETTLEMENT_CLOCK)
     child = _linked_child(svc, svc.get_case(parent.id))
 
     # 3. Employee declares the actual hotel expense (5M, BUSINESS, PERSONAL

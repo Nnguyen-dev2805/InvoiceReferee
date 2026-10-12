@@ -14,9 +14,9 @@ import { SourceUploadPanel } from './SourceUploadPanel';
 import { VerifyPanel } from './Verify';
 import { summarizeCase } from './uiState';
 import { historyKindLabel } from './uiCopy';
+import { useCaseWorkspace } from './useCaseWorkspace';
 import type {
-  B3DemoContext, B3Intake, B3RunContext, AuditEntry, CaseStage, CaseSummary,
-  CaseView, DemoRole, Job, QuestionView, Report, RunView,
+  B3DemoContext, B3Intake, CaseStage, CaseSummary, DemoRole, Job,
 } from './types';
 
 const STAGE_LABELS: Record<CaseStage, string> = {
@@ -80,13 +80,20 @@ export function App() {
   const [role, setRole] = useState<DemoRole>('EMPLOYEE');
   const [actorId, setActorId] = useState('NV-01');
   const [cases, setCases] = useState<CaseSummary[]>([]);
-  const [view, setView] = useState<CaseView | null>(null);
-  const [history, setHistory] = useState<AuditEntry[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [run, setRun] = useState<RunView | null>(null);
-  const [report, setReport] = useState<Report | null>(null);
-  const [questions, setQuestions] = useState<QuestionView[]>([]);
-  const [b3RunContext, setB3RunContext] = useState<B3RunContext | null>(null);
+  // The workspace hook owns the verified load/poll lifecycle (view/run/report/
+  // questions/history/b3Context) with a request generation, so a late response
+  // for case A cannot overwrite case B.
+  const {
+    workspace, error: workspaceError, load: loadWorkspace,
+  } = useCaseWorkspace(selectedCaseId);
+  const view = workspace?.view ?? null;
+  const history = workspace?.history ?? [];
+  const run = workspace?.run ?? null;
+  const report = workspace?.report ?? null;
+  const questions = workspace?.questions ?? [];
+  const b3RunContext = workspace?.b3Context ?? null;
 
   const [job, setJob] = useState<Job>('B7');
   const [employeeRef, setEmployeeRef] = useState('NV-01');
@@ -170,11 +177,9 @@ export function App() {
     if (!files) return;
     const incoming = Array.from(files);
     if (incoming.length === 0) return;
-    setImportFiles((prev) => {
-      const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`));
-      const newUnique = incoming.filter((f) => !existingKeys.has(`${f.name}-${f.size}`));
-      return [...prev, ...newUnique];
-    });
+    // Append every selected file: same name+size does not prove same bytes, so
+    // dropping one would silently lose a real document.
+    setImportFiles((prev) => [...prev, ...incoming]);
   };
 
   const handleRemoveImportFile = (index: number) => {
@@ -196,7 +201,7 @@ export function App() {
     }
     try {
       await api.deleteCase(id);
-      if (view?.id === id) setView(null);
+      if (view?.id === id) setSelectedCaseId(null);
       await loadCases();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không xoá được hồ sơ.');
@@ -204,57 +209,41 @@ export function App() {
   };
 
   const loadCase = useCallback(async (id: string) => {
-    try {
-      const next = await api.getCase(id);
-      setView(next);
-      setHistory(await api.getHistory(id));
-      setReport(null);
-      setRun(null);
-      setB3RunContext(null);
-      const qs = await api.getQuestions(id);
-      setQuestions(qs);
-      let nextReport: Report | null = null;
-      if (next.current_run_id) {
-        const currentRun = await api.getRun(next.current_run_id);
-        setRun(currentRun);
-        if (currentRun.status === 'SUCCEEDED') {
-          nextReport = await api.getReport(currentRun.id);
-          setReport(nextReport);
-          if (nextReport.b3) {
-            setB3RunContext(await api.getB3RunContext(currentRun.id));
-          }
-        }
-      }
-      setRevisePurpose(String(next.submission.form.purpose ?? ''));
-      setReviseScope(String(next.submission.form.scope ?? ''));
-      setReviseReason('');
+    // Select the case (drives the workspace hook) and await the guarded load so
+    // callers can read the committed workspace right after.
+    setSelectedCaseId(id);
+    await loadWorkspace(id);
+  }, [loadWorkspace]);
 
-      const b3Form = isB3V1Form(next.submission.form)
-        ? (next.submission.form as unknown as B3Intake)
-        : null;
-      const isUnconfirmedDraft = b3Form !== null
-        && !b3Form.confirmed
-        && !b3Form.destination
-        && !b3Form.purpose
-        && (!b3Form.estimate_rows || b3Form.estimate_rows.length === 0);
-      const draftToUse = isUnconfirmedDraft && nextReport?.b3?.intake
-        ? { ...nextReport.b3.intake, confirmed: false }
-        : b3Form;
-      setB3ReviseIntake(draftToUse);
-      setB3ReviseReason('');
-
-      if (qs.length > 0) {
-        setCaseTab('questions');
-      } else if (b3Form && !b3Form.confirmed) {
-        setCaseTab('draft');
-      } else {
-        setCaseTab('report');
-      }
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không tải được hồ sơ.');
+  // Derive the tab + revise/draft fields from the committed workspace (so a
+  // case switch resets them consistently with the loaded data).
+  useEffect(() => {
+    if (!workspace) return;
+    const next = workspace.view;
+    setRevisePurpose(String(next.submission.form.purpose ?? ''));
+    setReviseScope(String(next.submission.form.scope ?? ''));
+    setReviseReason('');
+    const b3Form = isB3V1Form(next.submission.form)
+      ? (next.submission.form as unknown as B3Intake)
+      : null;
+    const isUnconfirmedDraft = b3Form !== null
+      && !b3Form.confirmed
+      && !b3Form.destination
+      && !b3Form.purpose
+      && (!b3Form.estimate_rows || b3Form.estimate_rows.length === 0);
+    const draftToUse = isUnconfirmedDraft && workspace.report?.b3?.intake
+      ? { ...workspace.report.b3.intake, confirmed: false }
+      : b3Form;
+    setB3ReviseIntake(draftToUse);
+    setB3ReviseReason('');
+    if (workspace.questions.length > 0) {
+      setCaseTab('questions');
+    } else if (b3Form && !b3Form.confirmed) {
+      setCaseTab('draft');
+    } else {
+      setCaseTab('report');
     }
-  }, []);
+  }, [workspace]);
 
   useEffect(() => {
     void loadCases();
@@ -337,8 +326,8 @@ export function App() {
         actor_id: actorId.trim(),
         demo_role: role,
       });
-      setView(created);
-      setHistory(await api.getHistory(created.id));
+      setSelectedCaseId(created.id);
+      await loadCase(created.id);
       setRevisePurpose(purpose.trim());
       setReviseScope(scope.trim());
       setError(null);
@@ -368,12 +357,8 @@ export function App() {
     setIsCreatingB3(true);
     try {
       const created = await api.createB3Case(b3PersonaRef || actorId.trim(), intake);
-      setView(created);
-      setHistory(await api.getHistory(created.id));
-      setReport(null);
-      setRun(null);
-      setB3RunContext(null);
-      setQuestions([]);
+      setSelectedCaseId(created.id);
+      await loadCase(created.id);
       setError(null);
       await loadCases();
       if (b3Method === 'WEB') {
@@ -546,25 +531,6 @@ export function App() {
     }
   };
 
-  useEffect(() => {
-    if (!run || !runActive) return;
-    const timer = setInterval(async () => {
-      try {
-        const next = await api.getRun(run.id);
-        setRun(next);
-        if (next.status === 'SUCCEEDED') {
-          await loadCase(next.case_id);  // làm mới case_version + report + questions
-        } else if (next.status !== 'QUEUED' && next.status !== 'RUNNING' && next.detail) {
-          setError(`Run kết thúc với ${next.status}: ${next.detail}`);
-          await loadCase(next.case_id);
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Không theo dõi được run.');
-      }
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [run?.id, runActive]);
-
   const canStartRun = view !== null
     && view.allowed_actions.some((a) => a.action === 'START_RUN')
     && !runActive;
@@ -651,6 +617,9 @@ export function App() {
       </header>
 
       {error && <div className="notice notice-error" role="alert">{error}</div>}
+      {workspaceError && !error && (
+        <div className="notice notice-error" role="alert">{workspaceError}</div>
+      )}
 
       <div className="grid grid-master-detail">
         {/* ==================================================================
@@ -668,10 +637,7 @@ export function App() {
               }`}
               style={{ width: '100%', justifyContent: 'center', gap: '6px' }}
               onClick={() => {
-                setView(null);
-                setReport(null);
-                setRun(null);
-                setB3RunContext(null);
+                setSelectedCaseId(null);
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

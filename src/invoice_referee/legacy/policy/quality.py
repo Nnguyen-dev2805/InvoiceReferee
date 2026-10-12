@@ -24,7 +24,7 @@ from typing import Sequence
 
 from pydantic import ValidationError
 
-from invoice_referee.domain.models import (
+from invoice_referee.legacy.domain.models import (
     DomainError,
     FieldFact,
     HumanAction,
@@ -33,7 +33,7 @@ from invoice_referee.domain.models import (
     SourceRegistry,
     SourceWord,
 )
-from invoice_referee.policy.numeric import DECIMAL_CONTEXT
+from invoice_referee.legacy.policy.numeric import DECIMAL_CONTEXT
 
 _VERIFICATION_READINGS = ('UNREADABLE', 'UNKNOWN')
 

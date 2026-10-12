@@ -12,9 +12,9 @@ import threading
 import uuid
 from pathlib import Path
 
-from invoice_referee.application.service import CaseService
-from invoice_referee.verify.manifest import VerifyJob, VerifyManifest, VerifyReport
-from invoice_referee.verify.runner import VerifyRunner
+from invoice_referee.legacy.application.service import CaseService
+from invoice_referee.legacy.verify.manifest import VerifyJob, VerifyManifest, VerifyReport
+from invoice_referee.legacy.verify.runner import VerifyRunner
 
 
 class VerifyJobs:
@@ -41,7 +41,7 @@ class VerifyJobs:
         with self._lock:
             job = self._jobs.get(job_id)
         if job is None:
-            from invoice_referee.domain.models import DomainError
+            from invoice_referee.legacy.domain.models import DomainError
 
             raise DomainError('NOT_FOUND', f'Không tìm thấy verify job {job_id}.')
         return job

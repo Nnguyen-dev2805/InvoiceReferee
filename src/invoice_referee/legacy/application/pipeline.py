@@ -37,7 +37,7 @@ import time
 from decimal import Decimal
 from typing import Callable
 
-from invoice_referee.domain.models import (
+from invoice_referee.legacy.domain.models import (
     AnalysisRequest,
     CaseSnapshot,
     CheckResult,
@@ -55,10 +55,10 @@ from invoice_referee.domain.models import (
     StageIdentity,
     StoppedRun,
 )
-from invoice_referee.extraction.providers import Providers, registry_from_ocr
-from invoice_referee.extraction.validation import NUMERIC_FIELDS, is_applicable
-from invoice_referee.policy.decision import evaluate
-from invoice_referee.policy.quality import derive_fact
+from invoice_referee.legacy.extraction.providers import Providers, registry_from_ocr
+from invoice_referee.legacy.extraction.validation import NUMERIC_FIELDS, is_applicable
+from invoice_referee.legacy.policy.decision import evaluate
+from invoice_referee.legacy.policy.quality import derive_fact
 
 # Declarations that ground a REJECT before any provider call (Rulebook §3).
 _REFUSAL_PAYERS = ('COMPANY', 'ADVANCE', 'VENDOR')

@@ -23,21 +23,21 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from invoice_referee.application.service import CaseService
-from invoice_referee.domain.models import (
+from invoice_referee.legacy.application.service import CaseService
+from invoice_referee.legacy.domain.models import (
     DocumentFacts,
     EvidenceBundle,
     MappingProposal,
     SourceRegistry,
     Upload,
 )
-from invoice_referee.verify.manifest import (
+from invoice_referee.legacy.verify.manifest import (
     VerifyCase,
     VerifyManifest,
     VerifyReport,
     VerifyResult,
 )
-from invoice_referee.verify.replay import ReplayProviders
+from invoice_referee.legacy.verify.replay import ReplayProviders
 
 _TERMINAL = {'SUCCEEDED', 'FAILED', 'STOPPED'}
 
@@ -62,7 +62,7 @@ class VerifyRunner:
             if hasattr(self._service, 'release_reservation'):
                 self._service.release_reservation(reservation)
 
-        from invoice_referee.verify.metrics import summarize
+        from invoice_referee.legacy.verify.metrics import summarize
 
         finished_at = datetime.now(timezone.utc)
         return VerifyReport(

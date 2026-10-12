@@ -273,13 +273,13 @@ test('Task 4: bảng đối chiếu nghiệp vụ B3 hiển thị 4 dòng nghi�
   const row3 = screen.getByTestId('cross-check-trip');
   expect(row3.textContent).toContain('Thông tin chuyến đi giữa hai giấy');
   expect(row3.textContent).toContain('Khớp thông tin chuyến đi');
-  expect(row3.textContent).toContain('Xem hai giấy');
+  expect(row3.textContent).toContain('Xem căn cứ');
 
   // Dòng 4: Loại chứng từ & Phân vai hồ sơ
   const row4 = screen.getByTestId('cross-check-role');
   expect(row4.textContent).toContain('Loại chứng từ & Phân vai hồ sơ');
   expect(row4.textContent).toContain('Đầy đủ 2 chứng từ theo quy định');
-  expect(row4.textContent).toContain('Xem hồ sơ nguồn');
+  expect(row4.textContent).toContain('Xem căn cứ');
 
   // Critical facts nằm trong accordion collapsible
   const accordion = screen.getByTestId('critical-facts-accordion');
@@ -304,6 +304,41 @@ test('Task 4: đối chiếu nghiệp vụ phản ánh đúng trạng thái khi 
 
   const row3 = screen.getByTestId('cross-check-trip');
   expect(row3.textContent).toContain('Cần làm rõ');
+});
+
+test('R2.2: thiếu check/refs thì nói chưa có kết quả, không tự PASS', () => {
+  const b3Report = makeB3Report();
+  // No checks and no critical facts: the table must not invent PASS or refs.
+  b3Report.checks = [];
+  b3Report.critical_facts = [];
+  b3Report.source_refs = [];
+  render(<ReportPanel report={b3Report} sources={[
+    { id: 'S-1', filename: 'de_nghi.pdf', media_type: 'application/pdf', sha256: 'h1', size_bytes: 100, status: 'ACCEPTED', uploader_actor_id: 'NV-1', received_at: '', supersedes_source_id: null, provenance: {} },
+    { id: 'S-2', filename: 'du_toan.pdf', media_type: 'application/pdf', sha256: 'h2', size_bytes: 100, status: 'ACCEPTED', uploader_actor_id: 'NV-1', received_at: '', supersedes_source_id: null, provenance: {} },
+  ]} />);
+  const table = screen.getByTestId('business-cross-check-table');
+  const text = table.textContent ?? '';
+  // Two same-looking files do NOT make the rows pass or fabricate a basis.
+  expect(text).toContain('Chưa có kết quả kiểm tra/căn cứ cho mục này');
+  expect(text).not.toContain('Khớp: 2.000.000 VND');
+  expect(text).not.toContain('Đầy đủ 2 chứng từ theo quy định');
+  // The row basis cells show "—" (no invented refs) but documents are still
+  // reachable via the general document links area.
+  expect(screen.getByTestId('cross-check-documents')).toBeTruthy();
+});
+
+test('R2.2: filename gây nhầm không tạo PASS cho vai chứng từ', () => {
+  const b3Report = makeB3Report();
+  b3Report.checks = [];
+  // Two sources with role-suggesting names but NO document.role fact.
+  b3Report.critical_facts = [];
+  render(<ReportPanel report={b3Report} sources={[
+    { id: 'S-1', filename: '01_giay_de_nghi_tam_ung.pdf', media_type: 'application/pdf', sha256: 'h1', size_bytes: 100, status: 'ACCEPTED', uploader_actor_id: 'NV-1', received_at: '', supersedes_source_id: null, provenance: {} },
+    { id: 'S-2', filename: '02_bang_du_toan.pdf', media_type: 'application/pdf', sha256: 'h2', size_bytes: 100, status: 'ACCEPTED', uploader_actor_id: 'NV-1', received_at: '', supersedes_source_id: null, provenance: {} },
+  ]} />);
+  const row4 = screen.getByTestId('cross-check-role');
+  expect(row4.textContent).toContain('Chưa có kết quả kiểm tra/căn cứ cho mục này');
+  expect(row4.textContent).not.toContain('Đầy đủ 2 chứng từ theo quy định');
 });
 
 test('Task 5: checklist chính sách hiển thị tiêu đề gọn gàng, mã tag nhỏ và không lặp lại reason', () => {

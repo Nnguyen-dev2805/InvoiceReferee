@@ -41,8 +41,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from invoice_referee.application.service import CaseService
-from invoice_referee.config import activate_demo_policy, load_policy
+from invoice_referee.legacy.application.service import CaseService
+from invoice_referee.legacy.config import activate_demo_policy, load_policy
 from invoice_referee.domain.models import (
     AuditEvent,
     CaseRecord,
@@ -57,10 +57,10 @@ from invoice_referee.domain.models import (
     Upload,
 )
 from invoice_referee.env import load_repo_env
-from invoice_referee.extraction.providers import FakeProviders, LiveProviders, Providers
-from invoice_referee.storage.repository import Repository
-from invoice_referee.verify.jobs import VerifyJobs
-from invoice_referee.verify.manifest import load_manifest
+from invoice_referee.legacy.extraction.providers import FakeProviders, LiveProviders, Providers
+from invoice_referee.legacy.storage.repository import Repository
+from invoice_referee.legacy.verify.jobs import VerifyJobs
+from invoice_referee.legacy.verify.manifest import load_manifest
 
 # DomainError.code -> HTTP status (brief step 2). A code outside this set is a
 # server-side contract gap, not a client error; default to 422 (input-shaped).
@@ -76,7 +76,7 @@ HTTP_CODES = {
     'OUT_OF_DOMAIN': 422,
 }
 
-_POLICY_PATH = Path(__file__).resolve().parents[3] / 'config' / 'demo-policy.json'
+_POLICY_PATH = Path(__file__).resolve().parents[4] / 'config' / 'demo-policy.json'
 _VALID_MODES = {'fake', 'live'}
 
 
@@ -416,10 +416,10 @@ def create_app(service: CaseService, *, provider_mode: str = 'fake') -> FastAPI:
 
 def _load_suite(body: VerifyRunBody):
     """Load + select the manifest for a verify request (no outcome by filename)."""
-    root = Path(__file__).resolve().parents[3]
+    root = Path(__file__).resolve().parents[4]
     default = root / 'tests' / 'fixtures' / 'development' / 'manifest.json'
     manifest = load_manifest(Path(body.manifest) if body.manifest else default)
-    from invoice_referee.verify.__main__ import SUITES
+    from invoice_referee.legacy.verify.__main__ import SUITES
 
     ids = SUITES[body.suite]
     cases = manifest.cases if ids is None else [c for c in manifest.cases if c.id in ids]
@@ -520,8 +520,10 @@ def create_runtime_app() -> FastAPI:
     a submitted case without a manual activation step.
     """
     # Load the repo `.env` before reading any config so an operator can start a
-    # live runtime from the file (an explicit export still wins).
-    load_repo_env()
+    # live runtime from the file (an explicit export still wins). Resolve through
+    # the public ``api.app`` shim so tests can monkeypatch it there.
+    from invoice_referee.api import app as _public_app
+    _public_app.load_repo_env()
     mode = _provider_mode()
     data_root = Path(os.environ.get('DATA_ROOT', 'data'))
     repo = Repository(data_root / 'cases.sqlite', data_root / 'artifacts')

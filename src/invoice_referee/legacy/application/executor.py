@@ -19,7 +19,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Semaphore
 from typing import Callable
 
-from invoice_referee.domain.models import DomainError
+from invoice_referee.legacy.domain.models import DomainError
 
 
 class RunExecutor:

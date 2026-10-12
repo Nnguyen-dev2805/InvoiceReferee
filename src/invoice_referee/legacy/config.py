@@ -21,7 +21,7 @@ import json
 import uuid
 from pathlib import Path
 
-from invoice_referee.domain.models import CaseSnapshot, DomainError, PolicyConfig
+from invoice_referee.legacy.domain.models import CaseSnapshot, DomainError, PolicyConfig
 
 DEMO_ACTIVATED_ORIGIN = 'developer_activated_demo'
 

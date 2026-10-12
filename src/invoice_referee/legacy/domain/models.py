@@ -389,18 +389,10 @@ class StopReply(Record):
 
 
 # --- Errors --------------------------------------------------------------------
-
-class DomainError(Exception):
-    """Machine-readable domain error: ``code`` is stable, ``message`` business-friendly."""
-
-    def __init__(self, code: str, message: str) -> None:
-        self.code = code
-        self.message = message
-        super().__init__(f'{code}: {message}')
-
-
-class StoppedRun(DomainError):
-    """Stop was acknowledged; no late business action may be applied."""
-
-    def __init__(self, message: str = 'Run stopped; no late business action applied.') -> None:
-        super().__init__('STOPPED', message)
+# Single identity: the class lives in ``shared.errors`` and is re-exported here
+# so existing ``from invoice_referee.legacy.domain.models import DomainError`` imports
+# keep resolving to the SAME class (no duplicate exception types).
+from invoice_referee.shared.errors import (  # noqa: E402  (re-export)
+    DomainError,
+    StoppedRun,
+)

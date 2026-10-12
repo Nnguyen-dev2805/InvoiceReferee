@@ -22,7 +22,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Iterable
 
-from invoice_referee.domain.models import (
+from invoice_referee.legacy.domain.models import (
     AnalysisRequest,
     DocumentFacts,
     DomainError,
@@ -31,7 +31,7 @@ from invoice_referee.domain.models import (
     SourceRef,
     SourceRegistry,
 )
-from invoice_referee.policy.quality import derive_fact
+from invoice_referee.legacy.policy.quality import derive_fact
 
 _VERIFICATION_READINGS = ('UNREADABLE', 'UNKNOWN')
 

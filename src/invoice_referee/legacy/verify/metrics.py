@@ -7,7 +7,7 @@ are also visible in the all-attempt coverage.
 """
 from __future__ import annotations
 
-from invoice_referee.verify.manifest import VerifyResult
+from invoice_referee.legacy.verify.manifest import VerifyResult
 
 _HUMAN_ACTIONS = {'REQUEST_INFO', 'ESCALATE'}
 _ROUTINE_ACTIONS = {'CREATE_PAYMENT_REQUEST'}

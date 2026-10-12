@@ -280,13 +280,20 @@ def _qualifying_sums(events: list[B7MoneyEventView]) -> dict[str, int]:
 def revalidate_b7_decision(decision: B7DecisionView, current_report: Report,
                            canonical_history: dict,
                            qualifying_events: list[B7MoneyEventView],
-                           current_cost_signature: str) -> B7RevalidationView:
+                           current_cost_signature: str,
+                           original_cost_signature: str | None = None
+                           ) -> B7RevalidationView:
     """Keep the original decision valid when only correct fulfillment changed.
 
-    The accepted cost basis (E/T/B) must be unchanged; the whole-history delta
-    (A/RA/P/RP) must equal exactly the canonical qualifying receipts, with no
-    extra advance/return. Anything else is NEEDS_RECHECK — the original decision
-    is never rewritten and the new report S does not become a new approval.
+    The accepted cost basis must be unchanged — not just E/T/B by number, but
+    the full server-derived cost signature (cost facts by owning-document hash,
+    eligibility, payer parts, relations, claims). ``original_cost_signature`` is
+    the signature recorded at decision time; a mismatch is NEEDS_RECHECK so an
+    equal total cannot waive a changed cost basis. A missing original signature
+    is never guessed VALID. The whole-history delta (A/RA/P/RP) must equal
+    exactly the canonical qualifying receipts, with no extra advance/return.
+    The original decision is never rewritten and the new report S does not
+    become a new approval.
     """
     reasons: list[str] = []
     qualifying_ids = [e.id for e in qualifying_events
@@ -309,6 +316,15 @@ def revalidate_b7_decision(decision: B7DecisionView, current_report: Report,
         return slot.value if slot.state == "KNOWN" \
             and isinstance(slot.value, int) and not isinstance(slot.value, bool) \
             else None
+
+    # Cost basis is compared by the full signature, not by E/T/B alone.
+    if original_cost_signature is None:
+        reasons.append(
+            "Thiếu cost signature gốc của quyết định; không thể xác nhận basis.")
+    elif current_cost_signature != original_cost_signature:
+        reasons.append(
+            "Basis chi phí đã đổi (nguồn/eligibility/payer/relations/claims); "
+            "không waive dù tổng tiền bằng.")
 
     e, t, b = known(components.e), known(components.t), known(components.b)
     if e is None or e != target.employee_cost_vnd:

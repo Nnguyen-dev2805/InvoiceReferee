@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from invoice_referee.domain.models import (
+from invoice_referee.legacy.domain.models import (
     CheckResult,
     DocumentFacts,
     FieldFact,
@@ -35,7 +35,7 @@ from invoice_referee.domain.models import (
     SourceRef,
     SourceRegistry,
 )
-from invoice_referee.policy.quality import derive_fact
+from invoice_referee.legacy.policy.quality import derive_fact
 
 # Required primary fields per profile (Rulebook §2). Purpose/trip are
 # declarations, not invoice facts.

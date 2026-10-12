@@ -56,6 +56,11 @@ export function ActionsPanel({
   // closure; backend cũng chặn bằng B3_REPORT_ONLY.
   const b3V1 = view.job === 'B3'
     || (view.submission.form as Record<string, unknown>)?.schema_version === 'b3-intake-v1';
+  // Linked B7 child dùng dedicated B7 panels; generic money/decision/handoff/
+  // closure của W05 bị backend chặn bằng LINKED_B7_REPORT_ONLY nên không render.
+  const linkedB7 = Boolean(view.linked_b7);
+  // Legacy B7 (standalone, no link) keeps the explicit generic lifecycle.
+  const legacyB7 = !b3V1 && !linkedB7;
 
   const suggestedAmount = report?.proposed_net_vnd !== null && report?.proposed_net_vnd !== undefined
     ? String(Math.abs(report.proposed_net_vnd))
@@ -222,7 +227,7 @@ export function ActionsPanel({
       )}
 
       {/* Tình trạng tiền chỉ áp dụng cho B7, ẩn trên B3 */}
-      {!b3V1 && (
+      {legacyB7 && (
         <>
           <h3>Tình trạng tiền</h3>
           <ul className="reasons" data-testid="money-summary">
@@ -272,7 +277,7 @@ export function ActionsPanel({
             /* ================= GIAO DIỆN KẾ TOÁN (KT01, KT02, KT03) ================= */
             <>
               {/* 1. Rà soát kế toán ưu tiên hàng đầu (B7; B3 dùng panel trình duyệt) */}
-              {!b3V1 && (
+              {legacyB7 && (
               <div className="field" id="accountant-review-section">
                 <h3>Rà soát kế toán (không phải phê duyệt)</h3>
                 <p className="muted" style={{ fontSize: '0.85rem' }}>
@@ -335,7 +340,7 @@ export function ActionsPanel({
               )}
 
               {/* 2. Cảnh báo quyền phê duyệt cho Kế toán (chỉ hiển thị cho B7; ẩn form quyết định của Approver khỏi góc nhìn Kế toán trên B3) */}
-              {!b3V1 && (
+              {legacyB7 && (
                 <div className="field" style={{ opacity: 0.85 }}>
                   <h3>Quyết định (người duyệt)</h3>
                   <p className="notice-warn" role="alert">
@@ -351,7 +356,7 @@ export function ActionsPanel({
 
 
               {/* 3. Sự kiện tiền thực tế (Biên nhận / Phiếu chi) - Chỉ hiện cho B7 */}
-              {!b3V1 && (
+              {legacyB7 && (
                 <div className="field">
                   <h3>Sự kiện tiền thực tế (Biên nhận / Phiếu chi)</h3>
                   <div style={{ padding: 'var(--space-3)', background: 'var(--color-muted, #f1f5f9)', borderRadius: 'var(--radius)', marginBottom: 'var(--space-3)', fontSize: '0.85rem' }}>
@@ -435,8 +440,9 @@ export function ActionsPanel({
                 </div>
               )}
             </>
-          ) : b3V1 ? (
-            /* ================= NGƯỜI DUYỆT B3 V1 ================= */
+          ) : (b3V1 || linkedB7) ? (
+            /* B3 v1 dùng B3ApprovalPanel; linked B7 dùng B7ApprovalPanel ở trên.
+               Không render form quyết định generic cho hai nhánh này. */
             null
           ) : (
             /* ================= GIAO DIỆN NGƯỜI DUYỆT (AP01, AP02, AP03) ================= */
@@ -561,7 +567,7 @@ export function ActionsPanel({
             </button>
           </div>
 
-          {canHandoff && !b3V1 && (
+          {canHandoff && legacyB7 && (
             <div className="field">
               <h3>Bàn giao thủ quỹ (stage A)</h3>
               <button className="btn"
@@ -578,7 +584,7 @@ export function ActionsPanel({
             </div>
           )}
 
-          {!b3V1 && (
+          {legacyB7 && (
           <div className="field">
             <h3>Đóng hồ sơ</h3>
             <label htmlFor="closure-kind">Kiểu đóng</label>

@@ -19,7 +19,7 @@ import re
 from decimal import Context, Decimal, localcontext
 from typing import Literal
 
-from invoice_referee.domain.models import DomainError
+from invoice_referee.legacy.domain.models import DomainError
 
 # Explicit 50-digit context; arithmetic must not inherit the ambient context.
 DECIMAL_CONTEXT = Context(prec=50)

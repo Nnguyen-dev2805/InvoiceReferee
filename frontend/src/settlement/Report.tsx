@@ -2,7 +2,7 @@
 // checks, issues with owner, and an explicit fake/replay mode label.
 // B3 v1 (b3-intake-v1) hiển thị section proposal thay bảng S — S quyết toán
 // không phải kết quả chính của bước đề nghị ứng (Product P2a).
-import type { B3Proposal, B3RunContext, Report, SourceView } from './types';
+import type { B3Proposal, B3RunContext, CheckResult, Report, SourceView } from './types';
 import { EvidenceLinks } from './EvidenceLinks';
 import { checkLabel, factLabel } from './uiCopy';
 
@@ -393,6 +393,52 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
   );
 }
 
+function CrossCheckRow({
+  testId, title, desc, status, pillClass, refs, refsLabel, refsNode,
+}: {
+  testId: string;
+  title: string;
+  desc: string;
+  status: string;
+  pillClass: string;
+  refs: string[];
+  refsLabel: string;
+  refsNode: (list: string[], label?: string) => React.ReactNode;
+}) {
+  return (
+    <tr data-testid={testId}>
+      <td>
+        <div className="fact-title-cell">
+          <span className="fact-title-main">{title}</span>
+          <span className="cross-check-desc">{desc}</span>
+        </div>
+      </td>
+      <td>
+        <span className={`fact-status-pill ${pillClass}`}>{status}</span>
+      </td>
+      <td>
+        {refs.length > 0 ? refsNode(refs, refsLabel) : '—'}
+      </td>
+    </tr>
+  );
+}
+
+// Rows only consume the backend's CheckResult / CriticalFact / field_refs and
+// the owning source ids. A missing result or ref is stated as "no result", never
+// invented from a filename, source count or index, and never shown as PASS.
+const NO_RESULT_TEXT = 'Chưa có kết quả kiểm tra/căn cứ cho mục này';
+
+function checkStatusText(check: CheckResult | undefined, pass: string,
+                         fail: string): { text: string; pill: string } {
+  if (!check) return { text: NO_RESULT_TEXT, pill: 'fact-status-unclear' };
+  if (check.status === 'PASS') return { text: pass, pill: 'fact-status-known' };
+  if (check.status === 'FAIL') return { text: fail, pill: 'fact-status-contradicted' };
+  if (check.status === 'NOT_APPLICABLE') {
+    return { text: 'Không áp dụng', pill: 'fact-status-na' };
+  }
+  return { text: 'Cần làm rõ', pill: 'fact-status-unclear' };
+}
+
 function BusinessCrossCheckTable({
   report,
   proposal,
@@ -405,153 +451,53 @@ function BusinessCrossCheckTable({
   refs: (list: string[], label?: string) => React.ReactNode;
 }) {
   const intake = proposal.intake;
+  // Only refs the backend actually produced for a row count as its basis.
+  const rowRefs = (...groups: (string[] | undefined)[]) => {
+    const out: string[] = [];
+    for (const group of groups) for (const id of group ?? []) out.push(id);
+    return out;
+  };
 
-  // Find document sources
-  const requestSource = sources.find((s) =>
-    s.id.toLowerCase().includes('req') ||
-    s.id.toLowerCase().includes('de-nghi') ||
-    s.filename.toLowerCase().includes('de_nghi') ||
-    s.filename.toLowerCase().includes('de-nghi')
-  );
-  const forecastSource = sources.find((s) =>
-    s.id.toLowerCase().includes('fc') ||
-    s.id.toLowerCase().includes('du-toan') ||
-    s.filename.toLowerCase().includes('du_toan') ||
-    s.filename.toLowerCase().includes('du-toan')
-  );
-
-  // Row 1: Số xin ứng và số bằng chữ
+  // Row 1: số xin ứng và số bằng chữ — from the backend check + field refs.
   const wordsCheck = report.checks.find((c) => c.rule === 'amount_words_consistency');
   const wordsFact = report.critical_facts.find((f) => f.key === 'advance.request.amount_words');
-  let row1StatusText = `Khớp: ${vnd(intake.request_amount_vnd)}`;
-  let row1PillClass = 'fact-status-known';
+  const row1 = checkStatusText(
+    wordsCheck, `Khớp: ${vnd(intake.request_amount_vnd)}`, 'Mâu thuẫn');
+  const row1Refs = rowRefs(wordsCheck?.refs, proposal.field_refs['request_amount_vnd'],
+                           wordsFact?.refs);
 
-  if (wordsCheck) {
-    if (wordsCheck.status === 'PASS') {
-      row1StatusText = `Khớp: ${vnd(intake.request_amount_vnd)}`;
-      row1PillClass = 'fact-status-known';
-    } else if (wordsCheck.status === 'FAIL') {
-      row1StatusText = 'Mâu thuẫn';
-      row1PillClass = 'fact-status-contradicted';
-    } else if (wordsCheck.status === 'NOT_APPLICABLE') {
-      row1StatusText = 'Không áp dụng (không có chữ)';
-      row1PillClass = 'fact-status-na';
-    } else {
-      row1StatusText = 'Cần làm rõ';
-      row1PillClass = 'fact-status-unclear';
-    }
-  } else if (wordsFact && wordsFact.state === 'CONTRADICTED') {
-    row1StatusText = 'Mâu thuẫn';
-    row1PillClass = 'fact-status-contradicted';
-  } else if (wordsFact && wordsFact.state === 'UNCLEAR') {
-    row1StatusText = 'Cần làm rõ';
-    row1PillClass = 'fact-status-unclear';
-  }
-
-  const row1RefsCandidates = [
-    ...(wordsCheck?.refs ?? []),
-    ...(proposal.field_refs['request_amount_vnd'] ?? []),
-    ...(wordsFact?.refs ?? []),
-  ];
-  const row1Refs = row1RefsCandidates.length > 0
-    ? row1RefsCandidates
-    : requestSource
-      ? [requestSource.id]
-      : (report.source_refs[0] ? [report.source_refs[0]] : []);
-
-  // Row 2: Tổng dự toán và chi tiết các dòng
+  // Row 2: tổng dự toán và các dòng — from the arithmetic check + field refs.
   const arithCheck = report.checks.find((c) => c.rule === 'estimate_arithmetic');
   const totalFact = report.critical_facts.find((f) => f.key === 'forecast.total');
-  let row2StatusText = `Khớp: ${vnd(proposal.forecast_total_vnd)}`;
-  let row2PillClass = 'fact-status-known';
+  const row2 = checkStatusText(
+    arithCheck, `Khớp: ${vnd(proposal.forecast_total_vnd)}`, 'Lệch phép tính');
+  const row2Refs = rowRefs(arithCheck?.refs, proposal.field_refs['forecast_total_vnd'],
+                           totalFact?.refs);
 
-  if (arithCheck) {
-    if (arithCheck.status === 'PASS') {
-      row2StatusText = `Khớp: ${vnd(proposal.forecast_total_vnd)}`;
-      row2PillClass = 'fact-status-known';
-    } else if (arithCheck.status === 'FAIL') {
-      row2StatusText = 'Lệch phép tính';
-      row2PillClass = 'fact-status-contradicted';
-    } else {
-      row2StatusText = 'Cần làm rõ';
-      row2PillClass = 'fact-status-unclear';
-    }
-  } else if (totalFact && totalFact.state === 'CONTRADICTED') {
-    row2StatusText = 'Lệch phép tính';
-    row2PillClass = 'fact-status-contradicted';
-  } else if (proposal.forecast_total_vnd === null || proposal.forecast_total_vnd === undefined) {
-    row2StatusText = 'Cần làm rõ';
-    row2PillClass = 'fact-status-unclear';
-  }
-
-  const row2RefsCandidates = [
-    ...(arithCheck?.refs ?? []),
-    ...(proposal.field_refs['forecast_total_vnd'] ?? []),
-    ...(totalFact?.refs ?? []),
-  ];
-  const row2Refs = row2RefsCandidates.length > 0
-    ? row2RefsCandidates
-    : forecastSource
-      ? [forecastSource.id]
-      : (report.source_refs.find((r) => r.toLowerCase().includes('fc') || r.toLowerCase().includes('du-toan'))
-         ? [report.source_refs.find((r) => r.toLowerCase().includes('fc') || r.toLowerCase().includes('du-toan'))!]
-         : (report.source_refs[1] ? [report.source_refs[1]] : (report.source_refs[0] ? [report.source_refs[0]] : [])));
-
-  // Row 3: Thông tin chuyến đi giữa hai giấy
+  // Row 3: trip info between documents — from the relation check.
   const relationCheck = report.checks.find((c) => c.rule === 'proposal_relation');
-  let row3StatusText = 'Khớp thông tin chuyến đi';
-  let row3PillClass = 'fact-status-known';
+  const row3 = checkStatusText(relationCheck, 'Khớp thông tin chuyến đi', 'Cần làm rõ');
+  const row3Refs = rowRefs(relationCheck?.refs);
 
-  if (relationCheck) {
-    if (relationCheck.status === 'PASS') {
-      row3StatusText = 'Khớp thông tin chuyến đi';
-      row3PillClass = 'fact-status-known';
-    } else {
-      row3StatusText = 'Cần làm rõ';
-      row3PillClass = 'fact-status-unclear';
-    }
-  } else if (!intake.destination) {
-    row3StatusText = 'Cần làm rõ';
-    row3PillClass = 'fact-status-unclear';
-  }
-
-  const row3RefsCandidates = relationCheck?.refs?.length
-    ? relationCheck.refs
-    : [
-        ...(requestSource ? [requestSource.id] : []),
-        ...(forecastSource ? [forecastSource.id] : []),
-      ];
-  const row3Refs = row3RefsCandidates.length > 0
-    ? row3RefsCandidates
-    : report.source_refs.slice(0, 2);
-
-  // Row 4: Loại chứng từ & Phân vai hồ sơ
+  // Row 4: document role — from the role critical fact only. A source count of
+  // >=2 or two guessed files is NOT proof of the required document roles.
   const roleFact = report.critical_facts.find((f) => f.key === 'document.role');
-  let row4StatusText = 'Đầy đủ 2 chứng từ theo quy định';
-  let row4PillClass = 'fact-status-known';
-
-  const roleStr = roleFact?.value ? String(roleFact.value) : '';
-  const hasBothRoles = (roleStr.includes('ADVANCE_REQUEST') && roleStr.includes('FORECAST'))
-    || (requestSource && forecastSource)
-    || (report.source_refs.length >= 2);
-
-  if (roleFact && roleFact.state === 'CONTRADICTED') {
-    row4StatusText = 'Mâu thuẫn phân vai chứng từ';
-    row4PillClass = 'fact-status-contradicted';
-  } else if (!hasBothRoles && report.completion === 'INCOMPLETE') {
-    row4StatusText = 'Cần bổ sung';
-    row4PillClass = 'fact-status-unclear';
-  } else {
-    row4StatusText = 'Đầy đủ 2 chứng từ theo quy định';
-    row4PillClass = 'fact-status-known';
+  let row4 = { text: NO_RESULT_TEXT, pill: 'fact-status-unclear' };
+  if (roleFact) {
+    if (roleFact.state === 'CONTRADICTED') {
+      row4 = { text: 'Mâu thuẫn phân vai chứng từ', pill: 'fact-status-contradicted' };
+    } else if (roleFact.state === 'KNOWN') {
+      const roleStr = roleFact.value ? String(roleFact.value) : '';
+      const hasBothRoles = roleStr.includes('ADVANCE_REQUEST')
+        && roleStr.includes('FORECAST');
+      row4 = hasBothRoles
+        ? { text: 'Đầy đủ 2 chứng từ theo quy định', pill: 'fact-status-known' }
+        : { text: 'Cần bổ sung', pill: 'fact-status-unclear' };
+    } else {
+      row4 = { text: 'Cần làm rõ', pill: 'fact-status-unclear' };
+    }
   }
-
-  const row4RefsCandidates = roleFact?.refs?.length
-    ? roleFact.refs
-    : report.source_refs;
-  const row4Refs = row4RefsCandidates.length > 0
-    ? row4RefsCandidates
-    : (requestSource ? [requestSource.id] : []);
+  const row4Refs = rowRefs(roleFact?.refs);
 
   return (
     <div className="table-responsive">
@@ -564,72 +510,38 @@ function BusinessCrossCheckTable({
           </tr>
         </thead>
         <tbody>
-          <tr data-testid="cross-check-words">
-            <td>
-              <div className="fact-title-cell">
-                <span className="fact-title-main">Số xin ứng và số bằng chữ</span>
-                <span className="cross-check-desc">So sánh số tiền số và số tiền chữ trích xuất từ Giấy đề nghị</span>
-              </div>
-            </td>
-            <td>
-              <span className={`fact-status-pill ${row1PillClass}`}>
-                {row1StatusText}
-              </span>
-            </td>
-            <td>
-              {row1Refs.length > 0 ? refs(row1Refs, 'Xem giấy đề nghị') : '—'}
-            </td>
-          </tr>
-          <tr data-testid="cross-check-arithmetic">
-            <td>
-              <div className="fact-title-cell">
-                <span className="fact-title-main">Tổng dự toán và chi tiết các dòng</span>
-                <span className="cross-check-desc">So sánh tổng dự toán ghi trên giấy với tổng các dòng chi phí</span>
-              </div>
-            </td>
-            <td>
-              <span className={`fact-status-pill ${row2PillClass}`}>
-                {row2StatusText}
-              </span>
-            </td>
-            <td>
-              {row2Refs.length > 0 ? refs(row2Refs, 'Xem bảng dự toán') : '—'}
-            </td>
-          </tr>
-          <tr data-testid="cross-check-trip">
-            <td>
-              <div className="fact-title-cell">
-                <span className="fact-title-main">Thông tin chuyến đi giữa hai giấy</span>
-                <span className="cross-check-desc">Đối chiếu nơi đến và thời gian giữa Giấy đề nghị và Dự toán</span>
-              </div>
-            </td>
-            <td>
-              <span className={`fact-status-pill ${row3PillClass}`}>
-                {row3StatusText}
-              </span>
-            </td>
-            <td>
-              {row3Refs.length > 0 ? refs(row3Refs, 'Xem hai giấy') : '—'}
-            </td>
-          </tr>
-          <tr data-testid="cross-check-role">
-            <td>
-              <div className="fact-title-cell">
-                <span className="fact-title-main">Loại chứng từ &amp; Phân vai hồ sơ</span>
-                <span className="cross-check-desc">Giấy đề nghị tạm ứng &amp; Bảng dự toán</span>
-              </div>
-            </td>
-            <td>
-              <span className={`fact-status-pill ${row4PillClass}`}>
-                {row4StatusText}
-              </span>
-            </td>
-            <td>
-              {row4Refs.length > 0 ? refs(row4Refs, 'Xem hồ sơ nguồn') : '—'}
-            </td>
-          </tr>
+          <CrossCheckRow
+            testId="cross-check-words"
+            title="Số xin ứng và số bằng chữ"
+            desc="So sánh số tiền số và số tiền chữ trích xuất từ Giấy đề nghị"
+            status={row1.text} pillClass={row1.pill} refs={row1Refs}
+            refsLabel="Xem giấy đề nghị" refsNode={refs} />
+          <CrossCheckRow
+            testId="cross-check-arithmetic"
+            title="Tổng dự toán và chi tiết các dòng"
+            desc="So sánh tổng dự toán ghi trên giấy với tổng các dòng chi phí"
+            status={row2.text} pillClass={row2.pill} refs={row2Refs}
+            refsLabel="Xem bảng dự toán" refsNode={refs} />
+          <CrossCheckRow
+            testId="cross-check-trip"
+            title="Thông tin chuyến đi giữa hai giấy"
+            desc="Đối chiếu nơi đến và thời gian giữa Giấy đề nghị và Dự toán"
+            status={row3.text} pillClass={row3.pill} refs={row3Refs}
+            refsLabel="Xem căn cứ" refsNode={refs} />
+          <CrossCheckRow
+            testId="cross-check-role"
+            title="Loại chứng từ & Phân vai hồ sơ"
+            desc="Giấy đề nghị tạm ứng & Bảng dự toán"
+            status={row4.text} pillClass={row4.pill} refs={row4Refs}
+            refsLabel="Xem căn cứ" refsNode={refs} />
         </tbody>
       </table>
+      {sources.length > 0 && (
+        <div className="cross-check-doc-links" data-testid="cross-check-documents">
+          <span className="muted">Tài liệu hồ sơ: </span>
+          {refs(sources.map((s) => s.id), 'Mở tài liệu hồ sơ')}
+        </div>
+      )}
     </div>
   );
 }

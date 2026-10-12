@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from invoice_referee.domain.models import DomainError
-from invoice_referee.settlement import sqlite_records as _rec
+from invoice_referee.settlement.persistence import sqlite_records as _rec
 from invoice_referee.settlement.models import (
     B7LinkedIntake,
     CaseStage,
@@ -25,7 +25,7 @@ from invoice_referee.settlement.models import (
     Submission,
     fingerprint,
 )
-from invoice_referee.storage.artifacts import put_artifact
+from invoice_referee.shared.artifacts import put_artifact
 
 _PREPARE_LINKED_B7 = "PREPARE_LINKED_B7"
 _REVISE_LINKED_B7 = "REVISE_LINKED_B7"
@@ -41,13 +41,13 @@ def _iso(value) -> str:
 
 
 def _now() -> str:
-    from invoice_referee.settlement.store import utcnow
-    return _iso(utcnow())
+    from invoice_referee.shared import clock
+    return _iso(clock.utcnow())
 
 
 def _now_dt():
-    from invoice_referee.settlement.store import utcnow
-    return utcnow()
+    from invoice_referee.shared import clock
+    return clock.utcnow()
 
 
 def origin_link(case: sqlite3.Row) -> dict[str, Any] | None:
@@ -97,6 +97,13 @@ def prepare_linked_child(conn: sqlite3.Connection, parent_id: str,
         )
     existing = find_linked_child(conn, parent_id)
     if existing is not None:
+        # Business reuse (an active child already exists): still register the
+        # command so a later same-key/different-body request conflicts.
+        _rec.record_command(conn, existing["id"], parent_id,
+                            "LINKED_B7_PREPARED", _PREPARE_LINKED_B7, command,
+                            payload_fp, {"child_id": existing["id"],
+                                         "parent_id": parent_id,
+                                         "no_op": True}, _now())
         return existing["id"], False
     now_dt = _now_dt()
     now = _iso(now_dt)
@@ -251,7 +258,9 @@ def record_company_packet(conn: sqlite3.Connection, artifact_root: Path,
         submission=submission,
         source_records=_rec.source_records(conn, case_id))
     # Identical snapshot (same packet, same parent dependency): reuse the
-    # existing source and do NOT bump input_revision.
+    # existing source and do NOT bump input_revision. Still register the command
+    # (fingerprint/result) so a later reuse of the same key with a different
+    # body is an IDEMPOTENCY_CONFLICT, not a silent second no-op.
     snapshot_fp = fingerprint("LINKED_CONTEXT",
                               snapshot.model_dump(mode="json"))
     prior_ids = context_source_ids(conn, case_id)
@@ -262,6 +271,11 @@ def record_company_packet(conn: sqlite3.Connection, artifact_root: Path,
         prior_data = (artifact_root / prior.original_path
                       ).read_text(encoding="utf-8")
         if fingerprint("LINKED_CONTEXT", json.loads(prior_data)) == snapshot_fp:
+            _rec.record_command(conn, case_id, case_id, "B7_CONTEXT_REFRESHED",
+                                _B7_CONTEXT_REFRESH, command, payload_fp,
+                                {"source_id": prior_ids[-1],
+                                 "context_version": snapshot.context_version,
+                                 "no_op": True}, _now())
             return case_id, True
     source_id = store_context_source(conn, artifact_root, case_id, snapshot,
                                      command)

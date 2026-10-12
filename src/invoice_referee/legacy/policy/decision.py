@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation, localcontext
 
-from invoice_referee.domain.models import (
+from invoice_referee.legacy.domain.models import (
     Authorization,
     CaseSnapshot,
     CheckResult,
@@ -28,10 +28,10 @@ from invoice_referee.domain.models import (
     EvidenceBundle,
     Issue,
 )
-from invoice_referee.policy.expenses import context_check, document_checks
-from invoice_referee.policy.inventory import arithmetic_checks, inventory_checks
-from invoice_referee.policy.numeric import DECIMAL_CONTEXT
-from invoice_referee.policy.quality import confirmation_index, derive_fact
+from invoice_referee.legacy.policy.expenses import context_check, document_checks
+from invoice_referee.legacy.policy.inventory import arithmetic_checks, inventory_checks
+from invoice_referee.legacy.policy.numeric import DECIMAL_CONTEXT
+from invoice_referee.legacy.policy.quality import confirmation_index, derive_fact
 
 # The exact Rulebook §3 matrix. Every rule must be reported exactly once.
 _RULE_MATRIX = (

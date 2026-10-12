@@ -14,13 +14,42 @@ B1 as **B2**.
 | Intent | Start here |
 | --- | --- |
 | **Understand the business** | [Product](docs/settlement/PRODUCT.md) · [Rulebook](docs/settlement/RULEBOOK.md) · [System](docs/settlement/SYSTEM.md) · [Evaluation](docs/settlement/EVALUATION.md) |
-| **Run a demo** | [Setup](#setup) → [Run the app](#run-the-app-dev) → [travel demo recipe](data/settlement/travel-demo-v1/README.md) |
+| **Run a demo** | [Generate the recipe](#generate-the-demo-recipe) → [Setup](#setup) → [Run the app](#run-the-app-dev) |
 | **Evaluate** | [Verify (evaluation)](#verify-evaluation) · [Evaluation](docs/settlement/EVALUATION.md) |
 | **History / legacy** | [Archive](docs/archive/README.md) · [completed plans](#history--completed-plans) |
 
 Canonical docs are the four above plus the [MVP plan](docs/superpowers/plans/2026-10-09-settlement-mvp.md).
 Completed implementation plans are history, not a second rulebook. Check source
 and fresh execution before capability claims.
+
+## Generate the demo recipe
+
+The travel demo is a synthetic, fake/replay-only packet (never a measured
+baseline, gold label or holdout). It is Git-ignored; generate it before the
+steps in [Run the app](#run-the-app-dev):
+
+```bash
+.venv/bin/python scripts/build_travel_demo.py \
+  --work-ref WORK-DEMO-TRAVEL \
+  --settlement-as-of 2026-10-14T23:59:59+07:00
+```
+
+This writes `data/settlement/travel-demo-v1/` (employee-input / company-input /
+followup / expected partitions). Then start the app in **fake** mode pointing at
+the generated config:
+
+```bash
+SETTLEMENT_PROVIDER_MODE=fake \
+SETTLEMENT_B3_CONTEXT_PATH=data/settlement/travel-demo-v1/company-input/b3-context.json \
+SETTLEMENT_B7_CONTEXT_PATH=data/settlement/travel-demo-v1/company-input/b7-config.json \
+SETTLEMENT_DB_PATH=data/settlement/travel-demo-v1/cases.sqlite \
+SETTLEMENT_ARTIFACT_ROOT=data/settlement/travel-demo-v1/artifacts \
+.venv/bin/uvicorn invoice_referee.api.settlement:create_runtime_app \
+  --factory --host 127.0.0.1 --port 8000
+```
+
+The recipe README (`data/settlement/travel-demo-v1/README.md`, generated) lists
+the employee/accountant/approver steps and the literal expected oracle.
 
 ## Status
 
@@ -221,30 +250,43 @@ company identity.
 
 ```
 src/invoice_referee/
-  settlement/           core: models, store, service, api, rules, pipeline,
-                        advance_records/advance_workflow/advance_reconciliation,
-                        linked_context/linked_context_records,
-                        settlement_workflow/settlement_records/settlement_reconciliation,
-                        sqlite_records
-  api/                  FastAPI apps (settlement + historical app)
-  verify/               evaluation harness + settlement CLI
-frontend/               React + TypeScript + Vite UI
-config/                 demo-policy.json (proposed, inactive)
+  settlement/           current core: models, store, service, api, rules, pipeline
+  settlement/persistence/  SQL lifecycle (sqlite_records, queries,
+                        decision_records, money_records, action_records,
+                        advance_records, linked_context_records)
+  shared/               errors, artifacts, clock (used by current + legacy)
+  legacy/               historical claim-processing app (application,
+                        extraction, policy, storage/repository, domain, config,
+                        api/app, verify runner). Compatibility shims keep old
+                        import paths resolving.
+  api/                  settlement factory (current) + legacy app shim
+  verify/               settlement CLI (current) + legacy harness shims
+frontend/src/
+  settlement/           current settlement UI
+  legacy/               historical claim-processing UI
+  main.tsx              mounts the settlement App
 tests/                  unit + integration; fixtures/ holds the Verify corpus
 scripts/                synthetic-evidence / demo generators
 docs/                   canonical docs, plans, evidence, build log
 data/                   runtime SQLite + artifacts + frozen packets (Git-ignored)
 ```
 
-### Settlement module map
+### Settlement module map (current)
 
 | Module | Responsibility |
 | --- | --- |
-| `sqlite_records` | Common record helpers over an open connection (no txn of its own) |
-| `advance_records` / `advance_workflow` / `advance_reconciliation` | B3/B5 advance lifecycle + pure reconciliation |
-| `linked_context_records` / `linked_context` | B6→B7 child, declarations, company packet/context |
-| `settlement_records` / `settlement_workflow` / `settlement_reconciliation` | B7/B8/B9 present/decide/fulfill/revalidate/handoff/close/adjust |
-| `store` | Public façade: owns connections/transactions, delegates SQL to the above |
+| `store` | Public façade: owns connections/transactions, delegates SQL |
+| `persistence/sqlite_records` | Common record helpers over an open connection |
+| `persistence/queries` | Read projections, governing selector, money-context rebuild |
+| `persistence/decision_records` | B8 presentation/decision writes |
+| `persistence/money_records` | B9 money-event writes + revalidation |
+| `persistence/action_records` | Handoff / closure / adjustment writes |
+| `persistence/advance_records` | B3/B5 advance lifecycle |
+| `persistence/linked_context_records` | B6→B7 child, declarations, company context |
+| `advance_workflow` / `advance_reconciliation` | Pure B3/B5 computation |
+| `settlement_workflow` / `settlement_reconciliation` | Pure B7/B8/B9 computation |
+| `linked_context` | Pure linked-context building |
+| `shared/clock` | Record-time clock (monkeypatch owner); business time stays in `*_workflow` |
 
 ## History / completed plans
 

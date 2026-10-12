@@ -13,6 +13,7 @@ from tests.settlement.test_b3_workflow import (
 )
 from tests.settlement.test_b3_funding import approved_b3  # noqa: F401
 from tests.settlement.test_b7_linked import _linked_child
+from tests.settlement.test_b7_workflow import ready_linked_b7  # noqa: F401
 
 
 def _packet(*, events=None, expenses=None, complete=True, groups=None,
@@ -199,3 +200,17 @@ def test_same_event_ref_not_double_counted(approved_b3):
                             _scoped_event(amount=2_000_000)]),
             command("pkt", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
     assert exc.value.code == "INVALID_PAYLOAD"
+
+
+def test_noop_context_key_is_bound_to_its_payload(ready_linked_b7):
+    svc, child, _ = ready_linked_b7
+    packet = svc.store.get_linked_b7_context(child.id).company_packet.model_dump(mode="json")
+    cmd = command("noop-key", "ACC-DEMO-01", "ACCOUNTANT",
+                  svc.get_case(child.id).case_version)
+    first = svc.record_b7_company_packet(child.id, packet, cmd)
+    changed = dict(packet)
+    changed["reading_note"] += " Different request body."
+    with pytest.raises(DomainError) as error:
+        svc.record_b7_company_packet(child.id, changed, cmd)
+    assert error.value.code == "IDEMPOTENCY_CONFLICT"
+    assert svc.get_case(child.id).input_revision == first.input_revision

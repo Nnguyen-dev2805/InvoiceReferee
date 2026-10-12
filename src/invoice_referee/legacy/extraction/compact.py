@@ -13,14 +13,14 @@ from decimal import Decimal, InvalidOperation, localcontext
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from invoice_referee.domain.models import (
+from invoice_referee.legacy.domain.models import (
     AnalysisRequest, DocumentFacts, DocumentKind, DocumentTemplate, DomainError,
     FieldFact, ItemFacts, QualityObservation, Reading, SourceRef,
 )
-from invoice_referee.extraction.validation import (
+from invoice_referee.legacy.extraction.validation import (
     B1_WORD_REVIEW_THRESHOLD, NUMERIC_FIELDS, validate_document,
 )
-from invoice_referee.policy.numeric import DECIMAL_CONTEXT, parse_candidates
+from invoice_referee.legacy.policy.numeric import DECIMAL_CONTEXT, parse_candidates
 
 SCHEMA_VERSION = 'compact-document-v1'
 _WORD = '__compact_word__'

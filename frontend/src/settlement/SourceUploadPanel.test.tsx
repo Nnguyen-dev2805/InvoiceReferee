@@ -31,6 +31,17 @@ const source = (id: string, filename: string) => ({
 
 beforeEach(() => vi.restoreAllMocks());
 
+test('không bỏ file khác bytes chỉ vì trùng tên và size', () => {
+  render(<SourceUploadPanel view={makeView()} role="EMPLOYEE" actorId="NV-01"
+    onChanged={vi.fn().mockResolvedValue(undefined)} onError={vi.fn()} />);
+  const input = screen.getByTestId('sources-file-input');
+  const a = new File(['aa'], 'bill.pdf', { type: 'application/pdf' });
+  const b = new File(['bb'], 'bill.pdf', { type: 'application/pdf' });
+  fireEvent.change(input, { target: { files: [a] } });
+  fireEvent.change(input, { target: { files: [b] } });
+  expect(screen.getByText(/Đã chọn 2 tệp/)).toBeTruthy();
+});
+
 test('partial failure giữ lại file chưa tải và báo lỗi', async () => {
   const addSpy = vi.spyOn(api, 'addSource')
     .mockResolvedValueOnce(source('S-1', 'a.pdf'))

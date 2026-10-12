@@ -38,7 +38,7 @@ from typing import Any, Callable
 
 from pydantic import ValidationError
 
-from invoice_referee.domain.models import (
+from invoice_referee.legacy.domain.models import (
     AnalysisRequest,
     DocumentFacts,
     DomainError,
@@ -51,13 +51,13 @@ from invoice_referee.domain.models import (
     SourceWord,
     StageIdentity,
 )
-from invoice_referee.extraction.validation import (
+from invoice_referee.legacy.extraction.validation import (
     REPAIR_BUDGET,
     check_ref,
     shared_repair_allowed,
     validate_document,
 )
-from invoice_referee.extraction.compact import (
+from invoice_referee.legacy.extraction.compact import (
     SCHEMA_VERSION as COMPACT_SCHEMA_VERSION, model_sources, parse_compact_document,
 )
 
