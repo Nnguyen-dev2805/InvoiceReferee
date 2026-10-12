@@ -97,6 +97,7 @@ SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
 _CREATE_CASE = "CREATE_CASE"
 _CREATE_B3_CASE = "CREATE_B3_CASE"
+_CREATE_STANDALONE_B7 = "CREATE_STANDALONE_B7"
 _REVISE_SUBMISSION = "REVISE_SUBMISSION"
 _ADD_SOURCE = "ADD_SOURCE"
 _START_RUN = "START_RUN"
@@ -346,11 +347,12 @@ class Store:
     def create_b3_case(self, build_submission, command: Command,
                        request_payload: dict[str, Any],
                        origin: str = "USER") -> CaseView:
-        """Create a B3 v1 case: replay key checked BEFORE a new work id exists.
+        """Create a B3 v1 case: replay key checked BEFORE a new id exists.
 
         ``request_payload`` is the semantic user request (actor + intake); it
         must stay stable across retries so the same key replays, while a new
-        work id is generated exactly once and persisted with the case.
+        case id is generated exactly once and persisted with the case. The case
+        id is the shared dossier scope (no separate ``WORK-`` id for new cases).
         """
         payload_fp = fingerprint(_CREATE_B3_CASE, request_payload)
         with self._write() as conn:
@@ -360,9 +362,8 @@ class Store:
                 self._check_replay(row, payload_fp)
                 return self._case_view(conn, row["case_id"]).model_copy(
                     update={"idempotent_replay": True})
-            work_ref = f"WORK-{uuid.uuid4().hex[:12]}"
-            submission = build_submission(work_ref)
             case_id = f"C-{uuid.uuid4().hex[:12]}"
+            submission = build_submission(case_id)
             now = _iso(utcnow())
             stage: CaseStage = "CHECKING"
             conn.execute(
@@ -385,20 +386,62 @@ class Store:
                                  {"case_id": case_id}, now)
             return self._case_view(conn, case_id)
 
+    def create_standalone_b7(self, build_submission, command: Command,
+                             request_payload: dict[str, Any],
+                             origin: str = "USER") -> CaseView:
+        """Create a standalone (self-paid) B7 case: replay key before any id.
+
+        Same atomic pattern as ``create_b3_case`` but a distinct operation and
+        scope (own case id). ``build_submission(case_id)`` derives employee/work/
+        clock server-side; no B3/advance-0 is created and no origin_link exists.
+        """
+        payload_fp = fingerprint(_CREATE_STANDALONE_B7, request_payload)
+        with self._write() as conn:
+            row = self._lookup_command(conn, _CREATE_STANDALONE_B7, command,
+                                       scope_key="")
+            if row is not None:
+                self._check_replay(row, payload_fp)
+                return self._case_view(conn, row["case_id"]).model_copy(
+                    update={"idempotent_replay": True})
+            case_id = f"C-{uuid.uuid4().hex[:12]}"
+            submission = build_submission(case_id)
+            now = _iso(utcnow())
+            stage: CaseStage = "CHECKING"
+            conn.execute(
+                "INSERT INTO cases (id, case_version, input_revision, control_epoch, "
+                "stop_active, stage, current_run_id, submission_json, origin, "
+                "created_at, updated_at) "
+                "VALUES (?, 1, 1, 1, 0, ?, NULL, ?, ?, ?, ?)",
+                (case_id, stage, _dump(submission.model_dump(mode="json")),
+                 origin, now, now),
+            )
+            conn.execute(
+                "INSERT INTO case_revisions (id, case_id, revision, submission_json, "
+                "reason, actor_id, command_key, created_at) VALUES (?, ?, 1, ?, '', ?, ?, ?)",
+                (f"R-{uuid.uuid4().hex[:12]}", case_id,
+                 _dump(submission.model_dump(mode="json")), command.actor_id,
+                 command.key, now),
+            )
+            self._record_command(conn, case_id, "", "B7_STANDALONE_CREATED",
+                                 _CREATE_STANDALONE_B7, command, payload_fp,
+                                 {"case_id": case_id}, now)
+            return self._case_view(conn, case_id)
+
     def list_cases(self) -> list[CaseSummary]:
         with self._read() as conn:
             rows = conn.execute("SELECT * FROM cases ORDER BY created_at DESC").fetchall()
-        summaries = []
-        for row in rows:
-            submission = _load(row["submission_json"])
-            summaries.append(CaseSummary(
-                id=row["id"], job=submission["job"],
-                employee_ref=submission["employee_ref"],
-                work_ref=submission["work_ref"], stage=row["stage"],
-                case_version=row["case_version"],
-                updated_at=datetime.fromisoformat(row["updated_at"]),
-                origin=row["origin"],
-            ))
+            summaries = []
+            for row in rows:
+                submission = _load(row["submission_json"])
+                summaries.append(CaseSummary(
+                    id=row["id"], job=submission["job"],
+                    employee_ref=submission["employee_ref"],
+                    work_ref=submission["work_ref"], stage=row["stage"],
+                    case_version=row["case_version"],
+                    updated_at=datetime.fromisoformat(row["updated_at"]),
+                    origin=row["origin"],
+                    dossier_ref=_queries.dossier_reference(conn, row),
+                ))
         return summaries
 
     def delete_case(self, case_id: str) -> None:
@@ -1941,6 +1984,7 @@ class Store:
             control_epoch=case["control_epoch"], stop_active=bool(case["stop_active"]),
             stage=case["stage"], current_run_id=case["current_run_id"],
             submission=submission, sources=sources,
+            dossier_ref=_queries.dossier_reference(conn, case),
             allowed_actions=actions,
             money_summary=self._money_summary(conn, case).model_dump(mode="json"),
             origin=case["origin"],

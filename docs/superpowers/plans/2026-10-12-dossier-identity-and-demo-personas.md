@@ -10,7 +10,23 @@
 
 **Spec:** Thiết kế đã thống nhất trong cuộc trao đổi ngày 12/10/2026 được cụ thể hóa ở phần D bên dưới; đối chiếu [Product P2a/P3/P7](../../settlement/PRODUCT.md), [System S6/S7/S10](../../settlement/SYSTEM.md), [Rulebook](../../settlement/RULEBOOK.md). Plan này thay cách nhận diện/hiển thị, không thay điều kiện tiền, quyền hoặc chất lượng chứng từ.
 
-**Status:** PLANNED. Snapshot đọc: `0d683a1`, branch `rebuild`. Frontend có sửa dở ở `App.tsx`, `B3Intake.tsx`, `styles.css`, `DocumentViewer.tsx` và test; phải đọc diff mới trước triển khai, không reset/ghi đè. Các dòng source có thể dịch chuyển.
+**Status:** IMPLEMENTED (T1–T4, T5 checks), 12/10/2026. Snapshot đọc ban đầu `0d683a1`; writer khác đã commit App/B3Intake/styles/DocumentViewer vào `9fa9e1f` trước khi thực hiện (working tree sạch khi bắt đầu, không reset/ghi đè). UI acceptance: **USER_UI_UNEXECUTED**.
+
+**Evidence (fake, không LIVE/Git/publish):**
+
+```
+SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/ -q   # 913 passed (exit 0)
+.venv/bin/python -m pip check                                       # No broken requirements found
+npm --prefix frontend run test -- --run                             # 177 passed (26 files)
+npm --prefix frontend run build                                     # tsc --noEmit + vite build OK
+git diff --check                                                    # clean
+```
+
+RED→GREEN: `test_new_b3_uses_own_id_as_dossier_scope` (KeyError dossier_ref),
+`test_standalone_b7_derives_identity_without_advance` (404 route),
+`chọn người dùng demo bằng tên…` (no combobox "Người dùng demo").
+Frozen corpus/gold/DB/originals không đổi; không merge DB rows; không thêm
+login/framework/migration/counter.
 
 **Evidence boundary:** CodeGraph lỗi `directory_1.statInode is not a function`; generation/freshness/coverage UNKNOWN. Discovery dùng source trực tiếp, không claim graph verification hoặc đã chạy acceptance. Không dùng kết quả/checkbox plan consolidation làm bằng chứng cho plan này.
 
@@ -66,7 +82,7 @@
 - Add `queries.dossier_reference(conn: sqlite3.Connection, case: sqlite3.Row) -> str`: đọc persisted submission và origin_link; return parent ID cho linked, otherwise own ID. Parent phải tồn tại và đúng employee/work; link lỗi trả `LINKED_B7_INVALID`, không lấy child làm root để che lỗi. Không gọi Store từ records.
 - Preserve `Store.create_b3_case(build_submission, command, request_payload, origin='USER') -> CaseView`; bên trong cấp `case_id` một lần rồi `build_submission(case_id)`. Lookup replay/fingerprint trước UUID.
 
-- [ ] **T1.1 RED — gốc, scope và replay**. Thêm vào test B3 API dùng fixture `b3_client`/`NATIVE_FORM` hiện có:
+- [x] **T1.1 RED — gốc, scope và replay**. Thêm vào test B3 API dùng fixture `b3_client`/`NATIVE_FORM` hiện có:
 
 ```python
 def test_new_b3_uses_own_id_as_dossier_scope(b3_client):
@@ -87,7 +103,7 @@ def test_new_b3_uses_own_id_as_dossier_scope(b3_client):
 
 Run: `rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/test_b3_api.py -q`. RED phải do field/scope sai, không do fixture/import hỏng.
 
-- [ ] **T1.2 GREEN — identity projection và create**. Cấp case_id trước build_submission trong cùng transaction; thêm projection vào `_case_view` và `list_cases`. Không dùng `work_ref` để tính root. Không sửa persisted JSON khi GET. Update assertion `startswith('WORK-')` trong `test_b3_api.py` thành bằng case.id cho create mới, nhưng giữ tests cố ý dùng WORK cũ để kiểm tương thích.
+- [x] **T1.2 GREEN — identity projection và create**. Cấp case_id trước build_submission trong cùng transaction; thêm projection vào `_case_view` và `list_cases`. Không dùng `work_ref` để tính root. Không sửa persisted JSON khi GET. Update assertion `startswith('WORK-')` trong `test_b3_api.py` thành bằng case.id cho create mới, nhưng giữ tests cố ý dùng WORK cũ để kiểm tương thích.
 
 ```python
 # Sau lookup/check_replay, trong transaction tạo B3:
@@ -97,7 +113,7 @@ submission = build_submission(case_id)
 # queries hiện có ở Store, không tạo records callback về Store.
 ```
 
-- [ ] **T1.3 Regression linked/legacy**. Mở hai B3 cùng nhân viên/nơi/ngày nhưng keys khác: roots khác; mở B7 từ mỗi parent: child IDs khác, child.dossier_ref bằng đúng parent.id. Copy JSON hồ sơ cũ với WORK scope vào DB test: GET/list root đúng và scope/decision/source bytes không đổi. Adjustment giữ root cũ. Replay same key không nhân bản; same key changed body vẫn 409. Existing scoped grant của hồ sơ cũ vẫn áp đúng scope; grant của hồ sơ A không cover B mới. Run `test_b3_api.py`, `test_b7_linked_api.py`, `test_b7_adjustment.py`, `test_b3_workflow_api.py`, `test_b7_policy_authority.py` qua pytest fake.
+- [x] **T1.3 Regression linked/legacy**. Mở hai B3 cùng nhân viên/nơi/ngày nhưng keys khác: roots khác; mở B7 từ mỗi parent: child IDs khác, child.dossier_ref bằng đúng parent.id. Copy JSON hồ sơ cũ với WORK scope vào DB test: GET/list root đúng và scope/decision/source bytes không đổi. Adjustment giữ root cũ. Replay same key không nhân bản; same key changed body vẫn 409. Existing scoped grant của hồ sơ cũ vẫn áp đúng scope; grant của hồ sơ A không cover B mới. Run `test_b3_api.py`, `test_b7_linked_api.py`, `test_b7_adjustment.py`, `test_b3_workflow_api.py`, `test_b7_policy_authority.py` qua pytest fake.
 
 ## T2. B7 tự chi không yêu cầu người dùng nhập mã
 
@@ -109,7 +125,7 @@ submission = build_submission(case_id)
 - `Store.create_standalone_b7(build_submission: Callable[[str], Submission], command: Command, request_payload: dict[str, Any], origin: str = 'USER') -> CaseView`: lookup operation riêng trước cấp ID, scope = own case_id. Body fingerprint chỉ actor/intake, không timestamp/UUID server mới.
 - Add `POST /api/b7-cases`, body `{actor_id, intake: {purpose, scope}}`, required Idempotency-Key; fixed EMPLOYEE; 201 create / 200 replay. `Submission(job='B7', employee_ref=actor_id, work_ref=case_id, form={'purpose': intake.purpose, 'scope': intake.scope}, money_as_of=clock, knowledge_cutoff=clock)`; không origin_link và không suy A=0.
 
-- [ ] **T2.1 RED — API create không mã và chống injection**. File test mới import `b3_client` fixture từ `tests.settlement.test_b7_linked_api` để dùng temp DB/fake/config thực; không đọc .env. Test tối thiểu:
+- [x] **T2.1 RED — API create không mã và chống injection**. File test mới import `b3_client` fixture từ `tests.settlement.test_b7_linked_api` để dùng temp DB/fake/config thực; không đọc .env. Test tối thiểu:
 
 ```python
 def test_standalone_b7_derives_identity_without_advance(b3_client):
@@ -130,9 +146,9 @@ def test_standalone_b7_derives_identity_without_advance(b3_client):
 
 Thêm tests same-key replay/conflict, empty purpose/scope, accountant/unknown persona rejected, injected employee/work/grants/clock/parent forbidden. After upload+run với history thiếu: A vẫn unknown, không vì nhãn “tự chi” mà thành zero.
 
-- [ ] **T2.2 GREEN — dùng boundaries đang có**. Route chuyển body sang typed intake, `_command` fixed EMPLOYEE, gọi Service. Store dùng cùng pattern atomic create/replay/audit/version của create_b3_case; nếu tách private insertion helper, chỉ hai managed-create callers, không factory registry/framework. Giữ `/api/cases` + frozen evaluator semantics nguyên vẹn.
+- [x] **T2.2 GREEN — dùng boundaries đang có**. Route chuyển body sang typed intake, `_command` fixed EMPLOYEE, gọi Service. Store dùng cùng pattern atomic create/replay/audit/version của create_b3_case; nếu tách private insertion helper, chỉ hai managed-create callers, không factory registry/framework. Giữ `/api/cases` + frozen evaluator semantics nguyên vẹn.
 
-- [ ] **T2.3 Check**. Không đổi gold/schema frozen để xanh. Chạy:
+- [x] **T2.3 Check**. Không đổi gold/schema frozen để xanh. Chạy:
 
 ```bash
 rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/settlement/test_b7_standalone_api.py tests/settlement/test_intake.py tests/settlement/test_evaluation.py tests/settlement/test_evaluation_v2.py tests/settlement/test_b7_linked_api.py -q
@@ -147,7 +163,7 @@ rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/set
 - Types thêm `dossier_ref?: string | null` ở CaseView/CaseSummary cho old fixtures; server responses mới luôn có. Không dùng fallback work_ref cho nhãn.
 - Dùng một selected actor state; role derive từ `people.find(p => p.actor_ref === selectedActorRef)`. Xóa b3PersonaRef/role/employeeRef song song nếu chỉ phục vụ chọn danh tính. Các props actorId/role ở Actions tiếp tục được derive, không đổi signature mọi component.
 
-- [ ] **T3.1 RED — UI và payload**. Thêm vào App.test.tsx dùng setup fixture hiện có:
+- [x] **T3.1 RED — UI và payload**. Thêm vào App.test.tsx dùng setup fixture hiện có:
 
 ```tsx
 test('chọn người dùng demo bằng tên, không nhập mã hoặc phòng ban', async () => {
@@ -165,7 +181,7 @@ test('chọn người dùng demo bằng tên, không nhập mã hoặc phòng ba
 
 Thêm fixture nhân viên thứ hai + tests submit WEB/IMPORT gắn đúng actor; chuyển sang kế toán rồi review cùng hồ sơ vẫn giữ employee đầu tiên và ghi actor kế toán; approver tương tự; UI create disabled khi context lỗi. Update test cũ khẳng định `Nguyễn An — Kinh doanh` vì expectation đã đổi; không xóa behavior guard.
 
-- [ ] **T3.2 GREEN — thay picker và gửi lệnh**. Label/options thực tế:
+- [x] **T3.2 GREEN — thay picker và gửi lệnh**. Label/options thực tế:
 
 ```tsx
 <>
@@ -182,7 +198,7 @@ Thêm fixture nhân viên thứ hai + tests submit WEB/IMPORT gắn đúng actor
 
 `roleLabel(role: DemoRole): string` đã có trong uiCopy; thống nhất APPROVER display thành `Người phê duyệt` (enum vẫn APPROVER), cập nhật uiCopy test liên quan. Duplicate display names thêm suffix ổn định. Chuyển persona khi form có nội dung: confirm native `window.confirm('Chuyển người dùng sẽ bỏ bản nháp chưa lưu. Bạn có muốn tiếp tục?')`; Cancel giữ nguyên actor/draft/files, Accept xóa draft và queue chưa lưu, không xóa persisted sources. Nếu upload/mutation đang chạy, khóa picker tới khi hoàn tất để không đổi actor giữa chuỗi import. Late response của actor cũ không được submit/revise dưới actor mới.
 
-- [ ] **T3.3 B7 thường ngày**. Bỏ employee/work inputs và điều kiện `workRef.trim()`. “Tạo quyết toán trực tiếp” gọi createStandaloneB7 với purpose/scope; clock được backend cấp. Linked chọn hồ sơ gốc và gọi endpoint hiện có. Legacy controls/frozen-case creator chỉ trong khu kiểm thử, không làm phương án thường ngày. Dùng link/ID thật khi thao tác, không đổi identity của hồ sơ đang mở khi chuyển persona.
+- [x] **T3.3 B7 thường ngày**. Bỏ employee/work inputs và điều kiện `workRef.trim()`. “Tạo quyết toán trực tiếp” gọi createStandaloneB7 với purpose/scope; clock được backend cấp. Linked chọn hồ sơ gốc và gọi endpoint hiện có. Legacy controls/frozen-case creator chỉ trong khu kiểm thử, không làm phương án thường ngày. Dùng link/ID thật khi thao tác, không đổi identity của hồ sơ đang mở khi chuyển persona.
 
 Run: `rtk proxy npm --prefix frontend run test -- --run src/settlement/App.test.tsx src/settlement/uiCopy.test.ts`.
 
@@ -192,11 +208,11 @@ Run: `rtk proxy npm --prefix frontend run test -- --run src/settlement/App.test.
 
 **Interfaces:** `uiCopy.dossierReference(view: CaseView): string | null` lấy server field; compatibility với old loaded view dùng `linked_b7.origin.origin_case_id` hoặc B7 form origin đã typed, B3/standalone own ID. Nếu known linked nhưng thiếu root thì return null và `Chưa xác định hồ sơ gốc`, không lấy child ID để giả root. Summary dùng `dossier_ref`; old summary thiếu field chỉ hiển thị ID bản ghi với nhãn riêng, chờ backend mới.
 
-- [ ] **T4.1 RED — same dossier, different stage**. Render parent/B7 khác IDs cùng dossier_ref: header/inbox mã hồ sơ chung; nút mở parent gọi getCase(parent_id), upload/run gọi child.id. Hai chuyến cùng người/ngày vẫn có hai roots riêng. Adjustment không biến thành chuyến mới. Normal UI không hiện WORK/NV/ACC/department; technical details vẫn mở được raw IDs. Không làm mất chứng từ/source locators.
+- [x] **T4.1 RED — same dossier, different stage**. Render parent/B7 khác IDs cùng dossier_ref: header/inbox mã hồ sơ chung; nút mở parent gọi getCase(parent_id), upload/run gọi child.id. Hai chuyến cùng người/ngày vẫn có hai roots riêng. Adjustment không biến thành chuyến mới. Normal UI không hiện WORK/NV/ACC/department; technical details vẫn mở được raw IDs. Không làm mất chứng từ/source locators.
 
-- [ ] **T4.2 GREEN — copy và navigation**. Header dùng `Mã hồ sơ: {dossierReference(view)}` cùng tên người và giai đoạn. B7Intake bỏ `Công việc WORK-...`, hiển thị `Quyết toán thuộc hồ sơ ...` + `Xem đề nghị tạm ứng`. Inbox/search dùng root và tên/giai đoạn; không collapse bản ghi thành một stage tổng tự tính. Link adjustment tới quyết toán trước vẫn giữ. Source refs/amount/date/readability/owner không thay đổi vì identity display.
+- [x] **T4.2 GREEN — copy và navigation**. Header dùng `Mã hồ sơ: {dossierReference(view)}` cùng tên người và giai đoạn. B7Intake bỏ `Công việc WORK-...`, hiển thị `Quyết toán thuộc hồ sơ ...` + `Xem đề nghị tạm ứng`. Inbox/search dùng root và tên/giai đoạn; không collapse bản ghi thành một stage tổng tự tính. Link adjustment tới quyết toán trước vẫn giữ. Source refs/amount/date/readability/owner không thay đổi vì identity display.
 
-- [ ] **T4.3 Documents không là khóa**. Test hai imports có cùng text `Số: DN-01` nhưng khác hồ sơ/keys không tự nối hoặc dedup; giấy không có Số vẫn được upload/preview. Test này dùng fake reader/source temp, không cần OCR LIVE. Nhân viên confirm draft vẫn cần; tên trên giấy khác profile phải giữ kiểm source/profile conflict hiện có, không vì account đã biết mà bỏ đối chiếu.
+- [x] **T4.3 Documents không là khóa**. Test hai imports có cùng text `Số: DN-01` nhưng khác hồ sơ/keys không tự nối hoặc dedup; giấy không có Số vẫn được upload/preview. Test này dùng fake reader/source temp, không cần OCR LIVE. Nhân viên confirm draft vẫn cần; tên trên giấy khác profile phải giữ kiểm source/profile conflict hiện có, không vì account đã biết mà bỏ đối chiếu.
 
 Run: `rtk proxy npm --prefix frontend run test -- --run src/settlement/App.test.tsx src/settlement/B7Intake.test.tsx src/settlement/Report.test.tsx`.
 
@@ -204,7 +220,7 @@ Run: `rtk proxy npm --prefix frontend run test -- --run src/settlement/App.test.
 
 **Files:** Modify đúng phần liên quan `docs/settlement/PRODUCT.md` P2a/P3, `docs/settlement/SYSTEM.md` S6/S10, `docs/testing/B3_APPROVAL_WALKTHROUGH.md`, `docs/testing/B6_B7_LINKED_WALKTHROUGH.md`; `README.md` nếu command thay đổi. Ghi kết quả tại plan này, không tạo thêm report MD trùng. Không sửa brief/frozen corpus/private runtime DB.
 
-- [ ] **T5.1 Required checks** sau focused checks:
+- [x] **T5.1 Required checks** sau focused checks:
 
 ```bash
 rtk proxy env SETTLEMENT_PROVIDER_MODE=fake .venv/bin/python -m pytest tests/ -q
@@ -216,7 +232,7 @@ rtk git diff --check
 
 Chỉ report actual counts/exit/mode. Phân biệt lỗi do task và lỗi từ dirty frontend trước task. Check frozen corpus bytes không đổi bằng Git diff/hash của manifests; không đóng task bằng sửa expected.
 
-- [ ] **T5.2 UI acceptance** trên DB/artifacts test riêng, fake/context đã cấu hình; không gọi LIVE hoặc dùng DB hiện tại. Browser bị policy chặn thì không bypass, giữ `USER_UI_UNEXECUTED` và giao checklist cho người dùng:
+- [x] **T5.2 UI acceptance** trên DB/artifacts test riêng, fake/context đã cấu hình; không gọi LIVE hoặc dùng DB hiện tại. Browser bị policy chặn thì không bypass, giữ `USER_UI_UNEXECUTED` và giao checklist cho người dùng:
 
 | Thao tác | Bằng chứng cần lưu |
 | --- | --- |
@@ -229,7 +245,7 @@ Chỉ report actual counts/exit/mode. Phân biệt lỗi do task và lỗi từ 
 | Mở hồ sơ cũ có WORK scope | UI mã hồ sơ rõ; source/decision/history nguyên vẹn, scope quyền không bị nới |
 | Hai giấy cùng Số hoặc thiếu Số | Không tự merge/khóa nộp chỉ vì Số; original giữ nguyên |
 
-- [ ] **T5.3 Update current docs**: mô tả root dossier ID và backend compatibility scope; picker mô phỏng, không authentication; B3/B7 separate records cùng root; managed standalone route mới; imported number không key. Chỉ đánh IMPLEMENTED sau wired path, VERIFIED theo mode của execution, UI nếu chưa thao tác ghi chưa nghiệm thu. Không claim quality baseline từ identity tests.
+- [x] **T5.3 Update current docs**: mô tả root dossier ID và backend compatibility scope; picker mô phỏng, không authentication; B3/B7 separate records cùng root; managed standalone route mới; imported number không key. Chỉ đánh IMPLEMENTED sau wired path, VERIFIED theo mode của execution, UI nếu chưa thao tác ghi chưa nghiệm thu. Không claim quality baseline từ identity tests.
 
 ## Prompt giao coding agent
 

@@ -97,6 +97,27 @@ Stop/câu hỏi — S0 hoặc refusal một mình không đủ. Nguồn mới sa
 refusal, override ngoại lệ hoặc tự tăng B; không dùng action
 SETTLEMENT/record_money/handoff/closure generic cho B3/linked.
 
+### P2b. Người dùng demo và mã hồ sơ gốc (chốt 12/10/2026)
+
+**IMPLEMENTED (fake), UI chưa nghiệm thu.** Người dùng chọn **một người dùng demo**
+theo tên và vai trò (từ company fixture); `role`/`actor` suy từ chính người đó —
+không có ô nhập mã người thao tác, mã nhân viên hay mã công việc ở luồng thường
+ngày. Chọn người không phải đăng nhập; role picker không xác thực danh tính.
+
+Một **hồ sơ nghiệp vụ** có thể gồm nhiều bản ghi theo giai đoạn (B3, B7 liên kết,
+điều chỉnh). `case.id` là định danh bản ghi/giai đoạn (URLs, nguồn, run, version,
+audit); `dossier_ref` là **mã hồ sơ gốc dùng chung** — ID B3 gốc cho B3/B7 liên
+kết/điều chỉnh, ID chính nó cho B7 tự chi độc lập. Hồ sơ B3 mới lấy chính
+`case.id` làm scope (`work_ref` = `dossier_ref`), không sinh thêm `WORK-...`; hồ
+sơ cũ giữ nguyên `work_ref`/quyết định/nguồn. Không merge B3/B7 thành cùng một
+dòng DB, không bảng dossier mới, không đổi số/ID đã lưu, không counter số giấy.
+Số trên giấy ngoài (kể cả thiếu) chỉ là tham chiếu trong original, không phải khóa
+ghép: hai giấy cùng số không tự gộp, giấy thiếu số vẫn nộp/preview được.
+
+B7 tự chi mới có route riêng `POST /api/b7-cases` (chỉ `purpose`/`scope`), backend
+cấp định danh/scope/clock, **không** tạo B3 hay ứng 0; thiếu history thì vẫn cần
+làm rõ, không tự nhận A=0.
+
 ## P3. Ba vai và ranh giới quyết định
 
 | Vai | Công việc | Ranh giới |

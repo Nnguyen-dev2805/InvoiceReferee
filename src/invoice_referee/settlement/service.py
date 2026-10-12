@@ -41,6 +41,7 @@ from invoice_referee.settlement.models import (
     B7PresentPayload,
     B7PresentationView,
     B7RevalidationView,
+    B7StandaloneIntake,
     CaseView,
     ClosurePayload,
     ClosureView,
@@ -221,6 +222,53 @@ class Service:
             )
 
         return self.store.create_b3_case(
+            build, command,
+            {"actor_id": actor_id, "intake": intake.model_dump(mode="json")},
+            origin=origin,
+        )
+
+    def submit_standalone_b7(self, actor_id: str, intake: B7StandaloneIntake,
+                             command: Command, origin: str = "USER") -> CaseView:
+        """Standalone (self-paid) B7 intake: no B3/advance, no client id.
+
+        Identity is derived from the activated company fixture (only EMPLOYEE);
+        the case id is the dossier scope. The settlement clock comes from the
+        activated B7 config's demo clock when present, otherwise UTC now — never
+        the B3 demo clock. No origin_link and no A=0 is inferred.
+        """
+        context = self.config.b3_context
+        if context is None or not context.activated:
+            raise DomainError(
+                "CONFIG_NOT_ACTIVE",
+                "Chưa cấu hình SETTLEMENT_B3_CONTEXT_PATH (company fixture); "
+                "không tạo hồ sơ quyết toán tự chi.",
+            )
+        person = next((p for p in context.people if p.actor_ref == actor_id),
+                      None)
+        if person is None or person.role != "EMPLOYEE":
+            raise DomainError(
+                "PERSONA_MISMATCH",
+                f"Người nộp {actor_id} không phải persona nhân viên trong "
+                f"company fixture; chỉ nhân viên tự tạo hồ sơ quyết toán.",
+            )
+        if command.actor_id != actor_id:
+            raise DomainError(
+                "PERSONA_MISMATCH",
+                "actor_id không khớp người thao tác của lệnh.",
+            )
+        b7 = self.config.b7_context
+        clock = (b7.demo_clock
+                 if b7 is not None and b7.activated and b7.demo_clock is not None
+                 else datetime.now(timezone.utc))
+
+        def build(work_ref: str) -> Submission:
+            return Submission(
+                employee_ref=actor_id, work_ref=work_ref, job="B7",
+                money_as_of=clock, knowledge_cutoff=clock,
+                form={"purpose": intake.purpose, "scope": intake.scope},
+            )
+
+        return self.store.create_standalone_b7(
             build, command,
             {"actor_id": actor_id, "intake": intake.model_dump(mode="json")},
             origin=origin,

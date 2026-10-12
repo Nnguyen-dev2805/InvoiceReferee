@@ -404,6 +404,45 @@ def require_accountant_route(conn: sqlite3.Connection, case: sqlite3.Row,
         )
 
 
+def dossier_reference(conn: sqlite3.Connection, case: sqlite3.Row) -> str:
+    """Shared root dossier id for a case (read-only projection).
+
+    - Linked B7 child / adjustment: the B3 parent's id (``origin_case_id``).
+    - B3 or standalone B7: the case's own id.
+
+    The parent must exist and match the child's employee/work scope; a broken
+    link raises ``LINKED_B7_INVALID`` rather than silently using the child id as
+    the root (which would hide a data error). Never derives the root from
+    ``work_ref``.
+    """
+    link = _lc.origin_link(case)
+    if link is None:
+        return case["id"]
+    parent_id = link.get("origin_case_id")
+    if not isinstance(parent_id, str) or not parent_id:
+        raise DomainError(
+            "LINKED_B7_INVALID",
+            f"Hồ sơ {case['id']} thiếu origin_case_id hợp lệ trong link.",
+        )
+    parent = conn.execute("SELECT * FROM cases WHERE id = ?",
+                          (parent_id,)).fetchone()
+    if parent is None:
+        raise DomainError(
+            "LINKED_B7_INVALID",
+            f"Hồ sơ gốc {parent_id} của {case['id']} không tồn tại.",
+        )
+    submission = _rec.load(case["submission_json"])
+    parent_submission = _rec.load(parent["submission_json"])
+    if (link.get("employee_ref") != parent_submission.get("employee_ref")
+            or submission.get("employee_ref")
+            != parent_submission.get("employee_ref")):
+        raise DomainError(
+            "LINKED_B7_INVALID",
+            f"Hồ sơ {case['id']} và gốc {parent_id} khác nhân viên.",
+        )
+    return parent_id
+
+
 def _b3_workflow_of(conn: sqlite3.Connection, case_id: str):
     return _adv.workflow_view(conn, case_id)
 

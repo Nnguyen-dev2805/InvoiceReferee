@@ -261,6 +261,19 @@ export function createB3Case(
   });
 }
 
+export function createStandaloneB7(
+  actorId: string,
+  intake: { purpose: string; scope: string },
+  key?: string,
+): Promise<CaseView> {
+  return request<CaseView>('/api/b7-cases', {
+    method: 'POST',
+    headers: { ...JSON_HEADERS,
+               'Idempotency-Key': key ?? crypto.randomUUID() },
+    body: JSON.stringify({ actor_id: actorId, intake }),
+  });
+}
+
 export function getB3RunContext(runId: string): Promise<B3RunContext> {
   return request<B3RunContext>(
     `/api/runs/${encodeURIComponent(runId)}/b3-context`);

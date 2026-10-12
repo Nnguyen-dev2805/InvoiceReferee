@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { vi } from 'vitest';
 import { B7IntakePanel } from './B7Intake';
 import type { CaseView } from './types';
 
@@ -74,6 +75,14 @@ test('hiển thị link origin readonly', () => {
   render(<B7IntakePanel view={makeView()} report={null} role="EMPLOYEE"
     actorId="NV-DEMO-01" onAction={noop} />);
   expect(screen.getByTestId('b7-origin-link')).toHaveTextContent('C-parent');
+});
+
+test('T4: nút "Xem đề nghị tạm ứng" mở đúng parent id', () => {
+  const onOpenParent = vi.fn();
+  render(<B7IntakePanel view={makeView()} report={null} role="EMPLOYEE"
+    actorId="NV-DEMO-01" onAction={noop} onOpenParent={onOpenParent} />);
+  fireEvent.click(screen.getByTestId('b7-open-parent'));
+  expect(onOpenParent).toHaveBeenCalledWith('C-parent');
 });
 
 test('người khác không thấy nút khai báo', () => {

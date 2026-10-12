@@ -69,6 +69,9 @@ export interface CaseView {
   stage: CaseStage;
   current_run_id: string | null;
   submission: Submission;
+  // Shared root of the business dossier (B3 root for B3/linked B7/adjustment;
+  // own id for standalone B7). Optional for old fixtures; server always sends it.
+  dossier_ref?: string | null;
   sources: SourceView[];
   allowed_actions: AllowedAction[];
   money_summary: MoneySummary;
@@ -89,6 +92,7 @@ export interface CaseSummary {
   updated_at: string;
   // 'USER' for cases created via the UI; 'SYSTEM' for eval/verify/seed cases.
   origin: 'USER' | 'SYSTEM';
+  dossier_ref?: string | null;
 }
 
 export interface AuditEntry {

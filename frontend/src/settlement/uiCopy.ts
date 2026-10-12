@@ -1,4 +1,18 @@
-import type { CaseStage, DemoRole } from './types';
+import type { CaseStage, CaseView, DemoRole } from './types';
+
+// Shared root dossier id for display: server field when present; otherwise the
+// typed linked origin for old loaded views; otherwise the record's own id. A
+// known-linked case with no resolvable root returns null (never the child id,
+// which would fake a root).
+export function dossierReference(view: CaseView): string | null {
+  if (view.dossier_ref) return view.dossier_ref;
+  const origin = view.linked_b7?.origin?.origin_case_id;
+  if (origin) return origin;
+  const form = view.submission.form as Record<string, unknown> | undefined;
+  const link = form?.origin_link as { origin_case_id?: string } | undefined;
+  if (link?.origin_case_id) return link.origin_case_id;
+  return view.id;
+}
 
 export function formatMoney(value: number | null | undefined): string {
   if (value === null || value === undefined) {
@@ -46,10 +60,17 @@ export function roleLabel(role: DemoRole): string {
     case 'ACCOUNTANT':
       return 'Kế toán';
     case 'APPROVER':
-      return 'Người duyệt';
+      return 'Người phê duyệt';
     default:
       return role;
   }
+}
+
+export function getInitials(name: string): string {
+  if (!name || !name.trim()) return 'U';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 const CHECK_LABELS: Record<string, string> = {

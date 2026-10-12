@@ -4,6 +4,11 @@ Lát cắt: kế toán **trình** basis đã confirmed → người có quyền 
 / REFUSE** → chờ chi ứng. **Chưa ghi tiền thực nhận, chưa handoff/closure, chưa
 B3→B7.** Dùng **fake provider**; không gọi LIVE/Git/publish.
 
+> Cập nhật 12/10/2026: UI dùng **một bộ chọn Người dùng demo** (tên — vai trò);
+> không còn ô nhập mã người thao tác/vai trò riêng. Hồ sơ mới hiển thị **mã hồ sơ
+> gốc** (`dossier_ref`, = `case.id` cho B3) chung cho các giai đoạn; mã bản ghi/kỹ
+> thuật nằm trong "Chi tiết kỹ thuật". Chọn người không phải đăng nhập.
+
 ## 0. Đã xác minh trong phiên này (fake, không LIVE)
 
 ```

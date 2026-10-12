@@ -35,6 +35,8 @@ interface ActionsProps {
   onPrepareSettlement?: () => Promise<void>;
   // Runs the reconciliation; intake confirm only saves the declaration.
   onStartRun?: () => Promise<void>;
+  // Opens a parent B3 record by its real id (from the linked B7 child).
+  onOpenCase?: (caseId: string) => void;
 }
 
 export function ActionsPanel({
@@ -48,6 +50,7 @@ export function ActionsPanel({
   onAction,
   onPrepareSettlement,
   onStartRun,
+  onOpenCase,
 }: ActionsProps) {
   const summary = view.money_summary;
   const closed = view.stage === 'SETTLEMENT_CLOSED'
@@ -194,6 +197,7 @@ export function ActionsPanel({
           actorId={actorId}
           onAction={onAction}
           onRunCheck={onStartRun}
+          onOpenParent={onOpenCase}
         />
       )}
 

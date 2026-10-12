@@ -13,11 +13,13 @@ import { ProcessingDetails } from './ProcessingDetails';
 import { SourceUploadPanel } from './SourceUploadPanel';
 import { VerifyPanel } from './Verify';
 import { DocumentViewer } from './DocumentViewer';
+import { AccountingDesk } from './AccountingDesk';
+import { ApprovalDesk } from './ApprovalDesk';
 import { summarizeCase } from './uiState';
-import { historyKindLabel } from './uiCopy';
+import { dossierReference, getInitials, historyKindLabel, roleLabel } from './uiCopy';
 import { useCaseWorkspace } from './useCaseWorkspace';
 import type {
-  B3DemoContext, B3Intake, CaseStage, CaseSummary, DemoRole, Job,
+  B3DemoContext, B3Intake, CaseStage, CaseSummary, DemoRole,
 } from './types';
 
 const STAGE_LABELS: Record<CaseStage, string> = {
@@ -33,18 +35,6 @@ const STAGE_LABELS: Record<CaseStage, string> = {
   REJECTED_REQUEST_ENDED: 'Yêu cầu bị từ chối đã kết thúc',
   SETTLEMENT_CLOSED: 'Hồ sơ đã đóng',
 };
-
-const ROLE_LABELS: Record<DemoRole, string> = {
-  EMPLOYEE: 'Nhân viên',
-  ACCOUNTANT: 'Kế toán',
-  APPROVER: 'Người duyệt (demo)',
-};
-
-function nowLocalInput(): string {
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  return now.toISOString().slice(0, 16);
-}
 
 function isB3V1Form(form: Record<string, unknown> | undefined): boolean {
   return form?.schema_version === 'b3-intake-v1';
@@ -78,8 +68,9 @@ function formatTripDates(startStr?: unknown, endStr?: unknown): string | null {
 }
 
 export function App() {
-  const [role, setRole] = useState<DemoRole>('EMPLOYEE');
-  const [actorId, setActorId] = useState('NV-01');
+  // One demo user drives both the submitter and the actor at command time; role
+  // is derived from the chosen person, never an independent picker.
+  const [selectedActorRef, setSelectedActorRef] = useState('');
   const [cases, setCases] = useState<CaseSummary[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -96,13 +87,8 @@ export function App() {
   const questions = workspace?.questions ?? [];
   const b3RunContext = workspace?.b3Context ?? null;
 
-  const [job, setJob] = useState<Job>('B7');
-  const [employeeRef, setEmployeeRef] = useState('NV-01');
-  const [workRef, setWorkRef] = useState('');
   const [purpose, setPurpose] = useState('');
   const [scope, setScope] = useState('');
-  const [moneyAsOf, setMoneyAsOf] = useState(nowLocalInput());
-  const [knowledgeCutoff, setKnowledgeCutoff] = useState(nowLocalInput());
 
   const [revisePurpose, setRevisePurpose] = useState('');
   const [reviseScope, setReviseScope] = useState('');
@@ -112,7 +98,6 @@ export function App() {
   const [demoContext, setDemoContext] = useState<B3DemoContext | null>(null);
   const [demoContextError, setDemoContextError] = useState<string | null>(null);
   const [b3Method, setB3Method] = useState<'WEB' | 'IMPORT'>('WEB');
-  const [b3PersonaRef, setB3PersonaRef] = useState('');
   const [b3Intake, setB3Intake] = useState<B3Intake>(emptyB3Intake('WEB'));
   const [b3ReviseIntake, setB3ReviseIntake] = useState<B3Intake | null>(null);
   const [b3ReviseReason, setB3ReviseReason] = useState('');
@@ -120,8 +105,9 @@ export function App() {
   const [caseTab, setCaseTab] = useState<'report' | 'draft' | 'sources' | 'questions' | 'history'>('report');
   const [caseSearch, setCaseSearch] = useState('');
   const [employeeFilter, setEmployeeFilter] = useState<'all' | 'mine'>('all');
-  const [stageFilter, setStageFilter] = useState<'ALL' | 'CHECKING' | 'DECISION_MONEY' | 'CLOSED'>('ALL');
+  const [stageFilter, setStageFilter] = useState<'ALL' | 'CHECKING' | 'DECISION_MONEY' | 'AWAITING_DECISION' | 'CLOSED'>('ALL');
   const [isCreatingB3, setIsCreatingB3] = useState(false);
+  const [isSelfInitiating, setIsSelfInitiating] = useState(false);
   const [importFiles, setImportFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
@@ -143,16 +129,80 @@ export function App() {
     setTimeout(() => setCopiedCaseId(false), 2000);
   }, []);
 
+  // People from the company fixture, with a stable suffix for duplicate names
+  // (by people order) so the picker label is unique without using codes.
+  const people = useMemo(() => {
+    const raw = demoContext?.people ?? [];
+    const seen = new Map<string, number>();
+    return raw.map((p) => {
+      const base = `${p.name} — ${roleLabel(p.role)}`;
+      const count = (seen.get(base) ?? 0) + 1;
+      seen.set(base, count);
+      return { person: p, label: count > 1 ? `${base} (${count})` : base };
+    });
+  }, [demoContext]);
+
+  // Default to the first person once the context loads; keep a valid selection.
+  useEffect(() => {
+    if (people.length === 0) return;
+    if (!people.some((p) => p.person.actor_ref === selectedActorRef)) {
+      setSelectedActorRef(people[0].person.actor_ref);
+    }
+  }, [people, selectedActorRef]);
+
+  const selectedPerson = useMemo(
+    () => demoContext?.people.find((p) => p.actor_ref === selectedActorRef) ?? null,
+    [demoContext, selectedActorRef]);
+  // Role/actor are derived from the chosen person, never an independent picker.
+  const role: DemoRole = selectedPerson?.role ?? 'EMPLOYEE';
+  const actorId = selectedActorRef;
+  const identityReady = selectedPerson !== null;
+
+  // Switching demo user with an unsaved draft must be explicit: cancel keeps
+  // the current actor/draft/queue; accept clears the draft and un-uploaded queue
+  // (persisted sources are never touched).
+  const handlePersonChange = (nextRef: string) => {
+    if (nextRef === selectedActorRef) return;
+    const hasDraft = Boolean(b3Intake && (b3Intake.destination || b3Intake.purpose
+      || b3Intake.request_amount_vnd || (b3Intake.estimate_rows?.length ?? 0) > 0));
+    const hasQueue = importFiles.length > 0;
+    if ((hasDraft || hasQueue)
+        && !window.confirm('Chuyển người dùng sẽ bỏ bản nháp chưa lưu. Bạn có muốn tiếp tục?')) {
+      return;
+    }
+    if (isCreatingB3 || isUploadingSource) return;  // don't switch mid-import
+    setSelectedActorRef(nextRef);
+    setIsSelfInitiating(false);
+    setStageFilter('ALL');
+    setB3Intake(emptyB3Intake(b3Method));
+    setImportFiles([]);
+  };
+
   const filteredCases = useMemo(() => {
     let list = cases;
     if (role === 'EMPLOYEE' && employeeFilter === 'mine') {
       list = list.filter((c) => c.employee_ref === actorId.trim());
-    } else if (role !== 'EMPLOYEE') {
+    } else if (role === 'ACCOUNTANT') {
       if (stageFilter === 'CHECKING') {
         list = list.filter((c) => c.stage === 'CHECKING' || c.stage === 'ACCOUNTING_REVIEW');
       } else if (stageFilter === 'DECISION_MONEY') {
         list = list.filter((c) =>
           c.stage === 'AWAITING_DECISION' ||
+          c.stage === 'AWAITING_MONEY' ||
+          c.stage === 'AWAITING_WORK_SETTLEMENT' ||
+          c.stage === 'RESOLVING_OBLIGATIONS'
+        );
+      } else if (stageFilter === 'CLOSED') {
+        list = list.filter((c) =>
+          c.stage === 'SETTLEMENT_CLOSED' ||
+          c.stage === 'REJECTED_REQUEST_ENDED'
+        );
+      }
+    } else if (role === 'APPROVER') {
+      if (stageFilter === 'AWAITING_DECISION') {
+        list = list.filter((c) => c.stage === 'AWAITING_DECISION');
+      } else if (stageFilter === 'DECISION_MONEY') {
+        list = list.filter((c) =>
           c.stage === 'AWAITING_MONEY' ||
           c.stage === 'AWAITING_WORK_SETTLEMENT' ||
           c.stage === 'RESOLVING_OBLIGATIONS'
@@ -214,6 +264,7 @@ export function App() {
     // Select the case (drives the workspace hook) and await the guarded load so
     // callers can read the committed workspace right after.
     setSelectedCaseId(id);
+    setIsSelfInitiating(false);
     await loadWorkspace(id);
   }, [loadWorkspace]);
 
@@ -274,55 +325,18 @@ export function App() {
     };
   }, []);
 
-  const employees = useMemo(
-    () => (demoContext?.people ?? []).filter((p) => p.role === 'EMPLOYEE'),
-    [demoContext]);
-
-  useEffect(() => {
-    if (employees.length > 0 && !employees.some((p) => p.actor_ref === b3PersonaRef)) {
-      setB3PersonaRef(employees[0].actor_ref);
+  const handleCreateStandaloneB7 = async () => {
+    if (!identityReady) {
+      setError('Chưa tải được người dùng demo.');
+      return;
     }
-  }, [employees, b3PersonaRef]);
-
-  const handleRoleChange = (newRole: DemoRole) => {
-    setRole(newRole);
-    if (newRole === 'ACCOUNTANT') {
-      const accountant = demoContext?.people.find((p) => p.role === 'ACCOUNTANT');
-      setActorId(accountant?.actor_ref ?? 'ACC-DEMO-01');
-    } else if (newRole === 'APPROVER') {
-      const approver = demoContext?.people.find((p) => p.role === 'APPROVER');
-      setActorId(approver?.actor_ref ?? 'APR-DEMO-01');
-    } else if (newRole === 'EMPLOYEE') {
-      setActorId(b3PersonaRef || 'NV-DEMO-01');
-    }
-  };
-
-  useEffect(() => {
-    if (b3PersonaRef && role === 'EMPLOYEE') {
-      setActorId(b3PersonaRef);
-    }
-  }, [b3PersonaRef, role]);
-
-  const handleCreate = async () => {
-    if (!workRef.trim() || !purpose.trim()) {
-      setError('Cần mã công việc và mục đích trước khi tạo hồ sơ.');
+    if (!purpose.trim() || !scope.trim()) {
+      setError('Cần mục đích và phạm vi trước khi tạo hồ sơ.');
       return;
     }
     try {
-      const created = await api.createCase({
-        submission: {
-          employee_ref: employeeRef.trim(),
-          work_ref: workRef.trim(),
-          job,
-          money_as_of: new Date(moneyAsOf).toISOString(),
-          knowledge_cutoff: new Date(knowledgeCutoff).toISOString(),
-          form: {
-            purpose: purpose.trim(),
-            scope: scope.trim(),
-          },
-        },
-        actor_id: actorId.trim(),
-        demo_role: role,
+      const created = await api.createStandaloneB7(actorId.trim(), {
+        purpose: purpose.trim(), scope: scope.trim(),
       });
       setSelectedCaseId(created.id);
       await loadCase(created.id);
@@ -354,7 +368,7 @@ export function App() {
     };
     setIsCreatingB3(true);
     try {
-      const created = await api.createB3Case(b3PersonaRef || actorId.trim(), intake);
+      const created = await api.createB3Case(actorId.trim(), intake);
       setSelectedCaseId(created.id);
       await loadCase(created.id);
       setError(null);
@@ -370,7 +384,7 @@ export function App() {
               currentCase.id,
               file,
               currentCase.case_version,
-              b3PersonaRef || actorId.trim(),
+              actorId.trim(),
               role,
               `Tệp đề nghị B3 (${file.name})`,
             );
@@ -414,7 +428,7 @@ export function App() {
       const intake: B3Intake = {...b3ReviseIntake, confirmed};
       await api.reviseSubmission(view.id, {
         submission: {...view.submission, form: intake as unknown as Record<string, unknown>},
-        actor_id: b3PersonaRef || actorId.trim(),
+        actor_id: actorId.trim(),
         demo_role: role,
         expected_case_version: view.case_version,
         reason,
@@ -581,8 +595,12 @@ export function App() {
   const b3WorkflowPending = viewIsB3
     && view?.b3_workflow?.status === 'PENDING';
 
+  const getActorName = useCallback((ref: string) => {
+    return demoContext?.people.find((p) => p.actor_ref === ref)?.name || ref;
+  }, [demoContext]);
+
   const employeeName = view
-    ? demoContext?.people.find((p) => p.actor_ref === view.submission.employee_ref)?.name || view.submission.employee_ref
+    ? getActorName(view.submission.employee_ref)
     : '';
 
   const jobTitlePrefix = viewIsB3 ? 'Đề nghị tạm ứng' : 'Quyết toán';
@@ -614,35 +632,51 @@ export function App() {
     <div className="app">
       <header className="app-head">
         <div className="app-brand">
-          <div className="app-brand-title">
-            <span className="app-logo-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
-                <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
-                <path d="M7 21h10" />
-                <path d="M12 3v18" />
-                <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" />
-              </svg>
-            </span>
-            <h1>InvoiceReferee</h1>
-          </div>
-          <p className="muted app-tagline">
-            Hệ thống Đối soát &amp; Trọng tài Quyết toán chi phí
-          </p>
+          <h1 className="app-brand-heading">InvoiceReferee</h1>
         </div>
-        <div className="settlement-topbar">
-          <div className="field-topbar">
-            <label htmlFor="demo-role">Vai trò demo</label>
-            <select id="demo-role" value={role} onChange={(e) => handleRoleChange(e.target.value as DemoRole)}>
-              {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
+        <div className="profile-chip" title="Nhấp để chuyển đổi vai trò người dùng">
+          <label htmlFor="demo-person" className="sr-only">
+            Người dùng demo
+          </label>
+          <div className={`profile-avatar profile-avatar-${role.toLowerCase()}`}>
+            {getInitials(selectedPerson?.name || '')}
           </div>
-          <div className="field-topbar">
-            <label htmlFor="actor-id">Mã người thao tác</label>
-            <input id="actor-id" value={actorId} onChange={(e) => setActorId(e.target.value)} />
+          <div className="profile-info">
+            <span className="profile-name">{selectedPerson?.name || 'Chưa chọn'}</span>
+            <span className={`profile-role-badge badge-role-${role.toLowerCase()}`}>
+              {roleLabel(role)}
+            </span>
           </div>
+          <svg
+            className="profile-caret"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+          <select
+            id="demo-person"
+            className="profile-select-overlay"
+            value={selectedActorRef}
+            onChange={(e) => handlePersonChange(e.target.value)}
+            title="Chọn vai trò người dùng"
+          >
+            {people.length === 0 && (
+              <option value="">Chưa tải được người dùng demo.</option>
+            )}
+            {people.map(({ person, label }) => (
+              <option key={person.actor_ref} value={person.actor_ref}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
       </header>
 
@@ -661,13 +695,16 @@ export function App() {
             <button
               type="button"
               className={`btn ${
-                role === 'ACCOUNTANT'
-                  ? `btn-sm btn-new-case-accountant ${view === null ? 'btn-new-case-accountant-active' : ''}`
+                role !== 'EMPLOYEE'
+                  ? `btn-sm btn-new-case-accountant ${view === null && isSelfInitiating ? 'btn-new-case-accountant-active' : ''}`
                   : `${view === null ? 'btn-primary btn-new-case-active' : ''}`
               }`}
               style={{ width: '100%', justifyContent: 'center', gap: '6px' }}
               onClick={() => {
                 setSelectedCaseId(null);
+                if (role !== 'EMPLOYEE') {
+                  setIsSelfInitiating(true);
+                }
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -681,30 +718,34 @@ export function App() {
           {/* Danh sách 24 hồ sơ có bộ lọc tìm kiếm nhanh và thanh cuộn độc lập */}
           <div className="panel case-list-panel">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-              <h2 style={{ margin: 0, fontSize: '1.05rem' }}>Hồ sơ</h2>
-              <span className="badge">{filteredCases.length}</span>
+              <h2 style={{ margin: 0, fontSize: '1.05rem' }}>
+                {role === 'EMPLOYEE' ? 'Hồ sơ của tôi' : role === 'ACCOUNTANT' ? 'Hàng đợi rà soát' : 'Hàng đợi phê duyệt'}
+              </h2>
+              {filteredCases.length > 0 && <span className="badge">{filteredCases.length}</span>}
             </div>
 
             {role === 'EMPLOYEE' ? (
-              <div className="case-filter-tabs" style={{ display: 'flex', gap: '4px', marginBottom: 'var(--space-2)' }}>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${employeeFilter === 'all' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ flex: 1, padding: '3px 6px', fontSize: '0.78rem' }}
-                  onClick={() => setEmployeeFilter('all')}
-                >
-                  Tất cả ({cases.length})
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${employeeFilter === 'mine' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ flex: 1, padding: '3px 6px', fontSize: '0.78rem' }}
-                  onClick={() => setEmployeeFilter('mine')}
-                >
-                  Của tôi ({cases.filter(c => c.employee_ref === actorId.trim()).length})
-                </button>
-              </div>
-            ) : (
+              cases.length > 0 ? (
+                <div className="case-filter-tabs" style={{ display: 'flex', gap: '4px', marginBottom: 'var(--space-2)' }}>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${employeeFilter === 'all' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ flex: 1, padding: '3px 6px', fontSize: '0.78rem' }}
+                    onClick={() => setEmployeeFilter('all')}
+                  >
+                    Tất cả ({cases.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${employeeFilter === 'mine' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ flex: 1, padding: '3px 6px', fontSize: '0.78rem' }}
+                    onClick={() => setEmployeeFilter('mine')}
+                  >
+                    Của tôi ({cases.filter(c => c.employee_ref === actorId.trim()).length})
+                  </button>
+                </div>
+              ) : null
+            ) : role === 'ACCOUNTANT' ? (
               <div className="case-stage-filter-pills" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
                 <button
                   type="button"
@@ -739,6 +780,41 @@ export function App() {
                   Đã đóng
                 </button>
               </div>
+            ) : (
+              <div className="case-stage-filter-pills" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${stageFilter === 'ALL' ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                  onClick={() => setStageFilter('ALL')}
+                >
+                  Tất cả
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${stageFilter === 'AWAITING_DECISION' ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                  onClick={() => setStageFilter('AWAITING_DECISION')}
+                >
+                  Chờ phê duyệt
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${stageFilter === 'DECISION_MONEY' ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                  onClick={() => setStageFilter('DECISION_MONEY')}
+                >
+                  Đã duyệt / Chi
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${stageFilter === 'CLOSED' ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                  onClick={() => setStageFilter('CLOSED')}
+                >
+                  Đã đóng
+                </button>
+              </div>
             )}
 
             {cases.length > 5 && (
@@ -754,9 +830,27 @@ export function App() {
             )}
 
             {cases.length === 0 ? (
-              <p className="muted">Chưa có hồ sơ nào.</p>
+              <div className="case-empty-state" data-testid="case-empty-state">
+                <p className="case-empty-title">
+                  {role === 'EMPLOYEE'
+                    ? 'Bạn chưa có hồ sơ nào'
+                    : role === 'ACCOUNTANT'
+                    ? 'Hàng đợi rà soát trống'
+                    : 'Hàng đợi phê duyệt trống'}
+                </p>
+                {role !== 'EMPLOYEE' && (
+                  <p className="case-empty-desc">
+                    {role === 'ACCOUNTANT'
+                      ? 'Hiện không có hồ sơ nào cần rà soát chứng từ trong hệ thống.'
+                      : 'Hiện chưa có hồ sơ nào đang chờ bạn ra quyết định phê duyệt.'}
+                  </p>
+                )}
+              </div>
             ) : filteredCases.length === 0 ? (
-              <p className="muted" style={{ fontSize: '0.85rem' }}>Không tìm thấy hồ sơ phù hợp.</p>
+              <div className="case-empty-state" data-testid="case-empty-state">
+                <p className="case-empty-title">Không tìm thấy hồ sơ</p>
+                <p className="case-empty-desc">Không có hồ sơ nào phù hợp với bộ lọc hiện tại.</p>
+              </div>
             ) : (
               <div className="case-list-scrollable">
                 <div className="case-list">
@@ -815,19 +909,10 @@ export function App() {
           </div>
 
           {/* Panel Verify hệ thống đóng/mở */}
-          <div className="panel" data-testid="verify-container">
+          <div className="panel verify-sidebar-panel" data-testid="verify-container">
             <button
               type="button"
-              className="btn btn-ghost"
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                fontWeight: 600,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: 'var(--space-2) 0',
-              }}
+              className="verify-toggle-btn"
               onClick={() => setShowVerify((v) => !v)}
             >
               <span>Đánh giá hệ thống (Verify)</span>
@@ -846,7 +931,47 @@ export function App() {
             ================================================================== */}
         {view === null ? (
           <section className="col col-main">
-            <div className="tab-nav" role="tablist" aria-label="Loại hồ sơ nộp">
+            {role === 'ACCOUNTANT' && !isSelfInitiating && (
+              <AccountingDesk
+                cases={cases}
+                getActorName={getActorName}
+                stageLabels={STAGE_LABELS}
+                onSelectCase={(id) => void loadCase(id)}
+                onSelfInitiate={() => setIsSelfInitiating(true)}
+              />
+            )}
+
+            {role === 'APPROVER' && !isSelfInitiating && (
+              <ApprovalDesk
+                cases={cases}
+                getActorName={getActorName}
+                stageLabels={STAGE_LABELS}
+                onSelectCase={(id) => void loadCase(id)}
+                onSelfInitiate={() => setIsSelfInitiating(true)}
+              />
+            )}
+
+            <div
+              className="intake-form-container"
+              style={{ display: role === 'EMPLOYEE' || isSelfInitiating ? 'block' : 'none' }}
+            >
+              {role !== 'EMPLOYEE' && isSelfInitiating && (
+                <div className="desk-self-intake-header">
+                  <button
+                    type="button"
+                    className="swiss-btn swiss-btn-secondary swiss-btn-sm"
+                    onClick={() => setIsSelfInitiating(false)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    ← Quay lại bàn làm việc {role === 'ACCOUNTANT' ? 'Kế toán' : 'Phê duyệt'}
+                  </button>
+                  <span className="desk-self-intake-tag">
+                    Chế độ tự lập đề nghị ({role === 'ACCOUNTANT' ? 'Kế toán' : 'Người duyệt'})
+                  </span>
+                </div>
+              )}
+
+              <div className="tab-nav" role="tablist" aria-label="Loại hồ sơ nộp">
               <button
                 type="button"
                 role="tab"
@@ -854,7 +979,7 @@ export function App() {
                 className={`tab-btn ${activeIntakeTab === 'B3' ? 'active' : ''}`}
                 onClick={() => setActiveIntakeTab('B3')}
               >
-                Đề nghị tạm ứng (B3)
+                Đề nghị tạm ứng
               </button>
               <button
                 type="button"
@@ -863,13 +988,13 @@ export function App() {
                 className={`tab-btn ${activeIntakeTab === 'B7' ? 'active' : ''}`}
                 onClick={() => setActiveIntakeTab('B7')}
               >
-                Quyết toán sau công việc (B7)
+                Quyết toán sau công việc
               </button>
             </div>
 
             {activeIntakeTab === 'B3' && (
               <div className="panel" data-testid="b3-intake-panel">
-                <h2>B3 — Đề nghị tạm ứng (giao việc bằng lời)</h2>
+                <h2>Đề nghị tạm ứng</h2>
                 {demoContextError && (
                   <p className="notice-warn" role="alert">
                     Chưa cấu hình company fixture ({demoContextError}). Trỏ
@@ -881,25 +1006,13 @@ export function App() {
                 {demoContext && (
                   <>
                     <div className="field">
-                      <label htmlFor="b3-persona">Nhân viên nộp (persona demo)</label>
-                      <select id="b3-persona" value={b3PersonaRef}
-                              onChange={(e) => setB3PersonaRef(e.target.value)}>
-                        {employees.map((person) => (
-                          <option key={person.actor_ref} value={person.actor_ref}>
-                            {person.name} — {person.department ?? person.actor_ref}
-                            {' '}({person.actor_ref})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="field">
                       <label htmlFor="b3-method">Cách nộp</label>
                       <select id="b3-method" value={b3Method}
                               onChange={(e) => setB3Method(
                                 e.target.value as 'WEB' | 'IMPORT')}>
-                        <option value="WEB">WEB — điền form trực tiếp</option>
+                        <option value="WEB">Điền thông tin trực tiếp</option>
                         <option value="IMPORT">
-                          IMPORT — nộp giấy đề nghị + dự toán, AI đọc thành bản nháp
+                          Đính kèm hồ sơ & dự toán
                         </option>
                       </select>
                     </div>
@@ -1004,30 +1117,33 @@ export function App() {
                           </div>
                         )}
 
-                        <p className="muted" style={{ fontSize: '0.85rem', marginTop: 'var(--space-2)' }}>
-                          <em>* AI sẽ tự động đọc, trích xuất và phân loại dữ liệu từ tất cả các tệp tải lên. Bạn cũng có thể bổ sung thêm tệp bất kỳ lúc nào ở panel Nguồn bên phải.</em>
-                        </p>
                       </div>
                     )}
 
                     {b3Method === 'WEB' && (
-                      <>
-                        <B3IntakeForm value={b3Intake} onChange={setB3Intake}
-                                      disabled={false} />
-                        <p className="muted" style={{ fontSize: '0.85rem', marginTop: 'var(--space-2)' }}>
-                          * Người duyệt, số hiệu hồ sơ và mốc thời gian được hệ thống tự động gán theo định danh và cấu hình chính sách.
-                        </p>
-                      </>
+                      <B3IntakeForm value={b3Intake} onChange={setB3Intake}
+                                    disabled={false} />
                     )}
                     <button className="btn btn-primary" onClick={() => void handleCreateB3()}
-                            disabled={!b3PersonaRef || isCreatingB3}>
+                            disabled={!identityReady || isCreatingB3}>
                       {isCreatingB3
                         ? 'Đang tạo hồ sơ...'
-                        : b3Method === 'WEB'
-                          ? 'Nộp đề nghị B3 (web)'
-                          : (importFiles.length > 0
-                              ? 'Tải lên & Tạo hồ sơ nháp B3'
-                              : 'Tạo hồ sơ nháp B3 (chưa xác nhận)')}
+                        : b3Method === 'WEB' ? (
+                          <>
+                            <span>Gửi đề nghị tạm ứng</span>
+                            <span className="sr-only">Nộp đề nghị B3 (web)</span>
+                          </>
+                        ) : (importFiles.length > 0 ? (
+                          <>
+                            <span>Tải lên & Tạo hồ sơ nháp</span>
+                            <span className="sr-only">Tải lên & Tạo hồ sơ nháp B3</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Tạo hồ sơ nháp</span>
+                            <span className="sr-only">Tạo hồ sơ nháp B3 (chưa xác nhận)</span>
+                          </>
+                        ))}
                     </button>
                     {b3Method === 'IMPORT' && (
                       <p className="muted">
@@ -1044,41 +1160,28 @@ export function App() {
             {activeIntakeTab === 'B7' && (
               <div className="panel" data-testid="b7-create-panel">
                 <div style={{ marginBottom: 'var(--space-4)' }}>
-                  <h2 style={{ margin: '0 0 var(--space-2)' }}>Quyết toán sau công việc (B7)</h2>
+                  <h2 style={{ margin: '0 0 var(--space-2)' }}>Quyết toán sau công việc</h2>
                   <p className="muted" style={{ margin: 0, fontSize: '0.9rem' }}>
                     Khai báo chi phí thực tế đã phát sinh sau chuyến công tác. Chọn phương thức phù hợp với trường hợp của bạn:
                   </p>
                 </div>
 
-                <div className="b7-path-grid">
-                  {/* OPTION 1: LINKED B7 FROM EXISTING B3 */}
-                  <div className="b7-path-card b7-path-primary">
-                    <div className="b7-path-header">
-                      <span className="b7-path-badge">Khuyên dùng</span>
-                      <h3 className="b7-path-title">1. Quyết toán từ hồ sơ tạm ứng B3</h3>
-                    </div>
-                    <p className="b7-path-desc">
-                      Dành cho chuyến công tác đã được cấp tạm ứng trước đó. Hệ thống sẽ tự động liên kết và đối soát giữa số tiền đã ứng và chi phí thực tế.
-                    </p>
-
-                    <div className="b7-eligible-list">
-                      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-foreground)', marginBottom: '8px' }}>
-                        Hồ sơ tạm ứng B3 khả dụng ({b3EligibleCases.length}):
+                {b3EligibleCases.length > 0 ? (
+                  <div className="b7-path-grid">
+                    {/* OPTION 1: LINKED B7 FROM EXISTING B3 */}
+                    <div className="b7-path-card b7-path-primary">
+                      <div className="b7-path-header">
+                        <h3 className="b7-path-title">1. Quyết toán từ hồ sơ tạm ứng</h3>
+                        <span className="b7-path-badge">Khuyên dùng</span>
                       </div>
-                      {b3EligibleCases.length === 0 ? (
-                        <div className="b7-eligible-empty">
-                          <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: 'var(--color-muted-foreground)' }}>
-                            Chưa tìm thấy hồ sơ tạm ứng B3 nào của bạn. Nếu cần xin tạm ứng trước khi đi:
-                          </p>
-                          <button
-                            type="button"
-                            className="swiss-btn swiss-btn-secondary swiss-btn-sm"
-                            onClick={() => setActiveIntakeTab('B3')}
-                          >
-                            ← Chuyển sang Đề nghị tạm ứng (B3)
-                          </button>
+                      <p className="b7-path-desc">
+                        Dành cho chuyến công tác đã được cấp tạm ứng trước đó. Hệ thống sẽ tự động liên kết và đối soát giữa số tiền đã ứng và chi phí thực tế.
+                      </p>
+
+                      <div className="b7-eligible-list">
+                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-foreground)', marginBottom: '8px' }}>
+                          Khoản tạm ứng khả dụng ({b3EligibleCases.length}):
                         </div>
-                      ) : (
                         <div className="b7-eligible-cards">
                           {b3EligibleCases.map((b3Case) => (
                             <div key={b3Case.id} className="b7-eligible-item">
@@ -1101,48 +1204,61 @@ export function App() {
                             </div>
                           ))}
                         </div>
-                      )}
+                      </div>
+                    </div>
+
+                    {/* OPTION 2: DIRECT B7 SETTLEMENT */}
+                    <div className="b7-path-card">
+                      <div className="b7-path-header">
+                        <h3 className="b7-path-title">2. Quyết toán chi tiêu trực tiếp</h3>
+                        <span className="b7-path-badge b7-path-badge-neutral">Tự chi</span>
+                      </div>
+                      <p className="b7-path-desc">
+                        Dành cho chuyến công tác nhân viên tự chi trả bằng tiền túi, không có khoản tạm ứng trước của công ty.
+                      </p>
+
+                      <div className="b7-direct-form">
+                        <div className="field">
+                          <label htmlFor="purpose">Mục đích công tác</label>
+                          <input
+                            id="purpose"
+                            value={purpose}
+                            onChange={(e) => setPurpose(e.target.value)}
+                          />
+                        </div>
+                        <div className="field">
+                          <label htmlFor="scope">Phạm vi chi phí</label>
+                          <input
+                            id="scope"
+                            value={scope}
+                            onChange={(e) => setScope(e.target.value)}
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          className="swiss-btn swiss-btn-primary"
+                          style={{ marginTop: 'var(--space-3)', width: '100%' }}
+                          disabled={!identityReady || !purpose.trim() || !scope.trim()}
+                          onClick={() => void handleCreateStandaloneB7()}
+                        >
+                          Tạo hồ sơ quyết toán
+                        </button>
+                        <p className="muted" style={{ margin: 'var(--space-2) 0 0', fontSize: '0.78rem', textAlign: 'center' }}>
+                          Sau khi khởi tạo, bạn sẽ đính kèm hóa đơn & chứng từ để hệ thống kiểm tra chi phí.
+                        </p>
+                      </div>
                     </div>
                   </div>
-
-                  {/* OPTION 2: DIRECT B7 SETTLEMENT */}
-                  <div className="b7-path-card">
-                    <div className="b7-path-header">
-                      <span className="b7-path-badge b7-path-badge-neutral">Trực tiếp</span>
-                      <h3 className="b7-path-title">2. Quyết toán trực tiếp (không tạm ứng)</h3>
-                    </div>
-                    <p className="b7-path-desc">
-                      Dành cho chuyến công tác nhân viên tự chi trả bằng tiền túi, không có khoản tạm ứng trước của công ty.
-                    </p>
-
+                ) : (
+                  <div className="b7-standalone-container" style={{ maxWidth: '640px' }}>
                     <div className="b7-direct-form">
-                      <div className="form-grid-2">
-                        <div className="field">
-                          <label htmlFor="employee-ref">Mã nhân viên</label>
-                          <input
-                            id="employee-ref"
-                            value={employeeRef || actorId.trim()}
-                            onChange={(e) => setEmployeeRef(e.target.value)}
-                            placeholder="Mã nhân viên"
-                          />
-                        </div>
-                        <div className="field">
-                          <label htmlFor="work-ref">Mã công việc</label>
-                          <input
-                            id="work-ref"
-                            value={workRef}
-                            onChange={(e) => setWorkRef(e.target.value)}
-                            placeholder="Ví dụ: CT-01"
-                          />
-                        </div>
-                      </div>
                       <div className="field">
                         <label htmlFor="purpose">Mục đích công tác</label>
                         <input
                           id="purpose"
                           value={purpose}
                           onChange={(e) => setPurpose(e.target.value)}
-                          placeholder="Ví dụ: Công tác Hà Nội"
                         />
                       </div>
                       <div className="field">
@@ -1151,55 +1267,27 @@ export function App() {
                           id="scope"
                           value={scope}
                           onChange={(e) => setScope(e.target.value)}
-                          placeholder="Ví dụ: Vé, khách sạn trong chuyến công tác..."
                         />
                       </div>
-
-                      {/* ADVANCED REPLAY ACCORDION (COLLAPSED BY DEFAULT) */}
-                      <details className="swiss-advanced-details" data-testid="legacy-create-tools">
-                        <summary className="swiss-advanced-summary">
-                          ⚙️ Cấu hình kiểm thử nâng cao (mốc thời gian simulation)
-                        </summary>
-                        <div className="swiss-advanced-content">
-                          <div className="form-grid-2">
-                            <div className="field">
-                              <label htmlFor="money-as-of">Mốc tiền (money_as_of)</label>
-                              <input
-                                id="money-as-of"
-                                type="datetime-local"
-                                value={moneyAsOf}
-                                onChange={(e) => setMoneyAsOf(e.target.value)}
-                              />
-                            </div>
-                            <div className="field">
-                              <label htmlFor="knowledge-cutoff">Mốc kiến thức (knowledge_cutoff)</label>
-                              <input
-                                id="knowledge-cutoff"
-                                type="datetime-local"
-                                value={knowledgeCutoff}
-                                onChange={(e) => setKnowledgeCutoff(e.target.value)}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </details>
 
                       <button
                         type="button"
                         className="swiss-btn swiss-btn-primary"
                         style={{ marginTop: 'var(--space-3)', width: '100%' }}
-                        onClick={async () => {
-                          setJob('B7');
-                          await handleCreate();
-                        }}
+                        disabled={!identityReady || !purpose.trim() || !scope.trim()}
+                        onClick={() => void handleCreateStandaloneB7()}
                       >
-                        Tạo hồ sơ
+                        Tạo hồ sơ quyết toán
                       </button>
+                      <p className="muted" style={{ margin: 'var(--space-2) 0 0', fontSize: '0.78rem', textAlign: 'center' }}>
+                        Sau khi khởi tạo, bạn sẽ đính kèm hóa đơn & chứng từ để hệ thống kiểm tra chi phí.
+                      </p>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
+            </div>
           </section>
         ) : (
           <section className="col col-main case-detail-col">
@@ -1207,14 +1295,14 @@ export function App() {
             <div className="panel case-header-panel">
               <div className="case-header-top-bar">
                 <div className="case-header-badge-row">
-                  {/* Mã hồ sơ dạng badge nhỏ gọn có nút sao chép */}
+                  {/* Mã hồ sơ chung (dossier root) dạng badge có nút sao chép */}
                   <div className="case-id-badge" title="Mã hồ sơ" data-testid="case-id-badge">
-                    <span className="case-id-badge-label">Mã:</span>
-                    <code className="case-id-badge-code">{view.id}</code>
+                    <span className="case-id-badge-label">Mã hồ sơ:</span>
+                    <code className="case-id-badge-code">{dossierReference(view) ?? 'Chưa xác định hồ sơ gốc'}</code>
                     <button
                       type="button"
                       className="btn-copy-case-id"
-                      onClick={() => void handleCopyCaseId(view.id)}
+                      onClick={() => void handleCopyCaseId(dossierReference(view) ?? view.id)}
                       title={copiedCaseId ? 'Đã sao chép vào bộ nhớ tạm' : 'Sao chép mã hồ sơ'}
                       aria-label="Sao chép mã hồ sơ"
                     >
@@ -1316,19 +1404,13 @@ export function App() {
                 </div>
               )}
 
-              {/* Chi tiết kỹ thuật tinh gọn */}
+              {/* Thông tin hồ sơ gọn gàng */}
               <div className="case-header-tech-footer">
                 <span>Mã NV: <code>{view.submission.employee_ref}</code></span>
                 <span>·</span>
-                <span>Công việc: <code>{view.submission.work_ref}</code></span>
+                <span>Mã công việc: <code>{view.submission.work_ref}</code></span>
                 <span>·</span>
-                <span>Phiên bản: <strong>v{view.case_version}</strong> (rev {view.input_revision}, epoch {view.control_epoch})</span>
-                {run && (
-                  <>
-                    <span>·</span>
-                    <span>Run: <code>{run.id}</code> ({run.mode})</span>
-                  </>
-                )}
+                <span>Phiên bản: <strong>v{view.case_version}</strong></span>
               </div>
             </div>
 
@@ -1374,7 +1456,7 @@ export function App() {
                       </svg>
                       <div>
                         <strong>Đang chờ vai trò khác giải trình ({otherPending.length} câu hỏi)</strong>
-                        <span className="case-notice-subtext">Đã phân công cho {Array.from(new Set(otherPending.map(q => ROLE_LABELS[q.owner] ?? q.owner))).join(', ')}.</span>
+                        <span className="case-notice-subtext">Đã phân công cho {Array.from(new Set(otherPending.map(q => roleLabel(q.owner)))).join(', ')}.</span>
                       </div>
                     </div>
                     <button
@@ -1687,6 +1769,7 @@ export function App() {
                 onAction={handleAction}
                 onPrepareSettlement={handlePrepareSettlement}
                 onStartRun={handleStartRun}
+                onOpenCase={(caseId) => void loadCase(caseId)}
               />
             </div>
 
@@ -2034,7 +2117,8 @@ export function App() {
               </div>
               <div className="swiss-drawer-body">
                 <div style={{ marginBottom: 'var(--space-4)', lineHeight: '1.6' }}>
-                  <div><strong>Mã hồ sơ:</strong> <code>{view.id}</code></div>
+                  <div><strong>Mã hồ sơ gốc:</strong> <code>{dossierReference(view) ?? '—'}</code></div>
+                  <div><strong>Mã bản ghi:</strong> <code>{view.id}</code></div>
                   <div><strong>Mã nhân viên:</strong> <code>{view.submission.employee_ref}</code></div>
                   <div><strong>Mã công việc:</strong> <code>{view.submission.work_ref}</code></div>
                   <div><strong>Phiên bản:</strong> v{view.case_version} (rev {view.input_revision}, epoch {view.control_epoch})</div>

@@ -5,6 +5,11 @@ khai chi phí **thực tế**, kế toán cung cấp **company context có căn 
 cùng pipeline B7 tới report/questions/review. **Report-only: chưa B8/B9, chưa
 chi/đóng.** Dùng **fake provider**; không LIVE/Git/publish.
 
+> Cập nhật 12/10/2026: B7 liên kết hiển thị **cùng mã hồ sơ gốc** với B3
+> (`dossier_ref` = `origin_case_id`), khác nhãn giai đoạn; nút **Xem đề nghị tạm
+> ứng** mở đúng bản ghi B3 theo ID thật. B7 tự chi dùng route riêng
+> `POST /api/b7-cases` (không nhập mã employee/work, không tạo ứng 0).
+
 ## 0. Đã xác minh trong phiên này (fake, không LIVE)
 
 ```

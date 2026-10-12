@@ -72,7 +72,6 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
       <section className="swiss-form-section">
         <div className="swiss-section-header">
           <h3 className="swiss-section-title">1. Thông tin chuyến công tác</h3>
-          <p className="swiss-section-sub">Địa điểm, mục đích và thời gian dự kiến</p>
         </div>
 
         <div className="swiss-grid-2">
@@ -84,7 +83,6 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
               value={value.destination ?? ''}
               disabled={disabled}
               onChange={(e) => update({ destination: e.target.value })}
-              placeholder="Ví dụ: Hà Nội, Đà Nẵng, TP.HCM..."
             />
           </div>
           <div className="swiss-field">
@@ -95,7 +93,6 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
               value={value.purpose ?? ''}
               disabled={disabled}
               onChange={(e) => update({ purpose: e.target.value })}
-              placeholder="Ví dụ: Khảo sát dự án và thống nhất phạm vi..."
             />
           </div>
         </div>
@@ -130,7 +127,6 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
       <section className="swiss-form-section">
         <div className="swiss-section-header">
           <h3 className="swiss-section-title">2. Đề nghị tạm ứng & Thời hạn</h3>
-          <p className="swiss-section-sub">Số tiền xin ứng và kế hoạch nộp chứng từ hoàn ứng</p>
         </div>
 
         <div className="swiss-grid-2">
@@ -145,7 +141,6 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
                 value={numberField(value.request_amount_vnd)}
                 disabled={disabled}
                 onChange={(e) => update({ request_amount_vnd: parseAmount(e.target.value) })}
-                placeholder="0"
               />
               <span className="swiss-currency-badge">VND</span>
             </div>
@@ -177,7 +172,6 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
             className="swiss-input"
             value={value.assignment_note ?? ''}
             disabled={disabled}
-            placeholder="Ví dụ: Phân công công tác theo dự án..."
             onChange={(e) => update({ assignment_note: e.target.value || null })}
           />
         </div>
@@ -188,7 +182,6 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
         <div className="swiss-section-header-row">
           <div>
             <h3 className="swiss-section-title">3. Bảng dự toán chi phí</h3>
-            <p className="swiss-section-sub">Phân tách chi tiết nguồn chi trả theo quy định tài chính</p>
           </div>
           {!disabled && (
             <button
@@ -232,7 +225,7 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
                     colSpan={disabled ? 4 : 5}
                     className="swiss-table-empty"
                   >
-                    Chưa có dòng dự toán nào. {!disabled && 'Nhấn "+ Thêm dòng dự toán" ở trên để kê khai.'}
+                    Chưa có khoản dự toán nào.
                   </td>
                 </tr>
               ) : (
@@ -244,7 +237,6 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
                         className="swiss-table-input"
                         value={row.description}
                         disabled={disabled}
-                        placeholder="Ví dụ: Vé máy bay khứ hồi..."
                         onChange={(e) =>
                           updateRow(row.row_id, { description: e.target.value })
                         }
@@ -256,7 +248,6 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
                         className="swiss-table-input"
                         value={row.basis ?? ''}
                         disabled={disabled}
-                        placeholder="Theo báo giá..."
                         onChange={(e) =>
                           updateRow(row.row_id, { basis: e.target.value || null })
                         }
@@ -270,7 +261,6 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
                         className="swiss-table-input text-right"
                         value={numberField(row.company_vnd)}
                         disabled={disabled}
-                        placeholder="0"
                         onChange={(e) =>
                           updateRow(row.row_id, { company_vnd: parseAmount(e.target.value) })
                         }
@@ -284,7 +274,6 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
                         className="swiss-table-input text-right"
                         value={numberField(row.employee_vnd)}
                         disabled={disabled}
-                        placeholder="0"
                         onChange={(e) =>
                           updateRow(row.row_id, { employee_vnd: parseAmount(e.target.value) })
                         }
@@ -315,33 +304,23 @@ export function B3IntakeForm({ value, onChange, disabled }: B3IntakeFormProps) {
             </tbody>
             {/* Integrated Accounting Summary TFoot */}
             <tfoot>
-              <tr className="swiss-table-total-row">
+              <tr className="swiss-table-total-row" data-testid="b3-totals-preview">
                 <td colSpan={2} className="swiss-total-label">
-                  Tổng cộng dự toán
+                  Tổng cộng dự kiến: <strong>{vnd(totalPreview)}</strong>
+                  <span className="sr-only">
+                    công ty {vnd(companyTotal)} · nhân viên {vnd(employeeTotal)} · tổng {vnd(totalPreview)} (chưa duyệt, backend kiểm lại)
+                  </span>
                 </td>
-                <td className="text-right swiss-total-val">
+                <td className="text-right swiss-total-val" title="Công ty chi trả">
                   {vnd(companyTotal)}
                 </td>
-                <td className="text-right swiss-total-val">
+                <td className="text-right swiss-total-val" title="Nhân viên tự chi">
                   {vnd(employeeTotal)}
                 </td>
                 {!disabled && <td></td>}
               </tr>
             </tfoot>
           </table>
-        </div>
-
-        {/* Minimalist Summary Strip (Preserves test assertions for b3-totals-preview) */}
-        <div className="swiss-totals-bar" data-testid="b3-totals-preview">
-          <div className="swiss-totals-headline">
-            <span>Tổng cộng dự kiến: <strong>{vnd(totalPreview)}</strong></span>
-            <span className="swiss-totals-muted">
-              (Công ty: {vnd(companyTotal)} · Nhân viên: {vnd(employeeTotal)})
-            </span>
-          </div>
-          <div className="b3-totals-inline-summary swiss-totals-tech-note">
-            công ty {vnd(companyTotal)} · nhân viên {vnd(employeeTotal)} · tổng {vnd(totalPreview)} (chưa duyệt, backend kiểm lại)
-          </div>
         </div>
       </section>
     </div>

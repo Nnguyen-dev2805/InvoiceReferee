@@ -2,7 +2,7 @@
 // confirmed, IMPORT draft chưa confirm, không quảng cáo nút duyệt/chi.
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, vi } from 'vitest';
+import { afterEach, test, vi } from 'vitest';
 import * as api from './api';
 import { App } from './App';
 import type { B3DemoContext, B3Intake, CaseView, Report, RunView } from './types';
@@ -148,10 +148,22 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+test('chọn người dùng demo bằng tên, không nhập mã hoặc phòng ban', async () => {
+  setup();
+  const picker = await screen.findByRole('combobox', {name: 'Người dùng demo'});
+  expect(picker).toHaveTextContent('Nguyễn An — Nhân viên');
+  expect(picker).toHaveTextContent('Trần Bình — Kế toán');
+  expect(picker).not.toHaveTextContent('NV-DEMO-01');
+  expect(picker).not.toHaveTextContent('Kinh doanh');
+  expect(screen.queryByLabelText('Mã người thao tác')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Vai trò demo')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Nhân viên nộp (persona demo)')).not.toBeInTheDocument();
+});
+
 test('persona demo hiển thị profile; không nhập người duyệt/mã work/mốc trong B3', async () => {
   setup();
   expect(await screen.findByTestId('b3-intake-panel')).toBeTruthy();
-  expect(await screen.findByText(/Nguyễn An — Kinh doanh/)).toBeTruthy();
+  expect(await screen.findByText(/Nguyễn An — Nhân viên/)).toBeTruthy();
   const panel = screen.getByTestId('b3-intake-panel');
   // không có approver dropdown / work-id / clock input trong panel B3
   expect(screen.queryByLabelText(/người duyệt/i)).not.toBeInTheDocument();
@@ -373,7 +385,7 @@ test('không xoá khi người dùng huỷ hộp thoại xác nhận', async () 
   expect(deleteSpy).not.toHaveBeenCalled();
 });
 
-test('chuyển vai trò demo cập nhật đúng actorId theo roster demo context', async () => {
+test('chọn người dùng demo cập nhật role/actor theo roster context', async () => {
   const user = userEvent.setup();
   vi.spyOn(api, 'getDemoContext').mockResolvedValue(DEMO_CONTEXT);
   vi.spyOn(api, 'getHistory').mockResolvedValue([]);
@@ -382,16 +394,17 @@ test('chuyển vai trò demo cập nhật đúng actorId theo roster demo contex
 
   render(<App />);
 
-  // Khởi đầu là EMPLOYEE -> actor NV-DEMO-01
-  expect(await screen.findByDisplayValue('NV-DEMO-01')).toBeInTheDocument();
+  const picker = await screen.findByLabelText('Người dùng demo');
+  // Khởi đầu là nhân viên đầu tiên (Nguyễn An).
+  expect((picker as HTMLSelectElement).value).toBe('NV-DEMO-01');
 
-  // Đổi sang ACCOUNTANT -> actor tự động cập nhật ACC-DEMO-01
-  await user.selectOptions(screen.getByLabelText('Vai trò demo'), 'ACCOUNTANT');
-  expect(screen.getByDisplayValue('ACC-DEMO-01')).toBeInTheDocument();
+  // Chọn kế toán → role/actor derive từ người đó.
+  await user.selectOptions(picker, 'ACC-DEMO-01');
+  expect((picker as HTMLSelectElement).value).toBe('ACC-DEMO-01');
 
-  // Đổi sang APPROVER -> actor tự động cập nhật APR-DEMO-01
-  await user.selectOptions(screen.getByLabelText('Vai trò demo'), 'APPROVER');
-  expect(screen.getByDisplayValue('APR-DEMO-01')).toBeInTheDocument();
+  // Chọn người duyệt.
+  await user.selectOptions(picker, 'APR-DEMO-01');
+  expect((picker as HTMLSelectElement).value).toBe('APR-DEMO-01');
 });
 
 test('header nhận diện công việc: tiêu đề chính to rõ, dòng phụ hành trình, và nhãn xác nhận', async () => {
@@ -440,8 +453,9 @@ test('kế toán thấy trạng thái "Chờ kế toán rà soát" và nút Tạ
   const user = userEvent.setup();
   setup(caseView(true), true);
 
-  // Đổi vai sang ACCOUNTANT
-  await user.selectOptions(screen.getByLabelText('Vai trò demo'), 'ACCOUNTANT');
+  // Đổi người dùng sang kế toán (chờ roster tải xong).
+  const picker = await screen.findByLabelText('Người dùng demo');
+  await user.selectOptions(picker, 'ACC-DEMO-01');
 
   // Nút Tạo hồ sơ mới chuyển sang dạng thứ cấp (gọn hơn, không chiếm spotlight)
   const newCaseBtn = screen.getByRole('button', { name: /Tạo hồ sơ mới/ });
@@ -475,7 +489,8 @@ test('kế toán thấy trạng thái "Đã lưu kết quả rà soát" khi có 
     },
   ]);
 
-  await user.selectOptions(screen.getByLabelText('Vai trò demo'), 'ACCOUNTANT');
+  const picker = await screen.findByLabelText('Người dùng demo');
+  await user.selectOptions(picker, 'ACC-DEMO-01');
   await user.click(await screen.findByText(/C-b3test01/));
 
   const statusCard = await screen.findByTestId('accountant-status-card');
@@ -608,4 +623,76 @@ test('R2.3: case A trả muộn không ghi đè workspace case B', async () => {
   resolveA({...caseView(true), id: 'C-aaa'});
   await new Promise((r) => setTimeout(r, 20));
   expect(screen.getByTestId('case-id-badge')).toHaveTextContent('C-bbb');
+});
+
+// --- T3: demo-person picker drives submit + standalone B7 ----------------------
+
+test('T3: B3 WEB submit dùng đúng actor của người được chọn', async () => {
+  const user = userEvent.setup();
+  const createSpy = vi.spyOn(api, 'createB3Case').mockResolvedValue(caseView(true));
+  vi.spyOn(api, 'startRun').mockResolvedValue(RUN);
+  setup(caseView(true));
+  await screen.findByLabelText('Người dùng demo');
+  await user.type(screen.getByLabelText('Nơi đến'), 'Hà Nội');
+  await user.type(screen.getByLabelText('Mục đích công tác', {selector: '#b3-purpose'}), 'Khảo sát');
+  await user.type(screen.getByLabelText(/Số tiền đề nghị tạm ứng|Số xin ứng/), '2000000');
+  await user.click(screen.getByText('Nộp đề nghị B3 (web)'));
+  await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
+  expect(createSpy.mock.calls[0][0]).toBe('NV-DEMO-01');
+});
+
+test('T3: tạo quyết toán tự chi không cần nhập employee/work', async () => {
+  const user = userEvent.setup();
+  const standaloneSpy = vi.spyOn(api, 'createStandaloneB7')
+    .mockResolvedValue({...caseView(true), id: 'C-b7x', job: 'B7'});
+  setup();
+  await screen.findByLabelText('Người dùng demo');
+  // Mở tab quyết toán B7.
+  await user.click(screen.getByRole('tab', {name: /Quyết toán sau công việc/}));
+  expect(screen.queryByLabelText('Mã nhân viên')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Mã công việc')).not.toBeInTheDocument();
+  await user.type(screen.getByLabelText('Mục đích công tác'), 'Công tác Hà Nội');
+  await user.type(screen.getByLabelText('Phạm vi chi phí'), 'Chi phí chuyến đi');
+  await user.click(screen.getByRole('button', {name: 'Tạo hồ sơ quyết toán'}));
+  await waitFor(() => expect(standaloneSpy).toHaveBeenCalledTimes(1));
+  expect(standaloneSpy.mock.calls[0][0]).toBe('NV-DEMO-01');
+  expect(standaloneSpy.mock.calls[0][1]).toEqual({
+    purpose: 'Công tác Hà Nội', scope: 'Chi phí chuyến đi'});
+});
+
+test('T3: đổi người dùng khi có draft phải xác nhận; Cancel giữ nguyên', async () => {
+  const user = userEvent.setup();
+  const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  setup();
+  await screen.findByLabelText('Người dùng demo');
+  // Nhập draft.
+  await user.type(screen.getByLabelText('Nơi đến'), 'Hà Nội');
+  const picker = screen.getByLabelText('Người dùng demo') as HTMLSelectElement;
+  await user.selectOptions(picker, 'ACC-DEMO-01');
+  expect(confirmSpy).toHaveBeenCalled();
+  // Cancel → vẫn giữ người cũ và draft.
+  expect(picker.value).toBe('NV-DEMO-01');
+  expect((screen.getByLabelText('Nơi đến') as HTMLInputElement).value).toBe('Hà Nội');
+});
+
+test('T3: đổi người dùng khi có draft; Accept xóa draft', async () => {
+  const user = userEvent.setup();
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  setup();
+  await screen.findByLabelText('Người dùng demo');
+  await user.type(screen.getByLabelText('Nơi đến'), 'Hà Nội');
+  const picker = screen.getByLabelText('Người dùng demo') as HTMLSelectElement;
+  await user.selectOptions(picker, 'ACC-DEMO-01');
+  expect(picker.value).toBe('ACC-DEMO-01');
+  expect((screen.getByLabelText('Nơi đến') as HTMLInputElement).value).toBe('');
+});
+
+test('T3: context lỗi thì khóa tạo hồ sơ', async () => {
+  vi.spyOn(api, 'getDemoContext').mockRejectedValue(new Error('boom'));
+  vi.spyOn(api, 'listCases').mockResolvedValue([]);
+  vi.spyOn(api, 'getHistory').mockResolvedValue([]);
+  vi.spyOn(api, 'getQuestions').mockResolvedValue([]);
+  render(<App />);
+  const picker = await screen.findByLabelText('Người dùng demo') as HTMLSelectElement;
+  expect(picker).toHaveTextContent('Chưa tải được người dùng demo.');
 });

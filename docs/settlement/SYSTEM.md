@@ -122,6 +122,7 @@ Các paths dưới `/api`. POST/PATCH có actor_id/demo_role, expected_case_vers
 | Endpoint | Contract |
 | --- | --- |
 | POST /cases; GET /cases; GET /cases/{id} | Nhận Submission/job/scope/mốc; lưu unknown; trả versions/stage/sources/issues/actions, không cần approval đang xin |
+| POST /b3-cases; POST /b7-cases | Managed create cho luồng thường ngày: chỉ actor + lời khai (`b3-intake-v1`) hoặc `{purpose,scope}` (B7 tự chi); định danh/scope/clock do backend cấp, `work_ref` = `case.id` cho hồ sơ mới; không nhận employee/work/job/clock/parent/quyền |
 | PATCH /cases/{id}/submission | Revision mới, reason/version, giữ bản trước, invalidate/recheck phần ảnh hưởng |
 | POST /cases/{id}/sources; GET /sources/{id}/content | Originals/provenance/supersedes/import, trạng thái/limits; source ID backend, không tùy ý client path; upload không verified facts |
 | POST /cases/{id}/runs; GET /runs/{id}; GET /runs/{id}/report |202 run+status URL hoặc same command record; explicit allowed mode, snapshot/current; report đúng run/current khác history |
@@ -224,13 +225,18 @@ sửa report/basis cũ.
 
 Endpoint mới: `GET /api/demo-context` (people/routes, không cấp quyền do
 client nhập); `POST /api/b3-cases` (actor_id + intake; persona/role/employee_ref
-tra trong fixture, work id `WORK-<uuid12>` idempotent theo replay key trước khi
-phát id mới, clocks backend); `GET /api/runs/{run_id}/b3-context` (snapshot
-grants/coverage/history, refs `company:<...>`). PATCH submission giữ
-employee/work/clocks immutable cho B3 v1 và reject form b3-intake-v1 trên hồ
-sơ legacy (không di trú ngầm). Generic decision/money/handoff/closure vẫn bị
-chặn ở transaction guard bằng `B3_REPORT_ONLY` (review chỉ nhận khi đã
-confirm); allowed_actions không quảng cáo action chưa hỗ trợ.
+tra trong fixture; **hồ sơ mới lấy chính `case.id` làm scope** — không sinh
+`WORK-...`; idempotent theo replay key trước khi phát id mới; clocks backend);
+`POST /api/b7-cases` (B7 tự chi: `{purpose,scope}`, cùng định danh/scope/clock
+do backend cấp, **không** tạo B3/ứng 0); `GET /api/runs/{run_id}/b3-context`
+(snapshot grants/coverage/history, refs `company:<...>`). `CaseView`/`CaseSummary`
+trả thêm `dossier_ref` (read-only: ID B3 gốc cho B3/linked/adjustment, ID riêng
+cho B7 độc lập; suy từ persisted submission + origin_link, không từ `work_ref`).
+PATCH submission giữ employee/work/clocks immutable cho B3 v1 và reject form
+b3-intake-v1 trên hồ sơ legacy (không di trú ngầm). Generic
+decision/money/handoff/closure vẫn bị chặn ở transaction guard bằng
+`B3_REPORT_ONLY` (review chỉ nhận khi đã confirm); allowed_actions không quảng
+cáo action chưa hỗ trợ.
 
 Trình duyệt/quyết định ứng B3 (plan
 [2026-10-11-b3-present-and-approve](../superpowers/plans/2026-10-11-b3-present-and-approve.md))

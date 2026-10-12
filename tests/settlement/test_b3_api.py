@@ -62,11 +62,29 @@ def test_demo_context_lists_people_routes(b3_client):
 
 # --- POST /api/b3-cases -------------------------------------------------------
 
+def test_new_b3_uses_own_id_as_dossier_scope(b3_client):
+    body = {"actor_id": "NV-DEMO-01", "intake": NATIVE_FORM}
+    headers = {"Idempotency-Key": "dossier-new"}
+    first = b3_client.post("/api/b3-cases", json=body, headers=headers)
+    assert first.status_code == 201, first.text
+    case = first.json()
+    assert case["dossier_ref"] == case["id"]
+    assert case["submission"]["work_ref"] == case["id"]
+    assert case["submission"]["employee_ref"] == "NV-DEMO-01"
+    again = b3_client.post("/api/b3-cases", json=body, headers=headers)
+    assert again.status_code == 200, again.text
+    assert again.json()["id"] == case["id"]
+    assert again.json()["dossier_ref"] == case["dossier_ref"]
+    assert len(b3_client.get("/api/cases").json()) == 1
+
+
 def test_create_web_auto_profile_work_clock(b3_client):
     created = _create_b3(b3_client, _web_payload()).json()
     submission = created["submission"]
     assert submission["employee_ref"] == "NV-DEMO-01"
-    assert submission["work_ref"].startswith("WORK-")
+    # New B3: the case id is the dossier scope; no separate WORK- id.
+    assert submission["work_ref"] == created["id"]
+    assert created["dossier_ref"] == created["id"]
     assert submission["job"] == "B3"
     assert submission["form"]["schema_version"] == "b3-intake-v1"
     # clock mô phỏng của fixture synthetic, không phải giờ máy client
@@ -740,3 +758,84 @@ def test_native_run_matches_business_oracle(tmp_path):
         assert "giấy lệnh" not in issue["message"]
         assert "travel order" not in issue["message"]
     assert report["completion"] == "COMPLETE"
+
+
+# --- T1.3 regression: roots, linked scope, legacy compatibility ----------------
+
+def test_two_b3_same_person_get_distinct_roots(b3_client):
+    first = _create_b3(b3_client, _web_payload(), key="root-a").json()
+    second = _create_b3(b3_client, _web_payload(), key="root-b").json()
+    assert first["id"] != second["id"]
+    assert first["dossier_ref"] == first["id"]
+    assert second["dossier_ref"] == second["id"]
+    assert first["dossier_ref"] != second["dossier_ref"]
+
+
+def test_linked_child_dossier_ref_is_parent_root(b3_client):
+    # Reuse the linked fixture chain: approved parent → linked child.
+    from tests.settlement.test_b7_linked_api import _approved_parent
+    parent = _approved_parent(b3_client)
+    child = b3_client.post(
+        f"/api/cases/{parent['id']}/settlements",
+        json={"actor_id": "NV-DEMO-01", "demo_role": "EMPLOYEE",
+              "expected_case_version": parent["case_version"]},
+        headers={"Idempotency-Key": "t13-prep"}).json()
+    assert child["id"] != parent["id"]
+    assert child["dossier_ref"] == parent["id"]
+    # Each parent yields its own child; roots differ per parent.
+    second_parent = _create_b3(b3_client, _web_payload(), key="t13-p2").json()
+    # second_parent has no approval yet; just assert its own root projection.
+    assert second_parent["dossier_ref"] == second_parent["id"]
+
+
+def test_legacy_work_scope_row_keeps_root_and_bytes(b3_client):
+    """A legacy row whose submission.work_ref is a WORK- id keeps its raw bytes.
+
+    The dossier root is the record's own id (no origin link), and the persisted
+    submission JSON must not be rewritten to force work_ref == dossier_ref.
+    """
+    from invoice_referee.settlement.store import Store  # noqa: F401
+    legacy = b3_client.post("/api/cases", json={
+        "submission": {
+            "employee_ref": "NV-DEMO-01", "work_ref": "WORK-OLD-0001",
+            "job": "B7",
+            "money_as_of": "2026-10-10T09:00:00+07:00",
+            "knowledge_cutoff": "2026-10-10T09:00:00+07:00",
+            "form": {"purpose": "Công tác cũ", "scope": "Chi phí cũ"},
+        },
+        "actor_id": "NV-DEMO-01", "demo_role": "EMPLOYEE",
+    }, headers={"Idempotency-Key": "t13-legacy"})
+    assert legacy.status_code == 201, legacy.text
+    view = legacy.json()
+    assert view["submission"]["work_ref"] == "WORK-OLD-0001"
+    assert view["dossier_ref"] == view["id"]
+
+
+# --- T4.3 regression: imported document numbers are not internal keys ---------
+
+def test_two_imports_same_paper_number_do_not_merge(b3_client):
+    """Two cases whose papers carry the same 'Số' text stay separate records."""
+    doc = "Số: DN-01\nNơi đến: Hà Nội\nMục đích: Khảo sát\n"
+    a = _create_b3(b3_client, _web_payload(), key="same-so-a").json()
+    b = _create_b3(b3_client, _web_payload(), key="same-so-b").json()
+    _upload_b3(b3_client, a["id"], "de-nghi.txt", doc, a["case_version"], "so-a-1")
+    b_view = b3_client.get(f"/api/cases/{b['id']}").json()
+    _upload_b3(b3_client, b["id"], "de-nghi.txt", doc, b_view["case_version"],
+               "so-b-1")
+    # Distinct records with distinct roots; no automatic merge/dedup by number.
+    assert a["id"] != b["id"]
+    assert a["dossier_ref"] != b["dossier_ref"]
+    listing = b3_client.get("/api/cases").json()
+    ids = {c["id"] for c in listing}
+    assert {a["id"], b["id"]} <= ids
+
+
+def test_paper_without_number_uploads_and_previews(b3_client):
+    """A paper with no 'Số' line is accepted; missing number does not block."""
+    created = _create_b3(b3_client, _web_payload(), key="no-so").json()
+    no_number = "Nơi đến: Hà Nội\nMục đích: Khảo sát\n"
+    src = _upload_b3(b3_client, created["id"], "khong-so.txt", no_number,
+                     created["case_version"], "no-so-1")
+    assert src["filename"] == "khong-so.txt"
+    view = b3_client.get(f"/api/cases/{created['id']}").json()
+    assert any(s["filename"] == "khong-so.txt" for s in view["sources"])

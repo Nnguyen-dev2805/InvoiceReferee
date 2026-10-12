@@ -34,6 +34,7 @@ from invoice_referee.settlement.models import (
     B7MoneyEventView,
     B7PresentationView,
     B7RevalidationView,
+    B7StandaloneIntake,
     CaseSummary,
     CaseView,
     ClosureView,
@@ -237,6 +238,15 @@ class VerifyRunRequest(BaseModel):
 
 class CreateB3CaseRequest(BaseModel):
     """B3 v1 intake: chỉ actor + lời khai; context/quyền/clock do backend."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    actor_id: str
+    intake: dict[str, Any]
+
+
+class CreateB7CaseRequest(BaseModel):
+    """Standalone (self-paid) B7 intake: chỉ actor + nội dung; định danh backend."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -596,6 +606,29 @@ def create_runtime_app(*, db_path: Path | None = None,
         command = _command(idempotency_key, request.actor_id, "EMPLOYEE",
                            None, {})
         view = service.submit_b3(request.actor_id, intake, command)
+        if view.idempotent_replay:
+            return JSONResponse(status_code=200,
+                                content=view.model_dump(mode="json"))
+        return view
+
+    @app.post("/api/b7-cases", response_model=None, status_code=201)
+    async def create_b7_case(
+        request: CreateB7CaseRequest,
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    ) -> JSONResponse | CaseView:
+        from pydantic import ValidationError
+
+        try:
+            intake = B7StandaloneIntake.model_validate(request.intake)
+        except ValidationError as error:
+            raise DomainError(
+                "INVALID_PAYLOAD",
+                f"Lời khai quyết toán không hợp lệ (không nhận employee/work/"
+                f"job/clock/parent/quyền do client nhập): {error}",
+            ) from error
+        command = _command(idempotency_key, request.actor_id, "EMPLOYEE",
+                           None, {})
+        view = service.submit_standalone_b7(request.actor_id, intake, command)
         if view.idempotent_replay:
             return JSONResponse(status_code=200,
                                 content=view.model_dump(mode="json"))

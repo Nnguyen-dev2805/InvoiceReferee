@@ -29,6 +29,8 @@ interface B7IntakeProps {
   // Runs the actual reconciliation. Confirming intake only saves the
   // declaration; it must not imply an automatic run that does not exist.
   onRunCheck?: () => Promise<void>;
+  // Opens the parent B3 (advance request) record by its real id.
+  onOpenParent?: (parentId: string) => void;
 }
 
 function emptyIntake(): B7LinkedIntake {
@@ -36,7 +38,8 @@ function emptyIntake(): B7LinkedIntake {
            expense_rows: [], note: null };
 }
 
-export function B7IntakePanel({ view, report, role, actorId, onAction, onRunCheck }: B7IntakeProps) {
+export function B7IntakePanel({ view, report, role, actorId, onAction,
+                               onRunCheck, onOpenParent }: B7IntakeProps) {
   const link = view.linked_b7 ?? null;
   const form = view.submission.form as unknown as B7LinkedIntake;
   const [intake, setIntake] = useState<B7LinkedIntake>(
@@ -98,10 +101,16 @@ export function B7IntakePanel({ view, report, role, actorId, onAction, onRunChec
       <h2>Quyết toán liên kết — {view.submission.employee_ref}</h2>
       <div className="review-summary-card" data-testid="b7-origin-link">
         <div className="review-summary-line">
-          Công việc <code>{link.origin.work_ref}</code> · hồ sơ gốc{' '}
-          <code>{link.origin.origin_case_id}</code> · ứng đã ghi nhận{' '}
-          {formatVnd(link.managed_advance_subtotal_vnd)}
+          Quyết toán thuộc hồ sơ <code>{link.origin.origin_case_id}</code>
+          {' '}· ứng đã ghi nhận {formatVnd(link.managed_advance_subtotal_vnd)}
         </div>
+        {onOpenParent && (
+          <button type="button" className="btn btn-sm btn-ghost"
+                  data-testid="b7-open-parent"
+                  onClick={() => onOpenParent(link.origin.origin_case_id)}>
+            Xem đề nghị tạm ứng
+          </button>
+        )}
       </div>
       <p className="muted">
         Khai chi phí <strong>thực tế</strong> đã phát sinh. Số dự toán và số ứng

@@ -505,6 +505,28 @@ class B7LinkedIntake(BaseModel):
         return self
 
 
+class B7StandaloneIntake(BaseModel):
+    """Employee declaration for a self-paid B7 settlement (no B3/advance).
+
+    Carries only the business content the employee types: purpose and scope.
+    Identity (employee/work/clock) and any authority are server-derived; no
+    client-supplied employee/work/job/clock/parent/amount/authority fields.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    purpose: str
+    scope: str
+
+    @field_validator("purpose", "scope")
+    @classmethod
+    def _nonblank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("purpose/scope không được rỗng.")
+        return stripped
+
+
 class LinkedB7View(BaseModel):
     """Projection of a linked B7 case's origin/context/limits for API/UI."""
 
@@ -1088,6 +1110,10 @@ class CaseView(BaseModel):
     stage: CaseStage
     current_run_id: str | None = None
     submission: Submission
+    # Shared root of the business dossier (B3 root for B3/linked B7/adjustment;
+    # own id for a standalone B7). Read-only projection; ``id`` stays the record
+    # /stage identity used by URLs, versions, sources and commands.
+    dossier_ref: str | None = None
     sources: list[SourceView] = Field(default_factory=list)
     allowed_actions: list[AllowedAction] = Field(default_factory=list)
     money_summary: dict[str, Any] = Field(default_factory=dict)
@@ -1113,6 +1139,7 @@ class CaseSummary(BaseModel):
     case_version: StrictInt
     updated_at: AwareDatetime
     origin: CaseOrigin = "USER"
+    dossier_ref: str | None = None
 
 
 class AuditEntry(BaseModel):

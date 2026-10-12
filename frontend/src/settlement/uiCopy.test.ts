@@ -1,13 +1,33 @@
 import { describe, expect, test } from 'vitest';
 import {
   checkLabel,
+  dossierReference,
   errorText,
   factLabel,
   formatMoney,
+  getInitials,
   historyKindLabel,
   roleLabel,
   stageLabel,
 } from './uiCopy';
+import type { CaseView } from './types';
+
+function makeView(overrides: Partial<CaseView> = {}): CaseView {
+  return {
+    id: 'C-01', job: 'B7', case_version: 1, input_revision: 1, control_epoch: 1,
+    stop_active: false, stage: 'CHECKING', current_run_id: null,
+    submission: {
+      employee_ref: 'NV-01', work_ref: 'C-01', job: 'B7',
+      money_as_of: '2026-10-10T02:00:00Z',
+      knowledge_cutoff: '2026-10-10T02:00:00Z', form: {},
+    },
+    sources: [], allowed_actions: [],
+    money_summary: { approved_vnd: null, received_vnd: null, remaining_vnd: null,
+                     pending_events: 0, incidents: [] },
+    created_at: '2026-10-10T02:00:00Z', updated_at: '2026-10-10T02:00:00Z',
+    ...overrides,
+  };
+}
 
 describe('uiCopy', () => {
   test('formatMoney handles null, zero, and positive amounts', () => {
@@ -30,7 +50,22 @@ describe('uiCopy', () => {
   test('roleLabel translates demo roles to clear titles', () => {
     expect(roleLabel('EMPLOYEE')).toBe('Nhân viên');
     expect(roleLabel('ACCOUNTANT')).toBe('Kế toán');
-    expect(roleLabel('APPROVER')).toBe('Người duyệt');
+    expect(roleLabel('APPROVER')).toBe('Người phê duyệt');
+  });
+
+  test('dossierReference uses server field, then typed link, else own id', () => {
+    expect(dossierReference(makeView({ dossier_ref: 'C-root' }))).toBe('C-root');
+    // Old view without the server field but with a typed linked origin.
+    expect(dossierReference(makeView({
+      linked_b7: {
+        origin: { origin_case_id: 'C-parent', employee_ref: 'NV-01',
+                  work_ref: 'WORK-1', created_at: '2026-10-11T10:00:00Z' },
+        context_source_id: null, context_current: false, blocked_reasons: [],
+        managed_advance_subtotal_vnd: null,
+      },
+    }))).toBe('C-parent');
+    // Standalone / B3 with no link → own id.
+    expect(dossierReference(makeView({ id: 'C-self' }))).toBe('C-self');
   });
 
   test('checkLabel maps B3 and B7 rule keys to Vietnamese descriptions', () => {
@@ -63,5 +98,14 @@ describe('uiCopy', () => {
     expect(historyKindLabel('SUBMISSION_REVISED')).toBe('Cập nhật thông tin');
     expect(historyKindLabel('RUN_SUCCEEDED')).toBe('Hoàn thành kiểm tra');
     expect(historyKindLabel('UNKNOWN_EVENT_XYZ')).toBe('Thao tác khác');
+  });
+
+  test('getInitials extracts clean uppercase initials from person names', () => {
+    expect(getInitials('Nguyễn An')).toBe('NA');
+    expect(getInitials('Trần Bình')).toBe('TB');
+    expect(getInitials('Lê Chi')).toBe('LC');
+    expect(getInitials('Nguyễn Văn Hoà')).toBe('NH');
+    expect(getInitials('Admin')).toBe('AD');
+    expect(getInitials('')).toBe('U');
   });
 });
