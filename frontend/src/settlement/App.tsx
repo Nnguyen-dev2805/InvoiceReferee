@@ -12,6 +12,7 @@ import { ReportPanel } from './Report';
 import { ProcessingDetails } from './ProcessingDetails';
 import { SourceUploadPanel } from './SourceUploadPanel';
 import { VerifyPanel } from './Verify';
+import { DocumentViewer } from './DocumentViewer';
 import { summarizeCase } from './uiState';
 import { historyKindLabel } from './uiCopy';
 import { useCaseWorkspace } from './useCaseWorkspace';
@@ -100,8 +101,6 @@ export function App() {
   const [workRef, setWorkRef] = useState('');
   const [purpose, setPurpose] = useState('');
   const [scope, setScope] = useState('');
-  const [requestAmount, setRequestAmount] = useState('');
-  const [forecastAmount, setForecastAmount] = useState('');
   const [moneyAsOf, setMoneyAsOf] = useState(nowLocalInput());
   const [knowledgeCutoff, setKnowledgeCutoff] = useState(nowLocalInput());
 
@@ -127,6 +126,9 @@ export function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
   const [copiedCaseId, setCopiedCaseId] = useState(false);
+  const [showTechDrawer, setShowTechDrawer] = useState(false);
+  const [activeDocSourceId, setActiveDocSourceId] = useState<string | null>(null);
+  const [isUploadingSource, setIsUploadingSource] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleCopyCaseId = useCallback(async (id: string) => {
@@ -317,10 +319,6 @@ export function App() {
           form: {
             purpose: purpose.trim(),
             scope: scope.trim(),
-            ...(job === 'B3' && requestAmount.trim()
-              ? { request_amount_vnd: Number(requestAmount) } : {}),
-            ...(job === 'B3' && forecastAmount.trim()
-              ? { forecast_employee_vnd: Number(forecastAmount) } : {}),
           },
         },
         actor_id: actorId.trim(),
@@ -515,19 +513,44 @@ export function App() {
 
   // Dedicated prepare-settlement: use the returned child id directly instead of
   // reloading the parent and making the employee hunt for the new child case.
-  const handlePrepareSettlement = async () => {
-    if (!view) return;
+  const handlePrepareSettlement = async (caseId?: string, expectedVersion?: number) => {
+    const targetId = caseId ?? view?.id;
+    const targetVersion = expectedVersion ?? view?.case_version;
+    if (!targetId) return;
     try {
-      const child = await api.prepareLinkedB7(view.id, {
+      const child = await api.prepareLinkedB7(targetId, {
         actor_id: actorId.trim(),
         demo_role: role,
-        expected_case_version: view.case_version,
+        expected_case_version: targetVersion ?? 1,
       });
       setError(null);
       await loadCases();
       await loadCase(child.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không mở được hồ sơ quyết toán.');
+    }
+  };
+
+  const handleUploadWorkbenchSource = async (files: FileList | File[]) => {
+    if (!view) return;
+    try {
+      setIsUploadingSource(true);
+      for (const file of Array.from(files)) {
+        await api.addSource(
+          view.id,
+          file,
+          view.case_version,
+          actorId.trim(),
+          role,
+          '',
+        );
+      }
+      await loadCase(view.id);
+      await loadCases();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không tải được tệp đính kèm.');
+    } finally {
+      setIsUploadingSource(false);
     }
   };
 
@@ -541,6 +564,13 @@ export function App() {
   const caseSummary = view
     ? summarizeCase(view, run, report, { role, actorId: actorId.trim() })
     : null;
+
+  const b3EligibleCases = useMemo(() => {
+    return cases.filter((c) => {
+      const isMyCase = role !== 'EMPLOYEE' || c.employee_ref === actorId.trim();
+      return c.job === 'B3' && isMyCase;
+    });
+  }, [cases, role, actorId]);
 
   const latestReview = useMemo(() => {
     return history.filter(
@@ -732,6 +762,9 @@ export function App() {
                 <div className="case-list">
                   {filteredCases.map((c) => {
                     const isActive = c.id === view?.id;
+                    const actorName = demoContext?.people.find(
+                      (p) => p.actor_ref === c.employee_ref
+                    )?.name;
                     return (
                       <div
                         key={c.id}
@@ -756,7 +789,9 @@ export function App() {
                             <span className="case-version-text">v{c.case_version}</span>
                           </div>
                           <div className="case-item-bottom">
-                            <span className="case-item-actor">{c.employee_ref}</span>
+                            <span className="case-item-actor">
+                              {actorName ? `${actorName} (${c.employee_ref})` : c.employee_ref}
+                            </span>
                             <span>/</span>
                             <span className="case-item-work">{c.work_ref}</span>
                           </div>
@@ -1007,75 +1042,162 @@ export function App() {
             )}
 
             {activeIntakeTab === 'B7' && (
-              <div className="panel">
-                <h2>Quyết toán sau công việc</h2>
-                <p className="muted">
-                  Luồng chuẩn: nhân viên nộp đề nghị tạm ứng (B3) rồi mở
-                  <strong> hồ sơ quyết toán liên kết</strong> từ công việc đó —
-                  không tạo mới tại đây. Biểu mẫu dưới là công cụ mở rộng cho
-                  hồ sơ nhập ngoài/đã ở giai đoạn sau.
-                </p>
-                <details className="tech-context-summary" data-testid="legacy-create-tools">
-                  <summary>Công cụ mở rộng — tạo hồ sơ nhập ngoài</summary>
-                <div className="field">
-                  <label htmlFor="job">Loại kiểm tra</label>
-                  <select id="job" value={job} onChange={(e) => setJob(e.target.value as Job)}>
-                    <option value="B7">B7 — Quyết toán sau công việc</option>
-                    <option value="B3">B3 — Kiểm tra đề nghị tạm ứng</option>
-                  </select>
+              <div className="panel" data-testid="b7-create-panel">
+                <div style={{ marginBottom: 'var(--space-4)' }}>
+                  <h2 style={{ margin: '0 0 var(--space-2)' }}>Quyết toán sau công việc (B7)</h2>
+                  <p className="muted" style={{ margin: 0, fontSize: '0.9rem' }}>
+                    Khai báo chi phí thực tế đã phát sinh sau chuyến công tác. Chọn phương thức phù hợp với trường hợp của bạn:
+                  </p>
                 </div>
-                <div className="field">
-                  <label htmlFor="employee-ref">Mã nhân viên</label>
-                  <input id="employee-ref" value={employeeRef}
-                          onChange={(e) => setEmployeeRef(e.target.value)} />
-                </div>
-                <div className="field">
-                  <label htmlFor="work-ref">Mã công việc</label>
-                  <input id="work-ref" value={workRef} onChange={(e) => setWorkRef(e.target.value)}
-                          placeholder="Ví dụ: CT-01" />
-                </div>
-                <div className="field">
-                  <label htmlFor="purpose">Mục đích công tác</label>
-                  <input id="purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)}
-                          placeholder="Ví dụ: Công tác Hà Nội" />
-                </div>
-                <div className="field">
-                  <label htmlFor="scope">Phạm vi</label>
-                  <input id="scope" value={scope} onChange={(e) => setScope(e.target.value)}
-                          placeholder="Ví dụ: Vé, khách sạn trong chuyến công tác..." />
-                </div>
-                {job === 'B3' && (
-                  <>
-                    <div className="field">
-                      <label htmlFor="request-amount">Số xin ứng (VND, khai báo — không phải actual)</label>
-                      <input id="request-amount" type="number" min="0"
-                              value={requestAmount}
-                              onChange={(e) => setRequestAmount(e.target.value)}
-                              placeholder="0" />
+
+                <div className="b7-path-grid">
+                  {/* OPTION 1: LINKED B7 FROM EXISTING B3 */}
+                  <div className="b7-path-card b7-path-primary">
+                    <div className="b7-path-header">
+                      <span className="b7-path-badge">Khuyên dùng</span>
+                      <h3 className="b7-path-title">1. Quyết toán từ hồ sơ tạm ứng B3</h3>
                     </div>
-                    <div className="field">
-                      <label htmlFor="forecast-amount">Dự toán phần nhân viên (VND)</label>
-                      <input id="forecast-amount" type="number" min="0"
-                              value={forecastAmount}
-                              onChange={(e) => setForecastAmount(e.target.value)}
-                              placeholder="0" />
+                    <p className="b7-path-desc">
+                      Dành cho chuyến công tác đã được cấp tạm ứng trước đó. Hệ thống sẽ tự động liên kết và đối soát giữa số tiền đã ứng và chi phí thực tế.
+                    </p>
+
+                    <div className="b7-eligible-list">
+                      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-foreground)', marginBottom: '8px' }}>
+                        Hồ sơ tạm ứng B3 khả dụng ({b3EligibleCases.length}):
+                      </div>
+                      {b3EligibleCases.length === 0 ? (
+                        <div className="b7-eligible-empty">
+                          <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: 'var(--color-muted-foreground)' }}>
+                            Chưa tìm thấy hồ sơ tạm ứng B3 nào của bạn. Nếu cần xin tạm ứng trước khi đi:
+                          </p>
+                          <button
+                            type="button"
+                            className="swiss-btn swiss-btn-secondary swiss-btn-sm"
+                            onClick={() => setActiveIntakeTab('B3')}
+                          >
+                            ← Chuyển sang Đề nghị tạm ứng (B3)
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="b7-eligible-cards">
+                          {b3EligibleCases.map((b3Case) => (
+                            <div key={b3Case.id} className="b7-eligible-item">
+                              <div className="b7-eligible-item-info">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span className="case-id-badge-code" style={{ fontSize: '0.78rem' }}>{b3Case.id}</span>
+                                  <span className="case-stage-pill" style={{ fontSize: '0.72rem' }}>{STAGE_LABELS[b3Case.stage]}</span>
+                                </div>
+                                <div style={{ fontSize: '0.82rem', fontWeight: 600, marginTop: '4px' }}>
+                                  Công việc: <code>{b3Case.work_ref}</code>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                className="swiss-btn swiss-btn-primary swiss-btn-sm"
+                                onClick={() => void handlePrepareSettlement(b3Case.id, b3Case.case_version)}
+                              >
+                                Mở quyết toán liên kết →
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </>
-                )}
-                <div className="field">
-                  <label htmlFor="money-as-of">Mốc tiền (money_as_of)</label>
-                  <input id="money-as-of" type="datetime-local" value={moneyAsOf}
-                          onChange={(e) => setMoneyAsOf(e.target.value)} />
+                  </div>
+
+                  {/* OPTION 2: DIRECT B7 SETTLEMENT */}
+                  <div className="b7-path-card">
+                    <div className="b7-path-header">
+                      <span className="b7-path-badge b7-path-badge-neutral">Trực tiếp</span>
+                      <h3 className="b7-path-title">2. Quyết toán trực tiếp (không tạm ứng)</h3>
+                    </div>
+                    <p className="b7-path-desc">
+                      Dành cho chuyến công tác nhân viên tự chi trả bằng tiền túi, không có khoản tạm ứng trước của công ty.
+                    </p>
+
+                    <div className="b7-direct-form">
+                      <div className="form-grid-2">
+                        <div className="field">
+                          <label htmlFor="employee-ref">Mã nhân viên</label>
+                          <input
+                            id="employee-ref"
+                            value={employeeRef || actorId.trim()}
+                            onChange={(e) => setEmployeeRef(e.target.value)}
+                            placeholder="Mã nhân viên"
+                          />
+                        </div>
+                        <div className="field">
+                          <label htmlFor="work-ref">Mã công việc</label>
+                          <input
+                            id="work-ref"
+                            value={workRef}
+                            onChange={(e) => setWorkRef(e.target.value)}
+                            placeholder="Ví dụ: CT-01"
+                          />
+                        </div>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="purpose">Mục đích công tác</label>
+                        <input
+                          id="purpose"
+                          value={purpose}
+                          onChange={(e) => setPurpose(e.target.value)}
+                          placeholder="Ví dụ: Công tác Hà Nội"
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="scope">Phạm vi chi phí</label>
+                        <input
+                          id="scope"
+                          value={scope}
+                          onChange={(e) => setScope(e.target.value)}
+                          placeholder="Ví dụ: Vé, khách sạn trong chuyến công tác..."
+                        />
+                      </div>
+
+                      {/* ADVANCED REPLAY ACCORDION (COLLAPSED BY DEFAULT) */}
+                      <details className="swiss-advanced-details" data-testid="legacy-create-tools">
+                        <summary className="swiss-advanced-summary">
+                          ⚙️ Cấu hình kiểm thử nâng cao (mốc thời gian simulation)
+                        </summary>
+                        <div className="swiss-advanced-content">
+                          <div className="form-grid-2">
+                            <div className="field">
+                              <label htmlFor="money-as-of">Mốc tiền (money_as_of)</label>
+                              <input
+                                id="money-as-of"
+                                type="datetime-local"
+                                value={moneyAsOf}
+                                onChange={(e) => setMoneyAsOf(e.target.value)}
+                              />
+                            </div>
+                            <div className="field">
+                              <label htmlFor="knowledge-cutoff">Mốc kiến thức (knowledge_cutoff)</label>
+                              <input
+                                id="knowledge-cutoff"
+                                type="datetime-local"
+                                value={knowledgeCutoff}
+                                onChange={(e) => setKnowledgeCutoff(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </details>
+
+                      <button
+                        type="button"
+                        className="swiss-btn swiss-btn-primary"
+                        style={{ marginTop: 'var(--space-3)', width: '100%' }}
+                        onClick={async () => {
+                          setJob('B7');
+                          await handleCreate();
+                        }}
+                      >
+                        Tạo hồ sơ
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="field">
-                  <label htmlFor="knowledge-cutoff">Mốc kiến thức (knowledge_cutoff)</label>
-                  <input id="knowledge-cutoff" type="datetime-local" value={knowledgeCutoff}
-                          onChange={(e) => setKnowledgeCutoff(e.target.value)} />
-                </div>
-                <button className="btn btn-primary" onClick={() => void handleCreate()}>
-                  Tạo hồ sơ
-                </button>
-                </details>
               </div>
             )}
           </section>
@@ -1117,14 +1239,25 @@ export function App() {
                     )
                   )}
                 </div>
-                {viewIsB3 && (view.submission.form as Record<string, unknown>)?.request_amount_vnd != null && (
-                  <div className="case-header-amount-box">
-                    <span className="case-header-amount-label">Số tiền đề nghị:</span>
-                    <span className="case-header-amount-val">
-                      {Number((view.submission.form as Record<string, unknown>).request_amount_vnd).toLocaleString('vi-VN')} VND
-                    </span>
-                  </div>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {viewIsB3 && (view.submission.form as Record<string, unknown>)?.request_amount_vnd != null && (
+                    <div className="case-header-amount-box">
+                      <span className="case-header-amount-label">Số tiền đề nghị:</span>
+                      <span className="case-header-amount-val">
+                        {Number((view.submission.form as Record<string, unknown>).request_amount_vnd).toLocaleString('vi-VN')} VND
+                      </span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="swiss-btn swiss-btn-secondary swiss-btn-sm"
+                    style={{ fontSize: '0.78rem', padding: '3px 8px' }}
+                    onClick={() => setShowTechDrawer(true)}
+                    title="Xem chi tiết kỹ thuật & kiểm toán"
+                  >
+                    ℹ️ Kỹ thuật
+                  </button>
+                </div>
               </div>
 
               {/* Tiêu đề chính to rõ: Đề nghị tạm ứng — [Tên nhân viên] */}
@@ -1361,8 +1494,23 @@ export function App() {
               </div>
             )}
 
-            {/* Case Tabs Navigation */}
-            <div className="case-tabs-nav" role="tablist" aria-label="Các phần chi tiết của hồ sơ">
+            {/* WORKBENCH SPLIT-SCREEN LAYOUT */}
+            <div className="workbench-split" data-testid="workbench-split">
+              {/* CỘT TRÁI: DOCUMENT VIEWER */}
+              <div className="workbench-doc-pane">
+                <DocumentViewer
+                  sources={view.sources}
+                  selectedSourceId={activeDocSourceId}
+                  onSelectSource={setActiveDocSourceId}
+                  onUpload={handleUploadWorkbenchSource}
+                  isUploading={isUploadingSource}
+                />
+              </div>
+
+              {/* CỘT PHẢI: FORM / REPORT / TABS */}
+              <div className="workbench-content-pane">
+                {/* Case Tabs Navigation */}
+                <div className="case-tabs-nav" role="tablist" aria-label="Các phần chi tiết của hồ sơ">
               <button
                 type="button"
                 role="tab"
@@ -1788,7 +1936,120 @@ export function App() {
                 )}
               </div>
             </div>
-          </section>
+          </div>
+        </div>
+
+        {/* STICKY BOTTOM ACTION BAR */}
+        <div className="workbench-sticky-bar" data-testid="workbench-sticky-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--color-muted-foreground)', fontWeight: 600 }}>TRẠNG THÁI:</span>
+            <span className={`status-pill status-${view.stage.toLowerCase()}`} style={{ fontSize: '0.75rem' }}>
+              {viewIsB3 && view.b3_workflow?.status === 'APPROVED'
+                ? 'Đã duyệt tạm ứng'
+                : viewIsB3 && view.b3_workflow?.status === 'PENDING'
+                  ? 'Chờ duyệt tạm ứng'
+                  : STAGE_LABELS[view.stage]}
+            </span>
+            {caseTab === 'draft' && !view.submission.form.confirmed && (
+              <span className="pill-badge pill-badge-amber" style={{ fontSize: '0.75rem' }}>Bản nháp chưa gửi</span>
+            )}
+          </div>
+          <div className="workbench-sticky-actions">
+            {caseTab === 'draft' && viewIsB3 && !view.submission.form.confirmed && (
+              <>
+                <button
+                  type="button"
+                  className="swiss-btn swiss-btn-secondary swiss-btn-sm"
+                  onClick={() => void handleReviseB3(false)}
+                >
+                  Lưu nháp
+                </button>
+                <button
+                  type="button"
+                  className="swiss-btn swiss-btn-primary swiss-btn-sm"
+                  onClick={() => void handleReviseB3(true)}
+                >
+                  Gửi đề nghị
+                </button>
+              </>
+            )}
+            {caseTab === 'draft' && viewIsB3 && Boolean(view.submission.form.confirmed) && (
+              <button
+                type="button"
+                className="swiss-btn swiss-btn-primary swiss-btn-sm"
+                disabled={!b3ReviseReason.trim()}
+                onClick={() => void handleReviseB3(true)}
+              >
+                Lưu cập nhật
+              </button>
+            )}
+            {caseTab === 'report' && canStartRun && (
+              <button
+                type="button"
+                className="swiss-btn swiss-btn-primary swiss-btn-sm"
+                onClick={() => void handleStartRun()}
+              >
+                {viewIsB3
+                  ? (view.submission.form.confirmed ? 'Chạy đối soát' : 'Trích xuất hồ sơ')
+                  : 'Thực hiện đối soát'}
+              </button>
+            )}
+            {caseTab === 'report' && role === 'ACCOUNTANT' && (
+              <button
+                type="button"
+                className="swiss-btn swiss-btn-secondary swiss-btn-sm"
+                onClick={() => {
+                  const el = document.getElementById('accountant-review-section') || document.getElementById('review-note');
+                  if (el) {
+                    el.scrollIntoView?.({ behavior: 'smooth' });
+                    const input = document.getElementById('review-note');
+                    if (input instanceof HTMLElement) input.focus();
+                  }
+                }}
+              >
+                Rà soát ↓
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* TECHNICAL DETAILS DRAWER */}
+        {showTechDrawer && (
+          <div className="swiss-tech-drawer-overlay" onClick={() => setShowTechDrawer(false)}>
+            <div
+              className="swiss-tech-drawer"
+              data-testid="swiss-tech-drawer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="swiss-drawer-header">
+                <h3 className="swiss-drawer-title">Thông tin kỹ thuật &amp; Kiểm toán</h3>
+                <button
+                  type="button"
+                  className="btn-icon-subtle"
+                  onClick={() => setShowTechDrawer(false)}
+                  aria-label="Đóng bảng kỹ thuật"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="swiss-drawer-body">
+                <div style={{ marginBottom: 'var(--space-4)', lineHeight: '1.6' }}>
+                  <div><strong>Mã hồ sơ:</strong> <code>{view.id}</code></div>
+                  <div><strong>Mã nhân viên:</strong> <code>{view.submission.employee_ref}</code></div>
+                  <div><strong>Mã công việc:</strong> <code>{view.submission.work_ref}</code></div>
+                  <div><strong>Phiên bản:</strong> v{view.case_version} (rev {view.input_revision}, epoch {view.control_epoch})</div>
+                  {run && (
+                    <div><strong>Run ID:</strong> <code>{run.id}</code> ({run.mode})</div>
+                  )}
+                </div>
+                {run && report && (
+                  <ProcessingDetails run={run} report={report} />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
         )}
       </div>
     </div>
