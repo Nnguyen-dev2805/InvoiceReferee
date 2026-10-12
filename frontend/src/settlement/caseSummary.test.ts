@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { summarizeCase } from './uiState';
+import { summarizeCase } from './caseSummary';
 import type { CaseView, Report, RunView } from './types';
 
 function createCase(overrides?: Partial<CaseView>): CaseView {
@@ -115,7 +115,7 @@ function createReport(overrides?: Partial<Report>): Report {
   };
 }
 
-describe('uiState - summarizeCase', () => {
+describe('caseSummary - summarizeCase', () => {
   test('B3 draft unconfirmed identifies missing fields and directs to draft editor', () => {
     const view = createCase();
     const run = createRun();

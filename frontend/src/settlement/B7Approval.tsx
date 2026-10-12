@@ -6,18 +6,17 @@
 // receipt.
 import { useMemo, useState } from 'react';
 import * as api from './api';
+import { formatMoney } from './displayText';
 import type {
   AuditEntry, B7DecisionOutcome, B7DecisionTarget, CaseView, DemoRole, Report,
 } from './types';
 
 function formatVnd(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '—';
-  return `${value.toLocaleString('vi-VN')} đ`;
+  return formatMoney(value, { nullText: '—' });
 }
 
 function B7DecisionSummary({ target }: { target: B7DecisionTarget | null }) {
   if (!target) return <p className="muted">Chưa có quyết định phê duyệt.</p>;
-  const money = new Intl.NumberFormat('vi-VN').format(target.amount_vnd);
   const label = {
     PAY_EMPLOYEE: 'Số tiền công ty cần trả thêm',
     COLLECT_FROM_EMPLOYEE: 'Số tiền nhân viên cần hoàn lại',
@@ -26,7 +25,7 @@ function B7DecisionSummary({ target }: { target: B7DecisionTarget | null }) {
   return (
     <p>
       <strong>{label}</strong>
-      {target.direction === 'BALANCED' ? '' : `: ${money} đ`}
+      {target.direction === 'BALANCED' ? '' : `: ${formatVnd(target.amount_vnd)}`}
     </p>
   );
 }

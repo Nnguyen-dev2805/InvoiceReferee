@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from invoice_referee.domain.models import DomainError
+from invoice_referee.shared.errors import DomainError
 from invoice_referee.settlement.models import (
     B7ClaimRow, B7LinkedIntake, Observation, Relation,
 )

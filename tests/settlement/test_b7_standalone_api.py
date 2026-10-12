@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 
 from invoice_referee.api.settlement import create_runtime_app
-from invoice_referee.settlement.b3 import B3CompanyContext
+from invoice_referee.settlement.b3_intake import B3CompanyContext
 from invoice_referee.settlement.reader import StructuredLedgerReader
 from invoice_referee.settlement.service import Service, ServiceConfig
 from invoice_referee.settlement.store import Store

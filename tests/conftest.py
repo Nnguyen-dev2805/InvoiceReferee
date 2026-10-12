@@ -14,22 +14,11 @@ from __future__ import annotations
 import pytest
 
 # Provider + runtime config that a `.env` could set and that tests assert on.
+# Only the Mistral variables the settlement core actually reads are isolated.
 _ENV_VARS = (
-    'DATA_ROOT',
-    'PROVIDER_MODE',
     'MISTRAL_API_KEY',
     'MISTRAL_OCR_MODEL',
     'MISTRAL_BASE_URL',
-    'KIMI_API_KEY',
-    'KIMI_TOKEN',
-    'KIMI_SECRET',
-    'KIMI_MODEL',
-    'KIMI_BASE_URL',
-    'LLM_API_KEY',
-    'LLM_MODEL',
-    'LLM_BASE_URL',
-    'LLM_TIMEOUT',
-    'OCR_WORD_REVIEW_THRESHOLD',
 )
 
 

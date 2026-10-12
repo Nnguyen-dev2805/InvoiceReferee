@@ -7,13 +7,13 @@
 // and never derives permission from the demo role picker.
 import { useEffect, useMemo, useState } from 'react';
 import * as api from './api';
+import { formatMoney } from './displayText';
 import type {
   AuditEntry, B3DecisionOutcome, CaseView, DemoRole, Report,
 } from './types';
 
 function formatVnd(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '—';
-  return `${value.toLocaleString('vi-VN')} đ`;
+  return formatMoney(value, { nullText: '—' });
 }
 
 interface B3ApprovalProps {

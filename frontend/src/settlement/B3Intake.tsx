@@ -3,6 +3,7 @@
 // chỉ hiển thị tổng preview; backend kiểm lại số liệu. Không nhập tự do
 // người duyệt/mã nội bộ; persona và mã hồ sơ do hệ thống cấp.
 import type { B3EstimateRow, B3Intake } from './types';
+import { formatMoney } from './displayText';
 
 interface B3IntakeFormProps {
   value: B3Intake;
@@ -22,7 +23,7 @@ function sum(rows: B3EstimateRow[], side: 'company_vnd' | 'employee_vnd'):
 }
 
 function vnd(value: number | null): string {
-  return value === null ? '— (chưa rõ)' : `${value.toLocaleString('vi-VN')} đ`;
+  return formatMoney(value, { nullText: '— (chưa rõ)' });
 }
 
 export function emptyB3Intake(intakeMethod: 'WEB' | 'IMPORT'): B3Intake {

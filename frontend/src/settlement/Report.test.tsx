@@ -82,7 +82,7 @@ test('hiển thị components, unknown giữ "—" không phải 0', () => {
   render(<ReportPanel report={makeReport()} />);
   expect(screen.getByText(/A — ứng đã thực nhận/)).toBeTruthy();
   const reportPanel = screen.getByTestId('report-panel');
-  expect(reportPanel.textContent).toContain('5.000.000 VND');
+  expect(reportPanel.textContent).toContain('5.000.000 đ');
   expect(reportPanel.textContent).not.toContain('A — ứng đã thực nhận 0');
 });
 
@@ -106,7 +106,7 @@ test('proposed khác calculated: proposed null giữ "—"', () => {
   })} />);
   const text = screen.getByTestId('report-panel').textContent ?? '';
   expect(text).toContain('Calculated:');
-  expect(text).toContain('3.000.000 VND');
+  expect(text).toContain('3.000.000 đ');
   expect(text).toContain('Proposed (chưa duyệt, chưa chi): —');
 });
 
@@ -154,7 +154,7 @@ test('report B3 dùng section proposal, không dùng bảng S; pending không l�
   expect(screen.getAllByText(/2[.,]000[.,]000/).length).toBeGreaterThan(0);
   const text = screen.getByTestId('report-panel').textContent ?? '';
   expect(text).toContain('Tổng dự toán');
-  expect(text).toContain('8.000.000 VND');
+  expect(text).toContain('8.000.000 đ');
   expect(text).toContain('kế toán ACC-DEMO-01');
   expect(text).toContain('người duyệt APR-DEMO-01');
   expect(text).toContain('dự toán không phải ngân sách đã duyệt');
@@ -260,13 +260,13 @@ test('Task 4: bảng đối chiếu nghiệp vụ B3 hiển thị 4 dòng nghi�
   // Dòng 1: Số xin ứng và số bằng chữ
   const row1 = screen.getByTestId('cross-check-words');
   expect(row1.textContent).toContain('Số xin ứng và số bằng chữ');
-  expect(row1.textContent).toContain('Khớp: 2.000.000 VND');
+  expect(row1.textContent).toContain('Khớp: 2.000.000 đ');
   expect(row1.textContent).toContain('Xem giấy đề nghị');
 
   // Dòng 2: Tổng dự toán và chi tiết các dòng
   const row2 = screen.getByTestId('cross-check-arithmetic');
   expect(row2.textContent).toContain('Tổng dự toán và chi tiết các dòng');
-  expect(row2.textContent).toContain('Khớp: 8.000.000 VND');
+  expect(row2.textContent).toContain('Khớp: 8.000.000 đ');
   expect(row2.textContent).toContain('Xem bảng dự toán');
 
   // Dòng 3: Thông tin chuyến đi giữa hai giấy
@@ -320,7 +320,7 @@ test('R2.2: thiếu check/refs thì nói chưa có kết quả, không tự PASS
   const text = table.textContent ?? '';
   // Two same-looking files do NOT make the rows pass or fabricate a basis.
   expect(text).toContain('Chưa có kết quả kiểm tra/căn cứ cho mục này');
-  expect(text).not.toContain('Khớp: 2.000.000 VND');
+  expect(text).not.toContain('Khớp: 2.000.000 đ');
   expect(text).not.toContain('Đầy đủ 2 chứng từ theo quy định');
   // The row basis cells show "—" (no invented refs) but documents are still
   // reachable via the general document links area.

@@ -8,8 +8,8 @@ faking a result.
 """
 from __future__ import annotations
 
-from invoice_referee.domain.models import DomainError
-from invoice_referee.settlement.b3 import B3_V1_KEYS, is_b3_v1
+from invoice_referee.shared.errors import DomainError
+from invoice_referee.settlement.b3_intake import B3_V1_KEYS, is_b3_v1
 from invoice_referee.settlement.models import (
     Issue,
     Observation,

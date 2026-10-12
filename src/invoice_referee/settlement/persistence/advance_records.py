@@ -8,18 +8,18 @@ connection, commits, or reads financial policy beyond the context passed in.
 from __future__ import annotations
 
 import sqlite3
-import uuid
 from datetime import datetime
 from typing import Any
 
-from invoice_referee.domain.models import DomainError
+from invoice_referee.shared.errors import DomainError
+from invoice_referee.shared import clock
 from invoice_referee.settlement.persistence import sqlite_records as _rec
 from invoice_referee.settlement.advance_workflow import (
     b3_basis_signature,
     b3_context_signature,
     b3_route_for,
 )
-from invoice_referee.settlement.b3 import B3CompanyContext, is_b3_v1
+from invoice_referee.settlement.b3_intake import B3CompanyContext, is_b3_v1
 from invoice_referee.settlement.models import (
     B3AdvanceEventPayload,
     B3AdvanceEventView,
@@ -42,17 +42,6 @@ _B3_ADD_ADVANCE_PROOF = "B3_ADD_ADVANCE_PROOF"
 _B3_RECORD_ADVANCE = "B3_RECORD_ADVANCE"
 _NONTERMINAL_STATUSES = ("QUEUED", "RUNNING")
 _OPEN_QUESTION_STATUSES = ("OPEN", "ANSWERED")
-
-
-def _iso(value: datetime) -> str:
-    from datetime import timezone
-    return value.astimezone(timezone.utc).isoformat()
-
-
-def _now_iso() -> str:
-    from invoice_referee.shared import clock
-    return _iso(clock.utcnow())
-
 
 def b3_case_form(case: sqlite3.Row) -> dict[str, Any]:
     form = _rec.load(case["submission_json"]).get("form")
@@ -357,7 +346,7 @@ def record_presentation(conn: sqlite3.Connection, case_id: str,
             "Đề nghị đã bị yêu cầu bổ sung; nhân viên phải sửa/xác "
             "nhận và chạy lại trước khi trình lại (basis chưa đổi).",
         )
-    now = _now_iso()
+    now = clock.now_iso()
     if payload.review_id is not None:
         review = b3_find_review(conn, case_id, payload.review_id)
         if review["report_id"] != payload.basis_report_id \
@@ -370,7 +359,7 @@ def record_presentation(conn: sqlite3.Connection, case_id: str,
         review_id = payload.review_id
     else:
         review = {
-            "id": f"RV-{uuid.uuid4().hex[:12]}", "case_id": case_id,
+            "id": _rec.new_id("RV-"), "case_id": case_id,
             "report_id": payload.review.report_id,
             "note": payload.review.note, "refs": payload.review.refs,
             "actor_id": command.actor_id, "created_at": now,
@@ -382,7 +371,7 @@ def record_presentation(conn: sqlite3.Connection, case_id: str,
             (review_id, case_id, _rec.dump(review), now),
         )
     presentation = {
-        "id": f"PR-{uuid.uuid4().hex[:12]}", "case_id": case_id,
+        "id": _rec.new_id("PR-"), "case_id": case_id,
         "basis_report_id": payload.basis_report_id,
         "review_id": review_id,
         "employee_ref": submission.employee_ref,
@@ -487,9 +476,9 @@ def record_decision(conn: sqlite3.Connection, case_id: str,
                 "Số ứng duyệt cao hơn phần employee forecast; RETURN để "
                 "sửa và kiểm lại.",
             )
-    now = _now_iso()
+    now = clock.now_iso()
     decision = {
-        "id": f"BD-{uuid.uuid4().hex[:12]}", "case_id": case_id,
+        "id": _rec.new_id("BD-"), "case_id": case_id,
         "kind": "B3_ADVANCE", "presentation_id": presentation.id,
         "outcome": payload.outcome, "reason": payload.reason,
         "work_allowed": payload.work_allowed,
@@ -503,7 +492,7 @@ def record_decision(conn: sqlite3.Connection, case_id: str,
         "context_signature": presentation.context_signature,
         "employee_ref": submission.employee_ref,
         "work_ref": submission.work_ref, "actor_id": command.actor_id,
-        "grant_ref": grant_ref, "effective_at": _iso(effective_at),
+        "grant_ref": grant_ref, "effective_at": clock.iso(effective_at),
         "created_at": now,
     }
     conn.execute(
@@ -622,16 +611,16 @@ def record_receipt(conn: sqlite3.Connection, case_id: str,
                     reason=("Cùng giao dịch đã có kết quả RECEIVED xác "
                             "nhận; giữ cả hai, cần kế toán xử lý.")))
                 classification = "CONFLICT"
-    now = _now_iso()
+    now = clock.now_iso()
     event = {
-        "id": f"AE-{uuid.uuid4().hex[:12]}", "case_id": case_id,
+        "id": _rec.new_id("AE-"), "case_id": case_id,
         "kind": "ADVANCE_TO_EMPLOYEE",
         "decision_id": payload.decision_id,
         "event_namespace": payload.event_namespace,
         "event_ref": payload.event_ref, "method": payload.method,
         "gross_vnd": payload.gross_vnd, "payer_side": payload.payer_side,
         "payee_ref": payload.payee_ref,
-        "event_at": _iso(payload.event_at) if payload.event_at else None,
+        "event_at": clock.iso(payload.event_at) if payload.event_at else None,
         "reported_status": payload.reported_status,
         "evidence": [e.model_dump(mode="json") for e in payload.evidence],
         "allocation_note": payload.allocation_note,

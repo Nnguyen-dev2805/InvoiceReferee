@@ -4,7 +4,7 @@
 // không phải kết quả chính của bước đề nghị ứng (Product P2a).
 import type { B3Proposal, B3RunContext, CheckResult, Report, SourceView } from './types';
 import { EvidenceLinks } from './EvidenceLinks';
-import { checkLabel, factLabel } from './uiCopy';
+import { checkLabel, factLabel, formatMoney } from './displayText';
 
 const COMPONENT_LABELS: Record<string, string> = {
   t: 'T — tổng chi công việc',
@@ -38,8 +38,7 @@ const READINESS_LABELS: Record<B3Proposal['readiness'], string> = {
 };
 
 function vnd(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '—';
-  return `${value.toLocaleString('vi-VN')} VND`;
+  return formatMoney(value, { nullText: '—' });
 }
 
 export function ReportPanel({ report, b3Context = null, sources = [] }: {

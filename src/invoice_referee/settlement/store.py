@@ -19,15 +19,13 @@ import hashlib
 import json
 import shutil
 import sqlite3
-import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
 
-from invoice_referee.domain.models import DomainError
-from invoice_referee.settlement.b3 import B3CompanyContext
-from invoice_referee.settlement.advance_workflow import b3_route_for
+from invoice_referee.shared.errors import DomainError
+from invoice_referee.settlement.b3_intake import B3CompanyContext
 from invoice_referee.settlement.models import (
     MAX_ACTIVE_SOURCES_PER_CASE,
     MAX_SOURCE_BYTES,
@@ -40,10 +38,8 @@ from invoice_referee.settlement.models import (
     B3PresentPayload,
     B3PresentationView,
     B3WorkflowView,
-    B7ClosureView,
     B7DecisionPayload,
     B7DecisionView,
-    B7FulfillmentSummary,
     B7HandoffPayload,
     B7HandoffView,
     B7LinkedIntake,
@@ -92,27 +88,30 @@ from invoice_referee.settlement.persistence import decision_records as _decision
 from invoice_referee.settlement.persistence import money_records as _money
 from invoice_referee.settlement.persistence import action_records as _action
 from invoice_referee.settlement.persistence import queries as _queries
+# Persisted operation codes / source-use tags live in one shared table so the
+# Store façade and the persistence lifecycle modules cannot drift apart.
+from invoice_referee.settlement.persistence.operations import (
+    ADD_SOURCE as _ADD_SOURCE,
+    B3_ADD_ADVANCE_PROOF as _B3_ADD_ADVANCE_PROOF,
+    B3_ADVANCE_PROOF_USE as _B3_ADVANCE_PROOF_USE,
+    B7_ADD_SETTLEMENT_PROOF as _B7_ADD_SETTLEMENT_PROOF,
+    B7_MONEY_CONTEXT_REFRESH as _B7_MONEY_CONTEXT_REFRESH,
+    B7_SETTLEMENT_PROOF_USE as _B7_SETTLEMENT_PROOF_USE,
+    CLOSE_CASE as _CLOSE_CASE,
+    CONTROL as _CONTROL,
+    CREATE_B3_CASE as _CREATE_B3_CASE,
+    CREATE_CASE as _CREATE_CASE,
+    CREATE_STANDALONE_B7 as _CREATE_STANDALONE_B7,
+    DECIDE as _DECIDE,
+    HANDOFF as _HANDOFF,
+    RECORD_MONEY as _RECORD_MONEY,
+    RESPOND as _RESPOND,
+    REVIEW as _REVIEW,
+    REVISE_SUBMISSION as _REVISE_SUBMISSION,
+    START_RUN as _START_RUN,
+)
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
-
-_CREATE_CASE = "CREATE_CASE"
-_CREATE_B3_CASE = "CREATE_B3_CASE"
-_CREATE_STANDALONE_B7 = "CREATE_STANDALONE_B7"
-_REVISE_SUBMISSION = "REVISE_SUBMISSION"
-_ADD_SOURCE = "ADD_SOURCE"
-_START_RUN = "START_RUN"
-_RESPOND = "RESPOND"
-_DECIDE = "DECIDE"
-_REVIEW = "REVIEW"
-_RECORD_MONEY = "RECORD_MONEY"
-_CONTROL = "CONTROL"
-_HANDOFF = "HANDOFF"
-_CLOSE_CASE = "CLOSE_CASE"
-_B3_ADD_ADVANCE_PROOF = "B3_ADD_ADVANCE_PROOF"
-_B7_ADD_SETTLEMENT_PROOF = "B7_ADD_SETTLEMENT_PROOF"
-_B7_MONEY_CONTEXT_REFRESH = "B7_MONEY_CONTEXT_REFRESH"
-_B3_ADVANCE_PROOF_USE = "B3_ADVANCE_PROOF"
-_B7_SETTLEMENT_PROOF_USE = "B7_SETTLEMENT_PROOF"
 
 _NONTERMINAL_STATUSES = ("QUEUED", "RUNNING")
 _TERMINAL_STATUSES = ("SUCCEEDED", "FAILED", "TIMED_OUT", "STOPPED",
@@ -171,18 +170,6 @@ def detect_media_type(content: bytes, filename: str) -> str:
     return "text/plain"
 
 
-def _dump(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-
-def _load(text: str) -> Any:
-    return json.loads(text)
-
-
-def _iso(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat()
-
-
 class Store:
     """SQLite-backed store for cases, sources, runs and history."""
 
@@ -199,7 +186,7 @@ class Store:
                 "UPDATE runs SET status = 'INTERRUPTED', "
                 "detail = COALESCE(detail, 'process restart: run không kết thúc'), "
                 "updated_at = ? WHERE status IN ('QUEUED', 'RUNNING')",
-                (_iso(utcnow()),),
+                (clock.iso(utcnow()),),
             )
 
     @staticmethod
@@ -226,7 +213,7 @@ class Store:
             # created, so cases made after the migration are never relabeled.
             for row in conn.execute(
                     "SELECT id, submission_json FROM cases").fetchall():
-                work_ref = _load(row["submission_json"]).get("work_ref", "")
+                work_ref = _rec.load(row["submission_json"]).get("work_ref", "")
                 if _is_system_work_ref(work_ref):
                     conn.execute("UPDATE cases SET origin = 'SYSTEM' WHERE id = ?",
                                  (row["id"],))
@@ -283,22 +270,22 @@ class Store:
                 self._check_replay(row, payload_fp)
                 view = self._case_view(conn, row["case_id"])
                 return view.model_copy(update={"idempotent_replay": True})
-            case_id = f"C-{uuid.uuid4().hex[:12]}"
-            now = _iso(utcnow())
+            case_id = _rec.new_id("C-")
+            now = clock.iso(utcnow())
             stage: CaseStage = "CHECKING"
             conn.execute(
                 "INSERT INTO cases (id, case_version, input_revision, control_epoch, "
                 "stop_active, stage, current_run_id, submission_json, origin, "
                 "created_at, updated_at) "
                 "VALUES (?, 1, 1, 1, 0, ?, NULL, ?, ?, ?, ?)",
-                (case_id, stage, _dump(submission.model_dump(mode="json")),
+                (case_id, stage, _rec.dump(submission.model_dump(mode="json")),
                  origin, now, now),
             )
             conn.execute(
                 "INSERT INTO case_revisions (id, case_id, revision, submission_json, "
                 "reason, actor_id, command_key, created_at) VALUES (?, ?, 1, ?, '', ?, ?, ?)",
-                (f"R-{uuid.uuid4().hex[:12]}", case_id,
-                 _dump(submission.model_dump(mode="json")), command.actor_id,
+                (_rec.new_id("R-"), case_id,
+                 _rec.dump(submission.model_dump(mode="json")), command.actor_id,
                  command.key, now),
             )
             self._record_command(conn, case_id, "", "CASE_CREATED", _CREATE_CASE,
@@ -319,20 +306,20 @@ class Store:
                 return view.model_copy(update={"idempotent_replay": True})
             case = self._case_row(conn, case_id)
             self._check_version(case, command)
-            now = _iso(utcnow())
+            now = clock.iso(utcnow())
             new_version = case["case_version"] + 1
             new_revision = case["input_revision"] + 1
             conn.execute(
                 "UPDATE cases SET case_version = ?, input_revision = ?, "
                 "submission_json = ?, updated_at = ? WHERE id = ?",
                 (new_version, new_revision,
-                 _dump(submission.model_dump(mode="json")), now, case_id),
+                 _rec.dump(submission.model_dump(mode="json")), now, case_id),
             )
             conn.execute(
                 "INSERT INTO case_revisions (id, case_id, revision, submission_json, "
                 "reason, actor_id, command_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (f"R-{uuid.uuid4().hex[:12]}", case_id, new_revision,
-                 _dump(submission.model_dump(mode="json")), reason,
+                (_rec.new_id("R-"), case_id, new_revision,
+                 _rec.dump(submission.model_dump(mode="json")), reason,
                  command.actor_id, command.key, now),
             )
             self._record_command(conn, case_id, case_id, "SUBMISSION_REVISED",
@@ -362,23 +349,23 @@ class Store:
                 self._check_replay(row, payload_fp)
                 return self._case_view(conn, row["case_id"]).model_copy(
                     update={"idempotent_replay": True})
-            case_id = f"C-{uuid.uuid4().hex[:12]}"
+            case_id = _rec.new_id("C-")
             submission = build_submission(case_id)
-            now = _iso(utcnow())
+            now = clock.iso(utcnow())
             stage: CaseStage = "CHECKING"
             conn.execute(
                 "INSERT INTO cases (id, case_version, input_revision, control_epoch, "
                 "stop_active, stage, current_run_id, submission_json, origin, "
                 "created_at, updated_at) "
                 "VALUES (?, 1, 1, 1, 0, ?, NULL, ?, ?, ?, ?)",
-                (case_id, stage, _dump(submission.model_dump(mode="json")),
+                (case_id, stage, _rec.dump(submission.model_dump(mode="json")),
                  origin, now, now),
             )
             conn.execute(
                 "INSERT INTO case_revisions (id, case_id, revision, submission_json, "
                 "reason, actor_id, command_key, created_at) VALUES (?, ?, 1, ?, '', ?, ?, ?)",
-                (f"R-{uuid.uuid4().hex[:12]}", case_id,
-                 _dump(submission.model_dump(mode="json")), command.actor_id,
+                (_rec.new_id("R-"), case_id,
+                 _rec.dump(submission.model_dump(mode="json")), command.actor_id,
                  command.key, now),
             )
             self._record_command(conn, case_id, "", "B3_CASE_CREATED",
@@ -403,23 +390,23 @@ class Store:
                 self._check_replay(row, payload_fp)
                 return self._case_view(conn, row["case_id"]).model_copy(
                     update={"idempotent_replay": True})
-            case_id = f"C-{uuid.uuid4().hex[:12]}"
+            case_id = _rec.new_id("C-")
             submission = build_submission(case_id)
-            now = _iso(utcnow())
+            now = clock.iso(utcnow())
             stage: CaseStage = "CHECKING"
             conn.execute(
                 "INSERT INTO cases (id, case_version, input_revision, control_epoch, "
                 "stop_active, stage, current_run_id, submission_json, origin, "
                 "created_at, updated_at) "
                 "VALUES (?, 1, 1, 1, 0, ?, NULL, ?, ?, ?, ?)",
-                (case_id, stage, _dump(submission.model_dump(mode="json")),
+                (case_id, stage, _rec.dump(submission.model_dump(mode="json")),
                  origin, now, now),
             )
             conn.execute(
                 "INSERT INTO case_revisions (id, case_id, revision, submission_json, "
                 "reason, actor_id, command_key, created_at) VALUES (?, ?, 1, ?, '', ?, ?, ?)",
-                (f"R-{uuid.uuid4().hex[:12]}", case_id,
-                 _dump(submission.model_dump(mode="json")), command.actor_id,
+                (_rec.new_id("R-"), case_id,
+                 _rec.dump(submission.model_dump(mode="json")), command.actor_id,
                  command.key, now),
             )
             self._record_command(conn, case_id, "", "B7_STANDALONE_CREATED",
@@ -432,7 +419,7 @@ class Store:
             rows = conn.execute("SELECT * FROM cases ORDER BY created_at DESC").fetchall()
             summaries = []
             for row in rows:
-                submission = _load(row["submission_json"])
+                submission = _rec.load(row["submission_json"])
                 summaries.append(CaseSummary(
                     id=row["id"], job=submission["job"],
                     employee_ref=submission["employee_ref"],
@@ -488,7 +475,7 @@ class Store:
                 input_revision=case["input_revision"],
                 control_epoch=case["control_epoch"],
                 stop_active=bool(case["stop_active"]), stage=case["stage"],
-                submission=Submission.model_validate(_load(case["submission_json"])),
+                submission=Submission.model_validate(_rec.load(case["submission_json"])),
                 sources=self._source_records(conn, case_id),
             )
 
@@ -514,7 +501,7 @@ class Store:
                 self._check_replay(row, payload_fp)
                 record = self._source_record(
                     conn.execute("SELECT * FROM sources WHERE id = ?",
-                                 (_load(row["payload_json"])["source_id"],)).fetchone())
+                                 (_rec.load(row["payload_json"])["source_id"],)).fetchone())
                 return record.model_copy(update={"idempotent_replay": True})
             case = self._case_row(conn, case_id)
             self._check_open(case)
@@ -534,8 +521,8 @@ class Store:
                     f"Hồ sơ đã đạt giới hạn pilot {MAX_ACTIVE_SOURCES_PER_CASE} nguồn active.",
                 )
             self._check_version(case, command)
-            source_id = f"S-{uuid.uuid4().hex[:12]}"
-            now = _iso(utcnow())
+            source_id = _rec.new_id("S-")
+            now = clock.iso(utcnow())
             # Reserved source-use metadata is backend-owned: a client-supplied
             # provenance key of the same name is dropped so it cannot fake a
             # proof role. Only the Service B5 branch sets B3_ADVANCE_PROOF.
@@ -553,7 +540,7 @@ class Store:
                     "VALUES (?, ?, ?, ?, ?, ?, 'ACCEPTED', NULL, ?, ?, ?, ?)",
                     (source_id, case_id, upload.filename, media_type, sha,
                      len(upload.content), command.actor_id, now,
-                     _dump(provenance),
+                     _rec.dump(provenance),
                      str(stored_path.relative_to(self.artifact_root))),
                 )
                 new_version = case["case_version"] + 1
@@ -613,7 +600,7 @@ class Store:
                                        scope_key=run_input.case_id)
             if row is not None:
                 self._check_replay(row, payload_fp)
-                replay_run_id = _load(row["payload_json"])["run_id"]
+                replay_run_id = _rec.load(row["payload_json"])["run_id"]
                 return self._run_view(
                     conn.execute("SELECT * FROM runs WHERE id = ?",
                                  (replay_run_id,)).fetchone()
@@ -641,8 +628,8 @@ class Store:
                     "TOO_MANY_RUNS",
                     f"Đã đạt giới hạn pilot {MAX_ACCEPTED_RUNS} run active/queued.",
                 )
-            run_id = f"R-{uuid.uuid4().hex[:12]}"
-            now = _iso(utcnow())
+            run_id = _rec.new_id("R-")
+            now = clock.iso(utcnow())
             mode = str(run_input.config.get("reader_mode", "UNKNOWN"))
             conn.execute(
                 "INSERT INTO runs (id, case_id, input_revision, control_epoch, "
@@ -650,7 +637,7 @@ class Store:
                 "VALUES (?, ?, ?, ?, 'QUEUED', ?, ?, NULL, ?, ?)",
                 (run_id, run_input.case_id, run_input.input_revision,
                  run_input.control_epoch, mode,
-                 _dump(run_input.model_dump(mode="json")), now, now),
+                 _rec.dump(run_input.model_dump(mode="json")), now, now),
             )
             conn.execute(
                 "UPDATE cases SET current_run_id = ?, case_version = ?, "
@@ -675,7 +662,7 @@ class Store:
                     "RUN_TERMINAL",
                     f"Run {run_id} đã kết thúc ({run['status']}); không ghi đè.",
                 )
-            now = _iso(utcnow())
+            now = clock.iso(utcnow())
             conn.execute(
                 "UPDATE runs SET status = ?, detail = ?, updated_at = ? WHERE id = ?",
                 (status, detail, now, run_id),
@@ -703,7 +690,7 @@ class Store:
             if (case["stop_active"] or case["control_epoch"] != run["control_epoch"]
                     or case["input_revision"] != run["input_revision"]):
                 status: RunStatus = ("STOPPED" if case["stop_active"] else "SUPERSEDED")
-                now = _iso(utcnow())
+                now = clock.iso(utcnow())
                 conn.execute(
                     "UPDATE runs SET status = ?, updated_at = ? WHERE id = ?",
                     (status, now, run_id),
@@ -712,11 +699,11 @@ class Store:
                     conn.execute("SELECT * FROM runs WHERE id = ?",
                                  (run_id,)).fetchone()
                 )
-            now = _iso(utcnow())
+            now = clock.iso(utcnow())
             conn.execute(
                 "UPDATE runs SET status = 'SUCCEEDED', report_json = ?, "
                 "updated_at = ? WHERE id = ?",
-                (_dump(report.model_dump(mode="json")), now, run_id),
+                (_rec.dump(report.model_dump(mode="json")), now, run_id),
             )
             return self._run_view(
                 conn.execute("SELECT * FROM runs WHERE id = ?",
@@ -733,7 +720,7 @@ class Store:
             if run["status"] in _TERMINAL_STATUSES:
                 return  # run đã kết thúc; stage cũ giữ nguyên làm history
             conn.execute("UPDATE runs SET stage = ?, updated_at = ? WHERE id = ?",
-                         (stage, _iso(utcnow()), run_id))
+                         (stage, clock.iso(utcnow()), run_id))
 
     def set_run_trace(self, run_id: str,
                       entries: list[dict[str, Any]]) -> None:
@@ -741,20 +728,20 @@ class Store:
             self._run_row(conn, run_id)
             conn.execute("UPDATE runs SET trace_json = ?, updated_at = ? "
                          "WHERE id = ?",
-                         (_dump(entries), _iso(utcnow()), run_id))
+                         (_rec.dump(entries), clock.iso(utcnow()), run_id))
 
     def get_report(self, run_id: str) -> Report | None:
         with self._read() as conn:
             row = self._run_row(conn, run_id)
             if not row["report_json"]:
                 return None
-            return Report.model_validate(_load(row["report_json"]))
+            return Report.model_validate(_rec.load(row["report_json"]))
 
     def get_run_input(self, run_id: str) -> RunInput:
         """The immutable snapshot a run evaluated (context/policy persisted)."""
         with self._read() as conn:
             row = self._run_row(conn, run_id)
-            return RunInput.model_validate(_load(row["snapshot_json"]))
+            return RunInput.model_validate(_rec.load(row["snapshot_json"]))
 
     def run_status(self, run_id: str) -> RunStatus:
         with self._read() as conn:
@@ -768,11 +755,11 @@ class Store:
     def _run_view(row: sqlite3.Row) -> RunView:
         completion = None
         if row["report_json"]:
-            completion = _load(row["report_json"]).get("completion")
+            completion = _rec.load(row["report_json"]).get("completion")
         trace = []
         if row["trace_json"]:
             trace = [CallTrace.model_validate(entry)
-                     for entry in _load(row["trace_json"])]
+                     for entry in _rec.load(row["trace_json"])]
         return RunView(
             id=row["id"], case_id=row["case_id"], status=row["status"],
             mode=row["mode"], input_revision=row["input_revision"],
@@ -789,15 +776,15 @@ class Store:
     def ensure_questions(self, case_id: str, issues, run_id: str) -> None:
         """Materialize unresolved report issues as owner-scoped questions."""
         with self._write() as conn:
-            existing = {_load(row["payload_json"])["issue_id"] for row in
+            existing = {_rec.load(row["payload_json"])["issue_id"] for row in
                         conn.execute("SELECT payload_json FROM interactions "
                                      "WHERE case_id = ? AND kind = 'QUESTION'",
                                      (case_id,))}
-            now = _iso(utcnow())
+            now = clock.iso(utcnow())
             for issue in issues:
                 if issue.issue_id in existing:
                     continue
-                question_id = f"Q-{uuid.uuid4().hex[:12]}"
+                question_id = _rec.new_id("Q-")
                 payload = {
                     "id": question_id, "issue_id": issue.issue_id,
                     "owner": issue.owner, "message": issue.message,
@@ -808,7 +795,7 @@ class Store:
                 conn.execute(
                     "INSERT INTO interactions (id, case_id, kind, payload_json, "
                     "created_at) VALUES (?, ?, 'QUESTION', ?, ?)",
-                    (question_id, case_id, _dump(payload), now),
+                    (question_id, case_id, _rec.dump(payload), now),
                 )
 
     def resolve_questions(self, case_id: str, unresolved_issue_ids: set[str],
@@ -819,7 +806,7 @@ class Store:
                 "SELECT id, payload_json FROM interactions "
                 "WHERE case_id = ? AND kind = 'QUESTION'", (case_id,)).fetchall()
             for row in rows:
-                payload = _load(row["payload_json"])
+                payload = _rec.load(row["payload_json"])
                 if payload["issue_id"] in unresolved_issue_ids or \
                         payload["status"] in {"RESOLVED", "SUPERSEDED"}:
                     continue
@@ -827,7 +814,7 @@ class Store:
                 payload["resolved_run_id"] = run_id
                 conn.execute(
                     "UPDATE interactions SET payload_json = ? WHERE id = ?",
-                    (_dump(payload), row["id"]),
+                    (_rec.dump(payload), row["id"]),
                 )
 
     def get_question(self, question_id: str) -> QuestionView:
@@ -859,7 +846,7 @@ class Store:
                                        scope_key=question_id)
             if row is not None:
                 self._check_replay(row, payload_fp)
-                stored = _load(row["payload_json"])["response"]
+                stored = _rec.load(row["payload_json"])["response"]
                 return ResponseView.model_validate(stored).model_copy(
                     update={"idempotent_replay": True})
             question = conn.execute(
@@ -870,8 +857,8 @@ class Store:
                                   f"Không tìm thấy câu hỏi {question_id}.")
             case = self._case_row(conn, question["case_id"])
             self._check_version(case, command)
-            response_id = f"RS-{uuid.uuid4().hex[:12]}"
-            now = _iso(utcnow())
+            response_id = _rec.new_id("RS-")
+            now = clock.iso(utcnow())
             response = {
                 "id": response_id, "question_id": question_id,
                 "case_id": question["case_id"], "actor_id": command.actor_id,
@@ -882,15 +869,15 @@ class Store:
             conn.execute(
                 "INSERT INTO interactions (id, case_id, kind, payload_json, "
                 "created_at) VALUES (?, ?, 'RESPONSE', ?, ?)",
-                (response_id, question["case_id"], _dump(response), now),
+                (response_id, question["case_id"], _rec.dump(response), now),
             )
             if accepted:
-                qpayload = _load(question["payload_json"])
+                qpayload = _rec.load(question["payload_json"])
                 qpayload["status"] = "ANSWERED"
                 qpayload["answered_at"] = now
                 conn.execute(
                     "UPDATE interactions SET payload_json = ? WHERE id = ?",
-                    (_dump(qpayload), question_id),
+                    (_rec.dump(qpayload), question_id),
                 )
             conn.execute(
                 "UPDATE cases SET case_version = ?, input_revision = ?, "
@@ -906,7 +893,7 @@ class Store:
 
     @staticmethod
     def _question_view(row: sqlite3.Row) -> QuestionView:
-        payload = _load(row["payload_json"])
+        payload = _rec.load(row["payload_json"])
         return QuestionView(
             id=payload["id"], case_id=row["case_id"],
             issue_id=payload["issue_id"], owner=payload["owner"],
@@ -927,7 +914,7 @@ class Store:
 
     @staticmethod
     def _b3_v1_form(case: sqlite3.Row) -> dict[str, Any]:
-        form = _load(case["submission_json"]).get("form")
+        form = _rec.load(case["submission_json"]).get("form")
         if isinstance(form, dict) and form.get("schema_version") == "b3-intake-v1":
             return form
         return {}
@@ -980,7 +967,7 @@ class Store:
             "SELECT payload_json FROM decisions WHERE case_id = ? "
             "ORDER BY rowid DESC", (case_id,)).fetchall()
         for candidate in row:
-            payload = _load(candidate["payload_json"])
+            payload = _rec.load(candidate["payload_json"])
             if payload.get("kind") == "SETTLEMENT":
                 return payload
         return None
@@ -993,7 +980,7 @@ class Store:
             row = self._lookup_command(conn, _DECIDE, command, scope_key=case_id)
             if row is not None:
                 self._check_replay(row, payload_fp)
-                stored = _load(row["payload_json"])["decision"]
+                stored = _rec.load(row["payload_json"])["decision"]
                 return DecisionView.model_validate(stored).model_copy(
                     update={"idempotent_replay": True})
             case = self._case_row(conn, case_id)
@@ -1027,8 +1014,8 @@ class Store:
                     "Report basis đã cũ (input đã đổi hoặc run khác là current); "
                     "re-check trước khi duyệt, không duyệt trên basis cũ.",
                 )
-            decision_id = f"D-{uuid.uuid4().hex[:12]}"
-            now = _iso(utcnow())
+            decision_id = _rec.new_id("D-")
+            now = clock.iso(utcnow())
             decision = {
                 "id": decision_id, "case_id": case_id, "kind": payload.kind,
                 "amount_vnd": payload.amount_vnd, "direction": payload.direction,
@@ -1042,7 +1029,7 @@ class Store:
             conn.execute(
                 "INSERT INTO decisions (id, case_id, payload_json, created_at) "
                 "VALUES (?, ?, ?, ?)",
-                (decision_id, case_id, _dump(decision), now),
+                (decision_id, case_id, _rec.dump(decision), now),
             )
             new_stage = case["stage"]
             if payload.direction != "REFUSE" and payload.amount_vnd is not None:
@@ -1065,7 +1052,7 @@ class Store:
             row = self._lookup_command(conn, _REVIEW, command, scope_key=case_id)
             if row is not None:
                 self._check_replay(row, payload_fp)
-                stored = _load(row["payload_json"])["review"]
+                stored = _rec.load(row["payload_json"])["review"]
                 return ReviewView.model_validate(stored).model_copy(
                     update={"idempotent_replay": True})
             case = self._case_row(conn, case_id)
@@ -1074,8 +1061,8 @@ class Store:
             self._check_open(case)
             self._check_version(case, command)
             self._run_row(conn, payload.report_id)  # review phải chỉ vào run có thật
-            review_id = f"RV-{uuid.uuid4().hex[:12]}"
-            now = _iso(utcnow())
+            review_id = _rec.new_id("RV-")
+            now = clock.iso(utcnow())
             review = {
                 "id": review_id, "case_id": case_id, "report_id": payload.report_id,
                 "note": payload.note, "refs": payload.refs,
@@ -1084,7 +1071,7 @@ class Store:
             conn.execute(
                 "INSERT INTO interactions (id, case_id, kind, payload_json, "
                 "created_at) VALUES (?, ?, 'REVIEW', ?, ?)",
-                (review_id, case_id, _dump(review), now),
+                (review_id, case_id, _rec.dump(review), now),
             )
             conn.execute(
                 "UPDATE cases SET case_version = ?, updated_at = ? WHERE id = ?",
@@ -1096,30 +1083,6 @@ class Store:
             return ReviewView.model_validate(review)
 
     # --- B3 present-and-approve (b3-intake-v1) -------------------------------
-
-    def _b3_case_form(self, case: sqlite3.Row) -> dict[str, Any]:
-        return _adv.b3_case_form(case)
-
-    def _b3_report_ready(self, conn: sqlite3.Connection, case_id: str,
-                         basis_report_id: str) -> tuple[sqlite3.Row, Report]:
-        return _adv.b3_report_ready(conn, case_id, basis_report_id)
-
-    def _b3_has_open_question(self, conn: sqlite3.Connection,
-                              case_id: str) -> bool:
-        return _adv.b3_has_open_question(conn, case_id)
-
-    def _b3_active_run(self, conn: sqlite3.Connection, case_id: str) -> bool:
-        return _adv.b3_active_run(conn, case_id)
-
-    def _b3_find_review(self, conn: sqlite3.Connection, case_id: str,
-                        review_id: str) -> dict[str, Any]:
-        return _adv.b3_find_review(conn, case_id, review_id)
-
-    def _b3_other_active_approval(self, conn: sqlite3.Connection,
-                                  employee_ref: str, work_ref: str,
-                                  exclude_case_id: str) -> str | None:
-        return _adv.b3_other_active_approval(
-            conn, employee_ref, work_ref, exclude_case_id)
 
     def _b3_workflow(self, conn: sqlite3.Connection,
                      case_id: str) -> B3WorkflowView | None:
@@ -1281,10 +1244,6 @@ class Store:
 
     # --- B8/B9: settlement presentation, decision, fulfillment, closure -----
 
-    def _b7_linked_ready(self, conn: sqlite3.Connection, case_id: str,
-                         basis_report_id: str):
-        return _lc.linked_ready(conn, case_id, basis_report_id)
-
     def _b7_workflow(self, conn: sqlite3.Connection,
                      case_id: str) -> B7WorkflowView | None:
         return _queries.workflow_view(conn, case_id)
@@ -1308,9 +1267,6 @@ class Store:
                                      command: Command) -> str:
         return _lc.store_context_source(conn, self.artifact_root, case_id,
                                         snapshot, command)
-
-    def _load_linked_context(self, conn: sqlite3.Connection, source_id: str):
-        return _lc.load_context(conn, self.artifact_root, source_id)
 
     def _check_origin_not_stopped(self, conn: sqlite3.Connection,
                                   parent_id: str) -> None:
@@ -1353,14 +1309,6 @@ class Store:
             events = self._b7_money_events(conn, case_id)
         return [e for e in events if e.classification == "CONFIRMED_RECEIPT"]
 
-    def _b7_current_decision(self, conn: sqlite3.Connection,
-                             case_id: str) -> B7DecisionView | None:
-        return _queries.current_decision(conn, case_id)
-
-    def _b7_fulfillment(self, conn: sqlite3.Connection, case_id: str
-                        ) -> B7FulfillmentSummary | None:
-        return _queries.fulfillment(conn, case_id)
-
     def record_b7_money(self, case_id: str, payload: B7MoneyEventPayload,
                         command: Command, b7, b3, policy: dict
                         ) -> B7MoneyEventView:
@@ -1373,9 +1321,6 @@ class Store:
                                 ) -> tuple[str, object]:
         return _queries.build_money_context(conn, self.artifact_root, case_id,
                                        policy, authority_version)
-
-    def _augment_packet_with_money(self, conn, packet, case_id: str):
-        return _queries.augment_packet_with_money(conn, packet, case_id)
 
     def refresh_b7_money_context(self, case_id: str, command: Command,
                                  b7, policy: dict,
@@ -1407,7 +1352,7 @@ class Store:
             self._check_version(case, command)
             self._check_origin_not_stopped(
                 conn, self._b7_origin_link(case)["origin_case_id"])
-            submission = Submission.model_validate(_load(case["submission_json"]))
+            submission = Submission.model_validate(_rec.load(case["submission_json"]))
             now_dt = effective_b7_time(b7)
             new_submission = submission.model_copy(
                 update={"money_as_of": now_dt, "knowledge_cutoff": now_dt})
@@ -1417,18 +1362,18 @@ class Store:
                 "money_as_of": now_dt, "knowledge_cutoff": now_dt})
             source_id = self._store_linked_context_source(
                 conn, case_id, merged, command)
-            now = _iso(utcnow())
+            now = clock.iso(utcnow())
             conn.execute(
                 "UPDATE cases SET case_version = ?, input_revision = ?, "
                 "submission_json = ?, updated_at = ? WHERE id = ?",
                 (case["case_version"] + 1, case["input_revision"] + 1,
-                 _dump(new_submission.model_dump(mode="json")), now, case_id),
+                 _rec.dump(new_submission.model_dump(mode="json")), now, case_id),
             )
             self._record_command(conn, case_id, case_id,
                                  "B7_MONEY_CONTEXT_REFRESHED",
                                  _B7_MONEY_CONTEXT_REFRESH, command, payload_fp,
                                  {"source_id": source_id,
-                                  "as_of": _iso(now_dt)}, now)
+                                  "as_of": clock.iso(now_dt)}, now)
             return self._case_view(conn, case_id)
 
     def revalidate_b7(self, case_id: str, command: Command, policy: dict
@@ -1437,45 +1382,17 @@ class Store:
             return _money.revalidate(conn, self.artifact_root, case_id, command,
                                   policy)
 
-    def _b7_current_revalidation(self, conn: sqlite3.Connection, case_id: str
-                                 ) -> B7RevalidationView | None:
-        return _queries.current_revalidation(conn, case_id)
-
-    def _b7_open_question_count(self, conn: sqlite3.Connection,
-                                case_id: str) -> int:
-        return _queries.open_question_count(conn, case_id)
-
     def handoff_b7(self, case_id: str, payload: B7HandoffPayload,
                    command: Command, b7, b3, policy: dict) -> B7HandoffView:
         with self._write() as conn:
             return _action.handoff(conn, self.artifact_root, case_id, payload,
                                command, b7, b3, policy)
 
-    def _b7_grant_for(self, b7, decision):
-        return _queries.grant_for(b7, decision)
-
-    def _require_accountant_route_store(self, conn: sqlite3.Connection,
-                                        case: sqlite3.Row, command: Command,
-                                        b3) -> None:
-        _queries.require_accountant_route(conn, case, command, b3)
-
-    def _b7_receipt_signature(self, conn: sqlite3.Connection,
-                              case_id: str) -> str:
-        return _queries.receipt_signature(conn, case_id)
-
-    def _b7_latest_handoff(self, conn: sqlite3.Connection, case_id: str
-                           ) -> B7HandoffView | None:
-        return _queries.latest_handoff(conn, case_id)
-
     def close_b7(self, case_id: str, payload, command: Command, b3,
                  policy: dict):
         with self._write() as conn:
             return _action.close(conn, self.artifact_root, case_id, payload, command,
                              b3, policy)
-
-    def _b7_closure(self, conn: sqlite3.Connection, case_id: str
-                    ) -> B7ClosureView | None:
-        return _queries.closure(conn, case_id)
 
     def prepare_b7_adjustment(self, closed_case_id: str, payload, command: Command,
                               b3) -> CaseView:
@@ -1495,7 +1412,7 @@ class Store:
                                        scope_key=case_id)
             if row is not None:
                 self._check_replay(row, payload_fp)
-                stored = _load(row["payload_json"])["money_event"]
+                stored = _rec.load(row["payload_json"])["money_event"]
                 return MoneyEventView.model_validate(stored).model_copy(
                     update={"idempotent_replay": True})
             case = self._case_row(conn, case_id)
@@ -1505,28 +1422,28 @@ class Store:
             for event_row in conn.execute(
                     "SELECT payload_json FROM money_events WHERE case_id = ?",
                     (case_id,)):
-                if _load(event_row["payload_json"])["event_ref"] == payload.event_ref:
+                if _rec.load(event_row["payload_json"])["event_ref"] == payload.event_ref:
                     raise DomainError(
                         "DUPLICATE_EVENT_REF",
                         f"event_ref {payload.event_ref} đã được ghi cho hồ sơ; "
                         f"sự kiện tiền không được ghi hai lần.",
                     )
             self._check_version(case, command)
-            event_id = f"M-{uuid.uuid4().hex[:12]}"
-            now = _iso(utcnow())
+            event_id = _rec.new_id("M-")
+            now = clock.iso(utcnow())
             event = {
                 "id": event_id, "case_id": case_id,
                 "event_ref": payload.event_ref, "kind": payload.kind,
                 "gross_vnd": payload.gross_vnd,
                 "decision_id": payload.decision_id,
-                "payee_ref": payload.payee_ref, "event_at": _iso(payload.event_at),
+                "payee_ref": payload.payee_ref, "event_at": clock.iso(payload.event_at),
                 "reported_status": payload.reported_status, "refs": payload.refs,
                 "after_cutoff": after_cutoff, "created_at": now,
             }
             conn.execute(
                 "INSERT INTO money_events (id, case_id, payload_json, created_at) "
                 "VALUES (?, ?, ?, ?)",
-                (event_id, case_id, _dump(event), now),
+                (event_id, case_id, _rec.dump(event), now),
             )
             conn.execute(
                 "UPDATE cases SET case_version = ?, updated_at = ? WHERE id = ?",
@@ -1550,7 +1467,7 @@ class Store:
             row = self._lookup_command(conn, _CONTROL, command, scope_key=case_id)
             if row is not None:
                 self._check_replay(row, payload_fp)
-                stored = _load(row["payload_json"])["control"]
+                stored = _rec.load(row["payload_json"])["control"]
                 return dict(stored, idempotent_replay=True)
             case = self._case_row(conn, case_id)
             self._check_open(case)
@@ -1565,7 +1482,7 @@ class Store:
                     "CONTROL_INVALID",
                     "Hồ sơ không đang Stop; không có gì để resume.",
                 )
-            now = _iso(utcnow())
+            now = clock.iso(utcnow())
             new_version = case["case_version"] + 1
             if action == "STOP":
                 stop_active, epoch = 1, case["control_epoch"]
@@ -1596,7 +1513,7 @@ class Store:
             row = self._lookup_command(conn, _HANDOFF, command, scope_key=case_id)
             if row is not None:
                 self._check_replay(row, payload_fp)
-                stored = _load(row["payload_json"])["handoff"]
+                stored = _rec.load(row["payload_json"])["handoff"]
                 return dict(stored, idempotent_replay=True)
             case = self._case_row(conn, case_id)
             self._check_b3_v1_action(case, "HANDOFF")
@@ -1627,8 +1544,8 @@ class Store:
                     "Input đã thay đổi sau quyết định và chưa re-check xong; "
                     "không handoff trên basis cũ.",
                 )
-            now = _iso(utcnow())
-            handoff_id = f"H-{uuid.uuid4().hex[:12]}"
+            now = clock.iso(utcnow())
+            handoff_id = _rec.new_id("H-")
             handoff = {
                 "id": handoff_id, "case_id": case_id, "decision_id": decision_id,
                 "report_id": case["current_run_id"], "actor_id": command.actor_id,
@@ -1651,7 +1568,7 @@ class Store:
             row = self._lookup_command(conn, _CLOSE_CASE, command, scope_key=case_id)
             if row is not None:
                 self._check_replay(row, payload_fp)
-                stored = _load(row["payload_json"])["closure"]
+                stored = _rec.load(row["payload_json"])["closure"]
                 return ClosureView.model_validate(stored).model_copy(
                     update={"idempotent_replay": True})
             case = self._case_row(conn, case_id)
@@ -1661,7 +1578,7 @@ class Store:
                     "ORDER BY rowid DESC LIMIT 1", (case_id, _CLOSE_CASE),
                 ).fetchone()
                 if existing is not None and existing["fingerprint"] == payload_fp:
-                    stored = _load(existing["payload_json"])["closure"]
+                    stored = _rec.load(existing["payload_json"])["closure"]
                     return ClosureView.model_validate(stored).model_copy(
                         update={"idempotent_replay": True})
                 raise DomainError(
@@ -1677,8 +1594,8 @@ class Store:
                     "CLOSURE_BLOCKED",
                     "Không đóng được hồ sơ: " + "; ".join(blockers),
                 )
-            closure_id = f"CL-{uuid.uuid4().hex[:12]}"
-            now = _iso(utcnow())
+            closure_id = _rec.new_id("CL-")
+            now = clock.iso(utcnow())
             closure = {
                 "id": closure_id, "case_id": case_id, "kind": payload.kind,
                 "basis": payload.basis, "actor_id": command.actor_id,
@@ -1732,14 +1649,14 @@ class Store:
                 and latest.get("direction") != "REFUSE":
             approved = latest["amount_vnd"]
             direction = latest.get("direction")
-        employee_ref = _load(case["submission_json"])["employee_ref"]
+        employee_ref = _rec.load(case["submission_json"])["employee_ref"]
         received: int | None = None
         pending = 0
         incidents: list[MoneyIncident] = []
         for event_row in conn.execute(
                 "SELECT payload_json FROM money_events WHERE case_id = ? "
                 "ORDER BY rowid", (case["id"],)):
-            event = _load(event_row["payload_json"])
+            event = _rec.load(event_row["payload_json"])
             # B5 advance events (kind ADVANCE_TO_EMPLOYEE) are a separate
             # lifecycle: they must never count as a B7 reimbursement, not even
             # in the pending count. Filter by kind BEFORE any sum/count.
@@ -1810,7 +1727,7 @@ class Store:
         for question_row in conn.execute(
                 "SELECT payload_json FROM interactions "
                 "WHERE case_id = ? AND kind = 'QUESTION'", (case["id"],)):
-            if _load(question_row["payload_json"])["status"] in _OPEN_QUESTION_STATUSES:
+            if _rec.load(question_row["payload_json"])["status"] in _OPEN_QUESTION_STATUSES:
                 open_questions += 1
         if open_questions:
             blockers.append(
@@ -1831,7 +1748,7 @@ class Store:
                 operation=row["operation"], actor_id=row["actor_id"],
                 command_key=row["command_key"],
                 occurred_at=datetime.fromisoformat(row["created_at"]),
-                detail=_load(row["payload_json"]),
+                detail=_rec.load(row["payload_json"]),
             )
             for row in rows
         ]
@@ -1855,7 +1772,7 @@ class Store:
 
     def _case_view(self, conn: sqlite3.Connection, case_id: str) -> CaseView:
         case = self._case_row(conn, case_id)
-        submission = Submission.model_validate(_load(case["submission_json"]))
+        submission = Submission.model_validate(_rec.load(case["submission_json"]))
         rows = conn.execute(
             "SELECT * FROM sources WHERE case_id = ? AND status = 'ACCEPTED' "
             "ORDER BY received_at, rowid",
@@ -1868,7 +1785,7 @@ class Store:
                 status="ACCEPTED", uploader_actor_id=row["uploader_actor_id"],
                 received_at=datetime.fromisoformat(row["received_at"]),
                 supersedes_source_id=row["supersedes_source_id"],
-                provenance=_load(row["provenance_json"]),
+                provenance=_rec.load(row["provenance_json"]),
             )
             for row in rows
         ]

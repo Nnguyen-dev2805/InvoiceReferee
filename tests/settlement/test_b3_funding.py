@@ -254,7 +254,7 @@ def test_b5_advance_event_does_not_leak_into_b7_summary(approved_b3):
 
 
 def test_wrong_actor_cannot_record_advance(approved_b3):
-    from invoice_referee.domain.models import DomainError
+    from invoice_referee.shared.errors import DomainError
     svc, case, decision = approved_b3
     proof = upload_receipt(svc, case, decision)
     with pytest.raises(DomainError) as exc:
@@ -265,7 +265,7 @@ def test_wrong_actor_cannot_record_advance(approved_b3):
 
 
 def test_evidence_source_must_belong_to_case(approved_b3):
-    from invoice_referee.domain.models import DomainError
+    from invoice_referee.shared.errors import DomainError
     svc, case, decision = approved_b3
     with pytest.raises(DomainError) as exc:
         svc.record_b3_advance(case.id,

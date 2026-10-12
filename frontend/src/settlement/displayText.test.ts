@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  STAGE_LABELS,
   checkLabel,
   dossierReference,
   errorText,
@@ -9,8 +10,15 @@ import {
   historyKindLabel,
   roleLabel,
   stageLabel,
-} from './uiCopy';
-import type { CaseView } from './types';
+} from './displayText';
+import type { CaseStage, CaseView } from './types';
+
+const ALL_STAGES: CaseStage[] = [
+  'CHECKING', 'ACCOUNTING_REVIEW', 'AWAITING_DECISION', 'AWAITING_MONEY',
+  'AWAITING_WORK_SETTLEMENT', 'RESOLVING_OBLIGATIONS', 'ADVANCE_REQUEST_REFUSED',
+  'SETTLEMENT_REQUEST_REFUSED', 'READY_TO_CLOSE', 'REJECTED_REQUEST_ENDED',
+  'SETTLEMENT_CLOSED',
+];
 
 function makeView(overrides: Partial<CaseView> = {}): CaseView {
   return {
@@ -29,13 +37,33 @@ function makeView(overrides: Partial<CaseView> = {}): CaseView {
   };
 }
 
-describe('uiCopy', () => {
+describe('displayText', () => {
   test('formatMoney handles null, zero, and positive amounts', () => {
     expect(formatMoney(null)).toBe('Chưa xác định');
     expect(formatMoney(undefined)).toBe('Chưa xác định');
     expect(formatMoney(0)).toBe('0 đ');
     expect(formatMoney(2_000_000)).toBe('2.000.000 đ');
     expect(formatMoney(3_500_000)).toBe('3.500.000 đ');
+  });
+
+  test('formatMoney honours a caller nullText for unknown amounts', () => {
+    expect(formatMoney(null, { nullText: '—' })).toBe('—');
+    expect(formatMoney(undefined, { nullText: '—' })).toBe('—');
+    expect(formatMoney(2_000_000, { nullText: '—' })).toBe('2.000.000 đ');
+  });
+
+  test('formatMoney never renders a signed zero', () => {
+    expect(formatMoney(-0)).toBe('0 đ');
+  });
+
+  test('STAGE_LABELS covers every stage with the stageLabel text', () => {
+    for (const stage of ALL_STAGES) {
+      expect(STAGE_LABELS[stage]).toBeTruthy();
+      expect(STAGE_LABELS[stage]).toBe(stageLabel(stage));
+    }
+    expect(Object.keys(STAGE_LABELS).sort()).toEqual([...ALL_STAGES].sort());
+    // The previously divergent App-only wording must not reappear.
+    expect(STAGE_LABELS.AWAITING_WORK_SETTLEMENT).toBe('Chờ quyết toán chi phí');
   });
 
   test('stageLabel provides clean business Vietnamese translations', () => {

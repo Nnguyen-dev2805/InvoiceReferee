@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invoice_referee.domain.models import DomainError
+from invoice_referee.shared.errors import DomainError
 from invoice_referee.settlement.models import (
     B7ClaimComparison,
     B7CompanyConfig,

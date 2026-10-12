@@ -239,7 +239,7 @@ test('report B3 hiển thị "đang chờ quyết định", không nút đã duy
   await screen.findByTestId('report-panel');
   const text = screen.getByTestId('report-panel').textContent ?? '';
   expect(text).toContain('Đang chờ quyết định');
-  expect(text).toContain('2.000.000 VND');
+  expect(text).toContain('2.000.000 đ');
   expect(text).not.toContain('S = E −');
   expect(screen.queryByText(/Đã duyệt ứng/)).not.toBeInTheDocument();
 });

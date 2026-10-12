@@ -15,7 +15,7 @@ from invoice_referee.settlement.models import (
     SourceRecord,
     Submission,
 )
-from invoice_referee.settlement.b3 import B3CompanyContext
+from invoice_referee.settlement.b3_intake import B3CompanyContext
 
 DEMO_CLOCK = datetime(2026, 10, 10, 9, 0, tzinfo=timezone(timedelta(hours=7)))
 

@@ -15,8 +15,8 @@ from pathlib import Path
 import httpx
 import pytest
 
-from invoice_referee.domain.models import DomainError
-from invoice_referee.settlement.b3 import B3_V1_KEYS
+from invoice_referee.shared.errors import DomainError
+from invoice_referee.settlement.b3_intake import B3_V1_KEYS
 from invoice_referee.settlement.models import RunBudget, SourceRecord
 from invoice_referee.settlement.reader import StructuredLedgerReader
 from tests.settlement import builders as b

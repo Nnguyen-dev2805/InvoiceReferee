@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 
-from invoice_referee.settlement.b3 import evaluate_b3_proposal
+from invoice_referee.settlement.b3_intake import evaluate_b3_proposal
 from invoice_referee.settlement.models import Issue, Observation
 from invoice_referee.settlement.rules import evaluate as engine_evaluate
 from tests.settlement.b3_builders import (

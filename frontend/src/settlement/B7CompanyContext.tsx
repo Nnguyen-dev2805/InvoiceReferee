@@ -6,6 +6,7 @@
 // row; absence is unknown, not zero.
 import { useState } from 'react';
 import * as api from './api';
+import { formatMoney } from './displayText';
 import type { CaseView, DemoRole } from './types';
 
 interface B7CompanyContextProps {
@@ -64,7 +65,7 @@ export function B7CompanyContextPanel({
       </p>
       <ul className="reasons" data-testid="b7-context-status">
         <li><strong>Coverage hiện hành:</strong> {link.context_current ? 'Đã cập nhật' : 'Chưa có / cần làm mới'}</li>
-        <li><strong>Ứng đã ghi nhận (managed):</strong> {link.managed_advance_subtotal_vnd === null ? '—' : `${link.managed_advance_subtotal_vnd.toLocaleString('vi-VN')} đ`}</li>
+        <li><strong>Ứng đã ghi nhận (managed):</strong> {formatMoney(link.managed_advance_subtotal_vnd, { nullText: '—' })}</li>
       </ul>
 
       {isAccountant ? (

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import sqlite3
-import uuid
-from datetime import datetime
 from pathlib import Path
 
-from invoice_referee.domain.models import DomainError
+from invoice_referee.shared.errors import DomainError
 from invoice_referee.shared import clock
 from invoice_referee.settlement.persistence import sqlite_records as _rec
 from invoice_referee.settlement.persistence import queries as _q
@@ -37,33 +35,21 @@ from invoice_referee.settlement.models import (
     fingerprint,
 )
 
-_B7_CONTEXT_REFRESH = "B7_CONTEXT_REFRESH"
-_B7_MONEY_CONTEXT_REFRESH = "B7_MONEY_CONTEXT_REFRESH"
-_B7_PRESENT = "B7_PRESENT"
-_B7_DECIDE = "B7_DECIDE"
-_B7_ADD_SETTLEMENT_PROOF = "B7_ADD_SETTLEMENT_PROOF"
-_B7_RECORD_MONEY = "B7_RECORD_MONEY"
-_B7_REVALIDATE = "B7_REVALIDATE"
-_B7_HANDOFF = "B7_HANDOFF"
-_B7_CLOSE = "B7_CLOSE"
-_B7_ADJUSTMENT = "B7_ADJUSTMENT"
-_B7_SETTLEMENT_PROOF_USE = "B7_SETTLEMENT_PROOF"
+from invoice_referee.settlement.persistence.operations import (
+    B7_ADD_SETTLEMENT_PROOF as _B7_ADD_SETTLEMENT_PROOF,
+    B7_ADJUSTMENT as _B7_ADJUSTMENT,
+    B7_CLOSE as _B7_CLOSE,
+    B7_CONTEXT_REFRESH as _B7_CONTEXT_REFRESH,
+    B7_DECIDE as _B7_DECIDE,
+    B7_HANDOFF as _B7_HANDOFF,
+    B7_MONEY_CONTEXT_REFRESH as _B7_MONEY_CONTEXT_REFRESH,
+    B7_PRESENT as _B7_PRESENT,
+    B7_RECORD_MONEY as _B7_RECORD_MONEY,
+    B7_REVALIDATE as _B7_REVALIDATE,
+    B7_SETTLEMENT_PROOF_USE as _B7_SETTLEMENT_PROOF_USE,
+)
 _CLOSED_STAGES: tuple[str, ...] = ("SETTLEMENT_CLOSED", "REJECTED_REQUEST_ENDED")
 _OPEN_QUESTION_STATUSES = ("OPEN", "ANSWERED")
-
-
-def _iso(value) -> str:
-    from datetime import timezone
-    return value.astimezone(timezone.utc).isoformat()
-
-
-def _now_dt():
-    return clock.utcnow()
-
-
-def _now() -> str:
-    return _iso(_now_dt())
-
 
 def record_presentation(conn: sqlite3.Connection, artifact_root: Path,
                         case_id: str, payload: B7PresentPayload,
@@ -137,9 +123,9 @@ def record_presentation(conn: sqlite3.Connection, artifact_root: Path,
                             _B7_PRESENT, command, payload_fp,
                             {"presentation": current.presentation.model_dump(
                                 mode="json"),
-                             "cost_signature": cost_sig, "no_op": True}, _now())
+                             "cost_signature": cost_sig, "no_op": True}, clock.now_iso())
         return current.presentation.model_copy(update={"idempotent_replay": True})
-    now = _now()
+    now = clock.now_iso()
     if payload.review_id is not None:
         review = _adv.b3_find_review(conn, case_id, payload.review_id)
         if review["report_id"] != payload.basis_report_id \
@@ -150,7 +136,7 @@ def record_presentation(conn: sqlite3.Connection, artifact_root: Path,
         review_id = payload.review_id
     else:
         review = {
-            "id": f"RV-{uuid.uuid4().hex[:12]}", "case_id": case_id,
+            "id": _rec.new_id("RV-"), "case_id": case_id,
             "report_id": payload.review.report_id,
             "note": payload.review.note, "refs": payload.review.refs,
             "actor_id": command.actor_id, "created_at": now,
@@ -162,7 +148,7 @@ def record_presentation(conn: sqlite3.Connection, artifact_root: Path,
             (review_id, case_id, _rec.dump(review), now),
         )
     presentation = {
-        "id": f"PR-{uuid.uuid4().hex[:12]}", "case_id": case_id,
+        "id": _rec.new_id("PR-"), "case_id": case_id,
         "employee_ref": submission.employee_ref,
         "work_ref": submission.work_ref,
         "basis_report_id": payload.basis_report_id,
@@ -284,16 +270,16 @@ def record_decision(conn: sqlite3.Connection, artifact_root: Path,
     authority_sig = fingerprint("B7_AUTHORITY", {
         "grant_ref": getattr(grant, "actor_ref", None),
         "grant": grant.model_dump(mode="json"),
-        "effective_at": _iso(effective_at)})
+        "effective_at": clock.iso(effective_at)})
     history_baseline = None
     if target is not None:
         history_baseline = MoneyComponents(
             e=report.components.e.value, a=report.components.a.value,
             ra=report.components.ra.value, p=report.components.p.value,
             rp=report.components.rp.value)
-    now = _now()
+    now = clock.now_iso()
     decision = {
-        "id": f"B7D-{uuid.uuid4().hex[:12]}", "case_id": case_id,
+        "id": _rec.new_id("B7D-"), "case_id": case_id,
         "kind": "B7_SETTLEMENT", "outcome": payload.outcome,
         "reason": payload.reason,
         "presentation_id": presentation.id,
@@ -301,7 +287,7 @@ def record_decision(conn: sqlite3.Connection, artifact_root: Path,
         "basis_review_id": presentation.basis_review_id,
         "employee_ref": submission.employee_ref,
         "work_ref": submission.work_ref, "actor_id": command.actor_id,
-        "effective_at": _iso(effective_at), "created_at": now,
+        "effective_at": clock.iso(effective_at), "created_at": now,
         "basis_input_revision": presentation.basis_input_revision,
         "control_epoch": presentation.control_epoch,
         "business_signature": business_sig,

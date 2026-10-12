@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from invoice_referee.api.settlement import create_runtime_app
-from invoice_referee.settlement.b3 import B3CompanyContext
+from invoice_referee.settlement.b3_intake import B3CompanyContext
 from invoice_referee.settlement.reader import StructuredLedgerReader
 from invoice_referee.settlement.service import Service, ServiceConfig
 from invoice_referee.settlement.store import Store
@@ -374,7 +374,7 @@ def test_b3_control_stop_resume_still_works(b3_client):
 
 from pathlib import Path
 
-from invoice_referee.settlement.b3 import load_b3_context
+from invoice_referee.settlement.b3_intake import load_b3_context
 
 PACKET = Path("data/settlement/b3-verbal-v2")
 

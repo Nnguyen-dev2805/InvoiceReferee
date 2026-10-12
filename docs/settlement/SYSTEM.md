@@ -20,7 +20,7 @@ flowchart TD
 
 UI và runner dùng cùng application path; UI không tính lại kết luận tài chính. Một bộ điều phối thực hiện nhiều tác vụ AI, không đồng nghĩa cần nhiều agents. AI không tự chọn financial tools, sửa policy hoặc lặp tới khi có số vừa ý.
 
-Module map (sau consolidation): `store.py` là façade công khai giữ signature cho Service/API/tests và sở hữu connection/transaction (`_write`/`_read`). SQL lifecycle tách theo nghiệp vụ trong `settlement/persistence/` cùng một transaction: `sqlite_records.py` (helper record dùng chung), `queries.py` (read/selector/money-context), `decision_records.py` (B8), `money_records.py` (B9 + revalidation), `action_records.py` (handoff/closure/adjustment), `advance_records.py` (B3/B5), `linked_context_records.py` (B6→B7 child/context). Các hàm này nhận `conn:sqlite3.Connection` đã mở, không tự mở connection/commit và không gọi ngược façade. Module thuần tính toán: `advance_workflow.py`, `advance_reconciliation.py`, `settlement_workflow.py`, `settlement_reconciliation.py`, `linked_context.py`. `shared/` chứa `errors.py` (một `DomainError` class identity), `artifacts.py`, `clock.py` (thời gian ghi record — khác business time trong `*_workflow`). `legacy/` chứa app claim-processing cũ (application/extraction/policy/storage/domain/config/api app/verify runner); shim giữ import path cũ. Tên module là nội bộ; wire values/persisted codes/DB schema/API path không đổi.
+Module map (sau consolidation): `store.py` là façade công khai giữ signature cho Service/API/tests và sở hữu connection/transaction (`_write`/`_read`). SQL lifecycle tách theo nghiệp vụ trong `settlement/persistence/` cùng một transaction: `sqlite_records.py` (helper record dùng chung), `queries.py` (read/selector/money-context), `decision_records.py` (B8), `money_records.py` (B9 + revalidation), `action_records.py` (handoff/closure/adjustment), `advance_records.py` (B3/B5), `linked_context_records.py` (B6→B7 child/context). Các hàm này nhận `conn:sqlite3.Connection` đã mở, không tự mở connection/commit và không gọi ngược façade. Module thuần tính toán: `advance_workflow.py`, `advance_reconciliation.py`, `settlement_workflow.py`, `settlement_reconciliation.py`, `linked_context.py`. Contract Pydantic tách theo vùng nghiệp vụ trong `settlement/contracts/` (xem S11); `models.py` là façade re-export + `model_rebuild`, `b3_intake.py` là entry re-export contract B3 (từ `contracts/b3_contracts.py`) và evaluator `b3_evaluation.py` (xem S11). `shared/` chứa `errors.py` (một `DomainError` class identity), `artifacts.py`, `clock.py` (thời gian ghi record — khác business time trong `*_workflow`). Tên module là nội bộ; wire values/persisted codes/DB schema/API path không đổi.
 
 Reuse utilities/layout/guards thật đáp ứng. Lõi mới có tên và DB riêng trong quá trình chuyển đổi theo plan, không fallback sang reducer cũ hoặc mount hai contracts trên cùng API paths. Sau cutover, normal UI/Verify gọi cùng settlement core. Không phá local data cũ để đổi schema.
 
@@ -380,3 +380,25 @@ một active settlement trong scope. `B7OriginLink` thêm `adjustment_of_case_id
 (nullable, server-owned). `B7WorkflowView` thêm `fulfillment/revalidation/
 current_handoff/closure`. Generic money/handoff/closure **vẫn**
 `LINKED_B7_REPORT_ONLY`; `B7_SETTLEMENT_EVENT` không vào B7 `_money_summary`.
+
+## S11. Quy ước đặt tên và tổ chức code
+
+Tên module/symbol theo nghiệp vụ, không theo mã nội bộ: dùng `B3/B5/B7/B8/B9`,
+`E/A/RA/P/RP/T/B/S`, `EMPLOYEE/ACCOUNTANT/APPROVER`. Mã nội bộ chỉ xuất hiện ở
+**persisted code** (operation string, `schema_version`, DB column, API path, JSON
+field) và docstring — không dùng làm tên file/class/biến mới.
+
+- **Contract**: tách theo vùng nghiệp vụ trong `settlement/contracts/`
+  (`base`, `b3_contracts`, `advance`, `run`, `report`, `settlement`, `case`,
+  `fingerprint`);
+  `settlement/models.py` là façade re-export + `model_rebuild`, giữ nguyên
+  `from invoice_referee.settlement.models import ...` cho caller cũ. Không đổi
+  tên class/field/thứ tự field khi tách (thứ tự field là input của fingerprint).
+- **Hậu tố**: `*View` (đọc/chiếu ra UI), `*Payload` (client gửi lên), `*Summary`
+  (tổng hợp), `*Record` (bản ghi persisted), `*Result` (kết quả tính toán).
+  Boolean đặt tiền tố `is_/can_/has_` (`is_b3_v1`, `has_request`).
+- **Hàm dài nhiều bước**: tách theo *bước nghiệp vụ* thành hàm module-level
+  (validate → group → resolve → check → route → build), truyền phụ thuộc tường
+  minh; giữ nguyên thứ tự append và mọi chuỗi trong report.
+- **Tránh lồng nhau**: package chỉ để nhóm theo nghiệp vụ; không thêm tầng
+  `core/`/`utils/` trung gian khi không có consumer cụ thể.

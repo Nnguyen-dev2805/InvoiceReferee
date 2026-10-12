@@ -9,10 +9,11 @@ import { B7IntakePanel } from './B7Intake';
 import { B7CompanyContextPanel } from './B7CompanyContext';
 import { B7ApprovalPanel } from './B7Approval';
 import { SettlementReceiptPanel } from './SettlementReceiptPanel';
+import { formatMoney } from './displayText';
 import type { AuditEntry, CaseView, DemoRole, Report } from './types';
 
 function formatVnd(value: number | null): string {
-  return value === null ? '—' : `${value.toLocaleString('vi-VN')} VND`;
+  return formatMoney(value, { nullText: '—' });
 }
 
 function nowLocalInput(): string {
@@ -39,7 +40,7 @@ interface ActionsProps {
   onOpenCase?: (caseId: string) => void;
 }
 
-export function ActionsPanel({
+export function CaseActionsPanel({
   view,
   role,
   actorId,

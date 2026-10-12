@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import sqlite3
-import uuid
-from datetime import datetime
 from pathlib import Path
 
-from invoice_referee.domain.models import DomainError
+from invoice_referee.shared.errors import DomainError
 from invoice_referee.shared import clock
 from invoice_referee.settlement.persistence import sqlite_records as _rec
 from invoice_referee.settlement.persistence import queries as _q
@@ -37,33 +35,21 @@ from invoice_referee.settlement.models import (
     fingerprint,
 )
 
-_B7_CONTEXT_REFRESH = "B7_CONTEXT_REFRESH"
-_B7_MONEY_CONTEXT_REFRESH = "B7_MONEY_CONTEXT_REFRESH"
-_B7_PRESENT = "B7_PRESENT"
-_B7_DECIDE = "B7_DECIDE"
-_B7_ADD_SETTLEMENT_PROOF = "B7_ADD_SETTLEMENT_PROOF"
-_B7_RECORD_MONEY = "B7_RECORD_MONEY"
-_B7_REVALIDATE = "B7_REVALIDATE"
-_B7_HANDOFF = "B7_HANDOFF"
-_B7_CLOSE = "B7_CLOSE"
-_B7_ADJUSTMENT = "B7_ADJUSTMENT"
-_B7_SETTLEMENT_PROOF_USE = "B7_SETTLEMENT_PROOF"
+from invoice_referee.settlement.persistence.operations import (
+    B7_ADD_SETTLEMENT_PROOF as _B7_ADD_SETTLEMENT_PROOF,
+    B7_ADJUSTMENT as _B7_ADJUSTMENT,
+    B7_CLOSE as _B7_CLOSE,
+    B7_CONTEXT_REFRESH as _B7_CONTEXT_REFRESH,
+    B7_DECIDE as _B7_DECIDE,
+    B7_HANDOFF as _B7_HANDOFF,
+    B7_MONEY_CONTEXT_REFRESH as _B7_MONEY_CONTEXT_REFRESH,
+    B7_PRESENT as _B7_PRESENT,
+    B7_RECORD_MONEY as _B7_RECORD_MONEY,
+    B7_REVALIDATE as _B7_REVALIDATE,
+    B7_SETTLEMENT_PROOF_USE as _B7_SETTLEMENT_PROOF_USE,
+)
 _CLOSED_STAGES: tuple[str, ...] = ("SETTLEMENT_CLOSED", "REJECTED_REQUEST_ENDED")
 _OPEN_QUESTION_STATUSES = ("OPEN", "ANSWERED")
-
-
-def _iso(value) -> str:
-    from datetime import timezone
-    return value.astimezone(timezone.utc).isoformat()
-
-
-def _now_dt():
-    return clock.utcnow()
-
-
-def _now() -> str:
-    return _iso(_now_dt())
-
 
 def record_money(conn: sqlite3.Connection, case_id: str,
                  payload: B7MoneyEventPayload, command: Command, b7, b3,
@@ -134,16 +120,16 @@ def record_money(conn: sqlite3.Connection, case_id: str,
                 break
     after_cutoff = bool(payload.event_at is not None
                         and payload.event_at > submission.money_as_of)
-    now = _now()
+    now = clock.now_iso()
     event = {
-        "id": f"BM-{uuid.uuid4().hex[:12]}", "case_id": case_id,
+        "id": _rec.new_id("BM-"), "case_id": case_id,
         "kind": "B7_SETTLEMENT_EVENT",
         "decision_id": payload.decision_id,
         "event_namespace": payload.event_namespace,
         "event_ref": payload.event_ref, "method": payload.method,
         "gross_vnd": payload.gross_vnd, "payer_ref": payload.payer_ref,
         "payee_ref": payload.payee_ref,
-        "event_at": _iso(payload.event_at) if payload.event_at else None,
+        "event_at": clock.iso(payload.event_at) if payload.event_at else None,
         "reported_status": payload.reported_status,
         "purpose": payload.purpose,
         "evidence": [e.model_dump(mode="json") for e in payload.evidence],
@@ -235,7 +221,7 @@ def revalidate(conn: sqlite3.Connection, artifact_root: Path, case_id: str,
     reval = revalidate_b7_decision(
         decision, report, snapshot.history or {}, qualifying, current_cost,
         original_cost)
-    now = _now()
+    now = clock.now_iso()
     _rec.record_command(conn, case_id, case_id, "B7_REVALIDATED",
                         _B7_REVALIDATE, command, payload_fp,
                         {"revalidation": reval.model_dump(mode="json")}, now)

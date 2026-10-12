@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from invoice_referee.settlement.b3 import B3CompanyContext, B3Intake
+from invoice_referee.settlement.b3_intake import B3CompanyContext, B3Intake
 from invoice_referee.settlement.models import Report, RunInput
 from tests.settlement.b3_builders import (
     CONTEXT,

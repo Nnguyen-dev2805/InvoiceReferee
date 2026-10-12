@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from invoice_referee.domain.models import DomainError
+from invoice_referee.shared.errors import DomainError
 from invoice_referee.settlement import evaluation as ev
 from invoice_referee.settlement.evaluation import (
     compute_metrics,

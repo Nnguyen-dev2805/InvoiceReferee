@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from invoice_referee.domain.models import DomainError
+from invoice_referee.shared.errors import DomainError
 from invoice_referee.settlement.settlement_workflow import settlement_target
 from tests.settlement.b7_workflow_builders import (
     make_ready_linked, report_from_values,

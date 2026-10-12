@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from invoice_referee.domain.models import DomainError
-from invoice_referee.settlement.b3 import B3CompanyContext, B3Route
+from invoice_referee.shared.errors import DomainError
+from invoice_referee.settlement.b3_intake import B3CompanyContext, B3Route
 from invoice_referee.settlement.models import (
     Report,
     SourceRecord,

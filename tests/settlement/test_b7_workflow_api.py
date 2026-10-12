@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from invoice_referee.api.settlement import create_runtime_app
-from invoice_referee.settlement.b3 import B3CompanyContext
+from invoice_referee.settlement.b3_intake import B3CompanyContext
 from invoice_referee.settlement.reader import StructuredLedgerReader
 from invoice_referee.settlement.service import Service, ServiceConfig
 from invoice_referee.settlement.store import Store
@@ -31,7 +31,7 @@ def ready_linked_client(tmp_path, monkeypatch):
                       authority=[], b7_context=b7_config(),
                       b3_context=B3CompanyContext.model_validate(CONTEXT)))
     # Build a ready linked child directly through the service.
-    from invoice_referee.settlement.b3 import B3Intake
+    from invoice_referee.settlement.b3_intake import B3Intake
     from tests.settlement.b3_builders import NATIVE_FORM
 
     parent = svc.submit_b3("NV-DEMO-01", B3Intake.model_validate(NATIVE_FORM),

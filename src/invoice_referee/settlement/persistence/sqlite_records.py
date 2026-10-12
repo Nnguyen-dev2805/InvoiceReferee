@@ -16,7 +16,7 @@ import sqlite3
 import uuid
 from typing import Any
 
-from invoice_referee.domain.models import DomainError
+from invoice_referee.shared.errors import DomainError
 from invoice_referee.settlement.models import Command, SourceRecord
 
 
@@ -27,6 +27,11 @@ def dump(value: Any) -> str:
 
 def load(text: str) -> Any:
     return json.loads(text)
+
+
+def new_id(prefix: str) -> str:
+    """Record id: ``prefix`` + 12 hex chars (format preserved verbatim)."""
+    return f"{prefix}{uuid.uuid4().hex[:12]}"
 
 
 def case_row(conn: sqlite3.Connection, case_id: str) -> sqlite3.Row:
@@ -108,6 +113,6 @@ def record_command(conn: sqlite3.Connection, case_id: str, scope_key: str,
         "INSERT INTO audit_events (id, case_id, scope_key, kind, operation, "
         "actor_id, command_key, fingerprint, payload_json, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (f"A-{uuid.uuid4().hex[:12]}", case_id, scope_key, kind, operation,
+        (new_id("A-"), case_id, scope_key, kind, operation,
          command.actor_id, command.key, payload_fp, dump(detail), now),
     )

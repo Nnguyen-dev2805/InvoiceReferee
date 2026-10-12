@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import sqlite3
-import uuid
-from datetime import datetime
 from pathlib import Path
 
-from invoice_referee.domain.models import DomainError
+from invoice_referee.shared.errors import DomainError
 from invoice_referee.shared import clock
 from invoice_referee.settlement.persistence import sqlite_records as _rec
 from invoice_referee.settlement.persistence import queries as _q
@@ -37,33 +35,21 @@ from invoice_referee.settlement.models import (
     fingerprint,
 )
 
-_B7_CONTEXT_REFRESH = "B7_CONTEXT_REFRESH"
-_B7_MONEY_CONTEXT_REFRESH = "B7_MONEY_CONTEXT_REFRESH"
-_B7_PRESENT = "B7_PRESENT"
-_B7_DECIDE = "B7_DECIDE"
-_B7_ADD_SETTLEMENT_PROOF = "B7_ADD_SETTLEMENT_PROOF"
-_B7_RECORD_MONEY = "B7_RECORD_MONEY"
-_B7_REVALIDATE = "B7_REVALIDATE"
-_B7_HANDOFF = "B7_HANDOFF"
-_B7_CLOSE = "B7_CLOSE"
-_B7_ADJUSTMENT = "B7_ADJUSTMENT"
-_B7_SETTLEMENT_PROOF_USE = "B7_SETTLEMENT_PROOF"
+from invoice_referee.settlement.persistence.operations import (
+    B7_ADD_SETTLEMENT_PROOF as _B7_ADD_SETTLEMENT_PROOF,
+    B7_ADJUSTMENT as _B7_ADJUSTMENT,
+    B7_CLOSE as _B7_CLOSE,
+    B7_CONTEXT_REFRESH as _B7_CONTEXT_REFRESH,
+    B7_DECIDE as _B7_DECIDE,
+    B7_HANDOFF as _B7_HANDOFF,
+    B7_MONEY_CONTEXT_REFRESH as _B7_MONEY_CONTEXT_REFRESH,
+    B7_PRESENT as _B7_PRESENT,
+    B7_RECORD_MONEY as _B7_RECORD_MONEY,
+    B7_REVALIDATE as _B7_REVALIDATE,
+    B7_SETTLEMENT_PROOF_USE as _B7_SETTLEMENT_PROOF_USE,
+)
 _CLOSED_STAGES: tuple[str, ...] = ("SETTLEMENT_CLOSED", "REJECTED_REQUEST_ENDED")
 _OPEN_QUESTION_STATUSES = ("OPEN", "ANSWERED")
-
-
-def _iso(value) -> str:
-    from datetime import timezone
-    return value.astimezone(timezone.utc).isoformat()
-
-
-def _now_dt():
-    return clock.utcnow()
-
-
-def _now() -> str:
-    return _iso(_now_dt())
-
 
 def handoff(conn: sqlite3.Connection, artifact_root: Path, case_id: str,
             payload: B7HandoffPayload, command: Command, b7, b3,
@@ -137,15 +123,15 @@ def handoff(conn: sqlite3.Connection, artifact_root: Path, case_id: str,
         _rec.record_command(conn, case_id, case_id, "B7_HANDOFF_RECORDED",
                             _B7_HANDOFF, command, payload_fp,
                             {"handoff": prior.model_dump(mode="json"),
-                             "no_op": True}, _now())
+                             "no_op": True}, clock.now_iso())
         return prior.model_copy(update={"idempotent_replay": True})
-    now_dt = _now_dt()
+    now_dt = clock.utcnow()
     valid_until = None
     grant = _q.grant_for_action(b7, decision, effective_b7_time(b7))
     if grant is not None:
         valid_until = getattr(grant, "effective_until", None)
     handoff_view = B7HandoffView(
-        id=f"BH-{uuid.uuid4().hex[:12]}", case_id=case_id,
+        id=_rec.new_id("BH-"), case_id=case_id,
         decision_id=decision.id, report_id=case["current_run_id"] or "",
         employee_ref=submission.employee_ref,
         work_ref=submission.work_ref, actor_id=command.actor_id,
@@ -158,7 +144,7 @@ def handoff(conn: sqlite3.Connection, artifact_root: Path, case_id: str,
     _rec.record_command(conn, case_id, case_id, "B7_HANDOFF_RECORDED",
                         _B7_HANDOFF, command, payload_fp,
                         {"handoff": handoff_view.model_dump(mode="json")},
-                        _iso(now_dt))
+                        clock.iso(now_dt))
     return handoff_view
 
 
@@ -189,7 +175,7 @@ def close(conn: sqlite3.Connection, artifact_root: Path, case_id: str,
                 _rec.record_command(conn, case_id, case_id, "B7_SETTLEMENT_CLOSED",
                                     _B7_CLOSE, command, payload_fp,
                                     {"closure": stored.model_dump(mode="json"),
-                                     "no_op": True}, _now())
+                                     "no_op": True}, clock.now_iso())
                 return stored.model_copy(update={"idempotent_replay": True})
         raise DomainError(
             "CASE_CLOSED",
@@ -241,9 +227,9 @@ def close(conn: sqlite3.Connection, artifact_root: Path, case_id: str,
     from invoice_referee.settlement.settlement_workflow import b7_business_signature
     business_sig = b7_business_signature(
         submission, _rec.source_records(conn, case_id), report, policy, snapshot)
-    now_dt = _now_dt()
+    now_dt = clock.utcnow()
     closure_view = B7ClosureView(
-        id=f"BC-{uuid.uuid4().hex[:12]}", case_id=case_id,
+        id=_rec.new_id("BC-"), case_id=case_id,
         decision_id=decision.id, current_report_id=payload.current_report_id,
         actor_id=command.actor_id, kind="SETTLEMENT_COMPLETE",
         employee_ref=submission.employee_ref, work_ref=submission.work_ref,
@@ -264,12 +250,12 @@ def close(conn: sqlite3.Connection, artifact_root: Path, case_id: str,
     conn.execute(
         "UPDATE cases SET stage = 'SETTLEMENT_CLOSED', case_version = ?, "
         "updated_at = ? WHERE id = ?",
-        (case["case_version"] + 1, _iso(now_dt), case_id),
+        (case["case_version"] + 1, clock.iso(now_dt), case_id),
     )
     _rec.record_command(conn, case_id, case_id, "B7_SETTLEMENT_CLOSED",
                         _B7_CLOSE, command, payload_fp,
                         {"closure": closure_view.model_dump(mode="json")},
-                        _iso(now_dt))
+                        clock.iso(now_dt))
     return closure_view
 
 
@@ -307,9 +293,9 @@ def prepare_adjustment(conn: sqlite3.Connection, closed_case_id: str, payload,
     active = _lc.find_linked_child(conn, parent_id)
     if active is not None:
         return active["id"], False
-    now_dt = _now_dt()
-    now = _iso(now_dt)
-    child_id = f"C-{uuid.uuid4().hex[:12]}"
+    now_dt = clock.utcnow()
+    now = clock.iso(now_dt)
+    child_id = _rec.new_id("C-")
     new_link = {
         "origin_case_id": parent_id,
         "employee_ref": link["employee_ref"], "work_ref": link["work_ref"],
@@ -330,7 +316,7 @@ def prepare_adjustment(conn: sqlite3.Connection, closed_case_id: str, payload,
     conn.execute(
         "INSERT INTO case_revisions (id, case_id, revision, submission_json, "
         "reason, actor_id, command_key, created_at) VALUES (?, ?, 1, ?, ?, ?, ?, ?)",
-        (f"R-{uuid.uuid4().hex[:12]}", child_id,
+        (_rec.new_id("R-"), child_id,
          _rec.dump(submission.model_dump(mode="json")), payload.reason,
          command.actor_id, command.key, now),
     )

@@ -64,9 +64,6 @@ the employee/accountant/approver steps and the literal expected oracle.
   receipts; B6→B7 linked settlement; B8 settlement present/decision; B9 actual
   settlement money (P/RA/RP), fulfillment/revalidation, handoff and closure with
   post-closure adjustment. Fake/replay + HUMAN_SOURCE_REVIEW; no bank transfer.
-- **Earlier claim-processing app (T01–T11):** kept as historical reference on
-  `main`/B0. Its Verify corpus (15 claims) is legacy — it is NOT the accepted
-  20-packet settlement evaluation below.
 - **LIVE END-TO-END: INCONCLUSIVE** — no live provider call has been made. All
   settlement evidence so far is fake/replay (no network). Live OCR/LLM quality
   is unmeasured; the measured baseline below reflects the fake reader's
@@ -117,47 +114,7 @@ Implemented so far (W01–W06): create case → upload sources → reload → op
 stored original (stale-version and idempotency guards); B3/B7 reports with sourced
 checks and unknown-as-null; questions with owner/refs and re-check resolution;
 decisions (authority-gated), actual money with incidents, Stop/resume, handoff
-and closure gates in the UI. The sections below describe the earlier
-claim-processing implementation kept for comparison; they do not establish
-settlement capabilities.
-
-### Earlier claim-processing app (historical reference)
-
-The app needs two processes. The backend listens on **port 8000** because the Vite
-dev server proxies `/api` to `127.0.0.1:8000` (see `frontend/vite.config.ts`).
-
-**1. Configuration** — copy `.env.example` to `.env` (Git-ignored) and set:
-
-```bash
-PROVIDER_MODE=fake        # `fake` = no network; `live` = real Mistral + Kimi
-DATA_ROOT=data            # SQLite + artifacts/evidence live here
-# For live mode only:
-MISTRAL_API_KEY=...
-KIMI_API_KEY=...          # OR the B0 form: KIMI_TOKEN=... + KIMI_SECRET=...
-KIMI_BASE_URL=https://api.moonshot.ai/v1
-KIMI_MODEL=kimi-k2.6
-MISTRAL_OCR_MODEL=mistral-ocr-latest
-```
-
-The runtime loads the repo-root `.env` at startup; an explicitly exported
-environment variable always overrides the file. There is **no** live→fake
-fallback: a missing key fails closed with `CONFIG_NOT_ACTIVE`.
-
-**2. Backend:**
-
-```bash
-.venv/bin/uvicorn invoice_referee.api.app:create_runtime_app --factory --port 8000
-```
-
-Check: <http://127.0.0.1:8000/api/health> → `{"status":"ok", ...}`.
-
-**3. Frontend:**
-
-```bash
-npm --prefix frontend run dev
-```
-
-Open <http://127.0.0.1:5173>.
+and closure gates in the UI.
 
 ### What you can do in the settlement UI (current)
 
@@ -169,23 +126,19 @@ Open <http://127.0.0.1:5173>.
 4. **Verify panel** chạy bộ đánh giá settlement 20 packets qua cùng Service và
    hiển thị expected/actual/verdict/metrics trung thực.
 
-### What you can do in the UI (earlier claim-processing app — historical)
-
-1. **Activate the demo policy** (enter a reason). The policy starts INACTIVE; the
-   system will not auto-process anything until it is explicitly activated.
-2. **Submit a claim** (profile, purpose, amount as digits, one or more files with a
-   role) → the run starts and the UI polls until it finishes.
-3. **Verify panel** runs the Core / Escalation / All suites through the same
-   production service (replay mode, no network) and shows expected vs actual.
-
 ### Provider modes
 
-- `PROVIDER_MODE=fake` — wires an **empty** fake provider. It proves the wiring
-  only: submitting a claim yields a technical `PROVIDER_FAILED` (fail-closed, never
-  a fabricated approval). Use the **Verify panel** (replay corpus) to exercise the
-  full decision path offline.
-- `PROVIDER_MODE=live` — real Mistral OCR + Kimi. **This spends money** and needs
-  the keys above. Try one simple claim first to confirm both providers respond.
+Config comes from environment variables (repo-root `.env` is loaded at startup;
+an explicitly exported variable always wins). There is **no** live→fake fallback.
+
+- `SETTLEMENT_PROVIDER_MODE=fake` (default) — a deterministic fake reader. It
+  proves the wiring only and cannot read narrative sources; use the **Verify
+  panel** / `settlement_cli` (replay corpus) to exercise the full decision path
+  offline.
+- `SETTLEMENT_PROVIDER_MODE=live` — real Mistral OCR + xkiro LLM. **This spends
+  money** and needs `MISTRAL_API_KEY` (plus `MISTRAL_BASE_URL` / `MISTRAL_OCR_MODEL`
+  if non-default) and the xkiro keys. A missing key fails closed with
+  `CONFIG_NOT_ACTIVE` (never a fabricated approval).
 
 ## Tests
 
@@ -225,48 +178,32 @@ so this number reflects reader capability, not settlement quality — live-mode
 quality measurement (M1/M2) is not done. The corpus is DEVELOPMENT_ONLY from a
 single template family: it is not an independent holdout.
 
-**Earlier claim-processing Verify (legacy reference):**
-
-```bash
-.venv/bin/python -m invoice_referee.verify --suite core --mode replay --output data/verify
-.venv/bin/python -m invoice_referee.verify --suite escalation --mode replay --output data/verify
-.venv/bin/python -m invoice_referee.verify --suite all --mode replay --output data/verify
-```
-
-`core` = TC01/03/04/11; `escalation` = TC01/02/03/06/11; `all` = the 15-case
-development corpus of the historical app. This legacy runner is kept for
-comparison only and is not the accepted settlement evaluation.
-
 ## Policy
 
-The demo policy (`config/demo-policy.json`, version `demo-expense-v0.1-proposed`)
-holds PROPOSED rulebook values. It starts **inactive** (`active=false`,
-`origin='proposed'`); a run may only use it after an explicit, versioned activation
-(`activate_demo_policy`) that records a UUID activation id, a reason, and
-`origin='developer_activated_demo'`. Demo role selection is not authenticated
-company identity.
+The settlement core carries an explicit policy version/activation in each case's
+config (`{"version": ..., "activated": ...}`) and in the company context fixture
+(`SETTLEMENT_B3_CONTEXT_PATH` / `SETTLEMENT_B7_CONTEXT_PATH`). A run only uses an
+activated fixture; there is no implicit fallback to live policy. Demo role
+selection is not authenticated company identity.
 
 ## Layout
 
 ```
 src/invoice_referee/
-  settlement/           current core: models, store, service, api, rules, pipeline
+  settlement/           core: models, store, service, api, rules, pipeline
+  settlement/contracts/  Pydantic contracts split by business area
+  settlement/prompts/    reader prompt text files
   settlement/persistence/  SQL lifecycle (sqlite_records, queries,
                         decision_records, money_records, action_records,
                         advance_records, linked_context_records)
-  shared/               errors, artifacts, clock (used by current + legacy)
-  legacy/               historical claim-processing app (application,
-                        extraction, policy, storage/repository, domain, config,
-                        api/app, verify runner). Compatibility shims keep old
-                        import paths resolving.
-  api/                  settlement factory (current) + legacy app shim
-  verify/               settlement CLI (current) + legacy harness shims
+  shared/               errors, artifacts, clock
+  api/                  settlement factory (create_runtime_app)
+  verify/               settlement CLI + replay reader
 frontend/src/
-  settlement/           current settlement UI
-  legacy/               historical claim-processing UI
+  settlement/           settlement UI
   main.tsx              mounts the settlement App
-tests/                  unit + integration; fixtures/ holds the Verify corpus
-scripts/                synthetic-evidence / demo generators
+tests/                  settlement tests; fixtures/ holds the Verify corpus
+scripts/                demo generator
 docs/                   canonical docs, plans, evidence, build log
 data/                   runtime SQLite + artifacts + frozen packets (Git-ignored)
 ```
@@ -297,8 +234,9 @@ not a second rulebook: [B3 intake](docs/superpowers/plans/2026-10-10-b3-verbal-i
 [B6 linked settlement](docs/superpowers/plans/2026-10-11-b6-linked-settlement.md),
 [B8 settlement decision](docs/superpowers/plans/2026-10-11-b8-settlement-decision.md),
 [B9 settlement fulfillment](docs/superpowers/plans/2026-10-11-b9-settlement-fulfillment.md).
-Legacy commands and the earlier claim-processing app are preserved in
-[the archive](docs/archive/README.md); do not start new work from them.
+The earlier claim-processing app (T01–T11) was removed from the working tree; its
+documents and code are preserved in [the archive](docs/archive/README.md) for
+reference only — do not start new work from them.
 
 ## Configuration safety
 

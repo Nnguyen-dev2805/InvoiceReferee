@@ -1,4 +1,5 @@
-"""InvoiceReferee — expense-reimbursement MVP (B1 rebuild).
+"""InvoiceReferee — advance/expense-settlement MVP.
 
-Package marker only; domain records live in ``invoice_referee.domain``.
+Package marker only; settlement contracts live in
+``invoice_referee.settlement`` and shared helpers in ``invoice_referee.shared``.
 """

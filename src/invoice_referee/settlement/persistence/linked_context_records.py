@@ -8,14 +8,14 @@ here opens its own connection or commits.
 """
 from __future__ import annotations
 
+from invoice_referee.shared import clock
 import hashlib
 import json
 import sqlite3
-import uuid
 from pathlib import Path
 from typing import Any
 
-from invoice_referee.domain.models import DomainError
+from invoice_referee.shared.errors import DomainError
 from invoice_referee.settlement.persistence import sqlite_records as _rec
 from invoice_referee.settlement.models import (
     B7LinkedIntake,
@@ -27,28 +27,14 @@ from invoice_referee.settlement.models import (
 )
 from invoice_referee.shared.artifacts import put_artifact
 
-_PREPARE_LINKED_B7 = "PREPARE_LINKED_B7"
-_REVISE_LINKED_B7 = "REVISE_LINKED_B7"
-_B7_CONTEXT_REFRESH = "B7_CONTEXT_REFRESH"
-_B7_MONEY_CONTEXT_REFRESH = "B7_MONEY_CONTEXT_REFRESH"
-_LINKED_B7_CONTEXT_USE = "LINKED_B7_CONTEXT"
+from invoice_referee.settlement.persistence.operations import (
+    B7_CONTEXT_REFRESH as _B7_CONTEXT_REFRESH,
+    B7_MONEY_CONTEXT_REFRESH as _B7_MONEY_CONTEXT_REFRESH,
+    LINKED_B7_CONTEXT_USE as _LINKED_B7_CONTEXT_USE,
+    PREPARE_LINKED_B7 as _PREPARE_LINKED_B7,
+    REVISE_LINKED_B7 as _REVISE_LINKED_B7,
+)
 _CLOSED_STAGES: tuple[str, ...] = ("SETTLEMENT_CLOSED", "REJECTED_REQUEST_ENDED")
-
-
-def _iso(value) -> str:
-    from datetime import timezone
-    return value.astimezone(timezone.utc).isoformat()
-
-
-def _now() -> str:
-    from invoice_referee.shared import clock
-    return _iso(clock.utcnow())
-
-
-def _now_dt():
-    from invoice_referee.shared import clock
-    return clock.utcnow()
-
 
 def origin_link(case: sqlite3.Row) -> dict[str, Any] | None:
     form = _rec.load(case["submission_json"]).get("form") or {}
@@ -103,11 +89,11 @@ def prepare_linked_child(conn: sqlite3.Connection, parent_id: str,
                             "LINKED_B7_PREPARED", _PREPARE_LINKED_B7, command,
                             payload_fp, {"child_id": existing["id"],
                                          "parent_id": parent_id,
-                                         "no_op": True}, _now())
+                                         "no_op": True}, clock.now_iso())
         return existing["id"], False
-    now_dt = _now_dt()
-    now = _iso(now_dt)
-    child_id = f"C-{uuid.uuid4().hex[:12]}"
+    now_dt = clock.utcnow()
+    now = clock.iso(now_dt)
+    child_id = _rec.new_id("C-")
     link = {
         "origin_case_id": parent_id,
         "employee_ref": _rec.load(parent["submission_json"])["employee_ref"],
@@ -131,7 +117,7 @@ def prepare_linked_child(conn: sqlite3.Connection, parent_id: str,
     conn.execute(
         "INSERT INTO case_revisions (id, case_id, revision, submission_json, "
         "reason, actor_id, command_key, created_at) VALUES (?, ?, 1, ?, '', ?, ?, ?)",
-        (f"R-{uuid.uuid4().hex[:12]}", child_id,
+        (_rec.new_id("R-"), child_id,
          _rec.dump(submission.model_dump(mode="json")), command.actor_id,
          command.key, now),
     )
@@ -168,7 +154,7 @@ def revise_linked_child(conn: sqlite3.Connection, case_id: str,
     form = intake.model_dump(mode="json")
     form["origin_link"] = link  # server-owned, cannot be client-set
     merged = submission.model_copy(update={"form": form})
-    now = _now()
+    now = clock.now_iso()
     conn.execute(
         "UPDATE cases SET case_version = ?, input_revision = ?, "
         "submission_json = ?, updated_at = ? WHERE id = ?",
@@ -188,8 +174,8 @@ def store_context_source(conn: sqlite3.Connection, artifact_root: Path,
     Source-use ``LINKED_B7_CONTEXT`` is recorded in the audit operation, so
     the snapshot is trusted by audit — never by a client-supplied string.
     """
-    source_id = f"S-{uuid.uuid4().hex[:12]}"
-    now = _now()
+    source_id = _rec.new_id("S-")
+    now = clock.now_iso()
     content = _rec.dump(snapshot.model_dump(mode="json")).encode("utf-8")
     stored_path = put_artifact(artifact_root, case_id, "sources", source_id,
                                content)
@@ -275,11 +261,11 @@ def record_company_packet(conn: sqlite3.Connection, artifact_root: Path,
                                 _B7_CONTEXT_REFRESH, command, payload_fp,
                                 {"source_id": prior_ids[-1],
                                  "context_version": snapshot.context_version,
-                                 "no_op": True}, _now())
+                                 "no_op": True}, clock.now_iso())
             return case_id, True
     source_id = store_context_source(conn, artifact_root, case_id, snapshot,
                                      command)
-    now = _now()
+    now = clock.now_iso()
     conn.execute(
         "UPDATE cases SET case_version = ?, input_revision = ?, "
         "updated_at = ? WHERE id = ?",

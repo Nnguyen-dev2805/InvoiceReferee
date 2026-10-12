@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from invoice_referee.api.settlement import DEMO_AUTHORITY, _reader_from_env
-from invoice_referee.domain.models import DomainError
+from invoice_referee.shared.errors import DomainError
 from invoice_referee.settlement.evaluation import run_suite
 from invoice_referee.settlement.service import Service, ServiceConfig
 from invoice_referee.settlement.store import Store

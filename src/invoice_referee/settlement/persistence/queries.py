@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 import sqlite3
-import uuid
-from datetime import datetime
 from pathlib import Path
 
-from invoice_referee.domain.models import DomainError
-from invoice_referee.shared import clock
+from invoice_referee.shared.errors import DomainError
 from invoice_referee.settlement.persistence import sqlite_records as _rec
 from invoice_referee.settlement.persistence import advance_records as _adv
 from invoice_referee.settlement.persistence import linked_context_records as _lc
@@ -36,47 +33,21 @@ from invoice_referee.settlement.models import (
     fingerprint,
 )
 
-_B7_CONTEXT_REFRESH = "B7_CONTEXT_REFRESH"
-_B7_MONEY_CONTEXT_REFRESH = "B7_MONEY_CONTEXT_REFRESH"
-_B7_PRESENT = "B7_PRESENT"
-_B7_DECIDE = "B7_DECIDE"
-_B7_ADD_SETTLEMENT_PROOF = "B7_ADD_SETTLEMENT_PROOF"
-_B7_RECORD_MONEY = "B7_RECORD_MONEY"
-_B7_REVALIDATE = "B7_REVALIDATE"
-_B7_HANDOFF = "B7_HANDOFF"
-_B7_CLOSE = "B7_CLOSE"
-_B7_ADJUSTMENT = "B7_ADJUSTMENT"
-_B7_SETTLEMENT_PROOF_USE = "B7_SETTLEMENT_PROOF"
+from invoice_referee.settlement.persistence.operations import (
+    B7_ADD_SETTLEMENT_PROOF as _B7_ADD_SETTLEMENT_PROOF,
+    B7_ADJUSTMENT as _B7_ADJUSTMENT,
+    B7_CLOSE as _B7_CLOSE,
+    B7_CONTEXT_REFRESH as _B7_CONTEXT_REFRESH,
+    B7_DECIDE as _B7_DECIDE,
+    B7_HANDOFF as _B7_HANDOFF,
+    B7_MONEY_CONTEXT_REFRESH as _B7_MONEY_CONTEXT_REFRESH,
+    B7_PRESENT as _B7_PRESENT,
+    B7_RECORD_MONEY as _B7_RECORD_MONEY,
+    B7_REVALIDATE as _B7_REVALIDATE,
+    B7_SETTLEMENT_PROOF_USE as _B7_SETTLEMENT_PROOF_USE,
+)
 _CLOSED_STAGES: tuple[str, ...] = ("SETTLEMENT_CLOSED", "REJECTED_REQUEST_ENDED")
 _OPEN_QUESTION_STATUSES = ("OPEN", "ANSWERED")
-
-
-def _iso(value) -> str:
-    from datetime import timezone
-    return value.astimezone(timezone.utc).isoformat()
-
-
-def _now_dt():
-    return clock.utcnow()
-
-
-def _now() -> str:
-    return _iso(_now_dt())
-
-
-def _iso(value) -> str:
-    from datetime import timezone
-    return value.astimezone(timezone.utc).isoformat()
-
-
-def _now_dt():
-    from invoice_referee.shared import clock
-    return clock.utcnow()
-
-
-def _now() -> str:
-    return _iso(_now_dt())
-
 
 def workflow_view(conn: sqlite3.Connection,
                   case_id: str) -> B7WorkflowView | None:

@@ -15,8 +15,8 @@ from typing import Any, Callable
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError
 
-from invoice_referee.domain.models import DomainError
-from invoice_referee.settlement.b3 import B3CompanyContext, B3Intake, is_b3_v1
+from invoice_referee.shared.errors import DomainError
+from invoice_referee.settlement.b3_intake import B3CompanyContext, B3Intake, is_b3_v1
 from invoice_referee.settlement.advance_workflow import b3_route_for
 from invoice_referee.settlement.linked_context import is_linked_b7
 from invoice_referee.settlement.models import (
@@ -87,7 +87,7 @@ def _merge_b3_decision_into_history(
     a false duplicate-approval issue. Never a money event, and never applied to
     a foreign approval. Returns the new context and the ADVANCE_APPROVAL ref.
     """
-    from invoice_referee.settlement.b3 import B3HistoryRecord
+    from invoice_referee.settlement.b3_intake import B3HistoryRecord
 
     namespace = f"b3decision:{decision.id}"
     employee_ref = decision.employee_ref
@@ -123,7 +123,7 @@ def _merge_b3_advances_into_history(
     RECEIVED) in its company history under a ``b3advance:<id>`` namespace. Only
     confirmed events count; pending/unknown are not fabricated as ADVANCE 0.
     """
-    from invoice_referee.settlement.b3 import B3HistoryRecord
+    from invoice_referee.settlement.b3_intake import B3HistoryRecord
 
     records = [
         B3HistoryRecord(

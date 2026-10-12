@@ -12,3 +12,17 @@ from datetime import datetime, timezone
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def iso(value: datetime) -> str:
+    """Serialise an aware datetime to a UTC ISO-8601 string."""
+    return value.astimezone(timezone.utc).isoformat()
+
+
+def now_iso() -> str:
+    """Current record time as a UTC ISO-8601 string.
+
+    Resolves ``utcnow`` dynamically so monkeypatching ``clock.utcnow`` (the
+    single record-clock owner) still pins persisted timestamps in tests.
+    """
+    return iso(utcnow())

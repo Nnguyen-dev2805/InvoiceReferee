@@ -14,43 +14,41 @@ export function dossierReference(view: CaseView): string | null {
   return view.id;
 }
 
-export function formatMoney(value: number | null | undefined): string {
+export function formatMoney(
+  value: number | null | undefined,
+  options: { nullText?: string } = {},
+): string {
   if (value === null || value === undefined) {
-    return 'Chưa xác định';
+    return options.nullText ?? 'Chưa xác định';
   }
+  // ``value === 0`` also catches ``-0``; without this branch ``(-0)`` would
+  // render as "-0 đ" (money must never show a signed zero).
   if (value === 0) {
     return '0 đ';
   }
   return `${value.toLocaleString('vi-VN')} đ`;
 }
 
+// Exhaustively typed by ``CaseStage``: adding a stage to the union without a
+// label here is a compile error, and every screen reads this one table so the
+// wording can never drift between the case list and the accounting/approval
+// desks.
+export const STAGE_LABELS: Record<CaseStage, string> = {
+  CHECKING: 'Đang kiểm tra nguồn',
+  ACCOUNTING_REVIEW: 'Kế toán rà soát',
+  AWAITING_DECISION: 'Chờ người có quyền quyết định',
+  AWAITING_MONEY: 'Chờ thực nhận tiền',
+  AWAITING_WORK_SETTLEMENT: 'Chờ quyết toán chi phí',
+  RESOLVING_OBLIGATIONS: 'Đang xử lý nghĩa vụ',
+  ADVANCE_REQUEST_REFUSED: 'Đề nghị tạm ứng bị từ chối',
+  SETTLEMENT_REQUEST_REFUSED: 'Đề nghị quyết toán bị từ chối',
+  READY_TO_CLOSE: 'Đã duyệt cân bằng — chờ kiểm tra đóng',
+  REJECTED_REQUEST_ENDED: 'Yêu cầu bị từ chối đã kết thúc',
+  SETTLEMENT_CLOSED: 'Hồ sơ đã đóng',
+};
+
 export function stageLabel(stage: CaseStage): string {
-  switch (stage) {
-    case 'CHECKING':
-      return 'Đang kiểm tra nguồn';
-    case 'ACCOUNTING_REVIEW':
-      return 'Kế toán rà soát';
-    case 'AWAITING_DECISION':
-      return 'Chờ người có quyền quyết định';
-    case 'AWAITING_MONEY':
-      return 'Chờ thực nhận tiền';
-    case 'AWAITING_WORK_SETTLEMENT':
-      return 'Chờ quyết toán chi phí';
-    case 'RESOLVING_OBLIGATIONS':
-      return 'Đang xử lý nghĩa vụ';
-    case 'ADVANCE_REQUEST_REFUSED':
-      return 'Đề nghị tạm ứng bị từ chối';
-    case 'SETTLEMENT_REQUEST_REFUSED':
-      return 'Đề nghị quyết toán bị từ chối';
-    case 'READY_TO_CLOSE':
-      return 'Đã duyệt cân bằng — chờ kiểm tra đóng';
-    case 'REJECTED_REQUEST_ENDED':
-      return 'Yêu cầu bị từ chối đã kết thúc';
-    case 'SETTLEMENT_CLOSED':
-      return 'Hồ sơ đã đóng';
-    default:
-      return stage;
-  }
+  return STAGE_LABELS[stage] ?? stage;
 }
 
 export function roleLabel(role: DemoRole): string {

@@ -5,13 +5,13 @@
 // prefills a forecast as actual. Work/employee/link are readonly server facts.
 import { useState } from 'react';
 import * as api from './api';
+import { formatMoney } from './displayText';
 import type {
   B7ClaimRow, B7DeclaredPayer, B7LinkedIntake, CaseView, DemoRole, Report,
 } from './types';
 
 function formatVnd(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '—';
-  return `${value.toLocaleString('vi-VN')} đ`;
+  return formatMoney(value, { nullText: '—' });
 }
 
 let claimSeq = 0;

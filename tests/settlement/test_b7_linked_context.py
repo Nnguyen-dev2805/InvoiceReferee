@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from invoice_referee.domain.models import DomainError
+from invoice_referee.shared.errors import DomainError
 from tests.settlement.test_b3_workflow import (
     command, ready_b3, presented_b3,  # noqa: F401 — fixture chain for approved_b3
 )

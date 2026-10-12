@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { ActionsPanel } from './Actions';
+import { CaseActionsPanel } from './CaseActionsPanel';
 import type { AuditEntry, CaseView, MoneySummary } from './types';
 
 function b3Workflow(overrides: Partial<CaseView['b3_workflow']> = {}) {
@@ -57,7 +57,7 @@ function makeView(overrides: Partial<CaseView> = {}): CaseView {
 const noop = async () => undefined;
 
 test('hiển thị approved/received/remaining tách biệt; unknown giữ "—"', () => {
-  render(<ActionsPanel view={makeView({
+  render(<CaseActionsPanel view={makeView({
     money_summary: makeSummary({
       approved_vnd: null, received_vnd: null, remaining_vnd: null,
     }),
@@ -70,7 +70,7 @@ test('hiển thị approved/received/remaining tách biệt; unknown giữ "—"
 });
 
 test('incidents OVERPAY/WRONG_RECIPIENT hiển thị, không clip gross', () => {
-  render(<ActionsPanel view={makeView({
+  render(<CaseActionsPanel view={makeView({
     money_summary: makeSummary({
       received_vnd: 4_000_000, remaining_vnd: 0,
       incidents: [
@@ -83,19 +83,19 @@ test('incidents OVERPAY/WRONG_RECIPIENT hiển thị, không clip gross', () => 
     reportReady onAction={noop} />);
   const panel = screen.getByTestId('actions-panel').textContent ?? '';
   expect(panel).toContain('OVERPAY');
-  expect(panel).toContain('1.000.000 VND');
+  expect(panel).toContain('1.000.000 đ');
   expect(panel).toContain('WRONG_RECIPIENT');
   expect(panel).toContain('NV-99');
 });
 
 test('vai không phải APPROVER thấy cảnh báo BEYOND_AUTHORITY', () => {
-  render(<ActionsPanel view={makeView()} role="ACCOUNTANT" actorId="ACC-01"
+  render(<CaseActionsPanel view={makeView()} role="ACCOUNTANT" actorId="ACC-01"
     decisionId={null} reportReady onAction={noop} />);
   expect(screen.getByText(/BEYOND_AUTHORITY/)).toBeTruthy();
 });
 
 test('hồ sơ đã đóng chỉ còn thông báo đọc lại', () => {
-  render(<ActionsPanel view={makeView({ stage: 'SETTLEMENT_CLOSED' })}
+  render(<CaseActionsPanel view={makeView({ stage: 'SETTLEMENT_CLOSED' })}
     role="ACCOUNTANT" actorId="ACC-01" decisionId="D-1"
     reportReady onAction={noop} />);
   const panel = screen.getByTestId('actions-panel');
@@ -104,7 +104,7 @@ test('hồ sơ đã đóng chỉ còn thông báo đọc lại', () => {
 });
 
 test('Stop đang bật: không cho Stop nữa, cho Resume', () => {
-  render(<ActionsPanel view={makeView({ stop_active: true, stage: 'CHECKING' })}
+  render(<CaseActionsPanel view={makeView({ stop_active: true, stage: 'CHECKING' })}
     role="ACCOUNTANT" actorId="ACC-01" decisionId={null}
     reportReady onAction={noop} />);
   expect((screen.getByText(/Stop hồ sơ/) as HTMLButtonElement).disabled)
@@ -114,7 +114,7 @@ test('Stop đang bật: không cho Stop nữa, cho Resume', () => {
 });
 
 test('vai EMPLOYEE chỉ thấy tình trạng tiền và thông báo, không thấy form duyệt/chi', () => {
-  render(<ActionsPanel view={makeView()} role="EMPLOYEE" actorId="NV-01"
+  render(<CaseActionsPanel view={makeView()} role="EMPLOYEE" actorId="NV-01"
     decisionId={null} reportReady onAction={noop} />);
   expect(screen.getByTestId('money-summary')).toBeTruthy();
   expect(screen.getByText(/Góc nhìn Nhân viên/)).toBeTruthy();
@@ -125,7 +125,7 @@ test('vai EMPLOYEE chỉ thấy tình trạng tiền và thông báo, không th�
 });
 
 test('B3 chưa trình: kế toán thấy nút Lưu rà soát và trình duyệt; ẩn tình trạng tiền', () => {
-  render(<ActionsPanel view={makeView({
+  render(<CaseActionsPanel view={makeView({
     job: 'B3', b3_workflow: b3Workflow(),
     submission: { ...makeView().submission, job: 'B3',
       form: { schema_version: 'b3-intake-v1', confirmed: true } },
@@ -147,7 +147,7 @@ test('B3 đã có review còn current: kế toán không phải nhập lại, th
       note: 'Đã đối chiếu bảng kê.', refs: [], actor_id: 'ACC-01',
       created_at: '2026-10-11T09:30:00Z' } },
   };
-  render(<ActionsPanel view={makeView({
+  render(<CaseActionsPanel view={makeView({
     job: 'B3', b3_workflow: b3Workflow(),
     submission: { ...makeView().submission, job: 'B3',
       form: { schema_version: 'b3-intake-v1', confirmed: true } },
@@ -178,14 +178,14 @@ test('B3 pending: approver thấy ba nút quyết định, employee không thấ
     }),
   };
   const { unmount } = render(
-    <ActionsPanel view={presented} role="APPROVER" actorId="APR-DEMO-01"
+    <CaseActionsPanel view={presented} role="APPROVER" actorId="APR-DEMO-01"
       decisionId={null} reportReady onAction={noop} />);
   expect(screen.getByRole('button', { name: 'Phê duyệt tạm ứng' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Yêu cầu bổ sung' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Từ chối đề nghị' })).toBeInTheDocument();
   unmount();
 
-  render(<ActionsPanel view={presented} role="EMPLOYEE" actorId="NV-01"
+  render(<CaseActionsPanel view={presented} role="EMPLOYEE" actorId="NV-01"
     decisionId={null} reportReady onAction={noop} />);
   expect(screen.queryByRole('button', { name: 'Phê duyệt tạm ứng' }))
     .not.toBeInTheDocument();
@@ -211,7 +211,7 @@ test('B3 approved: hiển thị chờ chi ứng và "Chưa ghi nhận", không c
       },
     }),
   };
-  render(<ActionsPanel view={approved} role="APPROVER" actorId="APR-DEMO-01"
+  render(<CaseActionsPanel view={approved} role="APPROVER" actorId="APR-DEMO-01"
     decisionId={null} reportReady onAction={noop} />);
   const panel = screen.getByTestId('b3-approval-panel').textContent ?? '';
   expect(panel).toContain('Đã duyệt tạm ứng — chờ chi ứng');
@@ -240,7 +240,7 @@ test('B3 refused: employee thấy lý do, không có form mở lại', () => {
       },
     }),
   };
-  render(<ActionsPanel view={refused} role="EMPLOYEE" actorId="NV-01"
+  render(<CaseActionsPanel view={refused} role="EMPLOYEE" actorId="NV-01"
     decisionId={null} reportReady onAction={noop} />);
   expect(screen.getByText(/Đề nghị tạm ứng bị từ chối/)).toBeInTheDocument();
   expect(screen.getByText('Chưa cấp ứng')).toBeInTheDocument();
@@ -270,7 +270,7 @@ function linkedB7View(overrides: Partial<CaseView> = {}): CaseView {
 }
 
 test('R2.4: linked B7 kế toán không thấy form quyết định/chi generic', () => {
-  render(<ActionsPanel view={linkedB7View()} role="ACCOUNTANT" actorId="ACC-01"
+  render(<CaseActionsPanel view={linkedB7View()} role="ACCOUNTANT" actorId="ACC-01"
     decisionId="D-1" reportReady onAction={noop} />);
   expect(screen.getByTestId('b7-approval-panel')).toBeInTheDocument();
   // Generic W05 forms are blocked by the backend for linked B7 → not rendered.
@@ -282,7 +282,7 @@ test('R2.4: linked B7 kế toán không thấy form quyết định/chi generic'
 });
 
 test('R2.4: legacy B7 (không link) vẫn giữ generic lifecycle', () => {
-  render(<ActionsPanel view={makeView()} role="ACCOUNTANT" actorId="ACC-01"
+  render(<CaseActionsPanel view={makeView()} role="ACCOUNTANT" actorId="ACC-01"
     decisionId="D-1" reportReady onAction={noop} />);
   expect(screen.getByTestId('money-summary')).toBeInTheDocument();
   expect(screen.getByText('Ghi sự kiện tiền')).toBeInTheDocument();

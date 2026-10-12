@@ -1,0 +1,784 @@
+
+/* ==========================================================================
+   Modern App Header & Branding
+   ========================================================================== */
+.app-brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.app-brand-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app-brand-heading,
+.app-brand-title h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #09090b;
+  background: none;
+  -webkit-background-clip: initial;
+  -webkit-text-fill-color: initial;
+}
+
+.app-logo-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.app-tagline {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-muted-foreground);
+}
+
+.field.field-topbar {
+  margin-bottom: 0;
+}
+
+.field.field-topbar label {
+  font-size: 0.78rem;
+  color: var(--color-muted-foreground);
+  margin-bottom: 2px;
+}
+
+.field.field-topbar select,
+.field.field-topbar input {
+  min-height: 38px;
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.88rem;
+  border-radius: var(--radius);
+  background: var(--color-card);
+}
+
+/* ==========================================================================
+   New Case Button Banner
+   ========================================================================== */
+.col-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.col-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.new-case-banner {
+  margin-bottom: var(--space-1);
+}
+
+.btn-new-case-active {
+  background: var(--color-secondary) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 1px #18181b;
+}
+
+.btn-new-case-accountant {
+  background: var(--color-card, #ffffff) !important;
+  border: 1px dashed var(--color-border) !important;
+  color: var(--color-muted-foreground) !important;
+  font-weight: 500 !important;
+  font-size: 0.82rem !important;
+  min-height: 32px !important;
+  box-shadow: none !important;
+  transition: all 120ms ease;
+}
+
+.btn-new-case-accountant:hover {
+  background: #f4f4f5 !important;
+  color: var(--color-foreground) !important;
+  border-style: solid !important;
+  border-color: #18181b !important;
+}
+
+.btn-new-case-accountant-active {
+  background: #f4f4f5 !important;
+  border: 1px solid #18181b !important;
+  color: #18181b !important;
+  font-weight: 600 !important;
+}
+
+/* ==========================================================================
+   Sleek Case List Sidebar
+   ========================================================================== */
+.case-list-panel {
+  padding: var(--space-4);
+}
+
+.case-search-box {
+  margin-bottom: var(--space-2);
+}
+
+.case-search-input {
+  width: 100%;
+  font-size: 0.85rem;
+  padding: var(--space-2) var(--space-3);
+  min-height: 38px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.case-empty-state {
+  padding: 32px 14px;
+  background: transparent;
+  border: none;
+  text-align: center;
+  margin: 0;
+}
+
+.case-empty-title {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--color-muted-foreground);
+  margin: 0;
+}
+
+.case-empty-desc {
+  font-size: 0.78rem;
+  color: var(--color-muted-foreground);
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+
+.case-search-input:focus {
+  outline: 2px solid var(--color-secondary);
+  background: #ffffff;
+}
+
+.case-list-scrollable {
+  max-height: calc(100vh - 280px);
+  min-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+.case-list-scrollable::-webkit-scrollbar {
+  width: 6px;
+}
+
+.case-list-scrollable::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+.case-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.case-item-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  transition: all 160ms ease;
+}
+
+.case-item-card:hover {
+  border-color: var(--color-secondary);
+  background: #f8fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.case-item-card-active {
+  border-color: var(--color-secondary);
+  background: #f0f9ff !important;
+  border-left: 4px solid var(--color-secondary);
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.12);
+}
+
+.case-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: var(--space-3);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  border-radius: var(--radius);
+}
+
+.case-item-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 120ms ease, background 120ms ease;
+}
+
+.case-item-card:hover .case-item-delete,
+.case-item-delete:focus-visible {
+  opacity: 1;
+}
+
+.case-item-delete:hover {
+  background: #fee2e2;
+}
+
+.case-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  padding-right: 22px;
+}
+
+.case-item-id {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--color-foreground);
+}
+
+.case-item-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.case-item-system-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #fef3c7;
+  color: #92400e;
+  white-space: nowrap;
+}
+
+.case-item-job-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-muted);
+  color: var(--color-foreground);
+}
+
+.case-item-job-badge.badge-b3 {
+  background: #f4f4f5;
+  color: #18181b;
+  border: 1px solid var(--color-border);
+}
+
+.case-item-job-badge.badge-b7 {
+  background: #f4f4f5;
+  color: #18181b;
+  border: 1px solid var(--color-border);
+}
+
+.case-item-stage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.case-stage-pill {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #18181b;
+}
+
+.case-version-text {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--color-muted-foreground);
+}
+
+.case-item-bottom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+}
+
+.case-item-actor {
+  font-weight: 500;
+}
+
+.case-item-work {
+  font-family: var(--font-mono);
+}
+
+/* ==========================================================================
+   Case Detail Header
+   ========================================================================== */
+.case-header-panel {
+  padding: var(--space-4) var(--space-6);
+  border-radius: var(--radius);
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow);
+}
+
+.case-header-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.case-header-badge-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.case-id-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 2px 8px;
+  font-size: 0.8rem;
+}
+
+.case-id-badge-label {
+  color: var(--color-muted-foreground);
+  font-size: 0.75rem;
+}
+
+.case-id-badge-code {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-foreground);
+  background: none;
+  padding: 0;
+  border: none;
+}
+
+.btn-copy-case-id {
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: var(--color-muted-foreground);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 120ms ease;
+}
+
+.btn-copy-case-id:hover {
+  color: var(--color-secondary);
+  background: #e0f2fe;
+}
+
+.copy-status-text {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #166534;
+}
+
+.case-header-title-section {
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.case-main-title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+  line-height: 1.3;
+}
+
+.case-sub-meta {
+  margin-top: 4px;
+  font-size: 0.92rem;
+  color: #475569;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.case-header-amount-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+}
+
+.case-header-amount-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #166534;
+}
+
+.case-header-amount-val {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #15803d;
+  font-family: var(--font-mono);
+}
+
+.business-status-card {
+  margin-top: var(--space-2);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.business-status-pending-review {
+  background: #fefce8;
+  border-color: #fef08a;
+}
+
+.business-status-reviewed {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.business-status-general {
+  background: #f8fafc;
+  border-color: var(--color-border);
+}
+
+.business-status-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.business-status-desc {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #334155;
+}
+
+.case-header-tech-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: 0.76rem;
+  color: var(--color-muted-foreground);
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid #f1f5f9;
+}
+
+.case-header-tech-footer code {
+  font-family: var(--font-mono);
+  color: #64748b;
+}
+
+/* ==========================================================================
+   Contextual Notice Bar (Refined & Minimalist)
+   ========================================================================== */
+.case-notice-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  margin-bottom: var(--space-3);
+  background: #ffffff;
+}
+
+.case-notice-bar.case-notice-warning {
+  border-color: #fde68a;
+  background: #fffdf5;
+  color: #92400e;
+}
+
+.case-notice-body {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.icon-notice {
+  flex-shrink: 0;
+  color: #d97706;
+}
+
+.case-notice-subtext {
+  display: block;
+  font-size: 0.82rem;
+  color: #78350f;
+  margin-top: 1px;
+}
+
+/* ==========================================================================
+   Pill Badges & Buttons
+   ========================================================================== */
+.pill-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.pill-badge-green {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.pill-badge-amber {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.pill-badge-red {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.btn-sm {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.summary-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-icon {
+  flex-shrink: 0;
+  color: var(--color-secondary);
+}
+
+/* ==========================================================================
+   Case Navigation Tabs (Linear / GitHub Underline Style)
+   ========================================================================== */
+.case-tabs-nav {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 0 2px;
+  margin-bottom: var(--space-4);
+  background: transparent;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.case-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-weight: 500;
+  font-size: 0.88rem;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  transition: all 120ms ease;
+  min-height: 38px;
+  margin-bottom: -2px;
+}
+
+.case-tab-btn:hover {
+  color: var(--color-foreground);
+  background: transparent;
+}
+
+.case-tab-btn.case-tab-active {
+  color: var(--color-secondary);
+  border-bottom-color: var(--color-secondary);
+  font-weight: 600;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tab-count-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
+}
+
+.case-tab-btn.case-tab-active .tab-count-badge {
+  background: #18181b;
+  color: #ffffff;
+}
+
+.tab-count-badge.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tab-count-badge.badge-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ==========================================================================
+   History Timeline
+   ========================================================================== */
+.history-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.history-timeline-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-muted);
+}
+
+.history-timeline-item:last-child {
+  border-bottom: none;
+}
+
+.history-time {
+  font-size: 0.78rem;
+  color: var(--color-muted-foreground);
+}
+
+.history-content {
+  font-size: 0.9rem;
+}
+
+/* ==========================================================================
+   Accountant Review Actions & Summary
+   ========================================================================== */
+.review-summary-card {
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.review-summary-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.review-summary-line code {
+  font-size: 0.82rem;
+  background: #dcfce7;
+  padding: 1px 4px;
+  border-radius: 4px;
+  color: #14532d;
+}
+
+.review-hint {
+  font-size: 0.82rem;
+  color: var(--color-muted-foreground);
+  margin-top: var(--space-1);
+  margin-bottom: 0;
+}
+
+/* ==========================================================================
+   MINIMALIST SWISS FINANCIAL WORKBENCH (SPLIT-SCREEN)
+   ========================================================================== */
+.workbench-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: calc(100vh - 80px);
+  position: relative;
+}
+
+.workbench-case-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-bottom: none;
+}
+
+.workbench-case-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.workbench-case-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-foreground);
+}
+
+.workbench-case-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--color-muted-foreground);
+}
+
+.workbench-case-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+

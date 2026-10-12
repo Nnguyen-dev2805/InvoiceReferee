@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as api from './api';
 import { ApiError } from './api';
 import { B3IntakeForm, emptyB3Intake } from './B3Intake';
-import { ActionsPanel } from './Actions';
+import { CaseActionsPanel } from './CaseActionsPanel';
 import { QuestionsPanel } from './Questions';
 import { ReportPanel } from './Report';
 import { ProcessingDetails } from './ProcessingDetails';
@@ -15,57 +15,21 @@ import { VerifyPanel } from './Verify';
 import { DocumentViewer } from './DocumentViewer';
 import { AccountingDesk } from './AccountingDesk';
 import { ApprovalDesk } from './ApprovalDesk';
-import { summarizeCase } from './uiState';
-import { dossierReference, getInitials, historyKindLabel, roleLabel } from './uiCopy';
+import { summarizeCase } from './caseSummary';
+import { STAGE_LABELS, formatMoney, roleLabel } from './displayText';
+import { formatTripDates, isB3V1Form } from './lib/b3Form';
+import { TechDrawer } from './components/TechDrawer';
+import { PersonaPicker } from './components/PersonaPicker';
+import { CaseListItem } from './components/CaseListItem';
+import { HistoryTab } from './components/HistoryTab';
+import { StickyActionBar } from './components/StickyActionBar';
+import { SummaryCard } from './components/SummaryCard';
+import { CaseHeaderCard } from './components/CaseHeaderCard';
 import { useCaseWorkspace } from './useCaseWorkspace';
 import type {
-  B3DemoContext, B3Intake, CaseStage, CaseSummary, DemoRole,
+  B3DemoContext, B3Intake, CaseSummary, DemoRole,
 } from './types';
 
-const STAGE_LABELS: Record<CaseStage, string> = {
-  CHECKING: 'Đang kiểm tra nguồn',
-  ACCOUNTING_REVIEW: 'Kế toán rà soát',
-  AWAITING_DECISION: 'Chờ người có quyền quyết định',
-  AWAITING_MONEY: 'Chờ thực nhận tiền',
-  AWAITING_WORK_SETTLEMENT: 'Chờ quyết toán công việc',
-  RESOLVING_OBLIGATIONS: 'Đang xử lý nghĩa vụ',
-  ADVANCE_REQUEST_REFUSED: 'Đề nghị tạm ứng bị từ chối',
-  SETTLEMENT_REQUEST_REFUSED: 'Đề nghị quyết toán bị từ chối',
-  READY_TO_CLOSE: 'Đã duyệt cân bằng — chờ kiểm tra đóng',
-  REJECTED_REQUEST_ENDED: 'Yêu cầu bị từ chối đã kết thúc',
-  SETTLEMENT_CLOSED: 'Hồ sơ đã đóng',
-};
-
-function isB3V1Form(form: Record<string, unknown> | undefined): boolean {
-  return form?.schema_version === 'b3-intake-v1';
-}
-
-function formatTripDates(startStr?: unknown, endStr?: unknown): string | null {
-  if (!startStr && !endStr) return null;
-  const parseYMD = (s: string) => {
-    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (!m) return null;
-    return { y: m[1], m: m[2], d: m[3] };
-  };
-  const start = typeof startStr === 'string' ? parseYMD(startStr) : null;
-  const end = typeof endStr === 'string' ? parseYMD(endStr) : null;
-
-  if (start && end) {
-    if (start.y === end.y && start.m === end.m) {
-      if (start.d === end.d) {
-        return `${start.d}/${start.m}/${start.y}`;
-      }
-      return `${start.d}–${end.d}/${start.m}/${start.y}`;
-    }
-    if (start.y === end.y) {
-      return `${start.d}/${start.m} – ${end.d}/${end.m}/${start.y}`;
-    }
-    return `${start.d}/${start.m}/${start.y} – ${end.d}/${end.m}/${end.y}`;
-  }
-  if (start) return `${start.d}/${start.m}/${start.y}`;
-  if (end) return `${end.d}/${end.m}/${end.y}`;
-  return null;
-}
 
 export function App() {
   // One demo user drives both the submitter and the actor at command time; role
@@ -618,9 +582,9 @@ export function App() {
       parts.push(tripDates);
     }
     if (form.request_amount_vnd != null) {
-      parts.push(`Đề nghị ${Number(form.request_amount_vnd).toLocaleString('vi-VN')} đ`);
+      parts.push(`Đề nghị ${formatMoney(Number(form.request_amount_vnd))}`);
     } else if (view.money_summary?.approved_vnd != null) {
-      parts.push(`Đã duyệt ${Number(view.money_summary.approved_vnd).toLocaleString('vi-VN')} đ`);
+      parts.push(`Đã duyệt ${formatMoney(Number(view.money_summary.approved_vnd))}`);
     }
     if (parts.length === 0) {
       parts.push(`Công việc: ${view.submission.work_ref}`);
@@ -634,50 +598,15 @@ export function App() {
         <div className="app-brand">
           <h1 className="app-brand-heading">InvoiceReferee</h1>
         </div>
-        <div className="profile-chip" title="Nhấp để chuyển đổi vai trò người dùng">
-          <label htmlFor="demo-person" className="sr-only">
-            Người dùng demo
-          </label>
-          <div className={`profile-avatar profile-avatar-${role.toLowerCase()}`}>
-            {getInitials(selectedPerson?.name || '')}
-          </div>
-          <div className="profile-info">
-            <span className="profile-name">{selectedPerson?.name || 'Chưa chọn'}</span>
-            <span className={`profile-role-badge badge-role-${role.toLowerCase()}`}>
-              {roleLabel(role)}
-            </span>
-          </div>
-          <svg
-            className="profile-caret"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-          <select
-            id="demo-person"
-            className="profile-select-overlay"
-            value={selectedActorRef}
-            onChange={(e) => handlePersonChange(e.target.value)}
-            title="Chọn vai trò người dùng"
-          >
-            {people.length === 0 && (
-              <option value="">Chưa tải được người dùng demo.</option>
-            )}
-            {people.map(({ person, label }) => (
-              <option key={person.actor_ref} value={person.actor_ref}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <PersonaPicker
+          role={role}
+          selectedPersonName={selectedPerson?.name ?? null}
+          selectedActorRef={selectedActorRef}
+          people={people.map(({ person, label }) => ({
+            actorRef: person.actor_ref, label,
+          }))}
+          onChange={handlePersonChange}
+        />
       </header>
 
       {error && <div className="notice notice-error" role="alert">{error}</div>}
@@ -860,47 +789,14 @@ export function App() {
                       (p) => p.actor_ref === c.employee_ref
                     )?.name;
                     return (
-                      <div
+                      <CaseListItem
                         key={c.id}
-                        className={`case-item-card ${isActive ? 'case-item-card-active' : ''}`}
-                      >
-                        <button
-                          type="button"
-                          className="case-item-main"
-                          onClick={() => void loadCase(c.id)}
-                        >
-                          <div className="case-item-top">
-                            <span className="case-item-id">{c.id}</span>
-                            <span className="case-item-badges">
-                              {c.origin === 'SYSTEM' && (
-                                <span className="case-item-system-badge">Hệ thống</span>
-                              )}
-                              <span className={`case-item-job-badge badge-${c.job.toLowerCase()}`}>{c.job}</span>
-                            </span>
-                          </div>
-                          <div className="case-item-stage">
-                            <span className="case-stage-pill">{STAGE_LABELS[c.stage]}</span>
-                            <span className="case-version-text">v{c.case_version}</span>
-                          </div>
-                          <div className="case-item-bottom">
-                            <span className="case-item-actor">
-                              {actorName ? `${actorName} (${c.employee_ref})` : c.employee_ref}
-                            </span>
-                            <span>/</span>
-                            <span className="case-item-work">{c.work_ref}</span>
-                          </div>
-                        </button>
-                        <button
-                          type="button"
-                          className="case-item-delete"
-                          data-testid={`delete-case-${c.id}`}
-                          aria-label={`Xoá hồ sơ ${c.id}`}
-                          title="Xoá hồ sơ"
-                          onClick={() => void handleDeleteCase(c.id)}
-                        >
-                          🗑
-                        </button>
-                      </div>
+                        item={c}
+                        isActive={isActive}
+                        actorName={actorName}
+                        onOpen={(id) => void loadCase(id)}
+                        onDelete={(id) => void handleDeleteCase(id)}
+                      />
                     );
                   })}
                 </div>
@@ -1292,127 +1188,19 @@ export function App() {
         ) : (
           <section className="col col-main case-detail-col">
             {/* Case Header Card */}
-            <div className="panel case-header-panel">
-              <div className="case-header-top-bar">
-                <div className="case-header-badge-row">
-                  {/* Mã hồ sơ chung (dossier root) dạng badge có nút sao chép */}
-                  <div className="case-id-badge" title="Mã hồ sơ" data-testid="case-id-badge">
-                    <span className="case-id-badge-label">Mã hồ sơ:</span>
-                    <code className="case-id-badge-code">{dossierReference(view) ?? 'Chưa xác định hồ sơ gốc'}</code>
-                    <button
-                      type="button"
-                      className="btn-copy-case-id"
-                      onClick={() => void handleCopyCaseId(dossierReference(view) ?? view.id)}
-                      title={copiedCaseId ? 'Đã sao chép vào bộ nhớ tạm' : 'Sao chép mã hồ sơ'}
-                      aria-label="Sao chép mã hồ sơ"
-                    >
-                      {copiedCaseId ? (
-                        <span className="copy-status-text">Đã chép</span>
-                      ) : (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                  <span className="badge badge-job">{view.job} — {viewIsB3 ? 'Đề nghị tạm ứng' : 'Quyết toán'}</span>
-                  {viewIsB3 && (
-                    view.submission.form.confirmed ? (
-                      <span className="pill-badge pill-badge-green" title="Nhân viên đã xác nhận thông tin đề nghị">
-                        Nhân viên đã xác nhận thông tin đề nghị
-                      </span>
-                    ) : (
-                      <span className="pill-badge pill-badge-amber">Bản nháp chưa gửi</span>
-                    )
-                  )}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {viewIsB3 && (view.submission.form as Record<string, unknown>)?.request_amount_vnd != null && (
-                    <div className="case-header-amount-box">
-                      <span className="case-header-amount-label">Số tiền đề nghị:</span>
-                      <span className="case-header-amount-val">
-                        {Number((view.submission.form as Record<string, unknown>).request_amount_vnd).toLocaleString('vi-VN')} VND
-                      </span>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    className="swiss-btn swiss-btn-secondary swiss-btn-sm"
-                    style={{ fontSize: '0.78rem', padding: '3px 8px' }}
-                    onClick={() => setShowTechDrawer(true)}
-                    title="Xem chi tiết kỹ thuật & kiểm toán"
-                  >
-                    ℹ️ Kỹ thuật
-                  </button>
-                </div>
-              </div>
-
-              {/* Tiêu đề chính to rõ: Đề nghị tạm ứng — [Tên nhân viên] */}
-              <div className="case-header-title-section">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h2 className="case-main-title">{mainTitle}</h2>
-                  {actorId.trim() === view.submission.employee_ref ? (
-                    <span className="badge" style={{ fontSize: '0.72rem', background: '#e0f2fe', color: '#0369a1' }}>của bạn</span>
-                  ) : role === 'EMPLOYEE' ? (
-                    <span className="badge" style={{ fontSize: '0.72rem', background: '#fef3c7', color: '#b45309' }}>hồ sơ khác</span>
-                  ) : null}
-                </div>
-                {/* Dòng phụ ngay dưới: [Địa điểm] · [Thời gian chuyến đi] · Đề nghị [Số tiền VND] */}
-                <div className="case-sub-meta">{sublineText}</div>
-              </div>
-
-              {/* MỘT trạng thái nghiệp vụ thống nhất trên cùng */}
-              {role === 'ACCOUNTANT' ? (
-                <div
-                  className={`business-status-card ${b3WorkflowPending ? 'business-status-reviewed' : latestReview ? 'business-status-reviewed' : 'business-status-pending-review'}`}
-                  data-testid="accountant-status-card"
-                >
-                  <div className="business-status-title-row">
-                    <span className={`status-pill ${b3WorkflowPending || latestReview ? 'status-pill-success' : 'status-pill-warning'}`}>
-                      {b3WorkflowPending
-                        ? 'Chờ người duyệt tạm ứng'
-                        : latestReview ? 'Đã lưu kết quả rà soát' : 'Chờ kế toán rà soát'}
-                    </span>
-                  </div>
-                  <div className="business-status-desc">
-                    {b3WorkflowPending ? (
-                      <>
-                        Đã trình người có quyền <strong>{view.b3_workflow?.approver_ref}</strong> quyết định; chưa ghi nhận tiền thực nhận.
-                      </>
-                    ) : latestReview ? (
-                      <>
-                        Đã lưu kết quả rà soát bởi <strong>{latestReview.actor_id}</strong> lúc {new Date(latestReview.occurred_at).toLocaleString('vi-VN')}
-                        {latestReview.detail?.note ? ` — Ghi chú: “${String(latestReview.detail.note)}”` : ''}
-                      </>
-                    ) : (
-                      'Nhân viên đã xác nhận thông tin đề nghị. Hệ thống đã hoàn tất kiểm tra tự động. Chưa phê duyệt hoặc chi ứng.'
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="business-status-card business-status-general" data-testid="business-status-card">
-                  <div className="business-status-title-row">
-                    <span className={`status-pill status-${view.stage.toLowerCase()}`}>
-                      {viewIsB3 && view.b3_workflow?.status === 'APPROVED'
-                        ? 'Đã duyệt tạm ứng — chờ chi ứng'
-                        : viewIsB3 && view.b3_workflow?.status === 'PENDING'
-                          ? 'Chờ người duyệt tạm ứng'
-                          : STAGE_LABELS[view.stage]}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Thông tin hồ sơ gọn gàng */}
-              <div className="case-header-tech-footer">
-                <span>Mã NV: <code>{view.submission.employee_ref}</code></span>
-                <span>·</span>
-                <span>Mã công việc: <code>{view.submission.work_ref}</code></span>
-                <span>·</span>
-                <span>Phiên bản: <strong>v{view.case_version}</strong></span>
-              </div>
-            </div>
+            <CaseHeaderCard
+              view={view}
+              viewIsB3={viewIsB3}
+              role={role}
+              actorId={actorId}
+              mainTitle={mainTitle}
+              sublineText={sublineText}
+              b3WorkflowPending={b3WorkflowPending}
+              latestReview={latestReview}
+              copiedCaseId={copiedCaseId}
+              onCopyCaseId={(id) => void handleCopyCaseId(id)}
+              onOpenTech={() => setShowTechDrawer(true)}
+            />
 
             {/* Contextual Notice: Bổ sung câu hỏi giải trình */}
             {questions.length > 0 && (() => {
@@ -1497,83 +1285,7 @@ export function App() {
             })()}
 
             {caseSummary && (
-              <div className={`panel summary-card summary-${caseSummary.tone}`}>
-                <div className="summary-header">
-                  <div className="summary-title-group">
-                    <svg className="summary-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <line x1="16" y1="13" x2="8" y2="13" />
-                      <line x1="16" y1="17" x2="8" y2="17" />
-                    </svg>
-                    <div className="summary-title">{caseSummary.title}</div>
-                  </div>
-                  {caseSummary.primaryTarget && (
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => {
-                        const target = caseSummary.primaryTarget;
-                        if (!target) return;
-                        // Tab targets: switch tab, then focus the panel.
-                        const tabTargets: Record<string, typeof caseTab> = {
-                          'draft-editor': 'draft',
-                          'issues': 'report',
-                          'accountant-review': 'report',
-                          'advance-decision': 'report',
-                          'advance-receipt': 'report',
-                          'prepare-settlement': 'report',
-                          'settlement-intake': 'report',
-                          'settlement-decision': 'report',
-                          'settlement-receipt': 'report',
-                          'case-history': 'history',
-                          'sources': 'sources',
-                        };
-                        // Element ids that live in specific panels.
-                        const targetIds: Record<string, string> = {
-                          'draft-editor': 'b3-destination',
-                          'issues': 'report-issues-top',
-                          'accountant-review': 'accountant-review-section',
-                          'advance-decision': 'b3-approval-panel',
-                          'advance-receipt': 'b3-funding-panel',
-                          'prepare-settlement': 'b7-prepare-block',
-                          'settlement-intake': 'b7-company-context-panel',
-                          'settlement-decision': 'b7-approval-panel',
-                          'settlement-receipt': 'b7-funding-panel',
-                        };
-                        const nextTab = tabTargets[target];
-                        if (nextTab) setCaseTab(nextTab);
-                        const elementId = targetIds[target];
-                        if (elementId) {
-                          setTimeout(() => {
-                            const el = document.getElementById(elementId)
-                              ?? document.querySelector('.report-issues-top, .issues, #report-panel');
-                            if (el instanceof HTMLElement) {
-                              el.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-                              const focusable = el.matches('input,select,textarea,button')
-                                ? el : el.querySelector('input,select,textarea,button');
-                              if (focusable instanceof HTMLElement) focusable.focus();
-                            }
-                          }, 0);
-                        }
-                      }}
-                    >
-                      {caseSummary.primaryLabel
-                        ?? (caseSummary.primaryTarget === 'draft-editor'
-                          ? 'Kiểm tra bản nháp'
-                          : caseSummary.primaryTarget === 'issues'
-                            ? 'Xem việc cần làm rõ'
-                            : 'Kiểm tra lại hồ sơ')}
-                    </button>
-                  )}
-                </div>
-                <div className="summary-description">{caseSummary.description}</div>
-                {caseSummary.missingFields.length > 0 && (
-                  <div className="summary-missing">
-                    <strong>Trường còn thiếu:</strong> {caseSummary.missingFields.join(', ')}
-                  </div>
-                )}
-              </div>
+              <SummaryCard summary={caseSummary} onSelectTab={setCaseTab} />
             )}
 
             {/* WORKBENCH SPLIT-SCREEN LAYOUT */}
@@ -1758,7 +1470,7 @@ export function App() {
                 </div>
               )}
 
-              <ActionsPanel
+              <CaseActionsPanel
                 view={view}
                 role={role}
                 actorId={actorId}
@@ -1935,203 +1647,27 @@ export function App() {
 
             {/* TAB 5: Lịch sử & Kỹ thuật */}
             <div style={{ display: caseTab === 'history' ? 'block' : 'none' }}>
-              <div className="panel" style={{ marginBottom: 'var(--space-4)' }}>
-                <h2>Thông tin hồ sơ {view.id}</h2>
-                <p>
-                  <strong>Giai đoạn:</strong> {STAGE_LABELS[view.stage]} · v
-                  {view.case_version} (revision {view.input_revision}, epoch{' '}
-                  {view.control_epoch})
-                </p>
-                {viewIsB3 ? (
-                  <p>
-                    <strong>Đề nghị B3:</strong>{' '}
-                    {String(view.submission.form.purpose ?? '')}
-                    {view.submission.form.destination
-                      ? ` — ${String(view.submission.form.destination)}` : ''}
-                    {' · '}
-                    {view.submission.form.confirmed
-                      ? 'đã xác nhận' : 'draft chưa xác nhận'}
-                    {' · '}mã công việc <code>{view.submission.work_ref}</code>
-                  </p>
-                ) : (
-                  <p>
-                    <strong>Khai báo:</strong> {String(view.submission.form.purpose ?? '')}
-                    {view.submission.form.scope
-                      ? ` — phạm vi: ${String(view.submission.form.scope)}`
-                      : ''}
-                  </p>
-                )}
-                {view.allowed_actions.length > 0 && (
-                  <>
-                    <h3>Hành động cho phép</h3>
-                    <ul className="reasons">
-                      {view.allowed_actions.map((a) => (
-                        <li key={a.action}>
-                          <strong>{a.action}</strong> — {a.reason}
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </div>
-
-              {run && run.trace.length > 0 && (
-                <div className="panel" style={{ marginBottom: 'var(--space-4)' }}>
-                  <h2>Dấu vết thực thi (Run Trace)</h2>
-                  <ul className="reasons">
-                    {run.trace.map((entry) => (
-                      <li key={entry.call_id}>
-                        {entry.stage}
-                        {entry.source_id ? ` · nguồn ${entry.source_id}` : ''}{' '}
-                        — {entry.ok ? 'ok' : `lỗi ${entry.error_code}`}
-                        {entry.usage
-                          ? ` · tokens: ${entry.usage.total_tokens ?? '?'}`
-                          : ' · usage: không có (None)'}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="panel">
-                <h2>Lịch sử xử lý ({history.length})</h2>
-                {history.length === 0 ? (
-                  <p className="muted">Chưa có lịch sử thao tác nào.</p>
-                ) : (
-                  <ul className="history-timeline">
-                    {history.map((h) => (
-                      <li key={h.id} className="history-timeline-item">
-                        <span className="history-time">{new Date(h.occurred_at).toLocaleString('vi-VN')}</span>
-                        <span className="history-content">
-                          <strong>{historyKindLabel(h.kind)}</strong> bởi <code>{h.actor_id}</code>
-                          <details className="meta-details" style={{ display: 'inline-block', marginLeft: 'var(--space-1)' }}>
-                            <summary style={{ cursor: 'pointer', color: 'var(--color-muted-foreground)' }}>({h.kind})</summary>
-                            {h.detail && (
-                              <pre style={{ margin: 'var(--space-1) 0', fontSize: '0.8rem' }}>
-                                {JSON.stringify(h.detail, null, 2)}
-                              </pre>
-                            )}
-                          </details>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              <HistoryTab view={view} viewIsB3={viewIsB3} run={run} history={history} />
             </div>
           </div>
         </div>
 
         {/* STICKY BOTTOM ACTION BAR */}
-        <div className="workbench-sticky-bar" data-testid="workbench-sticky-bar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-muted-foreground)', fontWeight: 600 }}>TRẠNG THÁI:</span>
-            <span className={`status-pill status-${view.stage.toLowerCase()}`} style={{ fontSize: '0.75rem' }}>
-              {viewIsB3 && view.b3_workflow?.status === 'APPROVED'
-                ? 'Đã duyệt tạm ứng'
-                : viewIsB3 && view.b3_workflow?.status === 'PENDING'
-                  ? 'Chờ duyệt tạm ứng'
-                  : STAGE_LABELS[view.stage]}
-            </span>
-            {caseTab === 'draft' && !view.submission.form.confirmed && (
-              <span className="pill-badge pill-badge-amber" style={{ fontSize: '0.75rem' }}>Bản nháp chưa gửi</span>
-            )}
-          </div>
-          <div className="workbench-sticky-actions">
-            {caseTab === 'draft' && viewIsB3 && !view.submission.form.confirmed && (
-              <>
-                <button
-                  type="button"
-                  className="swiss-btn swiss-btn-secondary swiss-btn-sm"
-                  onClick={() => void handleReviseB3(false)}
-                >
-                  Lưu nháp
-                </button>
-                <button
-                  type="button"
-                  className="swiss-btn swiss-btn-primary swiss-btn-sm"
-                  onClick={() => void handleReviseB3(true)}
-                >
-                  Gửi đề nghị
-                </button>
-              </>
-            )}
-            {caseTab === 'draft' && viewIsB3 && Boolean(view.submission.form.confirmed) && (
-              <button
-                type="button"
-                className="swiss-btn swiss-btn-primary swiss-btn-sm"
-                disabled={!b3ReviseReason.trim()}
-                onClick={() => void handleReviseB3(true)}
-              >
-                Lưu cập nhật
-              </button>
-            )}
-            {caseTab === 'report' && canStartRun && (
-              <button
-                type="button"
-                className="swiss-btn swiss-btn-primary swiss-btn-sm"
-                onClick={() => void handleStartRun()}
-              >
-                {viewIsB3
-                  ? (view.submission.form.confirmed ? 'Chạy đối soát' : 'Trích xuất hồ sơ')
-                  : 'Thực hiện đối soát'}
-              </button>
-            )}
-            {caseTab === 'report' && role === 'ACCOUNTANT' && (
-              <button
-                type="button"
-                className="swiss-btn swiss-btn-secondary swiss-btn-sm"
-                onClick={() => {
-                  const el = document.getElementById('accountant-review-section') || document.getElementById('review-note');
-                  if (el) {
-                    el.scrollIntoView?.({ behavior: 'smooth' });
-                    const input = document.getElementById('review-note');
-                    if (input instanceof HTMLElement) input.focus();
-                  }
-                }}
-              >
-                Rà soát ↓
-              </button>
-            )}
-          </div>
-        </div>
+        <StickyActionBar
+          view={view}
+          viewIsB3={viewIsB3}
+          caseTab={caseTab}
+          role={role}
+          canStartRun={canStartRun}
+          b3ReviseReason={b3ReviseReason}
+          onReviseB3={(confirm) => void handleReviseB3(confirm)}
+          onStartRun={() => void handleStartRun()}
+        />
 
         {/* TECHNICAL DETAILS DRAWER */}
         {showTechDrawer && (
-          <div className="swiss-tech-drawer-overlay" onClick={() => setShowTechDrawer(false)}>
-            <div
-              className="swiss-tech-drawer"
-              data-testid="swiss-tech-drawer"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="swiss-drawer-header">
-                <h3 className="swiss-drawer-title">Thông tin kỹ thuật &amp; Kiểm toán</h3>
-                <button
-                  type="button"
-                  className="btn-icon-subtle"
-                  onClick={() => setShowTechDrawer(false)}
-                  aria-label="Đóng bảng kỹ thuật"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="swiss-drawer-body">
-                <div style={{ marginBottom: 'var(--space-4)', lineHeight: '1.6' }}>
-                  <div><strong>Mã hồ sơ gốc:</strong> <code>{dossierReference(view) ?? '—'}</code></div>
-                  <div><strong>Mã bản ghi:</strong> <code>{view.id}</code></div>
-                  <div><strong>Mã nhân viên:</strong> <code>{view.submission.employee_ref}</code></div>
-                  <div><strong>Mã công việc:</strong> <code>{view.submission.work_ref}</code></div>
-                  <div><strong>Phiên bản:</strong> v{view.case_version} (rev {view.input_revision}, epoch {view.control_epoch})</div>
-                  {run && (
-                    <div><strong>Run ID:</strong> <code>{run.id}</code> ({run.mode})</div>
-                  )}
-                </div>
-                {run && report && (
-                  <ProcessingDetails run={run} report={report} />
-                )}
-              </div>
-            </div>
-          </div>
+          <TechDrawer view={view} run={run} report={report}
+            onClose={() => setShowTechDrawer(false)} />
         )}
       </section>
         )}

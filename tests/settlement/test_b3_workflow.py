@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from invoice_referee.settlement.b3 import B3CompanyContext, B3Intake
+from invoice_referee.settlement.b3_intake import B3CompanyContext, B3Intake
 from invoice_referee.settlement.models import Command
 from invoice_referee.settlement.reader import StructuredLedgerReader
 from invoice_referee.settlement.service import Service, ServiceConfig
@@ -108,7 +108,7 @@ def _approve(svc, case, presentation, key="approve"):
 
 
 def test_wrong_actor_cannot_decide(presented_b3):
-    from invoice_referee.domain.models import DomainError
+    from invoice_referee.shared.errors import DomainError
     svc, case, presentation = presented_b3
     with pytest.raises(DomainError) as exc:
         svc.decide_b3(case.id, {
@@ -121,7 +121,7 @@ def test_wrong_actor_cannot_decide(presented_b3):
 
 
 def test_second_decision_on_same_presentation_conflicts(presented_b3):
-    from invoice_referee.domain.models import DomainError
+    from invoice_referee.shared.errors import DomainError
     svc, case, presentation = presented_b3
     _approve(svc, case, presentation)
     current = svc.get_case(case.id)
@@ -135,7 +135,7 @@ def test_second_decision_on_same_presentation_conflicts(presented_b3):
 
 
 def test_source_change_after_present_makes_decision_stale(ready_b3):
-    from invoice_referee.domain.models import DomainError
+    from invoice_referee.shared.errors import DomainError
     from invoice_referee.settlement.models import Upload
     svc, case, report_id = ready_b3
     presentation = svc.present_b3(case.id, {
@@ -155,7 +155,7 @@ def test_source_change_after_present_makes_decision_stale(ready_b3):
 
 
 def test_stop_blocks_presentation(ready_b3):
-    from invoice_referee.domain.models import DomainError
+    from invoice_referee.shared.errors import DomainError
     svc, case, report_id = ready_b3
     svc.control(case.id, "STOP",
                 command("stop", "ACC-DEMO-01", "ACCOUNTANT", case.case_version))
@@ -169,7 +169,7 @@ def test_stop_blocks_presentation(ready_b3):
 
 
 def test_approve_does_not_leak_into_b7_money_or_handoff(presented_b3):
-    from invoice_referee.domain.models import DomainError
+    from invoice_referee.shared.errors import DomainError
     svc, case, presentation = presented_b3
     decision = _approve(svc, case, presentation)
     after = svc.get_case(case.id)
@@ -208,7 +208,7 @@ def test_rerun_after_own_approval_has_no_false_duplicate_issue(presented_b3):
 
 def test_foreign_approval_same_scope_still_flags(presented_b3):
     """A decision from outside this case (foreign ref) is NOT waived."""
-    from invoice_referee.settlement.b3 import B3CompanyContext
+    from invoice_referee.settlement.b3_intake import B3CompanyContext
     svc, case, presentation = presented_b3
     _approve(svc, case, presentation)
     # Foreign approval in the company history for the same employee/work.
@@ -246,7 +246,7 @@ def test_approve_lower_advance_keeps_request(presented_b3):
 
 def test_represent_after_return_requires_new_basis(presented_b3):
     """After RETURN, re-presenting the SAME (unchanged) basis is blocked."""
-    from invoice_referee.domain.models import DomainError
+    from invoice_referee.shared.errors import DomainError
     svc, case, presentation = presented_b3
     svc.decide_b3(case.id, {
         "presentation_id": presentation.id, "outcome": "RETURN",
@@ -284,7 +284,7 @@ def test_stale_version_between_read_and_commit_keeps_review_count(ready_b3):
     the commit is refused for a stale version, the review row and history must
     roll back together (no orphan REVIEW, no extra command record).
     """
-    from invoice_referee.domain.models import DomainError
+    from invoice_referee.shared.errors import DomainError
 
     svc, case, report_id = ready_b3
     before = _review_count(svc, case.id)
@@ -303,8 +303,8 @@ def test_expired_grant_rejected_by_authority_check():
     """A grant outside its effective window does not cover (real-time check)."""
     from datetime import datetime, timezone
 
-    from invoice_referee.domain.models import DomainError
-    from invoice_referee.settlement.b3 import B3CompanyContext
+    from invoice_referee.shared.errors import DomainError
+    from invoice_referee.settlement.b3_intake import B3CompanyContext
     from invoice_referee.settlement.advance_workflow import authorize_b3_decision
     from invoice_referee.settlement.models import B3DecisionPayload
 
@@ -333,7 +333,7 @@ def test_expired_grant_rejected_by_authority_check():
 
 def test_two_competing_decisions_only_one_persists(presented_b3):
     """Two commands with the same expected version: one wins, one conflicts."""
-    from invoice_referee.domain.models import DomainError
+    from invoice_referee.shared.errors import DomainError
     svc, case, presentation = presented_b3
     first = svc.decide_b3(case.id, {
         "presentation_id": presentation.id, "outcome": "APPROVE",

@@ -6,13 +6,13 @@
 // source-read fields. The backend owns classification/sums/stage.
 import { useMemo, useState } from 'react';
 import * as api from './api';
+import { formatMoney } from './displayText';
 import type {
   B3AdvanceReportedStatus, CaseView, DemoRole, SourceView,
 } from './types';
 
 function formatVnd(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '—';
-  return `${value.toLocaleString('vi-VN')} đ`;
+  return formatMoney(value, { nullText: '—' });
 }
 
 const EVIDENCE_FIELDS = [
