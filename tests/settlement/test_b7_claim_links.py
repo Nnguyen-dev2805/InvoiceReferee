@@ -50,7 +50,7 @@ def test_claim_expense_relation_establishes_comparison(approved_b3):
         command("pkt", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
     # Build context observations + relations, then evaluate.
     snap = svc.store.get_linked_b7_context(child.id)
-    from invoice_referee.settlement.b7_linked import linked_context_observations
+    from invoice_referee.settlement.linked_context import linked_context_observations
     obs, rels, issues = linked_context_observations(snap, "S-ctx")
     # A CLAIM_EXPENSE relation links the claim to the company expense.
     rels.append(Relation(relation_id="RX-1", kind="CLAIM_EXPENSE",
@@ -91,7 +91,7 @@ def test_claim_mismatch_is_conflict_not_forecast(approved_b3):
     svc.record_b7_company_packet(child.id, packet,
         command("pkt", "ACC-DEMO-01", "ACCOUNTANT", child.case_version))
     snap = svc.store.get_linked_b7_context(child.id)
-    from invoice_referee.settlement.b7_linked import linked_context_observations
+    from invoice_referee.settlement.linked_context import linked_context_observations
     obs, rels, issues = linked_context_observations(snap, "S-ctx")
     rels.append(Relation(relation_id="RX-1", kind="CLAIM_EXPENSE",
                          from_id="CL-hotel", to_id="EXP-hotel",

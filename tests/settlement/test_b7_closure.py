@@ -20,7 +20,7 @@ from tests.settlement.b7_workflow_builders import report_from_values
 
 
 def test_zero_net_alone_cannot_close():
-    from invoice_referee.settlement.b7_fulfillment import b7_closure_blockers
+    from invoice_referee.settlement.settlement_reconciliation import b7_closure_blockers
     report = report_from_values(2_000_000, 2_000_000)
     blockers = b7_closure_blockers(
         report=report, decision=None, fulfillment=None, revalidation=None,

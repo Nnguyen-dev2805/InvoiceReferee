@@ -457,7 +457,7 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
     claim_rows = []
     form = run_input.submission.form or {}
     if isinstance(form, dict) and form.get("schema_version") == "b7-linked-intake-v1":
-        from invoice_referee.settlement.b7_linked import (
+        from invoice_referee.settlement.linked_context import (
             claim_comparisons as _claim_comparisons,
             load_b7_linked_intake,
         )
@@ -734,7 +734,7 @@ def _evaluate_b7(run_input: RunInput, observations: list[Observation],
              for r in relations]
     comparisons = []
     if claim_rows:
-        from invoice_referee.settlement.b7_linked import (
+        from invoice_referee.settlement.linked_context import (
             claim_comparisons as _claim_comparisons,
         )
         comparisons = _claim_comparisons(claim_rows, relations, expenses)

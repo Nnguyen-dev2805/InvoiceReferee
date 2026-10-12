@@ -25,6 +25,23 @@ Mode **PIPELINE_FAKE_OR_REPLAY** + **HUMAN_SOURCE_REVIEW**. Prerequisite B6–B8
 
 ## 1. Khởi động (DB/cổng riêng)
 
+Recipe demo đầy đủ (B3→B9, một work/employee, đúng work/time/source identity):
+`data/settlement/travel-demo-v1/` (sinh bởi `scripts/build_travel_demo.py`; xem
+`data/settlement/travel-demo-v1/README.md`). Dùng packet này thay cho placeholder
+bên dưới khi muốn đi hết luồng:
+
+```bash
+rtk proxy env SETTLEMENT_PROVIDER_MODE=fake \
+  SETTLEMENT_B3_CONTEXT_PATH=data/settlement/travel-demo-v1/company-input/b3-context.json \
+  SETTLEMENT_B7_CONTEXT_PATH=data/settlement/travel-demo-v1/company-input/b7-config.json \
+  SETTLEMENT_DB_PATH=data/settlement/travel-demo-v1/cases.sqlite \
+  SETTLEMENT_ARTIFACT_ROOT=data/settlement/travel-demo-v1/artifacts \
+  .venv/bin/uvicorn invoice_referee.api.settlement:create_runtime_app \
+  --factory --host 127.0.0.1 --port 8010
+```
+
+Hoặc dùng bộ B3 verbal tách rời:
+
 ```bash
 rtk proxy env SETTLEMENT_PROVIDER_MODE=fake \
   SETTLEMENT_B3_CONTEXT_PATH=data/settlement/b3-verbal-v2/company-context/context.json \

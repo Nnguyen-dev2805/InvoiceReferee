@@ -21,14 +21,14 @@ const EVIDENCE_FIELDS = [
   'receiver_outcome', 'event_namespace', 'event_ref', 'method', 'purpose',
 ] as const;
 
-interface B7FundingProps {
+interface SettlementReceiptProps {
   view: CaseView;
   role: DemoRole;
   actorId: string;
   onAction: (label: string, run: () => Promise<unknown>) => Promise<void>;
 }
 
-export function B7FundingPanel({ view, role, actorId, onAction }: B7FundingProps) {
+export function SettlementReceiptPanel({ view, role, actorId, onAction }: SettlementReceiptProps) {
   const workflow = view.b7_workflow ?? null;
   const decision = workflow?.decision ?? null;
   const fulfillment = workflow?.fulfillment ?? null;
@@ -129,7 +129,7 @@ export function B7FundingPanel({ view, role, actorId, onAction }: B7FundingProps
   // --- Closed: read-only banner + accountant adjustment ----------------------
   if (closure) {
     return (
-      <div className="panel" data-testid="b7-funding-panel">
+      <div className="panel" id="b7-funding-panel" data-testid="b7-funding-panel">
         <h2>Quyết toán đã đóng</h2>
         <ul className="reasons">
           <li><strong>Đóng lúc (as-of):</strong> {closure.close_as_of}</li>
@@ -163,7 +163,7 @@ export function B7FundingPanel({ view, role, actorId, onAction }: B7FundingProps
     ? 'Còn phải thu từ nhân viên' : 'Còn phải chi cho nhân viên';
 
   return (
-    <div className="panel" data-testid="b7-funding-panel">
+    <div className="panel" id="b7-funding-panel" data-testid="b7-funding-panel">
       <h2>Đối chiếu chi/thu quyết toán</h2>
       <p className="muted">
         Kế toán đọc chứng từ và ghi sự kiện tiền đã xảy ra; hệ thống{' '}

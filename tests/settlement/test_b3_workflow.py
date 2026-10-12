@@ -21,6 +21,15 @@ def command(key, actor, role, version):
                    expected_case_version=version, body={})
 
 
+def _review_count(svc, case_id):
+    """Count stored REVIEW interactions directly from the DB (not the View)."""
+    with svc.store._read() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM interactions "
+            "WHERE case_id = ? AND kind = 'REVIEW'", (case_id,)).fetchone()
+        return row["n"]
+
+
 @pytest.fixture
 def ready_b3(tmp_path):
     store = Store(tmp_path / "cases.sqlite", tmp_path / "artifacts")
@@ -268,13 +277,35 @@ def test_decision_idempotent_same_key(presented_b3):
     assert replay.idempotent_replay is True
 
 
+def test_stale_version_between_read_and_commit_keeps_review_count(ready_b3):
+    """A rejected presentation must not leave a half-written review behind.
+
+    The review is inserted in the SAME transaction as the presentation; when
+    the commit is refused for a stale version, the review row and history must
+    roll back together (no orphan REVIEW, no extra command record).
+    """
+    from invoice_referee.domain.models import DomainError
+
+    svc, case, report_id = ready_b3
+    before = _review_count(svc, case.id)
+    with pytest.raises(DomainError) as exc:
+        svc.present_b3(case.id, {
+            "basis_report_id": report_id,
+            "review": {"report_id": report_id, "note": "Trình sai version",
+                       "refs": []}},
+            command("present-stale", "ACC-DEMO-01", "ACCOUNTANT",
+                    case.case_version + 5))
+    assert exc.value.code == "STALE_VERSION"
+    assert _review_count(svc, case.id) == before
+
+
 def test_expired_grant_rejected_by_authority_check():
     """A grant outside its effective window does not cover (real-time check)."""
     from datetime import datetime, timezone
 
     from invoice_referee.domain.models import DomainError
     from invoice_referee.settlement.b3 import B3CompanyContext
-    from invoice_referee.settlement.b3_workflow import authorize_b3_decision
+    from invoice_referee.settlement.advance_workflow import authorize_b3_decision
     from invoice_referee.settlement.models import B3DecisionPayload
 
     expired = {

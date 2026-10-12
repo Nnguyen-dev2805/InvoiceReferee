@@ -1,34 +1,40 @@
 # InvoiceReferee
 
-## Current design and coding entry points
-
-The accepted advance/settlement design is maintained in four documents:
-[Product](docs/settlement/PRODUCT.md), [Rulebook](docs/settlement/RULEBOOK.md),
-[System](docs/settlement/SYSTEM.md), and [Evaluation](docs/settlement/EVALUATION.md).
-Implementation proceeds through [the six UI slices](docs/superpowers/plans/2026-10-09-settlement-mvp.md).
-
-The runtime/status/setup sections below describe the earlier claim-processing
-implementation; they do not establish that the new settlement spec is implemented
-or verified. Check source and fresh execution before capability claims. Original
-discovery notes, reviews and previous specs are preserved in [the archive](docs/archive/README.md).
-
-Expense-reimbursement MVP (OrganizationAI Challenge A). The system receives a
-claim plus evidence, verifies applicable rules, and either creates a payment
-request for eligible routine cases or asks the right person a concrete question.
-Human responses lead to reevaluation with traceable decisions and controls.
+Advance/expense-settlement MVP (OrganizationAI Challenge A). The system receives
+a dossier plus sources, completes sourced checks/reports (B3/B7), or asks the
+right owner a concrete question; human responses lead to reevaluation. Accountant
+review, authorized decisions, actual money and closure are distinct stages.
 
 This repository is a rebuild: **B0** (`main`) is the historical reference, the
 accepted rebuild is **B1**, and measured improvements are compared against frozen
 B1 as **B2**.
 
+## Navigation — what are you here to do?
+
+| Intent | Start here |
+| --- | --- |
+| **Understand the business** | [Product](docs/settlement/PRODUCT.md) · [Rulebook](docs/settlement/RULEBOOK.md) · [System](docs/settlement/SYSTEM.md) · [Evaluation](docs/settlement/EVALUATION.md) |
+| **Run a demo** | [Setup](#setup) → [Run the app](#run-the-app-dev) → [travel demo recipe](data/settlement/travel-demo-v1/README.md) |
+| **Evaluate** | [Verify (evaluation)](#verify-evaluation) · [Evaluation](docs/settlement/EVALUATION.md) |
+| **History / legacy** | [Archive](docs/archive/README.md) · [completed plans](#history--completed-plans) |
+
+Canonical docs are the four above plus the [MVP plan](docs/superpowers/plans/2026-10-09-settlement-mvp.md).
+Completed implementation plans are history, not a second rulebook. Check source
+and fresh execution before capability claims.
+
 ## Status
 
-- **IMPLEMENTED (W01–W06, settlement rebuild):** intake/stale-version/idempotency
-  guards (W01); B7 report with sourced checks (W02); provider readers with budget
-  and call trace, live mode fail-closed (W03); B3 advance checks and owner-scoped
+- **IMPLEMENTED (settlement rebuild):** intake/stale-version/idempotency guards
+  (W01); B7 report with sourced checks (W02); provider readers with budget and
+  call trace, live mode fail-closed (W03); B3 advance checks and owner-scoped
   questions with re-check (W04); authority-gated decisions, actual money with
   incidents, Stop/resume and closure gates (W05); evaluation harness + Verify
   CLI/UI over the frozen development corpus (W06).
+- **IMPLEMENTED (B1–B9, staged workflow):** B1/B2 intake and work permission;
+  B3 verbal intake + present-and-approve; B4 advance decision; B5 actual advance
+  receipts; B6→B7 linked settlement; B8 settlement present/decision; B9 actual
+  settlement money (P/RA/RP), fulfillment/revalidation, handoff and closure with
+  post-closure adjustment. Fake/replay + HUMAN_SOURCE_REVIEW; no bank transfer.
 - **Earlier claim-processing app (T01–T11):** kept as historical reference on
   `main`/B0. Its Verify corpus (15 claims) is legacy — it is NOT the accepted
   20-packet settlement evaluation below.
@@ -40,8 +46,8 @@ B1 as **B2**.
 - **PLANNED:** live provider bring-up (M0/M1), quality comparison B2, real-user
   study (3+ professional users), deployment/submission package.
 
-`CREATED` is not `PAID`: the system creates a payment **request**, never a bank
-transfer.
+`CREATED` is not `PAID`; `APPROVED` is not `RECEIVED`. The system never transfers
+bank funds.
 
 ## Requirements
 
@@ -214,14 +220,43 @@ company identity.
 ## Layout
 
 ```
-src/invoice_referee/    domain, policy, storage, extraction, application, api, verify
+src/invoice_referee/
+  settlement/           core: models, store, service, api, rules, pipeline,
+                        advance_records/advance_workflow/advance_reconciliation,
+                        linked_context/linked_context_records,
+                        settlement_workflow/settlement_records/settlement_reconciliation,
+                        sqlite_records
+  api/                  FastAPI apps (settlement + historical app)
+  verify/               evaluation harness + settlement CLI
 frontend/               React + TypeScript + Vite UI
 config/                 demo-policy.json (proposed, inactive)
 tests/                  unit + integration; fixtures/ holds the Verify corpus
-scripts/                make_synthetic_evidence.py (regenerate the corpus)
-docs/                   specs, plans, evidence, build log
-data/                   runtime SQLite + artifacts (Git-ignored)
+scripts/                synthetic-evidence / demo generators
+docs/                   canonical docs, plans, evidence, build log
+data/                   runtime SQLite + artifacts + frozen packets (Git-ignored)
 ```
+
+### Settlement module map
+
+| Module | Responsibility |
+| --- | --- |
+| `sqlite_records` | Common record helpers over an open connection (no txn of its own) |
+| `advance_records` / `advance_workflow` / `advance_reconciliation` | B3/B5 advance lifecycle + pure reconciliation |
+| `linked_context_records` / `linked_context` | B6→B7 child, declarations, company packet/context |
+| `settlement_records` / `settlement_workflow` / `settlement_reconciliation` | B7/B8/B9 present/decide/fulfill/revalidate/handoff/close/adjust |
+| `store` | Public façade: owns connections/transactions, delegates SQL to the above |
+
+## History / completed plans
+
+Completed implementation plans are historical records of how the code got here,
+not a second rulebook: [B3 intake](docs/superpowers/plans/2026-10-10-b3-verbal-intake.md),
+[B3 present/approve](docs/superpowers/plans/2026-10-11-b3-present-and-approve.md),
+[B5 advance receipts](docs/superpowers/plans/2026-10-11-b5-advance-receipts.md),
+[B6 linked settlement](docs/superpowers/plans/2026-10-11-b6-linked-settlement.md),
+[B8 settlement decision](docs/superpowers/plans/2026-10-11-b8-settlement-decision.md),
+[B9 settlement fulfillment](docs/superpowers/plans/2026-10-11-b9-settlement-fulfillment.md).
+Legacy commands and the earlier claim-processing app are preserved in
+[the archive](docs/archive/README.md); do not start new work from them.
 
 ## Configuration safety
 

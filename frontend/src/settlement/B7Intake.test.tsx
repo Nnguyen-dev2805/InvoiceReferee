@@ -46,7 +46,7 @@ test('employee thấy nút thêm khoản và xác nhận', () => {
     actorId="NV-DEMO-01" onAction={noop} />);
   expect(screen.getByRole('button', { name: 'Thêm khoản chi' })).toBeInTheDocument();
   const confirm = screen.getByRole('button',
-    { name: 'Xác nhận nộp và đối soát' }) as HTMLButtonElement;
+    { name: 'Xác nhận nộp' }) as HTMLButtonElement;
   // No rows yet → cannot confirm.
   expect(confirm.disabled).toBe(true);
 });
@@ -66,7 +66,7 @@ test('thêm dòng rồi confirm bật khi có mô tả', () => {
   const desc = screen.getAllByLabelText('Nội dung')[0];
   fireEvent.change(desc, { target: { value: 'Khách sạn' } });
   const confirm = screen.getByRole('button',
-    { name: 'Xác nhận nộp và đối soát' }) as HTMLButtonElement;
+    { name: 'Xác nhận nộp' }) as HTMLButtonElement;
   expect(confirm.disabled).toBe(false);
 });
 

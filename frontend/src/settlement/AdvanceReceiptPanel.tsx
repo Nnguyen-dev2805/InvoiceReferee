@@ -20,14 +20,14 @@ const EVIDENCE_FIELDS = [
   'receiver_outcome', 'event_namespace', 'event_ref', 'method',
 ] as const;
 
-interface B3FundingProps {
+interface AdvanceReceiptProps {
   view: CaseView;
   role: DemoRole;
   actorId: string;
   onAction: (label: string, run: () => Promise<unknown>) => Promise<void>;
 }
 
-export function B3FundingPanel({ view, role, actorId, onAction }: B3FundingProps) {
+export function AdvanceReceiptPanel({ view, role, actorId, onAction }: AdvanceReceiptProps) {
   const workflow = view.b3_workflow ?? null;
   const decision = workflow?.decision ?? null;
   const funding = workflow?.funding ?? null;
@@ -124,7 +124,7 @@ export function B3FundingPanel({ view, role, actorId, onAction }: B3FundingProps
   const sourcesForProof = (): SourceView[] => view.sources;
 
   return (
-    <div className="panel" data-testid="b3-funding-panel">
+    <div className="panel" id="b3-funding-panel" data-testid="b3-funding-panel">
       <h2>Ghi nhận tiền ứng thực nhận</h2>
       <p className="muted">
         Kế toán đọc chứng từ và ghi sự kiện tiền đã xảy ra. Hệ thống <strong>không</strong>

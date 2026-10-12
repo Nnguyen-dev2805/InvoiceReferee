@@ -42,6 +42,7 @@ htmlcov/
 !.env.example
 
 # Du lieu sinh ra khi chay
+output/maintenance/
 data/models/
 data/submissions/
 data/output/

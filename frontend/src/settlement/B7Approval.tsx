@@ -116,7 +116,7 @@ export function B7ApprovalPanel({
   // --- Approved ---
   if (decision && decision.outcome === 'APPROVE') {
     return (
-      <div className="panel" data-testid="b7-approval-panel">
+      <div className="panel" id="b7-approval-panel" data-testid="b7-approval-panel">
         <h2>Đã duyệt quyết toán — chờ chi/thu</h2>
         <B7DecisionSummary target={decision.target} />
         <ul className="reasons">
@@ -132,7 +132,7 @@ export function B7ApprovalPanel({
   // --- Returned / Refused ---
   if (decision && (decision.outcome === 'RETURN' || decision.outcome === 'REFUSE')) {
     return (
-      <div className="panel" data-testid="b7-approval-panel">
+      <div className="panel" id="b7-approval-panel" data-testid="b7-approval-panel">
         <h2>{decision.outcome === 'RETURN'
           ? 'Yêu cầu làm rõ' : 'Từ chối đề nghị quyết toán'}</h2>
         <p className="notice notice-warn" role="alert">{decision.reason}</p>
@@ -148,7 +148,7 @@ export function B7ApprovalPanel({
   // --- Pending: approver decides; accountant/employee read ---
   if (workflow.status === 'PENDING' && presentation) {
     return (
-      <div className="panel" data-testid="b7-approval-panel">
+      <div className="panel" id="b7-approval-panel" data-testid="b7-approval-panel">
         <h2>Chờ duyệt quyết toán</h2>
         <div className="review-summary-card">
           <div className="review-summary-line">
@@ -195,7 +195,7 @@ export function B7ApprovalPanel({
   // --- NOT_PRESENTED / RETURNED / NEEDS_RECHECK: accountant presents ---
   if (isAccountant) {
     return (
-      <div className="panel" data-testid="b7-approval-panel">
+      <div className="panel" id="b7-approval-panel" data-testid="b7-approval-panel">
         <h2>Trình duyệt quyết toán</h2>
         {savedReview ? (
           <div className="review-summary-card" data-testid="b7-saved-review">
@@ -225,7 +225,7 @@ export function B7ApprovalPanel({
 
   // Employee / approver with nothing to act on.
   return (
-    <div className="panel" data-testid="b7-approval-panel">
+    <div className="panel" id="b7-approval-panel" data-testid="b7-approval-panel">
       <h2>Quyết toán</h2>
       <p className="muted">
         {workflow.status === 'NEEDS_RECHECK'

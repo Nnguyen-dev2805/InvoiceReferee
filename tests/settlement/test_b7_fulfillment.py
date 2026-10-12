@@ -96,7 +96,7 @@ def _records(svc, case_id):
 
 def test_classifier_confirms_correct_receipt(approved_linked_b7):
     from datetime import datetime, timezone
-    from invoice_referee.settlement.b7_fulfillment import classify_b7_money
+    from invoice_referee.settlement.settlement_reconciliation import classify_b7_money
     from invoice_referee.settlement.models import B7MoneyEventPayload
     svc, child, report, decision = approved_linked_b7
     proof = upload_money_proof(svc, child, _money_text(
@@ -114,7 +114,7 @@ def test_classifier_confirms_correct_receipt(approved_linked_b7):
 
 def test_classifier_collection_requires_company_ref(approved_linked_b7):
     from datetime import datetime, timezone
-    from invoice_referee.settlement.b7_fulfillment import classify_b7_money
+    from invoice_referee.settlement.settlement_reconciliation import classify_b7_money
     from invoice_referee.settlement.models import B7MoneyEventPayload
     svc, child, report, decision = approved_linked_b7
     proof = upload_money_proof(svc, child, _money_text(
@@ -358,7 +358,7 @@ def _receipt(event_id, canonical_id, amount, state="CONFIRMED", *,
 
 def _project(receipts, *, approved=3_000_000, direction="PAY_EMPLOYEE"):
     from datetime import datetime, timezone
-    from invoice_referee.settlement.b7_fulfillment import project_b7_fulfillment
+    from invoice_referee.settlement.settlement_reconciliation import project_b7_fulfillment
     at = datetime(2026, 10, 15, tzinfo=timezone.utc)
     return project_b7_fulfillment("D-1", approved, direction, receipts,
                                   as_of=at, knowledge_cutoff=at)

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { B7FundingPanel } from './B7Funding';
+import { SettlementReceiptPanel } from './SettlementReceiptPanel';
 import type { B7DecisionTarget, CaseView } from './types';
 
 function target(overrides: Partial<B7DecisionTarget> = {}): B7DecisionTarget {
@@ -65,7 +65,7 @@ function makeView(overrides: Partial<CaseView> = {}): CaseView {
 const noop = async () => undefined;
 
 test('kế toán: nút ghi disabled khi thiếu số/outcome/purpose/ghi chú', () => {
-  render(<B7FundingPanel view={makeView()} role="ACCOUNTANT"
+  render(<SettlementReceiptPanel view={makeView()} role="ACCOUNTANT"
     actorId="ACC-DEMO-01" onAction={noop} />);
   const btn = screen.getByRole('button',
     { name: 'Ghi nhận kết quả thực tế' }) as HTMLButtonElement;
@@ -73,7 +73,7 @@ test('kế toán: nút ghi disabled khi thiếu số/outcome/purpose/ghi chú', 
 });
 
 test('kế toán: RECEIVED cần payer/payee/namespace/ref', () => {
-  render(<B7FundingPanel view={makeView()} role="ACCOUNTANT"
+  render(<SettlementReceiptPanel view={makeView()} role="ACCOUNTANT"
     actorId="ACC-DEMO-01" onAction={noop} />);
   const btn = screen.getByRole('button',
     { name: 'Ghi nhận kết quả thực tế' }) as HTMLButtonElement;
@@ -98,14 +98,14 @@ test('kế toán: RECEIVED cần payer/payee/namespace/ref', () => {
 });
 
 test('không mặc định bên nhận theo nhân viên', () => {
-  render(<B7FundingPanel view={makeView()} role="ACCOUNTANT"
+  render(<SettlementReceiptPanel view={makeView()} role="ACCOUNTANT"
     actorId="ACC-DEMO-01" onAction={noop} />);
   const payee = screen.getByLabelText('Bên nhận (đọc từ nguồn)');
   expect((payee as HTMLInputElement).value).toBe('');
 });
 
 test('nhân viên: readonly, không thấy nút ghi/đóng', () => {
-  render(<B7FundingPanel view={makeView()} role="EMPLOYEE"
+  render(<SettlementReceiptPanel view={makeView()} role="EMPLOYEE"
     actorId="NV-DEMO-01" onAction={noop} />);
   expect(screen.queryByRole('button',
     { name: 'Ghi nhận kết quả thực tế' })).not.toBeInTheDocument();
@@ -114,14 +114,14 @@ test('nhân viên: readonly, không thấy nút ghi/đóng', () => {
 });
 
 test('người duyệt: không thấy form ghi tiền', () => {
-  render(<B7FundingPanel view={makeView()} role="APPROVER"
+  render(<SettlementReceiptPanel view={makeView()} role="APPROVER"
     actorId="APR-DEMO-01" onAction={noop} />);
   expect(screen.queryByRole('button',
     { name: 'Ghi nhận kết quả thực tế' })).not.toBeInTheDocument();
 });
 
 test('approved không tự thành received: chưa ghi thì recorded là —', () => {
-  render(<B7FundingPanel view={makeView()} role="ACCOUNTANT"
+  render(<SettlementReceiptPanel view={makeView()} role="ACCOUNTANT"
     actorId="ACC-DEMO-01" onAction={noop} />);
   const summary = screen.getByTestId('b7-fulfillment-summary').textContent ?? '';
   expect(summary).toContain('Đã đối chiếu thực nhận: —');
@@ -141,7 +141,7 @@ test('collection: nhãn Công ty đã nhận, không P', () => {
     as_of: '2026-10-14T09:00:00+07:00',
     knowledge_cutoff: '2026-10-14T09:00:00+07:00',
   };
-  render(<B7FundingPanel view={view} role="ACCOUNTANT"
+  render(<SettlementReceiptPanel view={view} role="ACCOUNTANT"
     actorId="ACC-DEMO-01" onAction={noop} />);
   const summary = screen.getByTestId('b7-fulfillment-summary').textContent ?? '';
   expect(summary).toContain('Công ty đã nhận');
@@ -160,7 +160,7 @@ test('hiển thị incident OVERPAY', () => {
     as_of: '2026-10-14T09:00:00+07:00',
     knowledge_cutoff: '2026-10-14T09:00:00+07:00',
   };
-  render(<B7FundingPanel view={view} role="ACCOUNTANT"
+  render(<SettlementReceiptPanel view={view} role="ACCOUNTANT"
     actorId="ACC-DEMO-01" onAction={noop} />);
   const incidents = screen.getByTestId('b7-fulfillment-incidents');
   expect(incidents).toHaveTextContent('OVERPAY');
@@ -181,7 +181,7 @@ test('closed: banner readonly + nút tạo điều chỉnh cho kế toán', () =
     original_decision_id: 'B7D-1', revalidation_ref: 'R-run01',
     reason: 'Đủ căn cứ', idempotent_replay: false,
   };
-  render(<B7FundingPanel view={view} role="ACCOUNTANT"
+  render(<SettlementReceiptPanel view={view} role="ACCOUNTANT"
     actorId="ACC-DEMO-01" onAction={noop} />);
   expect(screen.getByRole('button',
     { name: 'Tạo hồ sơ điều chỉnh' })).toBeInTheDocument();
@@ -201,7 +201,7 @@ test('BALANCED: không có nút ghi tiền (không chi/thu)', () => {
     as_of: '2026-10-14T09:00:00+07:00',
     knowledge_cutoff: '2026-10-14T09:00:00+07:00',
   };
-  render(<B7FundingPanel view={view} role="ACCOUNTANT"
+  render(<SettlementReceiptPanel view={view} role="ACCOUNTANT"
     actorId="ACC-DEMO-01" onAction={noop} />);
   expect(screen.queryByRole('button',
     { name: 'Ghi nhận kết quả thực tế' })).not.toBeInTheDocument();

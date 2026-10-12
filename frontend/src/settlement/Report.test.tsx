@@ -161,6 +161,24 @@ test('report B3 dùng section proposal, không dùng bảng S; pending không l�
   expect(text).toContain('Complete nghĩa là đủ căn cứ rà soát, không nghĩa đã duyệt');
 });
 
+test('màn mặc định không phơi raw readiness enum; tiêu đề theo job', () => {
+  render(<ReportPanel report={makeB3Report()} />);
+  const text = screen.getByTestId('report-panel').textContent ?? '';
+  // Nhãn người dùng thay cho enum kỹ thuật.
+  expect(text).not.toContain('READY_FOR_ACCOUNTANT_REVIEW');
+  expect(text).toContain('Đủ để kế toán rà soát');
+  // Tiêu đề đúng job, không dùng chung "Thẩm định tài chính".
+  expect(text).toContain('Kiểm tra đề nghị tạm ứng');
+  expect(text).not.toContain('Thẩm định tài chính');
+});
+
+test('report B7 dùng tiêu đề đối chiếu quyết toán', () => {
+  render(<ReportPanel report={makeReport({ job: 'B7' })} />);
+  const text = screen.getByTestId('report-panel').textContent ?? '';
+  expect(text).toContain('Đối chiếu quyết toán');
+  expect(text).not.toContain('Thẩm định tài chính');
+});
+
 test('report B3 với company context hiển thị grants/coverage và nhãn mô phỏng', () => {
   render(<ReportPanel report={makeB3Report()} b3Context={{
     version: 'synthetic-verbal-v2',

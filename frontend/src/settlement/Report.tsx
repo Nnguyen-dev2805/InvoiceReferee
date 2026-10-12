@@ -77,7 +77,9 @@ export function ReportPanel({ report, b3Context = null, sources = [] }: {
       <div className="report-clean-header">
         <div className="report-header-main">
           <div className="report-header-badge-row">
-            <span className="report-badge-brand">Thẩm định tài chính</span>
+            <span className="report-badge-brand">
+              {report.job === 'B3' ? 'Kiểm tra đề nghị tạm ứng' : 'Đối chiếu quyết toán'}
+            </span>
             <span className={`status-badge-clean ${report.completion === 'COMPLETE' ? 'status-badge-success' : 'status-badge-warning'}`}>
               {report.completion === 'COMPLETE' ? 'Đã đủ căn cứ rà soát' : 'Cần bổ sung thông tin'}
             </span>
@@ -679,15 +681,12 @@ function B3ProposalSection({ proposal, b3Context, refs, effectiveSources = [] }:
           <div className="hero-kpi-num hero-kpi-status-text">
             {READINESS_LABELS[proposal.readiness]}
           </div>
-          <span className="hero-kpi-sub">
-            (<code>{proposal.readiness}</code>)
-          </span>
         </div>
       </div>
 
       {/* Clean Subtle Disclaimer Bar */}
       <div className="hero-kpi-audit-note">
-        <span>Tổng dự toán: {vnd(proposal.forecast_total_vnd)} — dự toán không phải ngân sách đã duyệt; phần dự kiến công ty trả không phải actual payer.</span>
+        <span>Tổng dự toán: {vnd(proposal.forecast_total_vnd)} — dự toán không phải ngân sách đã duyệt; phần dự kiến công ty trả không phải bên đã chi thực tế.</span>
       </div>
 
       <div className="b3-proposal-body">

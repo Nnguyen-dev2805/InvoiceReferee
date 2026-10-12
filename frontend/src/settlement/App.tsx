@@ -9,6 +9,8 @@ import { B3IntakeForm, emptyB3Intake } from './B3Intake';
 import { ActionsPanel } from './Actions';
 import { QuestionsPanel } from './Questions';
 import { ReportPanel } from './Report';
+import { ProcessingDetails } from './ProcessingDetails';
+import { SourceUploadPanel } from './SourceUploadPanel';
 import { VerifyPanel } from './Verify';
 import { summarizeCase } from './uiState';
 import { historyKindLabel } from './uiCopy';
@@ -36,18 +38,6 @@ const ROLE_LABELS: Record<DemoRole, string> = {
   ACCOUNTANT: 'Kế toán',
   APPROVER: 'Người duyệt (demo)',
 };
-
-const SOURCE_ERROR_CODES = new Set([
-  'UNSUPPORTED_FORMAT',
-  'FILE_TOO_LARGE',
-  'SOURCE_LIMIT_REACHED',
-]);
-
-function formatBytes(size: number): string {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function nowLocalInput(): string {
   const now = new Date();
@@ -93,7 +83,6 @@ export function App() {
   const [view, setView] = useState<CaseView | null>(null);
   const [history, setHistory] = useState<AuditEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [sourceError, setSourceError] = useState<string | null>(null);
   const [run, setRun] = useState<RunView | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [questions, setQuestions] = useState<QuestionView[]>([]);
@@ -109,9 +98,6 @@ export function App() {
   const [moneyAsOf, setMoneyAsOf] = useState(nowLocalInput());
   const [knowledgeCutoff, setKnowledgeCutoff] = useState(nowLocalInput());
 
-  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
-  const [uploadingSources, setUploadingSources] = useState(false);
-  const [uploadNote, setUploadNote] = useState('');
   const [revisePurpose, setRevisePurpose] = useState('');
   const [reviseScope, setReviseScope] = useState('');
   const [reviseReason, setReviseReason] = useState('');
@@ -195,21 +181,6 @@ export function App() {
     setImportFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleAddUploadFiles = (files: FileList | File[] | null) => {
-    if (!files) return;
-    const incoming = Array.from(files);
-    if (incoming.length === 0) return;
-    setUploadFiles((prev) => {
-      const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`));
-      const newUnique = incoming.filter((f) => !existingKeys.has(`${f.name}-${f.size}`));
-      return [...prev, ...newUnique];
-    });
-  };
-
-  const handleRemoveUploadFile = (index: number) => {
-    setUploadFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
   const loadCases = useCallback(async () => {
     try {
       setCases(await api.listCases());
@@ -240,8 +211,6 @@ export function App() {
       setReport(null);
       setRun(null);
       setB3RunContext(null);
-      setUploadFiles([]);
-      setUploadNote('');
       const qs = await api.getQuestions(id);
       setQuestions(qs);
       let nextReport: Report | null = null;
@@ -373,7 +342,6 @@ export function App() {
       setRevisePurpose(purpose.trim());
       setReviseScope(scope.trim());
       setError(null);
-      setSourceError(null);
       await loadCases();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không tạo được hồ sơ.');
@@ -407,7 +375,6 @@ export function App() {
       setB3RunContext(null);
       setQuestions([]);
       setError(null);
-      setSourceError(null);
       await loadCases();
       if (b3Method === 'WEB') {
         await startRunFor(created.id, created.case_version);
@@ -480,50 +447,6 @@ export function App() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không sửa được khai báo B3.');
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!view || uploadFiles.length === 0 || uploadingSources) return;
-    setUploadingSources(true);
-    let currentCase = view;
-    const remaining = [...uploadFiles];
-    try {
-      for (const file of uploadFiles) {
-        const note = uploadNote.trim()
-          ? (uploadFiles.length > 1 ? `${uploadNote.trim()} (${file.name})` : uploadNote.trim())
-          : '';
-        try {
-          await api.addSource(
-            currentCase.id,
-            file,
-            currentCase.case_version,
-            actorId.trim(),
-            role,
-            note,
-          );
-          currentCase = await api.getCase(currentCase.id);
-          remaining.shift();
-        } catch (fileErr) {
-          if (fileErr instanceof ApiError && SOURCE_ERROR_CODES.has(fileErr.code)) {
-            setSourceError(`Tệp "${file.name}" bị từ chối kỹ thuật (${fileErr.code}): ${fileErr.message}`);
-          } else {
-            setError(`Tải lên tệp "${file.name}" không thành công: ${fileErr instanceof Error ? fileErr.message : String(fileErr)}.`);
-          }
-          break;
-        }
-      }
-      setUploadFiles(remaining);
-      if (remaining.length === 0) {
-        setUploadNote('');
-        setSourceError(null);
-      }
-      await loadCase(currentCase.id);
-      await loadCases();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không tải lên được nguồn.');
-    } finally {
-      setUploadingSources(false);
     }
   };
 
@@ -605,6 +528,24 @@ export function App() {
     }
   };
 
+  // Dedicated prepare-settlement: use the returned child id directly instead of
+  // reloading the parent and making the employee hunt for the new child case.
+  const handlePrepareSettlement = async () => {
+    if (!view) return;
+    try {
+      const child = await api.prepareLinkedB7(view.id, {
+        actor_id: actorId.trim(),
+        demo_role: role,
+        expected_case_version: view.case_version,
+      });
+      setError(null);
+      await loadCases();
+      await loadCase(child.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không mở được hồ sơ quyết toán.');
+    }
+  };
+
   useEffect(() => {
     if (!run || !runActive) return;
     const timer = setInterval(async () => {
@@ -631,7 +572,9 @@ export function App() {
   const viewIsB3 = view !== null && (view.job === 'B3' || isB3V1Form(view.submission.form));
   const b3DraftReadyForFill = report?.b3 !== null
     && report?.b3.readiness === 'DRAFT_CONFIRMATION_REQUIRED';
-  const caseSummary = view ? summarizeCase(view, run, report) : null;
+  const caseSummary = view
+    ? summarizeCase(view, run, report, { role, actorId: actorId.trim() })
+    : null;
 
   const latestReview = useMemo(() => {
     return history.filter(
@@ -708,12 +651,6 @@ export function App() {
       </header>
 
       {error && <div className="notice notice-error" role="alert">{error}</div>}
-      {sourceError && (
-        <div className="notice notice-warn" role="alert">
-          {sourceError} — đây là từ chối kỹ thuật của nguồn, không phải kết luận
-          nghiệp vụ.
-        </div>
-      )}
 
       <div className="grid grid-master-detail">
         {/* ==================================================================
@@ -1105,7 +1042,15 @@ export function App() {
 
             {activeIntakeTab === 'B7' && (
               <div className="panel">
-                <h2>Tạo hồ sơ (B7 / B3 legacy)</h2>
+                <h2>Quyết toán sau công việc</h2>
+                <p className="muted">
+                  Luồng chuẩn: nhân viên nộp đề nghị tạm ứng (B3) rồi mở
+                  <strong> hồ sơ quyết toán liên kết</strong> từ công việc đó —
+                  không tạo mới tại đây. Biểu mẫu dưới là công cụ mở rộng cho
+                  hồ sơ nhập ngoài/đã ở giai đoạn sau.
+                </p>
+                <details className="tech-context-summary" data-testid="legacy-create-tools">
+                  <summary>Công cụ mở rộng — tạo hồ sơ nhập ngoài</summary>
                 <div className="field">
                   <label htmlFor="job">Loại kiểm tra</label>
                   <select id="job" value={job} onChange={(e) => setJob(e.target.value as Job)}>
@@ -1164,6 +1109,7 @@ export function App() {
                 <button className="btn btn-primary" onClick={() => void handleCreate()}>
                   Tạo hồ sơ
                 </button>
+                </details>
               </div>
             )}
           </section>
@@ -1386,39 +1332,57 @@ export function App() {
                       type="button"
                       className="btn btn-primary"
                       onClick={() => {
-                        if (caseSummary.primaryTarget === 'draft-editor') {
-                          setCaseTab('draft');
+                        const target = caseSummary.primaryTarget;
+                        if (!target) return;
+                        // Tab targets: switch tab, then focus the panel.
+                        const tabTargets: Record<string, typeof caseTab> = {
+                          'draft-editor': 'draft',
+                          'issues': 'report',
+                          'accountant-review': 'report',
+                          'advance-decision': 'report',
+                          'advance-receipt': 'report',
+                          'prepare-settlement': 'report',
+                          'settlement-intake': 'report',
+                          'settlement-decision': 'report',
+                          'settlement-receipt': 'report',
+                          'case-history': 'history',
+                          'sources': 'sources',
+                        };
+                        // Element ids that live in specific panels.
+                        const targetIds: Record<string, string> = {
+                          'draft-editor': 'b3-destination',
+                          'issues': 'report-issues-top',
+                          'accountant-review': 'accountant-review-section',
+                          'advance-decision': 'b3-approval-panel',
+                          'advance-receipt': 'b3-funding-panel',
+                          'prepare-settlement': 'b7-prepare-block',
+                          'settlement-intake': 'b7-company-context-panel',
+                          'settlement-decision': 'b7-approval-panel',
+                          'settlement-receipt': 'b7-funding-panel',
+                        };
+                        const nextTab = tabTargets[target];
+                        if (nextTab) setCaseTab(nextTab);
+                        const elementId = targetIds[target];
+                        if (elementId) {
                           setTimeout(() => {
-                            const el = document.getElementById('b3-destination');
+                            const el = document.getElementById(elementId)
+                              ?? document.querySelector('.report-issues-top, .issues, #report-panel');
                             if (el instanceof HTMLElement) {
-                              el.focus();
+                              el.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+                              const focusable = el.matches('input,select,textarea,button')
+                                ? el : el.querySelector('input,select,textarea,button');
+                              if (focusable instanceof HTMLElement) focusable.focus();
                             }
                           }, 0);
-                        } else if (caseSummary.primaryTarget === 'issues') {
-                          if (questions.some(q => q.owner === role && q.status === 'OPEN')) {
-                            setCaseTab('questions');
-                          } else {
-                            setCaseTab('report');
-                            setTimeout(() => {
-                              const el = document.querySelector('.report-issues-top, .issues, #report-panel');
-                              if (el instanceof HTMLElement) {
-                                el.scrollIntoView({ behavior: 'smooth' });
-                              }
-                            }, 0);
-                          }
-                        } else if (caseSummary.primaryTarget) {
-                          const el = document.querySelector(caseSummary.primaryTarget);
-                          if (el instanceof HTMLElement) {
-                            el.focus();
-                          }
                         }
                       }}
                     >
-                      {caseSummary.primaryTarget === 'draft-editor'
-                        ? 'Kiểm tra bản nháp'
-                        : caseSummary.primaryTarget === 'issues'
-                          ? 'Xem việc cần làm rõ'
-                          : 'Kiểm tra lại hồ sơ'}
+                      {caseSummary.primaryLabel
+                        ?? (caseSummary.primaryTarget === 'draft-editor'
+                          ? 'Kiểm tra bản nháp'
+                          : caseSummary.primaryTarget === 'issues'
+                            ? 'Xem việc cần làm rõ'
+                            : 'Kiểm tra lại hồ sơ')}
                     </button>
                   )}
                 </div>
@@ -1547,17 +1511,14 @@ export function App() {
                 <div data-testid="run-panel" style={{ marginBottom: 'var(--space-4)' }}>
                   <div className="run-status-strip">
                     <div className="run-status-meta">
-                      <span className="run-pill-id">Run <code>{run?.id}</code></span>
-                      {run?.status && (
-                        <span className={`run-pill-status ${run.status === 'SUCCEEDED' ? 'run-pill-succeeded' : ''}`}>
-                          {run.status} {run.completion ? `(${run.completion})` : ''}
-                        </span>
-                      )}
+                      {/* Một nhãn mô phỏng dễ thấy; raw run id/status/stage
+                          chuyển vào "Thông tin xử lý" bên dưới. */}
                       {run?.mode && (
-                        <span className="run-pill-mode">Chế độ: <strong>{run.mode}</strong></span>
-                      )}
-                      {run?.stage && (
-                        <span className="run-pill-stage">Giai đoạn: <code>{run.stage}</code></span>
+                        <span className="run-pill-mode">
+                          {run.mode === 'FAKE_OR_REPLAY'
+                            ? 'Chế độ mô phỏng/replay — không phải chất lượng OCR/LLM thật'
+                            : `Chế độ: ${run.mode}`}
+                        </span>
                       )}
                     </div>
                     <div className="run-actions">
@@ -1568,7 +1529,7 @@ export function App() {
                           onClick={() => {
                             const el = document.getElementById('accountant-review-section') || document.getElementById('review-note');
                             if (el) {
-                              el.scrollIntoView({ behavior: 'smooth' });
+                              el.scrollIntoView?.({ behavior: 'smooth' });
                               const input = document.getElementById('review-note');
                               if (input instanceof HTMLElement) input.focus();
                             }
@@ -1591,6 +1552,7 @@ export function App() {
                       </button>
                     </div>
                   </div>
+                  <ProcessingDetails run={run} report={report} />
 
                   <ReportPanel
                     report={report}
@@ -1609,6 +1571,8 @@ export function App() {
                 report={report}
                 history={history}
                 onAction={handleAction}
+                onPrepareSettlement={handlePrepareSettlement}
+                onStartRun={handleStartRun}
               />
             </div>
 
@@ -1747,119 +1711,17 @@ export function App() {
 
             {/* TAB 3: Nguồn chứng từ */}
             <div style={{ display: caseTab === 'sources' ? 'block' : 'none' }}>
-              <div className="panel">
-                <h2>Nguồn chứng từ ({view.sources.length})</h2>
-                <div className="field">
-                  <label htmlFor="sources-file-input">
-                    Thêm nguồn (JPEG/PNG/PDF/CSV/TXT/MD, tối đa 20 MiB — chọn được nhiều tệp cùng lúc)
-                  </label>
-                  <input
-                    id="sources-file-input"
-                    data-testid="sources-file-input"
-                    type="file"
-                    multiple
-                    accept="image/*,application/pdf,.csv,.txt,.md"
-                    onChange={(e) => {
-                      handleAddUploadFiles(e.target.files);
-                      e.target.value = '';
-                    }}
-                  />
-                </div>
-
-                {uploadFiles.length > 0 && (
-                  <div className="selected-files-list" style={{ marginBottom: 'var(--space-3)' }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>
-                      Đã chọn {uploadFiles.length} tệp:
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {uploadFiles.map((file, idx) => (
-                        <span
-                          key={`${file.name}-${idx}`}
-                          className="pill-badge"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '4px 8px',
-                            background: 'var(--color-bg-subtle, #f1f5f9)',
-                            border: '1px solid var(--color-border, #e2e8f0)',
-                            borderRadius: '4px',
-                            fontSize: '0.82rem',
-                          }}
-                        >
-                          <span>{file.name} ({formatBytes(file.size)})</span>
-                          <button
-                            type="button"
-                            aria-label={`Xoá ${file.name}`}
-                            style={{
-                              border: 'none',
-                              background: 'transparent',
-                              cursor: 'pointer',
-                              padding: 0,
-                              fontSize: '0.9rem',
-                              color: 'var(--color-muted-foreground, #64748b)',
-                              lineHeight: 1,
-                            }}
-                            onClick={() => handleRemoveUploadFile(idx)}
-                          >
-                            ✕
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="field">
-                  <label htmlFor="upload-note">
-                    Ghi chú nguồn (bạn nói file lấy từ đâu — không tự xác thực issuer)
-                  </label>
-                  <input
-                    id="upload-note"
-                    value={uploadNote}
-                    onChange={(e) => setUploadNote(e.target.value)}
-                    placeholder="Ví dụ: sao kê do kế toán export"
-                  />
-                </div>
-                <button
-                  className="btn btn-primary"
-                  disabled={uploadFiles.length === 0 || uploadingSources}
-                  onClick={() => void handleUpload()}
-                >
-                  {uploadingSources
-                    ? `Đang tải lên (${uploadFiles.length} tệp)...`
-                    : uploadFiles.length > 1
-                      ? `Tải lên ${uploadFiles.length} nguồn`
-                      : 'Tải lên nguồn'}
-                </button>
-                {view.sources.length > 0 && (
-                  <table style={{ marginTop: 'var(--space-4)' }}>
-                    <thead>
-                      <tr>
-                        <th>File</th>
-                        <th>Loại</th>
-                        <th>Dung lượng</th>
-                        <th>Mở gốc</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {view.sources.map((s) => (
-                        <tr key={s.id}>
-                          <td title={s.sha256}><strong>{s.filename}</strong></td>
-                          <td>{s.media_type}</td>
-                          <td>{formatBytes(s.size_bytes)}</td>
-                          <td>
-                            <a href={api.sourceContentUrl(s.id)} target="_blank"
-                               rel="noreferrer">Xem</a>
-                            {' · '}
-                            <a href={api.sourceContentUrl(s.id, true)}>Tải xuống</a>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+              <SourceUploadPanel
+                key={view.id}
+                view={view}
+                role={role}
+                actorId={actorId}
+                onChanged={async (caseId) => {
+                  await loadCase(caseId);
+                  await loadCases();
+                }}
+                onError={setError}
+              />
             </div>
 
             {/* TAB 4: Câu hỏi */}

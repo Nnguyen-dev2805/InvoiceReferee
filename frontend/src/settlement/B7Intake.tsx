@@ -26,6 +26,9 @@ interface B7IntakeProps {
   role: DemoRole;
   actorId: string;
   onAction: (label: string, run: () => Promise<unknown>) => Promise<void>;
+  // Runs the actual reconciliation. Confirming intake only saves the
+  // declaration; it must not imply an automatic run that does not exist.
+  onRunCheck?: () => Promise<void>;
 }
 
 function emptyIntake(): B7LinkedIntake {
@@ -33,7 +36,7 @@ function emptyIntake(): B7LinkedIntake {
            expense_rows: [], note: null };
 }
 
-export function B7IntakePanel({ view, report, role, actorId, onAction }: B7IntakeProps) {
+export function B7IntakePanel({ view, report, role, actorId, onAction, onRunCheck }: B7IntakeProps) {
   const link = view.linked_b7 ?? null;
   const form = view.submission.form as unknown as B7LinkedIntake;
   const [intake, setIntake] = useState<B7LinkedIntake>(
@@ -107,9 +110,17 @@ export function B7IntakePanel({ view, report, role, actorId, onAction }: B7Intak
       </p>
 
       {confirmed && (
-        <p className="notice notice-info" role="status">
-          Đã xác nhận nộp. {report ? 'Report đã có.' : 'Chưa chạy đối soát.'}
-        </p>
+        <div className="notice notice-info" role="status">
+          <p style={{ margin: 0 }}>
+            Đã xác nhận nộp. {report ? 'Report đã có.' : 'Chưa chạy đối soát.'}
+          </p>
+          {isEmployee && !report && onRunCheck && (
+            <button className="btn btn-primary btn-sm" style={{ marginTop: 'var(--space-2)' }}
+                    onClick={() => void onRunCheck()}>
+              Chạy kiểm tra đối soát
+            </button>
+          )}
+        </div>
       )}
 
       <div className="field" data-testid="b7-claim-rows">
@@ -169,7 +180,7 @@ export function B7IntakePanel({ view, report, role, actorId, onAction }: B7Intak
           </button>
           <button className="btn btn-primary" disabled={!canConfirm}
                   onClick={() => save(true)}>
-            Xác nhận nộp và đối soát
+            Xác nhận nộp
           </button>
         </div>
       )}

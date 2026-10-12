@@ -55,7 +55,7 @@ export function B7CompanyContextPanel({
   };
 
   return (
-    <div className="panel" data-testid="b7-company-context">
+    <div className="panel" id="b7-company-context-panel" data-testid="b7-company-context">
       <h2>Dữ liệu công ty (coverage &amp; thực tế)</h2>
       <p className="muted">
         Kế toán cung cấp nguồn sổ công ty cho toàn công việc: coverage tới mốc

@@ -76,7 +76,7 @@ def process(run_input: RunInput, reader: Reader, budget: RunBudget,
             technical.append(_technical_issue(None, error, len(technical) + 1))
     if linked_snapshot is not None:
         # Company context facts come from typed persisted records, not the LLM.
-        from invoice_referee.settlement.b7_linked import (
+        from invoice_referee.settlement.linked_context import (
             linked_context_observations,
         )
         ctx_obs, ctx_rel, ctx_issues = linked_context_observations(

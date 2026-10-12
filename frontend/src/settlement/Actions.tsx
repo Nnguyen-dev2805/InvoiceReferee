@@ -4,11 +4,11 @@
 import { useEffect, useState } from 'react';
 import * as api from './api';
 import { B3ApprovalPanel } from './B3Approval';
-import { B3FundingPanel } from './B3Funding';
+import { AdvanceReceiptPanel } from './AdvanceReceiptPanel';
 import { B7IntakePanel } from './B7Intake';
 import { B7CompanyContextPanel } from './B7CompanyContext';
 import { B7ApprovalPanel } from './B7Approval';
-import { B7FundingPanel } from './B7Funding';
+import { SettlementReceiptPanel } from './SettlementReceiptPanel';
 import type { AuditEntry, CaseView, DemoRole, Report } from './types';
 
 function formatVnd(value: number | null): string {
@@ -30,6 +30,11 @@ interface ActionsProps {
   report?: Report | null;
   history?: AuditEntry[];
   onAction: (action: string, run: () => Promise<unknown>) => Promise<void>;
+  // Dedicated callback: App owns the returned child id and opens it directly
+  // instead of reloading the parent and making the user hunt for the child.
+  onPrepareSettlement?: () => Promise<void>;
+  // Runs the reconciliation; intake confirm only saves the declaration.
+  onStartRun?: () => Promise<void>;
 }
 
 export function ActionsPanel({
@@ -41,6 +46,8 @@ export function ActionsPanel({
   report,
   history,
   onAction,
+  onPrepareSettlement,
+  onStartRun,
 }: ActionsProps) {
   const summary = view.money_summary;
   const closed = view.stage === 'SETTLEMENT_CLOSED'
@@ -145,7 +152,7 @@ export function ActionsPanel({
       )}
 
       {b3V1 && view.b3_workflow?.decision?.outcome === 'APPROVE' && (
-        <B3FundingPanel
+        <AdvanceReceiptPanel
           view={view}
           role={role}
           actorId={actorId}
@@ -156,17 +163,19 @@ export function ActionsPanel({
       {b3V1 && view.b3_workflow?.decision?.outcome === 'APPROVE'
         && role === 'EMPLOYEE'
         && actorId.trim() === view.submission.employee_ref && (
-        <div className="field" data-testid="b7-prepare-block">
+        <div className="field" id="b7-prepare-block" data-testid="b7-prepare-block">
           <h3>Quyết toán</h3>
           <p className="muted">
             Mở hồ sơ quyết toán liên kết cho công việc này để khai chi phí thực tế.
           </p>
           <button className="btn btn-primary"
-                  onClick={() => void onAction('B7_PREPARE',
-                    () => api.prepareLinkedB7(view.id, {
-                      actor_id: actorId.trim(), demo_role: role,
-                      expected_case_version: view.case_version,
-                    }))}>
+                  onClick={() => void (onPrepareSettlement
+                    ? onPrepareSettlement()
+                    : onAction('B7_PREPARE',
+                        () => api.prepareLinkedB7(view.id, {
+                          actor_id: actorId.trim(), demo_role: role,
+                          expected_case_version: view.case_version,
+                        })))}>
             Chuẩn bị hồ sơ quyết toán
           </button>
         </div>
@@ -179,6 +188,7 @@ export function ActionsPanel({
           role={role}
           actorId={actorId}
           onAction={onAction}
+          onRunCheck={onStartRun}
         />
       )}
 
@@ -203,7 +213,7 @@ export function ActionsPanel({
       )}
 
       {view.linked_b7 && view.b7_workflow?.decision?.outcome === 'APPROVE' && (
-        <B7FundingPanel
+        <SettlementReceiptPanel
           view={view}
           role={role}
           actorId={actorId}

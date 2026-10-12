@@ -17,8 +17,8 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, ValidationError
 
 from invoice_referee.domain.models import DomainError
 from invoice_referee.settlement.b3 import B3CompanyContext, B3Intake, is_b3_v1
-from invoice_referee.settlement.b3_workflow import b3_route_for
-from invoice_referee.settlement.b7_linked import is_linked_b7
+from invoice_referee.settlement.advance_workflow import b3_route_for
+from invoice_referee.settlement.linked_context import is_linked_b7
 from invoice_referee.settlement.models import (
     AuthorityGrant,
     B3AdvanceEventPayload,
@@ -809,7 +809,7 @@ class Service:
 
     def decide_b3(self, case_id: str, payload: dict[str, Any],
                   command: Command) -> B3DecisionView:
-        from invoice_referee.settlement.b3_workflow import (
+        from invoice_referee.settlement.advance_workflow import (
             authorize_b3_decision,
             effective_b3_time,
         )

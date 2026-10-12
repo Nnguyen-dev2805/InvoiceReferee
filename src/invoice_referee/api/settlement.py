@@ -510,9 +510,18 @@ def create_runtime_app(*, db_path: Path | None = None,
         if context_path:
             # File cấu hình sai dạng phải lỗi startup rõ, không fallback quyền.
             b3_context = load_b3_context(context_path)
+        b7_context = None
+        b7_path = os.environ.get("SETTLEMENT_B7_CONTEXT_PATH", "").strip()
+        if b7_path:
+            # B7 rights are separate from B3; a malformed config fails startup.
+            from invoice_referee.settlement.linked_context import (
+                load_b7_company_config,
+            )
+            b7_context = load_b7_company_config(Path(b7_path))
         service = Service(store, reader,
                           config=ServiceConfig(authority=DEMO_AUTHORITY,
-                                               b3_context=b3_context))
+                                               b3_context=b3_context,
+                                               b7_context=b7_context))
     app = FastAPI(title="InvoiceReferee Settlement", version="0.2.0")
 
     @app.exception_handler(DomainError)
@@ -707,7 +716,7 @@ def create_runtime_app(*, db_path: Path | None = None,
     ) -> JSONResponse | CaseView:
         from pydantic import ValidationError
 
-        from invoice_referee.settlement.b7_linked import load_b7_linked_intake
+        from invoice_referee.settlement.linked_context import load_b7_linked_intake
 
         try:
             intake = load_b7_linked_intake(request.intake)

@@ -131,7 +131,7 @@ export function B3ApprovalPanel({
   // --- Approved (terminal for this slice) ---
   if (decision && decision.outcome === 'APPROVE') {
     return (
-      <div className="panel" data-testid="b3-approval-panel">
+      <div className="panel" id="b3-approval-panel" data-testid="b3-approval-panel">
         <h2>Đã duyệt tạm ứng — chờ chi ứng</h2>
         <ul className="reasons">
           <li><strong>Công việc được phép:</strong> {decision.work_allowed ? 'Có' : 'Không'}</li>
@@ -156,7 +156,7 @@ export function B3ApprovalPanel({
   // --- Returned / Refused: read-only outcome + reason ---
   if (decision && (decision.outcome === 'RETURN' || decision.outcome === 'REFUSE')) {
     return (
-      <div className="panel" data-testid="b3-approval-panel">
+      <div className="panel" id="b3-approval-panel" data-testid="b3-approval-panel">
         <h2>{decision.outcome === 'RETURN'
           ? 'Yêu cầu bổ sung' : 'Đề nghị tạm ứng bị từ chối'}</h2>
         <p className="notice notice-warn" role="alert">{decision.reason}</p>
@@ -178,7 +178,7 @@ export function B3ApprovalPanel({
   // --- Pending: approver decides; accountant/employee read status ---
   if (workflow.status === 'PENDING' && presentation) {
     return (
-      <div className="panel" data-testid="b3-approval-panel">
+      <div className="panel" id="b3-approval-panel" data-testid="b3-approval-panel">
         <h2>Chờ người duyệt tạm ứng</h2>
         <div className="review-summary-card">
           <div className="review-summary-line">
@@ -250,7 +250,7 @@ export function B3ApprovalPanel({
   // --- NOT_PRESENTED / RETURNED (awaiting re-present) / NEEDS_RECHECK ---
   if (role === 'ACCOUNTANT') {
     return (
-      <div className="panel" data-testid="b3-approval-panel">
+      <div className="panel" id="b3-approval-panel" data-testid="b3-approval-panel">
         <h2>Trình người duyệt tạm ứng</h2>
         {savedReview ? (
           <div className="review-summary-card" data-testid="b3-saved-review">

@@ -232,6 +232,20 @@ test('report B3 hiển thị "đang chờ quyết định", không nút đã duy
   expect(screen.queryByText(/Đã duyệt ứng/)).not.toBeInTheDocument();
 });
 
+test('màn mặc định không phơi raw run enum; details vẫn truy vết', async () => {
+  const user = userEvent.setup();
+  setup(caseView(true), true);
+  await user.click(await screen.findByText(/C-b3test01/));
+  await screen.findByTestId('report-panel');
+  const strip = screen.getByTestId('run-panel');
+  // Nhãn mô phỏng dễ thấy, không phải raw SUCCEEDED/publishing.
+  expect(strip.textContent).toContain('Chế độ mô phỏng/replay');
+  // Raw run id/status/stage nằm trong "Thông tin xử lý".
+  const details = screen.getByTestId('processing-details');
+  expect(details.textContent).toContain('R-b3run01');
+  expect(details.textContent).toContain('SUCCEEDED');
+});
+
 test('IMPORT cho phép tải lên 2 tệp riêng biệt và thêm từng nguồn', async () => {
   const user = userEvent.setup();
   const createSpy = vi.spyOn(api, 'createB3Case').mockResolvedValue(caseView(false));
