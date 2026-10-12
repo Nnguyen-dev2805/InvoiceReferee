@@ -93,6 +93,7 @@ export interface CaseSummary {
   // 'USER' for cases created via the UI; 'SYSTEM' for eval/verify/seed cases.
   origin: 'USER' | 'SYSTEM';
   dossier_ref?: string | null;
+  confirmed?: boolean;
 }
 
 export interface AuditEntry {
@@ -291,6 +292,7 @@ export interface B3DemoContext {
   demo_clock: string | null;
   people: B3Person[];
   routes: B3Route[];
+  receipt_sources?: B3ReceiptSource[];
 }
 
 export interface B3GrantRecord {
@@ -428,7 +430,39 @@ export interface B3DecisionPayload {
 
 export type B3MoneyFieldName =
   | 'amount_vnd' | 'currency' | 'payer_side' | 'payee_ref' | 'event_at'
-  | 'receiver_outcome' | 'event_namespace' | 'event_ref' | 'method';
+  | 'receiver_outcome' | 'event_namespace' | 'event_ref' | 'method'
+  | 'receiver_name' | 'proof_scope' | 'bank_status_text' | 'voucher_number'
+  | 'handed_by_name' | 'acknowledgement';
+
+export interface B3BankReceiptDetails {
+  kind: 'BANK_TRANSFER';
+  receiver_name: string | null;
+  sender_name: string | null;
+  bank_name: string | null;
+  sender_account: string | null;
+  recipient_bank: string | null;
+  recipient_account: string | null;
+  bank_status_text: string | null;
+  proof_scope: 'ORDER_ONLY' | 'SENDER_DEBIT' | 'RECEIVER_CONFIRMED'
+    | 'UNCONFIRMED';
+}
+
+export interface B3CashReceiptDetails {
+  kind: 'CASH';
+  voucher_number: string | null;
+  cashbook_label: string | null;
+  handed_by_name: string | null;
+  receiver_name: string | null;
+  acknowledgement: 'ACKNOWLEDGED' | 'NOT_HANDED' | 'UNCONFIRMED';
+}
+
+export type B3ReceiptDetails = B3BankReceiptDetails | B3CashReceiptDetails;
+
+export interface B3ReceiptSource {
+  method: 'BANK_TRANSFER' | 'CASH';
+  namespace: string;
+  label: string;
+}
 
 export type B3AdvanceReportedStatus =
   | 'RECEIVED' | 'PENDING' | 'FAILED' | 'CANCELLED' | 'UNCONFIRMED';
@@ -481,6 +515,8 @@ export interface B3AdvanceEventView {
   created_at: string;
   after_money_cutoff: boolean;
   incidents: B3FundingIncident[];
+  receipt_details: B3ReceiptDetails | null;
+  evidence_issues: string[];
   idempotent_replay: boolean;
 }
 
@@ -515,6 +551,7 @@ export interface B3AdvanceEventPayload {
   evidence: B3MoneyFieldEvidence[];
   allocation_note: string;
   supersedes_event_id: string | null;
+  receipt_details?: B3ReceiptDetails | null;
 }
 
 // --- B6→B7 linked settlement (b7-linked-intake-v1) ---------------------------

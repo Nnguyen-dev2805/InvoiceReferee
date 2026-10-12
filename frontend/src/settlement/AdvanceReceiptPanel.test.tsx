@@ -4,6 +4,15 @@ import type { CaseView } from './types';
 
 const B3_FORM = { schema_version: 'b3-intake-v1', confirmed: true };
 
+const PEOPLE = [
+  { actor_ref: 'NV-DEMO-01', role: 'EMPLOYEE' as const, name: 'Nguyễn An', department: 'Kinh doanh' },
+  { actor_ref: 'ACC-DEMO-01', role: 'ACCOUNTANT' as const, name: 'Trần Bình', department: 'Kế toán' },
+];
+const RECEIPT_SOURCES = [
+  { method: 'BANK_TRANSFER' as const, namespace: 'BANK:DEMO-ACCOUNT', label: 'Tài khoản chi công ty demo' },
+  { method: 'CASH' as const, namespace: 'CASH:DEMO-QUY', label: 'Quỹ tiền mặt demo' },
+];
+
 function makeView(overrides: Partial<CaseView> = {}): CaseView {
   return {
     id: 'C-b3',
@@ -56,48 +65,77 @@ function makeView(overrides: Partial<CaseView> = {}): CaseView {
 
 const noop = async () => undefined;
 
-test('kế toán: nút ghi bị disabled khi thiếu số/outcome/ghi chú', () => {
+const fill = (label: string, value: string) =>
+  fireEvent.change(screen.getByLabelText(label), { target: { value } });
+
+test('received đủ fields nhưng chưa đính kèm chứng từ không bật nút ghi', () => {
   render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
-    actorId="ACC-DEMO-01" onAction={noop} />);
-  const btn = screen.getByRole('button',
-    { name: 'Ghi nhận sự kiện ứng' }) as HTMLButtonElement;
-  expect(btn.disabled).toBe(true);
+    actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
+  fill('Số tiền nguồn ghi (VND)', '2000000');
+  fill('Kết quả giao dịch (theo nguồn)', 'RECEIVED');
+  fill('Người nhận thực tế (đọc từ nguồn)', 'NV-DEMO-01');
+  fill('Tên người nhận (theo nguồn)', 'Nguyễn An');
+  fill('Nguồn chi (theo cấu hình)', 'BANK:DEMO-ACCOUNT');
+  fill('Mã giao dịch (event_ref)', 'TX-1');
+  fill('Thời điểm giao dịch', '2026-10-10T10:00');
+  fill('Phạm vi nguồn xác nhận', 'RECEIVER_CONFIRMED');
+  fill('Ghi chú đối chiếu', 'Đã đọc nguồn');
+  expect(screen.getByRole('button', { name: 'Ghi nhận kết quả thực tế' })).toBeDisabled();
 });
 
-test('kế toán: RECEIVED cần người nhận/namespace/ref', () => {
+test('kế toán: nút ghi bị disabled khi thiếu số/outcome/ghi chú', () => {
   render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
-    actorId="ACC-DEMO-01" onAction={noop} />);
+    actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
   const btn = screen.getByRole('button',
-    { name: 'Ghi nhận sự kiện ứng' }) as HTMLButtonElement;
-  fireEvent.change(screen.getByLabelText('Số tiền nguồn ghi (VND)'),
-    { target: { value: '2000000' } });
-  fireEvent.change(screen.getByLabelText('Kết quả giao dịch (theo nguồn)'),
-    { target: { value: 'RECEIVED' } });
-  fireEvent.change(screen.getByLabelText('Ghi chú đối chiếu'),
-    { target: { value: 'Đối chiếu đúng quyết định' } });
-  // Missing payee/namespace/ref for RECEIVED.
+    { name: 'Ghi nhận kết quả thực tế' }) as HTMLButtonElement;
   expect(btn.disabled).toBe(true);
-  fireEvent.change(screen.getByLabelText('Người nhận thực tế (đọc từ nguồn)'),
-    { target: { value: 'NV-DEMO-01' } });
-  fireEvent.change(screen.getByLabelText('Không gian giao dịch (namespace)'),
-    { target: { value: 'BANK:DEMO-ACCOUNT' } });
-  fireEvent.change(screen.getByLabelText('Mã giao dịch (event_ref)'),
-    { target: { value: 'TX-1' } });
-  expect(btn.disabled).toBe(false);
 });
 
 test('không mặc định người nhận theo nhân viên', () => {
   render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
-    actorId="ACC-DEMO-01" onAction={noop} />);
-  const payee = screen.getByLabelText('Người nhận thực tế (đọc từ nguồn)');
-  expect((payee as HTMLInputElement).value).toBe('');
+    actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
+  const recipient = screen.getByLabelText('Người nhận thực tế (đọc từ nguồn)');
+  expect((recipient as HTMLSelectElement).value).toBe('');
+});
+
+test('nhánh CASH hiện phiếu chi, không hiện phạm vi ngân hàng', () => {
+  render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
+    actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
+  fireEvent.change(screen.getByLabelText('Phương thức'), { target: { value: 'CASH' } });
+  expect(screen.getByLabelText('Số phiếu chi')).toBeInTheDocument();
+  expect(screen.getByLabelText('Kết quả giao/nhận tiền mặt')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Phạm vi nguồn xác nhận')).not.toBeInTheDocument();
+});
+
+test('nhánh BANK hiện phạm vi ngân hàng, không hiện phiếu chi', () => {
+  render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
+    actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
+  expect(screen.getByLabelText('Phạm vi nguồn xác nhận')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Số phiếu chi')).not.toBeInTheDocument();
+});
+
+test('đổi phương thức bỏ nguồn chi của phương thức cũ', () => {
+  render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
+    actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
+  fireEvent.change(screen.getByLabelText('Nguồn chi (theo cấu hình)'),
+    { target: { value: 'BANK:DEMO-ACCOUNT' } });
+  fireEvent.change(screen.getByLabelText('Phương thức'), { target: { value: 'CASH' } });
+  expect((screen.getByLabelText('Nguồn chi (theo cấu hình)') as HTMLSelectElement).value)
+    .toBe('');
 });
 
 test('nhân viên: readonly, không thấy nút ghi', () => {
   render(<AdvanceReceiptPanel view={makeView()} role="EMPLOYEE"
-    actorId="NV-DEMO-01" onAction={noop} />);
+    actorId="NV-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
   expect(screen.queryByRole('button',
-    { name: 'Ghi nhận sự kiện ứng' })).not.toBeInTheDocument();
+    { name: 'Ghi nhận kết quả thực tế' })).not.toBeInTheDocument();
 });
 
 test('hiển thị incidents khi có overpay', () => {
@@ -111,7 +149,8 @@ test('hiển thị incidents khi có overpay', () => {
     status: 'NEEDS_RESOLUTION', scope: 'decision:BD-1', as_of: null,
   };
   render(<AdvanceReceiptPanel view={view} role="ACCOUNTANT"
-    actorId="ACC-DEMO-01" onAction={noop} />);
+    actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
   const incidents = screen.getByTestId('b3-funding-incidents');
   expect(incidents).toHaveTextContent('OVERPAY');
 });
@@ -128,18 +167,43 @@ test('hiển thị từng sự kiện đã ghi', () => {
     employee_ref: 'NV-DEMO-01', work_ref: 'WORK-1',
     classification: 'CONFIRMED_RECEIPT', actor_id: 'ACC-DEMO-01',
     created_at: '2026-10-11T10:00:00Z', after_money_cutoff: false,
-    incidents: [], idempotent_replay: false,
+    incidents: [], receipt_details: null, evidence_issues: [],
+    idempotent_replay: false,
   }];
   render(<AdvanceReceiptPanel view={view} role="ACCOUNTANT"
-    actorId="ACC-DEMO-01" onAction={noop} />);
+    actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
   const events = screen.getByTestId('b3-advance-events');
   expect(events).toHaveTextContent('AE-1');
   expect(events).toHaveTextContent('RECEIVED');
 });
 
+test('sự kiện thiếu căn cứ được đánh dấu', () => {
+  const view = makeView();
+  view.b3_workflow!.advance_events = [{
+    id: 'AE-2', case_id: 'C-b3', kind: 'ADVANCE_TO_EMPLOYEE',
+    decision_id: 'BD-1', event_namespace: 'BANK:DEMO-ACCOUNT',
+    event_ref: 'TX-2', method: 'BANK_TRANSFER', gross_vnd: 2_000_000,
+    payer_side: 'COMPANY', payee_ref: 'NV-DEMO-01',
+    event_at: '2026-10-10T10:00:00+07:00', reported_status: 'RECEIVED',
+    evidence: [], allocation_note: 'x', supersedes_event_id: null,
+    employee_ref: 'NV-DEMO-01', work_ref: 'WORK-1',
+    classification: 'UNCONFIRMED', actor_id: 'ACC-DEMO-01',
+    created_at: '2026-10-11T10:00:00Z', after_money_cutoff: false,
+    incidents: [], receipt_details: null,
+    evidence_issues: ['Thiếu căn cứ đã đọc cho trường amount_vnd.'],
+    idempotent_replay: false,
+  }];
+  render(<AdvanceReceiptPanel view={view} role="ACCOUNTANT"
+    actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
+  expect(screen.getByTestId('b3-advance-events')).toHaveTextContent('Chưa đủ căn cứ');
+});
+
 test('approved không tự thành received: chưa ghi thì recorded là null', () => {
   render(<AdvanceReceiptPanel view={makeView()} role="ACCOUNTANT"
-    actorId="ACC-DEMO-01" onAction={noop} />);
+    actorId="ACC-DEMO-01" onAction={noop} people={PEOPLE}
+    receiptSources={RECEIPT_SOURCES} />);
   const summary = screen.getByTestId('b3-funding-summary').textContent ?? '';
   expect(summary).toContain('Đã ghi nhận thực nhận: —');
   expect(summary).toContain('Số ứng đã duyệt: 2.000.000 đ');

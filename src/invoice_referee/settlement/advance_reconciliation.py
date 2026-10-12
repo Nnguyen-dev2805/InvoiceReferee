@@ -12,6 +12,8 @@ Separation of meanings (spec §1, §4):
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from invoice_referee.settlement.models import (
     B3AdvanceEventView,
     B3DecisionView,
@@ -21,6 +23,130 @@ from invoice_referee.settlement.models import (
 
 _NONFINAL = ("PENDING", "FAILED", "CANCELLED", "UNCONFIRMED")
 _FINAL_RECEIVED = "RECEIVED"
+
+# Core receipt facts every confirmed RECEIVED must read from a retained source.
+_RECEIPT_CORE_FIELDS = (
+    "amount_vnd", "currency", "payer_side", "payee_ref", "event_at",
+    "receiver_outcome", "event_namespace", "event_ref", "method",
+)
+# Every RECEIVED additionally needs the human-readable receiver name.
+_RECEIPT_REQUIRED_FIELDS = _RECEIPT_CORE_FIELDS + ("receiver_name",)
+
+
+def _as_aware(value: datetime | None) -> datetime | None:
+    """Normalize a datetime to an aware instant for value comparison."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+def _value_matches(field: str, evidence_value, payload) -> bool:
+    """Whether an evidence field's value agrees with the payload's own fact."""
+    if field == "amount_vnd":
+        return evidence_value == payload.gross_vnd
+    if field == "currency":
+        return str(evidence_value).strip().upper() == "VND"
+    if field == "payer_side":
+        return evidence_value == payload.payer_side
+    if field == "payee_ref":
+        return evidence_value == payload.payee_ref
+    if field == "receiver_outcome":
+        return evidence_value == payload.reported_status
+    if field == "event_namespace":
+        return evidence_value == payload.event_namespace
+    if field == "event_ref":
+        return evidence_value == payload.event_ref
+    if field == "method":
+        return evidence_value == payload.method
+    if field == "event_at":
+        got = evidence_value
+        if isinstance(got, str):
+            try:
+                got = datetime.fromisoformat(got)
+            except ValueError:
+                return False
+        return _as_aware(got) == _as_aware(payload.event_at)
+    if field == "receiver_name":
+        details = payload.receipt_details
+        name = getattr(details, "receiver_name", None) if details else None
+        # The name is a free-text read; when details carry one it must agree.
+        return name is None or str(evidence_value).strip() == name.strip()
+    return True
+
+
+def validate_advance_receipt(payload, proof_source_ids: set[str],
+                             receipt_sources: list) -> list[str]:
+    """Reasons a reported RECEIVED is not yet a confirmed, sourced receipt.
+
+    A RECEIVED claim is only bookkeeping until every required fact is read
+    from a retained B5 proof source (human source review, READ state) with the
+    source belonging to this case, and the method-specific receipt condition
+    holds. The result is a list of issue strings; empty means evidence-ok. This
+    never calls OCR/LLM/signature recognition and never edits the source.
+    """
+    if payload.reported_status != _FINAL_RECEIVED:
+        return []
+
+    issues: list[str] = []
+    by_field: dict[str, list] = {}
+    for entry in payload.evidence:
+        by_field.setdefault(entry.field, []).append(entry)
+
+    for field in _RECEIPT_REQUIRED_FIELDS:
+        entries = by_field.get(field, [])
+        if not entries:
+            issues.append(f"Thiếu căn cứ đã đọc cho trường {field}.")
+            continue
+        if len(entries) > 1:
+            issues.append(f"Trường {field} có nhiều hơn một căn cứ; không rõ.")
+            continue
+        entry = entries[0]
+        if entry.source_id not in proof_source_ids:
+            issues.append(
+                f"Căn cứ {field} không thuộc chứng từ ứng đã ghi nhận.")
+        if entry.origin != "HUMAN_SOURCE_REVIEW":
+            issues.append(f"Căn cứ {field} không phải người đọc nguồn.")
+        if entry.read_state != "READ":
+            issues.append(f"Căn cứ {field} chưa được đọc rõ (không READ).")
+        if not (entry.locator or "").strip():
+            issues.append(f"Căn cứ {field} thiếu vị trí (locator).")
+        if entry.raw is None or not str(entry.raw).strip():
+            issues.append(f"Căn cứ {field} thiếu nội dung nguyên văn.")
+        if entry.read_state == "READ" and not _value_matches(
+                field, entry.value, payload):
+            issues.append(f"Căn cứ {field} không khớp dữ kiện sự kiện.")
+
+    # Method-specific receipt condition + configured source.
+    method_sources = {s.namespace for s in receipt_sources
+                      if s.method == payload.method}
+    if not method_sources:
+        issues.append(
+            "Chưa cấu hình nguồn chi cho phương thức này; không ghi nhận "
+            "mới khi thiếu cấu hình.")
+    elif payload.event_namespace not in method_sources:
+        issues.append(
+            "Nguồn chi không thuộc cấu hình cho phương thức đã chọn.")
+
+    details = payload.receipt_details
+    if payload.method == "BANK_TRANSFER":
+        scope = getattr(details, "proof_scope", None) if details else None
+        if scope != "RECEIVER_CONFIRMED":
+            issues.append(
+                "Chuyển khoản chưa đủ căn cứ người hưởng nhận "
+                "(proof_scope phải là RECEIVER_CONFIRMED).")
+    elif payload.method == "CASH":
+        ack = getattr(details, "acknowledgement", None) if details else None
+        if ack != "ACKNOWLEDGED":
+            issues.append(
+                "Phiếu chi chưa có xác nhận giao/nhận "
+                "(acknowledgement phải là ACKNOWLEDGED).")
+        voucher = getattr(details, "voucher_number", None) if details else None
+        if not voucher or voucher != payload.event_ref:
+            issues.append(
+                "Số phiếu chi phải khớp mã sự kiện (event_ref) của phiếu.")
+    return issues
 
 
 def _is_confirmed_receipt(event: B3AdvanceEventView) -> bool:
@@ -168,17 +294,22 @@ def _status(approved: int | None, recorded: int | None, uncertain: bool,
 
 
 def derive_classification(payload, employee_ref: str,
-                          incidents: list[B3FundingIncident]) -> str:
+                          incidents: list[B3FundingIncident], *,
+                          evidence_ok: bool) -> str:
     """Derive an event's classification from its own facts (never free text).
 
     RECEIVED is CONFIRMED_RECEIPT only when it reaches the right employee paid
-    by the company with a known gross; a conflicting outcome is CONFLICT;
-    otherwise the reported status maps directly.
+    by the company with a known gross AND ``evidence_ok`` (the caller's guard
+    found every required sourced fact). The guard result is passed explicitly —
+    it is never defaulted to True, so an unproven RECEIVED stays UNCONFIRMED.
+    A conflicting outcome is CONFLICT; otherwise the reported status maps
+    directly.
     """
     if any(i.kind == "CONFLICTING_OUTCOME" for i in incidents):
         return "CONFLICT"
     if payload.reported_status == "RECEIVED":
-        if (payload.payer_side == "COMPANY" and payload.gross_vnd is not None
+        if (evidence_ok and payload.payer_side == "COMPANY"
+                and payload.gross_vnd is not None
                 and payload.payee_ref == employee_ref):
             return "CONFIRMED_RECEIPT"
         return "UNCONFIRMED"

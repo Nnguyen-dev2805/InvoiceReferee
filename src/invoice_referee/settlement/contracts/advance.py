@@ -147,6 +147,10 @@ class B3WorkflowView(BaseModel):
 B3MoneyFieldName = Literal[
     "amount_vnd", "currency", "payer_side", "payee_ref", "event_at",
     "receiver_outcome", "event_namespace", "event_ref", "method",
+    # Per-method receipt facts (D4): the human-readable receiver name is a
+    # required read for a confirmed receipt; the rest are method-specific.
+    "receiver_name", "proof_scope", "bank_status_text", "voucher_number",
+    "handed_by_name", "acknowledgement",
 ]
 B3ReadState = Literal["READ", "UNCLEAR", "NOT_FOUND"]
 B3EventMethod = Literal["BANK_TRANSFER", "CASH"]
@@ -186,6 +190,45 @@ class B3MoneyFieldEvidence(BaseModel):
     origin: Literal["HUMAN_SOURCE_REVIEW"]
 
 
+class B3BankReceiptDetails(BaseModel):
+    """Bank-transfer receipt facts read by the accountant from the source.
+
+    These are optional corroborating context (account/bank may be masked) and
+    never substitute for the required receipt evidence. ``proof_scope`` records
+    how far the source proves the money reached the receiver.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["BANK_TRANSFER"]
+    receiver_name: str | None = None
+    sender_name: str | None = None
+    bank_name: str | None = None
+    sender_account: str | None = None
+    recipient_bank: str | None = None
+    recipient_account: str | None = None
+    bank_status_text: str | None = None
+    proof_scope: Literal[
+        "ORDER_ONLY", "SENDER_DEBIT", "RECEIVER_CONFIRMED", "UNCONFIRMED"]
+
+
+class B3CashReceiptDetails(BaseModel):
+    """Cash-voucher receipt facts read by the accountant from the source.
+
+    A printed approval line or pre-printed name is not an acknowledgement;
+    ``acknowledgement`` is the delivery/handover result.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["CASH"]
+    voucher_number: str | None = None
+    cashbook_label: str | None = None
+    handed_by_name: str | None = None
+    receiver_name: str | None = None
+    acknowledgement: Literal["ACKNOWLEDGED", "NOT_HANDED", "UNCONFIRMED"]
+
+
 class B3AdvanceEventPayload(BaseModel):
     """Accountant's record of an actual advance money event (no bank action).
 
@@ -207,6 +250,7 @@ class B3AdvanceEventPayload(BaseModel):
     evidence: list[B3MoneyFieldEvidence] = Field(default_factory=list)
     allocation_note: str
     supersedes_event_id: str | None = None
+    receipt_details: "B3BankReceiptDetails | B3CashReceiptDetails | None" = None
 
     @model_validator(mode="after")
     def _shape(self) -> "B3AdvanceEventPayload":
@@ -214,6 +258,10 @@ class B3AdvanceEventPayload(BaseModel):
             raise ValueError("allocation_note không được để trắng.")
         if self.gross_vnd is not None and self.gross_vnd <= 0:
             raise ValueError("gross_vnd phải dương khi biết; unknown để null.")
+        if self.receipt_details is not None \
+                and self.receipt_details.kind != self.method:
+            raise ValueError(
+                "receipt_details.kind phải khớp method của sự kiện.")
         return self
 
 
@@ -256,6 +304,8 @@ class B3AdvanceEventView(BaseModel):
     created_at: AwareDatetime
     after_money_cutoff: bool = False
     incidents: list[B3FundingIncident] = Field(default_factory=list)
+    receipt_details: "B3BankReceiptDetails | B3CashReceiptDetails | None" = None
+    evidence_issues: list[str] = Field(default_factory=list)
     idempotent_replay: bool = False
 
 

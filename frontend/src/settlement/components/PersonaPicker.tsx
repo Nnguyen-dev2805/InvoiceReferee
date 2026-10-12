@@ -52,7 +52,10 @@ export function PersonaPicker({
         id="demo-person"
         className="profile-select-overlay"
         value={selectedActorRef}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          e.target.blur();
+        }}
         title="Chọn vai trò người dùng"
       >
         {people.length === 0 && (

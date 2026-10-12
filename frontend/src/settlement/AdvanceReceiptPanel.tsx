@@ -4,30 +4,44 @@
 // evidence — approval is not receipt. This panel never transfers money and
 // never derives "received" from approval; it only captures the accountant's
 // source-read fields. The backend owns classification/sums/stage.
+//
+// Two method branches (BANK_TRANSFER / CASH) capture the facts each source
+// actually proves. A receipt is not recordable until the proof source is
+// attached and the method-specific receiver condition is read.
 import { useMemo, useState } from 'react';
 import * as api from './api';
 import { formatMoney } from './displayText';
 import type {
-  B3AdvanceReportedStatus, CaseView, DemoRole, SourceView,
+  B3AdvanceReportedStatus, B3BankReceiptDetails, B3CashReceiptDetails,
+  B3Person, B3ReceiptDetails, B3ReceiptSource, CaseView, DemoRole, SourceView,
 } from './types';
 
 function formatVnd(value: number | null | undefined): string {
   return formatMoney(value, { nullText: '—' });
 }
 
-const EVIDENCE_FIELDS = [
+// Fields always read from the source; method-specific ones are appended.
+const CORE_EVIDENCE_FIELDS = [
   'amount_vnd', 'currency', 'payer_side', 'payee_ref', 'event_at',
   'receiver_outcome', 'event_namespace', 'event_ref', 'method',
+  'receiver_name',
 ] as const;
+
+const OTHER_PAYEE = 'OTHER';
+const NONE_PAYEE = '__NONE__';
 
 interface AdvanceReceiptProps {
   view: CaseView;
   role: DemoRole;
   actorId: string;
   onAction: (label: string, run: () => Promise<unknown>) => Promise<void>;
+  people?: B3Person[];
+  receiptSources?: B3ReceiptSource[];
 }
 
-export function AdvanceReceiptPanel({ view, role, actorId, onAction }: AdvanceReceiptProps) {
+export function AdvanceReceiptPanel({
+  view, role, actorId, onAction, people = [], receiptSources = [],
+}: AdvanceReceiptProps) {
   const workflow = view.b3_workflow ?? null;
   const decision = workflow?.decision ?? null;
   const funding = workflow?.funding ?? null;
@@ -38,11 +52,23 @@ export function AdvanceReceiptPanel({ view, role, actorId, onAction }: AdvanceRe
   const [method, setMethod] =
     useState<'BANK_TRANSFER' | 'CASH'>('BANK_TRANSFER');
   const [outcome, setOutcome] = useState<B3AdvanceReportedStatus | ''>('');
-  const [payee, setPayee] = useState('');
+  const [recipient, setRecipient] = useState('');
+  const [receiverName, setReceiverName] = useState('');
+  const [senderSide, setSenderSide] =
+    useState<'COMPANY' | 'OTHER' | 'UNKNOWN'>('COMPANY');
   const [namespace, setNamespace] = useState('');
   const [eventRef, setEventRef] = useState('');
   const [eventAt, setEventAt] = useState('');
   const [note, setNote] = useState('');
+  // Bank-only
+  const [proofScope, setProofScope] =
+    useState<B3BankReceiptDetails['proof_scope']>('UNCONFIRMED');
+  // Cash-only
+  const [voucherNumber, setVoucherNumber] = useState('');
+  const [handedBy, setHandedBy] = useState('');
+  const [acknowledgement, setAcknowledgement] =
+    useState<B3CashReceiptDetails['acknowledgement']>('UNCONFIRMED');
+
   const [proofId, setProofId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -50,37 +76,74 @@ export function AdvanceReceiptPanel({ view, role, actorId, onAction }: AdvanceRe
   const isAccountant = role === 'ACCOUNTANT';
   const payable = decision?.outcome === 'APPROVE';
 
+  const methodSources = useMemo(
+    () => receiptSources.filter((s) => s.method === method),
+    [receiptSources, method]);
+
   const grossNum = gross.trim() === '' ? null : Number(gross);
+  const payeeRef = recipient === OTHER_PAYEE ? OTHER_PAYEE
+    : recipient === NONE_PAYEE ? null : recipient || null;
+
   const canRecord = useMemo(() => {
     if (!isAccountant || !payable) return false;
     if (grossNum === null || !Number.isFinite(grossNum) || grossNum <= 0) return false;
     if (outcome === '') return false;
     if (!note.trim()) return false;
-    // RECEIVED needs the core source facts to be meaningful.
     if (outcome === 'RECEIVED') {
-      if (!payee.trim() || !namespace.trim() || !eventRef.trim()) return false;
+      // A confirmed receipt needs the proof source attached and every
+      // required fact present; method-specific receiver condition included.
+      if (!proofId) return false;
+      if (!recipient) return false;
+      if (!receiverName.trim()) return false;
+      if (!namespace.trim() || !eventRef.trim() || !eventAt) return false;
+      if (method === 'BANK_TRANSFER' && proofScope !== 'RECEIVER_CONFIRMED') return false;
+      if (method === 'CASH') {
+        if (acknowledgement !== 'ACKNOWLEDGED') return false;
+        if (!voucherNumber.trim() || voucherNumber.trim() !== eventRef.trim()) return false;
+      }
     }
     return true;
-  }, [isAccountant, payable, grossNum, outcome, note, payee, namespace,
-      eventRef]);
+  }, [isAccountant, payable, grossNum, outcome, note, proofId, recipient,
+      receiverName, namespace, eventRef, eventAt, method, proofScope,
+      acknowledgement, voucherNumber]);
 
   if (!workflow || !payable) return null;
 
-  const evidence = () => {
+  const buildEvidence = () => {
     if (!proofId) return [];
     const values: Record<string, string | number | null> = {
-      amount_vnd: grossNum, currency: 'VND', payer_side: 'COMPANY',
-      payee_ref: payee.trim() || null, event_at: eventAt || null,
+      amount_vnd: grossNum, currency: 'VND', payer_side: senderSide,
+      payee_ref: payeeRef, event_at: eventAt || null,
       receiver_outcome: outcome || null,
       event_namespace: namespace.trim() || null,
       event_ref: eventRef.trim() || null, method,
+      receiver_name: receiverName.trim() || null,
     };
-    return EVIDENCE_FIELDS.filter((f) => values[f] !== null
-      && values[f] !== undefined).map((f) => ({
-      field: f, source_id: proofId, locator: f,
-      raw: String(values[f]), value: values[f] as number | string,
-      read_state: 'READ' as const, origin: 'HUMAN_SOURCE_REVIEW' as const,
-    }));
+    const fields = [...CORE_EVIDENCE_FIELDS];
+    return fields.filter((f) => values[f] !== null && values[f] !== undefined)
+      .map((f) => ({
+        field: f, source_id: proofId, locator: f,
+        raw: String(values[f]), value: values[f] as number | string,
+        read_state: 'READ' as const, origin: 'HUMAN_SOURCE_REVIEW' as const,
+      }));
+  };
+
+  const buildDetails = (): B3ReceiptDetails | null => {
+    if (method === 'BANK_TRANSFER') {
+      return {
+        kind: 'BANK_TRANSFER', receiver_name: receiverName.trim() || null,
+        sender_name: null, bank_name: null, sender_account: null,
+        recipient_bank: null, recipient_account: null, bank_status_text: null,
+        proof_scope: proofScope,
+      };
+    }
+    return {
+      kind: 'CASH', voucher_number: voucherNumber.trim() || null,
+      cashbook_label: namespace.trim() || null,
+      handed_by_name: handedBy.trim() || null,
+      receiver_name: receiverName.trim() || null,
+      acknowledgement,
+    };
   };
 
   const handleUpload = async (file: File) => {
@@ -108,13 +171,14 @@ export function AdvanceReceiptPanel({ view, role, actorId, onAction }: AdvanceRe
           event_namespace: namespace.trim() || null,
           event_ref: eventRef.trim() || null,
           method, gross_vnd: grossNum,
-          payer_side: 'COMPANY',
-          payee_ref: payee.trim() || null,
+          payer_side: senderSide,
+          payee_ref: payeeRef,
           event_at: eventAt ? new Date(eventAt).toISOString() : null,
           reported_status: outcome as B3AdvanceReportedStatus,
-          evidence: evidence(),
+          evidence: buildEvidence(),
           allocation_note: note.trim(),
           supersedes_event_id: null,
+          receipt_details: buildDetails(),
         }));
     } finally {
       setSubmitting(false);
@@ -165,6 +229,11 @@ export function AdvanceReceiptPanel({ view, role, actorId, onAction }: AdvanceRe
                 <code>{event.id}</code> · {event.reported_status} ·{' '}
                 {formatVnd(event.gross_vnd)} · {event.method} ·{' '}
                 {event.payee_ref ?? '—'} · {event.event_ref ?? '—'}
+                {event.evidence_issues.length > 0 && (
+                  <span className="pill-badge pill-badge-amber" style={{ marginLeft: 6 }}>
+                    Chưa đủ căn cứ
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -174,7 +243,20 @@ export function AdvanceReceiptPanel({ view, role, actorId, onAction }: AdvanceRe
       {isAccountant && (
         <div className="field">
           <h3>Chứng từ &amp; sự kiện</h3>
-          <label htmlFor="b3-proof-file">Chứng từ ứng (biên nhận ngân hàng / biên nhận cash)</label>
+
+          <label htmlFor="b3-funding-method">Phương thức</label>
+          <select id="b3-funding-method" value={method}
+                  onChange={(e) => {
+                    setMethod(e.target.value as 'BANK_TRANSFER' | 'CASH');
+                    // Switching method drops a support attached to the old one.
+                    setProofId(null);
+                    setNamespace('');
+                  }}>
+            <option value="BANK_TRANSFER">Chuyển khoản</option>
+            <option value="CASH">Tiền mặt</option>
+          </select>
+
+          <label htmlFor="b3-proof-file">Chứng từ ứng (biên nhận ngân hàng / phiếu chi)</label>
           <input id="b3-proof-file" type="file" disabled={uploading}
                  onChange={(e) => {
                    const file = e.target.files?.[0];
@@ -188,14 +270,6 @@ export function AdvanceReceiptPanel({ view, role, actorId, onAction }: AdvanceRe
           <input id="b3-funding-gross" type="number" min="0" value={gross}
                  onChange={(e) => setGross(e.target.value)} />
 
-          <label htmlFor="b3-funding-method">Phương thức</label>
-          <select id="b3-funding-method" value={method}
-                  onChange={(e) => setMethod(
-                    e.target.value as 'BANK_TRANSFER' | 'CASH')}>
-            <option value="BANK_TRANSFER">Chuyển khoản</option>
-            <option value="CASH">Tiền mặt</option>
-          </select>
-
           <label htmlFor="b3-funding-outcome">Kết quả giao dịch (theo nguồn)</label>
           <select id="b3-funding-outcome" value={outcome}
                   onChange={(e) => setOutcome(
@@ -208,23 +282,87 @@ export function AdvanceReceiptPanel({ view, role, actorId, onAction }: AdvanceRe
             <option value="UNCONFIRMED">Chưa xác định (UNCONFIRMED)</option>
           </select>
 
-          <label htmlFor="b3-funding-payee">Người nhận thực tế (đọc từ nguồn)</label>
-          <input id="b3-funding-payee" value={payee}
-                 onChange={(e) => setPayee(e.target.value)}
-                 placeholder="Điền đúng như nguồn, không mặc định theo nhân viên" />
+          <label htmlFor="b3-funding-recipient">Người nhận thực tế (đọc từ nguồn)</label>
+          <select id="b3-funding-recipient" value={recipient}
+                  onChange={(e) => setRecipient(e.target.value)}>
+            <option value="">— Chọn theo nguồn —</option>
+            {people.map((p) => (
+              <option key={p.actor_ref} value={p.actor_ref}>
+                {p.name}
+              </option>
+            ))}
+            <option value={OTHER_PAYEE}>Người khác</option>
+            <option value={NONE_PAYEE}>Chưa xác định</option>
+          </select>
 
-          <label htmlFor="b3-funding-namespace">Không gian giao dịch (namespace)</label>
-          <input id="b3-funding-namespace" value={namespace}
-                 onChange={(e) => setNamespace(e.target.value)}
-                 placeholder="BANK:DEMO-ACCOUNT" />
+          <label htmlFor="b3-funding-receiver-name">Tên người nhận (theo nguồn)</label>
+          <input id="b3-funding-receiver-name" value={receiverName}
+                 onChange={(e) => setReceiverName(e.target.value)}
+                 placeholder="Giữ nguyên văn tên đọc được trên chứng từ" />
 
-          <label htmlFor="b3-funding-ref">Mã giao dịch (event_ref)</label>
+          <label htmlFor="b3-funding-sender">Bên chi (theo nguồn)</label>
+          <select id="b3-funding-sender" value={senderSide}
+                  onChange={(e) => setSenderSide(
+                    e.target.value as 'COMPANY' | 'OTHER' | 'UNKNOWN')}>
+            <option value="COMPANY">Công ty</option>
+            <option value="OTHER">Người khác</option>
+            <option value="UNKNOWN">Chưa rõ</option>
+          </select>
+
+          <label htmlFor="b3-funding-namespace">Nguồn chi (theo cấu hình)</label>
+          <select id="b3-funding-namespace" value={namespace}
+                  onChange={(e) => setNamespace(e.target.value)}>
+            <option value="">— Chọn nguồn chi —</option>
+            {methodSources.map((s) => (
+              <option key={s.namespace} value={s.namespace}>{s.label}</option>
+            ))}
+          </select>
+          {methodSources.length === 0 && (
+            <p className="review-hint">
+              Chưa cấu hình nguồn chi cho phương thức này; không ghi nhận mới.
+            </p>
+          )}
+
+          <label htmlFor="b3-funding-ref">
+            {method === 'CASH' ? 'Mã sự kiện / số phiếu (event_ref)' : 'Mã giao dịch (event_ref)'}
+          </label>
           <input id="b3-funding-ref" value={eventRef}
                  onChange={(e) => setEventRef(e.target.value)} />
 
           <label htmlFor="b3-funding-time">Thời điểm giao dịch</label>
           <input id="b3-funding-time" type="datetime-local" value={eventAt}
                  onChange={(e) => setEventAt(e.target.value)} />
+
+          {method === 'BANK_TRANSFER' ? (
+            <>
+              <label htmlFor="b3-funding-proof-scope">Phạm vi nguồn xác nhận</label>
+              <select id="b3-funding-proof-scope" value={proofScope}
+                      onChange={(e) => setProofScope(
+                        e.target.value as B3BankReceiptDetails['proof_scope'])}>
+                <option value="UNCONFIRMED">— Chưa rõ —</option>
+                <option value="ORDER_ONLY">Lệnh mới tạo</option>
+                <option value="SENDER_DEBIT">Chỉ trích nợ bên gửi</option>
+                <option value="RECEIVER_CONFIRMED">Đủ căn cứ người hưởng nhận</option>
+              </select>
+            </>
+          ) : (
+            <>
+              <label htmlFor="b3-funding-voucher">Số phiếu chi</label>
+              <input id="b3-funding-voucher" value={voucherNumber}
+                     onChange={(e) => setVoucherNumber(e.target.value)} />
+              <label htmlFor="b3-funding-handed-by">Người giao tiền (theo nguồn)</label>
+              <input id="b3-funding-handed-by" value={handedBy}
+                     onChange={(e) => setHandedBy(e.target.value)} />
+              <label htmlFor="b3-funding-ack">Kết quả giao/nhận tiền mặt</label>
+              <select id="b3-funding-ack" value={acknowledgement}
+                      onChange={(e) => setAcknowledgement(
+                        e.target.value as B3CashReceiptDetails['acknowledgement'])}>
+                <option value="UNCONFIRMED">— Chưa đủ căn cứ —</option>
+                <option value="ACKNOWLEDGED">Đã giao, có xác nhận nhận tiền</option>
+                <option value="NOT_HANDED">Chưa giao</option>
+              </select>
+            </>
+          )}
 
           <label htmlFor="b3-funding-note">Ghi chú đối chiếu</label>
           <input id="b3-funding-note" value={note}
@@ -234,7 +372,7 @@ export function AdvanceReceiptPanel({ view, role, actorId, onAction }: AdvanceRe
           <button className="btn btn-primary"
                   disabled={!canRecord || submitting || uploading}
                   onClick={() => void submit()}>
-            Ghi nhận sự kiện ứng
+            Ghi nhận kết quả thực tế
           </button>
           <p className="review-hint">
             Không tự điền “đã nhận”: ghi theo nguồn. Chưa rõ thì để trống/UNCONFIRMED.

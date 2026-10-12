@@ -57,9 +57,14 @@ và ứng trong một quyết định có nội dung/phạm vi riêng. Không y�
   duyệt, **kế toán** đính kèm chứng từ ứng qua route riêng (source-use
   `B3_ADVANCE_PROOF`, không tăng `input_revision`, không làm decision stale) và
   **ghi sự kiện tiền** bằng HUMAN_SOURCE_REVIEW — đọc nguồn rồi lưu từng field
-  kèm source/locator/raw/value. Chương trình đối chiếu actual với số đã duyệt:
-  RECEIVED đủ → stage `AWAITING_WORK_SETTLEMENT`; nhận một phần/pending/unknown →
-  `AWAITING_MONEY`; wrong recipient/overpaid/conflict → `RESOLVING_OBLIGATIONS`.
+  kèm source/locator/raw/value. Hai nhánh phương thức: **chuyển khoản** (phạm vi
+  nguồn phải đủ căn cứ người hưởng nhận, không chỉ lệnh mới tạo/trích nợ bên gửi)
+  và **tiền mặt** (phiếu chi có xác nhận giao/nhận, số phiếu khớp sự kiện). Một
+  RECEIVED chỉ thành thực nhận khi **mọi** field bắt buộc đã đọc từ nguồn; thiếu
+  chứng từ/căn cứ giữ UNCONFIRMED, không tự thành đã nhận. Chương trình đối chiếu
+  actual với số đã duyệt: RECEIVED đủ → stage `AWAITING_WORK_SETTLEMENT`; nhận một
+  phần/pending/unknown → `AWAITING_MONEY`; wrong recipient/overpaid/conflict →
+  `RESOLVING_OBLIGATIONS`.
   Giữ gross thật (không clip), unknown/pending không thành 0, một giao dịch kinh
   tế không đếm hai lần. **Không** chuyển tiền/ngân hàng, không tự thu hồi, không
   closure, không tạo B7 tự động. B7 `money_summary` lọc kind trước mọi sum/pending

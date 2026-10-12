@@ -110,7 +110,7 @@ def test_record_receipt_fulfills_and_isolates_from_b7(b3_client):
               "payer_side": "COMPANY", "payee_ref": "NV-DEMO-01",
               "event_at": event_at.isoformat(), "receiver_outcome": "RECEIVED",
               "event_namespace": "BANK:DEMO-ACCOUNT", "event_ref": "TX-ADV-API",
-              "method": "BANK_TRANSFER"}
+              "method": "BANK_TRANSFER", "receiver_name": "Nguyễn An"}
     body = {
         "actor_id": "ACC-DEMO-01", "demo_role": "ACCOUNTANT",
         "expected_case_version": case["case_version"],
@@ -120,6 +120,9 @@ def test_record_receipt_fulfills_and_isolates_from_b7(b3_client):
         "payee_ref": "NV-DEMO-01", "event_at": event_at.isoformat(),
         "reported_status": "RECEIVED",
         "allocation_note": "Đối chiếu đúng quyết định",
+        "receipt_details": {"kind": "BANK_TRANSFER",
+                            "proof_scope": "RECEIVER_CONFIRMED",
+                            "receiver_name": "Nguyễn An"},
         "evidence": [{"field": k, "source_id": source_id, "locator": k,
                       "raw": str(v), "value": v, "read_state": "READ",
                       "origin": "HUMAN_SOURCE_REVIEW"}

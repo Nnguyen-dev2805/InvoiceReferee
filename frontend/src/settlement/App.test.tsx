@@ -298,17 +298,9 @@ test('IMPORT cho phép tải lên 2 tệp riêng biệt và thêm từng nguồn
   expect(startSpy).toHaveBeenCalledTimes(1);
 });
 
-test('Verify panel đóng mặc định và mở được mà không tự động chạy', async () => {
-  const user = userEvent.setup();
-  const verifySpy = vi.spyOn(api, 'runSettlementVerify');
+test('không hiển thị nút Đánh giá hệ thống (Verify) trong sidebar', () => {
   setup();
-
-  expect(screen.queryByRole('button', { name: /Chạy Verify/ })).not.toBeInTheDocument();
-  const toggleBtn = screen.getByText('Đánh giá hệ thống (Verify)');
-  await user.click(toggleBtn);
-
-  expect(screen.getByRole('button', { name: /Chạy Verify/ })).toBeVisible();
-  expect(verifySpy).not.toHaveBeenCalled();
+  expect(screen.queryByText('Đánh giá hệ thống (Verify)')).not.toBeInTheDocument();
 });
 
 test('hồ sơ IMPORT tự động nạp AI draft data vào form xác nhận khi mở', async () => {
@@ -347,7 +339,7 @@ test('hồ sơ hệ thống hiện tag và có nút xoá gọi API rồi tải l
   vi.spyOn(api, 'getHistory').mockResolvedValue([]);
   vi.spyOn(api, 'getQuestions').mockResolvedValue([]);
   const systemCase = {
-    id: 'C-sys01', job: 'B7' as const, employee_ref: 'NV-01',
+    id: 'C-sys01', job: 'B7' as const, employee_ref: 'NV-DEMO-01',
     work_ref: 'CT-E2E-01', stage: 'CHECKING' as const, case_version: 1,
     updated_at: '2026-10-10T09:00:00+07:00', origin: 'SYSTEM' as const,
   };
@@ -372,7 +364,7 @@ test('không xoá khi người dùng huỷ hộp thoại xác nhận', async () 
   vi.spyOn(api, 'getHistory').mockResolvedValue([]);
   vi.spyOn(api, 'getQuestions').mockResolvedValue([]);
   vi.spyOn(api, 'listCases').mockResolvedValue([{
-    id: 'C-user01', job: 'B7' as const, employee_ref: 'NV-01',
+    id: 'C-user01', job: 'B7' as const, employee_ref: 'NV-DEMO-01',
     work_ref: 'CT-USER', stage: 'CHECKING' as const, case_version: 1,
     updated_at: '2026-10-10T09:00:00+07:00', origin: 'USER' as const,
   }]);
@@ -449,7 +441,7 @@ test('mã hồ sơ hiển thị dạng badge nhỏ gọn có nút sao chép clip
   expect(await screen.findByText('Đã chép')).toBeInTheDocument();
 });
 
-test('kế toán thấy trạng thái "Chờ kế toán rà soát" và nút Tạo hồ sơ mới dạng thứ cấp', async () => {
+test('kế toán thấy trạng thái "Chờ kế toán rà soát" và không hiển thị nút Tạo hồ sơ mới', async () => {
   const user = userEvent.setup();
   setup(caseView(true), true);
 
@@ -457,9 +449,8 @@ test('kế toán thấy trạng thái "Chờ kế toán rà soát" và nút Tạ
   const picker = await screen.findByLabelText('Người dùng demo');
   await user.selectOptions(picker, 'ACC-DEMO-01');
 
-  // Nút Tạo hồ sơ mới chuyển sang dạng thứ cấp (gọn hơn, không chiếm spotlight)
-  const newCaseBtn = screen.getByRole('button', { name: /Tạo hồ sơ mới/ });
-  expect(newCaseBtn).toHaveClass('btn-new-case-accountant');
+  // Kế toán không hiển thị nút Tạo hồ sơ mới ở sidebar
+  expect(screen.queryByRole('button', { name: /Tạo hồ sơ mới/ })).not.toBeInTheDocument();
 
   // Mở hồ sơ
   await user.click(await screen.findByText(/C-b3test01/));
@@ -684,6 +675,10 @@ test('T3: đổi người dùng khi có draft; Accept xóa draft', async () => {
   const picker = screen.getByLabelText('Người dùng demo') as HTMLSelectElement;
   await user.selectOptions(picker, 'ACC-DEMO-01');
   expect(picker.value).toBe('ACC-DEMO-01');
+  // Kế toán không có form nộp hồ sơ
+  expect(screen.queryByLabelText('Nơi đến')).not.toBeInTheDocument();
+  // Đổi lại nhân viên: draft đã bị xóa sạch
+  await user.selectOptions(picker, 'NV-DEMO-01');
   expect((screen.getByLabelText('Nơi đến') as HTMLInputElement).value).toBe('');
 });
 
@@ -695,4 +690,72 @@ test('T3: context lỗi thì khóa tạo hồ sơ', async () => {
   render(<App />);
   const picker = await screen.findByLabelText('Người dùng demo') as HTMLSelectElement;
   expect(picker).toHaveTextContent('Chưa tải được người dùng demo.');
+});
+
+test('Kế toán và Người duyệt không thấy bản nháp B3 chưa gửi trong hàng đợi', async () => {
+  const user = userEvent.setup();
+  vi.spyOn(api, 'getDemoContext').mockResolvedValue(DEMO_CONTEXT);
+  vi.spyOn(api, 'getHistory').mockResolvedValue([]);
+  vi.spyOn(api, 'getQuestions').mockResolvedValue([]);
+  vi.spyOn(api, 'listCases').mockResolvedValue([
+    {
+      id: 'C-draft01', job: 'B3', employee_ref: 'NV-DEMO-01',
+      work_ref: 'WORK-01', stage: 'CHECKING', case_version: 1,
+      updated_at: '2026-10-10T09:00:00+07:00', origin: 'USER',
+      confirmed: false,
+    },
+    {
+      id: 'C-submitted01', job: 'B3', employee_ref: 'NV-DEMO-01',
+      work_ref: 'WORK-02', stage: 'CHECKING', case_version: 1,
+      updated_at: '2026-10-10T09:00:00+07:00', origin: 'USER',
+      confirmed: true,
+    },
+  ]);
+
+  render(<App />);
+  const picker = await screen.findByLabelText('Người dùng demo') as HTMLSelectElement;
+
+  // Nhân viên (NV-DEMO-01): Thấy cả bản nháp của mình
+  expect(await screen.findByText(/C-draft01/)).toBeInTheDocument();
+  expect(screen.getByText(/C-submitted01/)).toBeInTheDocument();
+
+  // Chuyển sang Kế toán (ACC-DEMO-01)
+  await user.selectOptions(picker, 'ACC-DEMO-01');
+
+  // Kế toán: CHỈ thấy hồ sơ đã nộp (C-submitted01), KHÔNG thấy bản nháp (C-draft01)
+  expect(screen.getByText(/C-submitted01/)).toBeInTheDocument();
+  expect(screen.queryByText(/C-draft01/)).not.toBeInTheDocument();
+
+  // Chuyển sang Người duyệt (APR-DEMO-01)
+  await user.selectOptions(picker, 'APR-DEMO-01');
+
+  // Người duyệt: KHÔNG thấy bản nháp (C-draft01)
+  expect(screen.queryByText(/C-draft01/)).not.toBeInTheDocument();
+});
+
+test('Kế toán mở hồ sơ nháp thấy thông báo bản nháp của nhân viên, không có nút nộp/sửa thay', async () => {
+  const user = userEvent.setup();
+  const draft = caseView(false);
+  setup(draft, true);
+
+  // Nhân viên mở hồ sơ nháp: Có nút "Xác nhận và gửi đề nghị"
+  await user.click(await screen.findByText(/C-b3test01/));
+  expect(await screen.findByText('Xác nhận và gửi đề nghị')).toBeInTheDocument();
+
+  // Đổi sang Kế toán
+  const picker = screen.getByLabelText('Người dùng demo') as HTMLSelectElement;
+  await user.selectOptions(picker, 'ACC-DEMO-01');
+
+  // Thẻ trạng thái kế toán ghi đúng là bản nháp của nhân viên, không báo "Nhân viên đã xác nhận..."
+  expect(await screen.findByText('Bản nháp của nhân viên (Chưa nộp)')).toBeInTheDocument();
+  expect(screen.getByText(/Nhân viên chưa gửi đề nghị chính thức/)).toBeInTheDocument();
+
+  // Chuyển sang tab Bản nháp B3
+  await user.click(screen.getByRole('tab', { name: /Bản nháp B3/ }));
+
+  // Không có nút "Xác nhận và gửi đề nghị" hay "Lưu bản nháp" cho Kế toán
+  expect(screen.queryByText('Xác nhận và gửi đề nghị')).not.toBeInTheDocument();
+  expect(screen.queryByText('Lưu bản nháp (chưa gửi)')).not.toBeInTheDocument();
+  // Có thông báo cảnh báo bản nháp của nhân viên
+  expect(screen.getByText(/Hồ sơ đang ở trạng thái bản nháp của nhân viên \(chưa nộp\)/)).toBeInTheDocument();
 });

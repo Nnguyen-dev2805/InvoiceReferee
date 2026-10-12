@@ -11,7 +11,6 @@ import { QuestionsPanel } from './Questions';
 import { ReportPanel } from './Report';
 import { ProcessingDetails } from './ProcessingDetails';
 import { SourceUploadPanel } from './SourceUploadPanel';
-import { VerifyPanel } from './Verify';
 import { DocumentViewer } from './DocumentViewer';
 import { AccountingDesk } from './AccountingDesk';
 import { ApprovalDesk } from './ApprovalDesk';
@@ -66,15 +65,13 @@ export function App() {
   const [b3ReviseIntake, setB3ReviseIntake] = useState<B3Intake | null>(null);
   const [b3ReviseReason, setB3ReviseReason] = useState('');
   const [activeIntakeTab, setActiveIntakeTab] = useState<'B3' | 'B7'>('B3');
+  const [b7PathMode, setB7PathMode] = useState<'linked' | 'direct'>('linked');
   const [caseTab, setCaseTab] = useState<'report' | 'draft' | 'sources' | 'questions' | 'history'>('report');
   const [caseSearch, setCaseSearch] = useState('');
-  const [employeeFilter, setEmployeeFilter] = useState<'all' | 'mine'>('all');
   const [stageFilter, setStageFilter] = useState<'ALL' | 'CHECKING' | 'DECISION_MONEY' | 'AWAITING_DECISION' | 'CLOSED'>('ALL');
   const [isCreatingB3, setIsCreatingB3] = useState(false);
-  const [isSelfInitiating, setIsSelfInitiating] = useState(false);
   const [importFiles, setImportFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [showVerify, setShowVerify] = useState(false);
   const [copiedCaseId, setCopiedCaseId] = useState(false);
   const [showTechDrawer, setShowTechDrawer] = useState(false);
   const [activeDocSourceId, setActiveDocSourceId] = useState<string | null>(null);
@@ -136,7 +133,6 @@ export function App() {
     }
     if (isCreatingB3 || isUploadingSource) return;  // don't switch mid-import
     setSelectedActorRef(nextRef);
-    setIsSelfInitiating(false);
     setStageFilter('ALL');
     setB3Intake(emptyB3Intake(b3Method));
     setImportFiles([]);
@@ -144,9 +140,10 @@ export function App() {
 
   const filteredCases = useMemo(() => {
     let list = cases;
-    if (role === 'EMPLOYEE' && employeeFilter === 'mine') {
-      list = list.filter((c) => c.employee_ref === actorId.trim());
+    if (role === 'EMPLOYEE') {
+      list = actorId.trim() ? list.filter((c) => c.employee_ref === actorId.trim()) : list;
     } else if (role === 'ACCOUNTANT') {
+      list = list.filter((c) => c.confirmed !== false);
       if (stageFilter === 'CHECKING') {
         list = list.filter((c) => c.stage === 'CHECKING' || c.stage === 'ACCOUNTING_REVIEW');
       } else if (stageFilter === 'DECISION_MONEY') {
@@ -163,6 +160,7 @@ export function App() {
         );
       }
     } else if (role === 'APPROVER') {
+      list = list.filter((c) => c.confirmed !== false);
       if (stageFilter === 'AWAITING_DECISION') {
         list = list.filter((c) => c.stage === 'AWAITING_DECISION');
       } else if (stageFilter === 'DECISION_MONEY') {
@@ -187,7 +185,7 @@ export function App() {
       c.employee_ref.toLowerCase().includes(q) ||
       (STAGE_LABELS[c.stage] ?? '').toLowerCase().includes(q)
     );
-  }, [cases, caseSearch, role, employeeFilter, actorId, stageFilter]);
+  }, [cases, caseSearch, role, actorId, stageFilter]);
 
   const handleAddImportFiles = (files: FileList | File[] | null) => {
     if (!files) return;
@@ -228,7 +226,6 @@ export function App() {
     // Select the case (drives the workspace hook) and await the guarded load so
     // callers can read the committed workspace right after.
     setSelectedCaseId(id);
-    setIsSelfInitiating(false);
     await loadWorkspace(id);
   }, [loadWorkspace]);
 
@@ -546,7 +543,10 @@ export function App() {
   const b3EligibleCases = useMemo(() => {
     return cases.filter((c) => {
       const isMyCase = role !== 'EMPLOYEE' || c.employee_ref === actorId.trim();
-      return c.job === 'B3' && isMyCase;
+      const isConfirmed = c.confirmed !== false;
+      const isNotClosed = c.stage !== 'SETTLEMENT_CLOSED' && c.stage !== 'REJECTED_REQUEST_ENDED';
+      const isNotRefused = c.stage !== 'ADVANCE_REQUEST_REFUSED' && c.stage !== 'SETTLEMENT_REQUEST_REFUSED';
+      return c.job === 'B3' && isMyCase && isConfirmed && isNotClosed && isNotRefused;
     });
   }, [cases, role, actorId]);
 
@@ -587,7 +587,11 @@ export function App() {
       parts.push(`Đã duyệt ${formatMoney(Number(view.money_summary.approved_vnd))}`);
     }
     if (parts.length === 0) {
-      parts.push(`Công việc: ${view.submission.work_ref}`);
+      if (view.submission.work_ref && view.submission.work_ref !== view.id) {
+        parts.push(`Công việc: ${view.submission.work_ref}`);
+      } else {
+        parts.push('Chờ hoàn thiện thông tin');
+      }
     }
     return parts.join(' · ');
   }, [view]);
@@ -619,132 +623,106 @@ export function App() {
             CỘT TRÁI (SIDEBAR CỐ ĐỊNH 340px)
             ================================================================== */}
         <section className="col col-sidebar">
-          {/* Nút Tạo hồ sơ mới luôn cố định ở đầu sidebar */}
-          <div className="new-case-banner">
-            <button
-              type="button"
-              className={`btn ${
-                role !== 'EMPLOYEE'
-                  ? `btn-sm btn-new-case-accountant ${view === null && isSelfInitiating ? 'btn-new-case-accountant-active' : ''}`
-                  : `${view === null ? 'btn-primary btn-new-case-active' : ''}`
-              }`}
-              style={{ width: '100%', justifyContent: 'center', gap: '6px' }}
-              onClick={() => {
-                setSelectedCaseId(null);
-                if (role !== 'EMPLOYEE') {
-                  setIsSelfInitiating(true);
-                }
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Tạo hồ sơ mới
-            </button>
-          </div>
+          {/* Nút Tạo hồ sơ mới chỉ dành cho Nhân viên nộp hồ sơ */}
+          {role === 'EMPLOYEE' && (
+            <div className="new-case-banner">
+              <button
+                type="button"
+                className={`btn ${view === null ? 'btn-primary btn-new-case-active' : ''}`}
+                style={{ width: '100%', justifyContent: 'center', gap: '6px' }}
+                onClick={() => setSelectedCaseId(null)}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Tạo hồ sơ mới
+              </button>
+            </div>
+          )}
 
           {/* Danh sách 24 hồ sơ có bộ lọc tìm kiếm nhanh và thanh cuộn độc lập */}
           <div className="panel case-list-panel">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
               <h2 style={{ margin: 0, fontSize: '1.05rem' }}>
-                {role === 'EMPLOYEE' ? 'Hồ sơ của tôi' : role === 'ACCOUNTANT' ? 'Hàng đợi rà soát' : 'Hàng đợi phê duyệt'}
+                {role === 'EMPLOYEE' ? 'Hồ sơ của tôi' : 'Danh sách hồ sơ'}
               </h2>
               {filteredCases.length > 0 && <span className="badge">{filteredCases.length}</span>}
             </div>
 
-            {role === 'EMPLOYEE' ? (
-              cases.length > 0 ? (
-                <div className="case-filter-tabs" style={{ display: 'flex', gap: '4px', marginBottom: 'var(--space-2)' }}>
+            {role === 'EMPLOYEE' ? null : cases.length > 0 ? (
+              role === 'ACCOUNTANT' ? (
+                <div className="case-stage-filter-pills" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
                   <button
                     type="button"
-                    className={`btn btn-sm ${employeeFilter === 'all' ? 'btn-primary' : 'btn-ghost'}`}
-                    style={{ flex: 1, padding: '3px 6px', fontSize: '0.78rem' }}
-                    onClick={() => setEmployeeFilter('all')}
+                    className={`btn btn-sm ${stageFilter === 'ALL' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                    onClick={() => setStageFilter('ALL')}
                   >
-                    Tất cả ({cases.length})
+                    Tất cả
                   </button>
                   <button
                     type="button"
-                    className={`btn btn-sm ${employeeFilter === 'mine' ? 'btn-primary' : 'btn-ghost'}`}
-                    style={{ flex: 1, padding: '3px 6px', fontSize: '0.78rem' }}
-                    onClick={() => setEmployeeFilter('mine')}
+                    className={`btn btn-sm ${stageFilter === 'CHECKING' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                    onClick={() => setStageFilter('CHECKING')}
                   >
-                    Của tôi ({cases.filter(c => c.employee_ref === actorId.trim()).length})
+                    Cần rà soát
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${stageFilter === 'DECISION_MONEY' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                    onClick={() => setStageFilter('DECISION_MONEY')}
+                  >
+                    Chờ duyệt / Chi
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${stageFilter === 'CLOSED' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                    onClick={() => setStageFilter('CLOSED')}
+                  >
+                    Đã đóng
                   </button>
                 </div>
-              ) : null
-            ) : role === 'ACCOUNTANT' ? (
-              <div className="case-stage-filter-pills" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${stageFilter === 'ALL' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
-                  onClick={() => setStageFilter('ALL')}
-                >
-                  Tất cả
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${stageFilter === 'CHECKING' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
-                  onClick={() => setStageFilter('CHECKING')}
-                >
-                  Cần rà soát
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${stageFilter === 'DECISION_MONEY' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
-                  onClick={() => setStageFilter('DECISION_MONEY')}
-                >
-                  Chờ duyệt/tiền
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${stageFilter === 'CLOSED' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
-                  onClick={() => setStageFilter('CLOSED')}
-                >
-                  Đã đóng
-                </button>
-              </div>
-            ) : (
-              <div className="case-stage-filter-pills" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${stageFilter === 'ALL' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
-                  onClick={() => setStageFilter('ALL')}
-                >
-                  Tất cả
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${stageFilter === 'AWAITING_DECISION' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
-                  onClick={() => setStageFilter('AWAITING_DECISION')}
-                >
-                  Chờ phê duyệt
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${stageFilter === 'DECISION_MONEY' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
-                  onClick={() => setStageFilter('DECISION_MONEY')}
-                >
-                  Đã duyệt / Chi
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${stageFilter === 'CLOSED' ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
-                  onClick={() => setStageFilter('CLOSED')}
-                >
-                  Đã đóng
-                </button>
-              </div>
-            )}
+              ) : (
+                <div className="case-stage-filter-pills" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${stageFilter === 'ALL' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                    onClick={() => setStageFilter('ALL')}
+                  >
+                    Tất cả
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${stageFilter === 'AWAITING_DECISION' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                    onClick={() => setStageFilter('AWAITING_DECISION')}
+                  >
+                    Chờ phê duyệt
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${stageFilter === 'DECISION_MONEY' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                    onClick={() => setStageFilter('DECISION_MONEY')}
+                  >
+                    Đã duyệt / Chi
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${stageFilter === 'CLOSED' ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ padding: '2px 8px', fontSize: '0.75rem', borderRadius: '9999px' }}
+                    onClick={() => setStageFilter('CLOSED')}
+                  >
+                    Đã đóng
+                  </button>
+                </div>
+              )
+            ) : null}
 
             {cases.length > 5 && (
               <div className="case-search-box">
@@ -763,17 +741,8 @@ export function App() {
                 <p className="case-empty-title">
                   {role === 'EMPLOYEE'
                     ? 'Bạn chưa có hồ sơ nào'
-                    : role === 'ACCOUNTANT'
-                    ? 'Hàng đợi rà soát trống'
-                    : 'Hàng đợi phê duyệt trống'}
+                    : 'Không có hồ sơ'}
                 </p>
-                {role !== 'EMPLOYEE' && (
-                  <p className="case-empty-desc">
-                    {role === 'ACCOUNTANT'
-                      ? 'Hiện không có hồ sơ nào cần rà soát chứng từ trong hệ thống.'
-                      : 'Hiện chưa có hồ sơ nào đang chờ bạn ra quyết định phê duyệt.'}
-                  </p>
-                )}
               </div>
             ) : filteredCases.length === 0 ? (
               <div className="case-empty-state" data-testid="case-empty-state">
@@ -803,23 +772,6 @@ export function App() {
               </div>
             )}
           </div>
-
-          {/* Panel Verify hệ thống đóng/mở */}
-          <div className="panel verify-sidebar-panel" data-testid="verify-container">
-            <button
-              type="button"
-              className="verify-toggle-btn"
-              onClick={() => setShowVerify((v) => !v)}
-            >
-              <span>Đánh giá hệ thống (Verify)</span>
-              <span>{showVerify ? '▲ Thu gọn' : '▼ Mở rộng'}</span>
-            </button>
-            {showVerify && (
-              <div style={{ marginTop: 'var(--space-3)' }}>
-                <VerifyPanel />
-              </div>
-            )}
-          </div>
         </section>
 
         {/* ==================================================================
@@ -827,45 +779,26 @@ export function App() {
             ================================================================== */}
         {view === null ? (
           <section className="col col-main">
-            {role === 'ACCOUNTANT' && !isSelfInitiating && (
+            {role === 'ACCOUNTANT' && (
               <AccountingDesk
                 cases={cases}
                 getActorName={getActorName}
                 stageLabels={STAGE_LABELS}
                 onSelectCase={(id) => void loadCase(id)}
-                onSelfInitiate={() => setIsSelfInitiating(true)}
               />
             )}
 
-            {role === 'APPROVER' && !isSelfInitiating && (
+            {role === 'APPROVER' && (
               <ApprovalDesk
                 cases={cases}
                 getActorName={getActorName}
                 stageLabels={STAGE_LABELS}
                 onSelectCase={(id) => void loadCase(id)}
-                onSelfInitiate={() => setIsSelfInitiating(true)}
               />
             )}
 
-            <div
-              className="intake-form-container"
-              style={{ display: role === 'EMPLOYEE' || isSelfInitiating ? 'block' : 'none' }}
-            >
-              {role !== 'EMPLOYEE' && isSelfInitiating && (
-                <div className="desk-self-intake-header">
-                  <button
-                    type="button"
-                    className="swiss-btn swiss-btn-secondary swiss-btn-sm"
-                    onClick={() => setIsSelfInitiating(false)}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    ← Quay lại bàn làm việc {role === 'ACCOUNTANT' ? 'Kế toán' : 'Phê duyệt'}
-                  </button>
-                  <span className="desk-self-intake-tag">
-                    Chế độ tự lập đề nghị ({role === 'ACCOUNTANT' ? 'Kế toán' : 'Người duyệt'})
-                  </span>
-                </div>
-              )}
+            {role === 'EMPLOYEE' && (
+              <div className="intake-form-container">
 
               <div className="tab-nav" role="tablist" aria-label="Loại hồ sơ nộp">
               <button
@@ -960,14 +893,9 @@ export function App() {
                             </svg>
                           </div>
                           <div className="dropzone-text">
-                            <strong>Kéo thả các tệp chứng từ vào đây</strong>
-                            <span className="dropzone-subtext">
-                              hoặc <span className="dropzone-link">bấm để chọn tệp</span> (chọn được 1 hoặc nhiều tệp cùng lúc)
-                            </span>
+                            <strong>Chọn hoặc kéo thả tệp đính kèm</strong>
+                            <span className="dropzone-subtext">PDF, hình ảnh, CSV</span>
                           </div>
-                          <p className="dropzone-hint">
-                            Hỗ trợ: Giấy đề nghị, Dự toán chi phí, Thư mời, Báo giá... (PDF, Ảnh, CSV)
-                          </p>
                         </div>
 
                         {importFiles.length > 0 && (
@@ -1020,8 +948,12 @@ export function App() {
                       <B3IntakeForm value={b3Intake} onChange={setB3Intake}
                                     disabled={false} />
                     )}
-                    <button className="btn btn-primary" onClick={() => void handleCreateB3()}
-                            disabled={!identityReady || isCreatingB3}>
+                    <button
+                      className="btn btn-primary"
+                      style={{ marginTop: 'var(--space-6)' }}
+                      onClick={() => void handleCreateB3()}
+                      disabled={!identityReady || isCreatingB3}
+                    >
                       {isCreatingB3
                         ? 'Đang tạo hồ sơ...'
                         : b3Method === 'WEB' ? (
@@ -1031,23 +963,16 @@ export function App() {
                           </>
                         ) : (importFiles.length > 0 ? (
                           <>
-                            <span>Tải lên & Tạo hồ sơ nháp</span>
+                            <span>Gửi đề nghị tạm ứng</span>
                             <span className="sr-only">Tải lên & Tạo hồ sơ nháp B3</span>
                           </>
                         ) : (
                           <>
-                            <span>Tạo hồ sơ nháp</span>
+                            <span>Gửi đề nghị tạm ứng</span>
                             <span className="sr-only">Tạo hồ sơ nháp B3 (chưa xác nhận)</span>
                           </>
                         ))}
                     </button>
-                    {b3Method === 'IMPORT' && (
-                      <p className="muted">
-                        {importFiles.length > 0
-                          ? 'Hệ thống sẽ tải tệp lên và tự động khởi chạy AI để đọc thành bản nháp.'
-                          : 'Sau khi tạo nháp: bạn có thể tải hai giấy (đề nghị + dự toán) ở ô trên hoặc ở panel Nguồn bên phải, rồi bấm "Chạy kiểm tra" để AI đọc bản nháp.'}
-                      </p>
-                    )}
                   </>
                 )}
               </div>
@@ -1055,44 +980,50 @@ export function App() {
 
             {activeIntakeTab === 'B7' && (
               <div className="panel" data-testid="b7-create-panel">
-                <div style={{ marginBottom: 'var(--space-4)' }}>
-                  <h2 style={{ margin: '0 0 var(--space-2)' }}>Quyết toán sau công việc</h2>
-                  <p className="muted" style={{ margin: 0, fontSize: '0.9rem' }}>
-                    Khai báo chi phí thực tế đã phát sinh sau chuyến công tác. Chọn phương thức phù hợp với trường hợp của bạn:
-                  </p>
-                </div>
-
                 {b3EligibleCases.length > 0 ? (
-                  <div className="b7-path-grid">
-                    {/* OPTION 1: LINKED B7 FROM EXISTING B3 */}
-                    <div className="b7-path-card b7-path-primary">
-                      <div className="b7-path-header">
-                        <h3 className="b7-path-title">1. Quyết toán từ hồ sơ tạm ứng</h3>
-                        <span className="b7-path-badge">Khuyên dùng</span>
-                      </div>
-                      <p className="b7-path-desc">
-                        Dành cho chuyến công tác đã được cấp tạm ứng trước đó. Hệ thống sẽ tự động liên kết và đối soát giữa số tiền đã ứng và chi phí thực tế.
-                      </p>
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className={`swiss-btn ${b7PathMode === 'linked' ? 'swiss-btn-primary' : 'swiss-btn-secondary'}`}
+                        onClick={() => setB7PathMode('linked')}
+                      >
+                        Quyết toán từ hồ sơ tạm ứng ({b3EligibleCases.length})
+                      </button>
+                      <button
+                        type="button"
+                        className={`swiss-btn ${b7PathMode === 'direct' ? 'swiss-btn-primary' : 'swiss-btn-secondary'}`}
+                        onClick={() => setB7PathMode('direct')}
+                      >
+                        Tự chi tiền túi (Không tạm ứng)
+                      </button>
+                    </div>
 
-                      <div className="b7-eligible-list">
-                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-foreground)', marginBottom: '8px' }}>
-                          Khoản tạm ứng khả dụng ({b3EligibleCases.length}):
-                        </div>
-                        <div className="b7-eligible-cards">
+                    {b7PathMode === 'linked' ? (
+                      <div className="b7-linked-section">
+                        <p className="muted" style={{ fontSize: '0.88rem', margin: '0 0 var(--space-3)' }}>
+                          Hệ thống tìm thấy các hồ sơ tạm ứng khả dụng. Chọn hồ sơ để mở quyết toán và tự động đối soát chênh lệch:
+                        </p>
+                        <div className="b7-eligible-cards" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           {b3EligibleCases.map((b3Case) => (
                             <div key={b3Case.id} className="b7-eligible-item">
                               <div className="b7-eligible-item-info">
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span className="case-id-badge-code" style={{ fontSize: '0.78rem' }}>{b3Case.id}</span>
-                                  <span className="case-stage-pill" style={{ fontSize: '0.72rem' }}>{STAGE_LABELS[b3Case.stage]}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <span className="case-id-badge-code" style={{ fontSize: '0.85rem' }}>
+                                    {b3Case.id}
+                                  </span>
+                                  <span className="case-stage-pill" style={{ fontSize: '0.75rem' }}>
+                                    {STAGE_LABELS[b3Case.stage]}
+                                  </span>
                                 </div>
-                                <div style={{ fontSize: '0.82rem', fontWeight: 600, marginTop: '4px' }}>
-                                  Công việc: <code>{b3Case.work_ref}</code>
+                                <div style={{ fontSize: '0.84rem', color: 'var(--color-muted-foreground)' }}>
+                                  Mã công việc: <code style={{ fontWeight: 600, color: 'var(--color-foreground)' }}>{b3Case.work_ref}</code>
                                 </div>
                               </div>
                               <button
                                 type="button"
                                 className="swiss-btn swiss-btn-primary swiss-btn-sm"
+                                style={{ whiteSpace: 'nowrap' }}
                                 onClick={() => void handlePrepareSettlement(b3Case.id, b3Case.case_version)}
                               >
                                 Mở quyết toán liên kết →
@@ -1101,59 +1032,63 @@ export function App() {
                           ))}
                         </div>
                       </div>
-                    </div>
-
-                    {/* OPTION 2: DIRECT B7 SETTLEMENT */}
-                    <div className="b7-path-card">
-                      <div className="b7-path-header">
-                        <h3 className="b7-path-title">2. Quyết toán chi tiêu trực tiếp</h3>
-                        <span className="b7-path-badge b7-path-badge-neutral">Tự chi</span>
-                      </div>
-                      <p className="b7-path-desc">
-                        Dành cho chuyến công tác nhân viên tự chi trả bằng tiền túi, không có khoản tạm ứng trước của công ty.
-                      </p>
-
-                      <div className="b7-direct-form">
-                        <div className="field">
-                          <label htmlFor="purpose">Mục đích công tác</label>
-                          <input
-                            id="purpose"
-                            value={purpose}
-                            onChange={(e) => setPurpose(e.target.value)}
-                          />
-                        </div>
-                        <div className="field">
-                          <label htmlFor="scope">Phạm vi chi phí</label>
-                          <input
-                            id="scope"
-                            value={scope}
-                            onChange={(e) => setScope(e.target.value)}
-                          />
-                        </div>
-
-                        <button
-                          type="button"
-                          className="swiss-btn swiss-btn-primary"
-                          style={{ marginTop: 'var(--space-3)', width: '100%' }}
-                          disabled={!identityReady || !purpose.trim() || !scope.trim()}
-                          onClick={() => void handleCreateStandaloneB7()}
-                        >
-                          Tạo hồ sơ quyết toán
-                        </button>
-                        <p className="muted" style={{ margin: 'var(--space-2) 0 0', fontSize: '0.78rem', textAlign: 'center' }}>
-                          Sau khi khởi tạo, bạn sẽ đính kèm hóa đơn & chứng từ để hệ thống kiểm tra chi phí.
+                    ) : (
+                      <div className="b7-direct-section" style={{ maxWidth: '640px' }}>
+                        <p className="muted" style={{ fontSize: '0.88rem', margin: '0 0 var(--space-3)' }}>
+                          Dành cho chuyến công tác tự chi trả bằng tiền túi, không có khoản tạm ứng trước của công ty:
                         </p>
+                        <div className="b7-direct-form" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                          <div className="field">
+                            <label htmlFor="purpose">Mục đích công tác</label>
+                            <input
+                              id="purpose"
+                              value={purpose}
+                              placeholder="Ví dụ: Công tác Hà Nội gặp đối tác"
+                              onChange={(e) => setPurpose(e.target.value)}
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="scope">Phạm vi chi phí</label>
+                            <input
+                              id="scope"
+                              value={scope}
+                              placeholder="Ví dụ: Vé máy bay, khách sạn, di chuyển"
+                              onChange={(e) => setScope(e.target.value)}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ marginTop: 'var(--space-2)', alignSelf: 'flex-start' }}
+                            disabled={!identityReady || !purpose.trim() || !scope.trim()}
+                            onClick={() => void handleCreateStandaloneB7()}
+                          >
+                            Tạo hồ sơ quyết toán
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    )}
+                  </>
                 ) : (
                   <div className="b7-standalone-container" style={{ maxWidth: '640px' }}>
-                    <div className="b7-direct-form">
+                    <div style={{
+                      padding: '10px 14px',
+                      background: 'var(--color-muted, #f4f4f5)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius)',
+                      fontSize: '0.86rem',
+                      color: 'var(--color-muted-foreground)',
+                      marginBottom: 'var(--space-4)',
+                    }}>
+                      Không có khoản tạm ứng nào đang chờ quyết toán. Bạn có thể tạo hồ sơ quyết toán trực tiếp cho chi phí tự chi:
+                    </div>
+                    <div className="b7-direct-form" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                       <div className="field">
                         <label htmlFor="purpose">Mục đích công tác</label>
                         <input
                           id="purpose"
                           value={purpose}
+                          placeholder="Ví dụ: Công tác Hà Nội gặp đối tác"
                           onChange={(e) => setPurpose(e.target.value)}
                         />
                       </div>
@@ -1162,29 +1097,28 @@ export function App() {
                         <input
                           id="scope"
                           value={scope}
+                          placeholder="Ví dụ: Vé máy bay, khách sạn, di chuyển"
                           onChange={(e) => setScope(e.target.value)}
                         />
                       </div>
 
                       <button
                         type="button"
-                        className="swiss-btn swiss-btn-primary"
-                        style={{ marginTop: 'var(--space-3)', width: '100%' }}
+                        className="btn btn-primary"
+                        style={{ marginTop: 'var(--space-2)', alignSelf: 'flex-start' }}
                         disabled={!identityReady || !purpose.trim() || !scope.trim()}
                         onClick={() => void handleCreateStandaloneB7()}
                       >
                         Tạo hồ sơ quyết toán
                       </button>
-                      <p className="muted" style={{ margin: 'var(--space-2) 0 0', fontSize: '0.78rem', textAlign: 'center' }}>
-                        Sau khi khởi tạo, bạn sẽ đính kèm hóa đơn & chứng từ để hệ thống kiểm tra chi phí.
-                      </p>
                     </div>
                   </div>
                 )}
               </div>
             )}
             </div>
-          </section>
+          )}
+        </section>
         ) : (
           <section className="col col-main case-detail-col">
             {/* Case Header Card */}
@@ -1479,6 +1413,8 @@ export function App() {
                 report={report}
                 history={history}
                 onAction={handleAction}
+                people={demoContext?.people}
+                receiptSources={demoContext?.receipt_sources}
                 onPrepareSettlement={handlePrepareSettlement}
                 onStartRun={handleStartRun}
                 onOpenCase={(caseId) => void loadCase(caseId)}
@@ -1510,76 +1446,99 @@ export function App() {
                     )}
                   </div>
                   {!view.submission.form.confirmed && (
-                    <div className="notice notice-info" style={{ marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, marginTop: '2px' }}>
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="16" x2="12" y2="12" />
-                        <line x1="12" y1="8" x2="12.01" y2="8" />
-                      </svg>
-                      <p style={{ margin: 0 }}>
-                        {report ? (
-                          <>
-                            <strong>AI đã trích xuất dữ liệu từ chứng từ đính kèm{view.sources.length > 0 ? ` (${view.sources.length} tài liệu)` : ''}.</strong> Vui lòng rà soát lại thông tin bên dưới và nhấn <em>"Xác nhận và gửi đề nghị"</em> để hoàn tất nộp hồ sơ.
-                          </>
-                        ) : view.sources.length === 0 ? (
-                          <>
-                            <strong>Chưa có chứng từ đính kèm.</strong> Bạn có thể tự nhập thông tin đề nghị bên dưới hoặc tải tài liệu tại tab <em>"Chứng từ đính kèm"</em> trước khi xác nhận.
-                          </>
-                        ) : (
-                          <>
-                            <strong>Đã lưu {view.sources.length} tài liệu nhưng chưa đối soát trích xuất.</strong> Bạn có thể nhấn <em>"Kiểm tra bản nháp"</em> để trích xuất tự động hoặc tự hoàn thiện thông tin bên dưới.
-                          </>
-                        )}
-                      </p>
+                    <div className="notice notice-info" style={{ marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flex: 1 }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, marginTop: '2px' }}>
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="16" x2="12" y2="12" />
+                          <line x1="12" y1="8" x2="12.01" y2="8" />
+                        </svg>
+                        <p style={{ margin: 0, fontSize: '0.86rem', lineHeight: 1.45 }}>
+                          {report ? (
+                            <>
+                              <strong>AI đã trích xuất dữ liệu từ chứng từ đính kèm{view.sources.length > 0 ? ` (${view.sources.length} tài liệu)` : ''}.</strong> Vui lòng rà soát lại thông tin bên dưới và nhấn <em>"Xác nhận và gửi đề nghị"</em> để hoàn tất nộp hồ sơ.
+                            </>
+                          ) : view.sources.length === 0 ? (
+                            <>
+                              <strong>Chưa có chứng từ đính kèm.</strong> Bạn có thể tự nhập thông tin đề nghị bên dưới hoặc tải tài liệu tại tab <em>"Nguồn chứng từ"</em> trước khi xác nhận.
+                            </>
+                          ) : (
+                            <>
+                              <strong>Đã lưu {view.sources.length} tài liệu nhưng chưa đối soát trích xuất.</strong> Bạn có thể nhấn nút bên cạnh để AI trích xuất tự động hoặc tự hoàn thiện thông tin bên dưới.
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      {!report && view.sources.length > 0 && canStartRun && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                          onClick={() => void handleStartRun()}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ marginRight: 4 }}>
+                            <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
+                          </svg>
+                          Trích xuất bằng AI
+                        </button>
+                      )}
                     </div>
                   )}
                   <B3IntakeForm
                     value={b3ReviseIntake}
                     onChange={setB3ReviseIntake}
-                    disabled={false}
+                    disabled={role !== 'EMPLOYEE'}
                   />
-                  <div className="field">
-                    <label htmlFor="b3-revise-reason">Lý do sửa / xác nhận</label>
-                    <input
-                      id="b3-revise-reason"
-                      value={b3ReviseReason}
-                      onChange={(e) => setB3ReviseReason(e.target.value)}
-                      placeholder={
-                        view.submission.form.confirmed
-                          ? 'Lý do điều chỉnh thông tin...'
-                          : 'Mặc định: Xác nhận bản nháp từ tài liệu đính kèm'
-                      }
-                    />
-                  </div>
-                  <div className="btn-group" style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                    {!view.submission.form.confirmed ? (
-                      <>
+                  {role === 'EMPLOYEE' && (
+                    <div className="field">
+                      <label htmlFor="b3-revise-reason">Lý do sửa / xác nhận</label>
+                      <input
+                        id="b3-revise-reason"
+                        value={b3ReviseReason}
+                        onChange={(e) => setB3ReviseReason(e.target.value)}
+                        placeholder={
+                          view.submission.form.confirmed
+                            ? 'Lý do điều chỉnh thông tin...'
+                            : 'Mặc định: Xác nhận bản nháp từ tài liệu đính kèm'
+                        }
+                      />
+                    </div>
+                  )}
+                  {role === 'EMPLOYEE' ? (
+                    <div className="btn-group" style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+                      {!view.submission.form.confirmed ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => void handleReviseB3(true)}
+                          >
+                            Xác nhận và gửi đề nghị
+                          </button>
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => void handleReviseB3(false)}
+                          >
+                            Lưu bản nháp (chưa gửi)
+                          </button>
+                        </>
+                      ) : (
                         <button
                           type="button"
                           className="btn btn-primary"
+                          disabled={!b3ReviseReason.trim()}
                           onClick={() => void handleReviseB3(true)}
                         >
-                          Xác nhận và gửi đề nghị
+                          Cập nhật khai báo
                         </button>
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={() => void handleReviseB3(false)}
-                        >
-                          Lưu bản nháp (chưa gửi)
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        disabled={!b3ReviseReason.trim()}
-                        onClick={() => void handleReviseB3(true)}
-                      >
-                        Cập nhật khai báo
-                      </button>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  ) : !view.submission.form.confirmed ? (
+                    <div className="notice notice-warning" style={{ marginTop: 'var(--space-2)', fontSize: '0.86rem' }}>
+                      Hồ sơ đang ở trạng thái bản nháp của nhân viên (chưa nộp). Kế toán / Người duyệt chỉ xem tham khảo, không thể gửi hoặc sửa bản nháp thay nhân viên.
+                    </div>
+                  ) : null}
                   <div className="form-audit-footer-note">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                       <circle cx="12" cy="12" r="10" />

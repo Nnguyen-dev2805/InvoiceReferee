@@ -121,11 +121,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: 16px;
+  padding: 12px 16px;
   background: #ffffff;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  flex-wrap: wrap;
+}
+
+.b7-eligible-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
 .b7-eligible-empty {
@@ -343,5 +351,6 @@
   color: #64748b;
   font-weight: 500;
 }
+
 
 

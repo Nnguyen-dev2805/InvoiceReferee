@@ -10,7 +10,9 @@ import { B7CompanyContextPanel } from './B7CompanyContext';
 import { B7ApprovalPanel } from './B7Approval';
 import { SettlementReceiptPanel } from './SettlementReceiptPanel';
 import { formatMoney } from './displayText';
-import type { AuditEntry, CaseView, DemoRole, Report } from './types';
+import type {
+  AuditEntry, B3Person, B3ReceiptSource, CaseView, DemoRole, Report,
+} from './types';
 
 function formatVnd(value: number | null): string {
   return formatMoney(value, { nullText: '—' });
@@ -31,6 +33,9 @@ interface ActionsProps {
   report?: Report | null;
   history?: AuditEntry[];
   onAction: (action: string, run: () => Promise<unknown>) => Promise<void>;
+  // Company fixture people + configured receipt sources for the B5 form.
+  people?: B3Person[];
+  receiptSources?: B3ReceiptSource[];
   // Dedicated callback: App owns the returned child id and opens it directly
   // instead of reloading the parent and making the user hunt for the child.
   onPrepareSettlement?: () => Promise<void>;
@@ -49,6 +54,8 @@ export function CaseActionsPanel({
   report,
   history,
   onAction,
+  people,
+  receiptSources,
   onPrepareSettlement,
   onStartRun,
   onOpenCase,
@@ -166,6 +173,8 @@ export function CaseActionsPanel({
           role={role}
           actorId={actorId}
           onAction={onAction}
+          people={people}
+          receiptSources={receiptSources}
         />
       )}
 

@@ -239,6 +239,29 @@ class B3HistoryRecord(BaseModel):
         return self
 
 
+class B3ReceiptSource(BaseModel):
+    """A configured place an advance may be paid from (bank account or cashbook).
+
+    Two options for the pilot — not an account-management/treasury store. The
+    ``namespace`` is the backend-configured value the money event carries; the
+    ``label`` is what the accountant sees. A missing config keeps readonly
+    history and blocks new records; no fallback namespace is invented.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    method: Literal["BANK_TRANSFER", "CASH"]
+    namespace: str
+    label: str
+
+    @field_validator("namespace", "label")
+    @classmethod
+    def _nonblank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("namespace/label nguồn chi không được để trắng.")
+        return value
+
+
 class B3CompanyContext(BaseModel):
     """Backend-owned synthetic company fixture for the B3 v1 slice."""
 
@@ -254,6 +277,7 @@ class B3CompanyContext(BaseModel):
     grants: list[B3Grant] = Field(default_factory=list)
     coverage: list[B3Coverage] = Field(default_factory=list)
     history: list[B3HistoryRecord] = Field(default_factory=list)
+    receipt_sources: list[B3ReceiptSource] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _clock_and_duplicates(self) -> "B3CompanyContext":
@@ -270,6 +294,9 @@ class B3CompanyContext(BaseModel):
             refs = [getattr(record, key) for record in records]
             if len(refs) != len(set(refs)):
                 raise ValueError(f"{key} trùng trong context {records[0]!r}.")
+        namespaces = [s.namespace for s in self.receipt_sources]
+        if len(namespaces) != len(set(namespaces)):
+            raise ValueError("namespace trùng trong receipt_sources.")
         return self
 
 

@@ -420,6 +420,8 @@ class Store:
             summaries = []
             for row in rows:
                 submission = _rec.load(row["submission_json"])
+                form = submission.get("form") or {}
+                confirmed = bool(form.get("confirmed", True))
                 summaries.append(CaseSummary(
                     id=row["id"], job=submission["job"],
                     employee_ref=submission["employee_ref"],
@@ -428,6 +430,7 @@ class Store:
                     updated_at=datetime.fromisoformat(row["updated_at"]),
                     origin=row["origin"],
                     dossier_ref=_queries.dossier_reference(conn, row),
+                    confirmed=confirmed,
                 ))
         return summaries
 

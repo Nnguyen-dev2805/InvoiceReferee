@@ -56,6 +56,7 @@ data/ocr/
 data/cases.sqlite
 data/cases.sqlite-*
 data/settlement/
+data/test-kit/
 
 # Rebuild tooling (task briefs/reports/snapshots)
 .superpowers/

@@ -34,6 +34,7 @@ from invoice_referee.settlement.contracts.b3_contracts import (
     B3Person,
     B3Proposal,
     B3Readiness,
+    B3ReceiptSource,
     B3Route,
 )
 from invoice_referee.settlement.b3_evaluation import (

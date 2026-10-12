@@ -45,6 +45,7 @@ from invoice_referee.settlement.contracts.b3_contracts import (
     B3Readiness,
     B3DecisionState,
     B3Proposal,
+    B3ReceiptSource,
 )
 from invoice_referee.settlement.contracts.advance import (
     B3WorkflowStatus,
@@ -64,6 +65,8 @@ from invoice_referee.settlement.contracts.advance import (
     B3FundingStatus,
     B3MoneyFieldEvidence,
     B3AdvanceEventPayload,
+    B3BankReceiptDetails,
+    B3CashReceiptDetails,
     B3FundingIncident,
     B3AdvanceEventView,
     B3FundingSummary,
@@ -205,6 +208,7 @@ __all__ = [
     "B3Readiness",
     "B3DecisionState",
     "B3Proposal",
+    "B3ReceiptSource",
     "B3WorkflowStatus",
     "B3DecisionOutcome",
     "B3DecisionValidity",
@@ -222,6 +226,8 @@ __all__ = [
     "B3FundingStatus",
     "B3MoneyFieldEvidence",
     "B3AdvanceEventPayload",
+    "B3BankReceiptDetails",
+    "B3CashReceiptDetails",
     "B3FundingIncident",
     "B3AdvanceEventView",
     "B3FundingSummary",

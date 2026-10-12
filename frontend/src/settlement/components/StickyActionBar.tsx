@@ -46,7 +46,7 @@ export function StickyActionBar({
         )}
       </div>
       <div className="workbench-sticky-actions">
-        {caseTab === 'draft' && viewIsB3 && !view.submission.form.confirmed && (
+        {caseTab === 'draft' && viewIsB3 && !view.submission.form.confirmed && role === 'EMPLOYEE' && (
           <>
             <button
               type="button"
@@ -64,7 +64,7 @@ export function StickyActionBar({
             </button>
           </>
         )}
-        {caseTab === 'draft' && viewIsB3 && Boolean(view.submission.form.confirmed) && (
+        {caseTab === 'draft' && viewIsB3 && Boolean(view.submission.form.confirmed) && role === 'EMPLOYEE' && (
           <button
             type="button"
             className="swiss-btn swiss-btn-primary swiss-btn-sm"

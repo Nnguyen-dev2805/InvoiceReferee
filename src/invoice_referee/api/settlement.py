@@ -273,6 +273,8 @@ def create_runtime_app(*, db_path: Path | None = None,
                            if context.demo_clock else None),
             "people": [p.model_dump(mode="json") for p in context.people],
             "routes": [r.model_dump(mode="json") for r in context.routes],
+            "receipt_sources": [s.model_dump(mode="json")
+                                for s in context.receipt_sources],
         })
 
     @app.post("/api/b3-cases", response_model=None, status_code=201)
@@ -403,6 +405,8 @@ def create_runtime_app(*, db_path: Path | None = None,
             "evidence": request.evidence,
             "allocation_note": request.allocation_note,
             "supersedes_event_id": request.supersedes_event_id,
+            "receipt_details": (request.receipt_details.model_dump(mode="json")
+                                if request.receipt_details is not None else None),
         }
         command = _command(idempotency_key, request.actor_id, request.demo_role,
                            request.expected_case_version, {})

@@ -528,7 +528,7 @@ def record_receipt(conn: sqlite3.Connection, case_id: str,
     never overwritten. The raw gross is kept, never clipped to approval.
     """
     from invoice_referee.settlement.advance_reconciliation import (
-        derive_classification, project_b3_funding,
+        derive_classification, project_b3_funding, validate_advance_receipt,
     )
 
     payload_fp = fingerprint(_B3_RECORD_ADVANCE, {
@@ -590,8 +590,16 @@ def record_receipt(conn: sqlite3.Connection, case_id: str,
             reason=(f"Người nhận {payload.payee_ref} không phải nhân viên "
                     f"{submission.employee_ref}; giữ raw, không tính "
                     f"thực nhận cho nhân viên.")))
+    # Evidence guard: a reported RECEIVED is only a confirmed receipt when
+    # every required fact is read from a retained B5 proof source. The guard
+    # result is passed explicitly (never defaulted True); missing evidence
+    # keeps the raw event UNCONFIRMED with reasons, never a fabricated receipt.
+    evidence_issues = validate_advance_receipt(
+        payload, advance_proof_source_ids(conn, case_id),
+        context.receipt_sources)
     classification = derive_classification(
-        payload, submission.employee_ref, incidents)
+        payload, submission.employee_ref, incidents,
+        evidence_ok=not evidence_issues)
     existing = advance_events(conn, case_id)
     # Same economic event (namespace+ref) already confirmed RECEIVED:
     # a new RECEIVED for the same identity is a conflicting outcome, not
@@ -633,6 +641,9 @@ def record_receipt(conn: sqlite3.Connection, case_id: str,
             payload.event_at is not None
             and payload.event_at > submission.money_as_of),
         "incidents": [i.model_dump(mode="json") for i in incidents],
+        "receipt_details": (payload.receipt_details.model_dump(mode="json")
+                            if payload.receipt_details is not None else None),
+        "evidence_issues": list(evidence_issues),
     }
     conn.execute(
         "INSERT INTO money_events (id, case_id, payload_json, created_at) "

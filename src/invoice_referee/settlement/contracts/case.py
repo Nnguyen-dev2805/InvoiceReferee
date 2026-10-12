@@ -73,6 +73,7 @@ class CaseSummary(BaseModel):
     updated_at: AwareDatetime
     origin: CaseOrigin = "USER"
     dossier_ref: str | None = None
+    confirmed: bool = True
 
 
 class AuditEntry(BaseModel):

@@ -9,7 +9,12 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, StrictInt
 
-from invoice_referee.settlement.models import DemoRole, Submission
+from invoice_referee.settlement.models import (
+    B3BankReceiptDetails,
+    B3CashReceiptDetails,
+    DemoRole,
+    Submission,
+)
 
 
 class CreateCaseRequest(BaseModel):
@@ -202,6 +207,7 @@ class B3AdvanceEventRequest(BaseModel):
     evidence: list[dict[str, Any]] = []
     allocation_note: str
     supersedes_event_id: str | None = None
+    receipt_details: (B3BankReceiptDetails | B3CashReceiptDetails | None) = None
 
 
 class PrepareLinkedB7Request(BaseModel):

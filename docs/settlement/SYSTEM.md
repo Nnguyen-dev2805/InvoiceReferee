@@ -287,7 +287,9 @@ operation `B3_ADD_ADVANCE_PROOF` + `provenance.source_use` backend-owned, tăng
 `POST /api/cases/{id}/b3-advance-events` (`B3AdvanceEventPayload`: decision_id/
 namespace/ref/method/gross_vnd/payer_side/payee_ref/event_at/reported_status
 RECEIVED|PENDING|FAILED|CANCELLED|UNCONFIRMED/evidence `B3MoneyFieldEvidence`
-`HUMAN_SOURCE_REVIEW`/allocation_note/supersedes_event_id; lưu `money_events`
+`HUMAN_SOURCE_REVIEW`/allocation_note/supersedes_event_id/`receipt_details`
+(`B3BankReceiptDetails` proof_scope … hoặc `B3CashReceiptDetails`
+voucher_number/acknowledgement …, kind phải khớp method); lưu `money_events`
 JSON kind `ADVANCE_TO_EMPLOYEE`, audit `B3_ADVANCE_EVENT_RECORDED`).
 `B3WorkflowView` thêm `funding:B3FundingSummary` và `advance_events`. Projection
 `b3_funding.project_b3_funding` chỉ cộng RECEIVED xác nhận đúng employee,
@@ -301,6 +303,21 @@ final outcome supersede nonfinal cùng identity. Stage: FULFILLED →
 `_money_summary` lọc kind trước sum/pending nên advance không thành
 reimbursement. Error codes dùng lại `BASIS_MISMATCH`/`BEYOND_AUTHORITY`/
 `INVALID_PAYLOAD`.
+
+**Gate evidence cho RECEIVED** (plan
+[2026-10-12-advance-receipt-methods](../superpowers/plans/2026-10-12-advance-receipt-methods.md)):
+một RECEIVED chỉ thành `CONFIRMED_RECEIPT` khi
+`advance_reconciliation.validate_advance_receipt` thấy **mọi** field bắt buộc
+(9 core + `receiver_name`) đọc từ **một** nguồn `B3_ADVANCE_PROOF` của đúng hồ sơ,
+`origin=HUMAN_SOURCE_REVIEW`, `read_state=READ`, locator/raw nonblank, value khớp
+payload, **và** nguồn chi thuộc `B3CompanyContext.receipt_sources` đúng method
+(**bank** `proof_scope=RECEIVER_CONFIRMED`; **cash** `acknowledgement=ACKNOWLEDGED`
+và `voucher_number=event_ref`). Guard trả `evidence_issues`; thiếu căn cứ →
+`UNCONFIRMED` (giữ raw + issues, **không** cộng fulfillment). `derive_classification`
+nhận `evidence_ok` tường minh, **không** default True. `receipt_details`/
+`evidence_issues` lưu trong money JSON; view cũ thiếu field vẫn parse (default
+None/[]). `GET /api/demo-context` trả thêm `receipt_sources` read-only; thiếu cấu
+hình → không ghi nhận mới (không sinh namespace fallback).
 
 **B6→B7 quyết toán liên kết** (plan
 [2026-10-11-b6-linked-settlement](../superpowers/plans/2026-10-11-b6-linked-settlement.md))

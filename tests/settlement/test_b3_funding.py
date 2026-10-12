@@ -12,9 +12,13 @@ from datetime import timedelta
 import pytest
 
 from invoice_referee.settlement.models import Upload
+from tests.settlement.b3_builders import CONTEXT as _CONTEXT
 from tests.settlement.test_b3_workflow import (
     command, ready_b3, presented_b3, _approve,
 )
+
+# Context with no configured receipt source (for the missing-config case).
+CONTEXT_NO_SOURCES = {**_CONTEXT, "receipt_sources": []}
 
 
 @pytest.fixture
@@ -25,19 +29,24 @@ def approved_b3(presented_b3):
 
 
 def receipt_payload(source_id, decision, *, amount=2_000_000,
-                    payee="NV-DEMO-01", event_ref="TX-ADV-01"):
+                    payee="NV-DEMO-01", event_ref="TX-ADV-01",
+                    method="BANK_TRANSFER", namespace="BANK:DEMO-ACCOUNT",
+                    receipt_details=None):
     event_at = decision.effective_at + timedelta(hours=1)
     values = {"amount_vnd": amount, "currency": "VND",
               "payer_side": "COMPANY", "payee_ref": payee,
               "event_at": event_at.isoformat(), "receiver_outcome": "RECEIVED",
-              "event_namespace": "BANK:DEMO-ACCOUNT", "event_ref": event_ref,
-              "method": "BANK_TRANSFER"}
+              "event_namespace": namespace, "event_ref": event_ref,
+              "method": method, "receiver_name": "Nguyễn An"}
     return {
-        "decision_id": decision.id, "event_namespace": "BANK:DEMO-ACCOUNT",
-        "event_ref": event_ref, "method": "BANK_TRANSFER", "gross_vnd": amount,
+        "decision_id": decision.id, "event_namespace": namespace,
+        "event_ref": event_ref, "method": method, "gross_vnd": amount,
         "payer_side": "COMPANY", "payee_ref": payee,
         "event_at": event_at.isoformat(), "reported_status": "RECEIVED",
         "allocation_note": "Đối chiếu giao dịch với đúng quyết định/công việc",
+        "receipt_details": receipt_details if receipt_details is not None
+        else {"kind": "BANK_TRANSFER", "proof_scope": "RECEIVER_CONFIRMED",
+              "receiver_name": "Nguyễn An"},
         "evidence": [{"field": k, "source_id": source_id, "locator": k,
             "raw": str(v), "value": v, "read_state": "READ",
             "origin": "HUMAN_SOURCE_REVIEW"} for k, v in values.items()],
@@ -50,11 +59,35 @@ def upload_receipt(svc, case, decision, amount=2_000_000,
     text = (f"amount_vnd={amount}\ncurrency=VND\npayer_side=COMPANY\n"
             f"payee_ref={payee}\nevent_at={at.isoformat()}\n"
             "receiver_outcome=RECEIVED\n"
-            f"event_namespace=BANK:DEMO-ACCOUNT\nevent_ref={event_ref}\n"
-            "method=BANK_TRANSFER\n")
+            "event_namespace=BANK:DEMO-ACCOUNT\n"
+            f"event_ref={event_ref}\n"
+            "method=BANK_TRANSFER\nreceiver_name=Nguyễn An\n")
     return svc.add_b3_advance_proof(case.id,
         Upload(filename="receiver-receipt.txt", content=text.encode()),
         command(key, "ACC-DEMO-01", "ACCOUNTANT", case.case_version))
+
+
+def test_received_without_evidence_never_fulfills(approved_b3):
+    """Probe FAKE_TEMP_DB: RECEIVED 2tr with no evidence must NOT fulfill.
+
+    A reported RECEIVED with an empty evidence list is an unproven claim, not
+    a confirmed receipt: it must not count as received, fulfill the advance,
+    or advance the stage to work-settlement.
+    """
+    svc, case, decision = approved_b3
+    event = svc.record_b3_advance(case.id, {
+        "decision_id": decision.id, "event_namespace": "BANK:DEMO-ACCOUNT",
+        "event_ref": "NO-PROOF", "method": "BANK_TRANSFER",
+        "gross_vnd": 2_000_000, "payer_side": "COMPANY",
+        "payee_ref": "NV-DEMO-01", "event_at": "2026-10-10T10:00:00+07:00",
+        "reported_status": "RECEIVED", "evidence": [],
+        "allocation_note": "Chưa có chứng từ",
+    }, command("no-proof", "ACC-DEMO-01", "ACCOUNTANT", case.case_version))
+    view = svc.get_case(case.id)
+    assert event.classification != "CONFIRMED_RECEIPT"
+    assert view.b3_workflow.funding.recorded_received_vnd is None
+    assert view.b3_workflow.funding.status != "FULFILLED"
+    assert view.stage != "AWAITING_WORK_SETTLEMENT"
 
 
 def test_receipt_fulfills_advance_not_closes_case(approved_b3):
@@ -345,3 +378,177 @@ def test_cross_case_same_event_ref_still_records_own_scope(presented_b3, tmp_pat
     view_a2 = svc.get_case(case_a.id)
     assert any(i.kind == "UNAUTHORIZED_OR_UNALLOCATED"
                for i in view_a2.b3_workflow.funding.incidents)
+
+
+# --- P1.3 regression matrix: evidence-gated classification -------------------
+
+def _next_version(svc, case_id):
+    return svc.get_case(case_id).case_version
+
+
+def test_bank_pending_scope_not_received(approved_b3):
+    """A bank order that is only 'created, awaiting approval' is not received."""
+    svc, case, decision = approved_b3
+    proof = upload_receipt(svc, case, decision)
+    payload = receipt_payload(proof.id, decision, event_ref="TX-PEND")
+    payload["reported_status"] = "PENDING"
+    for f in payload["evidence"]:
+        if f["field"] == "receiver_outcome":
+            f["value"] = "PENDING"
+    event = svc.record_b3_advance(case.id, payload,
+        command("bank-pend", "ACC-DEMO-01", "ACCOUNTANT", _next_version(svc, case.id)))
+    assert event.classification == "PENDING"
+    view = svc.get_case(case.id)
+    assert view.b3_workflow.funding.recorded_received_vnd is None
+    assert view.b3_workflow.funding.status != "FULFILLED"
+    assert view.stage == "AWAITING_MONEY"
+
+
+def test_bank_debit_only_scope_not_received(approved_b3):
+    """Sender-debit only (no receiver-side result) never confirms receipt."""
+    svc, case, decision = approved_b3
+    proof = upload_receipt(svc, case, decision)
+    payload = receipt_payload(proof.id, decision, event_ref="TX-DEBIT",
+        receipt_details={"kind": "BANK_TRANSFER", "proof_scope": "SENDER_DEBIT",
+                         "receiver_name": "Nguyễn An"})
+    event = svc.record_b3_advance(case.id, payload,
+        command("bank-debit", "ACC-DEMO-01", "ACCOUNTANT", _next_version(svc, case.id)))
+    assert event.classification == "UNCONFIRMED"
+    assert any("RECEIVER_CONFIRMED" in i for i in event.evidence_issues)
+    view = svc.get_case(case.id)
+    assert view.b3_workflow.funding.recorded_received_vnd is None
+    assert view.stage != "AWAITING_WORK_SETTLEMENT"
+
+
+def test_cash_acknowledged_receives(approved_b3):
+    """A cash voucher with a handover acknowledgement confirms receipt."""
+    svc, case, decision = approved_b3
+    text = "amount_vnd=2000000\n"
+    proof = svc.add_b3_advance_proof(case.id,
+        Upload(filename="cash-receipt.txt", content=text.encode()),
+        command("cash-proof", "ACC-DEMO-01", "ACCOUNTANT", _next_version(svc, case.id)))
+    payload = receipt_payload(
+        proof.id, decision, method="CASH", namespace="CASH:DEMO-QUY",
+        event_ref="PC-001",
+        receipt_details={"kind": "CASH", "voucher_number": "PC-001",
+                         "acknowledgement": "ACKNOWLEDGED",
+                         "receiver_name": "Nguyễn An"})
+    event = svc.record_b3_advance(case.id, payload,
+        command("cash-rec", "ACC-DEMO-01", "ACCOUNTANT", _next_version(svc, case.id)))
+    assert event.classification == "CONFIRMED_RECEIPT", event.evidence_issues
+    view = svc.get_case(case.id)
+    assert view.b3_workflow.funding.recorded_received_vnd == 2_000_000
+    assert view.stage == "AWAITING_WORK_SETTLEMENT"
+
+
+def test_cash_unsigned_not_received(approved_b3):
+    """A cash voucher with an empty handover section does not confirm receipt."""
+    svc, case, decision = approved_b3
+    proof = svc.add_b3_advance_proof(case.id,
+        Upload(filename="cash-unsigned.txt", content=b"x"),
+        command("cash-unsigned-proof", "ACC-DEMO-01", "ACCOUNTANT",
+                _next_version(svc, case.id)))
+    payload = receipt_payload(
+        proof.id, decision, method="CASH", namespace="CASH:DEMO-QUY",
+        event_ref="PC-002",
+        receipt_details={"kind": "CASH", "voucher_number": "PC-002",
+                         "acknowledgement": "UNCONFIRMED",
+                         "receiver_name": "Nguyễn An"})
+    event = svc.record_b3_advance(case.id, payload,
+        command("cash-unsigned", "ACC-DEMO-01", "ACCOUNTANT",
+                _next_version(svc, case.id)))
+    assert event.classification == "UNCONFIRMED"
+    view = svc.get_case(case.id)
+    assert view.b3_workflow.funding.recorded_received_vnd is None
+    assert view.stage != "AWAITING_WORK_SETTLEMENT"
+
+
+def test_proposal_source_in_evidence_not_confirmed(approved_b3):
+    """A same-case proposal source is valid ownership but not a proof source."""
+    svc, case, decision = approved_b3
+    generic = svc.store.add_source(case.id,
+        Upload(filename="proposal.txt", content=b"x"),
+        command("generic", "NV-DEMO-01", "EMPLOYEE", _next_version(svc, case.id)))
+    event = svc.record_b3_advance(case.id,
+        receipt_payload(generic.id, decision, event_ref="TX-GEN"),
+        command("gen", "ACC-DEMO-01", "ACCOUNTANT",
+                _next_version(svc, case.id)))
+    assert event.classification == "UNCONFIRMED"
+    assert any("không thuộc chứng từ ứng" in i for i in event.evidence_issues)
+    assert svc.get_case(case.id).b3_workflow.funding.recorded_received_vnd is None
+
+
+def test_missing_configured_source_blocks_new_record(approved_b3, monkeypatch):
+    """No configured receipt source for the method → new record stays unconfirmed."""
+    from invoice_referee.settlement.b3_intake import B3CompanyContext
+    svc, case, decision = approved_b3
+    # Strip receipt_sources on the context used by the service.
+    ctx = B3CompanyContext.model_validate({**CONTEXT_NO_SOURCES})
+    svc.config = svc.config.model_copy(update={"b3_context": ctx})
+    proof = svc.add_b3_advance_proof(case.id,
+        Upload(filename="p.txt", content=b"x"),
+        command("nosrc-proof", "ACC-DEMO-01", "ACCOUNTANT",
+                _next_version(svc, case.id)))
+    event = svc.record_b3_advance(case.id,
+        receipt_payload(proof.id, decision, event_ref="TX-NOSRC"),
+        command("nosrc", "ACC-DEMO-01", "ACCOUNTANT", _next_version(svc, case.id)))
+    assert event.classification == "UNCONFIRMED"
+    assert any("cấu hình" in i for i in event.evidence_issues)
+    assert svc.get_case(case.id).b3_workflow.funding.recorded_received_vnd is None
+
+
+def test_duplicate_evidence_field_rejected_as_ambiguous(approved_b3):
+    """Two evidence entries for one required field make it unconfirmed."""
+    svc, case, decision = approved_b3
+    proof = upload_receipt(svc, case, decision)
+    payload = receipt_payload(proof.id, decision, event_ref="TX-DUP")
+    payload["evidence"].append(dict(payload["evidence"][0]))
+    event = svc.record_b3_advance(case.id, payload,
+        command("dup", "ACC-DEMO-01", "ACCOUNTANT", _next_version(svc, case.id)))
+    assert event.classification == "UNCONFIRMED"
+    assert any("nhiều hơn một" in i for i in event.evidence_issues)
+
+
+def test_receipt_details_kind_must_match_method(approved_b3):
+    """A bank receipt_details on a CASH event is a 422 (kind mismatch)."""
+    from invoice_referee.shared.errors import DomainError
+    svc, case, decision = approved_b3
+    proof = upload_receipt(svc, case, decision)
+    payload = receipt_payload(proof.id, decision, method="CASH",
+        namespace="CASH:DEMO-QUY", event_ref="PC-BAD",
+        receipt_details={"kind": "BANK_TRANSFER",
+                         "proof_scope": "RECEIVER_CONFIRMED"})
+    with pytest.raises(DomainError):
+        svc.record_b3_advance(case.id, payload,
+            command("mismatch", "ACC-DEMO-01", "ACCOUNTANT",
+                    _next_version(svc, case.id)))
+
+
+def test_evidence_unread_stays_unconfirmed(approved_b3):
+    """A required field read as UNCLEAR is not a confirmed receipt."""
+    svc, case, decision = approved_b3
+    proof = upload_receipt(svc, case, decision)
+    payload = receipt_payload(proof.id, decision, event_ref="TX-UNCLEAR")
+    for f in payload["evidence"]:
+        if f["field"] == "receiver_outcome":
+            f["read_state"] = "UNCLEAR"
+    event = svc.record_b3_advance(case.id, payload,
+        command("unclear", "ACC-DEMO-01", "ACCOUNTANT", _next_version(svc, case.id)))
+    assert event.classification == "UNCONFIRMED"
+    assert svc.get_case(case.id).b3_workflow.funding.recorded_received_vnd is None
+
+
+def test_old_view_without_details_still_parses(approved_b3):
+    """An event recorded before receipt_details existed still reads (compat)."""
+    from invoice_referee.settlement.models import B3AdvanceEventView
+    legacy = {
+        "id": "AE-old", "case_id": "C-x", "kind": "ADVANCE_TO_EMPLOYEE",
+        "method": "BANK_TRANSFER", "payer_side": "COMPANY",
+        "reported_status": "RECEIVED", "allocation_note": "x",
+        "employee_ref": "NV-DEMO-01", "work_ref": "W",
+        "classification": "CONFIRMED_RECEIPT", "actor_id": "ACC-DEMO-01",
+        "created_at": "2026-10-11T10:00:00Z",
+    }
+    view = B3AdvanceEventView.model_validate(legacy)
+    assert view.receipt_details is None
+    assert view.evidence_issues == []

@@ -96,18 +96,22 @@ export function CaseHeaderCard({
       {/* MỘT trạng thái nghiệp vụ thống nhất trên cùng */}
       {role === 'ACCOUNTANT' ? (
         <div
-          className={`business-status-card ${b3WorkflowPending ? 'business-status-reviewed' : latestReview ? 'business-status-reviewed' : 'business-status-pending-review'}`}
+          className={`business-status-card ${viewIsB3 && !view.submission.form.confirmed ? 'business-status-pending-review' : b3WorkflowPending ? 'business-status-reviewed' : latestReview ? 'business-status-reviewed' : 'business-status-pending-review'}`}
           data-testid="accountant-status-card"
         >
           <div className="business-status-title-row">
-            <span className={`status-pill ${b3WorkflowPending || latestReview ? 'status-pill-success' : 'status-pill-warning'}`}>
-              {b3WorkflowPending
-                ? 'Chờ người duyệt tạm ứng'
-                : latestReview ? 'Đã lưu kết quả rà soát' : 'Chờ kế toán rà soát'}
+            <span className={`status-pill ${viewIsB3 && !view.submission.form.confirmed ? 'status-pill-warning' : b3WorkflowPending || latestReview ? 'status-pill-success' : 'status-pill-warning'}`}>
+              {viewIsB3 && !view.submission.form.confirmed
+                ? 'Bản nháp của nhân viên (Chưa nộp)'
+                : b3WorkflowPending
+                  ? 'Chờ người duyệt tạm ứng'
+                  : latestReview ? 'Đã lưu kết quả rà soát' : 'Chờ kế toán rà soát'}
             </span>
           </div>
           <div className="business-status-desc">
-            {b3WorkflowPending ? (
+            {viewIsB3 && !view.submission.form.confirmed ? (
+              'Nhân viên chưa gửi đề nghị chính thức. Hồ sơ đang ở trạng thái bản nháp của nhân viên, kế toán chưa thực hiện rà soát.'
+            ) : b3WorkflowPending ? (
               <>
                 Đã trình người có quyền <strong>{view.b3_workflow?.approver_ref}</strong> quyết định; chưa ghi nhận tiền thực nhận.
               </>
@@ -122,8 +126,9 @@ export function CaseHeaderCard({
           </div>
         </div>
       ) : (
-        <div className="business-status-card business-status-general" data-testid="business-status-card">
-          <div className="business-status-title-row">
+        <div className="business-status-card business-status-general" data-testid="business-status-card" style={{ padding: '6px 12px', background: '#fafafa' }}>
+          <div className="business-status-title-row" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--color-muted-foreground)', fontWeight: 600 }}>Trạng thái xử lý:</span>
             <span className={`status-pill status-${view.stage.toLowerCase()}`}>
               {viewIsB3 && view.b3_workflow?.status === 'APPROVED'
                 ? 'Đã duyệt tạm ứng — chờ chi ứng'
@@ -138,8 +143,12 @@ export function CaseHeaderCard({
       {/* Thông tin hồ sơ gọn gàng */}
       <div className="case-header-tech-footer">
         <span>Mã NV: <code>{view.submission.employee_ref}</code></span>
-        <span>·</span>
-        <span>Mã công việc: <code>{view.submission.work_ref}</code></span>
+        {view.submission.work_ref && view.submission.work_ref !== view.id && (
+          <>
+            <span>·</span>
+            <span>Mã công việc: <code>{view.submission.work_ref}</code></span>
+          </>
+        )}
         <span>·</span>
         <span>Phiên bản: <strong>v{view.case_version}</strong></span>
       </div>
