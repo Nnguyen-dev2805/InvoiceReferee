@@ -188,7 +188,35 @@ Decision Guard chỉ xét finding `FAIL`. Nếu không có `FAIL`, quyết đị
 | Không có `FAIL`                                                                      | `READY_FOR_APPROVAL` | Kế toán                       |
 
 
-## 9. Luồng OCR/kiểm kê cũ còn tồn tại trong chương trình
+## 9. Phạm vi regression UC03 v2
+
+Bộ fixture tại `data/testcase_uc3_v2/` là regression corpus cho nghiệp vụ hoàn
+ứng/quyết toán tạm ứng. Dữ liệu, tên công ty và người nộp đều là giả lập. Mỗi
+case gồm `request_form.pdf` là đơn chính, các PDF evidence, bản DOCX nguồn và
+`expected.json` làm oracle; tuyệt đối không tải `expected.json` vào hệ thống.
+
+Mỗi nhóm có đúng 10 case, gồm cả hồ sơ hợp lệ và hồ sơ phải hỏi lại/chuyển kế
+toán/chuyển cấp/từ chối. `COVERED` nghĩa là rule hiện có mục tiêu xử lý được;
+`PLANNED` là regression specification cho khoảng trống cần triển khai, không
+được quảng bá như rule đã chạy trong production.
+
+| Nhóm testcase | Test nghiệp vụ gì | Rule/quyết định tiêu biểu | Trạng thái |
+| --- | --- | --- | --- |
+| `01_quyet_toan_so_tien` | Số tổng cộng, tổng dòng, số tiền tạm ứng, số tiền nhân viên hoàn trả hoặc công ty trả thêm, số bằng chữ và thẩm quyền. | `SET_PAPER_TOTAL_001`, `SET_ADV_AMOUNT_001`, `SET_SETTLEMENT_DIFF_001`, `SET_AUTH_001` | Chủ yếu `COVERED` |
+| `02_hop_le_chung_tu` | Phân loại chứng từ trước matching; field bắt buộc theo profile; e-invoice thiếu/sai MST, người mua khác công ty hoặc khách lẻ; vé điện tử và chuyển khoản. | `SET_DOCUMENT_CLASSIFICATION_001`, `SET_DOCUMENT_REQUIRED_FIELDS_001`, `SET_DOCUMENT_VALIDITY_001`, `SET_BUYER_IDENTITY_001` | `COVERED`, có 1 case số học `PLANNED` |
+| `03_policy_khoan_chi` | Danh mục cá nhân/chưa phân loại, hạn mức taxi-tiếp khách, ngày chi và thời hạn nộp, ngoại lệ rượu bia. | `SET_CATEGORY_001`, `SET_CATEGORY_UNKNOWN_001`, `SET_LIMIT_001`, `SET_EXPENSE_DATE_001`, `SET_DEADLINE_001` | `COVERED`; cấm rượu bia là `PLANNED` |
+| `04_bang_chung_va_matching` | Ghép report với evidence theo số chứng từ, số tiền và nội dung; chứng từ thiếu, có giải trình, chứng từ thay thế, evidence dư hoặc ghép mơ hồ. | `SET_PAPER_MATCH_001`, `SET_PAPER_EVIDENCE_REQUIRED`, `SET_PAPER_EVIDENCE_EXCEPTION`, `SET_PAPER_AMOUNT_001`, `SET_PAPER_UNMATCHED_001` | `COVERED` |
+| `05_ho_so_phuc_hop` | Báo cáo nhiều dòng/nhiều chứng từ, một dòng dùng nhiều hóa đơn, phân bổ một hóa đơn, hóa đơn gốc kèm chứng minh thanh toán, hồ sơ hỗn hợp và duplicate. | Matching/policy chung; `SET_DUPLICATE_001`, phân bổ hóa đơn và chống double-count evidence | Một phần `COVERED`, nhiều case `PLANNED` |
+
+Các case `READY_FOR_APPROVAL` vẫn phải có `SET_APPROVAL_001` và hiện ở trạng
+thái `PENDING_APPROVAL`: chúng pass automation nhưng chưa thay thế bước kế toán
+đối chiếu bản gốc và ký/xác nhận.
+
+Kiểm tra cấu trúc corpus được tự động hóa tại
+`tests/unit/test_uc3_testcase_catalog.py`: test bảo đảm đủ 5 nhóm, 50 case,
+đủ cặp `DOCX/PDF`, `expected.json` và evidence được manifest tham chiếu.
+
+## 10. Luồng OCR/kiểm kê cũ còn tồn tại trong chương trình
 
 Các rule dưới đây thuộc `CaseProcessingService` và `policy/inventory.py`. Chúng
 phù hợp cho UC01/luồng đối chiếu hóa đơn - phiếu kiểm kê cũ; không phải toàn bộ
@@ -246,7 +274,7 @@ phải `rule_id` hay finding độc lập.
 | `INVENTORY_CONSISTENCY`                                            | Các nguồn và item nhất quán.                                                    | `PASS`                   | toàn bộ facts/matches                              |
 
 
-## 10. Rule được nhắc trong UI/Decision Guard nhưng chưa có engine phát sinh
+## 11. Rule được nhắc trong UI/Decision Guard nhưng chưa có engine phát sinh
 
 Hai rule sau có nhãn hoặc mapping, nhưng tại thời điểm viết tài liệu chưa thấy
 worker tạo finding tương ứng. Chúng là khoảng trống cần triển khai, không được
@@ -259,7 +287,7 @@ trình bày như đã hoạt động.
 | `SET_SIGNATURE_001` | Chưa phát sinh | UI có nhãn "Xác nhận chữ ký"; luồng hiện tại dùng `SET_APPROVAL_001` để chờ kế toán xác nhận, chưa có OCR/chữ ký số validation độc lập. |
 
 
-## 11. Vị trí triển khai chính
+## 12. Vị trí triển khai chính
 
 
 | Thành phần                                              | File                                                                                         |
@@ -270,24 +298,3 @@ trình bày như đã hoạt động.
 | Matching đơn giấy - evidence                            | `src/invoice_referee/application/paper_evidence_matching.py`                                 |
 | Quyết định tổng và routing                              | `src/invoice_referee/application/decision_guard.py`                                          |
 | OCR confidence và kiểm kê luồng cũ                      | `src/invoice_referee/application/process_case.py`, `src/invoice_referee/policy/inventory.py` |
-
-
-
-
-
-
-
-| Nhóm                 | Case cần thêm                                                                                                                             |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Canonical paper item | Không xác định category; không đọc được ngày chi; category/date có confidence thấp                                                        |
-| Hạn mức              | Taxi đúng 2 triệu, taxi 2 triệu + 1; tiếp khách đúng 5 triệu, vượt 1 đồng                                                                 |
-| Thời hạn             | Nộp đúng ngày thứ 30; quá ngày thứ 31; ngày chi trong tương lai                                                                           |
-| Chứng từ gốc         | Dòng không evidence, không lý do; evidence có nhưng chưa match; evidence match sai item                                                   |
-| Chứng từ thay thế    | Vé điện tử hợp lệ; ảnh chuyển khoản đơn lẻ; biên bản nghiệm thu + thanh toán; loại thay thế được policy auto-allow                        |
-| Matching             | Số hóa đơn khớp nhưng tiền lệch; một dòng cần hai hóa đơn; một hóa đơn bị phân bổ thiếu/thừa; evidence trùng hai hồ sơ                    |
-| Hóa đơn điện tử      | Sai định dạng MST; người mua “khách lẻ”; thiếu MST người bán; số lượng × đơn giá lệch thành tiền; số tiền chữ lệch số; VAT/tổng tiền lệch |
-| Tạm ứng              | Thiếu số tiền tạm ứng; số tạm ứng bằng 0; hoàn ứng nhưng lại khai tạm ứng; số hoàn trả/công ty trả thêm đúng và sai                       |
-| OCR                  | Report mờ; evidence mờ ở tổng tiền/MST; OCR nhầm loại chứng từ; PDF nhiều trang                                                           |
-| Workflow             | Thiếu form giấy chính; thiếu purpose trên form giấy; chưa có chữ ký chỉ là `PENDING_APPROVAL`, không phải `FAIL`                          |
-
-

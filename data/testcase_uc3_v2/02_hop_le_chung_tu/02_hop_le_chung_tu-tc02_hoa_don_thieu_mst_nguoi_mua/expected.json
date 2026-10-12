@@ -1,0 +1,46 @@
+{
+  "schema_version": "2.0",
+  "case_id": "02_hop_le_chung_tu-TC02",
+  "group_id": "02_hop_le_chung_tu",
+  "title": "Không hợp lệ - hóa đơn điện tử thiếu MST người mua",
+  "data_classification": "SYNTHETIC",
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "employee": {
+      "name": "Donal Trump",
+      "department": "Phòng Kinh doanh",
+      "position": "Nhân viên"
+    },
+    "request_form": "request_form.pdf",
+    "evidence_files": [
+      "hoa_don_0001802.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "primary_rule_id": "SET_DOCUMENT_REQUIRED_FIELDS_001",
+    "implementation_status": "COVERED",
+    "expected_findings": [
+      "REQUIRED_FIELD_UNCLEAR:buyer_tax_code"
+    ],
+    "workflow_status": "NEEDS_REVIEW"
+  },
+  "facts": {
+    "report_total_vnd": 5400000,
+    "advance_amount_vnd": 6000000,
+    "settlement_amount_vnd": 600000,
+    "settlement_direction": "Nhân viên hoàn trả công ty",
+    "line_count": 1
+  },
+  "line_support_expectations": [
+    {
+      "item_id": "L01",
+      "description": "Mua màn hình",
+      "amount_vnd": 5400000,
+      "reference": "0001802",
+      "note": "Đính kèm hóa đơn"
+    }
+  ],
+  "generator_notes": []
+}

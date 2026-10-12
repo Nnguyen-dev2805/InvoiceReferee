@@ -1,0 +1,61 @@
+{
+  "schema_version": "2.0",
+  "case_id": "05_ho_so_phuc_hop-TC08",
+  "group_id": "05_ho_so_phuc_hop",
+  "title": "Ngoại lệ - hồ sơ có chứng từ gốc, thay thế và không chứng từ",
+  "data_classification": "SYNTHETIC",
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "employee": {
+      "name": "Donal Trump",
+      "department": "Phòng Kinh doanh",
+      "position": "Nhân viên"
+    },
+    "request_form": "request_form.pdf",
+    "evidence_files": [
+      "hoa_don_0005011.pdf",
+      "chung_tu_VDT-5012.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "ACCOUNTANT_REVIEW",
+    "primary_rule_id": "SET_PAPER_EVIDENCE_EXCEPTION",
+    "implementation_status": "COVERED",
+    "expected_findings": [
+      "SET_PAPER_EVIDENCE_EXCEPTION"
+    ],
+    "workflow_status": "NEEDS_REVIEW"
+  },
+  "facts": {
+    "report_total_vnd": 2880000,
+    "advance_amount_vnd": 3500000,
+    "settlement_amount_vnd": 620000,
+    "settlement_direction": "Nhân viên hoàn trả công ty",
+    "line_count": 3
+  },
+  "line_support_expectations": [
+    {
+      "item_id": "L01",
+      "description": "Ăn uống tiếp khách",
+      "amount_vnd": 2400000,
+      "reference": "0005011",
+      "note": "Đính kèm hóa đơn"
+    },
+    {
+      "item_id": "L02",
+      "description": "Phí gửi xe",
+      "amount_vnd": 180000,
+      "reference": "VDT-5012",
+      "note": "Vé điện tử thay thế hóa đơn"
+    },
+    {
+      "item_id": "L03",
+      "description": "Phí bốc xếp",
+      "amount_vnd": 300000,
+      "reference": null,
+      "note": "Không có chứng từ: nhà cung cấp nhỏ lẻ không xuất chứng từ"
+    }
+  ],
+  "generator_notes": []
+}

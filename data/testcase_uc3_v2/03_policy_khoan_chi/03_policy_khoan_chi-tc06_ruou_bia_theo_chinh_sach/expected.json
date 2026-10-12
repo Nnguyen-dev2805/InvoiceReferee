@@ -1,0 +1,46 @@
+{
+  "schema_version": "2.0",
+  "case_id": "03_policy_khoan_chi-TC06",
+  "group_id": "03_policy_khoan_chi",
+  "title": "Ngoại lệ policy - rượu bia tiếp khách",
+  "data_classification": "SYNTHETIC",
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "employee": {
+      "name": "Donal Trump",
+      "department": "Phòng Kinh doanh",
+      "position": "Nhân viên"
+    },
+    "request_form": "request_form.pdf",
+    "evidence_files": [
+      "hoa_don_0001906.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "ACCOUNTANT_REVIEW",
+    "primary_rule_id": "SET_PROHIBITED_ITEM_001",
+    "implementation_status": "PLANNED",
+    "expected_findings": [
+      "PROHIBITED_OR_RESTRICTED_ITEM"
+    ],
+    "workflow_status": "NEEDS_REVIEW"
+  },
+  "facts": {
+    "report_total_vnd": 1650000,
+    "advance_amount_vnd": 2000000,
+    "settlement_amount_vnd": 350000,
+    "settlement_direction": "Nhân viên hoàn trả công ty",
+    "line_count": 1
+  },
+  "line_support_expectations": [
+    {
+      "item_id": "L01",
+      "description": "Rượu vang tiếp khách",
+      "amount_vnd": 1650000,
+      "reference": "0001906",
+      "note": "Đính kèm hóa đơn"
+    }
+  ],
+  "generator_notes": []
+}
