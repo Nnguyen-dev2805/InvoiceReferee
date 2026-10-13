@@ -95,9 +95,16 @@ class TranscriptionFact(StrictModel):
 
 
 class Transcription(StrictModel):
-    """A STUB reading of one packet's sources. Data origin is explicit."""
+    """A reading of one packet's sources. Data origin is explicit (contracts §5).
 
-    data_origin: Literal["STUB_TRANSCRIPTION"] = "STUB_TRANSCRIPTION"
+    `data_origin` records which reader produced the reading: a seeded STUB
+    hand-transcription, a LIVE provider read, or a replayed recording. It is
+    never hard-coded, so a LIVE read is not mislabelled as STUB.
+    """
+
+    data_origin: Literal["STUB_TRANSCRIPTION", "LIVE_READ", "RECORDED_REPLAY"] = (
+        "STUB_TRANSCRIPTION"
+    )
     facts: tuple[TranscriptionFact, ...] = ()
     # Relations asserted by the transcription (kind/from/to/state).
     relations: tuple[tuple[str, str, str, str], ...] = ()

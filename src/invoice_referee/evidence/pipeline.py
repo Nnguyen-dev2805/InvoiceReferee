@@ -172,8 +172,15 @@ async def transcribe_root(
             unread_pages=unread_pages,
             provider_mode=provider_mode,
         )
+    origin = {
+        "LIVE": "LIVE_READ",
+        "RECORDED_REPLAY": "RECORDED_REPLAY",
+    }.get(provider_mode, "STUB_TRANSCRIPTION")
     return ReadOutcome(
-        transcription=Transcription(facts=tuple(merged.values())),
+        transcription=Transcription(
+            data_origin=origin,  # type: ignore[arg-type]
+            facts=tuple(merged.values()),
+        ),
         read_pages=read_pages,
         unread_pages=unread_pages,
         provider_mode=provider_mode,

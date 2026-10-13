@@ -33,6 +33,25 @@ def test_blank_text_is_none() -> None:
     assert transcribe_text("   ") is None
 
 
+async def test_transcribe_root_tags_data_origin_from_mode() -> None:
+    # A LIVE read must not be mislabelled as a STUB hand-transcription
+    # (contracts §5: the label reflects the reader that produced the reading).
+    from invoice_referee.domain.evidence import SourceRef
+    from invoice_referee.evidence.pipeline import transcribe_root
+    from invoice_referee.evidence.trace import RunBudget
+
+    class Reader:
+        async def ocr_page(self, source, page):
+            return "Tổng chi 8.000.000 VND"
+
+    source = SourceRef(id="s", digest="a" * 64, tenant="t", media="PDF", storage_key="k")
+    for mode, expected in (("LIVE", "LIVE_READ"), ("RECORDED_REPLAY", "RECORDED_REPLAY")):
+        outcome = await transcribe_root(
+            reader=Reader(), sources=(source,), budget=RunBudget(), provider_mode=mode
+        )
+        assert outcome.transcription.data_origin == expected, mode
+
+
 async def test_transcribe_root_merges_facts_across_sources() -> None:
     # A root's documents carry different fields (invoice -> incurred, receipt ->
     # paid, advance slip -> advance); the pipeline must merge them, not stop at
