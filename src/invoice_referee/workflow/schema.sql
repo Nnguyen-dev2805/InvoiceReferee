@@ -228,6 +228,24 @@ CREATE TABLE IF NOT EXISTS case_transcriptions (
     created_at         TEXT NOT NULL
 );
 
+-- Responsible confirmations from an owner's answer (contracts §3, §5). A
+-- confirmation carries fact/value/actor/scope/reason, never a blanket approval.
+-- It feeds the snapshot so an answered FACT changes the basis rather than
+-- leaving the recomputed issue OPEN.
+CREATE TABLE IF NOT EXISTS case_confirmations (
+    id          TEXT PRIMARY KEY,
+    tenant      TEXT NOT NULL,
+    root_id     TEXT NOT NULL REFERENCES cases(id),
+    fact_key    TEXT NOT NULL,
+    value       TEXT NOT NULL,
+    actor       TEXT NOT NULL,
+    scope       TEXT NOT NULL,
+    refs_json   TEXT NOT NULL DEFAULT '[]',
+    reason      TEXT NOT NULL,
+    observed_at TEXT NOT NULL,
+    UNIQUE (root_id, fact_key)
+);
+
 -- Append-only money ledger (contracts §4, §10.1). A recorded event is never
 -- edited or deleted; a reversal is a new linked event. external_key is unique
 -- per tenant so a re-sent transaction is not counted twice.

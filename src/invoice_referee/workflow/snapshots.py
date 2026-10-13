@@ -44,6 +44,37 @@ def _ref(source_id: str, digest: str, page: int, quote: str):
     )
 
 
+def _load_confirmations(cx: sqlite3.Connection, tenant: str, root_id: str):
+    """Responsible confirmations from owner answers (contracts §3, §5)."""
+    from datetime import datetime as _dt
+
+    from invoice_referee.domain.common import EvidenceRef
+    from invoice_referee.domain.evidence import Confirmation
+
+    out: list[Confirmation] = []
+    for row in cx.execute(
+        "SELECT * FROM case_confirmations WHERE tenant = ? AND root_id = ? "
+        "ORDER BY observed_at, id",
+        (tenant, root_id),
+    ).fetchall():
+        refs = tuple(
+            EvidenceRef.model_validate(ref)
+            for ref in json.loads(row["refs_json"] or "[]")
+        )
+        out.append(
+            Confirmation(
+                fact_key=str(row["fact_key"]),
+                value=row["value"],
+                actor=str(row["actor"]),
+                scope=str(row["scope"]),
+                refs=refs,
+                reason=str(row["reason"]),
+                observed_at=_dt.fromisoformat(row["observed_at"]),
+            )
+        )
+    return tuple(out)
+
+
 def build_assessment_input(
     cx: sqlite3.Connection,
     *,
@@ -75,6 +106,13 @@ def build_assessment_input(
     expenses: list[Expense] = []
     ledger: list[MoneyEvent] = []
     coverage: CoverageRecord | None = None
+
+    # Responsible confirmations from owner answers (contracts §3, §5): an
+    # answered FACT changes the basis on the next assessment.
+    confirmations = _load_confirmations(cx, tenant, root_id)
+    confirmed_payer = next(
+        (c.value for c in confirmations if c.fact_key == "expense:payer"), None
+    )
 
     if transcription is not None:
         facts = {f.field: f for f in transcription.facts}
@@ -127,6 +165,21 @@ def build_assessment_input(
                         expense_id="expense:1",
                         received_state="CLEAR",
                         refs=(_ref(src_id, src_digest, 1, "company paid"),),
+                    )
+                )
+            # A responsible confirmation that the employee paid establishes the
+            # E candidate for the full incurred cost (contracts §3), when no
+            # explicit employee-paid portion was read.
+            if confirmed_payer == employee and not paid_employee:
+                payments.append(
+                    ExpensePayment(
+                        external_key="payment:employee-confirmed",
+                        payer=employee,
+                        payee="vendor:demo",
+                        amount=_int_fact(incurred) or 0,
+                        expense_id="expense:1",
+                        received_state="CLEAR",
+                        refs=(_ref(src_id, src_digest, 1, "confirmed payer"),),
                     )
                 )
             eligibility = facts.get("eligibility")
@@ -297,7 +350,7 @@ def build_assessment_input(
         expense_facts=tuple(expenses),
         observations=tuple(observations),
         relations=tuple(relations),
-        confirmations=(),
+        confirmations=confirmations,
         ledger=tuple(ledger),
         coverage=coverage,
         policy=policy,

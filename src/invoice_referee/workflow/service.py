@@ -779,6 +779,32 @@ class CaseWorkflow:
                 "Việc này thuộc người xử lý khác; câu trả lời không được áp dụng."
             )
         now = self._now_iso()
+        # The answer is persisted as a responsible confirmation keyed by the
+        # issue's field/rule, so the re-assessment consumes the supplied value
+        # instead of recomputing the same issue back to OPEN (contracts §3, §5).
+        fact_key = str(issue["field_or_rule"])
+        if answer.value is not None and str(answer.value).strip() != "":
+            confirmation_id = f"confirmation:{hashlib.sha256((str(row['id']) + fact_key).encode()).hexdigest()[:16]}"
+            cx.execute(
+                "INSERT OR REPLACE INTO case_confirmations (id, tenant, root_id, fact_key, "
+                "value, actor, scope, refs_json, reason, observed_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    confirmation_id,
+                    session.tenant,
+                    str(row["id"]),
+                    fact_key,
+                    str(answer.value),
+                    context.actor_id,
+                    str(row["activity"]),
+                    json.dumps(
+                        [ref.model_dump(mode="json") for ref in answer.refs],
+                        ensure_ascii=False,
+                    ),
+                    answer.reason,
+                    now,
+                ),
+            )
         cx.execute(
             "UPDATE case_issues SET status = 'ANSWERED', updated_at = ? WHERE id = ?",
             (now, answer.issue_id),
