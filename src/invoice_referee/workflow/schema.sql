@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS context_activities (
 );
 
 CREATE TABLE IF NOT EXISTS context_grants (
-    grant_id       TEXT PRIMARY KEY,
+    grant_id       TEXT NOT NULL,
     tenant         TEXT NOT NULL,
     version        TEXT NOT NULL,
     actor          TEXT NOT NULL,
@@ -97,13 +97,18 @@ CREATE TABLE IF NOT EXISTS context_grants (
     scope          TEXT NOT NULL,
     max_amount     INTEGER NOT NULL,
     effective_from TEXT NOT NULL,
-    effective_to   TEXT
+    effective_to   TEXT,
+    -- Grants are per tenant: the same grant id in another tenant is a
+    -- separate record, never an overwrite of this tenant's authority.
+    PRIMARY KEY (tenant, grant_id)
 );
 
 CREATE TABLE IF NOT EXISTS context_people (
-    id     TEXT PRIMARY KEY,
+    id     TEXT NOT NULL,
     tenant TEXT NOT NULL,
-    name   TEXT NOT NULL
+    name   TEXT NOT NULL,
+    -- People are per tenant: an import can never shadow another tenant's name.
+    PRIMARY KEY (tenant, id)
 );
 
 CREATE TABLE IF NOT EXISTS context_witnesses (

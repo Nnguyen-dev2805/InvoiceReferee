@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
 
@@ -23,6 +24,7 @@ from invoice_referee.domain.commands import (
 )
 from invoice_referee.domain.evidence import Media
 from invoice_referee.workflow.service import (
+    PROPOSED_ACTIVITY_PREFIX,
     CaseWorkflow,
     DemoSession,
     UnknownSessionError,
@@ -152,7 +154,7 @@ async def create_case(
     choice = payload.activity
     if isinstance(choice, views.NewActivity):
         # Server-generated activity id: the client never mints authority (§10.4).
-        activity_id = f"activity:proposed:{uuid.uuid4().hex}"
+        activity_id = f"{PROPOSED_ACTIVITY_PREFIX}{uuid.uuid4().hex}"
         activity = ActivityData(
             activity_id=activity_id,
             name=choice.name,
@@ -243,7 +245,20 @@ async def attach_sources(
     except Exception:
         for storage_key in written:
             (workflow.uploads_dir / storage_key).unlink(missing_ok=True)
+        _prune_empty_upload_dirs(workflow.uploads_dir, session.tenant, root_id)
         raise
+
+
+def _prune_empty_upload_dirs(uploads_dir: Path, tenant: str, root_id: str) -> None:
+    """Remove the per-root (and per-tenant) upload dirs once they are empty."""
+    for directory in (
+        uploads_dir / tenant / root_id,
+        uploads_dir / tenant,
+    ):
+        try:
+            directory.rmdir()
+        except OSError:
+            break
 
 
 def _sniff_media(data: bytes) -> Media | None:

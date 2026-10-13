@@ -38,6 +38,8 @@ DEFAULT_TENANT = "tenant:demo"
 DEFAULT_PERSONA = "employee"
 DEFAULT_ACTIVITY_PROFILE = "TRAVEL"
 DEFAULT_MAX_SOURCE_BYTES = 20 * 1024 * 1024  # contracts §6 pilot ceiling per file
+# Server-minted id prefix for a proposed (not yet authorized) activity (§10.4).
+PROPOSED_ACTIVITY_PREFIX = "activity:proposed:"
 
 PERSONAS: tuple[tuple[str, str], ...] = (
     ("employee", "Nhân viên"),
@@ -159,10 +161,44 @@ def _parse_dt(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value)
 
 
+def _meaningful_payload(command: CaseCommand) -> object:
+    """The client-meaningful part of a command for the idempotency fingerprint.
+
+    Server-minted fields are excluded so a retry with the same command id
+    replays the stored result instead of conflicting (§10.3): an attachment
+    `storage_key` is generated per attempt, and a new-activity `activity_id` is
+    minted by the server (the client only chooses name/date/purpose).
+    """
+    if isinstance(command, AttachSources):
+        return {
+            "kind": command.kind,
+            "root_id": command.root_id,
+            "uploads": sorted(
+                (upload.filename, upload.media, upload.digest)
+                for upload in command.uploads
+            ),
+        }
+    if isinstance(command, CreateDraft):
+        activity = command.activity_data
+        payload: dict[str, object] = {
+            "kind": command.kind,
+            "name": activity.name,
+            "occurred_at": activity.occurred_at.isoformat(),
+            "declared_purpose": activity.declared_purpose,
+        }
+        # Only a client-chosen existing activity id is meaningful; the server
+        # mints `activity:proposed:<hex>` for a new activity, which must not
+        # enter the fingerprint or a retry would look like a different command.
+        if not activity.activity_id.startswith(PROPOSED_ACTIVITY_PREFIX):
+            payload["activity_id"] = activity.activity_id
+        return payload
+    return json.loads(command.model_dump_json())
+
+
 def _fingerprint(context: CommandContext, command: CaseCommand) -> str:
     payload = {
         "expected_case_version": context.expected_case_version,
-        "command": json.loads(command.model_dump_json()),
+        "command": _meaningful_payload(command),
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -414,10 +450,14 @@ class CaseWorkflow:
         return digest
 
     def catalog(self, tenant: str = DEFAULT_TENANT) -> tuple[CatalogActivity, ...]:
+        # The selectable catalog is the authorized activity set: a PROPOSED
+        # activity is a draft awaiting authorization, not an existing choice
+        # (§10.4), so it is not offered here.
         connection = self.db.connect()
         try:
             rows = connection.execute(
-                "SELECT * FROM context_activities WHERE tenant = ? ORDER BY activity_id",
+                "SELECT * FROM context_activities WHERE tenant = ? "
+                "AND status = 'AUTHORIZED' ORDER BY activity_id",
                 (tenant,),
             ).fetchall()
         finally:
@@ -754,7 +794,8 @@ class CaseWorkflow:
             (row["activity"], row["tenant"]),
         ).fetchone()
         person = cx.execute(
-            "SELECT name FROM context_people WHERE id = ?", (row["employee"],)
+            "SELECT name FROM context_people WHERE id = ? AND tenant = ?",
+            (row["employee"], row["tenant"]),
         ).fetchone()
         sources = tuple(
             SourceRef(

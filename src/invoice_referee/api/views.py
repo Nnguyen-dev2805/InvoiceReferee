@@ -7,12 +7,12 @@ can never ride along into server authority (contracts §10.4).
 from __future__ import annotations
 
 import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from invoice_referee.domain.common import UtcDatetime
 from invoice_referee.workflow.service import (
     PERSONAS,
     CaseWorkflow,
@@ -33,7 +33,7 @@ class ExistingActivity(ApiModel):
 class NewActivity(ApiModel):
     mode: Literal["new"] = "new"
     name: str
-    occurred_at: datetime
+    occurred_at: UtcDatetime
     declared_purpose: str
 
 
