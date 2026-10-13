@@ -46,12 +46,91 @@ def _sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def load_input(packet_dir: Path) -> PacketInput:
-    """Load the application-visible layer only. Never reads gold/."""
+# Stage folder names (plan A): the physical home of each stage's documents.
+# Several stage ids may share a folder (e.g. bo-sung-payer -> 02-bo-sung).
+STAGE_FOLDERS: dict[str, str] = {
+    "ban-dau": "01-nop-ban-dau",
+    "bo-sung": "02-bo-sung",
+    "bo-sung-payer": "02-bo-sung",
+    "bo-sung-thanh-toan": "02-bo-sung",
+    "duyet-chi": "03-duyet-chi",
+    "thuc-hien-tien": "03-thuc-hien-tien",
+}
+# Physical folder order, for a stage's read-set cutoff.
+_FOLDER_ORDER: tuple[str, ...] = (
+    "01-nop-ban-dau",
+    "02-bo-sung",
+    "03-duyet-chi",
+    "03-thuc-hien-tien",
+)
+# Layout markers: the new corpus uses Vietnamese folders; the legacy layout uses
+# input/ + gold/. The loader detects which so both load during the R1->R2 move.
+_NEW_INPUT = "dau-vao"
+_NEW_CONTEXT = "cau-hinh"
+_NEW_GOLD = "dap-an"
+
+
+def _available_folders(stage_id: str) -> tuple[str, ...]:
+    """Folders whose documents are in the read-set at ``stage_id``."""
+    folder = STAGE_FOLDERS.get(stage_id, "01-nop-ban-dau")
+    cutoff = _FOLDER_ORDER.index(folder) if folder in _FOLDER_ORDER else 0
+    return _FOLDER_ORDER[: cutoff + 1]
+
+
+def _is_new_layout(packet_dir: Path) -> bool:
+    return (packet_dir / _NEW_INPUT).is_dir() or (packet_dir / _NEW_GOLD).is_dir()
+
+
+def load_input(packet_dir: Path, *, stage_id: str = "ban-dau") -> PacketInput:
+    """Load the application-visible layer only. Never reads gold/.
+
+    Supports both the new Vietnamese layout (dau-vao/<stage>/ + cau-hinh/) and
+    the legacy input/ layout. A later stage's documents are absent from an
+    earlier stage's read-set (plan A.1).
+    """
     packet_dir = Path(packet_dir)
+    if _is_new_layout(packet_dir):
+        return _load_input_new(packet_dir, stage_id=stage_id)
+    return _load_input_legacy(packet_dir)
+
+
+def _load_input_new(packet_dir: Path, *, stage_id: str) -> PacketInput:
+    context_dir = packet_dir / _NEW_CONTEXT
+    # model_validate_json (not model_validate): a StrictModel is strict=True, so
+    # a JSON list only coerces to a tuple through the JSON path.
+    organization = OrganizationContext.model_validate_json(
+        _read_text(context_dir / "to-chuc.json")
+    )
+    submission = Submission.model_validate_json(
+        _read_text(context_dir / "khai-bao.json")
+    )
+
+    # Sources available at this stage: every folder up to and including it.
+    sources: list[PacketSource] = []
+    for folder_name in _available_folders(stage_id):
+        folder = packet_dir / _NEW_INPUT / folder_name
+        if not folder.is_dir():
+            continue
+        for path in sorted(folder.iterdir()):
+            if not path.is_file():
+                continue
+            media = _media_for(path.name)
+            sources.append(
+                PacketSource(filename=path.name, media=media, sha256=_sha256_file(path))
+            )
+
+    return PacketInput(
+        root_id=submission.activity,
+        profile=organization.profile,
+        sources=tuple(sources),
+        organization=organization,
+        submission=submission,
+        transcription=None,
+    )
+
+
+def _load_input_legacy(packet_dir: Path) -> PacketInput:
     input_dir = packet_dir / "input"
-    # model_validate_json, not model_validate: a StrictModel is strict=True, so
-    # a JSON array only coerces to a tuple through the JSON path.
     organization = OrganizationContext.model_validate_json(
         _read_text(input_dir / "organization.json")
     )
@@ -78,7 +157,7 @@ def load_input(packet_dir: Path) -> PacketInput:
     )
 
     return PacketInput(
-        root_id=submission.activity,  # the root is keyed by the activity
+        root_id=submission.activity,
         profile=organization.profile,
         sources=tuple(sources),
         organization=organization,
@@ -87,9 +166,27 @@ def load_input(packet_dir: Path) -> PacketInput:
     )
 
 
-def load_gold(packet_dir: Path) -> GoldPacket:
+def load_gold(packet_dir: Path, *, stage_id: str = "ban-dau") -> GoldPacket:
     """Load the scorer-only layer. Must never be called on the app path."""
     packet_dir = Path(packet_dir)
+    if _is_new_layout(packet_dir):
+        gold_dir = packet_dir / _NEW_GOLD
+        latent_raw = json.loads(_read_text(gold_dir / "su-that-an.json"))
+        observable_raw = json.loads(_read_text(gold_dir / "quan-sat-duoc.json"))
+        allowed_raw = json.loads(_read_text(gold_dir / "ket-qua-hop-le.json"))
+        stage = stage_id if stage_id in latent_raw.get("stages", {}) else "ban-dau"
+        # model_validate_json for strict tuples.
+        return GoldPacket(
+            latent=LatentGold.model_validate_json(
+                json.dumps(latent_raw["stages"][stage])
+            ),
+            observable=ObservableGold.model_validate_json(
+                json.dumps(observable_raw["stages"][stage])
+            ),
+            allowed=AllowedGold.model_validate_json(
+                json.dumps(allowed_raw["stages"][stage])
+            ),
+        )
     gold_dir = packet_dir / "gold"
     return GoldPacket(
         latent=LatentGold.model_validate_json(_read_text(gold_dir / "latent.json")),
@@ -172,10 +269,30 @@ def validate_inventory(manifest: Path) -> InventoryReport:
     )
 
 
-def digest_packet_input(packet_dir: Path) -> str:
-    """A stable digest of the whole input layer, for the manifest."""
-    input_dir = Path(packet_dir) / "input"
-    parts: list[str] = []
+def digest_packet_input(packet_dir: Path, *, stage_id: str = "ban-dau") -> str:
+    """A stable digest of the input basis available at ``stage_id`` (plan R1).
+
+    Only the context and the documents available at that stage are hashed, so a
+    later-stage proof does not change the initial basis.
+    """
+    packet_dir = Path(packet_dir)
+    if _is_new_layout(packet_dir):
+        parts: list[str] = []
+        context_dir = packet_dir / _NEW_CONTEXT
+        if context_dir.is_dir():
+            for path in sorted(context_dir.rglob("*")):
+                if path.is_file() and path.name != "ban-doc-stub.json":
+                    parts.append(f"{path.relative_to(packet_dir)}:{_sha256_file(path)}")
+        for folder_name in _available_folders(stage_id):
+            folder = packet_dir / _NEW_INPUT / folder_name
+            if not folder.is_dir():
+                continue
+            for path in sorted(folder.rglob("*")):
+                if path.is_file():
+                    parts.append(f"{path.relative_to(packet_dir)}:{_sha256_file(path)}")
+        return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+    input_dir = packet_dir / "input"
+    parts = []
     for path in sorted(input_dir.rglob("*")):
         if path.is_file():
             parts.append(f"{path.relative_to(input_dir)}:{_sha256_file(path)}")
@@ -186,6 +303,55 @@ def write_manifest(manifest: Path, meta: PacketMetadata) -> None:
     Path(manifest).write_text(
         meta.model_dump_json(indent=2), encoding="utf-8"
     )
+
+
+def bind_sources(case_dir: Path, packet: PacketInput, *, stage_id: str = "ban-dau"):
+    """Return a resolver that materializes exactly this stage's source bytes.
+
+    The resolver only accepts a ``PacketSource`` already bound to this case and
+    stage; it validates an allowlisted relative file, media/size, a case-contained
+    resolved path (no symlink/traversal) and the SHA256 at read time. The path and
+    the case name live only in the closure, never serialized into a prompt (plan
+    A.2).
+    """
+    case_dir = Path(case_dir).resolve()
+    allowed: dict[tuple[str, str], Path] = {}
+    for folder_name in _available_folders(stage_id):
+        folder = case_dir / _NEW_INPUT / folder_name
+        if folder.is_dir():
+            for path in sorted(folder.rglob("*")):
+                if path.is_file():
+                    allowed[(folder_name, path.name)] = path
+    # Also accept the legacy input/sources layout.
+    legacy = case_dir / "input" / "sources"
+    if legacy.is_dir():
+        for path in sorted(legacy.rglob("*")):
+            if path.is_file():
+                allowed[("input", path.name)] = path
+
+    bound = {(s.filename, s.sha256) for s in packet.sources}
+
+    def resolve(source: PacketSource) -> bytes:
+        if (source.filename, source.sha256) not in bound:
+            raise PacketError(f"source not bound to this stage: {source.filename}")
+        path = None
+        for (_folder, name), candidate in allowed.items():
+            if name == source.filename:
+                path = candidate
+                break
+        if path is None:
+            raise PacketError(f"unknown source file: {source.filename}")
+        resolved = path.resolve()
+        if not resolved.is_relative_to(case_dir):
+            raise PacketError(f"source escapes the case dir: {source.filename}")
+        if resolved.is_symlink():
+            raise PacketError(f"source must not be a symlink: {source.filename}")
+        data = resolved.read_bytes()
+        if hashlib.sha256(data).hexdigest() != source.sha256:
+            raise PacketError(f"source digest mismatch: {source.filename}")
+        return data
+
+    return resolve
 
 
 def entry_from_packet(
