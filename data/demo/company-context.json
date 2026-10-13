@@ -1,0 +1,89 @@
+{
+  "data_origin": "SIMULATED",
+  "note": "Context công ty tổng hợp cho demo; không phải quyền thật của doanh nghiệp hay quy định pháp luật.",
+  "organization": {
+    "id": "tenant:demo",
+    "name": "Công ty Demo"
+  },
+  "people": [
+    { "id": "employee:employee-a", "name": "Nguyễn Văn A" },
+    { "id": "employee:accountant-demo", "name": "Trần Thị B (kế toán)" },
+    { "id": "employee:approver", "name": "Lê Văn C (người quyết định)" }
+  ],
+  "activities": [
+    {
+      "id": "activity:travel-a",
+      "name": "Công tác Hà Nội",
+      "occurred_at": "2026-10-05T09:00:00+07:00",
+      "purpose": "Làm việc với đối tác tại Hà Nội",
+      "status": "AUTHORIZED",
+      "budget": {
+        "amount": 8000000,
+        "effect_from": "2026-10-01T00:00:00+07:00",
+        "record_key": "budget:travel-a",
+        "quote": "Ngân sách hoạt động Công tác Hà Nội: 8.000.000 VND (hiệu lực từ 01/10/2026)."
+      }
+    },
+    {
+      "id": "activity:travel-b",
+      "name": "Công tác Đà Nẵng",
+      "occurred_at": "2026-11-02T09:00:00+07:00",
+      "purpose": "Khảo sát nhà cung cấp tại Đà Nẵng",
+      "status": "AUTHORIZED"
+    }
+  ],
+  "grants": [
+    {
+      "id": "grant:system:recognize",
+      "version": "v1",
+      "actor": "system:referee",
+      "actions": ["RECOGNIZE_COST"],
+      "scope": "tenant:demo",
+      "max_amount": 8000000,
+      "effective_from": "2026-10-01T00:00:00+07:00"
+    },
+    {
+      "id": "grant:system:issue",
+      "version": "v1",
+      "actor": "system:referee",
+      "actions": ["ISSUE_PAYMENT", "ISSUE_COLLECTION"],
+      "scope": "tenant:demo",
+      "max_amount": 4000000,
+      "effective_from": "2026-10-01T00:00:00+07:00"
+    },
+    {
+      "id": "grant:approver:per-action",
+      "version": "v1",
+      "actor": "employee:approver",
+      "actions": [
+        "AUTHORIZE_ACTIVITY",
+        "SET_BUDGET",
+        "RECOGNIZE_COST",
+        "EXCEPT_POLICY",
+        "ISSUE_PAYMENT",
+        "ISSUE_COLLECTION",
+        "OVERRIDE"
+      ],
+      "scope": "tenant:demo",
+      "max_amount": 20000000,
+      "effective_from": "2026-10-01T00:00:00+07:00"
+    }
+  ],
+  "witnesses": [
+    {
+      "kind": "LEDGER_OPENING",
+      "record_key": "ledger:opening:2026-09",
+      "quote": "Số dư theo dõi công tác của Nguyễn Văn A tại 01/10/2026: 0 VND (chưa có ứng nào được ghi)."
+    },
+    {
+      "kind": "LEDGER_COVERAGE",
+      "record_key": "ledger:coverage:2026-10",
+      "quote": "Sổ theo dõi ứng/hoàn cho Nguyễn Văn A được đối chiếu đủ giai đoạn 01/10/2026–13/10/2026."
+    },
+    {
+      "kind": "BUDGET",
+      "record_key": "budget:travel-a",
+      "quote": "Ngân sách hoạt động Công tác Hà Nội: 8.000.000 VND (hiệu lực từ 01/10/2026)."
+    }
+  ]
+}

@@ -1,0 +1,800 @@
+"""Case workflow: canonical roots, draft/source/declaration commands, demo context.
+
+This module owns the transaction boundary (contracts §6): a command, its version
+bump and its audit row commit together. Provider I/O does not exist here yet; the
+EvidenceReader arrives at T5 and the assessment pipeline at T6. Unsupported
+command kinds fail loudly instead of pretending to work.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import sqlite3
+import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Annotated, Callable, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+from zoneinfo import ZoneInfo
+
+from invoice_referee.domain.case import CaseView, CommandContext
+from invoice_referee.domain.commands import (
+    AttachSources,
+    CaseCommand,
+    CommandResult,
+    CreateDraft,
+    ReviseDeclaration,
+)
+from invoice_referee.domain.common import Fact, SignedVnd, Vnd
+from invoice_referee.domain.evidence import SourceRef
+from invoice_referee.domain.finance import Projection
+from invoice_referee.domain.issues import BusinessIssue
+from invoice_referee.workflow.db import Database
+
+DEFAULT_TENANT = "tenant:demo"
+DEFAULT_PERSONA = "employee"
+DEFAULT_ACTIVITY_PROFILE = "TRAVEL"
+DEFAULT_MAX_SOURCE_BYTES = 20 * 1024 * 1024  # contracts §6 pilot ceiling per file
+
+PERSONAS: tuple[tuple[str, str], ...] = (
+    ("employee", "Nhân viên"),
+    ("accountant", "Kế toán"),
+    ("approver", "Người quyết định"),
+)
+
+_VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+class WorkflowError(Exception):
+    """Base for server-side command errors the API maps to HTTP codes."""
+
+
+class UnknownSessionError(WorkflowError):
+    pass
+
+
+class NotFoundError(WorkflowError):
+    pass
+
+
+class StaleCommandError(WorkflowError):
+    pass
+
+
+class CommandConflictError(WorkflowError):
+    pass
+
+
+class UnsupportedCommandError(WorkflowError):
+    pass
+
+
+@dataclass(frozen=True)
+class DemoSession:
+    session_id: str
+    tenant: str
+    persona: str
+    actor_id: str
+
+
+@dataclass(frozen=True)
+class CatalogActivity:
+    activity_id: str
+    name: str
+    occurred_at: datetime | None
+    purpose: str
+    status: str
+    budget_amount: int | None
+
+    @property
+    def has_budget(self) -> bool:
+        return self.budget_amount is not None
+
+
+def default_actor(persona: str, tenant: str) -> str:
+    """The demo actor a persona switches into (contracts §5: server-side)."""
+    if tenant == DEFAULT_TENANT:
+        return {
+            "employee": "employee:employee-a",
+            "accountant": "employee:accountant-demo",
+            "approver": "employee:approver",
+        }[persona]
+    return f"employee:{persona}-{tenant.split(':')[-1]}"
+
+
+def _root_id(tenant: str, employee: str, activity: str) -> str:
+    digest = hashlib.sha256(f"{tenant}|{employee}|{activity}".encode("utf-8")).hexdigest()
+    return f"case:{digest[:20]}"
+
+
+def _unknown_projection() -> Projection:
+    """No figures yet: every amount stays UNKNOWN, never a fabricated zero."""
+    return Projection(
+        T=Fact[Vnd](key="projection:T", state="UNKNOWN"),
+        E=Fact[Vnd](key="projection:E", state="UNKNOWN"),
+        C=Fact[Vnd](key="projection:C", state="UNKNOWN"),
+        A=Fact[Vnd](key="projection:A", state="UNKNOWN"),
+        P=Fact[Vnd](key="projection:P", state="UNKNOWN"),
+        R=Fact[Vnd](key="projection:R", state="UNKNOWN"),
+        unpaid=Fact[Vnd](key="projection:unpaid", state="UNKNOWN"),
+        S=Fact[SignedVnd](key="projection:S", state="UNKNOWN"),
+    )
+
+
+def _context_issue(root_id: str) -> BusinessIssue:
+    return BusinessIssue(
+        id=f"issue:context:{root_id}",
+        kind="FACT",
+        field_or_rule="budget:B",
+        owner="org-data",
+        status="OPEN",
+        basis=(
+            "Context demo chưa có bản ghi ngân sách hoặc quyết định hoạt động "
+            "cho hoạt động này."
+        ),
+        refs=(),
+        question=(
+            "Tìm bản ghi ngân sách/quyết định hoạt động; chưa có số 0 thay thế "
+            "cho phần chưa xác minh."
+        ),
+    )
+
+
+def _vn_date(value: str) -> str:
+    try:
+        moment = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return moment.astimezone(_VN_TZ).strftime("%d/%m/%Y")
+
+
+def _parse_dt(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    return datetime.fromisoformat(value)
+
+
+def _fingerprint(context: CommandContext, command: CaseCommand) -> str:
+    payload = {
+        "expected_case_version": context.expected_case_version,
+        "command": json.loads(command.model_dump_json()),
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+# -- validated synthetic context models (contracts §10.4) --------------------
+
+
+class _ContextModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+Money = Annotated[int, Field(ge=0, strict=True)]
+
+
+class _DemoBudget(_ContextModel):
+    amount: Money
+    effect_from: datetime | None = None
+    record_key: str
+    quote: str
+
+
+class _DemoActivity(_ContextModel):
+    id: str
+    name: str
+    occurred_at: datetime | None = None
+    purpose: str
+    status: Literal["AUTHORIZED", "PROPOSED"] = "AUTHORIZED"
+    budget: _DemoBudget | None = None
+
+
+class _DemoGrant(_ContextModel):
+    id: str
+    version: str
+    actor: str
+    actions: tuple[str, ...]
+    scope: str
+    max_amount: Money
+    effective_from: datetime
+    effective_to: datetime | None = None
+
+
+class _DemoPerson(_ContextModel):
+    id: str
+    name: str
+
+
+class _DemoWitness(_ContextModel):
+    kind: Literal["LEDGER_OPENING", "LEDGER_COVERAGE", "BUDGET"]
+    record_key: str
+    quote: str
+
+
+class _DemoOrganization(_ContextModel):
+    id: str
+    name: str
+
+
+class _DemoContext(_ContextModel):
+    data_origin: Literal["SIMULATED"]
+    note: str
+    organization: _DemoOrganization
+    people: tuple[_DemoPerson, ...] = ()
+    activities: tuple[_DemoActivity, ...] = ()
+    grants: tuple[_DemoGrant, ...] = ()
+    witnesses: tuple[_DemoWitness, ...] = ()
+
+
+class CaseWorkflow:
+    """Canonical roots, draft commands and the validated demo context."""
+
+    def __init__(
+        self,
+        db: Database,
+        *,
+        uploads_dir: str | Path,
+        max_source_bytes: int = DEFAULT_MAX_SOURCE_BYTES,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
+        self.db = db
+        self.uploads_dir = Path(uploads_dir)
+        self.max_source_bytes = max_source_bytes
+        self._clock = clock or (lambda: datetime.now(UTC))
+
+    def _now_iso(self) -> str:
+        return self._clock().isoformat()
+
+    # -- demo sessions -------------------------------------------------------
+    def start_session(
+        self,
+        *,
+        tenant: str = DEFAULT_TENANT,
+        persona: str = DEFAULT_PERSONA,
+        actor_id: str | None = None,
+    ) -> DemoSession:
+        session_id = f"session:{uuid.uuid4().hex}"
+        actor = actor_id or default_actor(persona, tenant)
+        now = self._now_iso()
+        with self.db.transaction() as cx:
+            cx.execute(
+                "INSERT INTO demo_sessions (session_id, tenant, persona, actor_id, "
+                "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (session_id, tenant, persona, actor, now, now),
+            )
+            self._audit(
+                cx,
+                tenant=tenant,
+                root_id=None,
+                session_id=session_id,
+                actor=actor,
+                action="SESSION_START",
+                detail=json.dumps({"persona": persona}, ensure_ascii=False),
+            )
+        return DemoSession(session_id=session_id, tenant=tenant, persona=persona, actor_id=actor)
+
+    def session(self, session_id: str) -> DemoSession:
+        row = self._query_one(
+            "SELECT * FROM demo_sessions WHERE session_id = ?", (session_id,)
+        )
+        if row is None:
+            raise UnknownSessionError("Phiên demo không tồn tại; hãy tải lại trang.")
+        return DemoSession(
+            session_id=row["session_id"],
+            tenant=row["tenant"],
+            persona=row["persona"],
+            actor_id=row["actor_id"],
+        )
+
+    def switch_persona(self, session_id: str, persona: str) -> DemoSession:
+        current = self.session(session_id)
+        actor = default_actor(persona, current.tenant)
+        with self.db.transaction() as cx:
+            cx.execute(
+                "UPDATE demo_sessions SET persona = ?, actor_id = ?, updated_at = ? "
+                "WHERE session_id = ?",
+                (persona, actor, self._now_iso(), session_id),
+            )
+            self._audit(
+                cx,
+                tenant=current.tenant,
+                root_id=None,
+                session_id=session_id,
+                actor=actor,
+                action="PERSONA_SWITCH",
+                detail=json.dumps(
+                    {"from": current.persona, "to": persona}, ensure_ascii=False
+                ),
+            )
+        return DemoSession(
+            session_id=session_id, tenant=current.tenant, persona=persona, actor_id=actor
+        )
+
+    # -- demo context --------------------------------------------------------
+    def import_demo_context(
+        self, context_path: str | Path, *, origin: str = "SIMULATED"
+    ) -> str:
+        raw = Path(context_path).read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        data = _DemoContext.model_validate_json(raw)
+        tenant = data.organization.id
+        with self.db.transaction() as cx:
+            previous = cx.execute(
+                "SELECT digest FROM context_imports WHERE tenant = ? "
+                "ORDER BY id DESC LIMIT 1",
+                (tenant,),
+            ).fetchone()
+            if previous is not None and previous["digest"] == digest:
+                return digest
+
+            for activity in data.activities:
+                budget = activity.budget
+                cx.execute(
+                    "INSERT INTO context_activities (activity_id, tenant, name, "
+                    "occurred_at, purpose, budget_amount, budget_effect_from, status) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT(tenant, activity_id) DO UPDATE SET name = excluded.name, "
+                    "occurred_at = excluded.occurred_at, purpose = excluded.purpose, "
+                    "budget_amount = excluded.budget_amount, "
+                    "budget_effect_from = excluded.budget_effect_from, "
+                    "status = excluded.status",
+                    (
+                        activity.id,
+                        tenant,
+                        activity.name,
+                        activity.occurred_at.isoformat() if activity.occurred_at else None,
+                        activity.purpose,
+                        budget.amount if budget else None,
+                        budget.effect_from.isoformat()
+                        if budget and budget.effect_from
+                        else None,
+                        activity.status,
+                    ),
+                )
+            for grant in data.grants:
+                cx.execute(
+                    "INSERT OR REPLACE INTO context_grants (grant_id, tenant, version, "
+                    "actor, actions_json, scope, max_amount, effective_from, "
+                    "effective_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        grant.id,
+                        tenant,
+                        grant.version,
+                        grant.actor,
+                        json.dumps(list(grant.actions), ensure_ascii=False),
+                        grant.scope,
+                        grant.max_amount,
+                        grant.effective_from.isoformat(),
+                        grant.effective_to.isoformat() if grant.effective_to else None,
+                    ),
+                )
+            for person in data.people:
+                cx.execute(
+                    "INSERT OR REPLACE INTO context_people (id, tenant, name) "
+                    "VALUES (?, ?, ?)",
+                    (person.id, tenant, person.name),
+                )
+            cx.execute("DELETE FROM context_witnesses WHERE tenant = ?", (tenant,))
+            for witness in data.witnesses:
+                cx.execute(
+                    "INSERT INTO context_witnesses (tenant, kind, record_key, quote, "
+                    "source_id, source_sha256) VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        tenant,
+                        witness.kind,
+                        witness.record_key,
+                        witness.quote,
+                        "source:demo-context",
+                        digest,
+                    ),
+                )
+            cx.execute(
+                "INSERT INTO context_imports (tenant, digest, origin, imported_at, note) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (tenant, digest, origin, self._now_iso(), data.note),
+            )
+            self._audit(
+                cx,
+                tenant=tenant,
+                root_id=None,
+                session_id=None,
+                actor="system:context-import",
+                action="CONTEXT_IMPORT",
+                detail=json.dumps(
+                    {"digest": digest, "origin": origin, "activities": len(data.activities)},
+                    ensure_ascii=False,
+                ),
+                origin=origin,
+            )
+        return digest
+
+    def catalog(self, tenant: str = DEFAULT_TENANT) -> tuple[CatalogActivity, ...]:
+        connection = self.db.connect()
+        try:
+            rows = connection.execute(
+                "SELECT * FROM context_activities WHERE tenant = ? ORDER BY activity_id",
+                (tenant,),
+            ).fetchall()
+        finally:
+            connection.close()
+        return tuple(
+            CatalogActivity(
+                activity_id=row["activity_id"],
+                name=row["name"],
+                occurred_at=_parse_dt(row["occurred_at"]),
+                purpose=row["purpose"],
+                status=row["status"],
+                budget_amount=row["budget_amount"],
+            )
+            for row in rows
+        )
+
+    def catalog_entry(self, tenant: str, activity_id: str) -> CatalogActivity | None:
+        for entry in self.catalog(tenant):
+            if entry.activity_id == activity_id:
+                return entry
+        return None
+
+    def display_name(self, tenant: str, actor_id: str) -> str:
+        row = self._query_one(
+            "SELECT name FROM context_people WHERE id = ? AND tenant = ?",
+            (actor_id, tenant),
+        )
+        return str(row["name"]) if row is not None else actor_id
+
+    def last_context_import(self, tenant: str = DEFAULT_TENANT) -> dict[str, str] | None:
+        row = self._query_one(
+            "SELECT digest, origin, imported_at, note FROM context_imports "
+            "WHERE tenant = ? ORDER BY id DESC LIMIT 1",
+            (tenant,),
+        )
+        if row is None:
+            return None
+        return {
+            "digest": str(row["digest"]),
+            "origin": str(row["origin"]),
+            "imported_at": str(row["imported_at"]),
+            "note": str(row["note"]),
+        }
+
+    # -- commands ------------------------------------------------------------
+    async def execute(self, context: CommandContext, command: CaseCommand) -> CommandResult:
+        session = self.session(context.session_id)
+        handlers: dict[str, Callable[..., CommandResult]] = {
+            "CREATE_DRAFT": self._create_draft,
+            "ATTACH_SOURCES": self._attach_sources,
+            "REVISE_DECLARATION": self._revise_declaration,
+        }
+        handler = handlers.get(command.kind)
+        if handler is None:
+            raise UnsupportedCommandError(
+                f"Lệnh {command.kind} chưa được triển khai trong phạm vi T2."
+            )
+        fingerprint = _fingerprint(context, command)
+        with self.db.transaction() as cx:
+            stored = cx.execute(
+                "SELECT fingerprint, result_json FROM command_log WHERE tenant = ? "
+                "AND actor_id = ? AND command_id = ?",
+                (session.tenant, context.actor_id, context.command_id),
+            ).fetchone()
+            if stored is not None:
+                if stored["fingerprint"] != fingerprint:
+                    raise CommandConflictError(
+                        "command_id đã được dùng cho một nội dung khác."
+                    )
+                previous = CommandResult.model_validate_json(stored["result_json"])
+                return previous.model_copy(update={"duplicate_command": True})
+
+            result = handler(cx, session, context, command)
+            cx.execute(
+                "INSERT INTO command_log (tenant, actor_id, command_id, fingerprint, "
+                "result_json, recorded_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    session.tenant,
+                    context.actor_id,
+                    context.command_id,
+                    fingerprint,
+                    result.model_dump_json(),
+                    self._now_iso(),
+                ),
+            )
+            return result
+
+    def _create_draft(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        context: CommandContext,
+        command: CreateDraft,
+    ) -> CommandResult:
+        activity = command.activity_data
+        employee = session.actor_id
+        known = cx.execute(
+            "SELECT 1 FROM context_activities WHERE activity_id = ? AND tenant = ?",
+            (activity.activity_id, session.tenant),
+        ).fetchone()
+        if known is None:
+            # ProposedActivity: the draft grants no activity/B authority (§10.4).
+            cx.execute(
+                "INSERT INTO context_activities (activity_id, tenant, name, occurred_at, "
+                "purpose, budget_amount, budget_effect_from, status) "
+                "VALUES (?, ?, ?, ?, ?, NULL, NULL, 'PROPOSED') "
+                "ON CONFLICT(tenant, activity_id) DO NOTHING",
+                (
+                    activity.activity_id,
+                    session.tenant,
+                    activity.name,
+                    activity.occurred_at.isoformat(),
+                    activity.declared_purpose,
+                ),
+            )
+
+        root_id = _root_id(session.tenant, employee, activity.activity_id)
+        now = self._now_iso()
+        cx.execute(
+            "INSERT INTO cases (id, tenant, employee, activity, profile, state, version, "
+            "input_revision, control_epoch, activity_name, activity_occurred_at, "
+            "created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'DRAFT', 1, 1, 0, ?, ?, ?, ?) "
+            "ON CONFLICT (tenant, employee, activity) DO NOTHING",
+            (
+                root_id,
+                session.tenant,
+                employee,
+                activity.activity_id,
+                DEFAULT_ACTIVITY_PROFILE,
+                activity.name,
+                activity.occurred_at.isoformat(),
+                now,
+                now,
+            ),
+        )
+        row = cx.execute(
+            "SELECT * FROM cases WHERE tenant = ? AND employee = ? AND activity = ?",
+            (session.tenant, employee, activity.activity_id),
+        ).fetchone()
+        self._audit(
+            cx,
+            tenant=session.tenant,
+            root_id=str(row["id"]),
+            session_id=session.session_id,
+            actor=context.actor_id,
+            action="CREATE_DRAFT",
+            detail=json.dumps({"activity": activity.activity_id}, ensure_ascii=False),
+        )
+        return CommandResult(case_view=self._case_view(cx, row))
+
+    def _attach_sources(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        context: CommandContext,
+        command: AttachSources,
+    ) -> CommandResult:
+        row = self._require_root(cx, session, command.root_id)
+        self._require_version(row, context.expected_case_version)
+        now = self._now_iso()
+        for upload in command.uploads:
+            cx.execute(
+                "INSERT INTO case_sources (source_id, root_id, tenant, filename, media, "
+                "digest, storage_key, attached_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    f"source:{uuid.uuid4().hex}",
+                    str(row["id"]),
+                    session.tenant,
+                    upload.filename,
+                    upload.media,
+                    upload.digest,
+                    upload.storage_key,
+                    now,
+                ),
+            )
+        self._bump(cx, row, now)
+        self._audit(
+            cx,
+            tenant=session.tenant,
+            root_id=str(row["id"]),
+            session_id=session.session_id,
+            actor=context.actor_id,
+            action="ATTACH_SOURCES",
+            detail=json.dumps(
+                {"files": [upload.filename for upload in command.uploads]},
+                ensure_ascii=False,
+            ),
+        )
+        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
+    def _revise_declaration(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        context: CommandContext,
+        command: ReviseDeclaration,
+    ) -> CommandResult:
+        row = self._require_root(cx, session, command.root_id)
+        self._require_version(row, context.expected_case_version)
+        now = self._now_iso()
+        revision = int(row["input_revision"]) + 1
+        cx.execute(
+            "INSERT INTO case_declarations (root_id, revision, purpose, notes, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                str(row["id"]),
+                revision,
+                command.declaration.declared_purpose,
+                command.declaration.notes,
+                now,
+            ),
+        )
+        self._bump(cx, row, now)
+        self._audit(
+            cx,
+            tenant=session.tenant,
+            root_id=str(row["id"]),
+            session_id=session.session_id,
+            actor=context.actor_id,
+            action="REVISE_DECLARATION",
+            detail=json.dumps({"revision": revision}, ensure_ascii=False),
+        )
+        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
+    # -- reads ---------------------------------------------------------------
+    def view(self, context: CommandContext, root_id: str) -> CaseView:
+        session = self.session(context.session_id)
+        connection = self.db.connect()
+        try:
+            row = connection.execute(
+                "SELECT * FROM cases WHERE id = ? AND tenant = ?",
+                (root_id, session.tenant),
+            ).fetchone()
+            if row is None or not self._session_can_see(session, row):
+                raise NotFoundError("Không tìm thấy hồ sơ trong phạm vi phiên này.")
+            return self._case_view(connection, row)
+        finally:
+            connection.close()
+
+    def list_cases(self, context: CommandContext) -> tuple[CaseView, ...]:
+        session = self.session(context.session_id)
+        connection = self.db.connect()
+        try:
+            rows = connection.execute(
+                "SELECT * FROM cases WHERE tenant = ? ORDER BY created_at, id",
+                (session.tenant,),
+            ).fetchall()
+            return tuple(
+                self._case_view(connection, row)
+                for row in rows
+                if self._session_can_see(session, row)
+            )
+        finally:
+            connection.close()
+
+    # -- internals -----------------------------------------------------------
+    @staticmethod
+    def _session_can_see(session: DemoSession, row: sqlite3.Row) -> bool:
+        # Employees act on their own scope (contracts §5); accountant/approver
+        # tenant-scoped views arrive with their tasks.
+        if session.persona == "employee" and row["employee"] != session.actor_id:
+            return False
+        return True
+
+    def _require_root(
+        self, cx: sqlite3.Connection, session: DemoSession, root_id: str
+    ) -> sqlite3.Row:
+        row = cx.execute(
+            "SELECT * FROM cases WHERE id = ? AND tenant = ?", (root_id, session.tenant)
+        ).fetchone()
+        if row is None or not self._session_can_see(session, row):
+            raise NotFoundError("Không tìm thấy hồ sơ trong phạm vi phiên này.")
+        return row
+
+    @staticmethod
+    def _require_version(row: sqlite3.Row, expected: int) -> None:
+        if int(row["version"]) != expected:
+            raise StaleCommandError(
+                "Hồ sơ đã thay đổi sau khi bạn tải: "
+                f"bạn gửi theo version {expected}, hiện tại là {row['version']}. "
+                "Hãy tải lại hồ sơ rồi gửi lại."
+            )
+
+    @staticmethod
+    def _bump(cx: sqlite3.Connection, row: sqlite3.Row, now: str) -> None:
+        cx.execute(
+            "UPDATE cases SET version = version + 1, input_revision = input_revision + 1, "
+            "updated_at = ? WHERE id = ?",
+            (now, str(row["id"])),
+        )
+
+    @staticmethod
+    def _reload(cx: sqlite3.Connection, row: sqlite3.Row) -> sqlite3.Row:
+        return cx.execute("SELECT * FROM cases WHERE id = ?", (str(row["id"]),)).fetchone()
+
+    @staticmethod
+    def _audit(
+        cx: sqlite3.Connection,
+        *,
+        tenant: str,
+        root_id: str | None,
+        session_id: str | None,
+        actor: str,
+        action: str,
+        detail: str,
+        origin: str = "APP",
+    ) -> None:
+        cx.execute(
+            "INSERT INTO audit_events (tenant, root_id, session_id, actor, action, "
+            "detail, origin, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                tenant,
+                root_id,
+                session_id,
+                actor,
+                action,
+                detail,
+                origin,
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+
+    def _query_one(self, sql: str, params: tuple[object, ...] = ()) -> sqlite3.Row | None:
+        connection = self.db.connect()
+        try:
+            return connection.execute(sql, params).fetchone()
+        finally:
+            connection.close()
+
+    def _case_view(self, cx: sqlite3.Connection, row: sqlite3.Row) -> CaseView:
+        activity = cx.execute(
+            "SELECT name, budget_amount FROM context_activities "
+            "WHERE activity_id = ? AND tenant = ?",
+            (row["activity"], row["tenant"]),
+        ).fetchone()
+        person = cx.execute(
+            "SELECT name FROM context_people WHERE id = ?", (row["employee"],)
+        ).fetchone()
+        sources = tuple(
+            SourceRef(
+                id=source["source_id"],
+                digest=source["digest"],
+                tenant=source["tenant"],
+                media=source["media"],
+                storage_key=source["storage_key"],
+            )
+            for source in cx.execute(
+                "SELECT * FROM case_sources WHERE root_id = ? "
+                "ORDER BY attached_at, source_id",
+                (str(row["id"]),),
+            )
+        )
+        audit_rows = cx.execute(
+            "SELECT action, actor, occurred_at FROM audit_events WHERE root_id = ? "
+            "ORDER BY id DESC LIMIT 10",
+            (str(row["id"]),),
+        ).fetchall()
+        activity_name = activity["name"] if activity is not None else row["activity_name"]
+        employee_name = person["name"] if person is not None else row["employee"]
+        issues: tuple[BusinessIssue, ...] = ()
+        if activity is None or activity["budget_amount"] is None:
+            issues = (_context_issue(str(row["id"])),)
+        return CaseView(
+            id=row["id"],
+            version=int(row["version"]),
+            state=row["state"],
+            summary=(
+                f"{activity_name} · {_vn_date(row['activity_occurred_at'])} · {employee_name}"
+            ),
+            sources=sources,
+            issues=issues,
+            problems=(),
+            conclusion=None,
+            instructions=(),
+            actual_money=_unknown_projection(),
+            audit=tuple(
+                f"{entry['occurred_at']} · {entry['actor']} · {entry['action']}"
+                for entry in audit_rows
+            ),
+        )

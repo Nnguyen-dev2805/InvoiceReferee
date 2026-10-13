@@ -76,7 +76,7 @@ before adaptation. Travel15 required before profile gate T13.
 
 **Files:** Create foundation/domain group, tests/factories.py, tests/unit/test_contracts.py.
 **Interfaces:** DTO contracts §2/§9; snapshot(T,E,C,A,P,R,B,coverage=True,**overrides)->AssessmentInput, unit-only literal evidence.
-- [ ] Write test_money_rejects_bool_float_and_currency, test_unknown_has_no_value, test_ref_needs_digest_locator, test_extra_fields_rejected.
+- [x] Write test_money_rejects_bool_float_and_currency, test_unknown_has_no_value, test_ref_needs_digest_locator, test_extra_fields_rejected.
 ```python
 def test_money_rejects_bool_float_and_currency():
     for value in (True, 1.25, "USD 3"):
@@ -84,9 +84,9 @@ def test_money_rejects_bool_float_and_currency():
             KnownAmount(value=value, currency="VND")
 ```
   KnownAmount in domain/common.py is strict known VND; unknown uses Fact.
-- [ ] RED: `rtk proxy uv run pytest tests/unit/test_contracts.py -q`; missing module/required validation before body, environment error isn't valid RED.
-- [ ] Implement DTO/config; pydantic-settings .env, explicit missing settings. .env.example MISTRAL_API_KEY/MISTRAL_OCR_MODEL/XKIRO_API_KEY/XKIRO_BASE_URL/INVOICE_REFEREE_LLM_MODEL blank, no generated company grants.
-- [ ] GREEN same tests, uv lock compatible Python3.12. Commit checkpoint "feat: define final domain contracts".
+- [x] RED: `rtk proxy uv run pytest tests/unit/test_contracts.py -q`; missing module/required validation before body, environment error isn't valid RED.
+- [x] Implement DTO/config; pydantic-settings .env, explicit missing settings. .env.example MISTRAL_API_KEY/MISTRAL_OCR_MODEL/XKIRO_API_KEY/XKIRO_BASE_URL/INVOICE_REFEREE_LLM_MODEL blank, no generated company grants.
+- [x] GREEN same tests, uv lock compatible Python3.12. Commit checkpoint "feat: define final domain contracts".
 **Gate:** Strict types, no expected/oracle fields accepted by application.
 
 ### T2 — Canonical root, demo server and first UI
@@ -94,20 +94,20 @@ def test_money_rejects_bool_float_and_currency():
 **Files:** Create workflow/db.py,schema.sql,service.py; api/app.py,routes.py,views.py; frontend foundation/intake/dossier; scripts/dev.py; data/demo/company-context.json; docs/final/USER_TRIAL_PROTOCOL.md; tests/integration/test_root_session.py; frontend/e2e/intake.spec.ts.
 **Consumes:** T1 CaseCommand/CommandContext/CaseView.
 **Produces:** create_app(workflow:CaseWorkflow)->FastAPI; execute(CreateDraft/AttachSources/ReviseDeclaration)->CommandResult; view(ctx,id)->CaseView; frontend request<T>(path,body,commandId,version)->Promise<T>.
-- [ ] Tests root unique, concurrent create, client role cannot grant, tenantB no view/reset tenantA, source bad media/size clear error no financial mutation.
+- [x] Tests root unique, concurrent create, client role cannot grant, tenantB no view/reset tenantA, source bad media/size clear error no financial mutation.
 ```python
 async def test_same_activity_has_one_root(app_fixture):
     a = await app_fixture.create(employee="employee:a", activity="activity:travel-a")
     b = await app_fixture.create(employee="employee:a", activity="activity:travel-a")
     assert a.case_view.id == b.case_view.id
 ```
-- [ ] RED: `rtk proxy uv run pytest tests/integration/test_root_session.py -q`.
-- [ ] Implement SQLite WAL/DB unique, HttpOnly demo cookie/persona switch audit. API /api/demo/session,/api/demo/persona,/api/cases,/api/cases/{id},/api/cases/{id}/sources. User sees names/activity/date, no employee/operator/work ID entry.
-- [ ] Activity catalog/server-generated proposed IDs theo contracts §10.4: same activity trả cùng root; hai activity có hai roots. Draft mới không tự cấp B/quyền; Decide đúng quyền hoặc synthetic context import có audit. Client tự gửi role/B không thành authority.
-- [ ] Committed observable seed: travel B8, system8/4, approver20 per-action, ledger/opening/coverage witness refs. No E/S/forced outcome from gold. Missing-context activity doesn't auto zero. Doc metadata/data_origin SIMULATED, not true corporate auth.
-- [ ] Protocol/blank private study sheets: user recruits >=3 practitioners; matched manual/app tasks and order, whole human effort/draft/wait/onboarding/adverse effect, real written feedback/consent. Agent doesn't send/invent participants.
-- [ ] GREEN tests + `rtk proxy npm --prefix frontend run build`. UI `rtk proxy uv run python scripts/dev.py --mode stub`: select/create twice/attach/list sources; accessible labels/keyboard/screenshot and mode/config diagnostics.
-- [ ] Before npm/build/browser commands, resolve Node24 and verify `node --version` plus `npm --loglevel=verbose --version` show Node24 in the same scoped environment; record the exact selector/lockfile/command/exit. A green Node26 build does not satisfy the runtime pin.
+- [x] RED: `rtk proxy uv run pytest tests/integration/test_root_session.py -q`.
+- [x] Implement SQLite WAL/DB unique, HttpOnly demo cookie/persona switch audit. API /api/demo/session,/api/demo/persona,/api/cases,/api/cases/{id},/api/cases/{id}/sources. User sees names/activity/date, no employee/operator/work ID entry.
+- [x] Activity catalog/server-generated proposed IDs theo contracts §10.4: same activity trả cùng root; hai activity có hai roots. Draft mới không tự cấp B/quyền; Decide đúng quyền hoặc synthetic context import có audit. Client tự gửi role/B không thành authority.
+- [x] Committed observable seed: travel B8, system8/4, approver20 per-action, ledger/opening/coverage witness refs. No E/S/forced outcome from gold. Missing-context activity doesn't auto zero. Doc metadata/data_origin SIMULATED, not true corporate auth.
+- [x] Protocol/blank private study sheets: user recruits >=3 practitioners; matched manual/app tasks and order, whole human effort/draft/wait/onboarding/adverse effect, real written feedback/consent. Agent doesn't send/invent participants.
+- [x] GREEN tests + `rtk proxy npm --prefix frontend run build`. UI `rtk proxy uv run python scripts/dev.py --mode stub`: select/create twice/attach/list sources; accessible labels/keyboard/screenshot and mode/config diagnostics.
+- [x] Before npm/build/browser commands, resolve Node24 and verify `node --version` plus `npm --loglevel=verbose --version` show Node24 in the same scoped environment; record the exact selector/lockfile/command/exit. A green Node26 build does not satisfy the runtime pin.
 - [ ] Commit checkpoint "feat: add canonical demo intake".
 **Gate:** UI available, tenant/version/source checks; trial owner/preparation explicit.
 

@@ -7,17 +7,17 @@ The plan owns task acceptance; package/config files own executable commands.
 
 | Field | Current value |
 | --- | --- |
-| Base branch | `final`; verify the actual checkout at resume |
-| Phase | Agent setup reviewed; ready for an authorized application task; implementation has not started |
-| Authorized scope now | Agent setup and review completed; the user's next request sets the next scope |
+| Base branch | `final` @ 57d2e19 (T1 commit, pushed to origin/final); T2 runs on branch `t2-canonical-intake` in worktree `.worktrees/t2` |
+| Phase | T1 committed; T2 implemented and verified in the worktree — awaiting the user's review and any commit authorization |
+| Authorized scope now | T2 (canonical root, demo server, first UI). No Git authorization: T2 changes stay uncommitted on `t2-canonical-intake` |
 | Setup review | ACCEPTED at documentation/setup level; actual clean-clone and agent-execution proof remain open |
-| Execution method | Not selected; the plan handoff records Native / Subagent-driven choices |
-| Workflow integrator | Not assigned; name the main implementer when implementation is authorized |
-| Next application task | T1, not started |
-| Last completed application task | None |
-| Product unit/integration/UI/LIVE evidence | None for the fresh build |
-| CodeGraph | Index rebuilt 13/10/2026 on this checkout: `index_state=complete`, `indexed_at_commit=3cd8c41` (= HEAD), 0 files/nodes. Workspace is docs-only and CodeGraph does not index `.md`, so it stays **inactive** until T1 adds source; re-run `rtk proxy codegraph index` after code exists. Earlier `index_state=failed` was a stale pass left over from the rebuild branch (152 ENOENT on deleted `frontend/src/settlement/*`, `tests/settlement/*`) |
-| Git handoff | Setup/design files are not committed; local files exist, a fresh remote clone is not yet verified |
+| Execution method | Inline execution (executing-plans) with one integrator; the whole-branch final review has not been run |
+| Workflow integrator | Inline executor — single writer for workflow/api/domain owned files |
+| Next application task | T3, not started (needs authorization) |
+| Last completed application task | T2 — gate passed (UI available; tenant/version/source checks); T1 = 57d2e19 |
+| Product unit/integration/UI/LIVE evidence | T2: `uv run pytest -q` → 25 passed; `npm --prefix frontend run build` exit 0 under Node 24.19.0 / npm 11.12.1 (lockfile `frontend/package-lock.json`); UI checkpoint on `uv run python scripts/dev.py --mode stub` (create-twice/attach/list, a11y + keyboard + screenshot, mode/config diagnostics). LIVE/OCR: NOT_RUN |
+| CodeGraph | Index rebuilt 13/10/2026 at commit 3cd8c41 with 0 files/nodes (checkout was docs-only; CodeGraph does not index `.md`). T1/T2 added `src/invoice_referee/**`, `tests/**`, `frontend/**`, so the index is **stale** for code discovery — re-run `rtk proxy codegraph index` before relying on it. Earlier `index_state=failed` was a stale pass from the rebuild branch (152 ENOENT on deleted `frontend/src/settlement/*`, `tests/settlement/*`) |
+| Git handoff | T1 = 57d2e19 on `final` (pushed). T2 = uncommitted working tree on `t2-canonical-intake` in `.worktrees/t2` (commit step deferred, no Git authorization) |
 
 ## Evidence on demand
 
