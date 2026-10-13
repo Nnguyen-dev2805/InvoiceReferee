@@ -20,6 +20,7 @@ export function Execution({
 }) {
   const [amount, setAmount] = useState("");
   const [payee, setPayee] = useState("employee:employee-a");
+  const [completionClaim, setCompletionClaim] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -40,6 +41,9 @@ export function Execution({
         payee,
         amount: Number(amount),
         event_at: new Date().toISOString(),
+        // A bare amount is not proof: the accountant must confirm the transfer
+        // responsibly, or the money stays observed and does not fulfill (§4).
+        completion_claim: completionClaim || null,
         reason: "Ghi nhận tiền thực tế",
       });
       onCase(result.case_view);
@@ -85,6 +89,16 @@ export function Execution({
             id="received-payee"
             value={payee}
             onChange={(event) => setPayee(event.target.value)}
+          />
+        </label>
+      </p>
+      <p>
+        <label htmlFor="completion-claim">
+          Xác nhận đã chuyển (bắt buộc để tính là đã thực hiện)
+          <input
+            id="completion-claim"
+            value={completionClaim}
+            onChange={(event) => setCompletionClaim(event.target.value)}
           />
         </label>
       </p>

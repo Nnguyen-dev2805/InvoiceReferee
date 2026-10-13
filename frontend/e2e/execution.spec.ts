@@ -21,9 +21,13 @@ test("execution: record actual money updates the projection", async ({ page }) =
   await page.getByRole("button", { name: "Đính kèm" }).click();
   await page.getByRole("button", { name: "Nộp hồ sơ" }).click();
 
-  // An instruction exists; record a receipt of 2.000.000.
+  // An instruction exists; record a receipt of 2.000.000 with a responsible
+  // completion confirmation (a bare amount is not verified money).
   await expect(page.getByTestId("instruction-PAY")).toBeVisible();
   await page.getByLabel("Số tiền đã nhận").fill("2000000");
+  await page
+    .getByLabel("Xác nhận đã chuyển (bắt buộc để tính là đã thực hiện)")
+    .fill("Đã chuyển khoản, đối chiếu sao kê");
   await page.getByRole("button", { name: "Ghi nhận" }).click();
 
   await expect(page.getByText(/Đã ghi nhận tiền thực tế/)).toBeVisible();
