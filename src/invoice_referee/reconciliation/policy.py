@@ -52,6 +52,16 @@ def _active_budget(input: AssessmentInput) -> BudgetDecision | None:
     return None
 
 
+def _scope_covers(input: AssessmentInput, grant_scope: str) -> bool:
+    """A grant covers an activity when its scope is that activity or the tenant.
+
+    Contracts §5: a grant has an explicit scope (the system grant is scoped to
+    one activity/profile); a tenant-wide grant is the demo's ``tenant:<id>``
+    convention. A grant scoped to another activity never authorizes this one.
+    """
+    return grant_scope in (input.scope.activity, input.scope.tenant)
+
+
 def _grant_covers(
     input: AssessmentInput, action: str, amount: int, actor: str | None = None
 ) -> bool:
@@ -60,6 +70,8 @@ def _grant_covers(
         if action not in grant.actions:
             continue
         if actor is not None and grant.actor != actor:
+            continue
+        if not _scope_covers(input, grant.scope):
             continue
         if grant.effective_from <= when and (grant.effective_to is None or when <= grant.effective_to):
             if grant.max_amount >= amount:
@@ -71,6 +83,8 @@ def _has_grant_ignoring_amount(input: AssessmentInput, action: str) -> bool:
     when = input.as_of
     for grant in input.grants:
         if action not in grant.actions:
+            continue
+        if not _scope_covers(input, grant.scope):
             continue
         if grant.effective_from <= when and (grant.effective_to is None or when <= grant.effective_to):
             return True

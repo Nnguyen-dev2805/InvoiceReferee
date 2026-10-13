@@ -136,6 +136,29 @@ def test_new_paid_portion_requires_total_authority() -> None:
     assert "AUTHORITY" in _issue_kinds(across)
 
 
+def test_grant_scoped_to_another_activity_does_not_authorize() -> None:
+    # A grant whose scope is a different activity must not cover this scope
+    # (contracts §5: system grant has an explicit scope). E6/A2 => S4 would
+    # self-issue, but the only ISSUE grant is scoped elsewhere, so it needs
+    # authority and must not produce an allowed effect.
+    other_scope = tuple(
+        g.model_copy(update={"scope": "activity:other"}) for g in default_grants()
+    )
+    r = Reconciler().assess(
+        snapshot(T=6_000_000, E=6_000_000, C=0, A=2_000_000, P=0, R=0, B=8_000_000,
+                 grants=other_scope)
+    )
+    assert r.allowed_effect is None
+    assert "AUTHORITY" in _issue_kinds(r)
+
+
+def test_grant_scope_matches_activity_is_authorized() -> None:
+    # The committed demo grant is scoped to this activity and self-issues.
+    r = _assess(T=6_000_000, E=6_000_000, C=0, A=2_000_000, P=0, R=0, B=8_000_000)
+    assert r.allowed_effect is not None
+    assert r.allowed_effect.amount == 4_000_000
+
+
 def test_prior_eligibility_basis_unchanged_by_pure_receipt() -> None:
     # A pure confirmed receipt (P) moves S and the money basis but must not
     # change the cost basis, so a prior eligibility decision is still reusable.

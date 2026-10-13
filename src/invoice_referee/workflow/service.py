@@ -804,10 +804,16 @@ class CaseWorkflow:
     ) -> CommandResult:
         row = self._require_root(cx, session, command.root_id)
         decision = command.decision
-        # A decision needs a real grant for its actions at this scope (contracts §5).
+        # A decision needs a real grant for its actions at this scope and within
+        # the grant's amount ceiling (contracts §5).
         for action in decision.actions:
             if not self._actor_has_grant(
-                cx, session.tenant, context.actor_id, action, decision.effect_scope
+                cx,
+                session.tenant,
+                context.actor_id,
+                action,
+                decision.effect_scope,
+                decision.amount,
             ):
                 raise UnsupportedCommandError(
                     f"Không có quyền thực hiện {action} trong phạm vi này."
@@ -1016,10 +1022,15 @@ class CaseWorkflow:
     ) -> CommandResult:
         row = self._require_root(cx, session, command.root_id)
         decision = command.decision
-        # An override needs the exact grant for its actions (§5, §10.3).
+        # An override needs the exact grant for its actions and amount (§5, §10.3).
         for action in decision.actions:
             if not self._actor_has_grant(
-                cx, session.tenant, context.actor_id, action, decision.effect_scope
+                cx,
+                session.tenant,
+                context.actor_id,
+                action,
+                decision.effect_scope,
+                decision.amount,
             ):
                 raise UnsupportedCommandError(
                     f"Không có quyền thực hiện {action} trong phạm vi này."
@@ -1138,14 +1149,32 @@ class CaseWorkflow:
                 )
 
     def _actor_has_grant(
-        self, cx: sqlite3.Connection, tenant: str, actor: str, action: str, scope: str
+        self,
+        cx: sqlite3.Connection,
+        tenant: str,
+        actor: str,
+        action: str,
+        scope: str,
+        amount: int | None = None,
     ) -> bool:
+        """A grant authorizes one action, one scope and an amount ceiling (§5).
+
+        The scope must be the activity (or the tenant-wide convention); a grant
+        scoped elsewhere never authorizes this action. When `amount` is given it
+        must not exceed the grant's `max_amount` (per action, inclusive).
+        """
         now = datetime.now(UTC)
         for grant in cx.execute(
             "SELECT * FROM context_grants WHERE tenant = ? AND actor = ?",
             (tenant, actor),
         ).fetchall():
             if action not in json.loads(grant["actions_json"]):
+                continue
+            # The grant's scope must cover the requested scope: an exact match,
+            # or a tenant-wide grant (the demo's ``tenant:<id>`` convention).
+            if str(grant["scope"]) not in (scope, tenant):
+                continue
+            if amount is not None and amount > int(grant["max_amount"]):
                 continue
             eff_from = datetime.fromisoformat(grant["effective_from"])
             eff_to = (
