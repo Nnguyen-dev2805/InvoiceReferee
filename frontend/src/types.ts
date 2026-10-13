@@ -33,6 +33,17 @@ export interface IssueView {
   question: string;
 }
 
+export interface InstructionView {
+  id: string;
+  direction: "PAY" | "COLLECT";
+  amount: number;
+  status: string;
+  basis: string;
+  fulfilled_amount: number;
+  remaining: number;
+  execution_state: string;
+}
+
 export interface CaseView {
   id: string;
   version: number;
@@ -42,7 +53,7 @@ export interface CaseView {
   issues: IssueView[];
   problems: unknown[];
   conclusion: unknown | null;
-  instructions: unknown[];
+  instructions: InstructionView[];
   actual_money: Record<string, MoneyFact>;
   audit: string[];
 }

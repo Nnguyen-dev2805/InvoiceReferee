@@ -60,6 +60,33 @@ export const api = {
   listCases: () => request<{ cases: CaseView[] }>("/api/cases"),
 };
 
+export async function submitCase(
+  rootId: string,
+  activityId: string,
+  declaredPurpose: string,
+  version: number,
+): Promise<CommandResultView> {
+  return request<CommandResultView>(
+    `/api/cases/${rootId}/submit`,
+    { activity_id: activityId, declared_purpose: declaredPurpose },
+    newCommandId(),
+    version,
+  );
+}
+
+export async function answerIssue(
+  rootId: string,
+  body: {
+    issue_id: string;
+    basis_id: string;
+    answer_kind: string;
+    value: string | number | null;
+    reason: string;
+  },
+): Promise<CommandResultView> {
+  return request<CommandResultView>(`/api/cases/${rootId}/answers`, body, newCommandId());
+}
+
 export async function attachSources(
   rootId: string,
   files: File[],

@@ -12,7 +12,7 @@ test("source preview: attach a scan and see it listed with a next action", async
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Nộp hồ sơ" })).toBeVisible();
 
-  await page.locator("#activity-select").selectOption("activity:travel-a");
+  await page.locator("#activity-select").selectOption("activity:travel-b");
   await page.getByRole("button", { name: "Tạo hồ sơ" }).click();
 
   await page.getByLabel("Chứng từ (PDF/PNG/JPEG)").setInputFiles({

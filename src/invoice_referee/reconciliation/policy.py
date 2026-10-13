@@ -108,6 +108,19 @@ def evaluate_policy(
                 "Xác minh coverage lịch sử (scope/thời gian/loại dòng tiền).",
             )
         )
+    if projection.E.state == "UNKNOWN":
+        # An incurred cost with no established payer is a FACT owned by the
+        # verifier; it must not become an E=0 money conclusion (§3, §10.2).
+        issues.append(
+            _issue(
+                "issue:fact:payer",
+                "FACT",
+                "expense:payer",
+                "employee",
+                "Chưa xác minh ai thực tế đã trả khoản chi này.",
+                "Xác minh người trả (chứng từ thanh toán hoặc xác nhận có trách nhiệm).",
+            )
+        )
 
     budget = _active_budget(input)
     if budget is None:

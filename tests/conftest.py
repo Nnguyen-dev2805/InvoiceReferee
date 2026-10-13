@@ -20,13 +20,17 @@ from invoice_referee.api.routes import SESSION_COOKIE
 from invoice_referee.domain.case import CaseView, CommandContext
 from invoice_referee.domain.commands import (
     ActivityData,
+    AnswerIssue,
     AttachSources,
     CommandResult,
     CreateDraft,
+    Decide,
     Declaration,
     ReviseDeclaration,
     SourceUpload,
+    Submit,
 )
+from invoice_referee.evaluation.models import TranscriptionFact
 from invoice_referee.workflow.db import Database
 from invoice_referee.workflow.service import CaseWorkflow
 
@@ -36,6 +40,84 @@ DEMO_CONTEXT_PATH = PROJECT_ROOT / "data" / "demo" / "company-context.json"
 TENANT_DEMO = "tenant:demo"
 DEFAULT_ACTOR = "employee:employee-a"
 DEFAULT_OCCURRED_AT = datetime(2026, 10, 5, 9, 0, tzinfo=UTC)
+
+
+def upload(name: str = "hoadon.pdf") -> SourceUpload:
+    return SourceUpload(
+        filename=name,
+        media="PDF",
+        digest="a" * 64,
+        storage_key=f"{TENANT_DEMO}/root/{name}",
+    )
+
+
+# STUB packet transcriptions (test input only; never an app decision).
+TEST_PACKETS: dict[str, dict[str, object]] = {
+    # T8/E5/C3/A2/B8, S=3m -> one PAY instruction of 3m.
+    "travel-clean": {
+        "facts": [
+            {"field": "incurred", "value": 8_000_000, "role": "INVOICE"},
+            {"field": "paid_employee", "value": 5_000_000, "role": "PAYMENT"},
+            {"field": "paid_company", "value": 3_000_000, "role": "PAYMENT"},
+            {"field": "advance", "value": 2_000_000, "role": "ADVANCE"},
+            {"field": "coverage", "value": 1, "role": "LEDGER"},
+        ],
+        "relations": [("expense_activity", "expense:1", "activity:travel-clean", "SUPPORTED")],
+    },
+    # No payer on any document -> FACT issue, no instruction.
+    "missing-payer": {
+        "facts": [
+            {"field": "incurred", "value": 5_000_000, "role": "INVOICE"},
+            {"field": "coverage", "value": 1, "role": "LEDGER"},
+        ],
+    },
+    # No coverage -> A/P/R unknown, no balanced claim.
+    "missing-history": {
+        "facts": [
+            {"field": "incurred", "value": 5_000_000, "role": "INVOICE"},
+            {"field": "paid_employee", "value": 5_000_000, "role": "PAYMENT"},
+        ],
+    },
+    # E6/A2 => S4 => one I4.
+    "coverage-e6": {
+        "facts": [
+            {"field": "incurred", "value": 6_000_000, "role": "INVOICE"},
+            {"field": "paid_employee", "value": 6_000_000, "role": "PAYMENT"},
+            {"field": "advance", "value": 2_000_000, "role": "ADVANCE"},
+            {"field": "coverage", "value": 1, "role": "LEDGER"},
+            {"field": "economic_key", "value": "invoice:e6", "role": "INVOICE"},
+        ],
+    },
+    # Same economic invoice, filed under a second activity in the same tenant.
+    "dup-invoice": {
+        "facts": [
+            {"field": "incurred", "value": 6_000_000, "role": "INVOICE"},
+            {"field": "paid_employee", "value": 6_000_000, "role": "PAYMENT"},
+            {"field": "advance", "value": 2_000_000, "role": "ADVANCE"},
+            {"field": "coverage", "value": 1, "role": "LEDGER"},
+            {"field": "economic_key", "value": "invoice:dup", "role": "INVOICE"},
+        ],
+    },
+    # Same root, basisX then a replacement basisY with the same S.
+    "changed-basis": {
+        "facts": [
+            {"field": "incurred", "value": 6_000_000, "role": "INVOICE"},
+            {"field": "paid_employee", "value": 6_000_000, "role": "PAYMENT"},
+            {"field": "advance", "value": 2_000_000, "role": "ADVANCE"},
+            {"field": "coverage", "value": 1, "role": "LEDGER"},
+            {"field": "economic_key", "value": "invoice:basis-x", "role": "INVOICE"},
+        ],
+    },
+    "changed-basis-v2": {
+        "facts": [
+            {"field": "incurred", "value": 6_000_000, "role": "INVOICE"},
+            {"field": "paid_employee", "value": 6_000_000, "role": "PAYMENT"},
+            {"field": "advance", "value": 2_000_000, "role": "ADVANCE"},
+            {"field": "coverage", "value": 1, "role": "LEDGER"},
+            {"field": "economic_key", "value": "invoice:basis-y", "role": "INVOICE"},
+        ],
+    },
+}
 
 
 class AppFixture:
@@ -155,6 +237,99 @@ class AppFixture:
 
     def view(self, context: CommandContext, root_id: str) -> CaseView:
         return self.workflow.view(context, root_id)
+
+    # -- T6 submission helpers (contracts §9) --------------------------------
+    async def submit_packet(
+        self, name: str, *, mode: str = "STUB", activity: str = "activity:travel-a"
+    ) -> CaseView:
+        """Create a root from a named STUB packet and submit it.
+
+        The packet name selects test input only; it never drives an app
+        decision. A transcription is seeded for the root, a source is attached,
+        and Submit runs the assessment. Re-submitting the same packet on the
+        same activity targets the same root (one root per activity).
+        """
+        from invoice_referee.evaluation.models import Transcription
+
+        spec = TEST_PACKETS[name]
+        # File on the seeded authorized activity so the packet's scenario (not a
+        # missing budget) drives the outcome; the packet name only selects input.
+        created = await self.create(employee=DEFAULT_ACTOR, activity=activity)
+        root = created.case_view.id
+        # Seed the STUB transcription (hand-transcribed literal reading).
+        transcription = Transcription(
+            facts=tuple(
+                TranscriptionFact(**fact)  # type: ignore[arg-type]
+                for fact in spec["facts"]
+            ),
+            relations=tuple(spec.get("relations", ())),
+        )
+        connection = self.db.connect()
+        try:
+            connection.execute(
+                "INSERT OR REPLACE INTO case_transcriptions (root_id, transcription_json, "
+                "created_at) VALUES (?, ?, ?)",
+                (root, transcription.model_dump_json(), DEFAULT_OCCURRED_AT.isoformat()),
+            )
+        finally:
+            connection.close()
+        if self._source_count(root) == 0:
+            await self.attach(
+                self.ctx(actor=DEFAULT_ACTOR, expected_case_version=self._version(root)),
+                root,
+                (upload(),),
+            )
+        submitted = await self.workflow.execute(
+            self.ctx(actor=DEFAULT_ACTOR, expected_case_version=self._version(root)),
+            Submit(
+                root_id=root,
+                declaration=Declaration(
+                    activity_id=activity, declared_purpose="Công tác"
+                ),
+            ),
+        )
+        return submitted.case_view
+
+    def _source_count(self, root_id: str) -> int:
+        row = self.query_one(
+            "SELECT COUNT(*) AS n FROM case_sources WHERE root_id = ?", (root_id,)
+        )
+        return int(row["n"])
+
+    async def answer(self, root_id: str, answer, *, actor: str) -> CaseView:
+        context = self.ctx(actor=actor, expected_case_version=self._version(root_id))
+        result = await self.workflow.execute(context, AnswerIssue(root_id=root_id, answer=answer))
+        return result.case_view
+
+    async def decide(self, root_id: str, decision, *, actor: str) -> CaseView:
+        context = self.ctx(actor=actor, expected_case_version=self._version(root_id))
+        result = await self.workflow.execute(context, Decide(root_id=root_id, decision=decision))
+        return result.case_view
+
+    def question_card(self, root_id: str, issue_id: str):
+        from invoice_referee.domain.issues import QuestionCard
+
+        row = self.query_one(
+            "SELECT payload_json FROM case_issues WHERE id = ? AND root_id = ?",
+            (issue_id, root_id),
+        )
+        if row is None:
+            raise KeyError(issue_id)
+        from invoice_referee.domain.issues import BusinessIssue
+
+        issue = BusinessIssue.model_validate_json(row["payload_json"])
+        return QuestionCard(
+            issue_id=issue.id,
+            known_facts=(),
+            excerpt_refs=issue.refs,
+            required_answer=issue.question,
+            effects=issue.basis,
+            owner=issue.owner,
+        )
+
+    def _version(self, root_id: str) -> int:
+        row = self.query_one("SELECT version FROM cases WHERE id = ?", (root_id,))
+        return int(row["version"])
 
     # -- stored-state observation -------------------------------------------
     def query_one(self, sql: str, params: tuple[object, ...] = ()):

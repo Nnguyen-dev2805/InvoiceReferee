@@ -158,3 +158,82 @@ CREATE TABLE IF NOT EXISTS read_cache (
     cached_at      TEXT NOT NULL,
     PRIMARY KEY (tenant, source_digest, reader_config)
 );
+
+-- Business issues for a root (contracts §2, §6). Stable id keyed by the
+-- recovery key (field/relation/source), not a model-authored name.
+CREATE TABLE IF NOT EXISTS case_issues (
+    id           TEXT PRIMARY KEY,
+    tenant       TEXT NOT NULL,
+    root_id      TEXT NOT NULL REFERENCES cases(id),
+    kind         TEXT NOT NULL,
+    field_or_rule TEXT NOT NULL,
+    owner        TEXT NOT NULL,
+    status       TEXT NOT NULL,
+    recovery_key TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    UNIQUE (root_id, recovery_key)
+);
+
+-- Settled conclusions (contracts §10.3). Historical conclusions are kept but
+-- superseded; a new revision writes a new row.
+CREATE TABLE IF NOT EXISTS case_conclusions (
+    id           TEXT PRIMARY KEY,
+    tenant       TEXT NOT NULL,
+    root_id      TEXT NOT NULL REFERENCES cases(id),
+    revision     INTEGER NOT NULL,
+    status       TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    decided_at   TEXT NOT NULL,
+    UNIQUE (root_id, revision)
+);
+
+-- Instructions (contracts §4, §10.1). At most one actionable per root.
+CREATE TABLE IF NOT EXISTS instructions (
+    id               TEXT PRIMARY KEY,
+    tenant           TEXT NOT NULL,
+    root_id          TEXT NOT NULL REFERENCES cases(id),
+    direction        TEXT NOT NULL,
+    amount           INTEGER NOT NULL,
+    status           TEXT NOT NULL,
+    basis            TEXT NOT NULL,
+    cost_basis       TEXT NOT NULL,
+    authority_refs_json TEXT NOT NULL DEFAULT '[]',
+    supersedes_id    TEXT,
+    fulfilled_amount INTEGER NOT NULL DEFAULT 0,
+    execution_state  TEXT NOT NULL,
+    created_at       TEXT NOT NULL,
+    updated_at       TEXT NOT NULL
+);
+
+-- Tenant economic usage registry (contracts §10.2). One expense scope has one
+-- owner root; a verified obligation is not counted twice across roots.
+CREATE TABLE IF NOT EXISTS usage_registry (
+    tenant        TEXT NOT NULL,
+    economic_key  TEXT NOT NULL,
+    owner_root    TEXT NOT NULL,
+    expense_id    TEXT NOT NULL,
+    payment_keys_json TEXT NOT NULL DEFAULT '[]',
+    refs_json     TEXT NOT NULL DEFAULT '[]',
+    version       INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (tenant, economic_key)
+);
+
+-- A STUB hand-transcription for a root (contracts §5). Test/LIVE input only;
+-- this is the literal reading the workflow assesses, tagged by data_origin.
+CREATE TABLE IF NOT EXISTS case_transcriptions (
+    root_id            TEXT PRIMARY KEY REFERENCES cases(id),
+    transcription_json TEXT NOT NULL,
+    created_at         TEXT NOT NULL
+);
+
+-- A demo STUB hand-transcription keyed by activity (contracts §5). Used only
+-- when a root has no root-specific transcription (the STUB dev/UI path); it is
+-- validated input, not a per-root expected outcome.
+CREATE TABLE IF NOT EXISTS context_transcriptions (
+    tenant             TEXT NOT NULL,
+    activity_id        TEXT NOT NULL,
+    transcription_json TEXT NOT NULL,
+    PRIMARY KEY (tenant, activity_id)
+);

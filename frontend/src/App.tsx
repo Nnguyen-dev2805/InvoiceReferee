@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { api, errorMessage } from "./api";
+import { Approval } from "./features/approval";
 import { Dossier } from "./features/dossier";
 import { Intake } from "./features/intake";
+import { Questions } from "./features/questions";
 import type { CaseView, SessionPayload } from "./types";
 
 export default function App() {
@@ -71,6 +73,8 @@ export default function App() {
       {session !== null && (
         <main>
           <Intake session={session} onCase={setCaseView} />
+          <Questions caseView={caseView} onCase={setCaseView} />
+          <Approval caseView={caseView} />
           <Dossier caseView={caseView} />
         </main>
       )}

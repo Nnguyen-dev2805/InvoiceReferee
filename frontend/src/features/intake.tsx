@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { api, attachSources, errorMessage } from "../api";
+import { api, attachSources, errorMessage, submitCase } from "../api";
 import { formatDate, formatVnd } from "../format";
 import type { CaseView, SessionPayload } from "../types";
 
@@ -42,6 +42,28 @@ export function Intake({
       setCaseView(result.case_view);
       onCase(result.case_view);
       setStatus("Đã mở hồ sơ cho hoạt động này (cùng hoạt động ⇒ cùng root).");
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submit() {
+    if (caseView === null) return;
+    setBusy(true);
+    setError(null);
+    setStatus(null);
+    try {
+      const result = await submitCase(
+        caseView.id,
+        activityId,
+        "Công tác",
+        caseView.version,
+      );
+      setCaseView(result.case_view);
+      onCase(result.case_view);
+      setStatus("Đã nộp hồ sơ và đối chiếu.");
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -183,6 +205,13 @@ export function Intake({
           disabled={busy || caseView === null || files.length === 0}
         >
           Đính kèm
+        </button>
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={busy || caseView === null}
+        >
+          Nộp hồ sơ
         </button>
       </p>
 

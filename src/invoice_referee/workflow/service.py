@@ -20,13 +20,23 @@ from typing import Annotated, Callable, Literal
 from pydantic import BaseModel, ConfigDict, Field
 from zoneinfo import ZoneInfo
 
-from invoice_referee.domain.case import CaseView, CommandContext
+from invoice_referee.domain.case import (
+    AssessmentResult,
+    CaseView,
+    CommandContext,
+    Instruction,
+    ReadSet,
+    SettlementConclusion,
+)
 from invoice_referee.domain.commands import (
+    AnswerIssue,
     AttachSources,
     CaseCommand,
     CommandResult,
     CreateDraft,
+    Decide,
     ReviseDeclaration,
+    Submit,
 )
 from invoice_referee.domain.common import Fact, SignedVnd, Vnd
 from invoice_referee.domain.evidence import SourceRef
@@ -145,6 +155,16 @@ def _context_issue(root_id: str) -> BusinessIssue:
     )
 
 
+def _owner_persona(owner: str) -> str:
+    """Which demo persona may answer an issue owned by `owner` (§5)."""
+    return {
+        "employee": "employee",
+        "accountant": "accountant",
+        "org-data": "accountant",
+        "approver": "approver",
+    }.get(owner, "any")
+
+
 def _vn_date(value: str) -> str:
     try:
         moment = datetime.fromisoformat(value)
@@ -228,6 +248,8 @@ class _DemoActivity(_ContextModel):
     purpose: str
     status: Literal["AUTHORIZED", "PROPOSED"] = "AUTHORIZED"
     budget: _DemoBudget | None = None
+    # Optional STUB hand-transcription for the dev/UI path (contracts §5).
+    transcription: tuple[dict[str, object], ...] | None = None
 
 
 class _DemoGrant(_ContextModel):
@@ -392,6 +414,23 @@ class CaseWorkflow:
                         activity.status,
                     ),
                 )
+            # Seed a demo STUB transcription for activities that declare one, so
+            # the STUB dev/UI path can assess without a provider (contracts §5).
+            from invoice_referee.evaluation.models import Transcription, TranscriptionFact
+
+            for activity in data.activities:
+                if activity.transcription is None:
+                    continue
+                transcription = Transcription(
+                    facts=tuple(
+                        TranscriptionFact(**fact) for fact in activity.transcription
+                    )
+                )
+                cx.execute(
+                    "INSERT OR REPLACE INTO context_transcriptions (tenant, activity_id, "
+                    "transcription_json) VALUES (?, ?, ?)",
+                    (tenant, activity.id, transcription.model_dump_json()),
+                )
             for grant in data.grants:
                 cx.execute(
                     "INSERT OR REPLACE INTO context_grants (grant_id, tenant, version, "
@@ -509,6 +548,9 @@ class CaseWorkflow:
             "CREATE_DRAFT": self._create_draft,
             "ATTACH_SOURCES": self._attach_sources,
             "REVISE_DECLARATION": self._revise_declaration,
+            "SUBMIT": self._submit,
+            "ANSWER_ISSUE": self._answer_issue,
+            "DECIDE": self._decide,
         }
         handler = handlers.get(command.kind)
         if handler is None:
@@ -682,6 +724,328 @@ class CaseWorkflow:
         )
         return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
 
+    # -- submission and assessment -------------------------------------------
+    def _submit(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        context: CommandContext,
+        command: Submit,
+    ) -> CommandResult:
+        row = self._require_root(cx, session, command.root_id)
+        self._require_version(row, context.expected_case_version)
+        now = self._now_iso()
+        self._assess_and_commit(cx, session, row, now)
+        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
+    def _answer_issue(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        context: CommandContext,
+        command: AnswerIssue,
+    ) -> CommandResult:
+        row = self._require_root(cx, session, command.root_id)
+        answer = command.answer
+        issue = cx.execute(
+            "SELECT * FROM case_issues WHERE id = ? AND root_id = ?",
+            (answer.issue_id, str(row["id"])),
+        ).fetchone()
+        if issue is None:
+            raise NotFoundError("Không tìm thấy việc cần xử lý này.")
+        # Only the issue's owner may answer it (contracts §5).
+        if issue["owner"] not in (context.actor_id, "employee", "accountant", "approver", "org-data"):
+            raise UnsupportedCommandError("Bạn không phải người xử lý việc này.")
+        if _owner_persona(issue["owner"]) not in ("any", session.persona):
+            raise UnsupportedCommandError(
+                "Việc này thuộc người xử lý khác; câu trả lời không được áp dụng."
+            )
+        now = self._now_iso()
+        cx.execute(
+            "UPDATE case_issues SET status = 'ANSWERED', updated_at = ? WHERE id = ?",
+            (now, answer.issue_id),
+        )
+        self._audit(
+            cx,
+            tenant=session.tenant,
+            root_id=str(row["id"]),
+            session_id=session.session_id,
+            actor=context.actor_id,
+            action="ANSWER_ISSUE",
+            detail=json.dumps({"issue": answer.issue_id}, ensure_ascii=False),
+        )
+        self._assess_and_commit(cx, session, self._reload(cx, row), now)
+        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
+    def _decide(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        context: CommandContext,
+        command: Decide,
+    ) -> CommandResult:
+        row = self._require_root(cx, session, command.root_id)
+        decision = command.decision
+        # A decision needs a real grant for its actions at this scope (contracts §5).
+        for action in decision.actions:
+            if not self._actor_has_grant(
+                cx, session.tenant, context.actor_id, action, decision.effect_scope
+            ):
+                raise UnsupportedCommandError(
+                    f"Không có quyền thực hiện {action} trong phạm vi này."
+                )
+        now = self._now_iso()
+        for issue_id in decision.issue_ids:
+            cx.execute(
+                "UPDATE case_issues SET status = 'RESOLVED', updated_at = ? WHERE id = ?",
+                (now, issue_id),
+            )
+        self._audit(
+            cx,
+            tenant=session.tenant,
+            root_id=str(row["id"]),
+            session_id=session.session_id,
+            actor=context.actor_id,
+            action="DECIDE",
+            detail=json.dumps(
+                {"actions": list(decision.actions), "reason": decision.reason},
+                ensure_ascii=False,
+            ),
+        )
+        self._assess_and_commit(cx, session, self._reload(cx, row), now)
+        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
+    def _actor_has_grant(
+        self, cx: sqlite3.Connection, tenant: str, actor: str, action: str, scope: str
+    ) -> bool:
+        now = datetime.now(UTC)
+        for grant in cx.execute(
+            "SELECT * FROM context_grants WHERE tenant = ? AND actor = ?",
+            (tenant, actor),
+        ).fetchall():
+            if action not in json.loads(grant["actions_json"]):
+                continue
+            eff_from = datetime.fromisoformat(grant["effective_from"])
+            eff_to = (
+                datetime.fromisoformat(grant["effective_to"])
+                if grant["effective_to"]
+                else None
+            )
+            if eff_from <= now and (eff_to is None or now <= eff_to):
+                return True
+        return False
+
+    def _assess_and_commit(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        row: sqlite3.Row,
+        now: str,
+    ) -> None:
+        """Assess the current snapshot and commit issues/conclusion/instruction atomically."""
+        from invoice_referee.reconciliation.service import Reconciler
+        from invoice_referee.workflow.snapshots import build_assessment_input
+
+        root_id = str(row["id"])
+        transcription = self._transcription_for(cx, root_id)
+        assessment_input = build_assessment_input(
+            cx,
+            tenant=session.tenant,
+            root_id=root_id,
+            employee=str(row["employee"]),
+            activity=str(row["activity"]),
+            profile=str(row["profile"]),
+            transcription=transcription,
+        )
+        result = Reconciler().assess(assessment_input)
+
+        # Persist issues. The stable id is derived from the recovery key
+        # (kind + field/rule), never from a model-authored name, and is stored
+        # both as the row id and inside payload_json so view and lookup agree.
+        cx.execute("DELETE FROM case_issues WHERE root_id = ?", (root_id,))
+        for issue in result.issues:
+            recovery_key = f"{issue.kind}:{issue.field_or_rule}"
+            issue_id = f"issue:{hashlib.sha256((root_id + recovery_key).encode()).hexdigest()[:16]}"
+            stable_issue = issue.model_copy(update={"id": issue_id})
+            cx.execute(
+                "INSERT OR REPLACE INTO case_issues (id, tenant, root_id, kind, "
+                "field_or_rule, owner, status, recovery_key, payload_json, created_at, "
+                "updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    issue_id,
+                    session.tenant,
+                    root_id,
+                    issue.kind,
+                    issue.field_or_rule,
+                    issue.owner,
+                    issue.status,
+                    recovery_key,
+                    stable_issue.model_dump_json(),
+                    now,
+                    now,
+                ),
+            )
+
+        state = self._derive_state(result)
+        conclusion_status = None
+        if result.allowed_effect is not None and self._obligation_owned_elsewhere(
+            cx, session.tenant, root_id
+        ):
+            # The economic obligation already belongs to another root in this
+            # tenant: do not issue a second instruction (§10.2). The canonical
+            # owner keeps the actionable order.
+            state = "WAITING"
+            conclusion_status = "BLOCKED"
+        elif result.allowed_effect is not None:
+            self._issue_instruction(cx, session, row, result, now)
+            state = "READY_TO_EXECUTE"
+            conclusion_status = "OUTSTANDING"
+        elif result.issues:
+            state = "WAITING"
+            conclusion_status = "BLOCKED"
+        elif result.projection.S.state == "KNOWN" and int(result.projection.S.value or 0) == 0:
+            state = "SETTLED"
+            conclusion_status = "BALANCED"
+
+        revision = int(row["input_revision"])
+        cx.execute(
+            "INSERT OR REPLACE INTO case_conclusions (id, tenant, root_id, revision, "
+            "status, payload_json, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                f"conclusion:{root_id}:{revision}",
+                session.tenant,
+                root_id,
+                revision,
+                conclusion_status or "BLOCKED",
+                result.model_dump_json(),
+                now,
+            ),
+        )
+        cx.execute(
+            "UPDATE cases SET state = ?, version = version + 1, updated_at = ? WHERE id = ?",
+            (state, now, root_id),
+        )
+        self._audit(
+            cx,
+            tenant=session.tenant,
+            root_id=root_id,
+            session_id=session.session_id,
+            actor=session.actor_id,
+            action="ASSESS",
+            detail=json.dumps({"state": state}, ensure_ascii=False),
+        )
+
+    def _issue_instruction(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        row: sqlite3.Row,
+        result,
+        now: str,
+    ) -> None:
+        effect = result.allowed_effect
+        root_id = str(row["id"])
+        # At most one actionable instruction per root: supersede any current one.
+        cx.execute(
+            "UPDATE instructions SET status = 'SUPERSEDED', updated_at = ? "
+            "WHERE root_id = ? AND status IN ('ISSUED','PARTIAL')",
+            (now, root_id),
+        )
+        instruction_id = f"instruction:{hashlib.sha256((root_id + result.cost_basis).encode()).hexdigest()[:16]}"
+        cx.execute(
+            "INSERT OR REPLACE INTO instructions (id, tenant, root_id, direction, amount, "
+            "status, basis, cost_basis, supersedes_id, fulfilled_amount, execution_state, "
+            "created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'ISSUED', ?, ?, NULL, 0, "
+            "'NOT_STARTED', ?, ?)",
+            (
+                instruction_id,
+                session.tenant,
+                root_id,
+                effect.direction,
+                effect.amount,
+                effect.basis,
+                result.cost_basis,
+                now,
+                now,
+            ),
+        )
+        # Record economic usage so a second root cannot claim the same obligation
+        # (§10.2). The first writer becomes the canonical owner.
+        for economic_key in self._economic_keys_for(cx, root_id):
+            existing = cx.execute(
+                "SELECT owner_root FROM usage_registry WHERE tenant = ? AND economic_key = ?",
+                (session.tenant, economic_key),
+            ).fetchone()
+            if existing is None:
+                cx.execute(
+                    "INSERT INTO usage_registry (tenant, economic_key, owner_root, "
+                    "expense_id, version) VALUES (?, ?, ?, ?, 1)",
+                    (session.tenant, economic_key, root_id, "expense:1"),
+                )
+
+    def _obligation_owned_elsewhere(
+        self, cx: sqlite3.Connection, tenant: str, root_id: str
+    ) -> bool:
+        """True if any of this root's economic keys is owned by another root."""
+        for economic_key in self._economic_keys_for(cx, root_id):
+            row = cx.execute(
+                "SELECT owner_root FROM usage_registry WHERE tenant = ? AND economic_key = ?",
+                (tenant, economic_key),
+            ).fetchone()
+            if row is not None and str(row["owner_root"]) != root_id:
+                return True
+        return False
+
+    def _economic_keys_for(self, cx: sqlite3.Connection, root_id: str) -> tuple[str, ...]:
+        row = cx.execute(
+            "SELECT transcription_json FROM case_transcriptions WHERE root_id = ?",
+            (root_id,),
+        ).fetchone()
+        if row is None or not row["transcription_json"]:
+            return ()
+        from invoice_referee.evaluation.models import Transcription
+
+        transcription = Transcription.model_validate_json(row["transcription_json"])
+        return tuple(
+            str(fact.value) for fact in transcription.facts if fact.field == "economic_key"
+        )
+
+    def _transcription_for(self, cx: sqlite3.Connection, root_id: str):
+        from invoice_referee.evaluation.models import Transcription
+
+        row = cx.execute(
+            "SELECT transcription_json FROM case_transcriptions WHERE root_id = ?",
+            (root_id,),
+        ).fetchone()
+        if row is not None and row["transcription_json"]:
+            return Transcription.model_validate_json(row["transcription_json"])
+        # Fall back to the activity's demo STUB transcription (dev/UI path).
+        case = cx.execute(
+            "SELECT tenant, activity FROM cases WHERE id = ?", (root_id,)
+        ).fetchone()
+        if case is None:
+            return None
+        demo = cx.execute(
+            "SELECT transcription_json FROM context_transcriptions "
+            "WHERE tenant = ? AND activity_id = ?",
+            (case["tenant"], case["activity"]),
+        ).fetchone()
+        if demo is None or not demo["transcription_json"]:
+            return None
+        return Transcription.model_validate_json(demo["transcription_json"])
+
+    @staticmethod
+    def _derive_state(result) -> str:
+        if result.problems:
+            return "TECHNICAL_ERROR"
+        if result.issues:
+            return "WAITING"
+        if result.allowed_effect is not None:
+            return "READY_TO_EXECUTE"
+        if result.projection.S.state == "KNOWN" and int(result.projection.S.value or 0) == 0:
+            return "SETTLED"
+        return "WAITING"
+
     # -- reads ---------------------------------------------------------------
     def view(self, context: CommandContext, root_id: str) -> CaseView:
         session = self.session(context.session_id)
@@ -818,9 +1182,73 @@ class CaseWorkflow:
         ).fetchall()
         activity_name = activity["name"] if activity is not None else row["activity_name"]
         employee_name = person["name"] if person is not None else row["employee"]
-        issues: tuple[BusinessIssue, ...] = ()
-        if activity is None or activity["budget_amount"] is None:
+
+        # Persisted issues, conclusion and instructions (contracts §10.3).
+        issues = tuple(
+            BusinessIssue.model_validate_json(issue_row["payload_json"])
+            for issue_row in cx.execute(
+                "SELECT payload_json FROM case_issues WHERE root_id = ? "
+                "AND status IN ('OPEN','ANSWERED') ORDER BY created_at, id",
+                (str(row["id"]),),
+            )
+        )
+        if not issues and (activity is None or activity["budget_amount"] is None) \
+                and row["state"] == "DRAFT":
             issues = (_context_issue(str(row["id"])),)
+
+        conclusion_row = cx.execute(
+            "SELECT payload_json, decided_at FROM case_conclusions WHERE root_id = ? "
+            "ORDER BY revision DESC LIMIT 1",
+            (str(row["id"]),),
+        ).fetchone()
+        conclusion = None
+        actual_money = _unknown_projection()
+        if conclusion_row is not None:
+            from invoice_referee.domain.case import SettlementConclusion
+
+            result = AssessmentResult.model_validate_json(conclusion_row["payload_json"])
+            actual_money = result.projection
+            if result.issues:
+                status = "BLOCKED"
+            elif result.projection.S.state == "KNOWN" and int(result.projection.S.value or 0) == 0:
+                status = "BALANCED"
+            else:
+                status = "OUTSTANDING"
+            conclusion = SettlementConclusion(
+                status=status,
+                projection=result.projection,
+                expense_dispositions=(),
+                read_set=ReadSet(
+                    input_revision=int(row["input_revision"]),
+                    control_epoch=int(row["control_epoch"]),
+                    context_version=1,
+                    ledger_version=1,
+                    usage_version=1,
+                ),
+                basis=result.cost_basis,
+                actor_or_system="system:referee",
+                decided_at=datetime.fromisoformat(conclusion_row["decided_at"]),
+            )
+
+        instructions = tuple(
+            Instruction(
+                id=inst["id"],
+                root_id=inst["root_id"],
+                direction=inst["direction"],
+                amount=int(inst["amount"]),
+                status=inst["status"],
+                basis=inst["basis"],
+                supersedes_id=inst["supersedes_id"],
+                fulfilled_amount=int(inst["fulfilled_amount"]),
+                remaining=max(int(inst["amount"]) - int(inst["fulfilled_amount"]), 0),
+                execution_state=inst["execution_state"],
+            )
+            for inst in cx.execute(
+                "SELECT * FROM instructions WHERE root_id = ? "
+                "AND status IN ('ISSUED','PARTIAL') ORDER BY created_at",
+                (str(row["id"]),),
+            )
+        )
         return CaseView(
             id=row["id"],
             version=int(row["version"]),
@@ -831,9 +1259,9 @@ class CaseWorkflow:
             sources=sources,
             issues=issues,
             problems=(),
-            conclusion=None,
-            instructions=(),
-            actual_money=_unknown_projection(),
+            conclusion=conclusion,
+            instructions=instructions,
+            actual_money=actual_money,
             audit=tuple(
                 f"{entry['occurred_at']} · {entry['actor']} · {entry['action']}"
                 for entry in audit_rows

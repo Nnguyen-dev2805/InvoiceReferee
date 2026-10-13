@@ -13,9 +13,9 @@ The plan owns task acceptance; package/config files own executable commands.
 | Setup review | ACCEPTED at documentation/setup level; actual clean-clone and agent-execution proof remain open |
 | Execution method | Inline execution (executing-plans) with one integrator; the whole-branch final review has not been run |
 | Workflow integrator | Inline executor — single writer for workflow/api/domain owned files |
-| Next application task | T6, not started (needs authorization) |
-| Last completed application task | T5 — gate passed (M0 genuinely run against real Mistral OCR; LangSmith tracing verified). T4 = ae819ac |
-| Product unit/integration/UI/LIVE evidence | T5: `uv run pytest` → **116 passed**; `frontend npm run build` exit 0; **`npx playwright test` → 2 passed** (real Chromium, isolated `.runtime/e2e` DB). **M0 LIVE ran for real** (`.runtime/evidence/m0/m0-manifest.json`): text 69 chars/24ms native, clear_scan 70 chars/1240ms OCR, unclear_scan 70 chars/937ms OCR, non_document 12 chars/680ms OCR — all ok against `mistral-ocr-latest`. **LangSmith tracing verified**: 4 `m0-live:*` runs landed in project `invoice-referee` with basis/model/agent_id/agent_environment |
+| Next application task | T7, not started (needs authorization) |
+| Last completed application task | T6 — gate passed (persisted workflow handoff; instruction ≠ received). T5 = 2db07ff |
+| Product unit/integration/UI/LIVE evidence | T6: `uv run pytest` → **127 passed** (116 after T5 + 11 submit/handoff/API tests); `npx vitest run` 2 passed; `npx playwright test` → **4 passed** (routine→one PAY instruction of 3.000.000, missing-payer→FACT card, no instruction). `npm run build` exit 0. A routine STUB root persists one instruction; a missing-payer root persists a FACT issue owned by the right person with no instruction. LIVE: T5 M0 stands |
 | CodeGraph | **Fresh** at `1c395de`: `codegraph status` → 34 files, 505 nodes, 1135 edges (python 24, tsx 4, typescript 6). The earlier "stale/0 files" note was itself outdated; re-check with `rtk proxy codegraph status` before relying on it |
 | Git handoff | T1 = 57d2e19, T2 = 1c395de, domain-conformance = 3245d00, boundary fixes = ec37242 — all on `final` (unpushed beyond 1c395de; no push authorization) |
 

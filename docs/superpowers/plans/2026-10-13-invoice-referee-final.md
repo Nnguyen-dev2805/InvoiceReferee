@@ -174,7 +174,7 @@ async def test_model_cannot_record_money(reader_fixture):
 **Files:** src/invoice_referee/workflow/{service.py,snapshots.py,jobs.py,db.py,schema.sql}; src/invoice_referee/api/{routes.py,views.py}; frontend/src/features/{questions.tsx,approval.tsx,dossier.tsx}; tests/integration/test_submit_handoff.py; frontend/e2e/routine-and-fact.spec.ts. Integrator sở hữu transaction/schema boundary.
 **Consumes:** Reader/Reconciler + immutable read-set.
 **Produces:** execute(Submit/AnswerIssue/Decide)->CommandResult; atomic eligibility+FinancialEffect; QuestionCard.
-- [ ] Tests T8/E5/C3/A2/B8 CHI3 once; missing payer card owner; incomplete funds noS0; stale/wrongowner/unproved approval no resolve; future B doesn't cover past without effect scope.
+- [x] Tests T8/E5/C3/A2/B8 CHI3 once; missing payer card owner; incomplete funds noS0; stale/wrongowner/unproved approval no resolve; future B doesn't cover past without effect scope.
 ```python
 async def test_routine_issues_one_payment(app_fixture):
     v = await app_fixture.submit_packet("travel-clean", mode="STUB")
@@ -182,15 +182,15 @@ async def test_routine_issues_one_payment(app_fixture):
     assert v.state == "READY_TO_EXECUTE"
 ```
   Packet name selects input for test only, never app decision.
-- [ ] RED: `rtk proxy uv run pytest tests/integration/test_submit_handoff.py -q`.
-- [ ] Implement admission/snapshot process, stable issue IDs, one useful permitted recovery or ask; no source/no permission doesn't loop model; guard budget across attempts. Tests preview→submit/resume cùng basis không reset counters; recovery key theo field/relation/source, không tên issue do model đặt.
-- [ ] Job submit_requested/READING→ASSESSING theo contracts §10.4. test_submit_while_preview_running delayed read→Submit→release: một final assessment, cùng cached reads/counters; Stop/restart giữa phases không lost submit/late financial commit.
-- [ ] test_existing_instruction_covers_obligation: E6/A2⇒I4; retry/new command giữ I4; P2⇒same remaining2; closed execution rồi E+2⇒supersede old remainder, new I4 duy nhất actionable. test_same_invoice_two_roots_same_tenant dùng ảnh/PDF X ở hai activities trong shared DB: không issue hai lần; chưa đủ identity ⇒ FACT. Atomic usage/conclusion/instruction cùng transaction.
-- [ ] test_same_amount_changed_basis: I4 basisX→verified replacement expenseY, S4 vẫn giữ; NOT_STARTED⇒supersedeX/newY duy nhất, OPEN/UNKNOWN⇒suspend/no replacement. test_same_root_semantic_duplicate: cùng economic invoice và cùng paid portion qua scan/PDF ⇒T3/E3 một lần; phần mới verified khác key tăng E, không T.
-- [ ] test_submit_after_preview_failure: submit_requested còn sau timeout/restart, TECHNICAL_ERROR/counters giữ đúng; không lost submit/reset quota/false BALANCED.
-- [ ] Answer/compound decision exact basis/action/scope/refs; dependent FACT before amount approval, independent questions grouped/simultaneous allowed. Idempotent financial commit checks read-set/control/usage/grant.
-- [ ] GREEN integration + `rtk proxy npm --prefix frontend exec playwright test e2e/routine-and-fact.spec.ts --headed`. Cleanroutine andFACT through UI; card/crop enough one answer, no accounting eligibility signoff.
-- [ ] Commit "feat: complete routine and human recheck workflow".
+- [x] RED: `rtk proxy uv run pytest tests/integration/test_submit_handoff.py -q`.
+- [x] Implement admission/snapshot process, stable issue IDs, one useful permitted recovery or ask; no source/no permission doesn't loop model; guard budget across attempts. Tests preview→submit/resume cùng basis không reset counters; recovery key theo field/relation/source, không tên issue do model đặt.
+- [x] Job submit_requested/READING→ASSESSING theo contracts §10.4. test_submit_while_preview_running delayed read→Submit→release: một final assessment, cùng cached reads/counters; Stop/restart giữa phases không lost submit/late financial commit.
+- [x] test_existing_instruction_covers_obligation: E6/A2⇒I4; retry/new command giữ I4; P2⇒same remaining2; closed execution rồi E+2⇒supersede old remainder, new I4 duy nhất actionable. test_same_invoice_two_roots_same_tenant dùng ảnh/PDF X ở hai activities trong shared DB: không issue hai lần; chưa đủ identity ⇒ FACT. Atomic usage/conclusion/instruction cùng transaction.
+- [x] test_same_amount_changed_basis: I4 basisX→verified replacement expenseY, S4 vẫn giữ; NOT_STARTED⇒supersedeX/newY duy nhất, OPEN/UNKNOWN⇒suspend/no replacement. test_same_root_semantic_duplicate: cùng economic invoice và cùng paid portion qua scan/PDF ⇒T3/E3 một lần; phần mới verified khác key tăng E, không T.
+- [x] test_submit_after_preview_failure: submit_requested còn sau timeout/restart, TECHNICAL_ERROR/counters giữ đúng; không lost submit/reset quota/false BALANCED.
+- [x] Answer/compound decision exact basis/action/scope/refs; dependent FACT before amount approval, independent questions grouped/simultaneous allowed. Idempotent financial commit checks read-set/control/usage/grant.
+- [x] GREEN integration + `rtk proxy npm --prefix frontend exec playwright test e2e/routine-and-fact.spec.ts --headed`. Cleanroutine andFACT through UI; card/crop enough one answer, no accounting eligibility signoff.
+- [x] Commit "feat: complete routine and human recheck workflow".
 **Gate:** Actual persisted workflow handoff, instruction≠received.
 
 ### T7 — Actual money, fulfillment and supplemental portions

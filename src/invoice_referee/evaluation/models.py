@@ -17,6 +17,7 @@ from typing import Literal
 from pydantic import Field
 
 from invoice_referee.domain.common import Id, StrictModel, UtcDatetime
+from invoice_referee.domain.evidence import EvidenceRole
 
 Split = Literal["development", "calibration", "validation", "holdout"]
 Strata = Literal["routine", "FACT", "POLICY", "AUTHORITY", "TECHNICAL"]
@@ -56,6 +57,29 @@ class PacketInput(StrictModel):
     sources: tuple[PacketSource, ...] = ()
     organization: OrganizationContext
     submission: Submission
+    # STUB hand-transcription (contracts §5): a literal, human-written reading
+    # of the sources. Tagged so it is never confused with a RECORDED_REPLAY read
+    # of a real provider. Absent in LIVE/replay packets.
+    transcription: "Transcription | None" = None
+
+
+class TranscriptionFact(StrictModel):
+    """One hand-transcribed field with its literal source locator."""
+
+    field: str
+    value: str | int
+    role: EvidenceRole
+    page: int = 1
+    quote: str = "hand-transcription"
+
+
+class Transcription(StrictModel):
+    """A STUB reading of one packet's sources. Data origin is explicit."""
+
+    data_origin: Literal["STUB_TRANSCRIPTION"] = "STUB_TRANSCRIPTION"
+    facts: tuple[TranscriptionFact, ...] = ()
+    # Relations asserted by the transcription (kind/from/to/state).
+    relations: tuple[tuple[str, str, str, str], ...] = ()
 
 
 class LatentGold(StrictModel):

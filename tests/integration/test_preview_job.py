@@ -72,18 +72,25 @@ async def test_preview_has_no_financial_effect(tmp_path: Path) -> None:
     )
     assert result is not None
 
-    # No financial table has any row.
-    with db.transaction() as cx:
-        for table in ("jobs", "read_cache"):
-            assert cx.execute(f"SELECT COUNT(*) AS n FROM {table}").fetchone()["n"] >= 1
+    # The preview wrote its job/cache rows but NO financial rows (the tables
+    # exist from the schema, but a preview must leave them empty).
     conn = db.connect()
     try:
         tables = [
             r["name"]
             for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
         ]
-        financial = [t for t in tables if any(h in t for h in ("money", "instruction", "expense", "ledger", "actual"))]
-        assert financial == []
+        financial_tables = [
+            t
+            for t in tables
+            if any(h in t for h in ("instruction", "expense", "ledger", "usage"))
+        ]
+        for table in ("jobs", "read_cache"):
+            assert conn.execute(f"SELECT COUNT(*) AS n FROM {table}").fetchone()["n"] >= 1
+        for table in financial_tables:
+            assert (
+                conn.execute(f"SELECT COUNT(*) AS n FROM {table}").fetchone()["n"] == 0
+            ), f"{table} must have no rows after a preview"
     finally:
         conn.close()
 

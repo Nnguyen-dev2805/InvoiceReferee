@@ -22,14 +22,58 @@
         "effect_from": "2026-10-01T00:00:00+07:00",
         "record_key": "budget:travel-a",
         "quote": "Ngân sách hoạt động Công tác Hà Nội: 8.000.000 VND (hiệu lực từ 01/10/2026)."
-      }
+      },
+      "transcription": [
+        { "field": "incurred", "value": 8000000, "role": "INVOICE", "quote": "Tổng chi 8.000.000" },
+        { "field": "paid_employee", "value": 5000000, "role": "PAYMENT", "quote": "Nhân viên trả 5.000.000" },
+        { "field": "paid_company", "value": 3000000, "role": "PAYMENT", "quote": "Công ty trả 3.000.000" },
+        { "field": "advance", "value": 2000000, "role": "ADVANCE", "quote": "Ứng 2.000.000" },
+        { "field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn" },
+        { "field": "economic_key", "value": "invoice:travel-a", "role": "INVOICE", "quote": "Hóa đơn travel-a" }
+      ]
     },
     {
       "id": "activity:travel-b",
       "name": "Công tác Đà Nẵng",
       "occurred_at": "2026-11-02T09:00:00+07:00",
       "purpose": "Khảo sát nhà cung cấp tại Đà Nẵng",
-      "status": "AUTHORIZED"
+      "status": "AUTHORIZED",
+      "transcription": [
+        { "field": "incurred", "value": 5000000, "role": "INVOICE", "quote": "Tổng chi 5.000.000" },
+        { "field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn" }
+      ]
+    },
+    {
+      "id": "activity:travel-c",
+      "name": "Công tác Hải Phòng",
+      "occurred_at": "2026-10-20T09:00:00+07:00",
+      "purpose": "Làm việc với chi nhánh Hải Phòng",
+      "status": "AUTHORIZED",
+      "budget": {
+        "amount": 8000000,
+        "effect_from": "2026-10-01T00:00:00+07:00",
+        "record_key": "budget:travel-c",
+        "quote": "Ngân sách hoạt động Công tác Hải Phòng: 8.000.000 VND."
+      },
+      "transcription": [
+        { "field": "incurred", "value": 8000000, "role": "INVOICE", "quote": "Tổng chi 8.000.000" },
+        { "field": "paid_employee", "value": 5000000, "role": "PAYMENT", "quote": "Nhân viên trả 5.000.000" },
+        { "field": "paid_company", "value": 3000000, "role": "PAYMENT", "quote": "Công ty trả 3.000.000" },
+        { "field": "advance", "value": 2000000, "role": "ADVANCE", "quote": "Ứng 2.000.000" },
+        { "field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn" },
+        { "field": "economic_key", "value": "invoice:travel-c", "role": "INVOICE", "quote": "Hóa đơn travel-c" }
+      ]
+    },
+    {
+      "id": "activity:travel-d",
+      "name": "Công tác Cần Thơ",
+      "occurred_at": "2026-10-25T09:00:00+07:00",
+      "purpose": "Khảo sát đối tác Cần Thơ",
+      "status": "AUTHORIZED",
+      "transcription": [
+        { "field": "incurred", "value": 5000000, "role": "INVOICE", "quote": "Tổng chi 5.000.000" },
+        { "field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn" }
+      ]
     }
   ],
   "grants": [

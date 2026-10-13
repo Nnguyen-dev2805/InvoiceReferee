@@ -50,6 +50,29 @@ class PersonaSwitchRequest(ApiModel):
     persona: Literal["employee", "accountant", "approver"]
 
 
+class SubmitRequest(ApiModel):
+    activity_id: str
+    declared_purpose: str
+    notes: str | None = None
+
+
+class AnswerRequest(ApiModel):
+    issue_id: str
+    basis_id: str
+    answer_kind: str
+    value: str | int | None = None
+    reason: str
+
+
+class DecisionRequest(ApiModel):
+    issue_ids: list[str]
+    basis_id: str
+    actions: list[str]
+    effect_scope: str
+    amount: int | None = None
+    reason: str
+
+
 def session_payload(
     workflow: CaseWorkflow,
     session: DemoSession,

@@ -17,11 +17,16 @@ from invoice_referee.api import views
 from invoice_referee.domain.case import CommandContext
 from invoice_referee.domain.commands import (
     ActivityData,
+    AnswerIssue,
     AttachSources,
     CommandResult,
     CreateDraft,
+    Decide,
+    Declaration,
     SourceUpload,
+    Submit,
 )
+from invoice_referee.domain.issues import Answer, DecisionCommand
 from invoice_referee.domain.evidence import Media
 from invoice_referee.workflow.service import (
     PROPOSED_ACTIVITY_PREFIX,
@@ -269,4 +274,69 @@ def _sniff_media(data: bytes) -> Media | None:
     if data.startswith(b"\xff\xd8\xff"):
         return "JPEG"
     return None
+
+
+@router.post("/cases/{root_id}/submit")
+async def submit_case(
+    request: Request, root_id: str, payload: views.SubmitRequest
+) -> CommandResult:
+    session = _require_session(request)
+    workflow = _workflow(request)
+    context = _command_context(request, session, require_version=True)
+    return await workflow.execute(
+        context,
+        Submit(
+            root_id=root_id,
+            declaration=Declaration(
+                activity_id=payload.activity_id,
+                declared_purpose=payload.declared_purpose,
+                notes=payload.notes,
+            ),
+        ),
+    )
+
+
+@router.post("/cases/{root_id}/answers")
+async def answer_issue(
+    request: Request, root_id: str, payload: views.AnswerRequest
+) -> CommandResult:
+    session = _require_session(request)
+    workflow = _workflow(request)
+    context = _command_context(request, session, require_version=False)
+    return await workflow.execute(
+        context,
+        AnswerIssue(
+            root_id=root_id,
+            answer=Answer(
+                issue_id=payload.issue_id,
+                basis_id=payload.basis_id,
+                answer_kind=payload.answer_kind,
+                value=payload.value,
+                reason=payload.reason,
+            ),
+        ),
+    )
+
+
+@router.post("/cases/{root_id}/decisions")
+async def decide_case(
+    request: Request, root_id: str, payload: views.DecisionRequest
+) -> CommandResult:
+    session = _require_session(request)
+    workflow = _workflow(request)
+    context = _command_context(request, session, require_version=False)
+    return await workflow.execute(
+        context,
+        Decide(
+            root_id=root_id,
+            decision=DecisionCommand(
+                issue_ids=tuple(payload.issue_ids),
+                basis_id=payload.basis_id,
+                actions=tuple(payload.actions),
+                effect_scope=payload.effect_scope,
+                amount=payload.amount,
+                reason=payload.reason,
+            ),
+        ),
+    )
 
