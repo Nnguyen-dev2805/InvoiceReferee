@@ -1,0 +1,463 @@
+{
+  "schema_version": "2.0",
+  "case_count": 50,
+  "groups": [
+    "01_quyet_toan_so_tien",
+    "02_hop_le_chung_tu",
+    "03_policy_khoan_chi",
+    "04_bang_chung_va_matching",
+    "05_ho_so_phuc_hop"
+  ],
+  "cases": [
+    {
+      "case_id": "01_quyet_toan_so_tien-TC01",
+      "group_id": "01_quyet_toan_so_tien",
+      "folder": "01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc01_hoan_tra_tien_thua",
+      "title": "Hợp lệ - nhân viên hoàn trả tiền thừa",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC02",
+      "group_id": "01_quyet_toan_so_tien",
+      "folder": "01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc02_cong_ty_thanh_toan_them",
+      "title": "Hợp lệ - công ty thanh toán thêm",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC03",
+      "group_id": "01_quyet_toan_so_tien",
+      "folder": "01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc03_khong_chenh_lech",
+      "title": "Hợp lệ - không phát sinh chênh lệch",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC04",
+      "group_id": "01_quyet_toan_so_tien",
+      "folder": "01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc04_nhieu_dong_hop_le",
+      "title": "Hợp lệ - nhiều dòng chi trong một báo cáo",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC05",
+      "group_id": "01_quyet_toan_so_tien",
+      "folder": "01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc05_tong_dong_khong_khop",
+      "title": "Không hợp lệ - tổng dòng không khớp tổng cộng",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_PAPER_TOTAL_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC06",
+      "group_id": "01_quyet_toan_so_tien",
+      "folder": "01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc06_chenh_lech_ghi_sai",
+      "title": "Không hợp lệ - số tiền quyết toán chênh lệch ghi sai",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_SETTLEMENT_DIFF_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC07",
+      "group_id": "01_quyet_toan_so_tien",
+      "folder": "01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc07_so_tien_bang_chu_khong_khop",
+      "title": "Không hợp lệ - số tiền bằng chữ không khớp",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_PAPER_CONSISTENCY_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC08",
+      "group_id": "01_quyet_toan_so_tien",
+      "folder": "01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc08_thieu_so_tien_tam_ung",
+      "title": "Không hợp lệ - đơn quyết toán thiếu số tiền tạm ứng",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_ADV_AMOUNT_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC09",
+      "group_id": "01_quyet_toan_so_tien",
+      "folder": "01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc09_thieu_tong_cong",
+      "title": "Không hợp lệ - không đọc được tổng cộng trên đơn",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_PAPER_TOTAL_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC10",
+      "group_id": "01_quyet_toan_so_tien",
+      "folder": "01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc10_vuot_tham_quyen",
+      "title": "Vượt thẩm quyền - tổng hồ sơ trên 100 triệu",
+      "expected_decision": "ESCALATE",
+      "expected_primary_rule": "SET_AUTH_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC01",
+      "group_id": "02_hop_le_chung_tu",
+      "folder": "02_hop_le_chung_tu/02_hop_le_chung_tu-tc01_hoa_don_dien_tu_day_du",
+      "title": "Hợp lệ - hóa đơn điện tử đủ trường bắt buộc",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC02",
+      "group_id": "02_hop_le_chung_tu",
+      "folder": "02_hop_le_chung_tu/02_hop_le_chung_tu-tc02_hoa_don_thieu_mst_nguoi_mua",
+      "title": "Không hợp lệ - hóa đơn điện tử thiếu MST người mua",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_DOCUMENT_REQUIRED_FIELDS_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC03",
+      "group_id": "02_hop_le_chung_tu",
+      "folder": "02_hop_le_chung_tu/02_hop_le_chung_tu-tc03_mst_nguoi_mua_khac",
+      "title": "Không hợp lệ - MST người mua thuộc công ty khác",
+      "expected_decision": "RECOMMEND_REJECT",
+      "expected_primary_rule": "SET_BUYER_IDENTITY_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC04",
+      "group_id": "02_hop_le_chung_tu",
+      "folder": "02_hop_le_chung_tu/02_hop_le_chung_tu-tc04_hoa_don_thieu_so",
+      "title": "Không hợp lệ - hóa đơn điện tử thiếu số hóa đơn",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_DOCUMENT_REQUIRED_FIELDS_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC05",
+      "group_id": "02_hop_le_chung_tu",
+      "folder": "02_hop_le_chung_tu/02_hop_le_chung_tu-tc05_mst_nguoi_ban_sai_dinh_dang",
+      "title": "Không hợp lệ - MST người bán sai định dạng",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_DOCUMENT_REQUIRED_FIELDS_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC06",
+      "group_id": "02_hop_le_chung_tu",
+      "folder": "02_hop_le_chung_tu/02_hop_le_chung_tu-tc06_ve_may_bay_hop_le",
+      "title": "Hợp lệ - vé máy bay điện tử là chứng từ gốc",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC07",
+      "group_id": "02_hop_le_chung_tu",
+      "folder": "02_hop_le_chung_tu/02_hop_le_chung_tu-tc07_chuyen_khoan_chua_thanh_cong",
+      "title": "Không hợp lệ - bằng chứng chuyển khoản chưa hoàn tất",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_DOCUMENT_VALIDITY_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC08",
+      "group_id": "02_hop_le_chung_tu",
+      "folder": "02_hop_le_chung_tu/02_hop_le_chung_tu-tc08_khong_phan_loai_duoc_chung_tu",
+      "title": "Không hợp lệ - không phân loại được chứng từ",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_DOCUMENT_CLASSIFICATION_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC09",
+      "group_id": "02_hop_le_chung_tu",
+      "folder": "02_hop_le_chung_tu/02_hop_le_chung_tu-tc09_hoa_don_so_hoc_khong_khop",
+      "title": "Không hợp lệ - tiền hàng và tổng thanh toán không nhất quán",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_DOCUMENT_CONSISTENCY_001",
+      "implementation_status": "PLANNED"
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC10",
+      "group_id": "02_hop_le_chung_tu",
+      "folder": "02_hop_le_chung_tu/02_hop_le_chung_tu-tc10_nguoi_mua_khach_le",
+      "title": "Không hợp lệ - hóa đơn ghi người mua là khách lẻ",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_DOCUMENT_REQUIRED_FIELDS_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC01",
+      "group_id": "03_policy_khoan_chi",
+      "folder": "03_policy_khoan_chi/03_policy_khoan_chi-tc01_taxi_trong_han_muc",
+      "title": "Hợp lệ - taxi trong hạn mức",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC02",
+      "group_id": "03_policy_khoan_chi",
+      "folder": "03_policy_khoan_chi/03_policy_khoan_chi-tc02_taxi_vuot_han_muc",
+      "title": "Vượt policy - taxi trên hạn mức",
+      "expected_decision": "ESCALATE",
+      "expected_primary_rule": "SET_LIMIT_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC03",
+      "group_id": "03_policy_khoan_chi",
+      "folder": "03_policy_khoan_chi/03_policy_khoan_chi-tc03_tiep_khach_trong_han_muc",
+      "title": "Hợp lệ - tiếp khách trong hạn mức",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC04",
+      "group_id": "03_policy_khoan_chi",
+      "folder": "03_policy_khoan_chi/03_policy_khoan_chi-tc04_tiep_khach_vuot_han_muc",
+      "title": "Vượt policy - tiếp khách trên hạn mức",
+      "expected_decision": "ESCALATE",
+      "expected_primary_rule": "SET_LIMIT_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC05",
+      "group_id": "03_policy_khoan_chi",
+      "folder": "03_policy_khoan_chi/03_policy_khoan_chi-tc05_chi_tieu_ca_nhan",
+      "title": "Không hợp lệ - khoản chi cá nhân",
+      "expected_decision": "RECOMMEND_REJECT",
+      "expected_primary_rule": "SET_CATEGORY_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC06",
+      "group_id": "03_policy_khoan_chi",
+      "folder": "03_policy_khoan_chi/03_policy_khoan_chi-tc06_ruou_bia_theo_chinh_sach",
+      "title": "Ngoại lệ policy - rượu bia tiếp khách",
+      "expected_decision": "ACCOUNTANT_REVIEW",
+      "expected_primary_rule": "SET_PROHIBITED_ITEM_001",
+      "implementation_status": "PLANNED"
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC07",
+      "group_id": "03_policy_khoan_chi",
+      "folder": "03_policy_khoan_chi/03_policy_khoan_chi-tc07_nop_dung_han_30_ngay",
+      "title": "Hợp lệ - khoản chi đúng hạn 30 ngày",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC08",
+      "group_id": "03_policy_khoan_chi",
+      "folder": "03_policy_khoan_chi/03_policy_khoan_chi-tc08_nop_qua_han_31_ngay",
+      "title": "Ngoại lệ policy - nộp hồ sơ quá 30 ngày",
+      "expected_decision": "ACCOUNTANT_REVIEW",
+      "expected_primary_rule": "SET_DEADLINE_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC09",
+      "group_id": "03_policy_khoan_chi",
+      "folder": "03_policy_khoan_chi/03_policy_khoan_chi-tc09_ngay_chi_chua_xac_dinh",
+      "title": "Không hợp lệ - chưa xác định ngày chi",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_EXPENSE_DATE_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC10",
+      "group_id": "03_policy_khoan_chi",
+      "folder": "03_policy_khoan_chi/03_policy_khoan_chi-tc10_danh_muc_chua_xac_dinh",
+      "title": "Không hợp lệ - chưa xác định danh mục khoản chi",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_CATEGORY_UNKNOWN_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC01",
+      "group_id": "04_bang_chung_va_matching",
+      "folder": "04_bang_chung_va_matching/04_bang_chung_va_matching-tc01_khop_so_hoa_don_va_so_tien",
+      "title": "Hợp lệ - số hóa đơn và số tiền khớp",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC02",
+      "group_id": "04_bang_chung_va_matching",
+      "folder": "04_bang_chung_va_matching/04_bang_chung_va_matching-tc02_cung_so_tien_sai_noi_dung",
+      "title": "Không hợp lệ - cùng số tiền nhưng sai nội dung",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_PAPER_MATCH_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC03",
+      "group_id": "04_bang_chung_va_matching",
+      "folder": "04_bang_chung_va_matching/04_bang_chung_va_matching-tc03_khop_so_hoa_don_lech_so_tien",
+      "title": "Không hợp lệ - số hóa đơn khớp nhưng số tiền lệch",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_PAPER_AMOUNT_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC04",
+      "group_id": "04_bang_chung_va_matching",
+      "folder": "04_bang_chung_va_matching/04_bang_chung_va_matching-tc04_thieu_chung_tu_khong_ly_do",
+      "title": "Không hợp lệ - dòng ghi đính kèm nhưng thiếu chứng từ",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_PAPER_EVIDENCE_REQUIRED",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC05",
+      "group_id": "04_bang_chung_va_matching",
+      "folder": "04_bang_chung_va_matching/04_bang_chung_va_matching-tc05_khong_chung_tu_co_ly_do",
+      "title": "Ngoại lệ - không có chứng từ nhưng có giải trình",
+      "expected_decision": "ACCOUNTANT_REVIEW",
+      "expected_primary_rule": "SET_PAPER_EVIDENCE_EXCEPTION",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC06",
+      "group_id": "04_bang_chung_va_matching",
+      "folder": "04_bang_chung_va_matching/04_bang_chung_va_matching-tc06_bang_chung_chuyen_khoan_thay_the",
+      "title": "Ngoại lệ - dùng chứng từ chuyển khoản thay thế",
+      "expected_decision": "ACCOUNTANT_REVIEW",
+      "expected_primary_rule": "SET_PAPER_EVIDENCE_EXCEPTION",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC07",
+      "group_id": "04_bang_chung_va_matching",
+      "folder": "04_bang_chung_va_matching/04_bang_chung_va_matching-tc07_ve_dien_tu_thay_the",
+      "title": "Hợp lệ - vé điện tử thay thế hóa đơn",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC08",
+      "group_id": "04_bang_chung_va_matching",
+      "folder": "04_bang_chung_va_matching/04_bang_chung_va_matching-tc08_chung_tu_dinh_kem_khong_co_tren_report",
+      "title": "Không hợp lệ - chứng từ đính kèm không thuộc dòng nào",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_PAPER_UNMATCHED_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC09",
+      "group_id": "04_bang_chung_va_matching",
+      "folder": "04_bang_chung_va_matching/04_bang_chung_va_matching-tc09_so_hoa_don_khai_bao_nhung_thieu_file",
+      "title": "Không hợp lệ - khai báo hóa đơn nhưng không đính kèm file",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_PAPER_EVIDENCE_REQUIRED",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC10",
+      "group_id": "04_bang_chung_va_matching",
+      "folder": "04_bang_chung_va_matching/04_bang_chung_va_matching-tc10_evidence_gan_phu_hop_nhung_mo_ho",
+      "title": "Cần xác nhận - evidence gần phù hợp nhưng chưa đủ chắc chắn",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_PAPER_MATCH_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC01",
+      "group_id": "05_ho_so_phuc_hop",
+      "folder": "05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc01_ba_hoa_don_cong_tac_hop_le",
+      "title": "Hợp lệ - ba hóa đơn cho một chuyến công tác",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC02",
+      "group_id": "05_ho_so_phuc_hop",
+      "folder": "05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc02_mot_hoa_don_phan_bo_hai_dong",
+      "title": "Hợp lệ - một hóa đơn phân bổ đúng cho hai dòng",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "PLANNED"
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC03",
+      "group_id": "05_ho_so_phuc_hop",
+      "folder": "05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc03_phan_bo_vuot_gia_tri_hoa_don",
+      "title": "Không hợp lệ - một hóa đơn bị phân bổ vượt giá trị",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_EVIDENCE_REUSE_001",
+      "implementation_status": "PLANNED"
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC04",
+      "group_id": "05_ho_so_phuc_hop",
+      "folder": "05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc04_mot_dong_hai_hoa_don",
+      "title": "Hợp lệ - một dòng dùng hai hóa đơn gốc",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC05",
+      "group_id": "05_ho_so_phuc_hop",
+      "folder": "05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc05_hoa_don_va_chuyen_khoan",
+      "title": "Hợp lệ - hóa đơn gốc kèm bằng chứng thanh toán",
+      "expected_decision": "READY_FOR_APPROVAL",
+      "expected_primary_rule": null,
+      "implementation_status": "PLANNED"
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC06",
+      "group_id": "05_ho_so_phuc_hop",
+      "folder": "05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc06_hoa_don_trung_voi_ho_so_truoc",
+      "title": "Không hợp lệ - hóa đơn trùng định danh hồ sơ trước",
+      "expected_decision": "RECOMMEND_REJECT",
+      "expected_primary_rule": "SET_DUPLICATE_001",
+      "implementation_status": "PLANNED"
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC07",
+      "group_id": "05_ho_so_phuc_hop",
+      "folder": "05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc07_file_doi_ten_nhung_trung_noi_dung",
+      "title": "Không hợp lệ - file đổi tên nhưng nội dung hóa đơn trùng",
+      "expected_decision": "RECOMMEND_REJECT",
+      "expected_primary_rule": "SET_DUPLICATE_001",
+      "implementation_status": "PLANNED"
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC08",
+      "group_id": "05_ho_so_phuc_hop",
+      "folder": "05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc08_hon_hop_goc_thay_the_khong_chung_tu",
+      "title": "Ngoại lệ - hồ sơ có chứng từ gốc, thay thế và không chứng từ",
+      "expected_decision": "ACCOUNTANT_REVIEW",
+      "expected_primary_rule": "SET_PAPER_EVIDENCE_EXCEPTION",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC09",
+      "group_id": "05_ho_so_phuc_hop",
+      "folder": "05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc09_chung_tu_dinh_kem_du_thua",
+      "title": "Không hợp lệ - có chứng từ dư chưa được khai trong báo cáo",
+      "expected_decision": "REQUEST_INFO",
+      "expected_primary_rule": "SET_PAPER_UNMATCHED_001",
+      "implementation_status": "COVERED"
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC10",
+      "group_id": "05_ho_so_phuc_hop",
+      "folder": "05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc10_sai_mst_va_lech_so_tien",
+      "title": "Không hợp lệ - MST người mua sai đồng thời lệch số tiền",
+      "expected_decision": "RECOMMEND_REJECT",
+      "expected_primary_rule": "SET_BUYER_IDENTITY_001",
+      "implementation_status": "COVERED"
+    }
+  ]
+}

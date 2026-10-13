@@ -1,0 +1,46 @@
+{
+  "schema_version": "2.0",
+  "case_id": "02_hop_le_chung_tu-TC10",
+  "group_id": "02_hop_le_chung_tu",
+  "title": "Không hợp lệ - hóa đơn ghi người mua là khách lẻ",
+  "data_classification": "SYNTHETIC",
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "employee": {
+      "name": "Donal Trump",
+      "department": "Phòng Kinh doanh",
+      "position": "Nhân viên"
+    },
+    "request_form": "request_form.pdf",
+    "evidence_files": [
+      "hoa_don_0001810.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "primary_rule_id": "SET_DOCUMENT_REQUIRED_FIELDS_001",
+    "implementation_status": "COVERED",
+    "expected_findings": [
+      "BUYER_IDENTITY_UNCLEAR"
+    ],
+    "workflow_status": "NEEDS_REVIEW"
+  },
+  "facts": {
+    "report_total_vnd": 2200000,
+    "advance_amount_vnd": 2500000,
+    "settlement_amount_vnd": 300000,
+    "settlement_direction": "Nhân viên hoàn trả công ty",
+    "line_count": 1
+  },
+  "line_support_expectations": [
+    {
+      "item_id": "L01",
+      "description": "Mua vật tư sửa chữa",
+      "amount_vnd": 2200000,
+      "reference": "0001810",
+      "note": "Đính kèm hóa đơn"
+    }
+  ],
+  "generator_notes": []
+}

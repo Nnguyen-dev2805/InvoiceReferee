@@ -1,0 +1,44 @@
+{
+  "schema_version": "2.0",
+  "case_id": "04_bang_chung_va_matching-TC04",
+  "group_id": "04_bang_chung_va_matching",
+  "title": "Không hợp lệ - dòng ghi đính kèm nhưng thiếu chứng từ",
+  "data_classification": "SYNTHETIC",
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "employee": {
+      "name": "Donal Trump",
+      "department": "Phòng Kinh doanh",
+      "position": "Nhân viên"
+    },
+    "request_form": "request_form.pdf",
+    "evidence_files": []
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "primary_rule_id": "SET_PAPER_EVIDENCE_REQUIRED",
+    "implementation_status": "COVERED",
+    "expected_findings": [
+      "SET_PAPER_EVIDENCE_REQUIRED"
+    ],
+    "workflow_status": "NEEDS_REVIEW"
+  },
+  "facts": {
+    "report_total_vnd": 2750000,
+    "advance_amount_vnd": 3000000,
+    "settlement_amount_vnd": 250000,
+    "settlement_direction": "Nhân viên hoàn trả công ty",
+    "line_count": 1
+  },
+  "line_support_expectations": [
+    {
+      "item_id": "L01",
+      "description": "Mua vật tư sửa chữa",
+      "amount_vnd": 2750000,
+      "reference": "0002004",
+      "note": "Đính kèm hóa đơn"
+    }
+  ],
+  "generator_notes": []
+}

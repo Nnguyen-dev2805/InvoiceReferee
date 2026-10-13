@@ -1,0 +1,46 @@
+{
+  "schema_version": "2.0",
+  "case_id": "01_quyet_toan_so_tien-TC08",
+  "group_id": "01_quyet_toan_so_tien",
+  "title": "Không hợp lệ - đơn quyết toán thiếu số tiền tạm ứng",
+  "data_classification": "SYNTHETIC",
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "employee": {
+      "name": "Donal Trump",
+      "department": "Phòng Kinh doanh",
+      "position": "Nhân viên"
+    },
+    "request_form": "request_form.pdf",
+    "evidence_files": [
+      "hoa_don_0001711.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "primary_rule_id": "SET_ADV_AMOUNT_001",
+    "implementation_status": "COVERED",
+    "expected_findings": [
+      "SET_ADV_AMOUNT_001"
+    ],
+    "workflow_status": "NEEDS_REVIEW"
+  },
+  "facts": {
+    "report_total_vnd": 1800000,
+    "advance_amount_vnd": 0,
+    "settlement_amount_vnd": 1800000,
+    "settlement_direction": "Công ty thanh toán thêm",
+    "line_count": 1
+  },
+  "line_support_expectations": [
+    {
+      "item_id": "L01",
+      "description": "Dịch vụ in ấn tài liệu",
+      "amount_vnd": 1800000,
+      "reference": "0001711",
+      "note": "Đính kèm hóa đơn"
+    }
+  ],
+  "generator_notes": []
+}
