@@ -7,9 +7,18 @@ models are frozen value objects.
 
 from __future__ import annotations
 
-from typing import Annotated, Generic, Literal, TypeVar
+from datetime import UTC, datetime
+from typing import Annotated, Any, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StrictInt,
+    model_validator,
+)
 
 # Identity and money scalars (contracts §1).
 Id = str
@@ -20,6 +29,25 @@ Currency = Literal["VND"]
 FactState = Literal["KNOWN", "UNKNOWN", "CONFLICT"]
 
 T = TypeVar("T")
+
+
+def _parse_iso_datetime(value: Any) -> Any:
+    """Accept an ISO-8601 string (FastAPI JSON bodies parse to a dict first)."""
+    if isinstance(value, str):
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return value
+
+
+def _to_utc(value: datetime) -> datetime:
+    """Require timezone-awareness and normalize every timestamp to UTC (§1)."""
+    if value.tzinfo is None:
+        raise ValueError("datetime must be timezone-aware (UTC normalized)")
+    return value.astimezone(UTC)
+
+
+# Every timestamp in the domain uses this type: aware, ISO-8601 at the JSON
+# boundary, stored normalized to UTC so comparisons never mix naive/aware.
+UtcDatetime = Annotated[datetime, BeforeValidator(_parse_iso_datetime), AfterValidator(_to_utc)]
 
 
 class StrictModel(BaseModel):
@@ -43,16 +71,20 @@ class EvidenceRef(StrictModel):
     """
 
     source_id: Id
-    source_sha256: str = Field(min_length=1)
+    source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     page: Annotated[int | None, Field(default=None, ge=1)] = None
     record_key: str | None = None
-    exact_quote: str
+    exact_quote: str = Field(min_length=1)
     bbox: tuple[float, float, float, float] | None = None
 
     @model_validator(mode="after")
     def _require_locator(self) -> EvidenceRef:
-        if self.page is None and self.record_key is None:
+        page_missing = self.page is None
+        key = (self.record_key or "").strip()
+        if page_missing and not key:
             raise ValueError("EvidenceRef requires a 1-based page or a record_key")
+        if not self.exact_quote.strip():
+            raise ValueError("EvidenceRef requires a non-blank exact_quote")
         return self
 
 
@@ -71,4 +103,14 @@ class Fact(StrictModel, Generic[T]):
             raise ValueError("a KNOWN fact requires a value")
         if self.state != "KNOWN" and self.value is not None:
             raise ValueError(f"a {self.state} fact must not carry an aggregate value")
+        return self
+
+    @model_validator(mode="after")
+    def _typed_when_generic_is_unbound(self) -> Fact[T]:
+        # A bare `Fact` (no type argument) is a latent trap: it would accept a
+        # bool/float/str as "money". Every real field uses Fact[T] (T money or
+        # signed money); reject values on an unparameterized Fact.
+        meta = getattr(type(self), "__pydantic_generic_metadata__", None)
+        if meta is not None and meta.get("origin") is None and self.value is not None:
+            raise ValueError("Fact must be parameterized, e.g. Fact[Vnd]")
         return self

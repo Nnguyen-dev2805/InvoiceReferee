@@ -108,7 +108,7 @@ async def test_same_activity_has_one_root(app_fixture):
 - [x] Protocol/blank private study sheets: user recruits >=3 practitioners; matched manual/app tasks and order, whole human effort/draft/wait/onboarding/adverse effect, real written feedback/consent. Agent doesn't send/invent participants.
 - [x] GREEN tests + `rtk proxy npm --prefix frontend run build`. UI `rtk proxy uv run python scripts/dev.py --mode stub`: select/create twice/attach/list sources; accessible labels/keyboard/screenshot and mode/config diagnostics.
 - [x] Before npm/build/browser commands, resolve Node24 and verify `node --version` plus `npm --loglevel=verbose --version` show Node24 in the same scoped environment; record the exact selector/lockfile/command/exit. A green Node26 build does not satisfy the runtime pin.
-- [ ] Commit checkpoint "feat: add canonical demo intake".
+- [x] Commit checkpoint "feat: add canonical demo intake" (1c395de).
 **Gate:** UI available, tenant/version/source checks; trial owner/preparation explicit.
 
 ### T3 — Admissibility, finance and policy core

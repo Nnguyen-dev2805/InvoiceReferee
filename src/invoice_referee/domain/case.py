@@ -6,10 +6,18 @@ it, so it carries observations and relations rather than positional extras.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Literal
 
-from invoice_referee.domain.common import EvidenceRef, Fact, Id, StrictModel, Vnd
+from pydantic import model_validator
+
+from invoice_referee.domain.common import (
+    EvidenceRef,
+    Fact,
+    Id,
+    StrictModel,
+    UtcDatetime,
+    Vnd,
+)
 from invoice_referee.domain.evidence import (
     Confirmation,
     Observation,
@@ -94,7 +102,7 @@ class AssessmentInput(StrictModel):
     exceptions: tuple[ExceptionDecision, ...] = ()
     previous_eligibility: EligibilityDecision | None = None
     read_set: ReadSet
-    as_of: datetime
+    as_of: UtcDatetime
 
 
 class FinancialEffect(StrictModel):
@@ -141,7 +149,7 @@ class SettlementConclusion(StrictModel):
     basis: str
     refs: tuple[EvidenceRef, ...] = ()
     actor_or_system: str
-    decided_at: datetime
+    decided_at: UtcDatetime
 
 
 class Instruction(StrictModel):
@@ -158,6 +166,16 @@ class Instruction(StrictModel):
     fulfilled_amount: Vnd = 0
     remaining: Vnd
     execution_state: ExecutionState
+
+    @model_validator(mode="after")
+    def _remaining_matches_fulfillment(self) -> Instruction:
+        # contracts §4: remaining is the net uncovered amount; fulfillment can
+        # never exceed the instruction amount.
+        if self.fulfilled_amount > self.amount:
+            raise ValueError("fulfilled_amount must not exceed amount")
+        if self.remaining != max(self.amount - self.fulfilled_amount, 0):
+            raise ValueError("remaining must equal max(amount - fulfilled_amount, 0)")
+        return self
 
 
 class CaseView(StrictModel):

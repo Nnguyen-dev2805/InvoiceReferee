@@ -7,16 +7,14 @@ the version that was in force.
 
 from __future__ import annotations
 
-from datetime import datetime
-
-from invoice_referee.domain.common import EvidenceRef, Id, StrictModel, Vnd
+from invoice_referee.domain.common import EvidenceRef, Id, StrictModel, UtcDatetime, Vnd
 
 
 class PolicyVersion(StrictModel):
     id: Id
     version: str
-    effective_from: datetime
-    effective_to: datetime | None = None
+    effective_from: UtcDatetime
+    effective_to: UtcDatetime | None = None
     profile: str
     rules: tuple[str, ...] = ()
 
@@ -30,8 +28,8 @@ class Grant(StrictModel):
     actions: tuple[str, ...]
     scope: str
     max_amount: Vnd
-    effective_from: datetime
-    effective_to: datetime | None = None
+    effective_from: UtcDatetime
+    effective_to: UtcDatetime | None = None
 
 
 class BudgetDecision(StrictModel):
@@ -40,7 +38,7 @@ class BudgetDecision(StrictModel):
     id: Id
     activity: Id
     amount: Vnd
-    effect_range: tuple[datetime, datetime | None]
+    effect_range: tuple[UtcDatetime, UtcDatetime | None]
     actor: Id
     grant_ref: Id | None = None
     refs: tuple[EvidenceRef, ...] = ()
@@ -56,7 +54,7 @@ class ExceptionDecision(StrictModel):
     actions: tuple[str, ...]
     actor: Id
     grant_ref: Id | None = None
-    decided_at: datetime
-    effect_range: tuple[datetime, datetime | None]
+    decided_at: UtcDatetime
+    effect_range: tuple[UtcDatetime, UtcDatetime | None]
     refs: tuple[EvidenceRef, ...] = ()
     reason: str

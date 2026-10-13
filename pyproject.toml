@@ -23,6 +23,9 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[project.scripts]
+invoice-referee = "invoice_referee.cli:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/invoice_referee"]
 

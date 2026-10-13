@@ -6,12 +6,11 @@ could not be read, or failed is not the same as a page that is absent.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
-from invoice_referee.domain.common import EvidenceRef, Id, StrictModel
+from invoice_referee.domain.common import EvidenceRef, Id, StrictModel, UtcDatetime
 from invoice_referee.domain.issues import ProcessingProblem
 
 Media = Literal["PDF", "PNG", "JPEG"]
@@ -46,6 +45,13 @@ class EvidenceUnit(StrictModel):
     page_range: tuple[int, int]
     role: EvidenceRole
 
+    @model_validator(mode="after")
+    def _ordered_page_range(self) -> EvidenceUnit:
+        start, end = self.page_range
+        if start < 1 or end < start:
+            raise ValueError("page_range must be 1-based and ordered (start <= end)")
+        return self
+
 
 class Observation(StrictModel):
     field: str
@@ -72,7 +78,7 @@ class Confirmation(StrictModel):
     scope: str
     refs: tuple[EvidenceRef, ...] = ()
     reason: str
-    observed_at: datetime
+    observed_at: UtcDatetime
 
 
 class ReadResult(StrictModel):

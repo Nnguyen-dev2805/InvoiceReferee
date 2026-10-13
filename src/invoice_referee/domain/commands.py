@@ -7,16 +7,19 @@ applied to the newest version after the actor and idempotency checks.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Annotated, Literal, Union
 
 from pydantic import Field
 
-from invoice_referee.domain.case import CaseView, ExecutionState
-from invoice_referee.domain.common import EvidenceRef, Id, StrictModel
+from invoice_referee.domain.case import CaseView
+from invoice_referee.domain.common import EvidenceRef, Id, StrictModel, UtcDatetime
 from invoice_referee.domain.evidence import Media
 from invoice_referee.domain.finance import RecordMoneyInput
 from invoice_referee.domain.issues import Answer, DecisionCommand
+
+# contracts §9: MarkExecution reports an observed execution outcome. NOT_STARTED
+# is an instruction's initial state, never something a client may reset to.
+MarkExecutionState = Literal["OPEN", "CLOSED_CONFIRMED", "UNKNOWN"]
 
 
 class ActivityData(StrictModel):
@@ -24,7 +27,7 @@ class ActivityData(StrictModel):
 
     activity_id: Id
     name: str
-    occurred_at: datetime
+    occurred_at: UtcDatetime
     declared_purpose: str
 
 
@@ -100,7 +103,7 @@ class MarkExecution(StrictModel):
     kind: Literal["MARK_EXECUTION"] = "MARK_EXECUTION"
     root_id: Id
     instruction_id: Id
-    execution_state: ExecutionState
+    execution_state: MarkExecutionState
     refs: tuple[EvidenceRef, ...] = ()
     reason: str
 

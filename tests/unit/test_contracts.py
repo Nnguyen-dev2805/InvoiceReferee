@@ -208,3 +208,197 @@ def test_settings_report_missing_live_vars(monkeypatch: pytest.MonkeyPatch) -> N
     settings = Settings(_env_file=None)
     assert settings.mistral_api_key is None
     assert set(settings.missing_for_live()) == set(LIVE_REQUIRED_SETTINGS)
+
+
+# -- datetime boundary: aware, ISO-8601 JSON, normalized UTC (contracts §1) -----
+
+
+def test_timestamp_fields_normalize_to_utc() -> None:
+    from datetime import timedelta, timezone
+
+    from invoice_referee.domain.policy import Grant
+
+    tz7 = datetime(2026, 10, 13, 10, 0, tzinfo=timezone(timedelta(hours=7)))
+    grant = Grant(
+        id="grant:1",
+        version="v1",
+        actor="employee:a",
+        actions=("RECOGNIZE_COST",),
+        scope="activity:travel-a",
+        max_amount=1_000,
+        effective_from=tz7,
+    )
+    assert grant.effective_from == datetime(2026, 10, 13, 3, 0, tzinfo=UTC)
+    assert grant.effective_from.utcoffset() == timedelta(0)
+
+
+def test_naive_timestamp_is_rejected() -> None:
+    from invoice_referee.domain.finance import Expense
+
+    with pytest.raises(ValidationError):
+        Expense(
+            id="expense:1",
+            economic_key="invoice:1",
+            activity="activity:travel-a",
+            incurred=Fact[int](key="expense:1:incurred", value=1, state="KNOWN"),
+            incurred_at=datetime(2026, 1, 1),
+            eligibility="ELIGIBLE",
+        )
+
+
+def test_iso8601_json_datetime_accepted_at_domain_boundary() -> None:
+    from invoice_referee.domain.commands import CreateDraft
+
+    payload = (
+        '{"activity_data": {"activity_id": "a", "name": "n", '
+        '"occurred_at": "2026-10-13T03:00:00Z", "declared_purpose": "p"}}'
+    )
+    assert CreateDraft.model_validate_json(payload).activity_data.occurred_at == datetime(
+        2026, 10, 13, 3, 0, tzinfo=UTC
+    )
+    # FastAPI parses a JSON body into a python dict before model validation, so
+    # the python-mode path must accept the same ISO-8601 string.
+    as_dict = CreateDraft.model_validate(
+        {
+            "activity_data": {
+                "activity_id": "a",
+                "name": "n",
+                "occurred_at": "2026-10-13T03:00:00Z",
+                "declared_purpose": "p",
+            }
+        }
+    )
+    assert as_dict.activity_data.occurred_at == datetime(2026, 10, 13, 3, 0, tzinfo=UTC)
+
+
+# -- EvidenceRef must carry a real digest, quote and locator (T1 gate) ---------
+
+
+def test_evidence_ref_requires_real_digest_quote_and_locator() -> None:
+    good = _ref(source_sha256="a" * 64, page=1, exact_quote="Tổng cộng 450.000")
+    assert good.source_sha256 == "a" * 64
+
+    for bad in (
+        {"source_sha256": "x"},  # not 64 hex chars
+        {"source_sha256": "g" * 64},  # 64 chars but not hex
+        {"source_sha256": "A" * 64},  # uppercase hex is not canonical sha256
+        {"exact_quote": ""},  # blank quote
+        {"exact_quote": "   "},  # whitespace-only quote
+        {"page": None, "record_key": ""},  # empty record key is no locator
+        {"page": None, "record_key": "   "},  # whitespace-only record key
+    ):
+        with pytest.raises(ValidationError):
+            _ref(**bad)
+
+
+# -- Instruction money invariants (contracts §4) -------------------------------
+
+
+def test_instruction_remaining_matches_amount_minus_fulfilled() -> None:
+    from invoice_referee.domain.case import Instruction
+
+    good = Instruction(
+        id="instruction:1",
+        root_id="case:1",
+        direction="PAY",
+        amount=10,
+        status="PARTIAL",
+        basis="basis:1",
+        fulfilled_amount=2,
+        remaining=8,
+        execution_state="OPEN",
+    )
+    assert good.remaining == 8
+
+    with pytest.raises(ValidationError):  # remaining must equal amount - fulfilled
+        Instruction(
+            id="instruction:1",
+            root_id="case:1",
+            direction="PAY",
+            amount=10,
+            status="PARTIAL",
+            basis="basis:1",
+            fulfilled_amount=2,
+            remaining=999,
+            execution_state="OPEN",
+        )
+    with pytest.raises(ValidationError):  # fulfilled cannot exceed amount
+        Instruction(
+            id="instruction:1",
+            root_id="case:1",
+            direction="PAY",
+            amount=4,
+            status="PARTIAL",
+            basis="basis:1",
+            fulfilled_amount=10,
+            remaining=0,
+            execution_state="OPEN",
+        )
+
+
+# -- MarkExecution may not reset an instruction to NOT_STARTED (contracts §9) ---
+
+
+def test_mark_execution_rejects_not_started() -> None:
+    from invoice_referee.domain.commands import MarkExecution
+
+    for state in ("OPEN", "CLOSED_CONFIRMED", "UNKNOWN"):
+        MarkExecution(
+            root_id="case:1", instruction_id="instruction:1", execution_state=state, reason="x"
+        )
+    with pytest.raises(ValidationError):
+        MarkExecution(
+            root_id="case:1",
+            instruction_id="instruction:1",
+            execution_state="NOT_STARTED",
+            reason="reset",
+        )
+
+
+# -- latent traps: bare Fact, page_range order --------------------------------
+
+
+def test_bare_fact_rejects_untyped_value() -> None:
+    for value in (True, 1.25, "x"):
+        with pytest.raises(ValidationError):
+            Fact(key="k", value=value, state="KNOWN")
+
+
+def test_evidence_unit_page_range_is_ordered_and_1_based() -> None:
+    from invoice_referee.domain.evidence import EvidenceUnit
+
+    EvidenceUnit(source="source:1", page_range=(1, 3), role="INVOICE")
+    EvidenceUnit(source="source:1", page_range=(2, 2), role="INVOICE")
+    for bad in ((5, 2), (0, 1)):
+        with pytest.raises(ValidationError):
+            EvidenceUnit(source="source:1", page_range=bad, role="INVOICE")
+
+
+# -- test-helper honesty and the CLI entry point -------------------------------
+
+
+def test_snapshot_rejects_negative_amounts() -> None:
+    from tests.factories import snapshot
+
+    for field in ("T", "E", "C", "A", "P", "R", "B"):
+        kwargs: dict[str, int] = {
+            "T": 0,
+            "E": 0,
+            "C": 0,
+            "A": 0,
+            "P": 0,
+            "R": 0,
+            "B": 8_000_000,
+        }
+        kwargs[field] = -1
+        with pytest.raises(ValueError):
+            snapshot(**kwargs)  # type: ignore[arg-type]
+
+
+def test_package_declares_console_entry_point() -> None:
+    import tomllib
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    assert data["project"]["scripts"]["invoice-referee"] == "invoice_referee.cli:main"

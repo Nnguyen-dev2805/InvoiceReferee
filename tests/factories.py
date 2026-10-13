@@ -158,6 +158,19 @@ def snapshot(
         activity=ACTIVITY,
         profile=PROFILE,
     )
+    for name, amount in (
+        ("T", T),
+        ("E", E),
+        ("C", C),
+        ("A", A),
+        ("P", P),
+        ("R", R),
+        ("B", B),
+    ):
+        if amount < 0:
+            raise ValueError(
+                f"snapshot() {name} must be a non-negative literal VND amount"
+            )
     established = coverage or T > 0
 
     payments: list[ExpensePayment] = []

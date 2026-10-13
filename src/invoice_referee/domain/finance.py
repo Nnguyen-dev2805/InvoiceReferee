@@ -6,7 +6,6 @@ rather than being defaulted to zero. S = E − A − P + R as a signed integer.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Literal
 
 from invoice_referee.domain.common import (
@@ -15,6 +14,7 @@ from invoice_referee.domain.common import (
     Id,
     SignedVnd,
     StrictModel,
+    UtcDatetime,
     Vnd,
 )
 from invoice_referee.domain.evidence import ReadState
@@ -50,7 +50,7 @@ class Expense(StrictModel):
     economic_key: str
     activity: Id
     incurred: Fact[Vnd]
-    incurred_at: datetime
+    incurred_at: UtcDatetime
     payments: tuple[ExpensePayment, ...] = ()
     eligibility: ExpenseEligibility
     refs: tuple[EvidenceRef, ...] = ()
@@ -65,7 +65,7 @@ class RecordMoneyInput(StrictModel):
     payer: Id
     payee: Id
     amount: Vnd
-    event_at: datetime
+    event_at: UtcDatetime
     completion_claim: str | None = None
     reverses_event_id: Id | None = None
     refs: tuple[EvidenceRef, ...] = ()
@@ -82,8 +82,8 @@ class MoneyEvent(StrictModel):
     payer: Id
     payee: Id
     amount: Vnd
-    event_at: datetime
-    recorded_at: datetime
+    event_at: UtcDatetime
+    recorded_at: UtcDatetime
     verification_state: VerificationState
     allocation_state: AllocationState
     reverses_event_id: Id | None = None
@@ -98,8 +98,8 @@ class CoverageRecord(StrictModel):
     """
 
     scope: str
-    start: datetime
-    as_of: datetime
+    start: UtcDatetime
+    as_of: UtcDatetime
     funds: tuple[Id, ...] = ()
     flow_kinds: tuple[MoneyKind, ...] = ()
     opening_balance: Fact[Vnd] | None = None
