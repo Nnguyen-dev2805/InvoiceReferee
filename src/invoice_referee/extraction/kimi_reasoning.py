@@ -10,11 +10,13 @@ from pydantic import BaseModel
 from invoice_referee.domain import (
     ConfidenceAnalysis,
     ConflictAnalysis,
+    EvidenceReconciliationAnalysis,
     ExpenseDocumentFacts,
     PaperSettlementFacts,
 )
 
 from .conflict_reasoning import CONFLICT_SYSTEM_PROMPT
+from .evidence_reconciliation import EVIDENCE_RECONCILIATION_SYSTEM_PROMPT
 from .network_resilience import call_with_service_retry
 
 MAX_OUTPUT_TOKENS = 8192
@@ -37,6 +39,12 @@ Input có document_type và required_fields đã được Extraction Agent xác 
 Hãy đánh giá mức độ quan trọng theo đúng loại chứng từ đó. Không yêu cầu MST,
 mẫu số, ký hiệu hoặc trường của hóa đơn GTGT đối với vé, bill, phiếu thu, bằng
 chứng thanh toán hay tài liệu thay thế nếu required_fields không yêu cầu.
+Input cũng có extracted_usable_fields: đây là các giá trị đã được trích xuất rõ
+từ cùng chứng từ. Nếu chỉ nhãn của một field mờ (ví dụ chữ "Tổng cộng") nhưng
+giá trị tổng tiền đã rõ trong extracted_usable_fields, block đó không cần người
+xác nhận: canonical_fields có thể ghi total_amount nhưng phải đặt
+requires_verification=false. Chỉ ASK_HUMAN khi chính giá trị kế toán trọng yếu
+không thể dùng an toàn.
 
 Nhiệm vụ duy nhất:
 1. Đánh giá MỌI candidate block đúng một lần, giữ nguyên candidate_id.
@@ -74,6 +82,8 @@ Ví dụ:
   và các số tiền/định danh trọng yếu đã rõ.
 - Tổng tiền chỉ nhìn được một phần: UNCERTAIN, requires_verification=true.
 - Lời chào hoặc chân trang mờ: NON_CRITICAL, requires_verification=false.
+- "Tổng cộng:" bị mờ nhưng tổng thanh toán đã đọc rõ: READABLE hoặc
+  SEMANTICALLY_READABLE, requires_verification=false.
 - Thuế suất không đọc được: canonical_fields=["tax_rate"], UNCERTAIN và
   requires_verification=true. Agent chỉ báo chất lượng; không tự quyết định nó
   có chặn kiểm kê hay không.
@@ -458,6 +468,17 @@ class KimiReasoningAdapter:
             stage="Cross-source Conflict Agent",
             system_prompt=CONFLICT_SYSTEM_PROMPT,
             model_type=ConflictAnalysis,
+        )
+
+    def analyze_evidence_reconciliation(
+        self,
+        case_payload: dict[str, Any],
+    ) -> EvidenceReconciliationAnalysis:
+        return self._analyze(
+            case_payload,
+            stage="Evidence Reconciliation Agent",
+            system_prompt=EVIDENCE_RECONCILIATION_SYSTEM_PROMPT,
+            model_type=EvidenceReconciliationAnalysis,
         )
 
     def extract_expense_document(

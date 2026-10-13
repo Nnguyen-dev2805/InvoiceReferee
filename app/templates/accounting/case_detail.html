@@ -80,11 +80,12 @@
   <div><span>Tổng khai báo</span><strong>{{ case.claimed_total }} {{ case.currency }}</strong></div>
   <div><span>Tạm ứng</span><strong>{{ case.allocated_advance_amount }} {{ case.currency }}</strong></div>
 </section>
-<section class="review-action">
-  <div>
-    <h2>Thao tác của kế toán</h2>
-    <p>Mọi thay đổi đều yêu cầu lý do và được ghi vào audit.</p>
-  </div>
+<details class="progressive-panel review-panel" {% if action_error %}open{% endif %}>
+  <summary>
+    <span><strong>Thao tác của kế toán</strong><small>Yêu cầu bổ sung, chuyển cấp, chạy lại hoặc thay đổi quyết định</small></span>
+    <span class="disclosure-action">Mở</span>
+  </summary>
+  <div class="progressive-panel-body review-action">
   {% if action_error %}<div class="alert error">{{ action_error }}</div>{% endif %}
   <form method="post" action="/accounting/cases/{{ case.case_id }}/actions">
     <div class="action-grid">
@@ -116,9 +117,10 @@
     </div>
     <button class="button primary" type="submit">Ghi nhận thao tác</button>
   </form>
-</section>
+  </div>
+</details>
+{% if case.pending_approval_findings %}
 <section class="detail-section">
-  {% if case.pending_approval_findings %}
   <div class="section-heading">
     <div>
       <h2>Bước phê duyệt tiếp theo</h2>
@@ -151,13 +153,14 @@
     </article>
     {% endfor %}
   </div>
-  {% endif %}
-  <div class="section-heading">
-    <div>
-      <h2>Hồ sơ nhân viên đã gửi</h2>
-      <p>Tổng hợp nội dung khai báo, đơn/báo cáo và evidence theo đúng khoản chi.</p>
-    </div>
-  </div>
+</section>
+{% endif %}
+<details class="progressive-panel detail-disclosure">
+  <summary>
+    <span><strong>Hồ sơ nhân viên đã gửi</strong><small>Nội dung khai báo, đơn/báo cáo và evidence</small></span>
+    <span class="disclosure-meta">{{ case.documents|length }} chứng từ</span>
+  </summary>
+  <div class="progressive-panel-body">
   <div class="two-column submission-overview">
   <div>
     <h3>Báo cáo / đề nghị của nhân viên</h3>
@@ -205,9 +208,14 @@
     </div>
   </div>
   </div>
-</section>
-<section class="detail-section">
-  <h2>Các khoản chi</h2>
+  </div>
+  </details>
+<details class="progressive-panel detail-disclosure">
+  <summary>
+    <span><strong>Các khoản chi</strong><small>Số tiền, trạng thái chứng từ và kết quả ghép evidence</small></span>
+    <span class="disclosure-meta">{{ case.expense_items|length }} khoản</span>
+  </summary>
+  <div class="progressive-panel-body">
   <div class="table-scroll expense-table-scroll">
     <table class="expense-table">
       <thead><tr><th>Mã</th><th>Nội dung</th><th>Danh mục</th><th>Ngày</th><th>Trạng thái chứng từ</th><th>Evidence</th><th class="money">Khai báo</th></tr></thead>
@@ -246,7 +254,8 @@
       </tbody>
     </table>
   </div>
-</section>
+  </div>
+</details>
 <section class="detail-section">
   <div class="section-heading">
     <div>
@@ -255,94 +264,48 @@
     </div>
   </div>
   <div class="finding-list">
-  {% for finding in case.attention_findings %}
+  {% for finding in case.blocking_findings %}
     <article class="finding finding-{{ finding.status|lower }}">
       <div>
         <strong>{{ finding.rule_label }}</strong>
         <span>{{ finding.status_label }} · {{ finding.rule_id }}</span>
       </div>
-      <p>{{ finding.message }}</p>
-      {% if finding.question %}
-        <div class="finding-question"><strong>Cần xử lý:</strong> {{ finding.question }}</div>
-      {% endif %}
-      {% if finding.evidence_refs %}
-      <div class="evidence-citations">
-        <strong>Dẫn chứng:</strong>
-        {% for evidence in finding.evidence_refs %}
-          {% if evidence.url %}
-            <a href="{{ evidence.url }}" target="_blank">
-              {{ evidence.label }}{% if evidence.location %} · {{ evidence.location }}{% endif %}
-            </a>
-          {% else %}
-            <span>{{ evidence.label }}</span>
-          {% endif %}
-        {% endfor %}
-      </div>
-      {% else %}
-      <div class="evidence-citations muted">
-        <strong>Nguồn:</strong><span>Quy tắc hệ thống hoặc dữ liệu tổng hợp của hồ sơ</span>
-      </div>
-      {% endif %}
-      {% if finding.status != "PASS" and finding.evidence_previews %}
-      <div class="issue-evidence-list">
-        {% for evidence in finding.evidence_previews %}
-        <div class="issue-evidence">
-          <div class="issue-evidence-header">
-            <div>
-              <strong>{{ evidence.label }}</strong>
-              <span>
-                {% if evidence.block_id %}Trang {{ evidence.page_index + 1 }} · {{ evidence.block_id }}{% else %}Chứng từ liên quan{% endif %}
-              </span>
-            </div>
-            <a href="{{ evidence.url }}" target="_blank">Mở bản gốc</a>
-          </div>
-          {% if evidence.ocr_preview_url %}
-          <a class="issue-image" href="{{ evidence.url }}" target="_blank">
-            <img src="{{ evidence.ocr_preview_url }}" alt="Vùng OCR cần kiểm tra trên {{ evidence.label }}" loading="lazy">
-          </a>
-          {% elif evidence.preview_kind == "image" %}
-          <a class="issue-image" href="{{ evidence.url }}" target="_blank">
-            <img src="{{ evidence.url }}" alt="Bằng chứng {{ evidence.label }}" loading="lazy">
-            {% if evidence.annotation_style %}
-              <span class="issue-marker" style="{{ evidence.annotation_style }}" title="Vùng OCR cần kiểm tra"></span>
-            {% endif %}
-          </a>
-          {% elif evidence.preview_kind == "pdf" %}
-          <object class="issue-pdf" data="{{ evidence.url }}" type="application/pdf">
-            <a href="{{ evidence.url }}" target="_blank">Mở chứng từ PDF</a>
-          </object>
-          {% endif %}
-          {% if evidence.excerpt %}
-          <div class="ocr-excerpt">
-            <strong>Nội dung OCR tại vùng được đánh dấu</strong>
-            <p>{{ evidence.excerpt }}</p>
-            {% if evidence.low_words %}
-            <div class="low-word-list">
-              {% for word in evidence.low_words %}
-                <span>{{ word.text }} · {{ (word.confidence * 100)|round(1) }}%</span>
-              {% endfor %}
-            </div>
-            {% endif %}
-          </div>
-          {% endif %}
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
+      {% include "accounting/_finding_body.html" %}
     </article>
   {% else %}
     {% if case.findings %}
-      <div class="all-clear-note"><strong>Không có điều kiện nào cần xử lý.</strong><span>Các điều kiện đã đạt được gom ở cuối mục này.</span></div>
+      <div class="all-clear-note"><strong>Không có lỗi bắt buộc cần xử lý.</strong><span>Cảnh báo và điều kiện đã đạt được thu gọn bên dưới.</span></div>
     {% else %}
       <p>Hồ sơ chưa có kết quả xử lý.</p>
     {% endif %}
   {% endfor %}
   </div>
-  {% if case.passed_findings %}
-  <details class="passed-findings">
+  {% if case.warning_findings %}
+  <details class="finding-disclosure warning-findings">
     <summary>
-      <span>Điều kiện đã đáp ứng</span>
-      <strong>{{ case.passed_findings|length }}</strong>
+      <span><strong>Cảnh báo cần lưu ý</strong><small>Không chặn hồ sơ; mở để xem lý do và dẫn chứng</small></span>
+      <span class="disclosure-meta">{{ case.warning_findings|length }} WARN</span>
+    </summary>
+    <div class="finding-disclosure-list">
+      {% for finding in case.warning_findings %}
+      <details class="warning-item">
+        <summary>
+          <span><strong>{{ finding.rule_label }}</strong><small>{{ finding.message }}</small></span>
+          <span>{{ finding.rule_id }}</span>
+        </summary>
+        <div class="warning-item-body">
+          {% include "accounting/_finding_body.html" %}
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+  </details>
+  {% endif %}
+  {% if case.passed_findings %}
+  <details class="finding-disclosure passed-findings">
+    <summary>
+      <span><strong>Điều kiện đã đáp ứng</strong><small>Mở khi cần kiểm tra các bước Agent đã xác nhận</small></span>
+      <span class="disclosure-meta">{{ case.passed_findings|length }} PASS</span>
     </summary>
     <div class="passed-finding-list">
       {% for finding in case.passed_findings %}
@@ -370,13 +333,12 @@
   </details>
   {% endif %}
 </section>
-<section class="detail-section">
-  <div class="section-heading">
-    <div>
-      <h2>Chứng từ nguồn</h2>
-      <p>File gốc được giữ nguyên để kế toán đối chiếu trực tiếp với kết quả của Agent.</p>
-    </div>
-  </div>
+<details class="progressive-panel detail-disclosure">
+  <summary>
+    <span><strong>Chứng từ nguồn</strong><small>Mở để đối chiếu trực tiếp với kết quả của Agent</small></span>
+    <span class="disclosure-meta">{{ case.documents|length }} file</span>
+  </summary>
+  <div class="progressive-panel-body">
   <div class="evidence-gallery">
   {% for document in case.documents %}
     <article class="document-evidence" id="document-{{ document.document_id }}">
@@ -410,13 +372,19 @@
     <div class="empty-state"><strong>Không có chứng từ đính kèm</strong></div>
   {% endfor %}
   </div>
-</section>
-<section class="detail-section">
-  <h2>Audit timeline</h2>
+  </div>
+</details>
+<details class="progressive-panel detail-disclosure">
+  <summary>
+    <span><strong>Lịch sử xử lý</strong><small>Các sự kiện và thao tác đã được ghi nhận</small></span>
+    <span class="disclosure-meta">{{ case.audit_events|length }} sự kiện</span>
+  </summary>
+  <div class="progressive-panel-body">
   <ol class="timeline">
   {% for event in case.audit_events %}
     <li><time>{{ event.occurred_at }}</time><strong>{{ event.event_type }}</strong><span>{{ event.reason or "" }}</span></li>
   {% endfor %}
   </ol>
-</section>
+  </div>
+</details>
 {% endblock %}

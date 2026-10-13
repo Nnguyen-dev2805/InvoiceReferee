@@ -18,8 +18,12 @@ from invoice_referee.domain import (
     DecisionTarget,
     DocumentValidityResult,
     DocumentValidityStatus,
+    DocumentFieldImportance,
+    ExpenseDocumentType,
     ExpenseDocumentFacts,
     ExpenseEvidenceStatus,
+    ExpenseItemDraft,
+    ORIGINAL_EXPENSE_DOCUMENT_TYPES,
     PaperSettlementFacts,
     SettlementDocumentRole,
     SettlementDraft,
@@ -37,6 +41,7 @@ from invoice_referee.extraction import (
 from invoice_referee.policy import (
     SettlementPolicyConfig,
     evaluate_settlement_policy,
+    field_importance,
     validate_expense_document,
     validate_paper_settlement_document,
 )
@@ -60,6 +65,7 @@ VALIDITY_TO_CONFIDENCE_FIELDS = {
     "serial_number": {"serial_number"},
     "document_date": {"invoice_date"},
     "total_amount": {"total_amount"},
+    "line_items": {"item_name", "quantity", "unit_price", "line_amount"},
     "payer_name": {"buyer_name"},
     "payee_name": {"seller_name"},
     "transaction_reference": {"transaction_reference"},
@@ -75,8 +81,23 @@ def _required_confidence_fields(
 ) -> set[str]:
     fields: set[str] = set()
     for field_name in validity.required_fields:
+        try:
+            document_type = ExpenseDocumentType(validity.document_type)
+        except ValueError:
+            continue
+        if field_importance(document_type, field_name) != DocumentFieldImportance.CRITICAL:
+            continue
         fields.update(VALIDITY_TO_CONFIDENCE_FIELDS.get(field_name, set()))
     return fields.intersection(SETTLEMENT_BLOCKING_FIELDS)
+
+
+def _usable_confidence_fields(validity: DocumentValidityResult) -> set[str]:
+    """Canonical fields already extracted safely from this same document."""
+
+    fields: set[str] = set()
+    for field_name in validity.present_fields:
+        fields.update(VALIDITY_TO_CONFIDENCE_FIELDS.get(field_name, set()))
+    return fields
 
 
 def _ocr_markdown(response: dict[str, Any]) -> str:
@@ -95,6 +116,11 @@ def _validity_findings(
     source_refs = result.source_refs or [f"DOC:{result.document_id}"]
     findings: list[SettlementFinding] = []
     for issue in result.issues:
+        unresolved_invoice_identity = (
+            result.document_type == ExpenseDocumentType.E_INVOICE.value
+            and issue.code in {"REQUIRED_FIELD_UNCLEAR", "REQUIRED_FIELD_GROUP_UNCLEAR"}
+            and issue.importance == DocumentFieldImportance.CRITICAL
+        )
         if issue.code.startswith("DOCUMENT_TYPE"):
             rule_id = "SET_DOCUMENT_CLASSIFICATION_001"
         elif issue.code == "BUYER_TAX_CODE_MISMATCH":
@@ -108,20 +134,21 @@ def _validity_findings(
         else:
             rule_id = "SET_DOCUMENT_REQUIRED_FIELDS_001"
         outside_policy = issue.code == "BUYER_TAX_CODE_MISMATCH"
+        status = "FAIL" if issue.blocking or unresolved_invoice_identity else "WARN"
         findings.append(
             SettlementFinding(
                 rule_id=rule_id,
-                status="FAIL" if issue.blocking else "WARN",
+                status=status,
                 message=f"Chứng từ '{filename}': {issue.message}",
                 uncertainty_type=(
                     UncertaintyType.OUTSIDE_POLICY
-                    if outside_policy
+                    if outside_policy or unresolved_invoice_identity
                     else UncertaintyType.NONE
-                    if not issue.blocking
+                    if status != "FAIL"
                     else UncertaintyType.FACTUAL_UNKNOWN
                 ),
                 target=DecisionTarget.ACCOUNTANT,
-                question=issue.question if issue.blocking else None,
+                question=issue.question if status == "FAIL" else None,
                 source_refs=source_refs,
             )
         )
@@ -387,6 +414,7 @@ class SettlementProcessingService:
                     validity.model_dump(mode="json"),
                 )
                 confidence_blocking_fields = _required_confidence_fields(validity)
+                usable_confidence_fields = _usable_confidence_fields(validity)
 
                 if candidates:
                     confidence = self.reasoning_adapter.analyze_confidence(
@@ -399,6 +427,9 @@ class SettlementProcessingService:
                                 "filename": document["original_name"],
                                 "document_type": validity.document_type,
                                 "required_fields": validity.required_fields,
+                                "extracted_usable_fields": sorted(
+                                    usable_confidence_fields
+                                ),
                                 "ocr_text": _ocr_markdown(execution.response),
                                 "candidate_blocks": candidates,
                             },
@@ -408,6 +439,7 @@ class SettlementProcessingService:
                         candidates,
                         confidence,
                         blocking_fields=confidence_blocking_fields,
+                        usable_fields=usable_confidence_fields,
                     )
                     for finding in legacy_findings:
                         detailed_source_refs = [
@@ -550,6 +582,13 @@ class SettlementProcessingService:
             document_facts,
             evidence_documents,
             fallback_no_evidence_reason=draft.paper_no_evidence_reason,
+        )
+        items, links, matching_findings = self._resolve_suggested_paper_links(
+            case_id=case_id,
+            items=items,
+            links=links,
+            findings=matching_findings,
+            facts=document_facts,
         )
         for warning in paper_facts.extraction_warnings:
             matching_findings.append(
@@ -704,25 +743,25 @@ class SettlementProcessingService:
             bank_account_number=paper_facts.bank_account_number,
             bank_name=paper_facts.bank_name,
         )
-        if claimed_total > self.policy.authority_amount_vnd:
-            authority_finding = SettlementFinding(
-                rule_id="SET_AUTH_001",
-                status="FAIL",
-                message=(
-                    f"Tổng hồ sơ {claimed_total:,.0f} VND vượt thẩm quyền demo "
-                    f"{self.policy.authority_amount_vnd:,.0f} VND."
-                ),
-                uncertainty_type=UncertaintyType.BEYOND_AUTHORITY,
-                target=DecisionTarget.DIRECTOR,
-                source_refs=paper_facts.source_refs,
-            )
-        else:
-            authority_finding = SettlementFinding(
-                rule_id="SET_AUTH_001",
-                status="PASS",
-                message="Tổng hồ sơ trong thẩm quyền demo.",
-                source_refs=paper_facts.source_refs,
-            )
+        # The paper path is normalized into the same item contract as the
+        # electronic form, then evaluated by the same deterministic policy.
+        # This prevents paper-only gaps for limits, prohibited categories and
+        # late submissions.
+        try:
+            normalized_items = [ExpenseItemDraft.model_validate(item) for item in items]
+        except ValueError:
+            normalized_items = []
+        normalized_draft = draft.model_copy(
+            update={
+                "expense_items": normalized_items,
+                "allocated_advance_amount": paper_facts.advance_amount or Decimal("0"),
+            }
+        )
+        common_policy_findings = evaluate_settlement_policy(
+            normalized_draft,
+            has_paper_form=has_paper_form,
+            config=self.policy,
+        )
         approval_finding = SettlementFinding(
             rule_id="SET_APPROVAL_001",
             status="PENDING_APPROVAL",
@@ -744,14 +783,136 @@ class SettlementProcessingService:
             ],
         )
         findings = [
-            *base_findings,
+            *common_policy_findings,
             *quality_findings,
             *matching_findings,
-            authority_finding,
         ]
         if not any(finding.status == "FAIL" for finding in findings):
             findings.append(approval_finding)
         self._finish(job_id, case_id, findings)
+
+    def _resolve_suggested_paper_links(
+        self,
+        *,
+        case_id: str,
+        items: list[dict[str, Any]],
+        links: list[dict[str, Any]],
+        findings: list[SettlementFinding],
+        facts: list[ExpenseDocumentFacts],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[SettlementFinding]]:
+        """Use one bounded LLM call only for deterministic-match grey areas."""
+
+        suggested = [link for link in links if link["link_status"] == "SUGGEST_LINK"]
+        resolver = getattr(self.reasoning_adapter, "analyze_evidence_reconciliation", None)
+        if not suggested or not callable(resolver):
+            return items, links, findings
+
+        facts_by_id = {fact.document_id: fact for fact in facts}
+        payload = {
+            "case_id": case_id,
+            "workflow": "EVIDENCE_RECONCILIATION",
+            "candidate_links": [
+                {
+                    "item_id": link["item_id"],
+                    "document_id": link["document_id"],
+                    "score": link["score"],
+                    "method": link["link_method"],
+                    "line_amount": str(next(
+                        (item["claimed_amount"] for item in items if item["item_id"] == link["item_id"]),
+                        "",
+                    )),
+                    "document_number": link.get("document_number"),
+                    "document_total": str(link["total_amount"]) if link.get("total_amount") is not None else None,
+                    "document_type": str(link["document_type"]),
+                    "explanation": link["explanation"],
+                }
+                for link in suggested
+            ],
+            "documents": [
+                {
+                    "document_id": fact.document_id,
+                    "issuer_name": fact.issuer_name,
+                    "document_number": fact.document_number,
+                    "document_date": str(fact.document_date) if fact.document_date else None,
+                    "total_amount": str(fact.total_amount) if fact.total_amount is not None else None,
+                    "line_items": [line.description for line in fact.line_items],
+                }
+                for fact in facts
+            ],
+        }
+        try:
+            analysis = resolver(payload)
+        except Exception:
+            # The deterministic matcher already produces an accountant-facing
+            # request for this uncertainty.  A temporary LLM outage must not
+            # hide it or turn it into a technical false pass.
+            return items, links, findings
+
+        self.repository.save_json_artifact(
+            case_id,
+            "reconciliation",
+            "paper-link-resolution.json",
+            analysis.model_dump(mode="json"),
+        )
+        candidates = {(link["item_id"], link["document_id"]): link for link in suggested}
+        auto_document_ids = {
+            link["document_id"] for link in links if link["link_status"] == "AUTO_LINK"
+        }
+        promoted: list[dict[str, Any]] = []
+        for accepted in analysis.accepted_links:
+            key = (accepted.item_id, accepted.document_id)
+            link = candidates.get(key)
+            if link is None or accepted.confidence < 0.90 or accepted.document_id in auto_document_ids:
+                continue
+            link["link_status"] = "AUTO_LINK"
+            link["link_method"] = "LLM_RECONCILIATION"
+            link["score"] = float(accepted.confidence)
+            link["explanation"] = accepted.rationale
+            promoted.append(link)
+            auto_document_ids.add(accepted.document_id)
+
+        if not promoted:
+            return items, links, findings
+
+        item_by_id = {item["item_id"]: item for item in items}
+        promoted_document_ids = {link["document_id"] for link in promoted}
+        for link in promoted:
+            item = item_by_id[link["item_id"]]
+            fact = facts_by_id.get(link["document_id"])
+            item["evidence_names"] = list(dict.fromkeys([
+                *item.get("evidence_names", []), link["filename"]
+            ]))
+            if fact and fact.document_type in ORIGINAL_EXPENSE_DOCUMENT_TYPES:
+                item["evidence_status"] = "ORIGINAL_EVIDENCE"
+                item["alternative_evidence_type"] = None
+            elif fact:
+                item["evidence_status"] = "ALTERNATIVE_EVIDENCE"
+                item["alternative_evidence_type"] = "PAYMENT_PROOF" if fact.document_type == ExpenseDocumentType.PAYMENT_PROOF else "OTHER"
+            if fact and fact.document_date and not item.get("expense_date"):
+                item["expense_date"] = fact.document_date.isoformat()
+
+        findings = [
+            finding
+            for finding in findings
+            if not (
+                finding.rule_id == "SET_PAPER_MATCH_001"
+                and finding.status == "FAIL"
+                and any(ref == f"DOC:{document_id}" for document_id in promoted_document_ids for ref in finding.source_refs)
+            )
+        ]
+        findings.extend(
+            SettlementFinding(
+                rule_id="SET_PAPER_MATCH_001",
+                status="PASS",
+                message=(
+                    f"Đã xác nhận ghép evidence cho khoản '{item_by_id[link['item_id']]['description']}' "
+                    "sau bước đối chiếu có kiểm soát."
+                ),
+                source_refs=[f"DOC:{link['document_id']}"],
+            )
+            for link in promoted
+        )
+        return items, links, findings
 
     @staticmethod
     def _reconciliation_findings(

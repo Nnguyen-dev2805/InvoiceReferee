@@ -67,6 +67,21 @@ class ConfidenceAnalysis(BaseModel):
     block_assessments: list[BlockAssessment] = Field(default_factory=list)
 
 
+class EvidenceReconciliationLink(BaseModel):
+    """A suggested evidence-to-expense link; never a policy decision."""
+
+    item_id: str
+    document_id: str
+    confidence: float = Field(ge=0, le=1)
+    rationale: str
+
+
+class EvidenceReconciliationAnalysis(BaseModel):
+    accepted_links: list[EvidenceReconciliationLink] = Field(default_factory=list)
+    unresolved_item_ids: list[str] = Field(default_factory=list)
+    summary: str = ""
+
+
 class EvidenceQualityResult(BaseModel):
     evidence_id: str
     filename: str

@@ -13,6 +13,7 @@ from invoice_referee.domain import (
     BlockAssessment,
     BusinessContext,
     ConfidenceAnalysis,
+    DocumentFieldState,
     DocumentLineFact,
     ExpenseCategory,
     ExpenseDocumentFacts,
@@ -214,6 +215,12 @@ class _LowConfidenceOcr:
 
 
 class _BlockingConfidenceReasoner(_ExpenseExtractor):
+    def extract_expense_document(self, payload):
+        facts = super().extract_expense_document(payload)
+        return facts.model_copy(
+            update={"field_states": {"total_amount": DocumentFieldState.UNREADABLE}}
+        )
+
     def analyze_confidence(self, payload):
         candidate_id = payload["evidence"]["candidate_blocks"][0]["candidate_id"]
         return ConfidenceAnalysis(
@@ -552,7 +559,7 @@ def test_invalid_evidence_stops_paper_case_before_matching(tmp_path: Path) -> No
     ).run_once()
 
     case = repository.get_case(receipt.case_id)
-    assert case["automation_decision"] == "REQUEST_INFO"
+    assert case["automation_decision"] == "ACCOUNTANT_REVIEW"
     assert any(
         finding["rule_id"] == "SET_DOCUMENT_REQUIRED_FIELDS_001"
         and finding["status"] == "FAIL"

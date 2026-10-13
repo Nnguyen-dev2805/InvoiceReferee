@@ -512,14 +512,23 @@ def _decorate_accounting_case(
             if evidence["kind"] == "document"
         ]
     attention_order = {"ERROR": 0, "FAIL": 1, "WARN": 2}
-    case["attention_findings"] = sorted(
+    case["blocking_findings"] = sorted(
         [
             finding
             for finding in case["findings"]
-            if finding["status"] not in {"PASS", "PENDING_APPROVAL"}
+            if finding["status"] in {"ERROR", "FAIL"}
         ],
         key=lambda finding: attention_order.get(finding["status"], 3),
     )
+    case["warning_findings"] = [
+        finding for finding in case["findings"] if finding["status"] == "WARN"
+    ]
+    # Kept for compatibility with existing API/view consumers. The accounting
+    # detail page uses the split collections for progressive disclosure.
+    case["attention_findings"] = [
+        *case["blocking_findings"],
+        *case["warning_findings"],
+    ]
     case["pending_approval_findings"] = [
         finding
         for finding in case["findings"]

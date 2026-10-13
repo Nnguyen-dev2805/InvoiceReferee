@@ -10,6 +10,7 @@ from typing import Any
 
 from invoice_referee.domain import (
     DecisionTarget,
+    ExpenseCategory,
     ExpenseDocumentFacts,
     ExpenseDocumentType,
     ORIGINAL_EXPENSE_DOCUMENT_TYPES,
@@ -35,6 +36,32 @@ GENERIC_PARTY_TOKENS = {
     "mua",
     "tu",
 }
+
+
+def _infer_category(description: str, facts: list[ExpenseDocumentFacts]) -> ExpenseCategory:
+    """Use transparent keywords only; unknown descriptions remain OTHER.
+
+    This is deliberately modest.  It lets paper and digital submissions pass
+    through the same policy checks without pretending that OCR can infer a
+    business category from arbitrary prose.
+    """
+
+    text = _normalize_text(
+        " ".join(
+            [description, *(line.description for fact in facts for line in fact.line_items)]
+        )
+    )
+    if any(token in text for token in ("taxi", "grab", "be car", "xe om")):
+        return ExpenseCategory.TAXI
+    if any(token in text for token in ("an uong", "nha hang", "tiep khach", "cafe")):
+        return ExpenseCategory.CLIENT_MEAL
+    if any(token in text for token in ("khach san", "hotel", "luu tru")):
+        return ExpenseCategory.HOTEL
+    if any(token in text for token in ("ve may bay", "ve tau", "ve xe", "di chuyen")):
+        return ExpenseCategory.TRAVEL
+    if any(token in text for token in ("van phong pham", "giay in", "but", "muc in")):
+        return ExpenseCategory.OFFICE_SUPPLIES
+    return ExpenseCategory.OTHER
 
 
 def _normalize_identifier(value: str | None) -> str:
@@ -186,6 +213,7 @@ def match_paper_evidence(
                     "total_amount": fact.total_amount,
                     "document_number": fact.document_number,
                     "document_type": fact.document_type,
+                    "document_date": fact.document_date,
                 }
             )
 
@@ -204,11 +232,24 @@ def match_paper_evidence(
             for link in auto_links
         )
         has_alternative_evidence = bool(auto_links) and not has_original_evidence
+        matched_facts = [
+            fact for fact in evidence_facts if fact.document_id in {link["document_id"] for link in auto_links}
+        ]
+        matched_dates = {
+            link["document_date"]
+            for link in auto_links
+            if link["document_date"] is not None
+        }
         items.append(
             {
                 "item_id": item_id,
-                "category": "OTHER",
+                "category": _infer_category(line.description, matched_facts).value,
                 "description": line.description,
+                "expense_date": (
+                    next(iter(matched_dates)).isoformat()
+                    if len(matched_dates) == 1
+                    else None
+                ),
                 "claimed_amount": line.amount or Decimal("0"),
                 "currency": "VND",
                 "evidence_status": (

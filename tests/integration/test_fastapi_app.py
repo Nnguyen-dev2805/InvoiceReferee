@@ -88,7 +88,10 @@ def test_multipart_submission_is_visible_to_accounting(
         assert "0123456789" in detail.text
         assert "Kết quả kiểm tra và dẫn chứng" in detail.text
         assert "Điều kiện đã đáp ứng" in detail.text
-        assert '<details class="passed-findings">' in detail.text
+        assert (
+            '<details class="finding-disclosure passed-findings">'
+            in detail.text
+        )
         assert "Chứng từ nguồn" in detail.text
         assert f'/api/v1/cases/{case_id}/documents/' in detail.text
         assert '<img ' in detail.text

@@ -664,6 +664,59 @@ def test_non_critical_unknown_field_never_blocks() -> None:
     assert findings[0].status == "WARN"
 
 
+def test_critical_block_without_field_mapping_is_warning_not_gate() -> None:
+    candidate = {
+        "candidate_id": "EV-001:page-0-block-10",
+        "source_file": "bill-nha-hang.jpg",
+        "content": "Bản: CHỐI 27",
+    }
+    assessment = BlockAssessment(
+        candidate_id=candidate["candidate_id"],
+        importance="CRITICAL",
+        quality_state="UNCERTAIN",
+        review_action="ASK_HUMAN",
+        requires_verification=True,
+        canonical_fields=[],
+        reason="Không thể xác định đây là dữ kiện kế toán nào.",
+    )
+
+    findings = CaseProcessingService._confidence_findings(
+        [candidate],
+        ConfidenceAnalysis(block_assessments=[assessment]),
+        blocking_fields=SETTLEMENT_BLOCKING_FIELDS,
+    )
+
+    assert findings[0].rule_id == "OCR_NON_BLOCKING_QUALITY_WARNING"
+    assert findings[0].status == "WARN"
+
+
+def test_blurred_total_label_does_not_block_when_total_is_already_usable() -> None:
+    candidate = {
+        "candidate_id": "EV-001:page-0-block-11",
+        "source_file": "bill-nha-hang.jpg",
+        "content": "Tổng cộng:",
+    }
+    assessment = BlockAssessment(
+        candidate_id=candidate["candidate_id"],
+        importance="CRITICAL",
+        quality_state="UNCERTAIN",
+        review_action="ASK_HUMAN",
+        requires_verification=True,
+        canonical_fields=["total_amount"],
+        reason="Nhãn tổng cộng có confidence thấp.",
+    )
+
+    findings = CaseProcessingService._confidence_findings(
+        [candidate],
+        ConfidenceAnalysis(block_assessments=[assessment]),
+        blocking_fields={"total_amount"},
+        usable_fields={"total_amount"},
+    )
+
+    assert findings[0].rule_id == "OCR_NON_BLOCKING_QUALITY_WARNING"
+    assert findings[0].status == "WARN"
+
+
 def test_unclear_buyer_tax_code_blocks_before_conflict() -> None:
     candidate = {
         "candidate_id": "EV-001:page-0-block-13",

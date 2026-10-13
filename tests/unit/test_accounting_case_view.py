@@ -145,6 +145,12 @@ def test_accounting_case_resolves_ocr_block_as_annotated_evidence() -> None:
     assert [
         finding["status"] for finding in decorated["attention_findings"]
     ] == ["ERROR", "FAIL", "WARN"]
+    assert [
+        finding["status"] for finding in decorated["blocking_findings"]
+    ] == ["ERROR", "FAIL"]
+    assert [
+        finding["status"] for finding in decorated["warning_findings"]
+    ] == ["WARN"]
     assert [finding["status"] for finding in decorated["passed_findings"]] == [
         "PASS"
     ]

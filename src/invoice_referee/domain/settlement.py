@@ -68,6 +68,19 @@ class DocumentValidityStatus(StrEnum):
     OUTSIDE_POLICY = "OUTSIDE_POLICY"
 
 
+class DocumentFieldImportance(StrEnum):
+    """How a missing field affects the next stage of the UC-03 workflow.
+
+    The value is deliberately attached to the document profile instead of a
+    filename or OCR phrase.  That keeps a parking ticket from being evaluated
+    with electronic-invoice requirements, for example.
+    """
+
+    CRITICAL = "CRITICAL"
+    CORROBORATABLE = "CORROBORATABLE"
+    INFORMATIONAL = "INFORMATIONAL"
+
+
 ORIGINAL_EXPENSE_DOCUMENT_TYPES = frozenset(
     {
         ExpenseDocumentType.E_INVOICE,
@@ -284,6 +297,8 @@ class DocumentValidityIssue(BaseModel):
     message: str
     question: str | None = None
     blocking: bool = True
+    importance: DocumentFieldImportance = DocumentFieldImportance.CRITICAL
+    corroboratable: bool = False
 
 
 class DocumentValidityResult(BaseModel):

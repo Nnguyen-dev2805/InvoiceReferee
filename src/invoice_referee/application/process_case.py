@@ -485,12 +485,14 @@ class CaseProcessingService:
         analysis: ConfidenceAnalysis,
         *,
         blocking_fields: set[str] | None = None,
+        usable_fields: set[str] | None = None,
     ) -> list[RuleFinding]:
         effective_blocking_fields = (
             INVENTORY_BLOCKING_FIELDS
             if blocking_fields is None
             else blocking_fields
         )
+        effective_usable_fields = usable_fields or set()
         expected_ids = {candidate["candidate_id"] for candidate in candidates}
         assessment_counts: dict[str, int] = {}
         assessment_by_id: dict[str, Any] = {}
@@ -533,6 +535,7 @@ class CaseProcessingService:
             if CaseProcessingService._assessment_blocks_conflict(
                 assessment,
                 effective_blocking_fields,
+                effective_usable_fields,
             ):
                 question = CaseProcessingService._accountant_question(
                     assessment,
@@ -588,10 +591,13 @@ class CaseProcessingService:
     def _assessment_blocks_conflict(
         assessment: Any,
         blocking_fields: set[str] | None = None,
+        usable_fields: set[str] | None = None,
     ) -> bool:
         if not CaseProcessingService._assessment_requires_verification(assessment):
             return False
         if assessment.importance != "CRITICAL":
+            return False
+        if assessment.quality_state in {"READABLE", "SEMANTICALLY_READABLE"}:
             return False
         fields = set(assessment.canonical_fields)
         effective_blocking_fields = (
@@ -599,7 +605,12 @@ class CaseProcessingService:
             if blocking_fields is None
             else blocking_fields
         )
-        return not fields or bool(fields.intersection(effective_blocking_fields))
+        # A low-confidence block without a field mapping is not evidence that
+        # any accounting value is unclear.  It remains a warning, not a gate.
+        affected_critical_fields = fields.intersection(effective_blocking_fields)
+        if not affected_critical_fields:
+            return False
+        return bool(affected_critical_fields.difference(usable_fields or set()))
 
     @classmethod
     def _evidence_quality_results(

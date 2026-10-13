@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from invoice_referee.domain import (
+    DocumentFieldImportance,
     DocumentFieldState,
     DocumentValidityIssue,
     DocumentValidityResult,
@@ -24,6 +25,70 @@ from invoice_referee.domain import (
 class DocumentProfile:
     required_fields: tuple[str, ...]
     any_of_fields: tuple[tuple[str, ...], ...] = ()
+
+
+# These rules belong to a document type, not to a filename or a hand-written
+# OCR phrase.  They are shared by the confidence gate and the validity gate.
+FIELD_IMPORTANCE_BY_TYPE: dict[ExpenseDocumentType, dict[str, DocumentFieldImportance]] = {
+    ExpenseDocumentType.E_INVOICE: {
+        "issuer_name": DocumentFieldImportance.CORROBORATABLE,
+        "issuer_tax_code": DocumentFieldImportance.CRITICAL,
+        "buyer_name": DocumentFieldImportance.CORROBORATABLE,
+        "buyer_tax_code": DocumentFieldImportance.CRITICAL,
+        "document_number": DocumentFieldImportance.CRITICAL,
+        "template_number": DocumentFieldImportance.CRITICAL,
+        "serial_number": DocumentFieldImportance.CRITICAL,
+        "document_date": DocumentFieldImportance.CORROBORATABLE,
+        "total_amount": DocumentFieldImportance.CRITICAL,
+        "line_items": DocumentFieldImportance.CORROBORATABLE,
+    },
+    ExpenseDocumentType.PAPER_RECEIPT: {
+        "issuer_name": DocumentFieldImportance.CORROBORATABLE,
+        "document_date": DocumentFieldImportance.CORROBORATABLE,
+        "total_amount": DocumentFieldImportance.CRITICAL,
+    },
+    ExpenseDocumentType.HOTEL_RECEIPT: {
+        "issuer_name": DocumentFieldImportance.CORROBORATABLE,
+        "document_date": DocumentFieldImportance.CORROBORATABLE,
+        "total_amount": DocumentFieldImportance.CRITICAL,
+    },
+    ExpenseDocumentType.TRANSPORT_TICKET: {
+        "issuer_name": DocumentFieldImportance.CORROBORATABLE,
+        "document_number": DocumentFieldImportance.CORROBORATABLE,
+        "document_date": DocumentFieldImportance.CORROBORATABLE,
+        "total_amount": DocumentFieldImportance.CRITICAL,
+    },
+    ExpenseDocumentType.COLLECTION_RECEIPT: {
+        "issuer_name": DocumentFieldImportance.CORROBORATABLE,
+        "buyer_name": DocumentFieldImportance.CORROBORATABLE,
+        "document_number": DocumentFieldImportance.CORROBORATABLE,
+        "document_date": DocumentFieldImportance.CORROBORATABLE,
+        "total_amount": DocumentFieldImportance.CRITICAL,
+    },
+    ExpenseDocumentType.CARD_SLIP: {
+        "issuer_name": DocumentFieldImportance.CORROBORATABLE,
+        "document_date": DocumentFieldImportance.CORROBORATABLE,
+        "total_amount": DocumentFieldImportance.CRITICAL,
+        "transaction_reference": DocumentFieldImportance.CORROBORATABLE,
+    },
+    ExpenseDocumentType.PAYMENT_PROOF: {
+        "payee_name": DocumentFieldImportance.CORROBORATABLE,
+        "document_date": DocumentFieldImportance.CORROBORATABLE,
+        "total_amount": DocumentFieldImportance.CRITICAL,
+        "transaction_reference": DocumentFieldImportance.CORROBORATABLE,
+        "transaction_status": DocumentFieldImportance.CRITICAL,
+    },
+}
+
+
+def field_importance(
+    document_type: ExpenseDocumentType,
+    field_name: str,
+) -> DocumentFieldImportance:
+    return FIELD_IMPORTANCE_BY_TYPE.get(document_type, {}).get(
+        field_name,
+        DocumentFieldImportance.CORROBORATABLE,
+    )
 
 
 FIELD_LABELS = {
@@ -239,13 +304,31 @@ def _valid_vietnam_tax_code(value: str) -> bool:
     return bool(re.fullmatch(r"\d{10}(?:-\d{3})?", _normalized_tax_code(value)))
 
 
-def _missing_issue(field_name: str) -> DocumentValidityIssue:
+def _missing_issue(
+    field_name: str,
+    *,
+    document_type: ExpenseDocumentType | None = None,
+) -> DocumentValidityIssue:
     label = FIELD_LABELS.get(field_name, field_name)
+    importance = (
+        field_importance(document_type, field_name)
+        if document_type is not None
+        else DocumentFieldImportance.CRITICAL
+    )
     return DocumentValidityIssue(
         code="REQUIRED_FIELD_UNCLEAR",
         field=field_name,
         message=f"Chưa xác định rõ {label}.",
         question=f"Vui lòng kiểm tra chứng từ và xác nhận {label}.",
+        # Evidence fields may be corroborated after matching.  A missing core
+        # field on the settlement request itself cannot: there is no reliable
+        # source from which to reconstruct the employee's declaration.
+        blocking=document_type is None,
+        importance=importance,
+        corroboratable=(
+            document_type is not None
+            and importance == DocumentFieldImportance.CORROBORATABLE
+        ),
     )
 
 
@@ -314,7 +397,7 @@ def validate_expense_document(
         required_fields = list(profile.required_fields)
         for field_name in profile.required_fields:
             if not _field_is_usable(facts, field_name):
-                issues.append(_missing_issue(field_name))
+                issues.append(_missing_issue(field_name, document_type=document_type))
         for alternatives in profile.any_of_fields:
             if not any(_field_is_usable(facts, name) for name in alternatives):
                 labels = " hoặc ".join(FIELD_LABELS.get(name, name) for name in alternatives)
@@ -324,6 +407,9 @@ def validate_expense_document(
                         field="|".join(alternatives),
                         message=f"Chưa xác định rõ {labels}.",
                         question=f"Vui lòng kiểm tra chứng từ và xác nhận {labels}.",
+                        blocking=False,
+                        importance=DocumentFieldImportance.CORROBORATABLE,
+                        corroboratable=True,
                     )
                 )
 

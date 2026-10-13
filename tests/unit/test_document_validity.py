@@ -54,12 +54,14 @@ def test_clear_electronic_invoice_is_eligible_for_matching() -> None:
     assert result.issues == []
 
 
-def test_electronic_invoice_missing_buyer_tax_code_stops_before_matching() -> None:
+def test_electronic_invoice_missing_buyer_tax_code_is_retained_for_accountant_routing() -> None:
     result = validate_expense_document(_electronic_invoice(buyer_tax_code=None))
 
-    assert result.status == DocumentValidityStatus.NEEDS_HUMAN
-    assert result.eligible_for_matching is False
+    assert result.status == DocumentValidityStatus.CLEAR
+    assert result.eligible_for_matching is True
     assert any(issue.field == "buyer_tax_code" for issue in result.issues)
+    findings = _validity_findings(result, filename="invoice.pdf")
+    assert any(finding.status == "FAIL" for finding in findings)
 
 
 def test_unreadable_required_field_is_not_treated_as_present() -> None:
@@ -70,7 +72,7 @@ def test_unreadable_required_field_is_not_treated_as_present() -> None:
         )
     )
 
-    assert result.status == DocumentValidityStatus.NEEDS_HUMAN
+    assert result.status == DocumentValidityStatus.CLEAR
     assert any(issue.field == "buyer_tax_code" for issue in result.issues)
 
 
@@ -145,7 +147,7 @@ def test_payment_proof_requires_reference_payee_and_success_status() -> None:
     )
 
     assert result.document_role == ExpenseDocumentRole.SUPPORTING_DOCUMENT
-    assert result.status == DocumentValidityStatus.NEEDS_HUMAN
+    assert result.status == DocumentValidityStatus.CLEAR
     missing_fields = {issue.field for issue in result.issues}
     assert {"payee_name", "transaction_reference", "transaction_status"} <= missing_fields
 

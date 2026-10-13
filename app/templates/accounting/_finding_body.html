@@ -1,0 +1,68 @@
+<p>{{ finding.message }}</p>
+{% if finding.question %}
+  <div class="finding-question"><strong>Cần xử lý:</strong> {{ finding.question }}</div>
+{% endif %}
+{% if finding.evidence_refs %}
+<div class="evidence-citations">
+  <strong>Dẫn chứng:</strong>
+  {% for evidence in finding.evidence_refs %}
+    {% if evidence.url %}
+      <a href="{{ evidence.url }}" target="_blank">
+        {{ evidence.label }}{% if evidence.location %} · {{ evidence.location }}{% endif %}
+      </a>
+    {% else %}
+      <span>{{ evidence.label }}</span>
+    {% endif %}
+  {% endfor %}
+</div>
+{% else %}
+<div class="evidence-citations muted">
+  <strong>Nguồn:</strong><span>Quy tắc hệ thống hoặc dữ liệu tổng hợp của hồ sơ</span>
+</div>
+{% endif %}
+{% if finding.evidence_previews %}
+<div class="issue-evidence-list">
+  {% for evidence in finding.evidence_previews %}
+  <div class="issue-evidence">
+    <div class="issue-evidence-header">
+      <div>
+        <strong>{{ evidence.label }}</strong>
+        <span>
+          {% if evidence.block_id %}Trang {{ evidence.page_index + 1 }} · {{ evidence.block_id }}{% else %}Chứng từ liên quan{% endif %}
+        </span>
+      </div>
+      <a href="{{ evidence.url }}" target="_blank">Mở bản gốc</a>
+    </div>
+    {% if evidence.ocr_preview_url %}
+    <a class="issue-image" href="{{ evidence.url }}" target="_blank">
+      <img src="{{ evidence.ocr_preview_url }}" alt="Vùng OCR cần kiểm tra trên {{ evidence.label }}" loading="lazy">
+    </a>
+    {% elif evidence.preview_kind == "image" %}
+    <a class="issue-image" href="{{ evidence.url }}" target="_blank">
+      <img src="{{ evidence.url }}" alt="Bằng chứng {{ evidence.label }}" loading="lazy">
+      {% if evidence.annotation_style %}
+        <span class="issue-marker" style="{{ evidence.annotation_style }}" title="Vùng OCR cần kiểm tra"></span>
+      {% endif %}
+    </a>
+    {% elif evidence.preview_kind == "pdf" %}
+    <object class="issue-pdf" data="{{ evidence.url }}" type="application/pdf">
+      <a href="{{ evidence.url }}" target="_blank">Mở chứng từ PDF</a>
+    </object>
+    {% endif %}
+    {% if evidence.excerpt %}
+    <div class="ocr-excerpt">
+      <strong>Nội dung OCR tại vùng được đánh dấu</strong>
+      <p>{{ evidence.excerpt }}</p>
+      {% if evidence.low_words %}
+      <div class="low-word-list">
+        {% for word in evidence.low_words %}
+          <span>{{ word.text }} · {{ (word.confidence * 100)|round(1) }}%</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
