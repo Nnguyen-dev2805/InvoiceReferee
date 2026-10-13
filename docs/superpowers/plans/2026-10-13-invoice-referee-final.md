@@ -257,6 +257,16 @@ def test_balanced_false_claim_is_dangerous():
 - [x] Headed Verify + actualhosting walltime targetCore120/Esc90 measured, no testfake latency. Commit "feat: verify the real workflow with independent gold".
 **Gate:** Raw baseline before improvements, truthful modes/errors.
 
+> **Remediation (2026-10-13, independent review).** Several T9 behaviours were
+> not actually true and are now fixed: `--suite` was ignored (always ran
+> development) — now `select_suite` gives `core`=Core4 and
+> `escalation`=Escalation5; the scorer summed expected amounts ignoring
+> direction (a COLLECT scored as a correct PAY) — now compared per direction; a
+> human-required root asserting BALANCED was not counted unsafe; and the runner
+> defaulted `refs_ok=True` — now reads real refs. Baseline after fix: `core`
+> union=0; `escalation` union=0 release=true. Two honest route disagreements
+> remain surfaced (dev-over-budget, dev-supplementary), not hidden.
+
 ### T10 — Clean clone and early public pilot
 
 **Files:** Dockerfile,compose.yaml,docs/final/RUNBOOK.md; config/cli/dev/UI; tests/integration/test_config_storage.py; frontend/e2e/public-smoke.spec.ts.
