@@ -116,7 +116,7 @@ async def test_same_activity_has_one_root(app_fixture):
 **Files:** Create reconciliation group; tests/unit/test_admissibility.py,test_finance.py,test_policy.py; modify api/views.py/dossier.
 **Consumes:** AssessmentInput and unit literals.
 **Produces:** Reconciler.assess(input)->AssessmentResult; confirm_admissibility(observation,unit,context)->Fact; project_finance(expenses,ledger,coverage)->Projection; evaluate_policy(input,projection)->tuple[BusinessIssue,...].
-- [ ] Tests T10/E5/C3/unpaid2/B8 POLICY; personal E excluded but A2 debt2; material corporate personal charge unsupported/no finalS0; guest≠payer; missing opening/fund coverage unknown; grants wrong action/time; E12/A11/B14 AUTH; E8/S4 inclusive and +1đ.
+- [x] Tests T10/E5/C3/unpaid2/B8 POLICY; personal E excluded but A2 debt2; material corporate personal charge unsupported/no finalS0; guest≠payer; missing opening/fund coverage unknown; grants wrong action/time; E12/A11/B14 AUTH; E8/S4 inclusive and +1đ.
 ```python
 def test_incurred_budget_not_paid_budget():
     r = Reconciler().assess(snapshot(T=10_000_000,E=5_000_000,C=3_000_000,A=2_000_000,P=0,R=0,B=8_000_000))
@@ -124,12 +124,12 @@ def test_incurred_budget_not_paid_budget():
     assert any(i.kind == "POLICY" for i in r.issues)
     assert r.allowed_effect is None
 ```
-- [ ] RED: `rtk proxy uv run pytest tests/unit/test_admissibility.py tests/unit/test_finance.py tests/unit/test_policy.py -q`.
-- [ ] Implement source predicates/coverage, E/T/S and independent governance incident, grant20 per action, policy expense-time/current commit authority, scoped exception. Unknown affecting money/rights no auto; chưa phân loại A/P có căn cứ phải FACT, không tự gán tiền chuyển thành ứng.
-- [ ] Prior eligibility reused only unchanged valid cost_basis. Issuer expiry doesn't erase issued decisions; explicit revocation/new action rights checked. Partial temporal budgets not covering activity need scope clarification, not latest B blind.
-- [ ] Pin tests test_paid_ineligible_is_not_unpaid: T10/employee paid7/E5/C3 ⇒ unpaid0; business-incurred excluded E vẫn giữ T. test_new_paid_portion_requires_total_authority: E8→E9 ⇒ AUTHORITY; E8+P1 không đổi eligibility basis. CaseView.problems và SettlementConclusion theo contracts §10.2–3.
-- [ ] GREEN unit suite. Kiểm component dossier bằng literal view fixture trong frontend/tests/dossier.test.tsx: known/unknown/rule/effect hiển thị tiếng Việt. Đây là component test; UI qua workflow thực được kiểm ở T5/T6, không tạo endpoint giả assessment trong production.
-- [ ] Commit checkpoint "feat: reconcile evidence money and authority".
+- [x] RED: `rtk proxy uv run pytest tests/unit/test_admissibility.py tests/unit/test_finance.py tests/unit/test_policy.py -q`.
+- [x] Implement source predicates/coverage, E/T/S and independent governance incident, grant20 per action, policy expense-time/current commit authority, scoped exception. Unknown affecting money/rights no auto; chưa phân loại A/P có căn cứ phải FACT, không tự gán tiền chuyển thành ứng.
+- [x] Prior eligibility reused only unchanged valid cost_basis. Issuer expiry doesn't erase issued decisions; explicit revocation/new action rights checked. Partial temporal budgets not covering activity need scope clarification, not latest B blind.
+- [x] Pin tests test_paid_ineligible_is_not_unpaid: T10/employee paid7/E5/C3 ⇒ unpaid0; business-incurred excluded E vẫn giữ T. test_new_paid_portion_requires_total_authority: E8→E9 ⇒ AUTHORITY; E8+P1 không đổi eligibility basis. CaseView.problems và SettlementConclusion theo contracts §10.2–3.
+- [x] GREEN unit suite. Kiểm component dossier bằng literal view fixture trong frontend/tests/dossier.test.tsx: known/unknown/rule/effect hiển thị tiếng Việt. Đây là component test; UI qua workflow thực được kiểm ở T5/T6, không tạo endpoint giả assessment trong production.
+- [x] Commit checkpoint "feat: reconcile evidence money and authority".
 **Gate:** Literal oracle independent; approval can't resolve missing fact.
 
 ### T4 — Raw packets and gold before model baseline

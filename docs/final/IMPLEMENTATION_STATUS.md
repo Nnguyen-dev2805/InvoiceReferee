@@ -13,9 +13,9 @@ The plan owns task acceptance; package/config files own executable commands.
 | Setup review | ACCEPTED at documentation/setup level; actual clean-clone and agent-execution proof remain open |
 | Execution method | Inline execution (executing-plans) with one integrator; the whole-branch final review has not been run |
 | Workflow integrator | Inline executor — single writer for workflow/api/domain owned files |
-| Next application task | T3, not started (needs authorization) |
-| Last completed application task | T2 — gate passed (UI available; tenant/version/source checks); T1 = 57d2e19; T2 = 1c395de |
-| Product unit/integration/UI/LIVE evidence | Domain conformance: `uv run pytest` → **36 passed** (26 after T2 + 10 new contract tests); `uv run pytest tests/unit/test_contracts.py -W error` clean. T2 gate: `npm --prefix frontend run build` exit 0 under Node 24.19.0 / npm 11.12.1 (lockfile `frontend/package-lock.json`); UI checkpoint on `uv run python scripts/dev.py --mode stub`. LIVE/OCR: NOT_RUN. Note: `frontend/node_modules` and `frontend/dist` are absent on this checkout (ignored); rebuild before re-running the browser checkpoint |
+| Next application task | T4, not started (needs authorization) |
+| Last completed application task | T3 — gate passed (literal oracle independent; approval can't resolve missing fact). T1 = 57d2e19, T2 = 1c395de, conformance = 3245d00, boundary = ec37242 |
+| Product unit/integration/UI/LIVE evidence | T3: `uv run pytest` → **68 passed** (44 after boundary fixes + 24 T3 core tests); `frontend: npx vitest run` → 2 passed; `npm --prefix frontend run build` exit 0 under Node 24.19.0 / npm 11.12.1. T3 is a **pure unit core** — no endpoint yet, so the browser checkpoint is UI NOT_RUN (wired at T6). LIVE/OCR: NOT_RUN. Note: `frontend/node_modules`/`dist` are ignored; `npm install` before a browser run |
 | CodeGraph | **Fresh** at `1c395de`: `codegraph status` → 34 files, 505 nodes, 1135 edges (python 24, tsx 4, typescript 6). The earlier "stale/0 files" note was itself outdated; re-check with `rtk proxy codegraph status` before relying on it |
 | Git handoff | T1 = 57d2e19, T2 = 1c395de, domain-conformance = 3245d00, boundary fixes = ec37242 — all on `final` (unpushed beyond 1c395de; no push authorization) |
 

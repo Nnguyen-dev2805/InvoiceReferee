@@ -1,0 +1,189 @@
+"""Policy/authority assessment: issues, authorizations and the proposed effect.
+
+Contracts §2, §4–§5. Pure: a function of the immutable AssessmentInput and its
+projection. A grant is scoped to one action, one scope and an effective
+interval; the demo limits are E <= 8m (RECOGNIZE_COST), abs(S) <= 4m
+(ISSUE_PAYMENT/ISSUE_COLLECTION) and the approver's 20m per action.
+"""
+
+from __future__ import annotations
+
+from invoice_referee.domain.case import AssessmentInput, AssessmentResult, FinancialEffect
+from invoice_referee.domain.finance import Projection
+from invoice_referee.domain.issues import BusinessIssue
+from invoice_referee.domain.policy import BudgetDecision, Grant
+
+RECOGNIZE_LIMIT = 8_000_000
+ISSUE_LIMIT = 4_000_000
+APPROVER_LIMIT = 20_000_000
+# The system's autonomy is bounded by the system actor's own grants; a human
+# grant (approver) lets a person resolve an AUTHORITY issue, it does not let
+# the system auto-complete past its own limits (§2, §5).
+SYSTEM_ACTOR = "system:referee"
+
+
+def _issue(
+    issue_id: str,
+    kind: str,
+    field_or_rule: str,
+    owner: str,
+    basis: str,
+    question: str,
+) -> BusinessIssue:
+    return BusinessIssue(
+        id=issue_id,
+        kind=kind,  # type: ignore[arg-type]
+        field_or_rule=field_or_rule,
+        owner=owner,
+        basis=basis,
+        question=question,
+    )
+
+
+def _active_budget(input: AssessmentInput) -> BudgetDecision | None:
+    if not input.budget:
+        return None
+    # The budget whose effect range covers the activity time.
+    for decision in input.budget:
+        start, end = decision.effect_range
+        when = input.as_of
+        if start <= when and (end is None or when <= end):
+            return decision
+    return None
+
+
+def _grant_covers(
+    input: AssessmentInput, action: str, amount: int, actor: str | None = None
+) -> bool:
+    when = input.as_of
+    for grant in input.grants:
+        if action not in grant.actions:
+            continue
+        if actor is not None and grant.actor != actor:
+            continue
+        if grant.effective_from <= when and (grant.effective_to is None or when <= grant.effective_to):
+            if grant.max_amount >= amount:
+                return True
+    return False
+
+
+def _has_grant_ignoring_amount(input: AssessmentInput, action: str) -> bool:
+    when = input.as_of
+    for grant in input.grants:
+        if action not in grant.actions:
+            continue
+        if grant.effective_from <= when and (grant.effective_to is None or when <= grant.effective_to):
+            return True
+    return False
+
+
+def evaluate_policy(
+    input: AssessmentInput, projection: Projection
+) -> tuple[tuple[BusinessIssue, ...], tuple[str, ...], FinancialEffect | None]:
+    """Return (issues, required_authorizations, allowed_effect)."""
+    issues: list[BusinessIssue] = []
+    authorizations: list[str] = []
+    activity = input.scope.activity
+
+    # FACT: a required fact that is unresolved blocks any money conclusion.
+    if projection.T.state != "KNOWN":
+        issues.append(
+            _issue(
+                "issue:fact:incurred",
+                "FACT",
+                "expense:T",
+                "employee",
+                "Chi phí công việc chưa được xác minh.",
+                "Cung cấp chứng từ chi phí hợp lệ cho hoạt động này.",
+            )
+        )
+    if projection.A.state == "UNKNOWN" or projection.P.state == "UNKNOWN":
+        issues.append(
+            _issue(
+                "issue:fact:history",
+                "FACT",
+                "ledger:coverage",
+                "accountant",
+                "Thiếu lịch sử đối chiếu ứng/hoàn cho scope này.",
+                "Xác minh coverage lịch sử (scope/thời gian/loại dòng tiền).",
+            )
+        )
+
+    budget = _active_budget(input)
+    if budget is None:
+        # No B record: an org-data FACT issue, never a fabricated zero budget.
+        issues.append(
+            _issue(
+                "issue:fact:budget",
+                "FACT",
+                "budget:B",
+                "org-data",
+                "Chưa có bản ghi ngân sách cho hoạt động.",
+                "Tìm/cấp bản ghi ngân sách hoặc quyết định hoạt động.",
+            )
+        )
+    elif projection.T.state == "KNOWN" and int(projection.T.value or 0) > budget.amount:
+        issues.append(
+            _issue(
+                "issue:policy:budget",
+                "POLICY",
+                "budget:B",
+                "approver",
+                f"Tổng chi {int(projection.T.value or 0)} vượt ngân sách {budget.amount}.",
+                "Quyết định ngoại lệ vượt ngân sách (giữ nguyên số thực chi).",
+            )
+        )
+
+    # E recognition limit: the system self-recognizes up to 8m.
+    if projection.E.state == "KNOWN":
+        e_value = int(projection.E.value or 0)
+        if e_value > RECOGNIZE_LIMIT and not _grant_covers(
+            input, "RECOGNIZE_COST", e_value, actor=SYSTEM_ACTOR
+        ):
+            authorizations.append("RECOGNIZE_COST")
+            issues.append(
+                _issue(
+                    "issue:authority:recognize",
+                    "AUTHORITY",
+                    "RECOGNIZE_COST",
+                    "approver",
+                    f"Chi phí đủ điều kiện {e_value} vượt mức tự công nhận {RECOGNIZE_LIMIT}.",
+                    "Cấp quyết định công nhận chi phí trong phạm vi được giao.",
+                )
+            )
+
+    allowed_effect: FinancialEffect | None = None
+    if projection.S.state == "KNOWN":
+        s_value = int(projection.S.value or 0)
+        if s_value != 0:
+            action = "ISSUE_PAYMENT" if s_value > 0 else "ISSUE_COLLECTION"
+            amount = abs(s_value)
+            if amount <= ISSUE_LIMIT and _grant_covers(
+                input, action, amount, actor=SYSTEM_ACTOR
+            ):
+                allowed_effect = FinancialEffect(
+                    direction="PAY" if s_value > 0 else "COLLECT",
+                    amount=amount,
+                    employee=input.scope.employee,
+                    activity=activity,
+                    basis=f"S={s_value}",
+                )
+            else:
+                authorizations.append(action)
+                issues.append(
+                    _issue(
+                        "issue:authority:issue",
+                        "AUTHORITY",
+                        action,
+                        "approver",
+                        f"Cần phát hành {action} {amount} vượt quyền tự xử lý {ISSUE_LIMIT}.",
+                        "Cấp quyết định phát hành yêu cầu chi/thu trong phạm vi.",
+                    )
+                )
+
+    # Any material FACT/POLICY/AUTHORITY gate still open means no proposal:
+    # allowed_effect is a proposal only when every gate is clean (§4).
+    if issues:
+        allowed_effect = None
+
+    return tuple(issues), tuple(authorizations), allowed_effect

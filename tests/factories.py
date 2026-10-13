@@ -48,6 +48,31 @@ def digest(seed: str) -> str:
     return hashlib.sha256(seed.encode("utf-8")).hexdigest()
 
 
+def scope(**overrides: object) -> CaseScope:
+    fields: dict[str, object] = {
+        "tenant": TENANT,
+        "employee": EMPLOYEE,
+        "activity": ACTIVITY,
+        "profile": PROFILE,
+    }
+    fields.update(overrides)
+    return CaseScope(**fields)  # type: ignore[arg-type]
+
+
+def coverage(*, opening: int = 0) -> CoverageRecord:
+    """A complete history coverage record (contracts §3)."""
+    return CoverageRecord(
+        scope=ACTIVITY,
+        start=DEFAULT_AS_OF - timedelta(days=30),
+        as_of=DEFAULT_AS_OF,
+        funds=(COMPANY,),
+        flow_kinds=ALL_MONEY_KINDS,
+        opening_balance=known("ledger:opening", opening, "ledger-opening"),
+        ledger_version="ledger:v1",
+        witness_refs=(ref("ledger-witness"),),
+    )
+
+
 def ref(seed: str, *, page: int = 1, quote: str = "literal evidence") -> EvidenceRef:
     return EvidenceRef(
         source_id=f"source:{seed}",
@@ -63,6 +88,47 @@ def known(key: str, value: int, seed: str = "seed") -> Fact[int]:
 
 def unknown(key: str, seed: str = "seed") -> Fact[int]:
     return Fact[int](key=key, state="UNKNOWN", refs=(ref(seed),))
+
+
+def payment(
+    key: str, payer: str, payee: str, amount: int, expense_id: str = "expense:1"
+) -> ExpensePayment:
+    """A verified payment portion (contracts §2): payer paid `amount` for the expense."""
+    return ExpensePayment(
+        external_key=f"external:{key}",
+        payer=payer,
+        payee=payee,
+        amount=amount,
+        expense_id=expense_id,
+        received_state="CLEAR",
+        refs=(ref(key),),
+    )
+
+
+def expense(
+    expense_id: str,
+    incurred: int | None,
+    *,
+    payments: tuple[ExpensePayment, ...] = (),
+    eligibility: str = "ELIGIBLE",
+    activity: str = ACTIVITY,
+) -> Expense:
+    """A verified expense with a literal incurred cost and payment portions."""
+    incurred_fact = (
+        known(f"{expense_id}:incurred", incurred, expense_id)
+        if incurred is not None
+        else unknown(f"{expense_id}:incurred", expense_id)
+    )
+    return Expense(
+        id=expense_id,
+        economic_key=f"invoice:{expense_id}",
+        activity=activity,
+        incurred=incurred_fact,
+        incurred_at=DEFAULT_AS_OF - timedelta(days=2),
+        payments=tuple(payments),
+        eligibility=eligibility,  # type: ignore[arg-type]
+        refs=(ref(expense_id),),
+    )
 
 
 def money_event(

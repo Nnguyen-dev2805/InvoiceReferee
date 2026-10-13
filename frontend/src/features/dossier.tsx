@@ -16,6 +16,40 @@ const ISSUE_LABELS: Record<string, string> = {
   AUTHORITY: "Quyền",
 };
 
+const MONEY_LABELS: Record<string, string> = {
+  T: "Tổng chi công việc",
+  E: "Chi phí đủ điều kiện",
+  C: "Công ty trả trực tiếp",
+  A: "Ứng thực nhận",
+  P: "Đã hoàn",
+  R: "Đã thu hồi",
+  unpaid: "Chưa thanh toán",
+  S: "Chênh lệch (S)",
+};
+
+const UNKNOWN_LABEL = "Chưa xác minh";
+
+export function formatMoney(value: number | null): string {
+  if (value === null) return UNKNOWN_LABEL;
+  return new Intl.NumberFormat("vi-VN").format(value) + " ₫";
+}
+
+/** One money figure: a known amount, or an explicit "chưa xác minh" state. */
+export function MoneyLine({
+  label,
+  fact,
+}: {
+  label: string;
+  fact: { value: number | null; state: string };
+}) {
+  const known = fact.state === "KNOWN" && fact.value !== null;
+  return (
+    <li data-testid={`money-${label}`}>
+      {label}: <strong>{known ? formatMoney(fact.value) : UNKNOWN_LABEL}</strong>
+    </li>
+  );
+}
+
 export function Dossier({ caseView }: { caseView: CaseView | null }) {
   return (
     <section aria-labelledby="dossier-title">
@@ -45,6 +79,13 @@ export function Dossier({ caseView }: { caseView: CaseView | null }) {
               ))}
             </ul>
           )}
+
+          <h3>Số tiền</h3>
+          <ul className="money">
+            {Object.entries(caseView.actual_money).map(([key, fact]) => (
+              <MoneyLine key={key} label={MONEY_LABELS[key] ?? key} fact={fact} />
+            ))}
+          </ul>
 
           <h3>Việc cần xử lý ({caseView.issues.length})</h3>
           {caseView.issues.length === 0 ? (
