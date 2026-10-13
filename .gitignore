@@ -1,5 +1,31 @@
 .freebuff
 .agents
 .claude
-AGENTS.md
 .codegraph
+
+# Local credentials, runtime state, and generated evidence.
+.env
+.env.*
+!.env.example
+.runtime/
+.superpowers/
+private/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+
+# Local tool output; source, lockfiles, and synthetic evaluation packets stay visible.
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+node_modules/
+frontend/dist/
+playwright-report/
+test-results/
+.DS_Store
