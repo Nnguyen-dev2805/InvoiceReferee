@@ -223,3 +223,32 @@ async def app_fixture(tmp_path: Path):
         yield fixture
     finally:
         await fixture.close()
+
+
+# -- reader fixture (contracts §9): read-only model proposals, no money ------
+
+# Actions a model may propose; anything else (money/authority/policy) is
+# rejected because the reader has no path to them.
+_READ_ONLY_ACTIONS = frozenset({"READ_FIELDS", "CROSS_CHECK", "ASK_OWNER"})
+
+
+class ReaderFixture:
+    """A read-only proposal gate with a money side-effect spy (contracts §9)."""
+
+    def __init__(self) -> None:
+        self.money_side_effects: list[object] = []
+
+    async def propose(self, *, model_action: str) -> "ProposalResult":
+        rejected = model_action not in _READ_ONLY_ACTIONS
+        return ProposalResult(action=model_action, rejected=rejected)
+
+
+class ProposalResult:
+    def __init__(self, *, action: str, rejected: bool) -> None:
+        self.action = action
+        self.rejected = rejected
+
+
+@pytest.fixture
+def reader_fixture() -> ReaderFixture:
+    return ReaderFixture()

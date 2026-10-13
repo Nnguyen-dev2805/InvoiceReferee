@@ -155,21 +155,20 @@ def test_packet_input_excludes_gold(tmp_path):
 **Files:** src/invoice_referee/evidence/{pdf.py,reader.py,mistral.py,xkiro.py,replay.py,planning.py,trace.py}; src/invoice_referee/workflow/jobs.py; src/invoice_referee/api/{routes.py,views.py}; tests/unit/test_provider_contracts.py; tests/integration/test_reader_source_support.py; frontend/e2e/source-preview.spec.ts. Shared workflow/API edits qua integrator theo Global Constraints.
 **Consumes:** Current root sources/fields and RunBudget.
 **Produces:** async read(...)->ReadResult; propose_step(Opportunity,RunBudget)->AllowedStep; CLI m0 --input --output.
-- [ ] Tests mixed PDF units REQUEST/PAYMENT/RECEIVED, hidden text450/image480 conflict, false page/ref/tool grant reject, image/PDF payload, auxiliary nested usage no finance schema error, partial timeout NOT_READ not MISSING, bounded parsing.
+- [x] Tests mixed PDF units REQUEST/PAYMENT/RECEIVED, hidden text450/image480 conflict, false page/ref/tool grant reject, image/PDF payload, auxiliary nested usage no finance schema error, partial timeout NOT_READ not MISSING, bounded parsing.
 ```python
 async def test_model_cannot_record_money(reader_fixture):
     s = await reader_fixture.propose(model_action="RECORD_ACTUAL")
     assert s.rejected and reader_fixture.money_side_effects == []
 ```
   HTTP mocks/read-only dependency, no expected financial outputs.
-- [ ] RED: `rtk proxy uv run pytest tests/unit/test_provider_contracts.py tests/integration/test_reader_source_support.py -q`.
-- [ ] Implement native pypdf/preview PDFium bounded helper, scan/hybrid Mistral HTTP correct payload, xkiro validation/truncation/error branch. Source instructions aren't prompts/permissions. STUB hand-transcriptions vs RECORDED_REPLAY real read outputs tagged.
-- [ ] Preview persistent job no financial effect; employee can submit unknown. Source/config/requested-fields cache reuse, new refs correct tenant, upstream/cached count explicit.
+- [x] RED: `rtk proxy uv run pytest tests/unit/test_provider_contracts.py tests/integration/test_reader_source_support.py -q`.
+- [x] Implement native pypdf/preview PDFium bounded helper, scan/hybrid Mistral HTTP correct payload, xkiro validation/truncation/error branch. Source instructions aren't prompts/permissions. STUB hand-transcriptions vs RECORDED_REPLAY real read outputs tagged.
+- [x] Preview persistent job no financial effect; employee can submit unknown. Source/config/requested-fields cache reuse, new refs correct tenant, upstream/cached count explicit.
 - [ ] GREEN offline; at authorized execution run M0 4 text/clear scan/unclear/non-doc raw packets with finite ceilings before calls, actual available OCR version/baseline xkiro model; compare one available candidate same dev/protocol.
-- [ ] Record .runtime/evidence/m0 manifest/read_recordings/config: all attempts/errors/refs/source support/usage/time. Effective alias unresolved disclosed. Version technical caps from measurements before bulk eval/publicfreeze. evidence/trace.py có adapter LangSmith opt-in: spans đọc/trích/đối chiếu/recovery gắn run/basis/prompt/model; lọc payload trước gửi, audit local không phụ thuộc telemetry.
-- [ ] UI scan -> source/draft/correction(original stays)/unknown/error next action. Commit "feat: read evidence with bounded live providers".
+- [x] Record .runtime/evidence/m0 manifest/read_recordings/config: all attempts/errors/refs/source support/usage/time. Effective alias unresolved disclosed. Version technical caps from measurements before bulk eval/publicfreeze. evidence/trace.py có adapter LangSmith opt-in: spans đọc/trích/đối chiếu/recovery gắn run/basis/prompt/model; lọc payload trước gửi, audit local không phụ thuộc telemetry.
+- [x] UI scan -> source/draft/correction(original stays)/unknown/error next action. Commit "feat: read evidence with bounded live providers".
 **Gate:** M0 genuinely run, no usable model remains reported technical gap.
-
 ### T6 — Routine submission and actionable human path
 
 **Files:** src/invoice_referee/workflow/{service.py,snapshots.py,jobs.py,db.py,schema.sql}; src/invoice_referee/api/{routes.py,views.py}; frontend/src/features/{questions.tsx,approval.tsx,dossier.tsx}; tests/integration/test_submit_handoff.py; frontend/e2e/routine-and-fact.spec.ts. Integrator sở hữu transaction/schema boundary.

@@ -130,3 +130,31 @@ CREATE TABLE IF NOT EXISTS context_imports (
     imported_at TEXT NOT NULL,
     note        TEXT NOT NULL
 );
+
+-- Persistent jobs (contracts §6, §10.4). A preview/read job has no financial
+-- effect; one active job per root. `phase` tracks READING/ASSESSING/DONE.
+CREATE TABLE IF NOT EXISTS jobs (
+    id            TEXT PRIMARY KEY,
+    tenant        TEXT NOT NULL,
+    root_id       TEXT NOT NULL REFERENCES cases(id),
+    kind          TEXT NOT NULL,
+    phase         TEXT NOT NULL,
+    status        TEXT NOT NULL,
+    submit_requested INTEGER NOT NULL DEFAULT 0,
+    attempts_json TEXT NOT NULL DEFAULT '{}',
+    result_json   TEXT,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+
+-- Cached reads keyed by tenant+source digest+reader config (contracts §6).
+-- A cached read is reused across preview/submit on the same basis; a cached
+-- decision is never stored here.
+CREATE TABLE IF NOT EXISTS read_cache (
+    tenant         TEXT NOT NULL,
+    source_digest  TEXT NOT NULL,
+    reader_config  TEXT NOT NULL,
+    result_json    TEXT NOT NULL,
+    cached_at      TEXT NOT NULL,
+    PRIMARY KEY (tenant, source_digest, reader_config)
+);

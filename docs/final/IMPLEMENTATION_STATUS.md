@@ -13,9 +13,9 @@ The plan owns task acceptance; package/config files own executable commands.
 | Setup review | ACCEPTED at documentation/setup level; actual clean-clone and agent-execution proof remain open |
 | Execution method | Inline execution (executing-plans) with one integrator; the whole-branch final review has not been run |
 | Workflow integrator | Inline executor — single writer for workflow/api/domain owned files |
-| Next application task | T5, not started (needs authorization) |
-| Last completed application task | T4 — gate passed (actual files/input/context/gold 3 layers; baseline waits complete matrix). T3 = 4d80c9d |
-| Product unit/integration/UI/LIVE evidence | T4: `uv run pytest` → **84 passed** (68 after T3 + 16 packet/dataset tests); `uv run python scripts/build_packets.py --out data/evaluation` → 15 dev + 20 holdout roots with real PDFs (ReportLab + bundled Noto Sans, Vietnamese glyphs) and image-only scans (pypdfium2). Gold is a separate subtree; no slug/scenario text leaks into any source. No model run yet — the M0 baseline is T5. LIVE/OCR: NOT_RUN |
+| Next application task | T5 — implementation complete; **M0 LIVE is BLOCKED** (no provider credentials). T6 needs authorization |
+| Last completed application task | T4 — gate passed. T5 code+offline tests done; **T5 gate NOT met** (M0 not run) |
+| Product unit/integration/UI/LIVE evidence | T5: `uv run pytest` → **108 passed** (84 after T4 + 24 evidence/preview/m0/trace tests); `frontend npm run build` exit 0. `uv run invoice-referee m0 --mode stub` writes an honest manifest. **M0 LIVE: BLOCKED — no `.env`/credentials (MISTRAL_API_KEY, XKIRO_*) on this machine.** UI checkpoint for source preview: NOT_RUN (Playwright browsers not installed) |
 | CodeGraph | **Fresh** at `1c395de`: `codegraph status` → 34 files, 505 nodes, 1135 edges (python 24, tsx 4, typescript 6). The earlier "stale/0 files" note was itself outdated; re-check with `rtk proxy codegraph status` before relying on it |
 | Git handoff | T1 = 57d2e19, T2 = 1c395de, domain-conformance = 3245d00, boundary fixes = ec37242 — all on `final` (unpushed beyond 1c395de; no push authorization) |
 
