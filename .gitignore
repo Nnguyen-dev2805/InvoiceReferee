@@ -2,6 +2,7 @@
 .agents
 .claude
 .codegraph
+.archify
 
 # Local credentials, runtime state, and generated evidence.
 .env
