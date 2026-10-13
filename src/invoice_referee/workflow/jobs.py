@@ -112,6 +112,26 @@ class JobStore:
             return None
         return ReadResult.model_validate_json(row["result_json"])
 
+    def recover_incomplete(
+        self, cx: sqlite3.Connection, *, tenant: str, now: str
+    ) -> list[str]:
+        """Return incomplete job ids after a restart and requeue them (plan R4).
+
+        A job left QUEUED/RUNNING by a crash is marked for recovery so the
+        worker resumes it rather than duplicating its effect. Returns the ids.
+        """
+        rows = cx.execute(
+            "SELECT id FROM jobs WHERE tenant = ? AND status IN ('QUEUED','RUNNING')",
+            (tenant,),
+        ).fetchall()
+        ids = [str(row["id"]) for row in rows]
+        for job_id in ids:
+            cx.execute(
+                "UPDATE jobs SET status = 'QUEUED', updated_at = ? WHERE id = ?",
+                (now, job_id),
+            )
+        return ids
+
 
 async def run_preview(
     store: JobStore,

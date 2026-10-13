@@ -864,8 +864,25 @@ class CaseWorkflow:
         row = self._require_root(cx, session, command.root_id)
         self._require_version(row, context.expected_case_version)
         now = self._now_iso()
+        root_id = str(row["id"])
+        # A submit is a durable job (contracts §6, §10.4): one active job per
+        # root, READ -> ASSESS -> DONE. A crash mid-job leaves it recoverable
+        # rather than half-applied. The read already ran outside the txn.
+        from invoice_referee.workflow.jobs import JobStore
+
+        store = JobStore(self.db)
+        existing = store.active_job(cx, session.tenant, root_id)
+        job_id = (
+            str(existing["id"])
+            if existing is not None
+            else store.enqueue(cx, tenant=session.tenant, root_id=root_id, kind="SUBMIT", now=now)
+        )
+        store.mark(cx, job_id, phase="ASSESSING", status="RUNNING", now=now)
         self._assess_and_commit(cx, session, row, now)
-        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+        store.mark(cx, job_id, phase="DONE", status="COMPLETED", now=now)
+        return CommandResult(
+            case_view=self._case_view(cx, self._reload(cx, row)), job_id=job_id
+        )
 
     def _answer_issue(
         self,
