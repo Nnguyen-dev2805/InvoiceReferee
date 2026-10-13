@@ -17,6 +17,14 @@ _Avoid_: Dùng “hoàn ứng” cho mọi kết quả chi/thu.
 Khoản chi phục vụ công việc mà nhân viên thực tế trả cho bên cung cấp, bằng tiền ứng hoặc tiền riêng.
 _Avoid_: Đồng nhất với chi cá nhân không phục vụ công việc.
 
+**Chi phí nhân viên khai đã thanh toán**:
+Khoản tiền nhân viên xác nhận mình đã trả cho bên cung cấp theo nội dung đề nghị quyết toán.
+_Avoid_: Đồng nhất lời khai với giao dịch ngân hàng đã được xác minh hoặc chi phí đã được công nhận theo policy.
+
+**Giải trình**:
+Nội dung người nộp hồ sơ làm rõ lý do thiếu chứng từ hoặc thông tin khác nhau của một khoản chi.
+_Avoid_: Đồng nhất với phê duyệt ngoại lệ hoặc xác nhận tiền đã thực nhận.
+
 **Tiền ứng thực nhận**:
 Khoản tiền ứng mà nhân viên đã thực tế nhận từ công ty.
 _Avoid_: Đồng nhất với số xin ứng hoặc số ứng đã được duyệt.

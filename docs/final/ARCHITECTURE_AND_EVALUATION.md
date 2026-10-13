@@ -1,6 +1,9 @@
 # InvoiceReferee final — Thiết kế và hợp đồng đánh giá
 
 Ngày 13/10/2026, Asia/Ho_Chi_Minh. **DESIGN_CONSOLIDATED — Q1–Q30 đã chốt; review thiết kế đã thực hiện, chưa có bằng chứng runtime.**
+**Cập nhật phạm vi mới:** §14 ghi quyết định thu hẹp employee-paid và cuộc grill
+đang mở. Phần company-direct trước đó là lịch sử thiết kế; không triển khai thay
+policy hoặc coi các gate cũ đã chứng minh phạm vi mới trước khi grill kết thúc.
 Nguồn: [đề thi gốc](../Challenge_Brief_OrganizationAI_VN.docx.md), Q1–Q30 đã được người dùng chốt.
 Q5 là ưu tiên chất lượng, không phải bằng chứng BTC gia hạn hoặc bỏ yêu cầu thử nghiệm.
 Nhánh làm việc kiểm tra: final. Nhánh rebuild, code và quyết định của nhánh đó không là cơ sở thiết kế.
@@ -456,3 +459,50 @@ plan” ở các snapshot trên là lịch sử tại thời điểm review. Q1�
 Chưa triển khai app, chạy unit/UI/LIVE hoặc thu professional feedback trong lượt
 planning. Coding agent đọc spec + contracts + plan; review archive là căn cứ khi
 cần tra tranh luận, không là tập instructions phải nạp toàn bộ.
+
+## 14. Thu hẹp hồ sơ và policy đầu vào — cuộc grill 13/10/2026
+
+Trạng thái: **IN_DISCUSSION**. [ADR006](../adr/0006-employee-paid-scope.md) ghi
+phần đã được người dùng chốt; chưa thay code/contracts/dataset/gold hoặc mở
+implementation. Những khẳng định về implementation ở §13 là snapshot lịch sử,
+không phải kết quả kiểm tra checkout hiện tại.
+
+Đã chốt trong trao đổi:
+- Bản đầu quyết toán khoản nhân viên trực tiếp thanh toán cho hoạt động; không
+  hỗ trợ công ty thanh toán trực tiếp nhà cung cấp. Giữ tạm ứng/hoàn tiền/thu lại
+  giữa công ty và nhân viên; nguồn tiền nhân viên trả có thể là ứng hoặc tiền riêng.
+- Dùng bố cục gen_1.py làm tham khảo, thay nội dung/đáp án theo phạm vi hệ thống;
+  không lấy nguyên policy hoặc code của nguồn khác.
+- Hồ sơ gồm đề nghị/bảng kê và chứng từ dịch vụ; tạm thời không bắt upload file
+  chứng minh thanh toán riêng. Không đồng nhất quyết định bỏ file với quyết định
+  tự công nhận lời khai đủ căn cứ phát hành yêu cầu chi/thu.
+- Không yêu cầu giấy giải trình trong bộ nộp ban đầu. Người dùng yêu cầu hoãn
+  phần giải trình để phát triển sau; chưa chốt bỏ cả câu hỏi/chuyển tiếp.
+
+Cần chốt vòng hiện tại (mỗi câu có đề xuất, chưa được coi là đáp án đã duyệt):
+- **Q32 — Policy lời xác nhận chi tiền:** chấp nhận lời xác nhận chịu trách nhiệm
+  của nhân viên cùng chứng từ dịch vụ làm căn cứ xử lý routine khi các điều kiện
+  khác đủ và không có mâu thuẫn trọng yếu; hiển thị đúng mức căn cứ, không gọi là
+  đã xác minh giao dịch ngân hàng. Đây là thay đổi so với yêu cầu căn cứ tiền của
+  §3/contracts §3, mang rủi ro không phát hiện được lời khai sai không có dấu hiệu.
+  Phạm vi/số tiền áp dụng và metric phải chốt ở vòng sau nếu chọn phương án này.
+- **Q33 — Giới hạn hoãn giải trình:** hoãn form giải trình tự do; giữ khả năng nêu
+  vấn đề/câu hỏi cụ thể, đúng người xử lý, cho sửa khai báo/bổ sung nguồn và kiểm
+  lại. Không tự kết luận đủ điều kiện cho nguồn thiếu/mâu thuẫn trọng yếu. Chưa
+  quyết định giữ/xóa UI/API trả lời hiện có. Đây là đề xuất tránh bỏ yêu cầu đề A.
+- **Q34 — Nguồn ngoài phạm vi employee-paid:** khi tài liệu cho thấy công ty trả
+  trực tiếp hoặc người trả thuộc bên khác, giữ nguồn và báo phần ngoài phạm vi;
+  không ép thành khoản nhân viên đã trả, không bỏ phần vật chất để kết luận tiền.
+
+Hệ quả dữ liệu dự kiến, chưa triển khai:
+- D01 routine mới: nhân viên khai đã trả khách sạn4.320.000 + taxi680.000 =5 triệu;
+  ứng thực nhận2, B8, lịch sử P/R đủ và bằng0; đề nghị chi3. Số tiền/kết luận gold
+  cuối phải theo Q32 đã chốt, không chỉ sao chép số đề nghị trên bảng kê.
+- Nếu giữ chi8 và chuyển toàn bộ thành nhân viên trả, A2 =>S6; vượt quyền tự tạo
+  yêu cầu4. Không giữ đáp án chi3 của dữ liệu cũ sau thay đổi đó.
+- D01/D06/D15 cùng các case có company-direct cần rà soát lại nguồn, T/E, budget,
+  route, gold và bộ chấm. Không xóa/ghi đè dữ liệu trong cuộc grill.
+
+Bước tiếp theo: người dùng trả lời Q32–Q34, sau đó hỏi các quyết định phụ thuộc
+về form, ranh giới tiền, trường hợp thiếu nguồn và acceptance. Chỉ khi hết câu
+hỏi mở và người dùng xác nhận tổng hợp mới sửa contracts/lập plan triển khai.

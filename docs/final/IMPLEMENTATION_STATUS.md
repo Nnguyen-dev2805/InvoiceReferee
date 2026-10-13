@@ -66,6 +66,10 @@ migration is a T10 clean-clone/runbook item, not done here).
 
 ## Evidence on demand
 
+### Planning handoff — 14/10/2026
+
+User-authorized documentation task: Hoangha OCR/classification/extraction/matching integration into `final`, ending before financial calculation/policy. [Implementation plan](../superpowers/plans/2026-10-13-hoangha-evidence-pipeline.md) and [review/disposition](reviews/2026-10-13/hoangha-evidence-plan-synthesis.md) are saved. Initial independent review was NOT READY; the response/closure closed residual R1–R4 at specification level. E0–E8 are **NOT_IMPLEMENTED**; no product tests, browser, LIVE call, commit or push ran in the planning task. Existing implementation evidence above is historical and does not prove the new pipeline. Next action: user reviews this plan, then an integrator completes E0's canonical evidence contract gate before dependent code tasks.
+
 - For this setup's observed checks, read [setup evidence](reviews/2026-10-13-agent-setup/SETUP_EVIDENCE.md).
 - For the setup review/closure, read [independent response](reviews/2026-10-13-agent-setup/RESPONSE.md); the original findings remain linked there.
 - For the reviewed plan's disputed clauses, read [plan disposition](reviews/2026-10-13-plan/SYNTHESIS.md).
