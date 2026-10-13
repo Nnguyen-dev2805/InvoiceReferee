@@ -212,6 +212,55 @@ async def test_unknown_advance_stays_waiting(app_fixture):
     assert v.conclusion is None or v.conclusion.status != "BALANCED"
 
 
+async def test_resume_does_not_reset_unresolved_execution(app_fixture):
+    # A handed-off payment whose execution is UNKNOWN must not be silently
+    # restarted as NOT_STARTED after Stop/Resume (contracts §6, §10.1). The
+    # instruction keeps its unknown execution and the case stays WAITING.
+    from invoice_referee.domain.case import CommandContext
+    from invoice_referee.domain.commands import Control, MarkExecution
+
+    v = await app_fixture.submit_packet("coverage-e6", mode="STUB")  # I4
+    root = v.id
+    inst_id = v.instructions[0].id
+
+    acct = app_fixture.workflow.start_session(
+        tenant="tenant:demo", persona="accountant", actor_id="employee:accountant-demo"
+    )
+
+    def ctx(cid: str) -> CommandContext:
+        return CommandContext(
+            session_id=acct.session_id,
+            actor_id="employee:accountant-demo",
+            command_id=cid,
+            expected_case_version=app_fixture._version(root),
+        )
+
+    marked = await app_fixture.workflow.execute(
+        ctx("cmd-mark-open"),
+        MarkExecution(
+            root_id=root,
+            instruction_id=inst_id,
+            execution_state="OPEN",
+            reason="đã chuyển khoản ngoài app",
+        ),
+    )
+    assert marked.case_view.instructions[0].execution_state == "OPEN"
+
+    await app_fixture.workflow.execute(
+        ctx("cmd-stop"), Control(root_id=root, action="STOP", reason="dừng")
+    )
+    resumed = await app_fixture.workflow.execute(
+        ctx("cmd-resume"), Control(root_id=root, action="RESUME", reason="tiếp tục")
+    )
+
+    active = [i for i in resumed.case_view.instructions if i.id == inst_id]
+    assert active, "a handed-off instruction must stay visible after resume"
+    assert active[0].execution_state == "UNKNOWN", (
+        "a handed-off unknown is not NOT_STARTED"
+    )
+    assert resumed.case_view.state == "WAITING"
+
+
 async def test_authority_update_invalidates_read_set(app_fixture):
     # A worker snapshots context_version, a context import bumps it, then the
     # worker's commit must not proceed on the stale read-set (contracts §10.3).

@@ -1346,8 +1346,12 @@ class CaseWorkflow:
         """
         root_id = str(row["id"])
         effect = result.allowed_effect
+        # A Stop suspends the actionable instruction; Resume must find it again
+        # rather than treat it as absent and re-issue (which would reset its
+        # unresolved execution, §6, §10.1).
         active = cx.execute(
-            "SELECT * FROM instructions WHERE root_id = ? AND status IN ('ISSUED','PARTIAL') "
+            "SELECT * FROM instructions WHERE root_id = ? "
+            "AND status IN ('ISSUED','PARTIAL','SUSPENDED','EXECUTION_UNKNOWN') "
             "ORDER BY created_at DESC LIMIT 1",
             (root_id,),
         ).fetchone()
@@ -1358,7 +1362,19 @@ class CaseWorkflow:
             remaining = max(int(active["amount"]) - int(active["fulfilled_amount"]), 0)
             same_amount = remaining == effect.amount
             if same_basis and same_direction and same_amount:
-                # Nothing material changed: keep the same instruction.
+                # Nothing material changed: keep the same instruction. A suspended
+                # remainder is reactivated, but a handed-off unresolved execution
+                # stays UNKNOWN and keeps the case waiting for external proof.
+                if active["status"] in ("SUSPENDED", "EXECUTION_UNKNOWN"):
+                    reactivated = (
+                        "PARTIAL" if int(active["fulfilled_amount"]) > 0 else "ISSUED"
+                    )
+                    cx.execute(
+                        "UPDATE instructions SET status = ?, updated_at = ? WHERE id = ?",
+                        (reactivated, now, str(active["id"])),
+                    )
+                    if active["execution_state"] in ("OPEN", "UNKNOWN"):
+                        return "WAITING"
                 return "READY_TO_EXECUTE"
             if active["execution_state"] in ("OPEN", "UNKNOWN"):
                 # Cannot replace an instruction whose execution is unresolved.
@@ -1371,7 +1387,7 @@ class CaseWorkflow:
         # Supersede any current actionable remainder, then issue the full abs(S).
         cx.execute(
             "UPDATE instructions SET status = 'SUPERSEDED', updated_at = ? "
-            "WHERE root_id = ? AND status IN ('ISSUED','PARTIAL')",
+            "WHERE root_id = ? AND status IN ('ISSUED','PARTIAL','SUSPENDED','EXECUTION_UNKNOWN')",
             (now, root_id),
         )
         self._issue_instruction(cx, session, row, result, now, active)
@@ -1388,9 +1404,14 @@ class CaseWorkflow:
     ) -> None:
         effect = result.allowed_effect
         root_id = str(row["id"])
-        instruction_id = f"instruction:{hashlib.sha256((root_id + result.cost_basis).encode()).hexdigest()[:16]}"
+        # A distinct id per issuance event: a retained/superseded instruction is
+        # never overwritten by a later order on the same cost basis (§10.1 keeps
+        # old instructions and their fulfillment). Idempotency is provided by the
+        # retain path, which reuses the existing row without re-issuing.
+        basis_digest = hashlib.sha256((root_id + result.cost_basis).encode()).hexdigest()[:16]
+        instruction_id = f"instruction:{basis_digest}:{uuid.uuid4().hex[:8]}"
         cx.execute(
-            "INSERT OR REPLACE INTO instructions (id, tenant, root_id, direction, amount, "
+            "INSERT INTO instructions (id, tenant, root_id, direction, amount, "
             "status, basis, cost_basis, supersedes_id, fulfilled_amount, execution_state, "
             "created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'ISSUED', ?, ?, ?, 0, "
             "'NOT_STARTED', ?, ?)",
