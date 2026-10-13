@@ -37,6 +37,29 @@ def build_workflow(
     return workflow, digest
 
 
+def wire_live_read(workflow: CaseWorkflow, *, uploads_dir: str, settings: Settings) -> None:
+    """Connect the real read->transcription pipeline for LIVE mode (§5, §8).
+
+    The reader reads the uploaded sources (native PDF text or Mistral OCR) and
+    the pipeline turns the text into the transcription the Reconciler assesses.
+    The read runs outside the DB transaction.
+    """
+    from invoice_referee.evidence.live_reader import MistralPageReader
+    from invoice_referee.evidence.pipeline import transcribe_root
+    from invoice_referee.evidence.trace import RunBudget
+
+    async def transcriber(*, sources, budget=None, provider_mode="LIVE"):
+        reader = MistralPageReader(
+            uploads_dir=uploads_dir, settings=settings, budget=budget or RunBudget()
+        )
+        return await transcribe_root(
+            reader=reader, sources=sources, budget=budget or RunBudget(),
+            provider_mode=provider_mode,
+        )
+
+    workflow.enable_live_read(transcriber, provider_mode="LIVE")
+
+
 def format_diagnostics(
     *,
     mode: str,
@@ -98,6 +121,9 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     workflow, digest = build_workflow(args.db, args.uploads, args.context)
+    if mode == "LIVE":
+        # A LIVE submit reads the uploaded sources; there is no STUB fallback.
+        wire_live_read(workflow, uploads_dir=args.uploads, settings=settings)
     app = create_app(
         workflow, mode=mode, settings=settings, frontend_dir=FRONTEND_DIST
     )

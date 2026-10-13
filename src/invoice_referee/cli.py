@@ -133,7 +133,27 @@ def _run_evaluate(argv: list[str]) -> int:
         workflow = CaseWorkflow(db, uploads_dir=output_dir / "uploads")
         context_path = PROJECT_ROOT / "data" / "demo" / "company-context.json"
         workflow.import_demo_context(context_path, origin="SIMULATED")
-        runner = EvaluationRunner(workflow=workflow)
+        transcriber = None
+        if mode == "LIVE":
+            # A LIVE evaluation reads the packet sources through the real
+            # reader; a missing read stays unresolved, never a STUB fallback.
+            from invoice_referee.evidence.live_reader import MistralPageReader
+            from invoice_referee.evidence.pipeline import transcribe_root
+            from invoice_referee.evidence.trace import RunBudget
+
+            uploads_dir = output_dir / "uploads"
+
+            async def transcriber(*, sources, budget=None, provider_mode="LIVE"):
+                return await transcribe_root(
+                    reader=MistralPageReader(
+                        uploads_dir=uploads_dir, settings=settings, budget=budget or RunBudget()
+                    ),
+                    sources=sources,
+                    budget=budget or RunBudget(),
+                    provider_mode=provider_mode,
+                )
+
+        runner = EvaluationRunner(workflow=workflow, transcriber=transcriber)
         scorer = IndependentScorer()
         rows = []
         actuals = []

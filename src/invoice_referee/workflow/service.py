@@ -315,6 +315,19 @@ class CaseWorkflow:
         self.uploads_dir = Path(uploads_dir)
         self.max_source_bytes = max_source_bytes
         self._clock = clock or (lambda: datetime.now(UTC))
+        # The LIVE read seam (contracts §5, §8). Unset => the STUB/dev path reads
+        # a seeded transcription. When set, submit reads the uploaded sources.
+        self._transcriber: Callable[..., object] | None = None
+        self._provider_mode: str = "STUB"
+
+    def enable_live_read(self, transcriber: Callable[..., object], *, provider_mode: str) -> None:
+        """Wire a read->transcription callable so submit reads real sources.
+
+        The callable receives keyword args (sources, budget, provider_mode) and
+        returns a ``ReadOutcome``. It runs outside the DB transaction (§6).
+        """
+        self._transcriber = transcriber
+        self._provider_mode = provider_mode
 
     def _now_iso(self) -> str:
         return self._clock().isoformat()
@@ -572,6 +585,12 @@ class CaseWorkflow:
             raise UnsupportedCommandError(
                 f"Lệnh {command.kind} chưa được triển khai trong phạm vi T2."
             )
+        # The LIVE read happens outside the mutation transaction (§6): a submit
+        # in LIVE reads the uploaded sources and persists the resulting
+        # transcription before assessment. Provider I/O never runs inside the
+        # BEGIN IMMEDIATE block.
+        if command.kind == "SUBMIT" and self._transcriber is not None:
+            await self._read_sources_for_submit(session, command.root_id)
         fingerprint = _fingerprint(context, command)
         with self.db.transaction() as cx:
             stored = cx.execute(
@@ -601,6 +620,57 @@ class CaseWorkflow:
                 ),
             )
             return result
+
+    async def _read_sources_for_submit(self, session: DemoSession, root_id: str) -> None:
+        """Read the root's sources (LIVE) and persist the transcription (§5, §6).
+
+        Runs outside the mutation transaction. A run with no readable page
+        persists nothing, so the assessment keeps the case unresolved rather
+        than settling on a fabricated zero.
+        """
+        from invoice_referee.domain.evidence import SourceRef
+        from invoice_referee.evidence.trace import RunBudget
+
+        connection = self.db.connect()
+        try:
+            row = connection.execute(
+                "SELECT * FROM cases WHERE id = ? AND tenant = ?",
+                (root_id, session.tenant),
+            ).fetchone()
+            if row is None:
+                return
+            sources = tuple(
+                SourceRef(
+                    id=source["source_id"],
+                    digest=source["digest"],
+                    tenant=source["tenant"],
+                    media=source["media"],
+                    storage_key=source["storage_key"],
+                )
+                for source in connection.execute(
+                    "SELECT * FROM case_sources WHERE root_id = ? ORDER BY attached_at, source_id",
+                    (root_id,),
+                )
+            )
+        finally:
+            connection.close()
+        if not sources:
+            return
+        assert self._transcriber is not None
+        outcome = await self._transcriber(
+            sources=sources,
+            budget=RunBudget(),
+            provider_mode=self._provider_mode,
+        )
+        transcription = getattr(outcome, "transcription", None)
+        if transcription is None:
+            return
+        with self.db.transaction() as cx:
+            cx.execute(
+                "INSERT OR REPLACE INTO case_transcriptions (root_id, transcription_json, "
+                "created_at) VALUES (?, ?, ?)",
+                (root_id, transcription.model_dump_json(), self._now_iso()),
+            )
 
     def _create_draft(
         self,
@@ -1544,6 +1614,12 @@ class CaseWorkflow:
         ).fetchone()
         if row is not None and row["transcription_json"]:
             return Transcription.model_validate_json(row["transcription_json"])
+        # When a LIVE reader is wired, the read result is authoritative: a STUB
+        # transcription seeded for the demo path must not be consulted, so a
+        # failed read stays unresolved instead of falling back to fake input
+        # (contracts §5, §8).
+        if self._transcriber is not None:
+            return None
         # Fall back to the activity's demo STUB transcription (dev/UI path).
         case = cx.execute(
             "SELECT tenant, activity FROM cases WHERE id = ?", (root_id,)

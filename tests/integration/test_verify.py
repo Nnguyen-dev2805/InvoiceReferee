@@ -44,3 +44,15 @@ async def test_run_suite_reports_counts(app_fixture, tmp_path: Path):
     assert isinstance(report, SuiteReport)
     assert report.suite == "core"
     assert report.total == 1
+
+
+async def test_non_stub_run_does_not_use_seeded_transcription(app_fixture, tmp_path: Path):
+    # A LIVE/RECORDED_REPLAY run without a real reader must not consume the
+    # packet's seeded STUB transcription: it reads nothing and stays unresolved
+    # (contracts §5, §8), rather than settling on fake input.
+    packet = app_fixture.write_packet(tmp_path, name="travel-clean")
+    packet_input = load_input(packet)
+    runner = EvaluationRunner(workflow=app_fixture.workflow)  # no transcriber
+    actual = await runner.run(packet_input, mode="LIVE")
+    assert actual.instructions == ()
+    assert actual.state != "SETTLED"

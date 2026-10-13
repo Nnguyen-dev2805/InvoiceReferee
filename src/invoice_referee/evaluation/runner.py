@@ -71,12 +71,29 @@ def actual_from_view(view, packet: PacketInput, *, mode: str, elapsed_ms: float)
     )
 
 
+async def _no_read_transcriber(*, sources, budget=None, provider_mode="LIVE"):
+    """A non-STUB run with no reader wired: read nothing, honestly.
+
+    It returns a ReadOutcome with no transcription, so the case stays
+    unresolved rather than consuming a seeded STUB row (contracts §5, §8).
+    """
+    from invoice_referee.evidence.pipeline import ReadOutcome
+
+    return ReadOutcome(
+        transcription=None, read_pages=0, unread_pages=len(sources), provider_mode=provider_mode
+    )
+
+
 class EvaluationRunner:
     """Runs packets through the application workflow and reports actual results."""
 
-    def __init__(self, *, workflow, transcription_for=None) -> None:
+    def __init__(self, *, workflow, transcription_for=None, transcriber=None) -> None:
         self.workflow = workflow
         self._transcription_for = transcription_for
+        # A real read->transcription callable for LIVE/RECORDED_REPLAY runs. When
+        # absent, a non-STUB run is honest: it does not fall back to a seeded
+        # STUB transcription (contracts §5, §8).
+        self._transcriber = transcriber
 
     async def run(self, packet: PacketInput, mode: str) -> ActualResult:
         """Run one packet; returns what the app actually produced."""
@@ -85,17 +102,19 @@ class EvaluationRunner:
         start = time.monotonic()
         # The runner uses the workflow's own submit path via the app fixture
         # contract: it never injects observations or gold corrections.
-        view = await self._drive(packet)
+        view = await self._drive(packet, mode)
         return actual_from_view(
             view, packet, mode=mode, elapsed_ms=(time.monotonic() - start) * 1000
         )
 
-    async def _drive(self, packet: PacketInput):
+    async def _drive(self, packet: PacketInput, mode: str = "STUB"):
         """Drive the workflow for a packet using its real command surface.
 
         Creates the root for the packet's activity, attaches the raw sources,
         and submits — the same path the app uses. No observation or gold value
-        is injected.
+        is injected. In a non-STUB mode a real transcriber is wired so the
+        submit reads the sources; without one the run is honestly unread rather
+        than falling back to a seeded STUB transcription (§5, §8).
         """
         from invoice_referee.domain.case import CommandContext
         from invoice_referee.domain.commands import (
@@ -127,6 +146,16 @@ class EvaluationRunner:
         # hand-transcription) so a STUB run assesses real input. This is
         # input-layer data, never a gold/expected value.
         self._seed_context(packet, tenant)
+
+        # A non-STUB run must read the sources, not the seeded STUB row. Wire
+        # the injected transcriber (LIVE) or an explicit "no read" so a real
+        # mode cannot silently consume the STUB transcription.
+        if mode == "STUB":
+            self.workflow._transcriber = None
+        else:
+            self.workflow.enable_live_read(
+                self._transcriber or _no_read_transcriber, provider_mode=mode
+            )
 
         created = await self.workflow.execute(
             ctx(0),
