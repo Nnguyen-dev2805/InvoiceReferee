@@ -20,9 +20,11 @@ from invoice_referee.domain.commands import (
     AnswerIssue,
     AttachSources,
     CommandResult,
+    Control,
     CreateDraft,
     Decide,
     Declaration,
+    Override,
     RecordActual,
     SourceUpload,
     Submit,
@@ -304,7 +306,7 @@ async def answer_issue(
 ) -> CommandResult:
     session = _require_session(request)
     workflow = _workflow(request)
-    context = _command_context(request, session, require_version=False)
+    context = _command_context(request, session, require_version=True)
     return await workflow.execute(
         context,
         AnswerIssue(
@@ -366,6 +368,43 @@ async def record_actual(
                 completion_claim=money.completion_claim,
                 reverses_event_id=money.reverses_event_id,
                 reason=money.reason,
+            ),
+        ),
+    )
+
+
+@router.post("/cases/{root_id}/control")
+async def control_case(
+    request: Request, root_id: str, payload: views.ControlRequest
+) -> CommandResult:
+    session = _require_session(request)
+    workflow = _workflow(request)
+    # STOP is a control signal: it is not guarded by expected_case_version.
+    context = _command_context(request, session, require_version=False)
+    return await workflow.execute(
+        context, Control(root_id=root_id, action=payload.action, reason=payload.reason)
+    )
+
+
+@router.post("/cases/{root_id}/override")
+async def override_case(
+    request: Request, root_id: str, payload: views.OverrideRequest
+) -> CommandResult:
+    session = _require_session(request)
+    workflow = _workflow(request)
+    context = _command_context(request, session, require_version=False)
+    return await workflow.execute(
+        context,
+        Override(
+            root_id=root_id,
+            supersedes_decision_id=payload.supersedes_decision_id,
+            decision=DecisionCommand(
+                issue_ids=tuple(payload.issue_ids),
+                basis_id=payload.basis_id,
+                actions=tuple(payload.actions),
+                effect_scope=payload.effect_scope,
+                amount=payload.amount,
+                reason=payload.reason,
             ),
         ),
     )

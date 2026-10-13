@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { api, errorMessage } from "./api";
 import { Approval } from "./features/approval";
+import { Controls } from "./features/controls";
 import { Dossier } from "./features/dossier";
 import { Execution } from "./features/execution";
 import { Intake } from "./features/intake";
@@ -77,6 +78,7 @@ export default function App() {
           <Questions caseView={caseView} onCase={setCaseView} />
           <Approval caseView={caseView} />
           <Execution caseView={caseView} onCase={setCaseView} />
+          <Controls caseView={caseView} onCase={setCaseView} />
           <Dossier caseView={caseView} />
         </main>
       )}

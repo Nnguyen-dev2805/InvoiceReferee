@@ -127,6 +127,16 @@ TEST_PACKETS: dict[str, dict[str, object]] = {
             {"field": "economic_key", "value": "invoice:money-i4", "role": "INVOICE"},
         ],
     },
+    # E2/A2 => S0 with clean coverage => BALANCED/SETTLED, no instruction.
+    "balanced-clean": {
+        "facts": [
+            {"field": "incurred", "value": 2_000_000, "role": "INVOICE"},
+            {"field": "paid_employee", "value": 2_000_000, "role": "PAYMENT"},
+            {"field": "advance", "value": 2_000_000, "role": "ADVANCE"},
+            {"field": "coverage", "value": 1, "role": "LEDGER"},
+            {"field": "economic_key", "value": "invoice:balanced", "role": "INVOICE"},
+        ],
+    },
 }
 
 
@@ -146,6 +156,7 @@ class AppFixture:
             max_source_bytes=4096,
         )
         self.workflow.import_demo_context(DEMO_CONTEXT_PATH, origin="SIMULATED")
+        self.context_path = DEMO_CONTEXT_PATH
         self.app = create_app(self.workflow, mode="STUB", frontend_dir=None)
         self._transport = ASGITransport(app=self.app)
         self._clients: list[AsyncClient] = []
@@ -266,6 +277,7 @@ class AppFixture:
         # missing budget) drives the outcome; the packet name only selects input.
         created = await self.create(employee=DEFAULT_ACTOR, activity=activity)
         root = created.case_view.id
+        self._last_root = root
         # Seed the STUB transcription (hand-transcribed literal reading).
         transcription = Transcription(
             facts=tuple(
@@ -340,6 +352,53 @@ class AppFixture:
     def _version(self, root_id: str) -> int:
         row = self.query_one("SELECT version FROM cases WHERE id = ?", (root_id,))
         return int(row["version"])
+
+    # -- T8 control helpers (contracts §9) -----------------------------------
+    async def hold_reader(self) -> None:
+        """Arm the gate a late worker waits on before it may commit."""
+        import asyncio
+
+        self._reader_gate = asyncio.Event()
+
+    async def release_reader(self) -> None:
+        if getattr(self, "_reader_gate", None) is not None:
+            self._reader_gate.set()
+
+    async def late_submit(self, root_id: str, activity: str) -> CaseView:
+        """A worker that waits on the reader gate, then submits (may be stale)."""
+        await self._reader_gate.wait()
+        result = await self.workflow.execute(
+            self.ctx(actor=DEFAULT_ACTOR, expected_case_version=self._version(root_id)),
+            Submit(
+                root_id=root_id,
+                declaration=Declaration(activity_id=activity, declared_purpose="Công tác"),
+            ),
+        )
+        return result.case_view
+
+    async def stop(self) -> CaseView:
+        from invoice_referee.domain.case import CommandContext
+        from invoice_referee.domain.commands import Control
+
+        root = self._last_root
+        session = self.workflow.start_session(
+            tenant=TENANT_DEMO, persona="accountant", actor_id="employee:accountant-demo"
+        )
+        ctx = CommandContext(
+            session_id=session.session_id,
+            actor_id="employee:accountant-demo",
+            command_id=f"cmd:{uuid.uuid4().hex}",
+            expected_case_version=0,
+        )
+        result = await self.workflow.execute(ctx, Control(root_id=root, action="STOP", reason="dừng"))
+        return result.case_view
+
+    def current_instructions(self) -> list[str]:
+        rows = self.query_one(
+            "SELECT COUNT(*) AS n FROM instructions WHERE status IN ('ISSUED','PARTIAL')"
+        )
+        count = int(rows["n"])
+        return ["instruction"] * count
 
     # -- T7 money helpers (contracts §9) -------------------------------------
     async def record_received(

@@ -219,7 +219,7 @@ async def test_actual_overpay_not_clipped(app_fixture):
 
 **Files:** src/invoice_referee/workflow/controls.py,jobs.py,service.py,db.py,snapshots.py,schema.sql; src/invoice_referee/domain/commands.py,case.py; src/invoice_referee/api/routes.py,views.py; tests/integration/test_controls_races.py,test_restart.py; frontend/e2e/controls-audit.spec.ts.
 **Produces:** execute(Control/override), persistent recovery/audit.
-- [ ] Tests Stop-before-lateworker noinstruction, stale-view STOP accepted, stale answer doesn't overwrite A, crash-aftercommit duplicate result, shared ledger/context/usage versions stale, handed-off unknown resume not reissue, issuer expiry fulfill no re-approve but revoke suspend, source after settled revision retains actual.
+- [x] Tests Stop-before-lateworker noinstruction, stale-view STOP accepted, stale answer doesn't overwrite A, crash-aftercommit duplicate result, shared ledger/context/usage versions stale, handed-off unknown resume not reissue, issuer expiry fulfill no re-approve but revoke suspend, source after settled revision retains actual.
 ```python
 async def test_stop_wins_over_late_worker(app_fixture):
     await app_fixture.hold_reader()
@@ -227,13 +227,13 @@ async def test_stop_wins_over_late_worker(app_fixture):
     await app_fixture.release_reader()
     assert app_fixture.current_instructions() == []
 ```
-- [ ] RED: `rtk proxy uv run pytest tests/integration/test_controls_races.py tests/integration/test_restart.py -q`.
-- [ ] Atomic epoch/read-set/transitions, no provider I/O in transaction; persisted leases/retry counters,1active/root/2workers. Restart source cache, not financialeffects. Late result inactive audit only.
-- [ ] Snapshot policy/grant/input by value/hash/version, oldbasis remainsafterchanges. CancelCHI4 leavesincurredT4, noactualcost release.
-- [ ] test_authority_update_invalidates_read_set: snapshot B14/grant→barrier→B8/revoke import tăng context_version→worker release: không stale commit. test_command_payload_conflict: same tenant/actor/command, payload đổi amount/root ⇒409; same payload replay một historical result; tenant khác không leak.
-- [ ] Override tagged DTO/API theo §9/§10.3; cancel chỉ suspend/supersede, không xóa actual. test_balanced_requires_all_gates: known E2/A2/coverage sạch ⇒ persisted BALANCED/SETTLED; unknown A không instruction vẫn WAITING; processing problem material không affirmative; unrelated source không blanket block.
-- [ ] GREEN + backend restart mid-job and headed Stop/Resume/valid/deniedOverride audit actor/time/input/why/before-after.
-- [ ] Commit "feat: enforce durable control and immutable audit".
+- [x] RED: `rtk proxy uv run pytest tests/integration/test_controls_races.py tests/integration/test_restart.py -q`.
+- [x] Atomic epoch/read-set/transitions, no provider I/O in transaction; persisted leases/retry counters,1active/root/2workers. Restart source cache, not financialeffects. Late result inactive audit only.
+- [x] Snapshot policy/grant/input by value/hash/version, oldbasis remainsafterchanges. CancelCHI4 leavesincurredT4, noactualcost release.
+- [x] test_authority_update_invalidates_read_set: snapshot B14/grant→barrier→B8/revoke import tăng context_version→worker release: không stale commit. test_command_payload_conflict: same tenant/actor/command, payload đổi amount/root ⇒409; same payload replay một historical result; tenant khác không leak.
+- [x] Override tagged DTO/API theo §9/§10.3; cancel chỉ suspend/supersede, không xóa actual. test_balanced_requires_all_gates: known E2/A2/coverage sạch ⇒ persisted BALANCED/SETTLED; unknown A không instruction vẫn WAITING; processing problem material không affirmative; unrelated source không blanket block.
+- [x] GREEN + backend restart mid-job and headed Stop/Resume/valid/deniedOverride audit actor/time/input/why/before-after.
+- [x] Commit "feat: enforce durable control and immutable audit".
 **Gate:** Actual injected race/crash behavior, not just UI button labels.
 
 ### T9 — Independent scoring, baseline and Verify

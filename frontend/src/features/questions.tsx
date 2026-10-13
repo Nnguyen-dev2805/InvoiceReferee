@@ -28,13 +28,17 @@ export function QuestionCard({
     setBusy(true);
     setError(null);
     try {
-      const result = await answerIssue(caseView.id, {
-        issue_id: issue.id,
-        basis_id: `basis:${issue.id}`,
-        answer_kind: issue.kind,
-        value,
-        reason: reason || "Trả lời từ thẻ câu hỏi",
-      });
+      const result = await answerIssue(
+        caseView.id,
+        {
+          issue_id: issue.id,
+          basis_id: `basis:${issue.id}`,
+          answer_kind: issue.kind,
+          value,
+          reason: reason || "Trả lời từ thẻ câu hỏi",
+        },
+        caseView.version,
+      );
       onCase(result.case_view);
     } catch (cause) {
       setError(errorMessage(cause));

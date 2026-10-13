@@ -69,7 +69,7 @@ async def test_answer_over_http_wrong_owner_conflicts(app_fixture):
             "value": "employee:employee-a",
             "reason": "tôi trả",
         },
-        headers={"X-Command-Id": "cmd-ans"},
+        headers={"X-Command-Id": "cmd-ans", "X-Expected-Version": str(v.version)},
     )
     # Employee is not the accountant owner -> the answer is not applied.
     assert response.status_code == 400

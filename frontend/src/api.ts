@@ -83,8 +83,26 @@ export async function answerIssue(
     value: string | number | null;
     reason: string;
   },
+  version: number,
 ): Promise<CommandResultView> {
-  return request<CommandResultView>(`/api/cases/${rootId}/answers`, body, newCommandId());
+  return request<CommandResultView>(
+    `/api/cases/${rootId}/answers`,
+    body,
+    newCommandId(),
+    version,
+  );
+}
+
+export async function controlCase(
+  rootId: string,
+  action: "STOP" | "RESUME",
+  reason: string,
+): Promise<CommandResultView> {
+  return request<CommandResultView>(
+    `/api/cases/${rootId}/control`,
+    { action, reason },
+    newCommandId(),
+  );
 }
 
 export async function recordActual(

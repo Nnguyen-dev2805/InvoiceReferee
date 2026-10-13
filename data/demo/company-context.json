@@ -74,6 +74,27 @@
         { "field": "incurred", "value": 5000000, "role": "INVOICE", "quote": "Tổng chi 5.000.000" },
         { "field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn" }
       ]
+    },
+    {
+      "id": "activity:travel-e",
+      "name": "Công tác Huế",
+      "occurred_at": "2026-10-28T09:00:00+07:00",
+      "purpose": "Làm việc với đối tác Huế",
+      "status": "AUTHORIZED",
+      "budget": {
+        "amount": 8000000,
+        "effect_from": "2026-10-01T00:00:00+07:00",
+        "record_key": "budget:travel-e",
+        "quote": "Ngân sách hoạt động Công tác Huế: 8.000.000 VND."
+      },
+      "transcription": [
+        { "field": "incurred", "value": 8000000, "role": "INVOICE", "quote": "Tổng chi 8.000.000" },
+        { "field": "paid_employee", "value": 5000000, "role": "PAYMENT", "quote": "Nhân viên trả 5.000.000" },
+        { "field": "paid_company", "value": 3000000, "role": "PAYMENT", "quote": "Công ty trả 3.000.000" },
+        { "field": "advance", "value": 2000000, "role": "ADVANCE", "quote": "Ứng 2.000.000" },
+        { "field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn" },
+        { "field": "economic_key", "value": "invoice:travel-e", "role": "INVOICE", "quote": "Hóa đơn travel-e" }
+      ]
     }
   ],
   "grants": [

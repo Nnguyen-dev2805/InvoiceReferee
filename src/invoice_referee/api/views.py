@@ -92,6 +92,21 @@ class RecordActualRequest(ApiModel):
     money: MoneyInput
 
 
+class ControlRequest(ApiModel):
+    action: Literal["STOP", "RESUME"]
+    reason: str
+
+
+class OverrideRequest(ApiModel):
+    supersedes_decision_id: str
+    issue_ids: list[str]
+    basis_id: str
+    actions: list[str]
+    effect_scope: str
+    amount: int | None = None
+    reason: str
+
+
 def session_payload(
     workflow: CaseWorkflow,
     session: DemoSession,

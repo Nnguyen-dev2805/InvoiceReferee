@@ -33,9 +33,11 @@ from invoice_referee.domain.commands import (
     AttachSources,
     CaseCommand,
     CommandResult,
+    Control,
     CreateDraft,
     Decide,
     MarkExecution,
+    Override,
     RecordActual,
     ReviseDeclaration,
     Submit,
@@ -44,6 +46,12 @@ from invoice_referee.domain.common import Fact, SignedVnd, Vnd
 from invoice_referee.domain.evidence import SourceRef
 from invoice_referee.domain.finance import MoneyEvent, Projection
 from invoice_referee.domain.issues import BusinessIssue
+from invoice_referee.workflow.controls import (
+    StaleControlError,
+    assert_epoch_current,
+    bump_epoch,
+    context_version,
+)
 from invoice_referee.workflow.db import Database
 from invoice_referee.workflow.money import can_reverse, net_by_kind
 
@@ -556,6 +564,8 @@ class CaseWorkflow:
             "DECIDE": self._decide,
             "RECORD_ACTUAL": self._record_actual,
             "MARK_EXECUTION": self._mark_execution,
+            "CONTROL": self._control,
+            "OVERRIDE": self._override,
         }
         handler = handlers.get(command.kind)
         if handler is None:
@@ -751,6 +761,9 @@ class CaseWorkflow:
         command: AnswerIssue,
     ) -> CommandResult:
         row = self._require_root(cx, session, command.root_id)
+        # A stale answer is rejected (its history is kept in the command log but
+        # it must not overwrite newer state) — contracts §6.
+        self._require_version(row, context.expected_case_version)
         answer = command.answer
         issue = cx.execute(
             "SELECT * FROM case_issues WHERE id = ? AND root_id = ?",
@@ -948,6 +961,97 @@ class CaseWorkflow:
         )
         return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
 
+    def _control(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        context: CommandContext,
+        command: Control,
+    ) -> CommandResult:
+        row = self._require_root(cx, session, command.root_id)
+        # STOP is a control signal allowed on the newest version after the actor
+        # and idempotency checks; it is not guarded by expected_case_version.
+        if session.persona not in ("accountant", "approver"):
+            raise UnsupportedCommandError("Chỉ kế toán/người có quyền dừng hồ sơ.")
+        now = self._now_iso()
+        root_id = str(row["id"])
+        bump_epoch(cx, root_id, now)
+        if command.action == "STOP":
+            # Suspend pending instructions; a handed-off one becomes unknown
+            # until its execution is checked (§6).
+            cx.execute(
+                "UPDATE instructions SET status = 'SUSPENDED', "
+                "execution_state = CASE WHEN execution_state IN ('OPEN','UNKNOWN') "
+                "THEN 'UNKNOWN' ELSE execution_state END, updated_at = ? "
+                "WHERE root_id = ? AND status IN ('ISSUED','PARTIAL')",
+                (now, root_id),
+            )
+            cx.execute(
+                "UPDATE cases SET state = 'STOPPED', updated_at = ? WHERE id = ?",
+                (now, root_id),
+            )
+        else:  # RESUME
+            cx.execute(
+                "UPDATE cases SET state = 'WAITING', updated_at = ? WHERE id = ?",
+                (now, root_id),
+            )
+            self._assess_and_commit(cx, session, self._reload(cx, row), now)
+        self._audit(
+            cx,
+            tenant=session.tenant,
+            root_id=root_id,
+            session_id=session.session_id,
+            actor=context.actor_id,
+            action=command.action,
+            detail=json.dumps({"reason": command.reason}, ensure_ascii=False),
+        )
+        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
+    def _override(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        context: CommandContext,
+        command: Override,
+    ) -> CommandResult:
+        row = self._require_root(cx, session, command.root_id)
+        decision = command.decision
+        # An override needs the exact grant for its actions (§5, §10.3).
+        for action in decision.actions:
+            if not self._actor_has_grant(
+                cx, session.tenant, context.actor_id, action, decision.effect_scope
+            ):
+                raise UnsupportedCommandError(
+                    f"Không có quyền thực hiện {action} trong phạm vi này."
+                )
+        now = self._now_iso()
+        root_id = str(row["id"])
+        # A new scoped decision; the old decision is retained, facts and actual
+        # money are never rewritten.
+        for issue_id in decision.issue_ids:
+            cx.execute(
+                "UPDATE case_issues SET status = 'RESOLVED', updated_at = ? WHERE id = ?",
+                (now, issue_id),
+            )
+        self._audit(
+            cx,
+            tenant=session.tenant,
+            root_id=root_id,
+            session_id=session.session_id,
+            actor=context.actor_id,
+            action="OVERRIDE",
+            detail=json.dumps(
+                {
+                    "supersedes": command.supersedes_decision_id,
+                    "actions": list(decision.actions),
+                    "reason": decision.reason,
+                },
+                ensure_ascii=False,
+            ),
+        )
+        self._assess_and_commit(cx, session, self._reload(cx, row), now)
+        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
     def _load_money_events(
         self, cx: sqlite3.Connection, tenant: str, root_id: str
     ) -> tuple[MoneyEvent, ...]:
@@ -1065,6 +1169,10 @@ class CaseWorkflow:
         from invoice_referee.workflow.snapshots import build_assessment_input
 
         root_id = str(row["id"])
+        # Stop is atomic with the commit: a worker whose snapshot predates a
+        # Stop must not create a new instruction (contracts §6).
+        if str(row["state"]) == "STOPPED":
+            return
         transcription = self._transcription_for(cx, root_id)
         assessment_input = build_assessment_input(
             cx,
