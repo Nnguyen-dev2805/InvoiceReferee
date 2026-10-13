@@ -95,6 +95,9 @@ CREATE TABLE IF NOT EXISTS context_grants (
     actor          TEXT NOT NULL,
     actions_json   TEXT NOT NULL,
     scope          TEXT NOT NULL,
+    -- Profiles this grant is valid for (contracts §5, plan R3): a grant for a
+    -- different profile never authorizes this activity. Empty = all profiles.
+    allowed_profiles_json TEXT NOT NULL DEFAULT '[]',
     max_amount     INTEGER NOT NULL,
     effective_from TEXT NOT NULL,
     effective_to   TEXT,

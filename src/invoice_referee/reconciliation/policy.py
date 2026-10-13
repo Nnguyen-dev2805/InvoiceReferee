@@ -93,6 +93,13 @@ def _scope_covers(input: AssessmentInput, grant_scope: str) -> bool:
     return grant_scope in (input.scope.activity, input.scope.tenant)
 
 
+def _profile_covers(input: AssessmentInput, grant: Grant) -> bool:
+    """A grant with an explicit allowed_profiles list only covers those (R3)."""
+    if not grant.allowed_profiles:
+        return True
+    return input.scope.profile in grant.allowed_profiles
+
+
 def _grant_covers(
     input: AssessmentInput, action: str, amount: int, actor: str | None = None
 ) -> bool:
@@ -103,6 +110,8 @@ def _grant_covers(
         if actor is not None and grant.actor != actor:
             continue
         if not _scope_covers(input, grant.scope):
+            continue
+        if not _profile_covers(input, grant):
             continue
         if grant.effective_from <= when and (grant.effective_to is None or when <= grant.effective_to):
             if grant.max_amount >= amount:
@@ -116,6 +125,8 @@ def _has_grant_ignoring_amount(input: AssessmentInput, action: str) -> bool:
         if action not in grant.actions:
             continue
         if not _scope_covers(input, grant.scope):
+            continue
+        if not _profile_covers(input, grant):
             continue
         if grant.effective_from <= when and (grant.effective_to is None or when <= grant.effective_to):
             return True

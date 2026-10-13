@@ -53,7 +53,8 @@ from invoice_referee.workflow.controls import (
     context_version,
 )
 from invoice_referee.workflow.db import Database
-from invoice_referee.workflow.money import can_reverse, net_by_kind
+from invoice_referee.workflow.money import can_reverse, net_by_kind, verify_money_claim
+from invoice_referee.workflow.instructions import InstructionState, reconcile_instruction
 
 DEFAULT_TENANT = "tenant:demo"
 DEFAULT_PERSONA = "employee"
@@ -166,6 +167,38 @@ def _context_issue(root_id: str) -> BusinessIssue:
     )
 
 
+def _instruction_state(row: sqlite3.Row) -> "InstructionState":
+    """Build the pure InstructionState the reconcile decision reads (§10.1)."""
+    from invoice_referee.workflow.instructions import InstructionState
+
+    return InstructionState(
+        id=str(row["id"]),
+        direction=str(row["direction"]),
+        amount=int(row["amount"]),
+        cost_basis=str(row["cost_basis"]),
+        fulfilled_amount=int(row["fulfilled_amount"]),
+        execution_state=str(row["execution_state"]),
+        status=str(row["status"]),
+    )
+
+
+def _profile_allowed(grant: sqlite3.Row, profile: str | None) -> bool:
+    """A grant with an explicit allowed_profiles list only covers those profiles.
+
+    An empty list means the grant is profile-agnostic (plan R3). A grant for a
+    different profile never authorizes this activity.
+    """
+    if profile is None:
+        return True
+    try:
+        allowed = json.loads(grant["allowed_profiles_json"] or "[]")
+    except (KeyError, IndexError):
+        return True
+    if not allowed:
+        return True
+    return profile in allowed
+
+
 def _owner_persona(owner: str) -> str:
     """Which demo persona may answer an issue owned by `owner` (§5)."""
     return {
@@ -272,6 +305,8 @@ class _DemoGrant(_ContextModel):
     max_amount: Money
     effective_from: datetime
     effective_to: datetime | None = None
+    # Profiles this grant is valid for; empty means all (plan R3).
+    allowed_profiles: tuple[str, ...] = ()
 
 
 class _DemoPerson(_ContextModel):
@@ -458,8 +493,8 @@ class CaseWorkflow:
             for grant in data.grants:
                 cx.execute(
                     "INSERT OR REPLACE INTO context_grants (grant_id, tenant, version, "
-                    "actor, actions_json, scope, max_amount, effective_from, "
-                    "effective_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "actor, actions_json, scope, allowed_profiles_json, max_amount, "
+                    "effective_from, effective_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         grant.id,
                         tenant,
@@ -467,6 +502,7 @@ class CaseWorkflow:
                         grant.actor,
                         json.dumps(list(grant.actions), ensure_ascii=False),
                         grant.scope,
+                        json.dumps(list(grant.allowed_profiles), ensure_ascii=False),
                         grant.max_amount,
                         grant.effective_from.isoformat(),
                         grant.effective_to.isoformat() if grant.effective_to else None,
@@ -910,6 +946,7 @@ class CaseWorkflow:
                 action,
                 decision.effect_scope,
                 decision.amount,
+                str(row["profile"]),
             ):
                 raise UnsupportedCommandError(
                     f"Không có quyền thực hiện {action} trong phạm vi này."
@@ -969,17 +1006,9 @@ class CaseWorkflow:
 
         kind = money.claimed_kind
         event_id = f"money:{uuid.uuid4().hex}"
-        # A recorded claim is verified only when it carries a responsible
-        # completion confirmation or checked evidence (contracts §3–§4). A bare
-        # statement is preserved as OBSERVED for audit, but it never fulfills an
-        # instruction or settles a case (missing proof is not zero, and a
-        # statement alone is not proof). A linked reversal is verified by its
-        # binding to a real, unreversed original (§10.1).
-        verified = (
-            bool((money.completion_claim or "").strip())
-            or bool(money.refs)
-            or money.reverses_event_id is not None
-        )
+        # The server decides verification/allocation from the claim's evidence
+        # (contracts §3–§4): a bare statement stays OBSERVED and never fulfills.
+        verification = verify_money_claim(money, responsible_actor=context.actor_id)
         event = MoneyEvent(
             id=event_id,
             external_key=money.external_key,
@@ -990,8 +1019,8 @@ class CaseWorkflow:
             amount=money.amount,
             event_at=money.event_at,
             recorded_at=datetime.now(UTC),
-            verification_state="CONFIRMED" if verified else "OBSERVED",
-            allocation_state="ALLOCATED" if verified else "UNALLOCATED",
+            verification_state=verification.verification_state,  # type: ignore[arg-type]
+            allocation_state=verification.allocation_state,  # type: ignore[arg-type]
             reverses_event_id=money.reverses_event_id,
             refs=money.refs,
         )
@@ -1138,6 +1167,7 @@ class CaseWorkflow:
                 action,
                 decision.effect_scope,
                 decision.amount,
+                str(row["profile"]),
             ):
                 raise UnsupportedCommandError(
                     f"Không có quyền thực hiện {action} trong phạm vi này."
@@ -1301,12 +1331,14 @@ class CaseWorkflow:
         action: str,
         scope: str,
         amount: int | None = None,
+        profile: str | None = None,
     ) -> bool:
-        """A grant authorizes one action, one scope and an amount ceiling (§5).
+        """A grant authorizes one action, one scope, one profile and an amount.
 
-        The scope must be the activity (or the tenant-wide convention); a grant
-        scoped elsewhere never authorizes this action. When `amount` is given it
-        must not exceed the grant's `max_amount` (per action, inclusive).
+        The scope must be the activity (or the tenant-wide convention); the
+        profile must be allowed by the grant; a grant scoped elsewhere never
+        authorizes this action. When `amount` is given it must not exceed the
+        grant's `max_amount` (per action, inclusive). Contracts §5.
         """
         now = datetime.now(UTC)
         for grant in cx.execute(
@@ -1318,6 +1350,8 @@ class CaseWorkflow:
             # The grant's scope must cover the requested scope: an exact match,
             # or a tenant-wide grant (the demo's ``tenant:<id>`` convention).
             if str(grant["scope"]) not in (scope, tenant):
+                continue
+            if not _profile_allowed(grant, profile):
                 continue
             if amount is not None and amount > int(grant["max_amount"]):
                 continue
@@ -1484,42 +1518,38 @@ class CaseWorkflow:
             (root_id,),
         ).fetchone()
 
-        if active is not None:
-            same_basis = active["cost_basis"] == result.cost_basis
-            same_direction = active["direction"] == effect.direction
-            remaining = max(int(active["amount"]) - int(active["fulfilled_amount"]), 0)
-            same_amount = remaining == effect.amount
-            if same_basis and same_direction and same_amount:
-                # Nothing material changed: keep the same instruction. A suspended
-                # remainder is reactivated, but a handed-off unresolved execution
-                # stays UNKNOWN and keeps the case waiting for external proof.
-                if active["status"] in ("SUSPENDED", "EXECUTION_UNKNOWN"):
-                    reactivated = (
-                        "PARTIAL" if int(active["fulfilled_amount"]) > 0 else "ISSUED"
-                    )
-                    cx.execute(
-                        "UPDATE instructions SET status = ?, updated_at = ? WHERE id = ?",
-                        (reactivated, now, str(active["id"])),
-                    )
-                    if active["execution_state"] in ("OPEN", "UNKNOWN"):
-                        return "WAITING"
-                return "READY_TO_EXECUTE"
-            if active["execution_state"] in ("OPEN", "UNKNOWN"):
-                # Cannot replace an instruction whose execution is unresolved.
-                cx.execute(
-                    "UPDATE instructions SET status = 'SUSPENDED', updated_at = ? WHERE id = ?",
-                    (now, str(active["id"])),
-                )
-                return "WAITING"
+        decision = reconcile_instruction(
+            _instruction_state(active) if active is not None else None,
+            direction=effect.direction,
+            amount=effect.amount,
+            cost_basis=result.cost_basis,
+        )
 
-        # Supersede any current actionable remainder, then issue the full abs(S).
+        if decision.action == "RETAIN":
+            return decision.result_state
+        if decision.action == "REACTIVATE":
+            reactivated = "PARTIAL" if int(active["fulfilled_amount"]) > 0 else "ISSUED"
+            cx.execute(
+                "UPDATE instructions SET status = ?, updated_at = ? WHERE id = ?",
+                (reactivated, now, str(active["id"])),
+            )
+            return decision.result_state
+        if decision.action == "SUSPEND":
+            cx.execute(
+                "UPDATE instructions SET status = 'SUSPENDED', updated_at = ? WHERE id = ?",
+                (now, str(active["id"])),
+            )
+            return decision.result_state
+
+        # ISSUE / REPLACE: supersede any current actionable remainder, then issue
+        # the full abs(S) as a new instruction.
         cx.execute(
             "UPDATE instructions SET status = 'SUPERSEDED', updated_at = ? "
             "WHERE root_id = ? AND status IN ('ISSUED','PARTIAL','SUSPENDED','EXECUTION_UNKNOWN')",
             (now, root_id),
         )
         self._issue_instruction(cx, session, row, result, now, active)
-        return "READY_TO_EXECUTE"
+        return decision.result_state
 
     def _issue_instruction(
         self,

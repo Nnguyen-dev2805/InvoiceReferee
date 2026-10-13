@@ -30,6 +30,8 @@ class Grant(StrictModel):
     max_amount: Vnd
     effective_from: UtcDatetime
     effective_to: UtcDatetime | None = None
+    # Profiles this grant is valid for; empty means profile-agnostic (plan R3).
+    allowed_profiles: tuple[str, ...] = ()
 
 
 class BudgetDecision(StrictModel):

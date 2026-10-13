@@ -331,6 +331,11 @@ def build_assessment_input(
                 effective_to=_dt.fromisoformat(row["effective_to"])
                 if row["effective_to"]
                 else None,
+                allowed_profiles=tuple(
+                    json.loads(row["allowed_profiles_json"] or "[]")
+                    if "allowed_profiles_json" in row.keys()
+                    else ()
+                ),
             )
         )
 

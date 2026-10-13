@@ -8,7 +8,47 @@ is never clipped by the instruction's amount.
 
 from __future__ import annotations
 
-from invoice_referee.domain.finance import MoneyEvent
+from dataclasses import dataclass
+
+from invoice_referee.domain.finance import MoneyEvent, RecordMoneyInput
+
+
+@dataclass(frozen=True)
+class MoneyVerification:
+    """The server's verification decision for one recorded claim (plan R3)."""
+
+    verification_state: str  # CONFIRMED | OBSERVED
+    allocation_state: str  # ALLOCATED | UNALLOCATED
+    reason: str
+
+
+def verify_money_claim(
+    money: RecordMoneyInput,
+    *,
+    evidence: tuple[object, ...] = (),
+    responsible_actor: str | None = None,
+) -> MoneyVerification:
+    """Decide whether a recorded claim is verified money (contracts §3–§4).
+
+    A claim is CONFIRMED only when it carries a responsible completion
+    confirmation, checked evidence refs, or a linked reversal bound to a real
+    original. A bare statement is OBSERVED — preserved for audit, never
+    fulfilling or settling. This never reads a client-supplied verified flag.
+    """
+    has_claim = bool((money.completion_claim or "").strip())
+    has_refs = bool(money.refs) or bool(evidence)
+    is_reversal = money.reverses_event_id is not None
+    if has_claim or has_refs or is_reversal:
+        return MoneyVerification(
+            verification_state="CONFIRMED",
+            allocation_state="ALLOCATED",
+            reason="responsible confirmation / checked evidence / linked reversal",
+        )
+    return MoneyVerification(
+        verification_state="OBSERVED",
+        allocation_state="UNALLOCATED",
+        reason="bare claim: no confirmation, evidence or linked original",
+    )
 
 
 def net_by_kind(events: tuple[MoneyEvent, ...], kind: str) -> int:
