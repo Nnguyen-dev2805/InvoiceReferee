@@ -1,0 +1,11 @@
+{
+  "case_id": "D12",
+  "stages": {
+    "ban-dau": {
+      "facts": {
+        "currency": "USD",
+        "amount": 200
+      }
+    }
+  }
+}

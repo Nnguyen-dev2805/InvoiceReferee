@@ -1,0 +1,11 @@
+{
+  "case_id": "D05",
+  "stages": {
+    "ban-dau": {
+      "route": "FACT",
+      "expected_amounts": {},
+      "owner": "accountant",
+      "question_required": true
+    }
+  }
+}

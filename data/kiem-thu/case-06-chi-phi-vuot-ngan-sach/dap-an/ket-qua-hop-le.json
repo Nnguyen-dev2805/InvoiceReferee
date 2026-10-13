@@ -1,0 +1,11 @@
+{
+  "case_id": "D06",
+  "stages": {
+    "ban-dau": {
+      "route": "POLICY",
+      "expected_amounts": {},
+      "owner": "approver",
+      "question_required": true
+    }
+  }
+}

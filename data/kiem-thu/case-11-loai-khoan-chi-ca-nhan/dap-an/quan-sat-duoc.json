@@ -1,0 +1,10 @@
+{
+  "case_id": "D11",
+  "stages": {
+    "ban-dau": {
+      "facts": {
+        "excluded": 500000
+      }
+    }
+  }
+}

@@ -300,7 +300,7 @@ async def run_verify(request: Request, payload: views.VerifyRequest) -> dict[str
     from invoice_referee.evaluation.suites import select_suite
 
     workflow = _workflow(request)
-    dataset = PROJECT_ROOT / "data" / "evaluation" / "development"
+    dataset = PROJECT_ROOT / "data" / "kiem-thu"
     packets = select_suite(payload.suite, dataset)
     runner = EvaluationRunner(workflow=workflow)
     scorer = IndependentScorer()

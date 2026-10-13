@@ -109,7 +109,7 @@ def _run_evaluate(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="invoice-referee evaluate")
     parser.add_argument("--suite", required=True, choices=("core", "escalation", "development"))
     parser.add_argument("--mode", choices=("stub", "replay", "live"), default="stub")
-    parser.add_argument("--dataset", default=str(PROJECT_ROOT / "data" / "evaluation"))
+    parser.add_argument("--dataset", default=str(PROJECT_ROOT / "data" / "kiem-thu"))
     parser.add_argument("--output", required=True)
     args = parser.parse_args(argv)
 
@@ -119,7 +119,7 @@ def _run_evaluate(argv: list[str]) -> int:
         print("evaluate LIVE thiếu cấu hình: " + ", ".join(settings.missing_for_live()), file=sys.stderr)
         return 2
 
-    dataset = Path(args.dataset) / "development"
+    dataset = Path(args.dataset)
     packets = select_suite(args.suite, dataset)
     if not packets:
         print(f"không có packet cho suite {args.suite} trong {dataset}", file=sys.stderr)

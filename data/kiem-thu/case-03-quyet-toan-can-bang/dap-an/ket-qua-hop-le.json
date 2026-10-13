@@ -1,0 +1,11 @@
+{
+  "case_id": "D03",
+  "stages": {
+    "ban-dau": {
+      "route": "AUTO",
+      "expected_amounts": {},
+      "owner": null,
+      "question_required": false
+    }
+  }
+}

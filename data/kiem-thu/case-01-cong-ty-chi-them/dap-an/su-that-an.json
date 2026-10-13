@@ -1,0 +1,8 @@
+{
+  "case_id": "D01",
+  "stages": {
+    "ban-dau": {
+      "facts": {}
+    }
+  }
+}

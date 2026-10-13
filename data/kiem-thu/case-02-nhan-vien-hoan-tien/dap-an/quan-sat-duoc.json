@@ -1,0 +1,12 @@
+{
+  "case_id": "D02",
+  "stages": {
+    "ban-dau": {
+      "facts": {
+        "incurred": 1500000,
+        "paid_employee": 1500000,
+        "advance": 2000000
+      }
+    }
+  }
+}

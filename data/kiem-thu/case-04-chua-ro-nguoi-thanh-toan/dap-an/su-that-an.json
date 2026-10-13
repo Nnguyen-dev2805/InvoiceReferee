@@ -1,0 +1,11 @@
+{
+  "case_id": "D04",
+  "stages": {
+    "ban-dau": {
+      "facts": {}
+    },
+    "bo-sung-payer": {
+      "facts": {}
+    }
+  }
+}

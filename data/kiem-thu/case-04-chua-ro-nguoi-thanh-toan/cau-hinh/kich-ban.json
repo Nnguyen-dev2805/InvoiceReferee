@@ -1,0 +1,13 @@
+{
+  "case_id": "D04",
+  "stages": [
+    {
+      "stage_id": "ban-dau",
+      "folder": "01-nop-ban-dau"
+    },
+    {
+      "stage_id": "bo-sung-payer",
+      "folder": "02-bo-sung"
+    }
+  ]
+}

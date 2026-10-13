@@ -1,0 +1,11 @@
+{
+  "case_id": "D15",
+  "stages": {
+    "ban-dau": {
+      "facts": {}
+    },
+    "bo-sung-thanh-toan": {
+      "facts": {}
+    }
+  }
+}

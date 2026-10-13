@@ -1,0 +1,9 @@
+{
+  "case_id": "D09",
+  "stages": [
+    {
+      "stage_id": "ban-dau",
+      "folder": "01-nop-ban-dau"
+    }
+  ]
+}

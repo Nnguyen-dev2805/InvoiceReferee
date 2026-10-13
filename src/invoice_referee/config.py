@@ -6,6 +6,8 @@ LIVE run can never silently pretend to have a provider.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LIVE_REQUIRED_SETTINGS: tuple[str, ...] = (
@@ -15,6 +17,11 @@ LIVE_REQUIRED_SETTINGS: tuple[str, ...] = (
     "XKIRO_BASE_URL",
     "INVOICE_REFEREE_LLM_MODEL",
 )
+
+# The single dataset source root (plan R2), resolved relative to the project,
+# not the cwd. Overridable for a temporary corpus.
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_DATASET_ROOT = _PROJECT_ROOT / "data" / "kiem-thu"
 
 
 class Settings(BaseSettings):
@@ -27,6 +34,9 @@ class Settings(BaseSettings):
     xkiro_api_key: str | None = None
     xkiro_base_url: str | None = None
     invoice_referee_llm_model: str | None = None
+
+    # The evaluation dataset root (plan R2). One value for the whole app.
+    dataset_root: str = str(DEFAULT_DATASET_ROOT)
 
     # LangSmith tracing is opt-in: it is never a live-required setting, and a
     # missing/failed trace never blocks a business conclusion (contracts §9).
