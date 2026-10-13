@@ -454,3 +454,99 @@ def snapshot(
     }
     fields.update(overrides)
     return AssessmentInput(**fields)
+
+
+# -- T9 independent scoring literals (contracts §7, §9) ----------------------
+# These build literal ActualResult / GoldPacket pairs directly. They never call
+# the Reconciler, so the scorer cannot grade the app with the app's own logic.
+
+
+def _actual(**overrides):
+    from invoice_referee.evaluation.scorer import ActualResult
+
+    fields = {"root_id": "case:score-1", "mode": "STUB", "state": "READY_TO_EXECUTE"}
+    fields.update(overrides)
+    return ActualResult(**fields)
+
+
+def _gold(route: str, **overrides):
+    from invoice_referee.evaluation.models import (
+        AllowedGold,
+        GoldPacket,
+        LatentGold,
+        ObservableGold,
+    )
+
+    fields = {"route": route}
+    fields.update(overrides)
+    return GoldPacket(
+        latent=LatentGold(),
+        observable=ObservableGold(),
+        allowed=AllowedGold(**fields),
+    )
+
+
+def actual_affirmed_zero_without_coverage():
+    return _actual(state="SETTLED", affirmed_zero_without_coverage=True)
+
+
+def actual_routine_pay():
+    from invoice_referee.evaluation.scorer import ActualInstruction
+
+    return _actual(instructions=(ActualInstruction(direction="PAY", amount=3_000_000),))
+
+
+def actual_technical_error():
+    return _actual(state="TECHNICAL_ERROR", technical_error=True)
+
+
+def actual_fact_wrong_owner():
+    from invoice_referee.evaluation.scorer import ActualIssue
+
+    return _actual(state="WAITING", issues=(ActualIssue(kind="FACT", owner="employee"),))
+
+
+def actual_routine_bad_ref():
+    from invoice_referee.evaluation.scorer import ActualInstruction
+
+    return _actual(
+        instructions=(
+            ActualInstruction(direction="PAY", amount=3_000_000, refs_ok=False),
+        )
+    )
+
+
+def actual_lucky_guess_450():
+    from invoice_referee.evaluation.scorer import ActualInstruction
+
+    return _actual(instructions=(ActualInstruction(direction="PAY", amount=450_000),))
+
+
+def actual_grounded_fact_450_480():
+    from invoice_referee.evaluation.scorer import ActualIssue
+
+    return _actual(state="WAITING", issues=(ActualIssue(kind="FACT", owner="employee"),))
+
+
+def actual_action_and_conclusion_wrong():
+    from invoice_referee.evaluation.scorer import ActualInstruction
+
+    return _actual(
+        state="SETTLED",
+        affirmed_zero_without_coverage=True,
+        instructions=(ActualInstruction(direction="PAY", amount=1),),
+    )
+
+
+def gold_requires_fact():
+    return _gold("FACT", owner="accountant")
+
+
+def gold_routine_pay():
+    return _gold("AUTO", expected_amounts={"PAY": 3_000_000})
+
+
+def gold_ambiguous_450_480():
+    # The observable source is ambiguous (450 vs 480); the latent truth (450)
+    # must not reward a lucky guess.
+    return _gold("FACT", owner="employee")

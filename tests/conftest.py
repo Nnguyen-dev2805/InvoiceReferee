@@ -353,6 +353,15 @@ class AppFixture:
         row = self.query_one("SELECT version FROM cases WHERE id = ?", (root_id,))
         return int(row["version"])
 
+    # -- T9 evaluation helpers (contracts §9) --------------------------------
+    def write_packet(self, base: Path, *, name: str) -> Path:
+        """Write a packet on disk whose activity has a seeded demo transcription."""
+        from tests.factories import write_test_packet
+
+        # The packet's activity matches a demo activity that carries a
+        # transcription, so the runner's submit has real input to assess.
+        return write_test_packet(base, root_id=name, strata="routine")
+
     # -- T8 control helpers (contracts §9) -----------------------------------
     async def hold_reader(self) -> None:
         """Arm the gate a late worker waits on before it may commit."""

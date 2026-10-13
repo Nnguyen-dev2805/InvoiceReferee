@@ -93,6 +93,27 @@ export async function answerIssue(
   );
 }
 
+export async function runVerify(
+  suite: string,
+  mode: string,
+): Promise<{
+  suite: string;
+  mode: string;
+  total: number;
+  union_dangerous_miss: number;
+  release: boolean;
+  rows: Array<{
+    root_id: string;
+    expected_route: string;
+    actual_route: string;
+    union_dangerous_miss: number;
+    correct_auto_completion: number;
+    technical_failure: number;
+  }>;
+}> {
+  return request("/api/verify", { suite, mode }, newCommandId());
+}
+
 export async function controlCase(
   rootId: string,
   action: "STOP" | "RESUME",

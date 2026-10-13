@@ -24,6 +24,7 @@ from invoice_referee.evaluation.models import (
     PacketMetadata,
     PacketSource,
     Submission,
+    Transcription,
 )
 
 
@@ -69,12 +70,20 @@ def load_input(packet_dir: Path) -> PacketInput:
                 PacketSource(filename=path.name, media=media, sha256=_sha256_file(path))
             )
 
+    transcription_path = input_dir / "transcription.json"
+    transcription = (
+        Transcription.model_validate_json(_read_text(transcription_path))
+        if transcription_path.is_file()
+        else None
+    )
+
     return PacketInput(
         root_id=submission.activity,  # the root is keyed by the activity
         profile=organization.profile,
         sources=tuple(sources),
         organization=organization,
         submission=submission,
+        transcription=transcription,
     )
 
 

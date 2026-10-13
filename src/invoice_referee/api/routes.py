@@ -43,6 +43,8 @@ SESSION_COOKIE = "invoice_referee_session"
 
 router = APIRouter(prefix="/api")
 
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
 
 def _workflow(request: Request) -> CaseWorkflow:
     return request.app.state.workflow
@@ -268,6 +270,35 @@ def _prune_empty_upload_dirs(uploads_dir: Path, tenant: str, root_id: str) -> No
             directory.rmdir()
         except OSError:
             break
+
+
+@router.post("/verify")
+async def run_verify(request: Request, payload: views.VerifyRequest) -> dict[str, object]:
+    """Run a suite through the workflow and score with independent gold (§8)."""
+    from invoice_referee.evaluation.packets import load_gold, load_input
+    from invoice_referee.evaluation.runner import EvaluationRunner
+    from invoice_referee.evaluation.scorer import IndependentScorer
+
+    workflow = _workflow(request)
+    dataset = PROJECT_ROOT / "data" / "evaluation" / "development"
+    packets = sorted(p for p in dataset.iterdir() if p.is_dir()) if dataset.is_dir() else []
+    runner = EvaluationRunner(workflow=workflow)
+    scorer = IndependentScorer()
+    rows = []
+    for packet_dir in packets:
+        packet_input = load_input(packet_dir)
+        actual = await runner.run(packet_input, payload.mode)
+        gold = load_gold(packet_dir)
+        rows.append(scorer.score(actual, gold))
+    report = scorer.release_gate(rows, total_human=0)
+    return {
+        "suite": payload.suite,
+        "mode": payload.mode,
+        "total": len(rows),
+        "union_dangerous_miss": report.union_dangerous_miss,
+        "release": report.release,
+        "rows": [row.model_dump(mode="json") for row in rows],
+    }
 
 
 def _sniff_media(data: bytes) -> Media | None:

@@ -13,9 +13,9 @@ The plan owns task acceptance; package/config files own executable commands.
 | Setup review | ACCEPTED at documentation/setup level; actual clean-clone and agent-execution proof remain open |
 | Execution method | Inline execution (executing-plans) with one integrator; the whole-branch final review has not been run |
 | Workflow integrator | Inline executor — single writer for workflow/api/domain owned files |
-| Next application task | T9, not started (needs authorization) |
-| Last completed application task | T8 — gate passed (actual injected race/crash behavior). T7 = 6d7705a |
-| Product unit/integration/UI/LIVE evidence | T8: `uv run pytest` → **144 passed** (133 after T7 + 11 controls/restart tests); `npx playwright test` → **6 passed** (adds execution→actual money and controls→Stop/Resume audited); `npx vitest run` 2 passed; `npm run build` exit 0. Stop wins over a late worker (no instruction); a stale answer is rejected; a crash-after-commit replays; an override keeps the old decision; a settled case keeps its actual money across a revision. LIVE: T5 M0 stands |
+| Next application task | T10, not started (needs authorization) |
+| Last completed application task | T9 — gate passed (raw baseline before improvements; truthful modes/errors). T8 = 9daee09 |
+| Product unit/integration/UI/LIVE evidence | T9: `uv run pytest` → **159 passed** (144 after T8 + 15 scoring/visibility/verify tests); `npx playwright test` → **7 passed** (adds verify); `npx vitest run` 2 passed; `npm run build` exit 0. **Baseline run** `invoice-referee evaluate --suite development --mode stub` → `.runtime/evidence/baseline/development-stub-report.json`: 15 roots, **union_dangerous_miss=0**, 11/15 exact route, 4 non-dangerous route differences. The scorer is independent (literal gold, no Reconciler); gold loads only after the actual result |
 | CodeGraph | **Fresh** at `1c395de`: `codegraph status` → 34 files, 505 nodes, 1135 edges (python 24, tsx 4, typescript 6). The earlier "stale/0 files" note was itself outdated; re-check with `rtk proxy codegraph status` before relying on it |
 | Git handoff | T1 = 57d2e19, T2 = 1c395de, domain-conformance = 3245d00, boundary fixes = ec37242 — all on `final` (unpushed beyond 1c395de; no push authorization) |
 

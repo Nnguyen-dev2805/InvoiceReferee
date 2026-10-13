@@ -7,6 +7,7 @@ import { Dossier } from "./features/dossier";
 import { Execution } from "./features/execution";
 import { Intake } from "./features/intake";
 import { Questions } from "./features/questions";
+import { Verify } from "./features/verify";
 import type { CaseView, SessionPayload } from "./types";
 
 export default function App() {
@@ -79,6 +80,7 @@ export default function App() {
           <Approval caseView={caseView} />
           <Execution caseView={caseView} onCase={setCaseView} />
           <Controls caseView={caseView} onCase={setCaseView} />
+          <Verify />
           <Dossier caseView={caseView} />
         </main>
       )}

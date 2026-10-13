@@ -1,0 +1,1 @@
+{"data_origin": "STUB_TRANSCRIPTION", "facts": [{"field": "incurred", "value": 5000000, "role": "INVOICE", "page": 1, "quote": "Tổng chi 5000000"}, {"field": "paid_employee", "value": 5000000, "role": "PAYMENT", "page": 1, "quote": "Nhân viên trả 5000000"}, {"field": "economic_key", "value": "inv:dev:13", "role": "INVOICE", "page": 1, "quote": "inv:dev:13"}], "relations": []}

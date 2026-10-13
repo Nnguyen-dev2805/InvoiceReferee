@@ -52,40 +52,67 @@ class RootSpec:
     expected_amounts: dict[str, int] = field(default_factory=dict)
     owner: str | None = None
     scan: bool = False
+    # STUB hand-transcription facts (contracts §5); the runner seeds these so a
+    # STUB run assesses real input without a provider.
+    facts: tuple[dict[str, object], ...] = ()
 
 
 # 15 development travel roots — distinct sources/roots (mutations don't count).
+def _facts(incurred, *, paid_employee=0, paid_company=0, advance=0, coverage=True, key=None):
+    out = [{"field": "incurred", "value": incurred, "role": "INVOICE", "quote": f"Tổng chi {incurred}"}]
+    if paid_employee:
+        out.append({"field": "paid_employee", "value": paid_employee, "role": "PAYMENT", "quote": f"Nhân viên trả {paid_employee}"})
+    if paid_company:
+        out.append({"field": "paid_company", "value": paid_company, "role": "PAYMENT", "quote": f"Công ty trả {paid_company}"})
+    if advance:
+        out.append({"field": "advance", "value": advance, "role": "ADVANCE", "quote": f"Ứng {advance}"})
+    if coverage:
+        out.append({"field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn"})
+    if key:
+        out.append({"field": "economic_key", "value": key, "role": "INVOICE", "quote": key})
+    return tuple(out)
+
+
 DEVELOPMENT: tuple[RootSpec, ...] = (
     RootSpec("dev-clean-chi", "routine", "TRAVEL", "inv:dev:01", "fam:chi", "tpl:chi", "lay:a", "iss:vn-air", "AUTO",
-             observable={"amount": 3_000_000}, expected_amounts={"PAY": 3_000_000}),
+             observable={"amount": 3_000_000}, expected_amounts={"PAY": 3_000_000},
+             facts=_facts(8_000_000, paid_employee=5_000_000, paid_company=3_000_000, advance=2_000_000, key="inv:dev:01")),
     RootSpec("dev-clean-thu", "routine", "TRAVEL", "inv:dev:02", "fam:thu", "tpl:thu", "lay:b", "iss:hotel-b", "AUTO",
-             observable={"amount": 1_500_000}, expected_amounts={"COLLECT": 500_000}),
+             observable={"amount": 1_500_000}, expected_amounts={"COLLECT": 500_000},
+             facts=_facts(1_500_000, paid_employee=1_500_000, advance=2_000_000, key="inv:dev:02")),
     RootSpec("dev-balanced", "routine", "TRAVEL", "inv:dev:03", "fam:bal", "tpl:bal", "lay:c", "iss:taxi-c", "AUTO",
-             observable={"amount": 2_000_000}),
+             observable={"amount": 2_000_000},
+             facts=_facts(2_000_000, paid_employee=2_000_000, advance=2_000_000, key="inv:dev:03")),
     RootSpec("dev-payer-unknown", "FACT", "TRAVEL", "inv:dev:04", "fam:unk", "tpl:unk", "lay:a", "iss:misc-d", "FACT",
-             owner="employee"),
+             owner="employee", facts=_facts(5_000_000, key="inv:dev:04")),
     RootSpec("dev-relation-conflict", "FACT", "TRAVEL", "inv:dev:05", "fam:rel", "tpl:rel", "lay:b", "iss:hotel-e", "FACT",
-             owner="accountant"),
+             owner="accountant", facts=_facts(5_000_000, paid_employee=5_000_000, coverage=False, key="inv:dev:05")),
     RootSpec("dev-over-budget", "POLICY", "TRAVEL", "inv:dev:06", "fam:over", "tpl:over", "lay:c", "iss:venue-f", "POLICY",
-             observable={"T": 10_000_000, "B": 8_000_000}, owner="approver"),
+             observable={"T": 10_000_000, "B": 8_000_000}, owner="approver",
+             facts=_facts(10_000_000, paid_employee=10_000_000, key="inv:dev:06")),
     RootSpec("dev-cost-authority", "AUTHORITY", "TRAVEL", "inv:dev:07", "fam:auth", "tpl:auth", "lay:a", "iss:air-g", "AUTHORITY",
-             observable={"E": 12_000_000}, owner="approver"),
+             observable={"E": 12_000_000}, owner="approver",
+             facts=_facts(12_000_000, paid_employee=12_000_000, key="inv:dev:07")),
     RootSpec("dev-action-authority", "AUTHORITY", "TRAVEL", "inv:dev:08", "fam:auth2", "tpl:auth2", "lay:b", "iss:rail-h", "AUTHORITY",
-             observable={"S": 6_000_000}, owner="approver"),
+             observable={"S": 6_000_000}, owner="approver",
+             facts=_facts(8_000_000, paid_employee=8_000_000, advance=2_000_000, key="inv:dev:08")),
     RootSpec("dev-missing-history", "FACT", "TRAVEL", "inv:dev:09", "fam:hist", "tpl:hist", "lay:c", "iss:hotel-i", "FACT",
-             owner="accountant"),
+             owner="accountant", facts=_facts(5_000_000, paid_employee=5_000_000, coverage=False, key="inv:dev:09")),
     RootSpec("dev-duplicate", "FACT", "TRAVEL", "inv:dev:10", "fam:dup", "tpl:dup", "lay:a", "iss:misc-j", "FACT",
-             owner="accountant"),
+             owner="accountant", facts=_facts(5_000_000, paid_employee=5_000_000, coverage=False, key="inv:dev:10")),
     RootSpec("dev-personal", "routine", "TRAVEL", "inv:dev:11", "fam:per", "tpl:per", "lay:b", "iss:shop-k", "AUTO",
-             observable={"excluded": 500_000}),
+             observable={"excluded": 500_000},
+             facts=_facts(2_000_000, paid_employee=2_000_000, advance=2_000_000, key="inv:dev:11")),
     RootSpec("dev-material-unsupported", "TECHNICAL", "TRAVEL", "inv:dev:12", "fam:uns", "tpl:uns", "lay:c", "iss:fx-l", "UNSUPPORTED",
-             owner="accountant"),
+             owner="accountant", facts=_facts(5_000_000, paid_employee=5_000_000, coverage=False, key="inv:dev:12")),
     RootSpec("dev-pending-bank", "FACT", "TRAVEL", "inv:dev:13", "fam:bank", "tpl:bank", "lay:a", "iss:bank-m", "FACT",
-             owner="accountant"),
+             owner="accountant", facts=_facts(5_000_000, paid_employee=5_000_000, coverage=False, key="inv:dev:13")),
     RootSpec("dev-mixed-pdf", "routine", "TRAVEL", "inv:dev:14", "fam:mix", "tpl:mix", "lay:b", "iss:multi-n", "AUTO",
-             observable={"amount": 4_500_000}, scan=True),
+             observable={"amount": 4_500_000}, scan=True,
+             facts=_facts(4_500_000, paid_employee=4_500_000, advance=4_500_000, key="inv:dev:14")),
     RootSpec("dev-supplementary", "routine", "TRAVEL", "inv:dev:15", "fam:sup", "tpl:sup", "lay:c", "iss:hotel-o", "AUTO",
-             observable={"T": 10_000_000, "E": 7_000_000, "C": 3_000_000}, expected_amounts={"PAY": 4_000_000}),
+             observable={"T": 10_000_000, "E": 7_000_000, "C": 3_000_000}, expected_amounts={"PAY": 4_000_000},
+             facts=_facts(10_000_000, paid_employee=7_000_000, paid_company=3_000_000, advance=3_000_000, key="inv:dev:15")),
 )
 
 
@@ -193,8 +220,31 @@ def build_root(base: Path, spec: RootSpec) -> ManifestEntry:
                 "records": [
                     "ledger:opening:2026-09 — số dư theo dõi 0 VND",
                     "ledger:coverage:2026-10 — đối chiếu đủ giai đoạn",
-                    "budget:activity:travel-a — 8.000.000 VND (hiệu lực 01/10/2026)",
+                    "budget — 8.000.000 VND (hiệu lực 01/10/2026)",
                 ],
+                "budget_amount": 8_000_000,
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    # STUB hand-transcription (input layer, contracts §5): a literal reading the
+    # runner seeds so a STUB run assesses real input without a provider.
+    (input_dir / "transcription.json").write_text(
+        json.dumps(
+            {
+                "data_origin": "STUB_TRANSCRIPTION",
+                "facts": [
+                    {
+                        "field": f["field"],
+                        "value": f["value"],
+                        "role": f.get("role", "INVOICE"),
+                        "page": 1,
+                        "quote": f.get("quote", "hand-transcription"),
+                    }
+                    for f in spec.facts
+                ],
+                "relations": [],
             },
             ensure_ascii=False,
         ),

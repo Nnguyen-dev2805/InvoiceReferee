@@ -97,6 +97,11 @@ class ControlRequest(ApiModel):
     reason: str
 
 
+class VerifyRequest(ApiModel):
+    suite: Literal["core", "escalation", "development"] = "development"
+    mode: Literal["LIVE", "RECORDED_REPLAY", "STUB"] = "STUB"
+
+
 class OverrideRequest(ApiModel):
     supersedes_decision_id: str
     issue_ids: list[str]

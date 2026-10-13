@@ -12,7 +12,7 @@
       "template": "tpl:chi",
       "layout": "lay:a",
       "issuer": "iss:vn-air",
-      "input_digest": "9e9ceee6ccbcf1f4273cd76d40ed81a54b48d5d72b8236a6707a0d067473f037",
+      "input_digest": "ba5b599cbb59052b91e8b80f7a335d283f02f35d644051c028c4c2449e36face",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -25,7 +25,7 @@
       "template": "tpl:thu",
       "layout": "lay:b",
       "issuer": "iss:hotel-b",
-      "input_digest": "9875d877f6f41d5484335b8f8c736c849e8dc4b35db8d260c45ba4601a7ccdaf",
+      "input_digest": "99895bacb4d34b659262d1d304be496468dac77f2ab14ec4bcf07c113f55820d",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -38,7 +38,7 @@
       "template": "tpl:bal",
       "layout": "lay:c",
       "issuer": "iss:taxi-c",
-      "input_digest": "d234a10be1974033ec003d73e477960eec4bca8de749f76998daded2aaa507eb",
+      "input_digest": "195b557b5c3b06601bfc7a4f2b19e9d7458c01cac17c4a1fa75e3b11c2addeb9",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -51,7 +51,7 @@
       "template": "tpl:unk",
       "layout": "lay:a",
       "issuer": "iss:misc-d",
-      "input_digest": "c666a863ab3d08318e8f56d4f148e6e3eff4249032cfc69206112ab315512abd",
+      "input_digest": "cd7fe304cbd4d1136ebf68bfd17eec19793944ae897975be84ebd107dd4b1ae9",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -64,7 +64,7 @@
       "template": "tpl:rel",
       "layout": "lay:b",
       "issuer": "iss:hotel-e",
-      "input_digest": "bb898a9f4ba5d98c6574966bcb3cec37eb9a2168f5fc1f7eeb5a070b161653b3",
+      "input_digest": "744df3f9b5316c8a920fc42ecd020ac2f4a0f70ac8bc2bf05e52dc3f7a92dffb",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -77,7 +77,7 @@
       "template": "tpl:over",
       "layout": "lay:c",
       "issuer": "iss:venue-f",
-      "input_digest": "0e175a69049ab4c2ba13e96a34633e2ee7e1f1839f87cd60441a774ec54ce85d",
+      "input_digest": "d451e02e26e25296802981ff6f600a960f591efdf4e2270f1da68eebc6e7cc34",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -90,7 +90,7 @@
       "template": "tpl:auth",
       "layout": "lay:a",
       "issuer": "iss:air-g",
-      "input_digest": "aa916244b8b80981c31e7168458548ba21745a76e40562f4ebbc0f680f254fee",
+      "input_digest": "a5494f983d3bc1cd7f8233ebd3a979e2e987e448202e229626a0555c748b7480",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -103,7 +103,7 @@
       "template": "tpl:auth2",
       "layout": "lay:b",
       "issuer": "iss:rail-h",
-      "input_digest": "958f4e39a3d3c723b88887180bef8b2f6ec73096c46d31a9eec7127aa19704dd",
+      "input_digest": "64bab4dddd5da7bc7cbfeab9994981ecc9beda8ed82975e1f5a91a26082d6c94",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -116,7 +116,7 @@
       "template": "tpl:hist",
       "layout": "lay:c",
       "issuer": "iss:hotel-i",
-      "input_digest": "1e9930a880f4e67a8c00b9b6b58ebbb8d72abe6ea637012a0e12b44aef7831b5",
+      "input_digest": "92506ba9406f14094b8e8d21ff9bca69f3da8eb541b07a9fba826c2c3d611fa4",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -129,7 +129,7 @@
       "template": "tpl:dup",
       "layout": "lay:a",
       "issuer": "iss:misc-j",
-      "input_digest": "f521a567ef5cb8ac31518dd0a8cecf44c3ead7b9fe14e865a91ff0c6f39347b4",
+      "input_digest": "593fa9ee7447e89fc9c5a2780903acbe8bfb88c7d59c4c997213621b76cc1841",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -142,7 +142,7 @@
       "template": "tpl:per",
       "layout": "lay:b",
       "issuer": "iss:shop-k",
-      "input_digest": "c35db396f9441f6839de9570d484aac850d572cf88928545112ed1acd228bc70",
+      "input_digest": "ac059850d3bca408312d27ce51c9a0fd5e94e140f993c8a7f6431ef3a077beb9",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -155,7 +155,7 @@
       "template": "tpl:uns",
       "layout": "lay:c",
       "issuer": "iss:fx-l",
-      "input_digest": "8e91cd35ccee5f05e0a2ba8265d601c42c78e573e74aa6225334b29e67a5b033",
+      "input_digest": "aaa80a26b933a2ff620d35f8de70faca779c395fbda45a317f95bfe3a86846bd",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -168,7 +168,7 @@
       "template": "tpl:bank",
       "layout": "lay:a",
       "issuer": "iss:bank-m",
-      "input_digest": "b297df128a4fab231bded0c4151e2883f48b40e9e2dded1c00c54947f2571dd4",
+      "input_digest": "c6f10573965922056693e8328e4d9cb51c84b440397ace13bb33854dc1603dc1",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -181,7 +181,7 @@
       "template": "tpl:mix",
       "layout": "lay:b",
       "issuer": "iss:multi-n",
-      "input_digest": "a0558112218550cd4824d3a3ead7bc8ab7b42d88c5277f5b314a51cf9c43c483",
+      "input_digest": "833b41d91c778f311b090babfde57ff65042e4e1fe5149db0d9f5eadd7564d16",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -194,7 +194,7 @@
       "template": "tpl:sup",
       "layout": "lay:c",
       "issuer": "iss:hotel-o",
-      "input_digest": "cefdee467997167e109c97d1130503ad229b11cc39bf8b724b9d3281ab65e0b8",
+      "input_digest": "e7be75221c275193e28e4eca16d2aaf21883f94c0928c31ae9c4e0f02346b90d",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     }
   ]

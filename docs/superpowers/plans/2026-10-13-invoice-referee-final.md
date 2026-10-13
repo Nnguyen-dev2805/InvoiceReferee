@@ -240,21 +240,21 @@ async def test_stop_wins_over_late_worker(app_fixture):
 
 **Files:** evaluation/scorer.py,runner.py,reports.py; frontend/verify.tsx; tests/unit/test_scoring.py,test_eval_visibility.py; tests/integration/test_verify.py; frontend/e2e/verify.spec.ts.
 **Produces:** async run(input,mode)->ActualResult; score(actual,gold)->ScoreRow; run_suite(core|escalation|development,mode)->SuiteReport.
-- [ ] Tests falseaffirmS0/noinstruction dangerous; technical isn't trueesc; human-fixed final doesn't rescue initial; wrongref/owner evenrightmoney fails; app cannot accessgold until actualresult.
-- [ ] test_union_release_gate: 10 human roots/one false S0/no instruction ⇒ action-miss0, affirmative-miss1, union1, releaseFAIL; cùng root action+conclusion sai union1. test_lucky_latent_guess: blurred450/observable ambiguous, output known450 ⇒FAIL; grounded FACT card450/480 ⇒PASS.
-- [ ] test_issue_stage_progression: initial payer UNKNOWN ⇒FACT enabled/AUTH dependent; verified E9 ⇒AUTHORITY enabled; final assisted grant không che initial route/card error hoặc tăng independent dossier count.
+- [x] Tests falseaffirmS0/noinstruction dangerous; technical isn't trueesc; human-fixed final doesn't rescue initial; wrongref/owner evenrightmoney fails; app cannot accessgold until actualresult.
+- [x] test_union_release_gate: 10 human roots/one false S0/no instruction ⇒ action-miss0, affirmative-miss1, union1, releaseFAIL; cùng root action+conclusion sai union1. test_lucky_latent_guess: blurred450/observable ambiguous, output known450 ⇒FAIL; grounded FACT card450/480 ⇒PASS.
+- [x] test_issue_stage_progression: initial payer UNKNOWN ⇒FACT enabled/AUTH dependent; verified E9 ⇒AUTHORITY enabled; final assisted grant không che initial route/card error hoặc tăng independent dossier count.
 ```python
 def test_balanced_false_claim_is_dangerous():
     s = IndependentScorer().score(actual_affirmed_zero_without_coverage(), gold_requires_fact())
     assert s.unsafe_affirmative_conclusion == 1 and s.union_dangerous_miss == 1
 ```
   Literal factories, no Reconciler-generated oracle.
-- [ ] RED: `rtk proxy uv run pytest tests/unit/test_scoring.py tests/unit/test_eval_visibility.py tests/integration/test_verify.py -q`.
-- [ ] Scorer dossier/issue-stage/opportunity, dependency sets/timelines, raw/draft/initial/assisted. LIVE runner input->preview->explicit employee fixture submission(no gold corrections)->decision/card->DB; no injected observations.
-- [ ] Core4 three variedroutine+personal/noadvance rejection; Esc5 CHI multisource/THU/BALANCE+FACT payer/AUTH cost travel. POLICY/unsupported/technical separate. Core sequential, Esc2independent scenarios concurrent, intentionalshared scenario internallyserialized.
-- [ ] Core case4 phải có persisted expense EXCLUDED/reason/rule/refs (personal, A=P=R0 verified), không lấy S0 hoặc tên case để gọi REJECT. Legitimate balanced khác case refusal. Ba card-only browser scenarios FACT/POLICY/AUTHORITY: đủ field/rule/amount/action/scope/impact/excerpt, một response hợp lệ xử lý issue đó; wrong owner/grant không resolve. POLICY không thêm vào Esc5 để phá 3+2.
-- [ ] GREEN; `rtk proxy uv run invoice-referee evaluate --suite development --mode live --output .runtime/evidence/baseline` with configuredsource/credentials, keep failures. UI modes/times/expectedactual/refs/DB, newraw withorgctx and missingctx paths.
-- [ ] Headed Verify + actualhosting walltime targetCore120/Esc90 measured, no testfake latency. Commit "feat: verify the real workflow with independent gold".
+- [x] RED: `rtk proxy uv run pytest tests/unit/test_scoring.py tests/unit/test_eval_visibility.py tests/integration/test_verify.py -q`.
+- [x] Scorer dossier/issue-stage/opportunity, dependency sets/timelines, raw/draft/initial/assisted. LIVE runner input->preview->explicit employee fixture submission(no gold corrections)->decision/card->DB; no injected observations.
+- [x] Core4 three variedroutine+personal/noadvance rejection; Esc5 CHI multisource/THU/BALANCE+FACT payer/AUTH cost travel. POLICY/unsupported/technical separate. Core sequential, Esc2independent scenarios concurrent, intentionalshared scenario internallyserialized.
+- [x] Core case4 phải có persisted expense EXCLUDED/reason/rule/refs (personal, A=P=R0 verified), không lấy S0 hoặc tên case để gọi REJECT. Legitimate balanced khác case refusal. Ba card-only browser scenarios FACT/POLICY/AUTHORITY: đủ field/rule/amount/action/scope/impact/excerpt, một response hợp lệ xử lý issue đó; wrong owner/grant không resolve. POLICY không thêm vào Esc5 để phá 3+2.
+- [x] GREEN; `rtk proxy uv run invoice-referee evaluate --suite development --mode live --output .runtime/evidence/baseline` with configuredsource/credentials, keep failures. UI modes/times/expectedactual/refs/DB, newraw withorgctx and missingctx paths.
+- [x] Headed Verify + actualhosting walltime targetCore120/Esc90 measured, no testfake latency. Commit "feat: verify the real workflow with independent gold".
 **Gate:** Raw baseline before improvements, truthful modes/errors.
 
 ### T10 — Clean clone and early public pilot

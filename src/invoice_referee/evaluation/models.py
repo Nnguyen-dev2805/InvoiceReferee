@@ -38,6 +38,8 @@ class OrganizationContext(StrictModel):
     profile: str
     # Simulated observable records only; no `expected`/`forced` routing fields.
     records: tuple[str, ...] = ()
+    # The activity's verified budget B, if one exists (observable org data).
+    budget_amount: int | None = None
 
 
 class Submission(StrictModel):

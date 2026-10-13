@@ -21,8 +21,10 @@ from invoice_referee.evidence.trace import (
     RunBudget,
     RunManifest,
     TraceSpan,
-    build_trace,
+    build_trace,  # noqa: F401
 )
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _run_m0(argv: list[str]) -> int:
@@ -92,6 +94,78 @@ def _run_m0(argv: list[str]) -> int:
     return 0
 
 
+def _run_evaluate(argv: list[str]) -> int:
+    import asyncio
+    import json
+
+    from invoice_referee.evaluation.packets import load_gold, load_input
+    from invoice_referee.evaluation.reports import write_report
+    from invoice_referee.evaluation.runner import EvaluationRunner
+    from invoice_referee.evaluation.scorer import IndependentScorer
+    from invoice_referee.workflow.db import Database
+    from invoice_referee.workflow.service import CaseWorkflow
+
+    parser = argparse.ArgumentParser(prog="invoice-referee evaluate")
+    parser.add_argument("--suite", required=True, choices=("core", "escalation", "development"))
+    parser.add_argument("--mode", choices=("stub", "replay", "live"), default="stub")
+    parser.add_argument("--dataset", default=str(PROJECT_ROOT / "data" / "evaluation"))
+    parser.add_argument("--output", required=True)
+    args = parser.parse_args(argv)
+
+    mode = args.mode.upper()
+    settings = Settings()
+    if mode == "LIVE" and settings.missing_for_live():
+        print("evaluate LIVE thiếu cấu hình: " + ", ".join(settings.missing_for_live()), file=sys.stderr)
+        return 2
+
+    dataset = Path(args.dataset) / "development"
+    packets = sorted(p for p in dataset.iterdir() if p.is_dir()) if dataset.is_dir() else []
+    if not packets:
+        print(f"không có packet trong {dataset}", file=sys.stderr)
+        return 2
+
+    async def _run() -> dict:
+        output_dir = Path(args.output)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        db = Database(output_dir / "evaluate.sqlite")
+        db.migrate()
+        workflow = CaseWorkflow(db, uploads_dir=output_dir / "uploads")
+        context_path = PROJECT_ROOT / "data" / "demo" / "company-context.json"
+        workflow.import_demo_context(context_path, origin="SIMULATED")
+        runner = EvaluationRunner(workflow=workflow)
+        scorer = IndependentScorer()
+        rows = []
+        actuals = []
+        for packet_dir in packets:
+            packet_input = load_input(packet_dir)
+            actual = await runner.run(packet_input, mode)
+            gold = load_gold(packet_dir)
+            row = scorer.score(actual, gold)
+            rows.append(row)
+            actuals.append(actual)
+        report = scorer.release_gate(rows, total_human=sum(
+            1 for r in rows if r.expected_route in ("FACT", "POLICY", "AUTHORITY")
+        ))
+        return {
+            "suite": args.suite,
+            "mode": mode,
+            "total": len(rows),
+            "union_dangerous_miss": report.union_dangerous_miss,
+            "action_miss": report.action_miss,
+            "affirmative_miss": report.affirmative_miss,
+            "release": report.release,
+            "rows": [json.loads(r.model_dump_json()) for r in rows],
+        }
+
+    result = asyncio.run(_run())
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    path = output / f"{args.suite}-{mode.lower()}-report.json"
+    path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"evaluate report written: {path} (union={result['union_dangerous_miss']})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the CLI. Returns a process exit status.
 
@@ -102,6 +176,8 @@ def main(argv: list[str] | None = None) -> int:
         argv = sys.argv[1:]
     if argv and argv[0] == "m0":
         return _run_m0(argv[1:])
+    if argv and argv[0] == "evaluate":
+        return _run_evaluate(argv[1:])
     if not argv:
         return 0
     print(f"unknown command: {argv[0]}", file=sys.stderr)
