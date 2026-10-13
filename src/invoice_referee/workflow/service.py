@@ -364,6 +364,14 @@ class CaseWorkflow:
         self._transcriber = transcriber
         self._provider_mode = provider_mode
 
+    @property
+    def provider_mode(self) -> str:
+        return self._provider_mode
+
+    @provider_mode.setter
+    def provider_mode(self, value: str) -> None:
+        self._provider_mode = value
+
     def _now_iso(self) -> str:
         return self._clock().isoformat()
 
