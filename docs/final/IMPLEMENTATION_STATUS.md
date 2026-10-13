@@ -17,7 +17,14 @@ The plan owns task acceptance; package/config files own executable commands.
 | Last completed application task | T2 — gate passed (UI available; tenant/version/source checks); T1 = 57d2e19; T2 = 1c395de |
 | Product unit/integration/UI/LIVE evidence | Domain conformance: `uv run pytest` → **36 passed** (26 after T2 + 10 new contract tests); `uv run pytest tests/unit/test_contracts.py -W error` clean. T2 gate: `npm --prefix frontend run build` exit 0 under Node 24.19.0 / npm 11.12.1 (lockfile `frontend/package-lock.json`); UI checkpoint on `uv run python scripts/dev.py --mode stub`. LIVE/OCR: NOT_RUN. Note: `frontend/node_modules` and `frontend/dist` are absent on this checkout (ignored); rebuild before re-running the browser checkpoint |
 | CodeGraph | **Fresh** at `1c395de`: `codegraph status` → 34 files, 505 nodes, 1135 edges (python 24, tsx 4, typescript 6). The earlier "stale/0 files" note was itself outdated; re-check with `rtk proxy codegraph status` before relying on it |
-| Git handoff | T1 = 57d2e19 on `final`. T2 = 1c395de on `final` (pushed). Domain-conformance fixes = uncommitted working tree on `final` (commit deferred, no Git authorization) |
+| Git handoff | T1 = 57d2e19, T2 = 1c395de, domain-conformance = 3245d00, boundary fixes = ec37242 — all on `final` (unpushed beyond 1c395de; no push authorization) |
+
+**Schema note (13/10/2026).** `context_grants` and `context_people` changed primary
+keys to `(tenant, grant_id)` / `(tenant, id)` for tenant isolation. `Database.migrate()`
+only runs `CREATE TABLE IF NOT EXISTS`, so it does **not** alter an existing table.
+No runtime DB exists in this repo, so nothing needs migrating today; any DB file created
+before this change must be deleted and recreated (a real versioned migration is a T10
+clean-clone/runbook item, not done here).
 
 ## Evidence on demand
 
