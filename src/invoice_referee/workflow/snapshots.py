@@ -205,15 +205,18 @@ def build_assessment_input(
             )
 
     # Recorded money events (actual P/R/A) join the ledger so the projection
-    # reflects what really moved (§4). They are append-only and scoped.
+    # reflects what really moved (§4). Only CONFIRMED events are projected; an
+    # OBSERVED-only claim is preserved for audit but is not verified money, so
+    # it must not move A/P/R/S or fulfill an instruction.
     for row in cx.execute(
         "SELECT payload_json FROM money_events WHERE tenant = ? AND root_id = ? "
-        "ORDER BY recorded_at, id",
+        "AND verification_state = 'CONFIRMED' ORDER BY recorded_at, id",
         (tenant, root_id),
     ).fetchall():
         ledger.append(MoneyEvent.model_validate_json(row["payload_json"]))
     if coverage is None and cx.execute(
-        "SELECT 1 FROM money_events WHERE tenant = ? AND root_id = ? LIMIT 1",
+        "SELECT 1 FROM money_events WHERE tenant = ? AND root_id = ? "
+        "AND verification_state = 'CONFIRMED' LIMIT 1",
         (tenant, root_id),
     ).fetchone() is not None:
         coverage = CoverageRecord(

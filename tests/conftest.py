@@ -418,11 +418,15 @@ class AppFixture:
         payee: str | None = None,
         external_key: str | None = None,
         kind: str = "REIMBURSEMENT_RECEIVED",
+        completion_claim: str | None = "Đã nhận đủ, đối chiếu sao kê ngân hàng",
+        refs: tuple = (),
     ) -> CaseView:
         """Submit a routine root for `instruction_amount`, then record a receipt.
 
         Builds an instruction via the real submit path, then executes
-        RecordActual (never a direct SQL write) as the accountant.
+        RecordActual (never a direct SQL write) as the accountant. The default
+        carries a responsible completion claim; pass ``completion_claim=None``
+        (and no refs) to record a bare, unverified statement.
         """
         from invoice_referee.domain.finance import RecordMoneyInput
         from invoice_referee.domain.commands import RecordActual
@@ -440,6 +444,8 @@ class AppFixture:
             payee=payee or DEFAULT_ACTOR,
             amount=received,
             event_at=DEFAULT_OCCURRED_AT,
+            completion_claim=completion_claim,
+            refs=refs,
             reason="Ghi nhận tiền thực tế",
         )
         context = self.ctx(

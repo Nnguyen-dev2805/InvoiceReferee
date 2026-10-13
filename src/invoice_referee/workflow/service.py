@@ -873,6 +873,17 @@ class CaseWorkflow:
 
         kind = money.claimed_kind
         event_id = f"money:{uuid.uuid4().hex}"
+        # A recorded claim is verified only when it carries a responsible
+        # completion confirmation or checked evidence (contracts §3–§4). A bare
+        # statement is preserved as OBSERVED for audit, but it never fulfills an
+        # instruction or settles a case (missing proof is not zero, and a
+        # statement alone is not proof). A linked reversal is verified by its
+        # binding to a real, unreversed original (§10.1).
+        verified = (
+            bool((money.completion_claim or "").strip())
+            or bool(money.refs)
+            or money.reverses_event_id is not None
+        )
         event = MoneyEvent(
             id=event_id,
             external_key=money.external_key,
@@ -883,8 +894,8 @@ class CaseWorkflow:
             amount=money.amount,
             event_at=money.event_at,
             recorded_at=datetime.now(UTC),
-            verification_state="CONFIRMED",
-            allocation_state="ALLOCATED",
+            verification_state="CONFIRMED" if verified else "OBSERVED",
+            allocation_state="ALLOCATED" if verified else "UNALLOCATED",
             reverses_event_id=money.reverses_event_id,
             refs=money.refs,
         )
@@ -1088,7 +1099,13 @@ class CaseWorkflow:
         overpay is recorded and raises an incident, never clipped.
         """
         root_id = str(row["id"])
-        events = self._load_money_events(cx, session.tenant, root_id)
+        # Only confirmed movements fulfill an instruction; an OBSERVED-only
+        # claim is recorded for audit but grants no fulfillment (§3–§4).
+        events = tuple(
+            e
+            for e in self._load_money_events(cx, session.tenant, root_id)
+            if e.verification_state == "CONFIRMED"
+        )
         employee = str(row["employee"])
         for inst in cx.execute(
             "SELECT * FROM instructions WHERE root_id = ? AND status IN ('ISSUED','PARTIAL')",
