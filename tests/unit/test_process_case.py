@@ -343,6 +343,36 @@ def test_uncertain_critical_low_confidence_block_asks_human(tmp_path: Path) -> N
     assert agent.conflict_calls == []
 
 
+def test_accountant_reason_names_field_file_and_observed_value() -> None:
+    candidate = {
+        "candidate_id": "EV-001:page-0-block-4",
+        "source_file": "5.jpg",
+        "content": "1.000.000",
+        "low_words": [{"text": "1.000.000", "confidence": 0.769}],
+    }
+    assessment = BlockAssessment(
+        candidate_id=candidate["candidate_id"],
+        importance="CRITICAL",
+        quality_state="UNCERTAIN",
+        review_action="ASK_HUMAN",
+        requires_verification=True,
+        canonical_fields=["total_amount"],
+        observed_text="1.000.000",
+        reason="Không đọc chắc chắn số tiền.",
+        human_question=(
+            "Vui lòng kiểm tra phiếu trong file 5.jpg và xác nhận ngày lập chứng từ."
+        ),
+    )
+
+    message = CaseProcessingService._accountant_question(assessment, candidate)
+
+    assert message == (
+        "Hệ thống chưa đọc chắc chắn số tiền tổng cộng phải thanh toán trong "
+        "file 5.jpg; vùng được đánh dấu hiện được đọc là '1.000.000'. "
+        "Vui lòng kiểm tra bản gốc và xác nhận số tiền tổng cộng phải thanh toán."
+    )
+
+
 def test_readable_critical_low_confidence_block_can_continue(tmp_path: Path) -> None:
     case_id, repository = _save_case(
         tmp_path,
@@ -607,11 +637,11 @@ def test_unclear_tax_rate_with_clear_zero_tax_does_not_block_inventory() -> None
     assert assessment.review_action == "ASK_HUMAN"
     assert assessment.semantic_category is None
     assert assessment.human_question is not None
-    assert findings[0].rule_id == "OCR_NON_BLOCKING_QUALITY_WARNING"
-    assert findings[0].status == "WARN"
+    assert findings[0].rule_id == "OCR_CONFIDENCE_REVIEW"
+    assert findings[0].status == "PASS"
 
 
-def test_unclear_item_name_is_warning_not_blocking() -> None:
+def test_unclear_item_name_is_hidden_when_not_blocking() -> None:
     candidate = {
         "candidate_id": "EV-001:page-0-block-3",
         "source_file": "hoa_don_ve_may_bay.pdf",
@@ -635,8 +665,8 @@ def test_unclear_item_name_is_warning_not_blocking() -> None:
         blocking_fields=SETTLEMENT_BLOCKING_FIELDS,
     )
 
-    assert findings[0].rule_id == "OCR_NON_BLOCKING_QUALITY_WARNING"
-    assert findings[0].status == "WARN"
+    assert findings[0].rule_id == "OCR_CONFIDENCE_REVIEW"
+    assert findings[0].status == "PASS"
 
 
 def test_non_critical_unknown_field_never_blocks() -> None:
@@ -660,11 +690,11 @@ def test_non_critical_unknown_field_never_blocks() -> None:
         ConfidenceAnalysis(block_assessments=[assessment]),
     )
 
-    assert findings[0].rule_id == "OCR_NON_BLOCKING_QUALITY_WARNING"
-    assert findings[0].status == "WARN"
+    assert findings[0].rule_id == "OCR_CONFIDENCE_REVIEW"
+    assert findings[0].status == "PASS"
 
 
-def test_critical_block_without_field_mapping_is_warning_not_gate() -> None:
+def test_block_without_accounting_field_mapping_is_hidden() -> None:
     candidate = {
         "candidate_id": "EV-001:page-0-block-10",
         "source_file": "bill-nha-hang.jpg",
@@ -686,11 +716,70 @@ def test_critical_block_without_field_mapping_is_warning_not_gate() -> None:
         blocking_fields=SETTLEMENT_BLOCKING_FIELDS,
     )
 
-    assert findings[0].rule_id == "OCR_NON_BLOCKING_QUALITY_WARNING"
-    assert findings[0].status == "WARN"
+    assert findings[0].rule_id == "OCR_CONFIDENCE_REVIEW"
+    assert findings[0].status == "PASS"
 
 
-def test_blurred_total_label_does_not_block_when_total_is_already_usable() -> None:
+def test_low_confidence_cashier_label_is_hidden() -> None:
+    candidate = {
+        "candidate_id": "EV-001:page-0-block-12",
+        "source_file": "bill-nha-hang.jpg",
+        "content": "Thu ngân: Tạ Ngọc Loan",
+        "low_words": [
+            {"text": "Thu", "confidence": 0.605},
+            {"text": "ngân:", "confidence": 0.62},
+        ],
+    }
+    assessment = BlockAssessment(
+        candidate_id=candidate["candidate_id"],
+        importance="NON_CRITICAL",
+        quality_state="SEMANTICALLY_READABLE",
+        review_action="CONTINUE",
+        requires_verification=False,
+        canonical_fields=[],
+        reason="Tên thu ngân không ảnh hưởng dữ liệu kế toán trọng yếu.",
+    )
+
+    findings = CaseProcessingService._confidence_findings(
+        [candidate],
+        ConfidenceAnalysis(block_assessments=[assessment]),
+        blocking_fields=SETTLEMENT_BLOCKING_FIELDS,
+    )
+
+    assert [(finding.rule_id, finding.status) for finding in findings] == [
+        ("OCR_CONFIDENCE_REVIEW", "PASS")
+    ]
+
+
+def test_semantically_readable_total_label_does_not_block_clear_amount() -> None:
+    candidate = {
+        "candidate_id": "EV-001:page-0-block-14",
+        "source_file": "bill-nha-hang.jpg",
+        "content": "Tổng cộng: 2.442.960đ",
+        "low_words": [{"text": "cộng:", "confidence": 0.432}],
+    }
+    assessment = BlockAssessment(
+        candidate_id=candidate["candidate_id"],
+        importance="NON_CRITICAL",
+        quality_state="SEMANTICALLY_READABLE",
+        review_action="CONTINUE",
+        requires_verification=False,
+        canonical_fields=["total_amount"],
+        observed_text="cộng:",
+        reason="Chỉ nhãn tổng cộng có confidence thấp; số tiền vẫn rõ.",
+    )
+
+    findings = CaseProcessingService._confidence_findings(
+        [candidate],
+        ConfidenceAnalysis(block_assessments=[assessment]),
+        blocking_fields=SETTLEMENT_BLOCKING_FIELDS,
+    )
+
+    assert findings[0].rule_id == "OCR_CONFIDENCE_REVIEW"
+    assert findings[0].status == "PASS"
+
+
+def test_readable_total_label_does_not_block() -> None:
     candidate = {
         "candidate_id": "EV-001:page-0-block-11",
         "source_file": "bill-nha-hang.jpg",
@@ -699,9 +788,9 @@ def test_blurred_total_label_does_not_block_when_total_is_already_usable() -> No
     assessment = BlockAssessment(
         candidate_id=candidate["candidate_id"],
         importance="CRITICAL",
-        quality_state="UNCERTAIN",
-        review_action="ASK_HUMAN",
-        requires_verification=True,
+        quality_state="READABLE",
+        review_action="CONTINUE",
+        requires_verification=False,
         canonical_fields=["total_amount"],
         reason="Nhãn tổng cộng có confidence thấp.",
     )
@@ -710,14 +799,13 @@ def test_blurred_total_label_does_not_block_when_total_is_already_usable() -> No
         [candidate],
         ConfidenceAnalysis(block_assessments=[assessment]),
         blocking_fields={"total_amount"},
-        usable_fields={"total_amount"},
     )
 
-    assert findings[0].rule_id == "OCR_NON_BLOCKING_QUALITY_WARNING"
-    assert findings[0].status == "WARN"
+    assert findings[0].rule_id == "OCR_CONFIDENCE_REVIEW"
+    assert findings[0].status == "PASS"
 
 
-def test_unassessed_block_warns_when_required_fields_are_already_usable() -> None:
+def test_unassessed_block_fails_closed_even_when_extraction_found_values() -> None:
     candidate = {
         "candidate_id": "EV-001:page-0-block-4",
         "source_file": "bill-nha-hang.jpg",
@@ -728,12 +816,65 @@ def test_unassessed_block_warns_when_required_fields_are_already_usable() -> Non
         [candidate],
         ConfidenceAnalysis(),
         blocking_fields={"total_amount"},
-        usable_fields={"total_amount"},
     )
 
-    assert findings[0].rule_id == "OCR_CONFIDENCE_ASSESSMENT_INCOMPLETE"
-    assert findings[0].status == "WARN"
-    assert "không bị chặn" in findings[0].message
+    assert findings[0].rule_id == "LOW_CONFIDENCE_BLOCK_UNKNOWN"
+    assert findings[0].status == "FAIL"
+
+
+def test_exact_identifier_cannot_pass_as_only_semantically_readable() -> None:
+    candidate = {
+        "candidate_id": "EV-001:page-0-block-13",
+        "source_file": "hoa-don.png",
+        "content": "MST người mua: 01010704004",
+    }
+    assessment = BlockAssessment(
+        candidate_id=candidate["candidate_id"],
+        importance="CRITICAL",
+        quality_state="SEMANTICALLY_READABLE",
+        review_action="CONTINUE",
+        requires_verification=False,
+        canonical_fields=["buyer_tax_code"],
+        observed_text="01010704004",
+        reason=(
+            "Nhận diện được đây là mã số thuế nhưng không chắc chắn từng chữ số."
+        ),
+    )
+
+    findings = CaseProcessingService._confidence_findings(
+        [candidate],
+        ConfidenceAnalysis(block_assessments=[assessment]),
+        blocking_fields={"buyer_tax_code"},
+    )
+
+    assert findings[0].rule_id == "LOW_CONFIDENCE_ASK_HUMAN"
+    assert findings[0].status == "FAIL"
+
+
+def test_llm_cannot_downgrade_required_identifier_to_non_critical() -> None:
+    candidate = {
+        "candidate_id": "EV-001:page-0-block-13",
+        "source_file": "hoa-don.png",
+        "content": "MST người mua: 01010704004",
+    }
+    assessment = BlockAssessment(
+        candidate_id=candidate["candidate_id"],
+        importance="NON_CRITICAL",
+        quality_state="UNCERTAIN",
+        review_action="ASK_HUMAN",
+        requires_verification=True,
+        canonical_fields=["buyer_tax_code"],
+        reason="Không đọc chắc chắn từng chữ số của MST người mua.",
+    )
+
+    findings = CaseProcessingService._confidence_findings(
+        [candidate],
+        ConfidenceAnalysis(block_assessments=[assessment]),
+        blocking_fields={"buyer_tax_code"},
+    )
+
+    assert findings[0].rule_id == "LOW_CONFIDENCE_ASK_HUMAN"
+    assert findings[0].status == "FAIL"
 
 
 def test_unclear_buyer_tax_code_blocks_before_conflict() -> None:

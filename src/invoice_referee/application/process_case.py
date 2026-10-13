@@ -31,7 +31,7 @@ ACCOUNTING_FIELD_LABELS = {
     "seller_tax_code": "mã số thuế người bán",
     "buyer_name": "tên người mua",
     "buyer_tax_code": "mã số thuế người mua",
-    "invoice_date": "ngày chứng từ",
+    "invoice_date": "ngày lập chứng từ",
     "invoice_number": "số hóa đơn",
     "template_number": "mẫu số hóa đơn",
     "serial_number": "ký hiệu hóa đơn",
@@ -42,20 +42,11 @@ ACCOUNTING_FIELD_LABELS = {
     "line_amount": "thành tiền",
     "tax_rate": "thuế suất",
     "tax_amount": "tiền thuế",
-    "total_amount": "tổng thanh toán",
+    "total_amount": "số tiền tổng cộng phải thanh toán",
     "receipt_status": "trạng thái nhận hàng",
     "payment_method": "phương thức thanh toán",
     "transaction_reference": "mã giao dịch",
 }
-TECHNICAL_QUESTION_MARKERS = (
-    "candidate",
-    "block",
-    "page-",
-    "confidence",
-    "ocr",
-    "ev-",
-)
-
 INVENTORY_BLOCKING_FIELDS = {
     "seller_name",
     "seller_tax_code",
@@ -85,6 +76,16 @@ SETTLEMENT_BLOCKING_FIELDS = {
     "transaction_status",
 }
 
+EXACT_ACCOUNTING_VALUE_FIELDS = {
+    "seller_tax_code",
+    "buyer_tax_code",
+    "invoice_date",
+    "invoice_number",
+    "line_amount",
+    "total_amount",
+    "transaction_reference",
+    "transaction_status",
+}
 
 def _ocr_markdown(response: dict[str, Any]) -> str:
     pages = response.get("pages") or []
@@ -485,14 +486,12 @@ class CaseProcessingService:
         analysis: ConfidenceAnalysis,
         *,
         blocking_fields: set[str] | None = None,
-        usable_fields: set[str] | None = None,
     ) -> list[RuleFinding]:
         effective_blocking_fields = (
             INVENTORY_BLOCKING_FIELDS
             if blocking_fields is None
             else blocking_fields
         )
-        effective_usable_fields = usable_fields or set()
         expected_ids = {candidate["candidate_id"] for candidate in candidates}
         assessment_counts: dict[str, int] = {}
         assessment_by_id: dict[str, Any] = {}
@@ -519,23 +518,6 @@ class CaseProcessingService:
             assessment = assessment_by_id.get(candidate_id)
             if assessment is None or assessment_counts.get(candidate_id) != 1:
                 source_file = candidate.get("source_file") or "chứng từ"
-                unresolved_fields = effective_blocking_fields.difference(
-                    effective_usable_fields
-                )
-                if not unresolved_fields:
-                    findings.append(
-                        RuleFinding(
-                            rule_id="OCR_CONFIDENCE_ASSESSMENT_INCOMPLETE",
-                            status="WARN",
-                            message=(
-                                "Confidence Agent chưa đánh giá được vùng này trên "
-                                f"{source_file}, nhưng các dữ liệu trọng yếu bắt "
-                                "buộc đã được trích xuất rõ nên hồ sơ không bị chặn."
-                            ),
-                            source_refs=[candidate_id],
-                        )
-                    )
-                    continue
                 findings.append(
                     RuleFinding(
                         rule_id="LOW_CONFIDENCE_BLOCK_UNKNOWN",
@@ -552,7 +534,7 @@ class CaseProcessingService:
             if CaseProcessingService._assessment_blocks_conflict(
                 assessment,
                 effective_blocking_fields,
-                effective_usable_fields,
+                candidate=candidate,
             ):
                 question = CaseProcessingService._accountant_question(
                     assessment,
@@ -566,26 +548,9 @@ class CaseProcessingService:
                         source_refs=[candidate_id],
                     )
                 )
-            elif (
-                CaseProcessingService._assessment_requires_verification(assessment)
-                or assessment.review_action == "DEFER_TO_POLICY"
-            ):
-                source_file = candidate.get("source_file") or "chứng từ"
-                labels = [
-                    ACCOUNTING_FIELD_LABELS.get(field, field.replace("_", " "))
-                    for field in assessment.canonical_fields
-                ] or ["thông tin này"]
-                findings.append(
-                    RuleFinding(
-                        rule_id="OCR_NON_BLOCKING_QUALITY_WARNING",
-                        status="WARN",
-                        message=(
-                            f"{source_file} có {', '.join(labels)} chưa rõ, nhưng "
-                            "không cần cho bước đối chiếu bill và report hiện tại."
-                        ),
-                        source_refs=[candidate_id],
-                    )
-                )
+            # Non-critical candidates remain available in the confidence
+            # artifact for diagnostics. They must not become accountant-facing
+            # warnings or affect the case decision.
 
         if not findings:
             findings.append(
@@ -608,26 +573,37 @@ class CaseProcessingService:
     def _assessment_blocks_conflict(
         assessment: Any,
         blocking_fields: set[str] | None = None,
-        usable_fields: set[str] | None = None,
+        *,
+        candidate: dict[str, Any] | None = None,
     ) -> bool:
-        if not CaseProcessingService._assessment_requires_verification(assessment):
-            return False
-        if assessment.importance != "CRITICAL":
-            return False
-        if assessment.quality_state in {"READABLE", "SEMANTICALLY_READABLE"}:
-            return False
         fields = set(assessment.canonical_fields)
         effective_blocking_fields = (
             INVENTORY_BLOCKING_FIELDS
             if blocking_fields is None
             else blocking_fields
         )
-        # A low-confidence block without a field mapping is not evidence that
-        # any accounting value is unclear.  It remains a warning, not a gate.
-        affected_critical_fields = fields.intersection(effective_blocking_fields)
-        if not affected_critical_fields:
+        # A candidate is blocking only when the semantic reviewer maps it to a
+        # field used by this workflow. Unmapped labels, decorations and other
+        # peripheral text never stop accounting processing.
+        affected_fields = fields.intersection(effective_blocking_fields)
+        if not affected_fields:
             return False
-        return bool(affected_critical_fields.difference(usable_fields or set()))
+        if affected_fields.intersection(EXACT_ACCOUNTING_VALUE_FIELDS):
+            if CaseProcessingService._assessment_requires_verification(assessment):
+                return True
+            low_word_text = " ".join(
+                str(word.get("text") or "")
+                for word in ((candidate or {}).get("low_words") or [])
+            )
+            uncertain_text = low_word_text or assessment.observed_text
+            return (
+                assessment.quality_state != "READABLE"
+                and any(character.isdigit() for character in uncertain_text)
+            )
+        return (
+            assessment.importance == "CRITICAL"
+            and CaseProcessingService._assessment_requires_verification(assessment)
+        )
 
     @classmethod
     def _evidence_quality_results(
@@ -650,7 +626,10 @@ class CaseProcessingService:
                 if assessment is None:
                     status = "ERROR"
                     continue
-                if cls._assessment_blocks_conflict(assessment):
+                if cls._assessment_blocks_conflict(
+                    assessment,
+                    candidate=candidate,
+                ):
                     if status != "ERROR":
                         status = "NEEDS_HUMAN"
                     blocking_fields.update(assessment.canonical_fields)
@@ -673,12 +652,6 @@ class CaseProcessingService:
         assessment: Any,
         candidate: dict[str, Any],
     ) -> str:
-        question = (assessment.human_question or "").strip()
-        if question and not any(
-            marker in question.lower() for marker in TECHNICAL_QUESTION_MARKERS
-        ):
-            return question
-
         source_file = candidate.get("source_file") or "chứng từ"
         labels = [
             ACCOUNTING_FIELD_LABELS.get(field, field.replace("_", " "))
@@ -691,13 +664,25 @@ class CaseProcessingService:
         else:
             field_text = ", ".join(labels[:-1]) + f" và {labels[-1]}"
 
-        observed_text = assessment.observed_text.strip()
+        low_word_text = " ".join(
+            str(word.get("text") or "").strip()
+            for word in candidate.get("low_words") or []
+            if str(word.get("text") or "").strip()
+        )
+        observed_text = low_word_text or assessment.observed_text.strip()
+        if not observed_text:
+            observed_text = str(candidate.get("content") or "").strip()
         if observed_text and len(observed_text) <= 80:
             return (
-                f"Vui lòng kiểm tra {source_file} và xác nhận {field_text} "
-                f"có phải là '{observed_text}' không."
+                f"Hệ thống chưa đọc chắc chắn {field_text} trong file "
+                f"{source_file}; vùng được đánh dấu hiện được đọc là "
+                f"'{observed_text}'. Vui lòng kiểm tra bản gốc và xác nhận "
+                f"{field_text}."
             )
-        return f"Vui lòng kiểm tra {source_file} và xác nhận {field_text}."
+        return (
+            f"Hệ thống chưa đọc chắc chắn {field_text} trong file {source_file}. "
+            f"Vui lòng kiểm tra bản gốc và xác nhận {field_text}."
+        )
 
     @staticmethod
     def _missing_source_findings(

@@ -43,7 +43,6 @@ from invoice_referee.extraction import (
 from invoice_referee.policy import (
     SettlementPolicyConfig,
     evaluate_settlement_policy,
-    field_importance,
     validate_expense_document,
     validate_paper_settlement_document,
 )
@@ -56,51 +55,6 @@ SOURCE_GATE_RULES = {
     "SET_ADV_001",
     "SET_DOC_001",
 }
-
-VALIDITY_TO_CONFIDENCE_FIELDS = {
-    "issuer_name": {"seller_name"},
-    "issuer_tax_code": {"seller_tax_code"},
-    "buyer_name": {"buyer_name"},
-    "buyer_tax_code": {"buyer_tax_code"},
-    "document_number": {"invoice_number", "transaction_reference"},
-    "template_number": {"template_number"},
-    "serial_number": {"serial_number"},
-    "document_date": {"invoice_date"},
-    "total_amount": {"total_amount"},
-    "line_items": {"item_name", "quantity", "unit_price", "line_amount"},
-    "payer_name": {"buyer_name"},
-    "payee_name": {"seller_name"},
-    "transaction_reference": {"transaction_reference"},
-    "transaction_status": {"transaction_status"},
-    "confirmation_present": {"receipt_status"},
-    "purpose": {"business_purpose"},
-    "advance_amount": {"total_amount"},
-}
-
-
-def _required_confidence_fields(
-    validity: DocumentValidityResult,
-) -> set[str]:
-    fields: set[str] = set()
-    for field_name in validity.required_fields:
-        try:
-            document_type = ExpenseDocumentType(validity.document_type)
-        except ValueError:
-            continue
-        if field_importance(document_type, field_name) != DocumentFieldImportance.CRITICAL:
-            continue
-        fields.update(VALIDITY_TO_CONFIDENCE_FIELDS.get(field_name, set()))
-    return fields.intersection(SETTLEMENT_BLOCKING_FIELDS)
-
-
-def _usable_confidence_fields(validity: DocumentValidityResult) -> set[str]:
-    """Canonical fields already extracted safely from this same document."""
-
-    fields: set[str] = set()
-    for field_name in validity.present_fields:
-        fields.update(VALIDITY_TO_CONFIDENCE_FIELDS.get(field_name, set()))
-    return fields
-
 
 def _ocr_markdown(response: dict[str, Any]) -> str:
     return "\n\n".join(
@@ -322,6 +276,7 @@ class SettlementProcessingService:
                 )
             ], [], None
 
+        prepared_documents: list[dict[str, Any]] = []
         for document in documents:
             document_id = str(document["document_id"])
             path = self.repository.document_path(case_id, document_id)
@@ -364,60 +319,7 @@ class SettlementProcessingService:
                 for candidate in candidates:
                     candidate["source_file"] = document["original_name"]
 
-                extraction_payload = {
-                    "case_id": case_id,
-                    "document_id": document_id,
-                    "filename": document["original_name"],
-                    "role": document["role"],
-                    "ocr_text": _ocr_markdown(execution.response),
-                }
-                if (
-                    document["role"]
-                    == SettlementDocumentRole.SETTLEMENT_REQUEST_FORM.value
-                ):
-                    extracted_paper = self.reasoning_adapter.extract_paper_settlement(
-                        extraction_payload
-                    )
-                    if extracted_paper.document_id != document_id:
-                        raise ValueError(
-                            "Paper Extraction Agent trả document_id không khớp nguồn."
-                        )
-                    artifact_payload = extracted_paper.model_dump(mode="json")
-                    validity = validate_paper_settlement_document(
-                        extracted_paper,
-                        advance_amount_required=(
-                            draft.settlement_type
-                            == SettlementType.ADVANCE_SETTLEMENT
-                        ),
-                    )
-                else:
-                    extracted = self.reasoning_adapter.extract_expense_document(
-                        extraction_payload
-                    )
-                    if extracted.document_id != document_id:
-                        raise ValueError(
-                            "Extraction Agent trả document_id không khớp nguồn."
-                        )
-                    artifact_payload = extracted.model_dump(mode="json")
-                    validity = validate_expense_document(
-                        extracted,
-                        company_tax_codes=self.policy.company_tax_codes,
-                    )
-                self.repository.save_json_artifact(
-                    case_id,
-                    "facts",
-                    f"{document_id}.json",
-                    artifact_payload,
-                )
-                self.repository.save_json_artifact(
-                    case_id,
-                    "validity",
-                    f"{document_id}.json",
-                    validity.model_dump(mode="json"),
-                )
-                confidence_blocking_fields = _required_confidence_fields(validity)
-                usable_confidence_fields = _usable_confidence_fields(validity)
-
+                confidence = ConfidenceAnalysis()
                 if candidates:
                     confidence_payload = {
                         "case_id": case_id,
@@ -426,11 +328,6 @@ class SettlementProcessingService:
                             "evidence_id": document_id,
                             "role": document["role"],
                             "filename": document["original_name"],
-                            "document_type": validity.document_type,
-                            "required_fields": validity.required_fields,
-                            "extracted_usable_fields": sorted(
-                                usable_confidence_fields
-                            ),
                             "ocr_text": _ocr_markdown(execution.response),
                             "candidate_blocks": candidates,
                         },
@@ -454,11 +351,17 @@ class SettlementProcessingService:
                             },
                         )
                         confidence = ConfidenceAnalysis()
+                    else:
+                        self.repository.save_json_artifact(
+                            case_id,
+                            "confidence",
+                            f"{document_id}.json",
+                            confidence.model_dump(mode="json"),
+                        )
                     legacy_findings = CaseProcessingService._confidence_findings(
                         candidates,
                         confidence,
-                        blocking_fields=confidence_blocking_fields,
-                        usable_fields=usable_confidence_fields,
+                        blocking_fields=SETTLEMENT_BLOCKING_FIELDS,
                     )
                     for finding in legacy_findings:
                         detailed_source_refs = [
@@ -504,22 +407,100 @@ class SettlementProcessingService:
                             source_refs=[f"DOC:{document_id}"],
                         )
                     )
-
-                findings.extend(
-                    _validity_findings(
-                        validity,
-                        filename=document["original_name"],
+                prepared_documents.append(
+                    {
+                        "document": document,
+                        "ocr_text": _ocr_markdown(execution.response),
+                    }
+                )
+            except ExternalServiceUnavailableError:
+                raise
+            except Exception as exc:
+                findings.append(
+                    SettlementFinding(
+                        rule_id="SET_QUALITY_001",
+                        status="FAIL",
+                        message=(
+                            f"Chưa kiểm tra xong chất lượng chứng từ "
+                            f"'{document['original_name']}': {exc}"
+                        ),
+                        uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,
+                        target=DecisionTarget.ACCOUNTANT,
+                        question=(
+                            f"Vui lòng kiểm tra '{document['original_name']}' "
+                            "hoặc chạy lại hồ sơ."
+                        ),
+                        source_refs=[f"DOC:{document_id}"],
                     )
                 )
-                if any(
-                    finding.status == "FAIL"
-                    and any(
-                        source_ref == f"DOC:{document_id}"
-                        or source_ref.startswith(f"DOC:{document_id}:")
-                        for source_ref in finding.source_refs
-                    )
-                    for finding in findings
+
+        # No extracted value may enter validation or matching until every file
+        # has passed its independent OCR quality gate.
+        if any(finding.status == "FAIL" for finding in findings):
+            return findings, [], None
+
+        for prepared in prepared_documents:
+            document = prepared["document"]
+            document_id = str(document["document_id"])
+            extraction_payload = {
+                "case_id": case_id,
+                "document_id": document_id,
+                "filename": document["original_name"],
+                "role": document["role"],
+                "ocr_text": prepared["ocr_text"],
+            }
+            try:
+                if (
+                    document["role"]
+                    == SettlementDocumentRole.SETTLEMENT_REQUEST_FORM.value
                 ):
+                    extracted_paper = self.reasoning_adapter.extract_paper_settlement(
+                        extraction_payload
+                    )
+                    if extracted_paper.document_id != document_id:
+                        raise ValueError(
+                            "Paper Extraction Agent trả document_id không khớp nguồn."
+                        )
+                    artifact_payload = extracted_paper.model_dump(mode="json")
+                    validity = validate_paper_settlement_document(
+                        extracted_paper,
+                        advance_amount_required=(
+                            draft.settlement_type
+                            == SettlementType.ADVANCE_SETTLEMENT
+                        ),
+                    )
+                else:
+                    extracted = self.reasoning_adapter.extract_expense_document(
+                        extraction_payload
+                    )
+                    if extracted.document_id != document_id:
+                        raise ValueError(
+                            "Extraction Agent trả document_id không khớp nguồn."
+                        )
+                    artifact_payload = extracted.model_dump(mode="json")
+                    validity = validate_expense_document(
+                        extracted,
+                        company_tax_codes=self.policy.company_tax_codes,
+                    )
+
+                self.repository.save_json_artifact(
+                    case_id,
+                    "facts",
+                    f"{document_id}.json",
+                    artifact_payload,
+                )
+                self.repository.save_json_artifact(
+                    case_id,
+                    "validity",
+                    f"{document_id}.json",
+                    validity.model_dump(mode="json"),
+                )
+                document_findings = _validity_findings(
+                    validity,
+                    filename=document["original_name"],
+                )
+                findings.extend(document_findings)
+                if any(finding.status == "FAIL" for finding in document_findings):
                     continue
                 if validity.eligible_for_matching:
                     if (
@@ -537,7 +518,7 @@ class SettlementProcessingService:
                         rule_id="SET_EXTRACTION_001",
                         status="FAIL",
                         message=(
-                            f"Chưa đọc xong chứng từ "
+                            f"Chưa trích xuất xong chứng từ "
                             f"'{document['original_name']}': {exc}"
                         ),
                         uncertainty_type=UncertaintyType.FACTUAL_UNKNOWN,

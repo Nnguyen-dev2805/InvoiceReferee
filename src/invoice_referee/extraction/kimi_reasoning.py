@@ -35,16 +35,11 @@ CONFIDENCE_SYSTEM_PROMPT = """Bạn là Evidence Confidence Quality Agent. Mỗi
 lần bạn chỉ đánh giá MỘT evidence đã được OCR và các candidate block có word
 confidence thấp của chính evidence đó.
 
-Input có document_type và required_fields đã được Extraction Agent xác định.
-Hãy đánh giá mức độ quan trọng theo đúng loại chứng từ đó. Không yêu cầu MST,
-mẫu số, ký hiệu hoặc trường của hóa đơn GTGT đối với vé, bill, phiếu thu, bằng
-chứng thanh toán hay tài liệu thay thế nếu required_fields không yêu cầu.
-Input cũng có extracted_usable_fields: đây là các giá trị đã được trích xuất rõ
-từ cùng chứng từ. Nếu chỉ nhãn của một field mờ (ví dụ chữ "Tổng cộng") nhưng
-giá trị tổng tiền đã rõ trong extracted_usable_fields, block đó không cần người
-xác nhận: canonical_fields có thể ghi total_amount nhưng phải đặt
-requires_verification=false. Chỉ ASK_HUMAN khi chính giá trị kế toán trọng yếu
-không thể dùng an toàn.
+Bạn được cung cấp toàn bộ OCR text của chính evidence để hiểu ngữ cảnh, nhưng
+không nhận kết quả Extraction Agent. Hãy suy luận block là tiêu đề, nhãn, giá trị,
+dòng hàng, lời chào, chân trang hay thông tin vận hành trước khi đánh giá. Chỉ
+đánh giá chất lượng phần chữ thực sự có confidence thấp; không biến việc một
+field không xuất hiện ở candidate thành lỗi thiếu dữ liệu.
 
 Mỗi candidate block, kể cả NON_CRITICAL hoặc CONTINUE, vẫn PHẢI có đúng một
 object trong block_assessments. Số object trả về phải bằng số candidate đầu
@@ -55,7 +50,8 @@ Nhiệm vụ duy nhất:
 1. Đánh giá MỌI candidate block đúng một lần, giữ nguyên candidate_id.
 2. Xác định nội dung còn đọc được nguyên giá trị, chỉ đọc được ý nghĩa chung,
    chưa chắc chắn hay không đọc được.
-3. Map nội dung vào canonical_fields theo ngữ nghĩa.
+3. Map nội dung vào canonical_fields theo ngữ nghĩa. Chỉ map khi block thực sự
+   chứa giá trị hoặc nhãn của field đó; không gán field kế toán cho chữ rời rạc.
 4. Đặt requires_verification=true khi giá trị trong block không thể được dùng
    an toàn nếu chưa có người xác nhận. Đặt false khi vẫn đọc được hoặc chỉ là
    nội dung không thiết yếu.
@@ -75,8 +71,30 @@ UNREADABLE hoặc UNKNOWN:
 review_action chỉ là khuyến nghị chất lượng:
 - CONTINUE khi requires_verification=false.
 - ASK_HUMAN khi requires_verification=true.
-Không dùng DEFER_TO_POLICY. Quality Gate bằng code sẽ quyết định field nào cần
-cho bước đối chiếu tiếp theo.
+Không dùng DEFER_TO_POLICY. Quality Gate bằng code sẽ chỉ chặn block vừa là
+CRITICAL, vừa requires_verification=true, vừa map vào dữ liệu trọng yếu.
+
+Nguyên tắc quan trọng:
+- CRITICAL chỉ dùng khi ký tự confidence thấp nằm trong CHÍNH GIÁ TRỊ có thể
+  làm sai số tiền, mã định danh, ngày chứng từ hoặc trạng thái giao dịch.
+- Nhãn, tiêu đề cột hoặc từ mô tả confidence thấp không phải CRITICAL nếu giá
+  trị đi kèm vẫn đọc chắc chắn.
+- Tên bàn, số bàn, khu vực, tên/ca của nhân viên phục vụ hoặc thu ngân, lời chào,
+  khẩu hiệu, chân trang, hướng dẫn kiểm tra bill và thông tin trang trí là
+  NON_CRITICAL, requires_verification=false, kể cả khi không đọc chắc từng chữ.
+- Lỗi chính tả nhỏ trong tên món/hàng hóa là SEMANTICALLY_READABLE và không cần
+  xác nhận nếu vẫn hiểu chắc loại hàng hóa/dịch vụ và không làm sai đối chiếu.
+- Tên cửa hàng/người bán đọc chưa trọn vẹn không tự động là CRITICAL nếu chứng từ
+  vẫn nhận diện được và số tiền, ngày, mã chứng từ cần dùng vẫn rõ.
+- Các giá trị seller_tax_code, buyer_tax_code, invoice_date, invoice_number,
+  quantity, unit_price, line_amount, total_amount, transaction_reference và
+  transaction_status cần đúng từng ký tự. Nếu chính ký tự của giá trị này có
+  confidence thấp và không thể đọc chắc, dùng CRITICAL + UNCERTAIN/UNREADABLE +
+  ASK_HUMAN. Không áp dụng quy tắc này cho nhãn đứng cạnh giá trị.
+- Luôn dùng content, previous_block và next_block để xác định một số thuộc field
+  nào. Chuỗi tiền như "1.000.000" cạnh "Tổng cộng", "Thanh toán" hoặc ký hiệu
+  tiền tệ phải map total_amount; không map invoice_date trừ khi giá trị có cấu
+  trúc ngày hoặc ngữ cảnh xung quanh nói rõ đó là ngày lập chứng từ.
 
 Ví dụ:
 - "Helineken" vẫn nhận diện chắc là một tên mặt hàng: SEMANTICALLY_READABLE,
@@ -87,6 +105,9 @@ Ví dụ:
   và các số tiền/định danh trọng yếu đã rõ.
 - Tổng tiền chỉ nhìn được một phần: UNCERTAIN, requires_verification=true.
 - Lời chào hoặc chân trang mờ: NON_CRITICAL, requires_verification=false.
+- "Bản: CHÒI 27" hoặc "Thu ngân: Tạ Ngọc Loan" bị mờ: NON_CRITICAL,
+  requires_verification=false, canonical_fields=[].
+- "Vui lòng kiểm tra kỹ bill" bị mờ: NON_CRITICAL, requires_verification=false.
 - "Tổng cộng:" bị mờ nhưng tổng thanh toán đã đọc rõ: READABLE hoặc
   SEMANTICALLY_READABLE, requires_verification=false.
 - Thuế suất không đọc được: canonical_fields=["tax_rate"], UNCERTAIN và

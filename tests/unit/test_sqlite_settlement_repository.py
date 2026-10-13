@@ -214,6 +214,131 @@ class _LowConfidenceOcr:
         )
 
 
+class _LowConfidenceTaxCodeOcr:
+    def process(self, _path, _mime_type):
+        text = "MST người mua: 01010704004"
+        return OcrExecution(
+            provider="fake",
+            model="fake-ocr",
+            processed_at="2026-10-13T10:00:00+07:00",
+            response={
+                "pages": [
+                    {
+                        "index": 0,
+                        "dimensions": {"width": 1000, "height": 2000},
+                        "markdown": text,
+                        "confidence_scores": {
+                            "word_confidence_scores": [
+                                {
+                                    "text": "MST người mua: ",
+                                    "confidence": 0.99,
+                                    "start_index": 0,
+                                },
+                                {
+                                    "text": "01010704004",
+                                    "confidence": 0.61,
+                                    "start_index": 15,
+                                },
+                            ]
+                        },
+                        "blocks": [
+                            {
+                                "type": "text",
+                                "content": text,
+                                "top_left_x": 100,
+                                "top_left_y": 300,
+                                "bottom_right_x": 600,
+                                "bottom_right_y": 360,
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+
+
+class _LowConfidencePeripheralOcr:
+    def process(self, _path, _mime_type):
+        text = "Vui lòng kiểm tra kỹ bill trước khi thanh toán"
+        return OcrExecution(
+            provider="fake",
+            model="fake-ocr",
+            processed_at="2026-10-13T10:00:00+07:00",
+            response={
+                "pages": [
+                    {
+                        "index": 0,
+                        "dimensions": {"width": 1000, "height": 2000},
+                        "markdown": text,
+                        "confidence_scores": {
+                            "word_confidence_scores": [
+                                {
+                                    "text": text,
+                                    "confidence": 0.62,
+                                    "start_index": 0,
+                                }
+                            ]
+                        },
+                        "blocks": [
+                            {
+                                "type": "text",
+                                "content": text,
+                                "top_left_x": 100,
+                                "top_left_y": 300,
+                                "bottom_right_x": 700,
+                                "bottom_right_y": 360,
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+
+
+class _UncertainTaxCodeReasoner:
+    def __init__(self) -> None:
+        self.extraction_calls = 0
+
+    def extract_expense_document(self, payload):
+        self.extraction_calls += 1
+        return ExpenseDocumentFacts(
+            document_id=payload["document_id"],
+            document_type="E_INVOICE",
+            issuer_name="Công ty bán hàng",
+            issuer_tax_code="0101234567",
+            buyer_name="Công ty mua hàng",
+            buyer_tax_code="01010704004",
+            document_number="00001234",
+            template_number="1",
+            serial_number="C26TAA",
+            document_date=date(2026, 10, 13),
+            total_amount=Decimal("1200000"),
+            line_items=[DocumentLineFact(description="Chi phí tiếp khách")],
+            field_states={"buyer_tax_code": DocumentFieldState.PRESENT},
+            source_refs=[f"DOC:{payload['document_id']}"],
+        )
+
+    def analyze_confidence(self, payload):
+        candidate_id = payload["evidence"]["candidate_blocks"][0]["candidate_id"]
+        return ConfidenceAnalysis(
+            block_assessments=[
+                BlockAssessment(
+                    candidate_id=candidate_id,
+                    importance="CRITICAL",
+                    quality_state="UNCERTAIN",
+                    review_action="ASK_HUMAN",
+                    requires_verification=True,
+                    canonical_fields=["buyer_tax_code"],
+                    observed_text="01010704004",
+                    reason="Không đọc chắc chắn từng chữ số của MST người mua.",
+                    human_question=(
+                        "Vui lòng kiểm tra hóa đơn và xác nhận mã số thuế người mua."
+                    ),
+                )
+            ]
+        )
+
+
 class _BlockingConfidenceReasoner(_ExpenseExtractor):
     def extract_expense_document(self, payload):
         facts = super().extract_expense_document(payload)
@@ -267,13 +392,12 @@ class _TicketReplacementReasoner:
             block_assessments=[
                 BlockAssessment(
                     candidate_id=candidate_id,
-                    importance="CRITICAL",
-                    quality_state="UNCERTAIN",
-                    review_action="ASK_HUMAN",
-                    requires_verification=True,
-                    canonical_fields=["seller_tax_code"],
-                    reason="Không tìm thấy MST trên vé điện tử.",
-                    human_question="Vui lòng xác nhận MST bên bán.",
+                    importance="NON_CRITICAL",
+                    quality_state="SEMANTICALLY_READABLE",
+                    review_action="CONTINUE",
+                    requires_verification=False,
+                    canonical_fields=[],
+                    reason="Đây là câu hướng dẫn kiểm tra bill.",
                 )
             ]
         )
@@ -625,7 +749,43 @@ def test_low_confidence_finding_keeps_block_reference_for_visual_review(
     assert case["decision"]["source_refs"] == [expected_ref]
 
 
-def test_ticket_is_classified_before_confidence_and_does_not_require_tax_codes(
+def test_low_confidence_tax_code_stops_before_extraction_and_matching(
+    tmp_path: Path,
+) -> None:
+    repository = SQLiteSettlementRepository(
+        tmp_path / "invoice_referee.sqlite3",
+        tmp_path / "cases",
+        id_factory=lambda: "SET-TEST-UNTRUSTED-TAX-CODE",
+    )
+    receipt = SubmitSettlementService(repository).submit(_draft(), [_upload()])
+    reasoner = _UncertainTaxCodeReasoner()
+    SettlementProcessingService(
+        repository,
+        ocr_adapter=_LowConfidenceTaxCodeOcr(),
+        reasoning_adapter=reasoner,
+        enable_document_pipeline=True,
+    ).run_once()
+
+    case = repository.get_case(receipt.case_id)
+    document_id = case["documents"][0]["document_id"]
+    trusted_facts = repository.load_json_artifact(
+        receipt.case_id,
+        document_id,
+        "facts",
+    )
+
+    assert case["automation_decision"] == "REQUEST_INFO"
+    assert case["primary_finding_code"] == "SET_QUALITY_001"
+    assert trusted_facts is None
+    assert reasoner.extraction_calls == 0
+    assert not any(
+        finding["rule_id"] == "SET_DOCUMENT_REQUIRED_FIELDS_001"
+        or "định dạng MST" in finding["message"]
+        for finding in case["findings"]
+    )
+
+
+def test_confidence_runs_before_ticket_extraction_and_ignores_peripheral_text(
     tmp_path: Path,
 ) -> None:
     repository = SQLiteSettlementRepository(
@@ -649,7 +809,7 @@ def test_ticket_is_classified_before_confidence_and_does_not_require_tax_codes(
 
     SettlementProcessingService(
         repository,
-        ocr_adapter=_LowConfidenceOcr(),
+        ocr_adapter=_LowConfidencePeripheralOcr(),
         reasoning_adapter=reasoner,
         enable_document_pipeline=True,
     ).run_once()
@@ -662,13 +822,9 @@ def test_ticket_is_classified_before_confidence_and_does_not_require_tax_codes(
         "validity",
     )
 
-    assert reasoner.events == ["extract", "confidence"]
-    assert reasoner.confidence_payload["evidence"]["document_type"] == (
-        "TRANSPORT_TICKET"
-    )
-    assert "issuer_tax_code" not in reasoner.confidence_payload["evidence"][
-        "required_fields"
-    ]
+    assert reasoner.events == ["confidence", "extract"]
+    assert "document_type" not in reasoner.confidence_payload["evidence"]
+    assert "required_fields" not in reasoner.confidence_payload["evidence"]
     assert validity["status"] == "CLEAR"
     assert validity["eligible_for_matching"] is True
     assert case["automation_decision"] == "READY_FOR_APPROVAL"
