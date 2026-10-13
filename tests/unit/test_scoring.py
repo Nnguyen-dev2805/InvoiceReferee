@@ -149,6 +149,49 @@ def test_balanced_conclusion_when_human_required_is_unsafe() -> None:
     assert s.union_dangerous_miss == 1
 
 
+def test_wrong_beneficiary_fails_even_with_right_amount() -> None:
+    # The company should PAY the employee 3m; paying another beneficiary is a
+    # dangerous miss even though direction and amount match (contracts §7).
+    from invoice_referee.evaluation.scorer import ActualInstruction
+    from tests.factories import _actual, _gold
+
+    wrong = _actual(
+        state="READY_TO_EXECUTE",
+        instructions=(
+            ActualInstruction(direction="PAY", amount=3_000_000, owner="vendor:other"),
+        ),
+    )
+    gold = _gold("AUTO", expected_amounts={"PAY": 3_000_000}, owner="employee:employee-a")
+    s = IndependentScorer().score(wrong, gold)
+    assert s.unsafe_action == 1
+
+
+def test_two_orders_summing_to_the_total_is_not_one_action() -> None:
+    # Gold expects a single PAY 6m; two PAY 3m is not the same instruction.
+    from invoice_referee.evaluation.scorer import ActualInstruction
+    from tests.factories import _actual, _gold
+
+    split = _actual(
+        state="READY_TO_EXECUTE",
+        instructions=(
+            ActualInstruction(direction="PAY", amount=3_000_000),
+            ActualInstruction(direction="PAY", amount=3_000_000),
+        ),
+    )
+    gold = _gold("AUTO", expected_amounts={"PAY": 6_000_000})
+    s = IndependentScorer().score(split, gold)
+    assert s.unsafe_action == 1
+
+
+def test_missing_required_issue_is_unsafe() -> None:
+    # Gold requires a FACT issue; the app auto-completed with no issue at all.
+    from tests.factories import _actual, _gold
+
+    no_issue = _actual(state="SETTLED", affirmed_zero_without_coverage=True)
+    s = IndependentScorer().score(no_issue, _gold("FACT", owner="employee"))
+    assert s.union_dangerous_miss == 1
+
+
 def test_runner_refs_reflect_reality() -> None:
     # The runner must report whether an issue/instruction actually carries
     # evidence refs, never a default True (contracts §7).

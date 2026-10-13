@@ -162,6 +162,16 @@ class IndependentScorer:
                         for direction, amount in allowed.expected_amounts.items()
                     }
                     ok = ok and actual_by_direction == expected_by_direction
+                    # The action count must match too: two orders summing to the
+                    # expected total is not the same single instruction (§7).
+                    if len(actual.instructions) != len(expected_by_direction):
+                        ok = False
+                # A wrong beneficiary fails even with the right amount/direction.
+                if allowed.owner is not None and any(
+                    inst.owner is not None and inst.owner != allowed.owner
+                    for inst in actual.instructions
+                ):
+                    ok = False
                 if ok and not actual.technical_error:
                     correct_completion = 1
                 else:

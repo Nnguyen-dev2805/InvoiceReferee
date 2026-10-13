@@ -158,9 +158,17 @@ def _run_evaluate(argv: list[str]) -> int:
         rows = []
         actuals = []
         for packet_dir in packets:
-            packet_input = load_input(packet_dir)
+            packet_input = load_input(packet_dir, stage_id="ban-dau")
+            if mode == "STUB":
+                # The STUB reader assesses the case's own hand-transcription
+                # (reader-only; never part of load_input).
+                from invoice_referee.evaluation.packets import load_stub_readings
+
+                packet_input = packet_input.model_copy(
+                    update={"transcription": load_stub_readings(packet_dir, stage_id="ban-dau")}
+                )
             actual = await runner.run(packet_input, mode)
-            gold = load_gold(packet_dir)
+            gold = load_gold(packet_dir, stage_id="ban-dau")
             row = scorer.score(actual, gold)
             rows.append(row)
             actuals.append(actual)

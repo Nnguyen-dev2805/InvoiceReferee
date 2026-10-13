@@ -56,3 +56,45 @@ async def test_non_stub_run_does_not_use_seeded_transcription(app_fixture, tmp_p
     actual = await runner.run(packet_input, mode="LIVE")
     assert actual.instructions == ()
     assert actual.state != "SETTLED"
+
+
+async def test_core_and_escalation_suites_pass_on_the_corpus() -> None:
+    # The R7 gate: Core4 and Escalation5 select the right cases and the release
+    # gate is union=0 (independent gold, real command surface).
+    from pathlib import Path
+
+    from invoice_referee.evaluation.packets import load_gold, load_input, load_stub_readings
+    from invoice_referee.evaluation.runner import EvaluationRunner
+    from invoice_referee.evaluation.scorer import IndependentScorer
+    from invoice_referee.evaluation.suites import select_suite
+    from invoice_referee.workflow.db import Database
+    from invoice_referee.workflow.service import CaseWorkflow
+
+    corpus = Path(__file__).resolve().parents[2] / "data" / "kiem-thu"
+    import tempfile
+
+    tmp = Path(tempfile.mkdtemp())
+    db = Database(tmp / "r.sqlite")
+    db.migrate()
+    workflow = CaseWorkflow(db, uploads_dir=tmp / "up")
+    workflow.import_demo_context(
+        Path(__file__).resolve().parents[2] / "data" / "demo" / "company-context.json",
+        origin="SIMULATED",
+    )
+    runner = EvaluationRunner(workflow=workflow)
+    scorer = IndependentScorer()
+    for suite, count in (("core", 4), ("escalation", 5)):
+        packets = select_suite(suite, corpus)
+        assert len(packets) == count, suite
+        rows = []
+        for packet_dir in packets:
+            packet = load_input(packet_dir, stage_id="ban-dau").model_copy(
+                update={"transcription": load_stub_readings(packet_dir, stage_id="ban-dau")}
+            )
+            actual = await runner.run(packet, mode="STUB")
+            gold = load_gold(packet_dir, stage_id="ban-dau")
+            rows.append(scorer.score(actual, gold))
+        report = scorer.release_gate(rows, total_human=sum(
+            1 for r in rows if r.expected_route in ("FACT", "POLICY", "AUTHORITY")
+        ))
+        assert report.union_dangerous_miss == 0, (suite, [r.model_dump() for r in rows])
