@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, TypeVar
+from typing import Any, Callable, TypeVar
 
 from pydantic import BaseModel
 
@@ -45,6 +45,11 @@ giá trị tổng tiền đã rõ trong extracted_usable_fields, block đó khô
 xác nhận: canonical_fields có thể ghi total_amount nhưng phải đặt
 requires_verification=false. Chỉ ASK_HUMAN khi chính giá trị kế toán trọng yếu
 không thể dùng an toàn.
+
+Mỗi candidate block, kể cả NON_CRITICAL hoặc CONTINUE, vẫn PHẢI có đúng một
+object trong block_assessments. Số object trả về phải bằng số candidate đầu
+vào. Không được bỏ qua candidate không quan trọng và không được trả danh sách
+rỗng khi candidate_blocks không rỗng.
 
 Nhiệm vụ duy nhất:
 1. Đánh giá MỌI candidate block đúng một lần, giữ nguyên candidate_id.
@@ -390,6 +395,7 @@ class KimiReasoningAdapter:
         stage: str,
         system_prompt: str,
         model_type: type[AnalysisModel],
+        result_validator: Callable[[AnalysisModel], None] | None = None,
     ) -> AnalysisModel:
         messages = [
             {"role": "system", "content": system_prompt},
@@ -404,9 +410,15 @@ class KimiReasoningAdapter:
         ]
         diagnostics: list[dict[str, Any]] = []
 
+        def parse_and_validate(response: str) -> AnalysisModel:
+            result = _parse_analysis(response, model_type)
+            if result_validator is not None:
+                result_validator(result)
+            return result
+
         response_text, finish_reason = self._complete(messages)
         try:
-            return _parse_analysis(response_text, model_type)
+            return parse_and_validate(response_text)
         except ValueError as exc:
             first_validation_error = str(exc)
             diagnostics.append(
@@ -436,7 +448,7 @@ class KimiReasoningAdapter:
         ]
         repaired_text, repaired_finish_reason = self._complete(repair_messages)
         try:
-            return _parse_analysis(repaired_text, model_type)
+            return parse_and_validate(repaired_text)
         except ValueError as exc:
             diagnostics.append(
                 {
@@ -452,11 +464,46 @@ class KimiReasoningAdapter:
         self,
         case_payload: dict[str, Any],
     ) -> ConfidenceAnalysis:
+        candidate_ids = [
+            str(candidate.get("candidate_id") or "")
+            for candidate in (
+                (case_payload.get("evidence") or {}).get("candidate_blocks") or []
+            )
+            if candidate.get("candidate_id")
+        ]
+
+        def validate_coverage(result: BaseModel) -> None:
+            if not candidate_ids:
+                return
+            if not isinstance(result, ConfidenceAnalysis):
+                raise ValueError("Confidence Agent trả sai loại kết quả.")
+            counts: dict[str, int] = {}
+            for assessment in result.block_assessments:
+                counts[assessment.candidate_id] = counts.get(
+                    assessment.candidate_id, 0
+                ) + 1
+            expected = set(candidate_ids)
+            actual = set(counts)
+            missing = sorted(expected.difference(actual))
+            unexpected = sorted(actual.difference(expected))
+            duplicated = sorted(
+                candidate_id for candidate_id, count in counts.items() if count != 1
+            )
+            if missing or unexpected or duplicated:
+                raise ValueError(
+                    "Confidence Agent chưa đánh giá đúng một lần cho mọi candidate. "
+                    f"expected_count={len(candidate_ids)}, "
+                    f"actual_count={len(result.block_assessments)}, "
+                    f"missing={missing}, unexpected={unexpected}, "
+                    f"duplicated={duplicated}."
+                )
+
         return self._analyze(
             case_payload,
             stage="Confidence Quality Agent",
             system_prompt=CONFIDENCE_SYSTEM_PROMPT,
             model_type=ConfidenceAnalysis,
+            result_validator=validate_coverage,
         )
 
     def analyze_conflict(

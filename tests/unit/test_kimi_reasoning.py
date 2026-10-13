@@ -210,6 +210,47 @@ def test_adapter_retries_confidence_once_for_truncated_json() -> None:
     assert "không thể được hệ thống đọc" in completions.calls[1]["messages"][-1]["content"]
 
 
+def test_adapter_retries_when_confidence_omits_candidate_assessments() -> None:
+    completions = FakeCompletions('{"block_assessments": []}', CONFIDENCE_JSON)
+    adapter = build_adapter(completions)
+    payload = {
+        "evidence": {
+            "candidate_blocks": [
+                {"candidate_id": "EV-001:page-0-block-4"}
+            ]
+        }
+    }
+
+    result = adapter.analyze_confidence(payload)
+
+    assert len(completions.calls) == 2
+    assert result.block_assessments[0].candidate_id == (
+        "EV-001:page-0-block-4"
+    )
+    repair_prompt = completions.calls[1]["messages"][-1]["content"]
+    assert "expected_count=1" in repair_prompt
+    assert "actual_count=0" in repair_prompt
+
+
+def test_adapter_rejects_incomplete_confidence_coverage_after_repair() -> None:
+    empty_result = '{"block_assessments": []}'
+    completions = FakeCompletions(empty_result, empty_result)
+    adapter = build_adapter(completions)
+    payload = {
+        "evidence": {
+            "candidate_blocks": [
+                {"candidate_id": "EV-001:page-0-block-4"}
+            ]
+        }
+    }
+
+    with pytest.raises(KimiResponseError) as error:
+        adapter.analyze_confidence(payload)
+
+    assert len(error.value.diagnostics) == 2
+    assert "missing=['EV-001:page-0-block-4']" in str(error.value)
+
+
 def test_adapter_sends_specific_conflict_schema_errors_to_repair() -> None:
     completions = FakeCompletions(INVALID_CONFLICT_JSON, CONFLICT_JSON)
     adapter = build_adapter(completions)

@@ -15,6 +15,7 @@ from invoice_referee.application.settlement_summary import (
     build_settlement_success_reason,
 )
 from invoice_referee.domain import (
+    ConfidenceAnalysis,
     DecisionTarget,
     DocumentValidityResult,
     DocumentValidityStatus,
@@ -35,6 +36,7 @@ from invoice_referee.domain import (
 from invoice_referee.extraction import (
     DEFAULT_WORD_REVIEW_THRESHOLD,
     ExternalServiceUnavailableError,
+    KimiResponseError,
     collect_low_confidence_blocks,
     restructure_mistral_ocr,
 )
@@ -417,24 +419,41 @@ class SettlementProcessingService:
                 usable_confidence_fields = _usable_confidence_fields(validity)
 
                 if candidates:
-                    confidence = self.reasoning_adapter.analyze_confidence(
-                        {
-                            "case_id": case_id,
-                            "ocr_word_review_threshold": self.word_confidence_threshold,
-                            "evidence": {
-                                "evidence_id": document_id,
-                                "role": document["role"],
-                                "filename": document["original_name"],
-                                "document_type": validity.document_type,
-                                "required_fields": validity.required_fields,
-                                "extracted_usable_fields": sorted(
-                                    usable_confidence_fields
-                                ),
-                                "ocr_text": _ocr_markdown(execution.response),
-                                "candidate_blocks": candidates,
+                    confidence_payload = {
+                        "case_id": case_id,
+                        "ocr_word_review_threshold": self.word_confidence_threshold,
+                        "evidence": {
+                            "evidence_id": document_id,
+                            "role": document["role"],
+                            "filename": document["original_name"],
+                            "document_type": validity.document_type,
+                            "required_fields": validity.required_fields,
+                            "extracted_usable_fields": sorted(
+                                usable_confidence_fields
+                            ),
+                            "ocr_text": _ocr_markdown(execution.response),
+                            "candidate_blocks": candidates,
+                        },
+                    }
+                    try:
+                        confidence = self.reasoning_adapter.analyze_confidence(
+                            confidence_payload
+                        )
+                    except KimiResponseError as exc:
+                        self.repository.save_json_artifact(
+                            case_id,
+                            "confidence",
+                            f"{document_id}.error.json",
+                            {
+                                "stage": exc.stage,
+                                "diagnostics": exc.diagnostics,
+                                "expected_candidate_ids": [
+                                    candidate["candidate_id"]
+                                    for candidate in candidates
+                                ],
                             },
-                        }
-                    )
+                        )
+                        confidence = ConfidenceAnalysis()
                     legacy_findings = CaseProcessingService._confidence_findings(
                         candidates,
                         confidence,

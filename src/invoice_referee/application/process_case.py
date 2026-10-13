@@ -519,6 +519,23 @@ class CaseProcessingService:
             assessment = assessment_by_id.get(candidate_id)
             if assessment is None or assessment_counts.get(candidate_id) != 1:
                 source_file = candidate.get("source_file") or "chứng từ"
+                unresolved_fields = effective_blocking_fields.difference(
+                    effective_usable_fields
+                )
+                if not unresolved_fields:
+                    findings.append(
+                        RuleFinding(
+                            rule_id="OCR_CONFIDENCE_ASSESSMENT_INCOMPLETE",
+                            status="WARN",
+                            message=(
+                                "Confidence Agent chưa đánh giá được vùng này trên "
+                                f"{source_file}, nhưng các dữ liệu trọng yếu bắt "
+                                "buộc đã được trích xuất rõ nên hồ sơ không bị chặn."
+                            ),
+                            source_refs=[candidate_id],
+                        )
+                    )
+                    continue
                 findings.append(
                     RuleFinding(
                         rule_id="LOW_CONFIDENCE_BLOCK_UNKNOWN",

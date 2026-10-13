@@ -717,6 +717,25 @@ def test_blurred_total_label_does_not_block_when_total_is_already_usable() -> No
     assert findings[0].status == "WARN"
 
 
+def test_unassessed_block_warns_when_required_fields_are_already_usable() -> None:
+    candidate = {
+        "candidate_id": "EV-001:page-0-block-4",
+        "source_file": "bill-nha-hang.jpg",
+        "content": "Bàn: CHỒI 27",
+    }
+
+    findings = CaseProcessingService._confidence_findings(
+        [candidate],
+        ConfidenceAnalysis(),
+        blocking_fields={"total_amount"},
+        usable_fields={"total_amount"},
+    )
+
+    assert findings[0].rule_id == "OCR_CONFIDENCE_ASSESSMENT_INCOMPLETE"
+    assert findings[0].status == "WARN"
+    assert "không bị chặn" in findings[0].message
+
+
 def test_unclear_buyer_tax_code_blocks_before_conflict() -> None:
     candidate = {
         "candidate_id": "EV-001:page-0-block-13",
