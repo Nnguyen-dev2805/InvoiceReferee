@@ -1100,6 +1100,38 @@ class CaseWorkflow:
         self._assess_and_commit(cx, session, self._reload(cx, row), now)
         return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
 
+    def _covering_grant_ids(
+        self,
+        cx: sqlite3.Connection,
+        tenant: str,
+        actor: str,
+        action: str,
+        scope: str,
+        amount: int,
+    ) -> tuple[str, ...]:
+        """The grant ids that authorize `action` at `scope` for `amount` (§2, §5)."""
+        now = datetime.now(UTC)
+        ids: list[str] = []
+        for grant in cx.execute(
+            "SELECT * FROM context_grants WHERE tenant = ? AND actor = ?",
+            (tenant, actor),
+        ).fetchall():
+            if action not in json.loads(grant["actions_json"]):
+                continue
+            if str(grant["scope"]) not in (scope, tenant):
+                continue
+            if amount > int(grant["max_amount"]):
+                continue
+            eff_from = datetime.fromisoformat(grant["effective_from"])
+            eff_to = (
+                datetime.fromisoformat(grant["effective_to"])
+                if grant["effective_to"]
+                else None
+            )
+            if eff_from <= now and (eff_to is None or now <= eff_to):
+                ids.append(str(grant["grant_id"]))
+        return tuple(ids)
+
     def _load_money_events(
         self, cx: sqlite3.Connection, tenant: str, root_id: str
     ) -> tuple[MoneyEvent, ...]:
@@ -1436,11 +1468,18 @@ class CaseWorkflow:
         # retain path, which reuses the existing row without re-issuing.
         basis_digest = hashlib.sha256((root_id + result.cost_basis).encode()).hexdigest()[:16]
         instruction_id = f"instruction:{basis_digest}:{uuid.uuid4().hex[:8]}"
+        # The authority that lets this order be issued (contracts §2): the
+        # covering system grant(s) for the action at this scope/amount. Recorded
+        # so the instruction is grounded, not merely asserted.
+        action = "ISSUE_PAYMENT" if effect.direction == "PAY" else "ISSUE_COLLECTION"
+        authority_refs = self._covering_grant_ids(
+            cx, session.tenant, "system:referee", action, str(row["activity"]), effect.amount
+        )
         cx.execute(
             "INSERT INTO instructions (id, tenant, root_id, direction, amount, "
-            "status, basis, cost_basis, supersedes_id, fulfilled_amount, execution_state, "
-            "created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'ISSUED', ?, ?, ?, 0, "
-            "'NOT_STARTED', ?, ?)",
+            "status, basis, cost_basis, authority_refs_json, supersedes_id, "
+            "fulfilled_amount, execution_state, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, 'ISSUED', ?, ?, ?, ?, 0, 'NOT_STARTED', ?, ?)",
             (
                 instruction_id,
                 session.tenant,
@@ -1449,6 +1488,7 @@ class CaseWorkflow:
                 effect.amount,
                 effect.basis,
                 result.cost_basis,
+                json.dumps(list(authority_refs), ensure_ascii=False),
                 str(supersedes["id"]) if supersedes is not None else None,
                 now,
                 now,
@@ -1723,6 +1763,11 @@ class CaseWorkflow:
                 amount=int(inst["amount"]),
                 status=inst["status"],
                 basis=inst["basis"],
+                authority_refs=tuple(
+                    json.loads(inst["authority_refs_json"] or "[]")
+                    if "authority_refs_json" in inst.keys()
+                    else ()
+                ),
                 supersedes_id=inst["supersedes_id"],
                 fulfilled_amount=int(inst["fulfilled_amount"]),
                 remaining=max(int(inst["amount"]) - int(inst["fulfilled_amount"]), 0),

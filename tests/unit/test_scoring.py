@@ -111,3 +111,91 @@ def test_assisted_grant_does_not_hide_initial_route_error() -> None:
     gold_fact = _gold("FACT", owner="accountant")
     s = IndependentScorer().score(wrong_initial, gold_fact)
     assert s.union_dangerous_miss == 1
+
+
+def test_wrong_direction_fails_even_with_right_amount() -> None:
+    # The company should PAY 3m; issuing a COLLECT of 3m is the wrong money
+    # direction and must be a dangerous miss even though the amount matches
+    # (contracts §4, §7).
+    from invoice_referee.evaluation.scorer import ActualInstruction
+    from tests.factories import _actual, gold_routine_pay
+
+    wrong_direction = _actual(
+        state="READY_TO_EXECUTE",
+        instructions=(ActualInstruction(direction="COLLECT", amount=3_000_000),),
+    )
+    s = IndependentScorer().score(wrong_direction, gold_routine_pay())
+    assert s.union_dangerous_miss == 1
+    assert s.correct_auto_completion == 0
+
+
+def test_correct_direction_passes() -> None:
+    from tests.factories import actual_routine_pay, gold_routine_pay
+
+    s = IndependentScorer().score(actual_routine_pay(), gold_routine_pay())
+    assert s.union_dangerous_miss == 0
+    assert s.correct_auto_completion == 1
+
+
+def test_balanced_conclusion_when_human_required_is_unsafe() -> None:
+    # Gold requires a POLICY question, but the app asserted a BALANCED (settled)
+    # conclusion with no instruction and no issue: that affirmative conclusion
+    # is a dangerous miss even though no money moved (contracts §7, §11).
+    from tests.factories import _actual, _gold
+
+    balanced = _actual(state="SETTLED", conclusion_status="BALANCED")
+    s = IndependentScorer().score(balanced, _gold("POLICY", owner="approver"))
+    assert s.unsafe_affirmative_conclusion == 1
+    assert s.union_dangerous_miss == 1
+
+
+def test_runner_refs_reflect_reality() -> None:
+    # The runner must report whether an issue/instruction actually carries
+    # evidence refs, never a default True (contracts §7).
+    from invoice_referee.evaluation.runner import actual_from_view
+    from invoice_referee.evaluation.models import PacketInput, OrganizationContext, Submission
+
+    packet = PacketInput(
+        root_id="case:r",
+        profile="TRAVEL",
+        organization=OrganizationContext(tenant="tenant:demo", profile="TRAVEL"),
+        submission=Submission(employee="employee:a", activity="activity:x", declared_purpose="p"),
+    )
+
+    from invoice_referee.domain.case import CaseView, Instruction
+    from invoice_referee.domain.finance import Projection
+    from invoice_referee.domain.common import Fact
+    from invoice_referee.domain.issues import BusinessIssue
+
+    empty_projection = Projection(
+        T=Fact[int](key="T", state="UNKNOWN"),
+        E=Fact[int](key="E", state="UNKNOWN"),
+        C=Fact[int](key="C", state="UNKNOWN"),
+        A=Fact[int](key="A", state="UNKNOWN"),
+        P=Fact[int](key="P", state="UNKNOWN"),
+        R=Fact[int](key="R", state="UNKNOWN"),
+        unpaid=Fact[int](key="unpaid", state="UNKNOWN"),
+        S=Fact[int](key="S", state="UNKNOWN"),
+    )
+    ungrounded = CaseView(
+        id="case:r",
+        version=1,
+        state="WAITING",
+        summary="x",
+        issues=(
+            BusinessIssue(
+                id="issue:1", kind="FACT", field_or_rule="expense:payer",
+                owner="employee", basis="b", question="q",
+            ),
+        ),
+        instructions=(
+            Instruction(
+                id="i:1", root_id="case:r", direction="PAY", amount=1,
+                status="ISSUED", basis="b", remaining=1, execution_state="NOT_STARTED",
+            ),
+        ),
+        actual_money=empty_projection,
+    )
+    actual = actual_from_view(ungrounded, packet, mode="STUB", elapsed_ms=0.0)
+    assert actual.issues[0].refs_ok is False
+    assert actual.instructions[0].refs_ok is False

@@ -20,6 +20,57 @@ from invoice_referee.evaluation.scorer import (
 from invoice_referee.evaluation.reports import SuiteReport
 
 
+def actual_from_view(view, packet: PacketInput, *, mode: str, elapsed_ms: float) -> ActualResult:
+    """Read what the app actually persisted into an ActualResult (contracts §9).
+
+    `refs_ok` reflects whether the issue/instruction actually carries evidence
+    refs; it is never defaulted to True, so an ungrounded output is scored as
+    such rather than passed.
+    """
+    instructions = tuple(
+        ActualInstruction(
+            direction=inst.direction,
+            amount=inst.amount,
+            owner=None,
+            refs_ok=bool(inst.authority_refs) or bool(getattr(inst, "refs", ())),
+        )
+        for inst in view.instructions
+    )
+    issues = tuple(
+        ActualIssue(kind=issue.kind, owner=issue.owner, refs_ok=bool(issue.refs))
+        for issue in view.issues
+    )
+    technical = view.state == "TECHNICAL_ERROR"
+    # A false affirmative is a BALANCED conclusion reached without coverage:
+    # the projection's A/P/R must be KNOWN (established by coverage), not
+    # merely "no instruction issued". A legitimate S=0 with coverage is fine.
+    money = view.actual_money
+    money_states = {
+        "A": money.A.state,
+        "P": money.P.state,
+        "R": money.R.state,
+        "S": money.S.state,
+    }
+    affirmed_zero = (
+        view.conclusion is not None
+        and view.conclusion.status == "BALANCED"
+        and not view.instructions
+        and (money.A.state != "KNOWN" or money.P.state != "KNOWN")
+    )
+    return ActualResult(
+        root_id=packet.root_id,
+        mode=mode,  # type: ignore[arg-type]
+        state=view.state,
+        instructions=instructions,
+        issues=issues,
+        conclusion_status=view.conclusion.status if view.conclusion else None,
+        affirmed_zero_without_coverage=affirmed_zero,
+        technical_error=technical,
+        elapsed_ms=elapsed_ms,
+        money_states=money_states,
+    )
+
+
 class EvaluationRunner:
     """Runs packets through the application workflow and reports actual results."""
 
@@ -35,47 +86,8 @@ class EvaluationRunner:
         # The runner uses the workflow's own submit path via the app fixture
         # contract: it never injects observations or gold corrections.
         view = await self._drive(packet)
-        instructions = tuple(
-            ActualInstruction(
-                direction=inst.direction,
-                amount=inst.amount,
-                owner=None,
-                refs_ok=True,
-            )
-            for inst in view.instructions
-        )
-        issues = tuple(
-            ActualIssue(kind=issue.kind, owner=issue.owner, refs_ok=bool(issue.refs) or True)
-            for issue in view.issues
-        )
-        technical = view.state == "TECHNICAL_ERROR"
-        # A false affirmative is a BALANCED conclusion reached without coverage:
-        # the projection's A/P/R must be KNOWN (established by coverage), not
-        # merely "no instruction issued". A legitimate S=0 with coverage is fine.
-        money = view.actual_money
-        money_states = {
-            "A": money.A.state,
-            "P": money.P.state,
-            "R": money.R.state,
-            "S": money.S.state,
-        }
-        affirmed_zero = (
-            view.conclusion is not None
-            and view.conclusion.status == "BALANCED"
-            and not view.instructions
-            and (money.A.state != "KNOWN" or money.P.state != "KNOWN")
-        )
-        return ActualResult(
-            root_id=packet.root_id,
-            mode=mode,  # type: ignore[arg-type]
-            state=view.state,
-            instructions=instructions,
-            issues=issues,
-            conclusion_status=view.conclusion.status if view.conclusion else None,
-            affirmed_zero_without_coverage=affirmed_zero,
-            technical_error=technical,
-            elapsed_ms=(time.monotonic() - start) * 1000,
-            money_states=money_states,
+        return actual_from_view(
+            view, packet, mode=mode, elapsed_ms=(time.monotonic() - start) * 1000
         )
 
     async def _drive(self, packet: PacketInput):

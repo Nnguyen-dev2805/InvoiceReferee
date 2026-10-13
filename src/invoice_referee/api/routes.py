@@ -297,10 +297,11 @@ async def run_verify(request: Request, payload: views.VerifyRequest) -> dict[str
     from invoice_referee.evaluation.packets import load_gold, load_input
     from invoice_referee.evaluation.runner import EvaluationRunner
     from invoice_referee.evaluation.scorer import IndependentScorer
+    from invoice_referee.evaluation.suites import select_suite
 
     workflow = _workflow(request)
     dataset = PROJECT_ROOT / "data" / "evaluation" / "development"
-    packets = sorted(p for p in dataset.iterdir() if p.is_dir()) if dataset.is_dir() else []
+    packets = select_suite(payload.suite, dataset)
     runner = EvaluationRunner(workflow=workflow)
     scorer = IndependentScorer()
     rows = []
@@ -309,7 +310,12 @@ async def run_verify(request: Request, payload: views.VerifyRequest) -> dict[str
         actual = await runner.run(packet_input, payload.mode)
         gold = load_gold(packet_dir)
         rows.append(scorer.score(actual, gold))
-    report = scorer.release_gate(rows, total_human=0)
+    report = scorer.release_gate(
+        rows,
+        total_human=sum(
+            1 for row in rows if row.expected_route in ("FACT", "POLICY", "AUTHORITY")
+        ),
+    )
     return {
         "suite": payload.suite,
         "mode": payload.mode,

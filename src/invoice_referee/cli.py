@@ -102,6 +102,7 @@ def _run_evaluate(argv: list[str]) -> int:
     from invoice_referee.evaluation.reports import write_report
     from invoice_referee.evaluation.runner import EvaluationRunner
     from invoice_referee.evaluation.scorer import IndependentScorer
+    from invoice_referee.evaluation.suites import select_suite
     from invoice_referee.workflow.db import Database
     from invoice_referee.workflow.service import CaseWorkflow
 
@@ -119,9 +120,9 @@ def _run_evaluate(argv: list[str]) -> int:
         return 2
 
     dataset = Path(args.dataset) / "development"
-    packets = sorted(p for p in dataset.iterdir() if p.is_dir()) if dataset.is_dir() else []
+    packets = select_suite(args.suite, dataset)
     if not packets:
-        print(f"không có packet trong {dataset}", file=sys.stderr)
+        print(f"không có packet cho suite {args.suite} trong {dataset}", file=sys.stderr)
         return 2
 
     async def _run() -> dict:

@@ -9,6 +9,7 @@ interval; the demo limits are E <= 8m (RECOGNIZE_COST), abs(S) <= 4m
 from __future__ import annotations
 
 from invoice_referee.domain.case import AssessmentInput, AssessmentResult, FinancialEffect
+from invoice_referee.domain.common import EvidenceRef
 from invoice_referee.domain.finance import Projection
 from invoice_referee.domain.issues import BusinessIssue
 from invoice_referee.domain.policy import BudgetDecision, Grant
@@ -22,6 +23,34 @@ APPROVER_LIMIT = 20_000_000
 SYSTEM_ACTOR = "system:referee"
 
 
+def _evidence_refs(
+    input: AssessmentInput,
+    *,
+    fields: tuple[str, ...] = (),
+    expense: bool = False,
+    coverage: bool = False,
+    budget: bool = False,
+) -> tuple[EvidenceRef, ...]:
+    """The source evidence a card rests on (contracts §7: cards carry refs).
+
+    An issue/card is grounded in the observations, expense, coverage or budget
+    records that establish its fact, so a scored card can show real refs.
+    """
+    refs: list[EvidenceRef] = []
+    for observation in input.observations:
+        if observation.field in fields:
+            refs.append(observation.ref)
+    if expense:
+        for item in input.expense_facts:
+            refs.extend(item.refs)
+    if coverage and input.coverage is not None:
+        refs.extend(input.coverage.witness_refs)
+    if budget:
+        for decision in input.budget:
+            refs.extend(decision.refs)
+    return tuple(refs)
+
+
 def _issue(
     issue_id: str,
     kind: str,
@@ -29,6 +58,7 @@ def _issue(
     owner: str,
     basis: str,
     question: str,
+    refs: tuple[EvidenceRef, ...] = (),
 ) -> BusinessIssue:
     return BusinessIssue(
         id=issue_id,
@@ -37,6 +67,7 @@ def _issue(
         owner=owner,
         basis=basis,
         question=question,
+        refs=refs,
     )
 
 
@@ -109,6 +140,7 @@ def evaluate_policy(
                 "employee",
                 "Chi phí công việc chưa được xác minh.",
                 "Cung cấp chứng từ chi phí hợp lệ cho hoạt động này.",
+                _evidence_refs(input, fields=("incurred", "amount"), expense=True),
             )
         )
     if projection.A.state == "UNKNOWN" or projection.P.state == "UNKNOWN":
@@ -120,6 +152,7 @@ def evaluate_policy(
                 "accountant",
                 "Thiếu lịch sử đối chiếu ứng/hoàn cho scope này.",
                 "Xác minh coverage lịch sử (scope/thời gian/loại dòng tiền).",
+                _evidence_refs(input, fields=("coverage", "advance", "reimbursed", "returned")),
             )
         )
     if projection.E.state == "UNKNOWN":
@@ -133,6 +166,7 @@ def evaluate_policy(
                 "employee",
                 "Chưa xác minh ai thực tế đã trả khoản chi này.",
                 "Xác minh người trả (chứng từ thanh toán hoặc xác nhận có trách nhiệm).",
+                _evidence_refs(input, fields=("incurred", "paid_employee", "paid_company"), expense=True),
             )
         )
 
@@ -158,6 +192,7 @@ def evaluate_policy(
                 "approver",
                 f"Tổng chi {int(projection.T.value or 0)} vượt ngân sách {budget.amount}.",
                 "Quyết định ngoại lệ vượt ngân sách (giữ nguyên số thực chi).",
+                _evidence_refs(input, fields=("incurred", "amount"), budget=True, expense=True),
             )
         )
 
@@ -176,6 +211,7 @@ def evaluate_policy(
                     "approver",
                     f"Chi phí đủ điều kiện {e_value} vượt mức tự công nhận {RECOGNIZE_LIMIT}.",
                     "Cấp quyết định công nhận chi phí trong phạm vi được giao.",
+                    _evidence_refs(input, fields=("paid_employee", "incurred"), expense=True),
                 )
             )
 
@@ -205,6 +241,7 @@ def evaluate_policy(
                         "approver",
                         f"Cần phát hành {action} {amount} vượt quyền tự xử lý {ISSUE_LIMIT}.",
                         "Cấp quyết định phát hành yêu cầu chi/thu trong phạm vi.",
+                        _evidence_refs(input, fields=("incurred", "paid_employee"), expense=True),
                     )
                 )
 
