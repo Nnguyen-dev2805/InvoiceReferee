@@ -8,6 +8,7 @@ disclosed, never faked as a resolved version or a zero cost.
 from __future__ import annotations
 
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -109,14 +110,47 @@ class LocalTrace:
 
 
 class LangSmithTrace:
-    """Opt-in LangSmith adapter. A failure here never blocks the local audit."""
+    """Opt-in LangSmith adapter (contracts §9).
 
-    def __init__(self, *, api_key: str | None, project: str = "invoice-referee") -> None:
+    Spans carry run/basis/prompt/model; the payload is filtered before it is
+    sent (no bank PDF/secrets/private raw data). The local span is always kept,
+    and a tracing failure never affects a business conclusion.
+    """
+
+    def __init__(
+        self,
+        *,
+        api_key: str | None,
+        project: str = "invoice-referee",
+        endpoint: str | None = None,
+        agent_id: str | None = None,
+        agent_environment: str | None = None,
+        client: object | None = None,
+    ) -> None:
         self.enabled = api_key is not None
         self.project = project
+        self.endpoint = endpoint
+        self.agent_id = agent_id
+        self.agent_environment = agent_environment
         self.local = LocalTrace()
+        self._client = client
+        self._api_key = api_key
+
+    def _ensure_client(self) -> object | None:
+        if self._client is not None:
+            return self._client
+        if not self.enabled:
+            return None
+        from langsmith import Client  # imported lazily; SDK is opt-in
+
+        self._client = Client(
+            api_url=self.endpoint,
+            api_key=self._api_key,
+        )
+        return self._client
 
     def record(self, span: TraceSpan, *, payload: dict[str, object] | None = None) -> None:
+        # Local audit first and unconditionally — telemetry is optional on top.
         self.local.record(span)
         if not self.enabled:
             return
@@ -127,6 +161,47 @@ class LangSmithTrace:
             pass
 
     def _send(self, span: TraceSpan, payload: dict[str, object]) -> None:
-        # Real SDK wiring arrives when a key is configured; kept isolated so a
-        # missing/failed telemetry never affects a conclusion.
-        return None
+        from datetime import UTC, datetime
+
+        client = self._ensure_client()
+        if client is None:
+            return
+        # LangSmith requires a UUID run id; the domain's logical span id (a
+        # business key) is kept as metadata, not used as the UUID.
+        run_uuid = uuid.uuid5(uuid.NAMESPACE_URL, span.run_id)
+        now = datetime.now(UTC)
+        # A completed run needs both a start and an end time; an open run is not
+        # persisted, so a single span is written as an ended run.
+        client.create_run(  # type: ignore[attr-defined]
+            id=str(run_uuid),
+            name=span.name,
+            run_type="chain",
+            project_name=self.project,
+            inputs=payload,
+            start_time=span.started_at or now,
+            extra={
+                "logical_run_id": span.run_id,
+                "basis": span.basis,
+                "prompt_version": span.prompt_version,
+                "model": span.model,
+                "agent_id": self.agent_id,
+                "agent_environment": self.agent_environment,
+            },
+        )
+        client.update_run(  # type: ignore[attr-defined]
+            str(run_uuid),
+            end_time=span.ended_at or now,
+            outputs={"detail": span.detail} if span.detail else {},
+        )
+
+
+def build_trace(settings: object) -> LangSmithTrace:
+    """Build a trace adapter from Settings. Off unless explicitly enabled."""
+    enabled = getattr(settings, "langsmith_ready", False)
+    return LangSmithTrace(
+        api_key=getattr(settings, "langsmith_api_key", None) if enabled else None,
+        project=getattr(settings, "langsmith_project", "invoice-referee"),
+        endpoint=getattr(settings, "langsmith_endpoint", None),
+        agent_id=getattr(settings, "langsmith_agent_id", None),
+        agent_environment=getattr(settings, "langsmith_agent_environment", None),
+    )

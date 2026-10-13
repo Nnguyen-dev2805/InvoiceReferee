@@ -16,7 +16,13 @@ from pathlib import Path
 
 from invoice_referee.config import Settings
 from invoice_referee.evidence.m0 import M0Report, measure_call, write_m0_report
-from invoice_referee.evidence.trace import ProviderMode, RunBudget, RunManifest
+from invoice_referee.evidence.trace import (
+    ProviderMode,
+    RunBudget,
+    RunManifest,
+    TraceSpan,
+    build_trace,
+)
 
 
 def _run_m0(argv: list[str]) -> int:
@@ -35,6 +41,23 @@ def _run_m0(argv: list[str]) -> int:
         )
         return 2
 
+    input_dir = Path(args.input)
+    if not input_dir.exists():
+        print(f"input không tồn tại: {input_dir}", file=sys.stderr)
+        return 2
+
+    if mode == "LIVE":
+        # Real provider run: measure the reader over the 4 M0 inputs.
+        from invoice_referee.evidence.m0_live import run_m0_live
+
+        live = run_m0_live(input_dir, settings)
+        output_dir = Path(args.output)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        path = output_dir / "m0-manifest.json"
+        path.write_text(live.to_json(), encoding="utf-8")
+        print(f"M0 LIVE report written: {path}")
+        return 0
+
     budget = RunBudget()
     manifest = RunManifest(
         mode=mode,
@@ -45,31 +68,28 @@ def _run_m0(argv: list[str]) -> int:
         notes="M0 baseline; no business decision.",
     )
     report = M0Report(mode=mode, budget=budget, manifest=manifest)
+    trace = build_trace(settings)
 
-    input_dir = Path(args.input)
-    if not input_dir.exists():
-        print(f"input không tồn tại: {input_dir}", file=sys.stderr)
-        return 2
-
-    # In non-LIVE modes there is no provider call; record that honestly rather
-    # than a fake attempt.
+    # Non-LIVE modes make no provider call; record that honestly rather than a
+    # fake attempt. Spans carry run/basis/prompt/model; the payload is filtered
+    # before send and the local audit never depends on telemetry (§9).
     for kind in ("text", "clear_scan", "unclear_scan", "non_document"):
-        report.attempts.append(
-            measure_call(
-                kind,
-                source=str(input_dir),
-                page=1,
-                call=lambda: None if mode != "LIVE" else _require_provider(),
-            )
+        attempt = measure_call(kind, source=str(input_dir), page=1, call=lambda: None)
+        report.attempts.append(attempt)
+        trace.record(
+            TraceSpan(
+                name=f"m0:{kind}",
+                run_id=f"m0:{mode}:{kind}",
+                model=settings.mistral_ocr_model,
+                basis=str(input_dir),
+                detail=attempt.error or "ok",
+            ),
+            payload={"kind": kind, "ok": attempt.ok, "error": attempt.error},
         )
 
     path = write_m0_report(report, Path(args.output))
     print(f"M0 report written: {path}")
     return 0
-
-
-def _require_provider() -> None:
-    raise RuntimeError("LIVE provider not wired in this build step")
 
 
 def main(argv: list[str] | None = None) -> int:

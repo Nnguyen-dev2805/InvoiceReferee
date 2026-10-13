@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     xkiro_base_url: str | None = None
     invoice_referee_llm_model: str | None = None
 
+    # LangSmith tracing is opt-in: it is never a live-required setting, and a
+    # missing/failed trace never blocks a business conclusion (contracts §9).
+    langsmith_tracing: bool = False
+    langsmith_api_key: str | None = None
+    langsmith_endpoint: str = "https://api.smith.langchain.com"
+    langsmith_project: str = "invoice-referee"
+    langsmith_agent_id: str | None = None
+    langsmith_agent_environment: str | None = None
+
     def missing_for_live(self) -> tuple[str, ...]:
         """The live-required settings that are absent or blank."""
         return tuple(
@@ -39,3 +48,8 @@ class Settings(BaseSettings):
     @property
     def live_ready(self) -> bool:
         return not self.missing_for_live()
+
+    @property
+    def langsmith_ready(self) -> bool:
+        """Tracing is active only when explicitly enabled and keyed."""
+        return bool(self.langsmith_tracing and self.langsmith_api_key)

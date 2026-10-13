@@ -30,10 +30,16 @@ def test_m0_stub_writes_manifest(tmp_path: Path) -> None:
 
 
 def test_m0_live_without_credentials_fails_clearly(tmp_path: Path, monkeypatch) -> None:
+    # Stub the settings seam so the branch is tested regardless of a local .env.
     from invoice_referee.config import LIVE_REQUIRED_SETTINGS
 
-    for name in LIVE_REQUIRED_SETTINGS:
-        monkeypatch.delenv(name, raising=False)
+    class MissingSettings:
+        mistral_ocr_model = None
+
+        def missing_for_live(self) -> tuple[str, ...]:
+            return LIVE_REQUIRED_SETTINGS
+
+    monkeypatch.setattr("invoice_referee.cli.Settings", lambda: MissingSettings())
     inp = tmp_path / "input"
     inp.mkdir()
     code = main(["m0", "--input", str(inp), "--output", str(tmp_path / "o"), "--mode", "live"])

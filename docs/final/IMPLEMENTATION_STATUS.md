@@ -13,9 +13,9 @@ The plan owns task acceptance; package/config files own executable commands.
 | Setup review | ACCEPTED at documentation/setup level; actual clean-clone and agent-execution proof remain open |
 | Execution method | Inline execution (executing-plans) with one integrator; the whole-branch final review has not been run |
 | Workflow integrator | Inline executor — single writer for workflow/api/domain owned files |
-| Next application task | T5 — implementation complete; **M0 LIVE is BLOCKED** (no provider credentials). T6 needs authorization |
-| Last completed application task | T4 — gate passed. T5 code+offline tests done; **T5 gate NOT met** (M0 not run) |
-| Product unit/integration/UI/LIVE evidence | T5: `uv run pytest` → **108 passed** (84 after T4 + 24 evidence/preview/m0/trace tests); `frontend npm run build` exit 0. `uv run invoice-referee m0 --mode stub` writes an honest manifest. **M0 LIVE: BLOCKED — no `.env`/credentials (MISTRAL_API_KEY, XKIRO_*) on this machine.** UI checkpoint for source preview: NOT_RUN (Playwright browsers not installed) |
+| Next application task | T6, not started (needs authorization) |
+| Last completed application task | T5 — gate passed (M0 genuinely run against real Mistral OCR; LangSmith tracing verified). T4 = ae819ac |
+| Product unit/integration/UI/LIVE evidence | T5: `uv run pytest` → **116 passed**; `frontend npm run build` exit 0. **M0 LIVE ran for real** (`.runtime/evidence/m0/m0-manifest.json`): text 69 chars/24ms native, clear_scan 70 chars/1240ms OCR, unclear_scan 70 chars/937ms OCR, non_document 12 chars/680ms OCR — all ok against `mistral-ocr-latest`. **LangSmith tracing verified**: 4 `m0-live:*` runs landed in project `invoice-referee` with basis/model/agent_id/agent_environment. UI source-preview checkpoint: NOT_RUN (Playwright browsers not installed) |
 | CodeGraph | **Fresh** at `1c395de`: `codegraph status` → 34 files, 505 nodes, 1135 edges (python 24, tsx 4, typescript 6). The earlier "stale/0 files" note was itself outdated; re-check with `rtk proxy codegraph status` before relying on it |
 | Git handoff | T1 = 57d2e19, T2 = 1c395de, domain-conformance = 3245d00, boundary fixes = ec37242 — all on `final` (unpushed beyond 1c395de; no push authorization) |
 
