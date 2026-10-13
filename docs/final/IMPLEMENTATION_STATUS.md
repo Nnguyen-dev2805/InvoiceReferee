@@ -16,7 +16,7 @@ The plan owns task acceptance; package/config files own executable commands.
 | Next application task | T1, not started |
 | Last completed application task | None |
 | Product unit/integration/UI/LIVE evidence | None for the fresh build |
-| CodeGraph | Setup query returned “This project has nothing indexed”; generation/coverage unknown; retry discovery against the current environment on a later code task |
+| CodeGraph | Index rebuilt 13/10/2026 on this checkout: `index_state=complete`, `indexed_at_commit=3cd8c41` (= HEAD), 0 files/nodes. Workspace is docs-only and CodeGraph does not index `.md`, so it stays **inactive** until T1 adds source; re-run `rtk proxy codegraph index` after code exists. Earlier `index_state=failed` was a stale pass left over from the rebuild branch (152 ENOENT on deleted `frontend/src/settlement/*`, `tests/settlement/*`) |
 | Git handoff | Setup/design files are not committed; local files exist, a fresh remote clone is not yet verified |
 
 ## Evidence on demand
