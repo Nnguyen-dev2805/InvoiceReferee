@@ -23,9 +23,11 @@ from invoice_referee.domain.commands import (
     CreateDraft,
     Decide,
     Declaration,
+    RecordActual,
     SourceUpload,
     Submit,
 )
+from invoice_referee.domain.finance import RecordMoneyInput
 from invoice_referee.domain.issues import Answer, DecisionCommand
 from invoice_referee.domain.evidence import Media
 from invoice_referee.workflow.service import (
@@ -336,6 +338,34 @@ async def decide_case(
                 effect_scope=payload.effect_scope,
                 amount=payload.amount,
                 reason=payload.reason,
+            ),
+        ),
+    )
+
+
+@router.post("/cases/{root_id}/actuals")
+async def record_actual(
+    request: Request, root_id: str, payload: views.RecordActualRequest
+) -> CommandResult:
+    session = _require_session(request)
+    workflow = _workflow(request)
+    context = _command_context(request, session, require_version=False)
+    money = payload.money
+    return await workflow.execute(
+        context,
+        RecordActual(
+            root_id=root_id,
+            money=RecordMoneyInput(
+                external_key=money.external_key,
+                claimed_kind=money.claimed_kind,
+                claimed_scope=money.claimed_scope,
+                payer=money.payer,
+                payee=money.payee,
+                amount=money.amount,
+                event_at=money.event_at,
+                completion_claim=money.completion_claim,
+                reverses_event_id=money.reverses_event_id,
+                reason=money.reason,
             ),
         ),
     )

@@ -117,6 +117,16 @@ TEST_PACKETS: dict[str, dict[str, object]] = {
             {"field": "economic_key", "value": "invoice:basis-y", "role": "INVOICE"},
         ],
     },
+    # E6/A2 => S4 => one I4, used by the money-execution tests.
+    "money-i4": {
+        "facts": [
+            {"field": "incurred", "value": 6_000_000, "role": "INVOICE"},
+            {"field": "paid_employee", "value": 6_000_000, "role": "PAYMENT"},
+            {"field": "advance", "value": 2_000_000, "role": "ADVANCE"},
+            {"field": "coverage", "value": 1, "role": "LEDGER"},
+            {"field": "economic_key", "value": "invoice:money-i4", "role": "INVOICE"},
+        ],
+    },
 }
 
 
@@ -330,6 +340,88 @@ class AppFixture:
     def _version(self, root_id: str) -> int:
         row = self.query_one("SELECT version FROM cases WHERE id = ?", (root_id,))
         return int(row["version"])
+
+    # -- T7 money helpers (contracts §9) -------------------------------------
+    async def record_received(
+        self,
+        *,
+        instruction_amount: int,
+        received: int,
+        payee: str | None = None,
+        external_key: str | None = None,
+        kind: str = "REIMBURSEMENT_RECEIVED",
+    ) -> CaseView:
+        """Submit a routine root for `instruction_amount`, then record a receipt.
+
+        Builds an instruction via the real submit path, then executes
+        RecordActual (never a direct SQL write) as the accountant.
+        """
+        from invoice_referee.domain.finance import RecordMoneyInput
+        from invoice_referee.domain.commands import RecordActual
+
+        # E = instruction_amount + A(2m) so the derived instruction equals the
+        # requested amount (E - A = instruction_amount).
+        packet = "money-i4" if instruction_amount == 4_000_000 else "money-i4"
+        v = await self.submit_packet(packet, mode="STUB")
+        root = v.id
+        money = RecordMoneyInput(
+            external_key=external_key or f"bank:txn-{uuid.uuid4().hex[:8]}",
+            claimed_kind=kind,
+            claimed_scope="activity:travel-a",
+            payer="company:demo" if kind == "REIMBURSEMENT_RECEIVED" else "employee:employee-a",
+            payee=payee or DEFAULT_ACTOR,
+            amount=received,
+            event_at=DEFAULT_OCCURRED_AT,
+            reason="Ghi nhận tiền thực tế",
+        )
+        context = self.ctx(
+            actor="employee:accountant-demo",
+            expected_case_version=self._version(root),
+        )
+        # The accountant persona is required by the handler.
+        session = self.workflow.start_session(
+            tenant=TENANT_DEMO, persona="accountant", actor_id="employee:accountant-demo"
+        )
+        context = CommandContext(
+            session_id=session.session_id,
+            actor_id="employee:accountant-demo",
+            command_id=f"cmd:{uuid.uuid4().hex}",
+            expected_case_version=self._version(root),
+        )
+        result = await self.workflow.execute(context, RecordActual(root_id=root, money=money))
+        return result.case_view
+
+    async def reverse_last_received(self, *, amount: int | None = None) -> CaseView:
+        from invoice_referee.domain.finance import RecordMoneyInput
+        from invoice_referee.domain.commands import RecordActual
+
+        row = self.query_one(
+            "SELECT root_id, id, amount, kind FROM money_events "
+            "WHERE kind = 'REIMBURSEMENT_RECEIVED' ORDER BY recorded_at DESC LIMIT 1"
+        )
+        root = str(row["root_id"])
+        money = RecordMoneyInput(
+            external_key=f"bank:rev-{uuid.uuid4().hex[:8]}",
+            claimed_kind="REVERSAL",
+            claimed_scope="activity:travel-a",
+            payer="employee:employee-a",
+            payee="company:demo",
+            amount=amount if amount is not None else int(row["amount"]),
+            event_at=DEFAULT_OCCURRED_AT,
+            reverses_event_id=str(row["id"]),
+            reason="Đảo giao dịch",
+        )
+        session = self.workflow.start_session(
+            tenant=TENANT_DEMO, persona="accountant", actor_id="employee:accountant-demo"
+        )
+        context = CommandContext(
+            session_id=session.session_id,
+            actor_id="employee:accountant-demo",
+            command_id=f"cmd:{uuid.uuid4().hex}",
+            expected_case_version=self._version(root),
+        )
+        result = await self.workflow.execute(context, RecordActual(root_id=root, money=money))
+        return result.case_view
 
     # -- stored-state observation -------------------------------------------
     def query_one(self, sql: str, params: tuple[object, ...] = ()):

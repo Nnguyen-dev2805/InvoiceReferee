@@ -35,14 +35,17 @@ from invoice_referee.domain.commands import (
     CommandResult,
     CreateDraft,
     Decide,
+    MarkExecution,
+    RecordActual,
     ReviseDeclaration,
     Submit,
 )
 from invoice_referee.domain.common import Fact, SignedVnd, Vnd
 from invoice_referee.domain.evidence import SourceRef
-from invoice_referee.domain.finance import Projection
+from invoice_referee.domain.finance import MoneyEvent, Projection
 from invoice_referee.domain.issues import BusinessIssue
 from invoice_referee.workflow.db import Database
+from invoice_referee.workflow.money import can_reverse, net_by_kind
 
 DEFAULT_TENANT = "tenant:demo"
 DEFAULT_PERSONA = "employee"
@@ -551,6 +554,8 @@ class CaseWorkflow:
             "SUBMIT": self._submit,
             "ANSWER_ISSUE": self._answer_issue,
             "DECIDE": self._decide,
+            "RECORD_ACTUAL": self._record_actual,
+            "MARK_EXECUTION": self._mark_execution,
         }
         handler = handlers.get(command.kind)
         if handler is None:
@@ -815,6 +820,219 @@ class CaseWorkflow:
         self._assess_and_commit(cx, session, self._reload(cx, row), now)
         return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
 
+    def _record_actual(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        context: CommandContext,
+        command: RecordActual,
+    ) -> CommandResult:
+        row = self._require_root(cx, session, command.root_id)
+        money = command.money
+        # The accountant (or a granted actor) records actual money (§5).
+        if session.persona not in ("accountant", "approver") and not self._actor_has_grant(
+            cx, session.tenant, context.actor_id, "RECORD_ACTUAL", money.claimed_scope
+        ):
+            raise UnsupportedCommandError("Bạn không có quyền ghi nhận tiền thực tế.")
+        now = self._now_iso()
+        root_id = str(row["id"])
+        # external_key is unique per tenant: a re-sent transaction is not counted
+        # twice, and the same key with a different payload is a conflict (§4).
+        existing = cx.execute(
+            "SELECT * FROM money_events WHERE tenant = ? AND external_key = ?",
+            (session.tenant, money.external_key),
+        ).fetchone()
+        if existing is not None:
+            if (
+                int(existing["amount"]) != money.amount
+                or existing["kind"] != money.claimed_kind
+            ):
+                raise CommandConflictError(
+                    "external_key đã dùng cho một giao dịch khác nội dung."
+                )
+            return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
+        kind = money.claimed_kind
+        event_id = f"money:{uuid.uuid4().hex}"
+        event = MoneyEvent(
+            id=event_id,
+            external_key=money.external_key,
+            kind=kind,  # type: ignore[arg-type]
+            scope=money.claimed_scope,
+            payer=money.payer,
+            payee=money.payee,
+            amount=money.amount,
+            event_at=money.event_at,
+            recorded_at=datetime.now(UTC),
+            verification_state="CONFIRMED",
+            allocation_state="ALLOCATED",
+            reverses_event_id=money.reverses_event_id,
+            refs=money.refs,
+        )
+        # A reversal must not exceed the unreversed original (§10.1).
+        if money.reverses_event_id is not None:
+            events = self._load_money_events(cx, session.tenant, root_id)
+            if not can_reverse(events, money.reverses_event_id, money.amount):
+                raise UnsupportedCommandError(
+                    "Đảo giao dịch vượt quá số gốc chưa bị đảo."
+                )
+        cx.execute(
+            "INSERT INTO money_events (id, tenant, root_id, external_key, kind, scope, "
+            "payer, payee, amount, event_at, recorded_at, verification_state, "
+            "allocation_state, reverses_event_id, payload_json) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                event.id,
+                session.tenant,
+                root_id,
+                event.external_key,
+                event.kind,
+                event.scope,
+                event.payer,
+                event.payee,
+                event.amount,
+                event.event_at.isoformat(),
+                event.recorded_at.isoformat(),
+                event.verification_state,
+                event.allocation_state,
+                event.reverses_event_id,
+                event.model_dump_json(),
+            ),
+        )
+        self._audit(
+            cx,
+            tenant=session.tenant,
+            root_id=root_id,
+            session_id=session.session_id,
+            actor=context.actor_id,
+            action="RECORD_ACTUAL",
+            detail=json.dumps(
+                {"kind": event.kind, "amount": event.amount, "key": event.external_key},
+                ensure_ascii=False,
+            ),
+        )
+        # Re-assess so the projection reflects the new money and the active
+        # instruction's fulfillment is re-derived (contracts §4).
+        self._reconcile_money(cx, session, self._reload(cx, row), now)
+        self._assess_and_commit(cx, session, self._reload(cx, row), now)
+        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
+    def _mark_execution(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        context: CommandContext,
+        command: MarkExecution,
+    ) -> CommandResult:
+        row = self._require_root(cx, session, command.root_id)
+        # MarkExecution belongs to the accountant with a grant on the root (§10.1).
+        if session.persona not in ("accountant", "approver"):
+            raise UnsupportedCommandError("Chỉ kế toán/người có quyền đánh dấu thực hiện.")
+        now = self._now_iso()
+        cx.execute(
+            "UPDATE instructions SET execution_state = ?, updated_at = ? WHERE id = ? "
+            "AND root_id = ?",
+            (command.execution_state, now, command.instruction_id, str(row["id"])),
+        )
+        self._audit(
+            cx,
+            tenant=session.tenant,
+            root_id=str(row["id"]),
+            session_id=session.session_id,
+            actor=context.actor_id,
+            action="MARK_EXECUTION",
+            detail=json.dumps(
+                {"instruction": command.instruction_id, "state": command.execution_state},
+                ensure_ascii=False,
+            ),
+        )
+        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
+    def _load_money_events(
+        self, cx: sqlite3.Connection, tenant: str, root_id: str
+    ) -> tuple[MoneyEvent, ...]:
+        return tuple(
+            MoneyEvent.model_validate_json(row["payload_json"])
+            for row in cx.execute(
+                "SELECT payload_json FROM money_events WHERE tenant = ? AND root_id = ? "
+                "ORDER BY recorded_at, id",
+                (tenant, root_id),
+            )
+        )
+
+    def _reconcile_money(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        row: sqlite3.Row,
+        now: str,
+    ) -> None:
+        """Re-derive fulfillment of active instructions from the ledger (§4).
+
+        A payment fulfills only when received by the instruction's payee; an
+        overpay is recorded and raises an incident, never clipped.
+        """
+        root_id = str(row["id"])
+        events = self._load_money_events(cx, session.tenant, root_id)
+        employee = str(row["employee"])
+        for inst in cx.execute(
+            "SELECT * FROM instructions WHERE root_id = ? AND status IN ('ISSUED','PARTIAL')",
+            (root_id,),
+        ).fetchall():
+            if inst["direction"] == "PAY":
+                matching = tuple(
+                    e
+                    for e in events
+                    if e.kind == "REIMBURSEMENT_RECEIVED" and e.payee == employee
+                )
+            else:
+                matching = tuple(
+                    e for e in events if e.kind == "EMPLOYEE_RETURN" and e.payee == "company:demo"
+                )
+            fulfilled = net_by_kind(matching, matching[0].kind) if matching else 0
+            amount = int(inst["amount"])
+            capped = min(fulfilled, amount)
+            status = "FULFILLED" if capped >= amount and amount > 0 else (
+                "PARTIAL" if capped > 0 else "ISSUED"
+            )
+            cx.execute(
+                "UPDATE instructions SET fulfilled_amount = ?, status = ?, updated_at = ? "
+                "WHERE id = ?",
+                (capped, status, now, str(inst["id"])),
+            )
+            # An overpay beyond the instruction is an incident, not absorbed.
+            if fulfilled > amount:
+                over = fulfilled - amount
+                recovery_key = f"incident:overpay:{inst['id']}"
+                issue_id = f"issue:{hashlib.sha256((root_id + recovery_key).encode()).hexdigest()[:16]}"
+                from invoice_referee.domain.issues import BusinessIssue
+
+                issue = BusinessIssue(
+                    id=issue_id,
+                    kind="FACT",
+                    field_or_rule=f"overpay:{inst['id']}",
+                    owner="accountant",
+                    basis=f"Chi vượt {over} so với yêu cầu {amount}.",
+                    question="Xác minh khoản chi vượt và xử lý riêng (không tự thu bù).",
+                )
+                cx.execute(
+                    "INSERT OR REPLACE INTO case_issues (id, tenant, root_id, kind, "
+                    "field_or_rule, owner, status, recovery_key, payload_json, created_at, "
+                    "updated_at) VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, ?)",
+                    (
+                        issue_id,
+                        session.tenant,
+                        root_id,
+                        issue.kind,
+                        issue.field_or_rule,
+                        issue.owner,
+                        recovery_key,
+                        issue.model_dump_json(),
+                        now,
+                        now,
+                    ),
+                )
+
     def _actor_has_grant(
         self, cx: sqlite3.Connection, tenant: str, actor: str, action: str, scope: str
     ) -> bool:
@@ -862,7 +1080,12 @@ class CaseWorkflow:
         # Persist issues. The stable id is derived from the recovery key
         # (kind + field/rule), never from a model-authored name, and is stored
         # both as the row id and inside payload_json so view and lookup agree.
-        cx.execute("DELETE FROM case_issues WHERE root_id = ?", (root_id,))
+        # Reconciler-derived issues are recomputed each pass; incident issues
+        # (e.g. an overpay) are preserved until their owner resolves them.
+        cx.execute(
+            "DELETE FROM case_issues WHERE root_id = ? AND recovery_key NOT LIKE 'incident:%'",
+            (root_id,),
+        )
         for issue in result.issues:
             recovery_key = f"{issue.kind}:{issue.field_or_rule}"
             issue_id = f"issue:{hashlib.sha256((root_id + recovery_key).encode()).hexdigest()[:16]}"
@@ -888,7 +1111,17 @@ class CaseWorkflow:
 
         state = self._derive_state(result)
         conclusion_status = None
-        if result.allowed_effect is not None and self._obligation_owned_elsewhere(
+        open_incident = cx.execute(
+            "SELECT 1 FROM case_issues WHERE root_id = ? AND recovery_key LIKE 'incident:%' "
+            "AND status = 'OPEN' LIMIT 1",
+            (root_id,),
+        ).fetchone()
+        if open_incident is not None:
+            # An unresolved overpay/wrong-payee incident blocks any new action
+            # until its owner resolves it (§10.1); actual money is retained.
+            state = "WAITING"
+            conclusion_status = "BLOCKED"
+        elif result.allowed_effect is not None and self._obligation_owned_elsewhere(
             cx, session.tenant, root_id
         ):
             # The economic obligation already belongs to another root in this
@@ -897,14 +1130,19 @@ class CaseWorkflow:
             state = "WAITING"
             conclusion_status = "BLOCKED"
         elif result.allowed_effect is not None:
-            self._issue_instruction(cx, session, row, result, now)
-            state = "READY_TO_EXECUTE"
-            conclusion_status = "OUTSTANDING"
+            state = self._apply_instruction_coverage(cx, session, row, result, now)
+            conclusion_status = "OUTSTANDING" if state == "READY_TO_EXECUTE" else "BLOCKED"
         elif result.issues:
             state = "WAITING"
             conclusion_status = "BLOCKED"
         elif result.projection.S.state == "KNOWN" and int(result.projection.S.value or 0) == 0:
-            state = "SETTLED"
+            # S=0 with every gate clean; only SETTLED if no execution is pending.
+            pending = cx.execute(
+                "SELECT 1 FROM instructions WHERE root_id = ? AND status IN ('ISSUED','PARTIAL') "
+                "AND execution_state IN ('OPEN','UNKNOWN') LIMIT 1",
+                (root_id,),
+            ).fetchone()
+            state = "WAITING" if pending is not None else "SETTLED"
             conclusion_status = "BALANCED"
 
         revision = int(row["input_revision"])
@@ -935,6 +1173,56 @@ class CaseWorkflow:
             detail=json.dumps({"state": state}, ensure_ascii=False),
         )
 
+    def _apply_instruction_coverage(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        row: sqlite3.Row,
+        result,
+        now: str,
+    ) -> str:
+        """Retain, supersede or issue the actionable instruction (§10.1).
+
+        One actionable instruction per root. A pure confirmed receipt lowers S
+        and the net remaining without changing the cost instruction basis, so
+        the current instruction is retained. A changed cost basis (or a
+        different direction) supersedes the old remainder and issues the full
+        current abs(S). An OPEN/UNKNOWN execution that would be replaced is
+        suspended pending external verification.
+        """
+        root_id = str(row["id"])
+        effect = result.allowed_effect
+        active = cx.execute(
+            "SELECT * FROM instructions WHERE root_id = ? AND status IN ('ISSUED','PARTIAL') "
+            "ORDER BY created_at DESC LIMIT 1",
+            (root_id,),
+        ).fetchone()
+
+        if active is not None:
+            same_basis = active["cost_basis"] == result.cost_basis
+            same_direction = active["direction"] == effect.direction
+            remaining = max(int(active["amount"]) - int(active["fulfilled_amount"]), 0)
+            same_amount = remaining == effect.amount
+            if same_basis and same_direction and same_amount:
+                # Nothing material changed: keep the same instruction.
+                return "READY_TO_EXECUTE"
+            if active["execution_state"] in ("OPEN", "UNKNOWN"):
+                # Cannot replace an instruction whose execution is unresolved.
+                cx.execute(
+                    "UPDATE instructions SET status = 'SUSPENDED', updated_at = ? WHERE id = ?",
+                    (now, str(active["id"])),
+                )
+                return "WAITING"
+
+        # Supersede any current actionable remainder, then issue the full abs(S).
+        cx.execute(
+            "UPDATE instructions SET status = 'SUPERSEDED', updated_at = ? "
+            "WHERE root_id = ? AND status IN ('ISSUED','PARTIAL')",
+            (now, root_id),
+        )
+        self._issue_instruction(cx, session, row, result, now, active)
+        return "READY_TO_EXECUTE"
+
     def _issue_instruction(
         self,
         cx: sqlite3.Connection,
@@ -942,20 +1230,15 @@ class CaseWorkflow:
         row: sqlite3.Row,
         result,
         now: str,
+        supersedes: sqlite3.Row | None = None,
     ) -> None:
         effect = result.allowed_effect
         root_id = str(row["id"])
-        # At most one actionable instruction per root: supersede any current one.
-        cx.execute(
-            "UPDATE instructions SET status = 'SUPERSEDED', updated_at = ? "
-            "WHERE root_id = ? AND status IN ('ISSUED','PARTIAL')",
-            (now, root_id),
-        )
         instruction_id = f"instruction:{hashlib.sha256((root_id + result.cost_basis).encode()).hexdigest()[:16]}"
         cx.execute(
             "INSERT OR REPLACE INTO instructions (id, tenant, root_id, direction, amount, "
             "status, basis, cost_basis, supersedes_id, fulfilled_amount, execution_state, "
-            "created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'ISSUED', ?, ?, NULL, 0, "
+            "created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'ISSUED', ?, ?, ?, 0, "
             "'NOT_STARTED', ?, ?)",
             (
                 instruction_id,
@@ -965,6 +1248,7 @@ class CaseWorkflow:
                 effect.amount,
                 effect.basis,
                 result.cost_basis,
+                str(supersedes["id"]) if supersedes is not None else None,
                 now,
                 now,
             ),
@@ -1245,7 +1529,7 @@ class CaseWorkflow:
             )
             for inst in cx.execute(
                 "SELECT * FROM instructions WHERE root_id = ? "
-                "AND status IN ('ISSUED','PARTIAL') ORDER BY created_at",
+                "AND status IN ('ISSUED','PARTIAL','FULFILLED') ORDER BY created_at",
                 (str(row["id"]),),
             )
         )

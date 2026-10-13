@@ -204,6 +204,34 @@ def build_assessment_input(
                 witness_refs=(_ref(src_id, src_digest, 1, "coverage witness"),),
             )
 
+    # Recorded money events (actual P/R/A) join the ledger so the projection
+    # reflects what really moved (§4). They are append-only and scoped.
+    for row in cx.execute(
+        "SELECT payload_json FROM money_events WHERE tenant = ? AND root_id = ? "
+        "ORDER BY recorded_at, id",
+        (tenant, root_id),
+    ).fetchall():
+        ledger.append(MoneyEvent.model_validate_json(row["payload_json"]))
+    if coverage is None and cx.execute(
+        "SELECT 1 FROM money_events WHERE tenant = ? AND root_id = ? LIMIT 1",
+        (tenant, root_id),
+    ).fetchone() is not None:
+        coverage = CoverageRecord(
+            scope=activity,
+            start=datetime(2026, 9, 1, tzinfo=UTC),
+            as_of=as_of or datetime.now(UTC),
+            funds=("company:demo",),
+            flow_kinds=(
+                "ADVANCE_RECEIVED",
+                "REIMBURSEMENT_RECEIVED",
+                "EMPLOYEE_RETURN",
+                "REVERSAL",
+                "OBSERVED_UNALLOCATED",
+            ),
+            ledger_version="ledger:v1",
+            witness_refs=(_ref(src_id, src_digest, 1, "ledger coverage"),),
+        )
+
     # Org context: budget, grants, policy for this activity/tenant.
     budget_rows = cx.execute(
         "SELECT * FROM context_activities WHERE activity_id = ? AND tenant = ?",

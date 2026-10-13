@@ -87,6 +87,17 @@ export async function answerIssue(
   return request<CommandResultView>(`/api/cases/${rootId}/answers`, body, newCommandId());
 }
 
+export async function recordActual(
+  rootId: string,
+  money: Record<string, unknown>,
+): Promise<CommandResultView> {
+  return request<CommandResultView>(
+    `/api/cases/${rootId}/actuals`,
+    { money },
+    newCommandId(),
+  );
+}
+
 export async function attachSources(
   rootId: string,
   files: File[],

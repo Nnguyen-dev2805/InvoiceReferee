@@ -228,6 +228,28 @@ CREATE TABLE IF NOT EXISTS case_transcriptions (
     created_at         TEXT NOT NULL
 );
 
+-- Append-only money ledger (contracts §4, §10.1). A recorded event is never
+-- edited or deleted; a reversal is a new linked event. external_key is unique
+-- per tenant so a re-sent transaction is not counted twice.
+CREATE TABLE IF NOT EXISTS money_events (
+    id                 TEXT PRIMARY KEY,
+    tenant             TEXT NOT NULL,
+    root_id            TEXT NOT NULL REFERENCES cases(id),
+    external_key       TEXT NOT NULL,
+    kind               TEXT NOT NULL,
+    scope              TEXT NOT NULL,
+    payer              TEXT NOT NULL,
+    payee              TEXT NOT NULL,
+    amount             INTEGER NOT NULL,
+    event_at           TEXT NOT NULL,
+    recorded_at        TEXT NOT NULL,
+    verification_state TEXT NOT NULL,
+    allocation_state   TEXT NOT NULL,
+    reverses_event_id  TEXT,
+    payload_json       TEXT NOT NULL,
+    UNIQUE (tenant, external_key)
+);
+
 -- A demo STUB hand-transcription keyed by activity (contracts §5). Used only
 -- when a root has no root-specific transcription (the STUB dev/UI path); it is
 -- validated input, not a per-root expected outcome.

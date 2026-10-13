@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, errorMessage } from "./api";
 import { Approval } from "./features/approval";
 import { Dossier } from "./features/dossier";
+import { Execution } from "./features/execution";
 import { Intake } from "./features/intake";
 import { Questions } from "./features/questions";
 import type { CaseView, SessionPayload } from "./types";
@@ -75,6 +76,7 @@ export default function App() {
           <Intake session={session} onCase={setCaseView} />
           <Questions caseView={caseView} onCase={setCaseView} />
           <Approval caseView={caseView} />
+          <Execution caseView={caseView} onCase={setCaseView} />
           <Dossier caseView={caseView} />
         </main>
       )}

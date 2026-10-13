@@ -73,6 +73,25 @@ class DecisionRequest(ApiModel):
     reason: str
 
 
+class MoneyInput(ApiModel):
+    """A client's claim about money that moved; the server verifies it (§4)."""
+
+    external_key: str
+    claimed_kind: str
+    claimed_scope: str
+    payer: str
+    payee: str
+    amount: int
+    event_at: UtcDatetime
+    completion_claim: str | None = None
+    reverses_event_id: str | None = None
+    reason: str
+
+
+class RecordActualRequest(ApiModel):
+    money: MoneyInput
+
+
 def session_payload(
     workflow: CaseWorkflow,
     session: DemoSession,

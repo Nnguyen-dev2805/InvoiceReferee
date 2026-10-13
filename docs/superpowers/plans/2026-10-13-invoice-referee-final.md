@@ -198,21 +198,21 @@ async def test_routine_issues_one_payment(app_fixture):
 **Files:** src/invoice_referee/workflow/money.py,service.py,schema.sql; src/invoice_referee/domain/commands.py,finance.py,case.py; frontend/src/features/execution.tsx; tests/integration/test_money_execution.py; frontend/e2e/execution.spec.ts. Tất cả sibling Python paths nằm trong thư mục ghi đầu mỗi group.
 **Consumes:** RecordActual evidence request, server financial confirmation, ledger/instruction.
 **Produces:** Actual projections/remaining/incident/audit through execute.
-- [ ] Tests I4/pay2 one remainder2; different command same bank key noP4; changed payload same key conflict; pay5=>P5/fulfill4/incident1; wrongpayee notP; bankreversal notR; P5 received missinghistoric grant keepsS3; proven violation blocks new action only.
+- [x] Tests I4/pay2 one remainder2; different command same bank key noP4; changed payload same key conflict; pay5=>P5/fulfill4/incident1; wrongpayee notP; bankreversal notR; P5 received missinghistoric grant keepsS3; proven violation blocks new action only.
 ```python
 async def test_actual_overpay_not_clipped(app_fixture):
     v = await app_fixture.record_received(instruction_amount=4_000_000, received=5_000_000)
     assert v.actual_money.P.value == 5_000_000
     assert v.instructions[0].fulfilled_amount == 4_000_000 and v.issues
 ```
-- [ ] RED: `rtk proxy uv run pytest tests/integration/test_money_execution.py -q`.
-- [ ] Implement append-only observed/confirmed/allocated/fulfilled, linked reversals. Client cannot set verified/origin/net effect. STOP retains actual, no auto effects; pending completion unknown. Existing I covers remaining, no I2 duplicate.
-- [ ] Same invoice supplemental employee2 after incurred10/E5/C3/unpaid2 => T10/E7/C3. Keep A/P/R and usage owned canonical root; valid new payment portion allowed, no duplicate original reimbursement.
-- [ ] test_reversal_reopens_net_remaining: I4→P2→reverse2 ⇒ P0/R0/remaining4; I4→P4→reverse1 ⇒ P3/remaining1, không SETTLED. Reverse A/R đúng loại, over/duplicate reversal reject. Superseded instruction không reopen song song với active successor.
-- [ ] test_reversal_of_superseded_receipt: old I4 fulfilled2→supersede/new I4→reverse old P2 ⇒ currentS6, predecessor không actionable. Default grant4⇒AUTHORITY/no I6; authorized decision6 + NOT_STARTED⇒một I6; OPEN/UNKNOWN còn phải xác minh execution.
-- [ ] MarkExecution OPEN trước thực hiện ngoài app; CLOSED_CONFIRMED có refs/confirmation. OPEN/UNKNOWN khi basis đổi không tự replacement. Overpay chưa làm rõ giữ incident, không tự tạo lệnh thu bù.
-- [ ] GREEN + UI bank/cash evidence -> preview/confirmation -> record -> actual/remaining; knownreceived no grant≠no money. Employee settled separate from vendor fully paid.
-- [ ] Commit "feat: record actual money without duplicate fulfillment".
+- [x] RED: `rtk proxy uv run pytest tests/integration/test_money_execution.py -q`.
+- [x] Implement append-only observed/confirmed/allocated/fulfilled, linked reversals. Client cannot set verified/origin/net effect. STOP retains actual, no auto effects; pending completion unknown. Existing I covers remaining, no I2 duplicate.
+- [x] Same invoice supplemental employee2 after incurred10/E5/C3/unpaid2 => T10/E7/C3. Keep A/P/R and usage owned canonical root; valid new payment portion allowed, no duplicate original reimbursement.
+- [x] test_reversal_reopens_net_remaining: I4→P2→reverse2 ⇒ P0/R0/remaining4; I4→P4→reverse1 ⇒ P3/remaining1, không SETTLED. Reverse A/R đúng loại, over/duplicate reversal reject. Superseded instruction không reopen song song với active successor.
+- [x] test_reversal_of_superseded_receipt: old I4 fulfilled2→supersede/new I4→reverse old P2 ⇒ currentS6, predecessor không actionable. Default grant4⇒AUTHORITY/no I6; authorized decision6 + NOT_STARTED⇒một I6; OPEN/UNKNOWN còn phải xác minh execution.
+- [x] MarkExecution OPEN trước thực hiện ngoài app; CLOSED_CONFIRMED có refs/confirmation. OPEN/UNKNOWN khi basis đổi không tự replacement. Overpay chưa làm rõ giữ incident, không tự tạo lệnh thu bù.
+- [x] GREEN + UI bank/cash evidence -> preview/confirmation -> record -> actual/remaining; knownreceived no grant≠no money. Employee settled separate from vendor fully paid.
+- [x] Commit "feat: record actual money without duplicate fulfillment".
 **Gate:** Actual never erased by caps/denial, no wrongperson/duplicatefulfillment.
 
 ### T8 — Durable jobs, controls and immutable audit

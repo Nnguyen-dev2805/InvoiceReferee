@@ -1,0 +1,31 @@
+import { expect, test } from "@playwright/test";
+
+// T7 browser checkpoint: after a routine submit produces an instruction, the
+// accountant records actual money and the projection/remaining update. Known
+// received money is recorded even without an extra grant.
+
+const GOOD_PDF = Buffer.from("%PDF-1.4\nchung tu demo\n%%EOF\n");
+
+test("execution: record actual money updates the projection", async ({ page }) => {
+  await page.goto("/");
+  // Switch to the accountant persona so recording is permitted.
+  await page.getByLabel("Vai trò (demo)").selectOption("accountant");
+
+  await page.locator("#activity-select").selectOption("activity:travel-c");
+  await page.getByRole("button", { name: "Tạo hồ sơ" }).click();
+  await page.getByLabel("Chứng từ (PDF/PNG/JPEG)").setInputFiles({
+    name: "hoadon.pdf",
+    mimeType: "application/pdf",
+    buffer: GOOD_PDF,
+  });
+  await page.getByRole("button", { name: "Đính kèm" }).click();
+  await page.getByRole("button", { name: "Nộp hồ sơ" }).click();
+
+  // An instruction exists; record a receipt of 2.000.000.
+  await expect(page.getByTestId("instruction-PAY")).toBeVisible();
+  await page.getByLabel("Số tiền đã nhận").fill("2000000");
+  await page.getByRole("button", { name: "Ghi nhận" }).click();
+
+  await expect(page.getByText(/Đã ghi nhận tiền thực tế/)).toBeVisible();
+  await expect(page.getByTestId("actual-P")).toContainText("2.000.000");
+});

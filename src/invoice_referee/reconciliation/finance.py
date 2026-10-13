@@ -34,7 +34,19 @@ def _unknown(key: str) -> Fact[int]:
 
 
 def _sum_ledger(ledger: tuple[MoneyEvent, ...], kinds: tuple[str, ...]) -> int:
-    return sum(event.amount for event in ledger if event.kind in kinds)
+    """Net amount for the given kinds, minus linked reversals of their events.
+
+    A reversal event (kind REVERSAL) does not add to any kind; it reduces the
+    original event it points at, so P/R/A reflect the net (contracts §10.1).
+    """
+    gross = sum(event.amount for event in ledger if event.kind in kinds)
+    matching_ids = {event.id for event in ledger if event.kind in kinds}
+    reversed_amount = sum(
+        event.amount
+        for event in ledger
+        if event.reverses_event_id in matching_ids
+    )
+    return max(gross - reversed_amount, 0)
 
 
 def project_finance(
