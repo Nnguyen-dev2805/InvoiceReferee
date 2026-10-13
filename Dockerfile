@@ -40,6 +40,8 @@ VOLUME ["/data"]
 EXPOSE 8000
 
 # One entry: the same scripts/dev.py the pilot uses, against the volume.
+# Default mode is LIVE (reads uploaded documents); set MISTRAL_API_KEY etc. in
+# the environment, or pass --mode stub for the offline demo path.
 CMD ["uv", "run", "--frozen", "--no-dev", "python", "scripts/dev.py", \
-     "--mode", "stub", "--host", "0.0.0.0", "--port", "8000", \
+     "--host", "0.0.0.0", "--port", "8000", \
      "--db", "/data/invoice-referee.sqlite", "--uploads", "/data/uploads"]

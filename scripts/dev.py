@@ -1,10 +1,11 @@
 """Single dev/pilot entry (plan T2; extended for Docker/public pilot at T10).
 
 Usage:
-    uv run python scripts/dev.py --mode stub [--port 8000]
+    uv run python scripts/dev.py [--mode live|replay|stub] [--port 8000]
 
-Modes are explicit — LIVE/RECORDED_REPLAY/STUB — and are printed with the
-config diagnostics; a missing live credential fails with the missing names
+Default mode is LIVE: the server reads the documents you upload (Mistral OCR +
+model). Pass --mode stub for the offline demo path (a seeded hand-transcription,
+no provider calls). A missing live credential fails with the missing names
 instead of silently degrading (design §10).
 """
 
@@ -80,7 +81,7 @@ def format_diagnostics(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="InvoiceReferee demo server")
-    parser.add_argument("--mode", choices=("stub", "replay", "live"), default="stub")
+    parser.add_argument("--mode", choices=("stub", "replay", "live"), default="live")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--db", default=str(DEFAULT_DB))
