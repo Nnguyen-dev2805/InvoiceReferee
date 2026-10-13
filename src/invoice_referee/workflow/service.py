@@ -167,6 +167,13 @@ def _context_issue(root_id: str) -> BusinessIssue:
     )
 
 
+def _budget_for(budgets: tuple[dict[str, object], ...], activity_id: str) -> dict[str, object] | None:
+    for budget in budgets:
+        if str(budget.get("activity")) == activity_id:
+            return budget
+    return None
+
+
 def _instruction_state(row: sqlite3.Row) -> "InstructionState":
     """Build the pure InstructionState the reconcile decision reads (§10.1)."""
     from invoice_referee.workflow.instructions import InstructionState
@@ -552,6 +559,103 @@ class CaseWorkflow:
                     {"digest": digest, "origin": origin, "activities": len(data.activities)},
                     ensure_ascii=False,
                 ),
+                origin=origin,
+            )
+        return digest
+
+    def import_company_context(
+        self, context: "object", *, origin: str = "SIMULATED"
+    ) -> str:
+        """Import a typed OrganizationContext through the same validated path.
+
+        Maps the A.1 records (activity/authorization, budgets, grants, people,
+        ledger, coverage, witnesses) into the same tables the demo importer
+        uses, so the app and the evaluator share one importer (plan A.1). No
+        expected/route value is stored; the ledger is trusted server fixture.
+        """
+        import json as _json
+
+        from invoice_referee.evaluation.models import OrganizationContext
+
+        data = (
+            context
+            if isinstance(context, OrganizationContext)
+            else OrganizationContext.model_validate(context)
+        )
+        tenant = data.organization_id or data.tenant
+        raw = _json.dumps(data.model_dump(mode="json"), sort_keys=True, ensure_ascii=False)
+        digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        now = self._now_iso()
+        with self.db.transaction() as cx:
+            activity = data.activity or {}
+            activity_id = str(activity.get("activity_id") or "")
+            if activity_id:
+                authorization = activity.get("authorization")
+                budget = _budget_for(data.budgets, activity_id)
+                cx.execute(
+                    "INSERT INTO context_activities (activity_id, tenant, name, occurred_at, "
+                    "purpose, budget_amount, budget_effect_from, status) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT(tenant, activity_id) DO UPDATE SET name=excluded.name, "
+                    "occurred_at=excluded.occurred_at, purpose=excluded.purpose, "
+                    "budget_amount=excluded.budget_amount, "
+                    "budget_effect_from=excluded.budget_effect_from, status=excluded.status",
+                    (
+                        activity_id,
+                        tenant,
+                        str(activity.get("name") or activity_id),
+                        activity.get("occurred_at"),
+                        str(activity.get("purpose") or ""),
+                        int(budget["amount"]) if budget else None,
+                        (budget["effect_range"][0] if budget else None),
+                        "AUTHORIZED" if authorization is not None else "PROPOSED",
+                    ),
+                )
+            for person in data.people:
+                cx.execute(
+                    "INSERT OR REPLACE INTO context_people (id, tenant, name) VALUES (?, ?, ?)",
+                    (str(person["id"]), tenant, str(person["name"])),
+                )
+            for grant in data.grants:
+                cx.execute(
+                    "INSERT OR REPLACE INTO context_grants (grant_id, tenant, version, actor, "
+                    "actions_json, scope, allowed_profiles_json, max_amount, effective_from, "
+                    "effective_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        str(grant["id"]),
+                        tenant,
+                        str(grant.get("version", "v1")),
+                        str(grant["actor"]),
+                        _json.dumps(list(grant.get("actions", [])), ensure_ascii=False),
+                        str(grant["scope"]),
+                        _json.dumps(list(grant.get("allowed_profiles", [])), ensure_ascii=False),
+                        int(grant["max_amount"]),
+                        str(grant["effective_from"]),
+                        grant.get("effective_to"),
+                    ),
+                )
+            for witness in data.witnesses:
+                cx.execute(
+                    "INSERT OR REPLACE INTO context_witnesses (tenant, kind, record_key, quote, "
+                    "source_id, source_sha256) VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        tenant,
+                        "LEDGER_COVERAGE",
+                        str(witness["record_key"]),
+                        str(witness["quote"]),
+                        "source:company-context",
+                        digest,
+                    ),
+                )
+            cx.execute(
+                "INSERT INTO context_imports (tenant, digest, origin, imported_at, note) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (tenant, digest, origin, now, "typed company context"),
+            )
+            self._audit(
+                cx, tenant=tenant, root_id=None, session_id=None,
+                actor="system:context-import", action="CONTEXT_IMPORT",
+                detail=_json.dumps({"digest": digest, "origin": origin}, ensure_ascii=False),
                 origin=origin,
             )
         return digest

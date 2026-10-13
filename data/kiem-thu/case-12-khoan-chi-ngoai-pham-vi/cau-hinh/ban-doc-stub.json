@@ -1,5 +1,18 @@
 {
   "data_origin": "STUB_TRANSCRIPTION",
-  "facts": [],
+  "facts": [
+    {
+      "field": "coverage",
+      "value": 1,
+      "role": "LEDGER",
+      "quote": "Đối chiếu đủ giai đoạn"
+    },
+    {
+      "field": "economic_key",
+      "value": "invoice:d12",
+      "role": "INVOICE",
+      "quote": "invoice:d12"
+    }
+  ],
   "relations": []
 }

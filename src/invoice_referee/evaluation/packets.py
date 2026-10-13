@@ -305,6 +305,21 @@ def write_manifest(manifest: Path, meta: PacketMetadata) -> None:
     )
 
 
+def load_stub_readings(case_dir: Path, *, stage_id: str = "ban-dau") -> Transcription | None:
+    """The STUB hand-transcription for a case (reader-only; plan A.1).
+
+    This is called only by the runtime STUB reader path; `load_input` never
+    includes it, so a LIVE/replay run cannot consume it.
+    """
+    case_dir = Path(case_dir)
+    if not _is_new_layout(case_dir):
+        return None
+    path = case_dir / _NEW_CONTEXT / "ban-doc-stub.json"
+    if not path.is_file():
+        return None
+    return Transcription.model_validate_json(_read_text(path))
+
+
 def bind_sources(case_dir: Path, packet: PacketInput, *, stage_id: str = "ban-dau"):
     """Return a resolver that materializes exactly this stage's source bytes.
 

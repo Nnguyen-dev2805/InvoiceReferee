@@ -1,5 +1,24 @@
 {
   "data_origin": "STUB_TRANSCRIPTION",
-  "facts": [],
+  "facts": [
+    {
+      "field": "incurred",
+      "value": 3000000,
+      "role": "INVOICE",
+      "quote": "incurred (hand-transcription)"
+    },
+    {
+      "field": "paid_employee",
+      "value": 3000000,
+      "role": "PAYMENT",
+      "quote": "paid_employee (hand-transcription)"
+    },
+    {
+      "field": "economic_key",
+      "value": "invoice:d09",
+      "role": "INVOICE",
+      "quote": "invoice:d09"
+    }
+  ],
   "relations": []
 }

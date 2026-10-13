@@ -87,13 +87,18 @@ async def _no_read_transcriber(*, sources, budget=None, provider_mode="LIVE"):
 class EvaluationRunner:
     """Runs packets through the application workflow and reports actual results."""
 
-    def __init__(self, *, workflow, transcription_for=None, transcriber=None) -> None:
+    def __init__(
+        self, *, workflow, transcription_for=None, transcriber=None, source_resolver=None
+    ) -> None:
         self.workflow = workflow
         self._transcription_for = transcription_for
         # A real read->transcription callable for LIVE/RECORDED_REPLAY runs. When
         # absent, a non-STUB run is honest: it does not fall back to a seeded
         # STUB transcription (contracts §5, §8).
         self._transcriber = transcriber
+        # Materializes a PacketSource's exact bytes into the upload storage so a
+        # LIVE reader can read them (plan A.2). None => metadata-only attach.
+        self._source_resolver = source_resolver
 
     async def run(self, packet: PacketInput, mode: str) -> ActualResult:
         """Run one packet; returns what the app actually produced."""
@@ -181,6 +186,15 @@ class EvaluationRunner:
                 )
                 for source in packet.sources
             )
+            # Materialize the exact source bytes into the upload storage so a
+            # LIVE reader can read them (plan A.2); the resolver validates the
+            # file/containment/digest. STUB runs need no bytes.
+            if self._source_resolver is not None:
+                for source in packet.sources:
+                    data = self._source_resolver(source)
+                    destination = self.workflow.uploads_dir / f"{tenant}/{root}/{source.filename}"
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(data)
             attached = await self.workflow.execute(
                 ctx(version), AttachSources(root_id=root, uploads=uploads)
             )
@@ -199,29 +213,20 @@ class EvaluationRunner:
         return submitted.case_view
 
     def _seed_context(self, packet: PacketInput, tenant: str) -> None:
-        """Seed the packet's observable context: an authorized activity with its
-        budget and its STUB hand-transcription (contracts §5, §7)."""
-        import json
+        """Seed the packet's observable context through the real importer.
 
+        The typed OrganizationContext (activity/authorization, budget, grants,
+        ledger, coverage, witnesses) is imported with the same validated path
+        the app uses (plan A.1), so a case's gates are real, not fabricated.
+        """
         from invoice_referee.evaluation.models import Transcription
 
         activity_id = packet.submission.activity
-        with self.workflow.db.transaction() as cx:
-            cx.execute(
-                "INSERT OR REPLACE INTO context_activities (activity_id, tenant, name, "
-                "occurred_at, purpose, budget_amount, budget_effect_from, status) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, 'AUTHORIZED')",
-                (
-                    activity_id,
-                    tenant,
-                    activity_id,
-                    "2026-10-05T09:00:00+00:00",
-                    packet.submission.declared_purpose,
-                    packet.organization.budget_amount,
-                    "2026-10-01T00:00:00+00:00" if packet.organization.budget_amount else None,
-                ),
-            )
-            if packet.transcription is not None:
+        self.workflow.import_company_context(packet.organization, origin="SIMULATED")
+        # A STUB hand-transcription is seeded only for the STUB reader path; it
+        # is never written in LIVE/replay (the reader supplies the transcription).
+        if packet.transcription is not None:
+            with self.workflow.db.transaction() as cx:
                 cx.execute(
                     "INSERT OR REPLACE INTO context_transcriptions (tenant, activity_id, "
                     "transcription_json) VALUES (?, ?, ?)",

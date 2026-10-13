@@ -76,6 +76,10 @@ class CaseSpec:
     coverage: bool = True
     grants: tuple[dict[str, object], ...] = ()
     ledger: tuple[dict[str, object], ...] = ()
+    # The literal STUB hand-transcription (contracts §5): the fields a correct
+    # reader should observe, with a page/quote locator. Written to
+    # ban-doc-stub.json and loaded only by the STUB reader path.
+    stub_facts: tuple[dict[str, object], ...] = ()
 
 
 # -- shared fixtures ---------------------------------------------------------
@@ -151,6 +155,39 @@ def _payment(payer: str, amount: int, *, method: str = "Chuyển khoản") -> tu
 
 def _vnd(amount: int) -> str:
     return f"{amount:,}".replace(",", ".") + " VND"
+
+
+def _stub(
+    incurred: int,
+    *,
+    paid_employee: int = 0,
+    paid_company: int = 0,
+    advance: int = 0,
+    coverage: bool = True,
+    key: str | None = None,
+    eligibility: str | None = None,
+) -> tuple[dict[str, object], ...]:
+    """A literal STUB hand-transcription (contracts §5): the observed fields.
+
+    This is the human-written reading the STUB reader assesses; it carries a
+    quote locator and never an expected/route value.
+    """
+    out: list[dict[str, object]] = [
+        {"field": "incurred", "value": incurred, "role": "INVOICE", "quote": f"Tổng chi {_vnd(incurred)}"}
+    ]
+    if paid_employee:
+        out.append({"field": "paid_employee", "value": paid_employee, "role": "PAYMENT", "quote": f"Đã thanh toán {_vnd(paid_employee)}"})
+    if paid_company:
+        out.append({"field": "paid_company", "value": paid_company, "role": "PAYMENT", "quote": f"Đã thanh toán {_vnd(paid_company)}"})
+    if advance:
+        out.append({"field": "advance", "value": advance, "role": "ADVANCE", "quote": f"Ứng {_vnd(advance)}"})
+    if coverage:
+        out.append({"field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn"})
+    if key:
+        out.append({"field": "economic_key", "value": key, "role": "INVOICE", "quote": key})
+    if eligibility:
+        out.append({"field": "eligibility", "value": eligibility, "role": "INVOICE", "quote": "Loại chi phí"})
+    return tuple(out)
 
 
 # -- the 15 cases (plan B) ---------------------------------------------------
@@ -434,6 +471,37 @@ CASE_IDS: list[str] = [c.case_id for c in CASES]
 CASE_SLUGS: list[str] = [c.slug for c in CASES]
 
 
+def _stub_facts_from_gold(spec: CaseSpec) -> list[dict[str, object]]:
+    """Build the STUB hand-transcription from the case's observable reading.
+
+    The observable facts are what a correct reader sees on the sources (the
+    input-layer reading), not the expected outcome; the STUB reader assesses
+    exactly these. `budget`/`excluded`/`advance_pending`/`currency` are context
+    or outcome notes, not transcription fields.
+    """
+    observable = dap_an.GOLD[spec.case_id].get("observable", {})
+    facts: list[dict[str, object]] = []
+    field_map = {
+        "incurred": ("incurred", "INVOICE"),
+        "paid_employee": ("paid_employee", "PAYMENT"),
+        "paid_company": ("paid_company", "PAYMENT"),
+        "advance": ("advance", "ADVANCE"),
+    }
+    for key, (field, role) in field_map.items():
+        if key in observable:
+            facts.append(
+                {"field": field, "value": observable[key], "role": role, "quote": f"{field} (hand-transcription)"}
+            )
+    # Coverage is present unless the case is intentionally missing history (D09).
+    if spec.coverage:
+        facts.append({"field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn"})
+    # A stable economic key so two representations of one invoice dedup (D10).
+    facts.append(
+        {"field": "economic_key", "value": f"invoice:{spec.case_id.lower()}", "role": "INVOICE", "quote": f"invoice:{spec.case_id.lower()}"}
+    )
+    return facts
+
+
 def stage_id_for_folder(folder: str) -> str:
     for stage, name in STAGE_FOLDERS.items():
         if name == folder:
@@ -492,10 +560,15 @@ def build_case(spec: CaseSpec, out: Path) -> ManifestEntry:
         encoding="utf-8",
     )
     # A STUB hand-transcription is written by the generator ONLY for the STUB
-    # reader path; it is excluded from load_input (plan A).
+    # reader path; it is excluded from load_input (plan A). It is the literal
+    # observable reading (input-layer facts), never the expected outcome.
     (case_dir / "cau-hinh" / "ban-doc-stub.json").write_text(
         json.dumps(
-            {"data_origin": "STUB_TRANSCRIPTION", "facts": [], "relations": []},
+            {
+                "data_origin": "STUB_TRANSCRIPTION",
+                "facts": _stub_facts_from_gold(spec),
+                "relations": [],
+            },
             ensure_ascii=False,
             indent=2,
         ),
