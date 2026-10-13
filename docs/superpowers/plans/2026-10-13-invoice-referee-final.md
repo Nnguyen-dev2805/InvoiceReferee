@@ -136,18 +136,18 @@ def test_incurred_budget_not_paid_budget():
 
 **Files:** scripts/build_packets.py, fonts/licenses, data/evaluation/development,holdout; evaluation/models.py,packets.py; tests/unit/test_packet_inventory.py.
 **Interfaces:** load_input(dir:Path)->PacketInput; load_gold(dir:Path)->GoldPacket scorer-only; validate_inventory(manifest:Path)->InventoryReport.
-- [ ] Tests input excludes gold; root/economic/source clone overlap fail trước model selection. Pin grouping axes family/template/layout/issuer có lý do theo contracts §11; shared font/A4 không là leakage. Family overlap phải group hoặc disclosure within-family, không claim unseen-family. Travel15/holdout10+10, filenames không leak latent, embedded Vietnamese font/page refs.
+- [x] Tests input excludes gold; root/economic/source clone overlap fail trước model selection. Pin grouping axes family/template/layout/issuer có lý do theo contracts §11; shared font/A4 không là leakage. Family overlap phải group hoặc disclosure within-family, không claim unseen-family. Travel15/holdout10+10, filenames không leak latent, embedded Vietnamese font/page refs.
 ```python
 def test_packet_input_excludes_gold(tmp_path):
     p = load_input(write_test_packet(tmp_path))
     assert "latent" not in p.model_dump() and "expected" not in p.model_dump()
 ```
   write_test_packet in tests/factories.py creates input/separate literal gold.
-- [ ] RED: `rtk proxy uv run pytest tests/unit/test_packet_inventory.py -q`.
-- [ ] Generate PDFs ReportLab+NotoSans; render scans pypdfium2. Mask/low-contrast source drawings then image-only PDF strips hidden numeric text. No seed truth in image metadata/filename; visually adjudicate observable gold, not generator claim of readability.
-- [ ] Travel15: cleanCHI/THU/BALANCE, payer unknown, relation conflict, overB, cost/action authority, missing history/opening, duplicate, personal, material unsupported, pending bank, mixed PDF, amount conflict, supplementary costs. Independent roots/sources; mutations don't count15.
-- [ ] Freeze holdout20 roots: routine10 varied source/money; human10 main strata FACT4/POLICY3/AUTHORITY3 with co-occurrence/stages documented. Don't force single label; actor/context/gold before run.
-- [ ] GREEN inventory + native extract/render/manual check with PDF skill when creating actual artifacts. Store fonts/license once, no host font dependency; source provenance/data synthetic. Commit "test: add independent raw evaluation packets".
+- [x] RED: `rtk proxy uv run pytest tests/unit/test_packet_inventory.py -q`.
+- [x] Generate PDFs ReportLab+NotoSans; render scans pypdfium2. Mask/low-contrast source drawings then image-only PDF strips hidden numeric text. No seed truth in image metadata/filename; visually adjudicate observable gold, not generator claim of readability.
+- [x] Travel15: cleanCHI/THU/BALANCE, payer unknown, relation conflict, overB, cost/action authority, missing history/opening, duplicate, personal, material unsupported, pending bank, mixed PDF, amount conflict, supplementary costs. Independent roots/sources; mutations don't count15.
+- [x] Freeze holdout20 roots: routine10 varied source/money; human10 main strata FACT4/POLICY3/AUTHORITY3 with co-occurrence/stages documented. Don't force single label; actor/context/gold before run.
+- [x] GREEN inventory + native extract/render/manual check with PDF skill when creating actual artifacts. Store fonts/license once, no host font dependency; source provenance/data synthetic. Commit "test: add independent raw evaluation packets".
 **Gate:** Actual files/input/context/gold3 layers, not15 table rows. Baseline waits complete matrix.
 
 ### T5 — LIVE EvidenceReader, readonly proposals and M0

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from invoice_referee.domain.case import (
     AssessmentInput,
@@ -46,6 +47,90 @@ ALL_MONEY_KINDS: tuple[MoneyKind, ...] = (
 
 def digest(seed: str) -> str:
     return hashlib.sha256(seed.encode("utf-8")).hexdigest()
+
+
+def write_test_packet(
+    base: Path,
+    *,
+    root_id: str = "case:test-1",
+    profile: str = "TRAVEL",
+    split: str = "development",
+    strata: str = "routine",
+    family: str = "family-1",
+    template: str = "template-1",
+    layout: str = "layout-1",
+    issuer: str = "issuer-1",
+    economic_key: str = "invoice:test:1",
+    route: str = "AUTO",
+    latent: dict[str, object] | None = None,
+    observable: dict[str, object] | None = None,
+) -> Path:
+    """Write a complete packet (input/ + gold/) with a literal, separate gold.
+
+    Returns the packet directory. Gold is written to a different subtree than
+    input so a loader that only reads input/ cannot see it.
+    """
+    import json
+
+    packet = Path(base) / root_id.replace(":", "_")
+    input_dir = packet / "input"
+    sources_dir = input_dir / "sources"
+    sources_dir.mkdir(parents=True, exist_ok=True)
+    (packet / "gold").mkdir(parents=True, exist_ok=True)
+
+    (input_dir / "organization.json").write_text(
+        json.dumps(
+            {
+                "tenant": "tenant:demo",
+                "profile": profile,
+                "records": ["ledger:opening 0 VND"],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    (input_dir / "submission.json").write_text(
+        json.dumps(
+            {
+                "employee": "employee:employee-a",
+                "activity": "activity:test-1",
+                "declared_purpose": "Công tác kiểm thử",
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    (sources_dir / "hoadon.pdf").write_bytes(b"%PDF-1.4\n% test\n%%EOF\n")
+
+    (packet / "gold" / "latent.json").write_text(
+        json.dumps({"facts": latent if latent is not None else {"payer": "employee:employee-a"}}),
+        encoding="utf-8",
+    )
+    (packet / "gold" / "observable.json").write_text(
+        json.dumps(
+            {"facts": observable if observable is not None else {"amount": 450_000}}
+        ),
+        encoding="utf-8",
+    )
+    (packet / "gold" / "allowed.json").write_text(
+        json.dumps({"route": route, "expected_amounts": {}}), encoding="utf-8"
+    )
+    return packet
+
+
+def write_manifest_file(base: Path, entries: list[dict[str, object]]) -> Path:
+    """Write a dataset-level manifest.json (one row per root) for inventory tests."""
+    import json
+
+    path = Path(base) / "manifest.json"
+    path.write_text(
+        json.dumps(
+            {"dataset": "test", "frozen_at": "2026-10-13T03:00:00+00:00", "entries": entries},
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return path
 
 
 def scope(**overrides: object) -> CaseScope:

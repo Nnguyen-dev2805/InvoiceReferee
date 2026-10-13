@@ -13,9 +13,9 @@ The plan owns task acceptance; package/config files own executable commands.
 | Setup review | ACCEPTED at documentation/setup level; actual clean-clone and agent-execution proof remain open |
 | Execution method | Inline execution (executing-plans) with one integrator; the whole-branch final review has not been run |
 | Workflow integrator | Inline executor — single writer for workflow/api/domain owned files |
-| Next application task | T4, not started (needs authorization) |
-| Last completed application task | T3 — gate passed (literal oracle independent; approval can't resolve missing fact). T1 = 57d2e19, T2 = 1c395de, conformance = 3245d00, boundary = ec37242 |
-| Product unit/integration/UI/LIVE evidence | T3: `uv run pytest` → **68 passed** (44 after boundary fixes + 24 T3 core tests); `frontend: npx vitest run` → 2 passed; `npm --prefix frontend run build` exit 0 under Node 24.19.0 / npm 11.12.1. T3 is a **pure unit core** — no endpoint yet, so the browser checkpoint is UI NOT_RUN (wired at T6). LIVE/OCR: NOT_RUN. Note: `frontend/node_modules`/`dist` are ignored; `npm install` before a browser run |
+| Next application task | T5, not started (needs authorization) |
+| Last completed application task | T4 — gate passed (actual files/input/context/gold 3 layers; baseline waits complete matrix). T3 = 4d80c9d |
+| Product unit/integration/UI/LIVE evidence | T4: `uv run pytest` → **84 passed** (68 after T3 + 16 packet/dataset tests); `uv run python scripts/build_packets.py --out data/evaluation` → 15 dev + 20 holdout roots with real PDFs (ReportLab + bundled Noto Sans, Vietnamese glyphs) and image-only scans (pypdfium2). Gold is a separate subtree; no slug/scenario text leaks into any source. No model run yet — the M0 baseline is T5. LIVE/OCR: NOT_RUN |
 | CodeGraph | **Fresh** at `1c395de`: `codegraph status` → 34 files, 505 nodes, 1135 edges (python 24, tsx 4, typescript 6). The earlier "stale/0 files" note was itself outdated; re-check with `rtk proxy codegraph status` before relying on it |
 | Git handoff | T1 = 57d2e19, T2 = 1c395de, domain-conformance = 3245d00, boundary fixes = ec37242 — all on `final` (unpushed beyond 1c395de; no push authorization) |
 
