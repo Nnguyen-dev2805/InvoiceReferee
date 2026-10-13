@@ -1,0 +1,25 @@
+# Never ship secrets, local state, VCS or build scratch into the image.
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+.runtime/
+.superpowers/
+private/
+.venv/
+.worktrees/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+.DS_Store

@@ -121,6 +121,25 @@ def _read_context(session: DemoSession) -> CommandContext:
     )
 
 
+@router.get("/health")
+def health(request: Request) -> dict[str, object]:
+    """Redacted health/versions for the launcher; never exposes a secret."""
+    import platform
+    import sys
+
+    settings = getattr(request.app.state, "settings", None)
+    return {
+        "status": "ok",
+        "mode": request.app.state.mode,
+        "python": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        "platform": platform.system(),
+        "live_ready": bool(getattr(settings, "live_ready", False)) if settings else False,
+        "langsmith_ready": bool(getattr(settings, "langsmith_ready", False))
+        if settings
+        else False,
+    }
+
+
 @router.get("/demo/session")
 def demo_session(request: Request, response: Response) -> dict[str, object]:
     session = _resolve_session(request, response)

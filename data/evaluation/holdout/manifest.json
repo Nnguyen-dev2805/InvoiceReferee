@@ -12,7 +12,7 @@
       "template": "tpl:hr01",
       "layout": "lay:a",
       "issuer": "iss:hr01",
-      "input_digest": "638b1a6422c77e1ddd567869e3f681e7f55c80c8928ca5a9e6358b28e93ad7e8",
+      "input_digest": "7965a26ecef5f86b2c4672b1eeaaf486ecafdd21cc46fe8453d1659fd293aa49",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -25,7 +25,7 @@
       "template": "tpl:hr02",
       "layout": "lay:a",
       "issuer": "iss:hr02",
-      "input_digest": "940ac596fb4b18927823af33dd0fac9dab3028f7f4a3d486f0e7c0169e50cf51",
+      "input_digest": "dfc074353ddbf6b1aad6267d515fe856a5d1fd9f39ed592d9cb39f6d44cda8f3",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -38,7 +38,7 @@
       "template": "tpl:hr03",
       "layout": "lay:a",
       "issuer": "iss:hr03",
-      "input_digest": "bfd704912853fb20f9952eb81285dadd2211853b85a2709027934db7df816348",
+      "input_digest": "3180a8a74ac1c70103af4d3551bb9a3e94e5f9d7a62f04627d078c3573bb6954",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -51,7 +51,7 @@
       "template": "tpl:hr04",
       "layout": "lay:a",
       "issuer": "iss:hr04",
-      "input_digest": "c839cafbacb2e9318d763060940cc74ccb0a4243121448f302884e3968f95296",
+      "input_digest": "92e44b39c9f7b834c2c5ad77e08854165e5e5ca49d8bc875912b19212c4005f2",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -64,7 +64,7 @@
       "template": "tpl:hr05",
       "layout": "lay:a",
       "issuer": "iss:hr05",
-      "input_digest": "e7f95727bdc72a5c9d8bce231b4fb5f68e0077ddf9584cb63cc0d0be636809b7",
+      "input_digest": "f102f3e1df50cb94dc8f15626b45820d0e45279cd5a0e80a81c108150e6e43ad",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -77,7 +77,7 @@
       "template": "tpl:hr06",
       "layout": "lay:a",
       "issuer": "iss:hr06",
-      "input_digest": "ffd6977dac265b944d778b20b24d42381289a5611bf2c5bb726594f34945014e",
+      "input_digest": "39b505291d5ca8ba21c5cd7dd09e470663ca21793656b24ecb0c1e9df0ad4593",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -90,7 +90,7 @@
       "template": "tpl:hr07",
       "layout": "lay:a",
       "issuer": "iss:hr07",
-      "input_digest": "50b58e3dff148d5739228be4ecebfbc221268e9b2234b68d08b04a7800898667",
+      "input_digest": "ec9fddec788a572c03df8cd0e5bdf13d01bc7423e6c7452f386fc25880bdb1e5",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -103,7 +103,7 @@
       "template": "tpl:hr08",
       "layout": "lay:a",
       "issuer": "iss:hr08",
-      "input_digest": "83fd2e72edf949393659fef4d40cf149f5955066d6ea3fd5d631307b93604110",
+      "input_digest": "52ce29935218b5acd2be7d8e3dc912f4affe372d0adcacc299df5f16c4cc4b7e",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -116,7 +116,7 @@
       "template": "tpl:hr09",
       "layout": "lay:a",
       "issuer": "iss:hr09",
-      "input_digest": "4485e5208ce9367a8db2692bcfc8a5e8e8ede60505cf1d2f0599a1f34bb67222",
+      "input_digest": "2b53498ff23f517aed5a57a64ca595000e5a3088a258159e210b40605912ddeb",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -129,7 +129,7 @@
       "template": "tpl:hr10",
       "layout": "lay:a",
       "issuer": "iss:hr10",
-      "input_digest": "7fb93cd0329eae73113afe544863d0fed5712ab743d08bfb6fbc80aa2048b26e",
+      "input_digest": "9276c6676435dff6498764753a4bc4bf9dc53e8539b8b1c926e9c8eeb9bd7f42",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -142,7 +142,7 @@
       "template": "tpl:hf01",
       "layout": "lay:b",
       "issuer": "iss:hf01",
-      "input_digest": "720543e91ea22b681d11147594ef53392f85d8b4dd576b6a384eb917a5fe2908",
+      "input_digest": "4435422c06df1dff568b0e852b0587df7941845548865a27a0edf7fe39557c9c",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -155,7 +155,7 @@
       "template": "tpl:hf02",
       "layout": "lay:b",
       "issuer": "iss:hf02",
-      "input_digest": "18924c8df35b184ff0b4743ab1c658ad619bdaf6013d18133e2827ea8c682db5",
+      "input_digest": "dff70fd41255a105ae940f5c75d82e9cb4e8ee6b2843fbb306de655c569f20b1",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -168,7 +168,7 @@
       "template": "tpl:hf03",
       "layout": "lay:b",
       "issuer": "iss:hf03",
-      "input_digest": "74150776931d53263a5aa5b501b8f748a6b0111c0c3b2dec891e69dd935c2e78",
+      "input_digest": "1b99eae1409e67998fafc872ff9d9745fabac59769601c7a441431949bab6edc",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -181,7 +181,7 @@
       "template": "tpl:hf04",
       "layout": "lay:b",
       "issuer": "iss:hf04",
-      "input_digest": "8bbe75d3c2ebea8094a84c372f7f1103322bdccd647f1f10b5639151be90fb71",
+      "input_digest": "70d7d414984babd698f3a53f902c3f258a18c296e5378cd05bc10b847dd0f22a",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -194,7 +194,7 @@
       "template": "tpl:hp01",
       "layout": "lay:c",
       "issuer": "iss:hp01",
-      "input_digest": "ac7ae27e2c517e298d1fa33d88c575f282ef322c6201420c8c8932df07fa0c71",
+      "input_digest": "031af378a9616f089d8350127c8d3120ca4b1ac33d3dbf8d6cc44b921d8f8974",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -207,7 +207,7 @@
       "template": "tpl:hp02",
       "layout": "lay:c",
       "issuer": "iss:hp02",
-      "input_digest": "e4b7a3c71cacc339a7e614b0ec86378cd04f8281e9ac05bdc572f0ec47c57222",
+      "input_digest": "a156d045b860af1e19c8e2a9fa6f31f44ae2c3c70299966c68119b21b03215b4",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -220,7 +220,7 @@
       "template": "tpl:hp03",
       "layout": "lay:c",
       "issuer": "iss:hp03",
-      "input_digest": "34bab1a9b8ad68c95460ff04c24b6d78c31bb47bf97e4b68ca36fe3a7ede484e",
+      "input_digest": "8221d045acf6720f0d4f430cbb396f7c92d68f9a8826a02f0c12761f83fed9cd",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -233,7 +233,7 @@
       "template": "tpl:ha01",
       "layout": "lay:a",
       "issuer": "iss:ha01",
-      "input_digest": "c521ad9f8024a06cc246c9aa3815aa6ca1d8f857dcdf4a10b017360a6312e81e",
+      "input_digest": "0066bc27f68a0dfd0b3253bc2ce568c6e02a7c10561a768bf5123421d57f225c",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -246,7 +246,7 @@
       "template": "tpl:ha02",
       "layout": "lay:a",
       "issuer": "iss:ha02",
-      "input_digest": "fa588f504ac502315af8039ace176cd5ffea1321b55bbc7796c0c103eefb2a58",
+      "input_digest": "289f4c8a8ec42e4908c9b46f7aee733dc7414858477a30dfb0c1409d55c8429a",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     },
     {
@@ -259,7 +259,7 @@
       "template": "tpl:ha03",
       "layout": "lay:a",
       "issuer": "iss:ha03",
-      "input_digest": "463128e3277063e12260b99017d8d84b782b909256d5d89a489355e12b95a965",
+      "input_digest": "e850a113a02e9400fd1eefcf02b6d87d95adff94488bf659713e3679f989765c",
       "gold_digest": "29adf3070f5faf551e3e312626bc4216c22c40e9696700a0eb4c8c8c41cfe057"
     }
   ]

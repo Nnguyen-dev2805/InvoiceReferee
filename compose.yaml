@@ -1,0 +1,26 @@
+# InvoiceReferee public pilot (plan T10). One process, one persistent volume.
+# Secrets are read from the local .env (gitignored); never baked into the image.
+services:
+  referee:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: invoice-referee:local
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      INVOICE_REFEREE_MODE: stub
+    volumes:
+      # Persistent DB + uploads survive a restart.
+      - referee-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  referee-data:

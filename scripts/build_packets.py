@@ -143,6 +143,45 @@ def _holdout() -> tuple[RootSpec, ...]:
 HOLDOUT: tuple[RootSpec, ...] = _holdout()
 
 
+def _calibration_like(prefix: str) -> tuple[RootSpec, ...]:
+    """10 distinct roots for threshold selection/validation (contracts §7, §10.5).
+
+    Each set mixes routine and human-required roots so all four buckets are
+    represented; they are separate from development/holdout and from each other.
+    """
+    specs: list[RootSpec] = []
+    for i in range(1, 7):
+        specs.append(
+            RootSpec(f"{prefix}-routine-{i:02d}", "routine", "TRAVEL",
+                     f"inv:{prefix}:r{i:02d}", f"fam:{prefix}r{i:02d}",
+                     f"tpl:{prefix}r{i:02d}", "lay:a", f"iss:{prefix}r{i:02d}", "AUTO",
+                     observable={"amount": 1_000_000 * i},
+                     facts=_facts(1_000_000 * i, paid_employee=1_000_000 * i,
+                                  advance=1_000_000 * i, key=f"inv:{prefix}:r{i:02d}"))
+        )
+    for i in range(1, 3):
+        specs.append(
+            RootSpec(f"{prefix}-fact-{i:02d}", "FACT", "TRAVEL",
+                     f"inv:{prefix}:f{i:02d}", f"fam:{prefix}f{i:02d}",
+                     f"tpl:{prefix}f{i:02d}", "lay:b", f"iss:{prefix}f{i:02d}", "FACT",
+                     owner="employee", facts=_facts(5_000_000, key=f"inv:{prefix}:f{i:02d}"))
+        )
+    for i in range(1, 3):
+        specs.append(
+            RootSpec(f"{prefix}-auth-{i:02d}", "AUTHORITY", "TRAVEL",
+                     f"inv:{prefix}:a{i:02d}", f"fam:{prefix}a{i:02d}",
+                     f"tpl:{prefix}a{i:02d}", "lay:c", f"iss:{prefix}a{i:02d}", "AUTHORITY",
+                     owner="approver",
+                     facts=_facts(10_000_000 + i * 100_000, paid_employee=10_000_000 + i * 100_000,
+                                  key=f"inv:{prefix}:a{i:02d}"))
+        )
+    return tuple(specs)
+
+
+CALIBRATION: tuple[RootSpec, ...] = _calibration_like("cal")
+VALIDATION: tuple[RootSpec, ...] = _calibration_like("val")
+
+
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -335,6 +374,14 @@ def main(argv: list[str] | None = None) -> int:
     hold_dir = out / "holdout"
     hold_meta = build_split(hold_dir, HOLDOUT, "holdout")
     write_manifest(hold_dir / "manifest.json", hold_meta)
+
+    # Calibration/validation are separate eligible-root sets for threshold
+    # selection and validation (contracts §7, §10.5); never the holdout.
+    for split_name, specs in (("calibration", CALIBRATION), ("validation", VALIDATION)):
+        split_dir = out / split_name
+        meta = build_split(split_dir, specs, split_name)  # type: ignore[arg-type]
+        write_manifest(split_dir / "manifest.json", meta)
+        print(f"{split_name}: {len(meta.entries)} roots -> {split_dir}")
 
     print(f"development: {len(dev_meta.entries)} roots -> {dev_dir}")
     print(f"holdout: {len(hold_meta.entries)} roots -> {hold_dir}")
