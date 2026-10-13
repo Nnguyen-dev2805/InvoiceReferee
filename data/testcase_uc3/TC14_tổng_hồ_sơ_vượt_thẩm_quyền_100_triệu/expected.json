@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "case_id": "TC14",
+  "title": "Tổng hồ sơ vượt thẩm quyền 100 triệu",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_dien_tu.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "ESCALATE",
+    "uncertainty_type": "BEYOND_AUTHORITY",
+    "primary_rule": "SET_AUTH_001",
+    "findings": [
+      "SET_AUTH_001"
+    ],
+    "followup": null
+  },
+  "implementation_status": "COVERED",
+  "accounting_facts": {
+    "report_line_sum": "121000000",
+    "report_total": "121000000",
+    "advance_amount": "120000000",
+    "declared_difference": "1000000",
+    "invoice_subtotal": "110000000",
+    "invoice_tax": "11000000",
+    "invoice_total": "121000000",
+    "buyer_tax_code": "0319999996",
+    "expected_company_tax_code": "0319999996"
+  },
+  "rationale": "Tổng thanh toán 121.000.000 VND vượt hạn mức phê duyệt 100.000.000 VND."
+}

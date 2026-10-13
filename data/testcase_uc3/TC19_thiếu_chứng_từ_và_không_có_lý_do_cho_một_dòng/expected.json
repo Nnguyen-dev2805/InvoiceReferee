@@ -1,0 +1,100 @@
+{
+  "schema_version": "2.0",
+  "case_id": "TC19",
+  "title": "Thiếu chứng từ và không có lý do cho một dòng",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_khach_san.pdf",
+      "hoa_don_taxi.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "uncertainty_type": "FACTUAL_UNKNOWN",
+    "primary_rule": "SET_PAPER_EVIDENCE_REQUIRED",
+    "findings": [
+      "SET_PAPER_EVIDENCE_REQUIRED"
+    ],
+    "followup": null
+  },
+  "implementation_status": "COVERED",
+  "accounting_facts": {
+    "report_lines": [
+      {
+        "line_id": "L01",
+        "description": "Phòng nghỉ",
+        "invoice_ref": "00001901",
+        "amount": "2160000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L02",
+        "description": "Taxi nội thành",
+        "invoice_ref": "00001902",
+        "amount": "540000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L03",
+        "description": "Ăn trưa khi khảo sát",
+        "invoice_ref": "Không có",
+        "amount": "800000",
+        "note": ""
+      }
+    ],
+    "report_line_sum": "3500000",
+    "report_total": "3500000",
+    "advance_amount": "4000000",
+    "declared_difference": "500000",
+    "evidence": [
+      {
+        "evidence_id": "EV01",
+        "file": "hoa_don_khach_san.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00001901",
+        "description": "Phòng nghỉ công tác",
+        "amount": "2160000"
+      },
+      {
+        "evidence_id": "EV02",
+        "file": "hoa_don_taxi.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00001902",
+        "description": "Taxi nội thành",
+        "amount": "540000"
+      }
+    ]
+  },
+  "line_support_expectations": [
+    {
+      "report_line_id": "L01",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_khach_san.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn khớp."
+    },
+    {
+      "report_line_id": "L02",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_taxi.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn khớp."
+    },
+    {
+      "report_line_id": "L03",
+      "support_type": "NO_DOCUMENT",
+      "document_files": [],
+      "match_status": "MISSING_REASON",
+      "reason": "Không có file và cột ghi chú không nêu lý do."
+    }
+  ],
+  "rationale": "Dòng ăn trưa 800.000 VND không có chứng từ và không ghi lý do."
+}

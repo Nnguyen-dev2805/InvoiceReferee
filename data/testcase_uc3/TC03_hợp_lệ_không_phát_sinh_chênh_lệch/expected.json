@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "case_id": "TC03",
+  "title": "Hợp lệ không phát sinh chênh lệch",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_dien_tu.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "AUTO_PROCESS",
+    "uncertainty_type": "NONE",
+    "primary_rule": null,
+    "findings": [
+      "SET_PAPER_TOTAL_001",
+      "SET_ADV_AMOUNT_001",
+      "SET_SETTLEMENT_DIFF_001",
+      "SET_APPROVAL_001"
+    ],
+    "followup": "PENDING_APPROVAL"
+  },
+  "implementation_status": "COVERED",
+  "accounting_facts": {
+    "report_line_sum": "4320000",
+    "report_total": "4320000",
+    "advance_amount": "4320000",
+    "declared_difference": "0",
+    "invoice_subtotal": "4000000",
+    "invoice_tax": "320000",
+    "invoice_total": "4320000",
+    "buyer_tax_code": "0319999996",
+    "expected_company_tax_code": "0319999996"
+  },
+  "rationale": "Số tạm ứng bằng đúng tổng chi phí."
+}

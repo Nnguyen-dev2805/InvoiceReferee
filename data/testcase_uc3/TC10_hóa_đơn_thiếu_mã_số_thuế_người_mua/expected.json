@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "case_id": "TC10",
+  "title": "Hóa đơn thiếu mã số thuế người mua",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_dien_tu.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "uncertainty_type": "FACTUAL_UNKNOWN",
+    "primary_rule": "SET_REQUIRED_FIELD_001",
+    "findings": [
+      "SET_REQUIRED_FIELD_001"
+    ],
+    "followup": null
+  },
+  "implementation_status": "GAP_EXPECTED",
+  "accounting_facts": {
+    "report_line_sum": "3240000",
+    "report_total": "3240000",
+    "advance_amount": "4000000",
+    "declared_difference": "760000",
+    "invoice_subtotal": "3000000",
+    "invoice_tax": "240000",
+    "invoice_total": "3240000",
+    "buyer_tax_code": null,
+    "expected_company_tax_code": "0319999996"
+  },
+  "rationale": "Hóa đơn điện tử không có MST người mua."
+}

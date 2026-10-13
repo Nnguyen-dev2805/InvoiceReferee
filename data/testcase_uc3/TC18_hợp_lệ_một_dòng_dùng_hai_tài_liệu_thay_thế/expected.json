@@ -1,0 +1,97 @@
+{
+  "schema_version": "2.0",
+  "case_id": "TC18",
+  "title": "Hợp lệ một dòng dùng hai tài liệu thay thế",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_linh_kien.pdf",
+      "bien_ban_nghiem_thu.pdf",
+      "xac_nhan_chuyen_khoan.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "AUTO_PROCESS",
+    "uncertainty_type": "NONE",
+    "primary_rule": null,
+    "findings": [
+      "SET_MULTI_EVIDENCE_MATCH_001",
+      "SET_ALTERNATIVE_DOCUMENT_001"
+    ],
+    "followup": "PENDING_APPROVAL"
+  },
+  "implementation_status": "GAP_EXPECTED",
+  "accounting_facts": {
+    "report_lines": [
+      {
+        "line_id": "L01",
+        "description": "Mua linh kiện máy in",
+        "invoice_ref": "00001801",
+        "amount": "2700000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L02",
+        "description": "Nhân công sửa chữa",
+        "invoice_ref": "BBNT-181026-02 / FT262918104578",
+        "amount": "1500000",
+        "note": "Biên bản nghiệm thu và chuyển khoản"
+      }
+    ],
+    "report_line_sum": "4200000",
+    "report_total": "4200000",
+    "advance_amount": "5000000",
+    "declared_difference": "800000",
+    "evidence": [
+      {
+        "evidence_id": "EV01",
+        "file": "hoa_don_linh_kien.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00001801",
+        "description": "Linh kiện sửa máy in",
+        "amount": "2700000"
+      },
+      {
+        "evidence_id": "EV02",
+        "file": "bien_ban_nghiem_thu.pdf",
+        "document_type": "ACCEPTANCE_MINUTES",
+        "reference": "BBNT-181026-02",
+        "description": "Nhân công sửa chữa máy in",
+        "amount": "1500000"
+      },
+      {
+        "evidence_id": "EV03",
+        "file": "xac_nhan_chuyen_khoan.pdf",
+        "document_type": "BANK_TRANSFER",
+        "reference": "FT262918104578",
+        "description": "Thanh toán nhân công sửa chữa máy in",
+        "amount": "1500000"
+      }
+    ]
+  },
+  "line_support_expectations": [
+    {
+      "report_line_id": "L01",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_linh_kien.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn linh kiện khớp 2.700.000 VND."
+    },
+    {
+      "report_line_id": "L02",
+      "support_type": "ALTERNATIVE_DOCUMENT",
+      "document_files": [
+        "bien_ban_nghiem_thu.pdf",
+        "xac_nhan_chuyen_khoan.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hai tài liệu cùng xác nhận dịch vụ và khoản thanh toán 1.500.000 VND."
+    }
+  ],
+  "rationale": "Dòng nhân công được hỗ trợ đồng thời bởi biên bản nghiệm thu và xác nhận chuyển khoản."
+}

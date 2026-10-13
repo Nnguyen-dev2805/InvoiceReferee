@@ -1,0 +1,95 @@
+{
+  "schema_version": "2.0",
+  "case_id": "TC24",
+  "title": "Có hóa đơn đính kèm nhưng không xuất hiện trên report",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_khach_san.pdf",
+      "hoa_don_taxi.pdf",
+      "hoa_don_khong_khai_bao.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "uncertainty_type": "FACTUAL_UNKNOWN",
+    "primary_rule": "SET_UNREFERENCED_EVIDENCE_001",
+    "findings": [
+      "SET_UNREFERENCED_EVIDENCE_001"
+    ],
+    "followup": null
+  },
+  "implementation_status": "GAP_EXPECTED",
+  "accounting_facts": {
+    "report_lines": [
+      {
+        "line_id": "L01",
+        "description": "Phòng nghỉ",
+        "invoice_ref": "00002401",
+        "amount": "2160000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L02",
+        "description": "Taxi công tác",
+        "invoice_ref": "00002402",
+        "amount": "540000",
+        "note": "Đính kèm hóa đơn"
+      }
+    ],
+    "report_line_sum": "2700000",
+    "report_total": "2700000",
+    "advance_amount": "3000000",
+    "declared_difference": "300000",
+    "evidence": [
+      {
+        "evidence_id": "EV01",
+        "file": "hoa_don_khach_san.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00002401",
+        "description": "Phòng nghỉ công tác",
+        "amount": "2160000"
+      },
+      {
+        "evidence_id": "EV02",
+        "file": "hoa_don_taxi.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00002402",
+        "description": "Taxi công tác",
+        "amount": "540000"
+      },
+      {
+        "evidence_id": "EV03",
+        "file": "hoa_don_khong_khai_bao.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00002409",
+        "description": "Ăn uống cá nhân",
+        "amount": "1080000"
+      }
+    ]
+  },
+  "line_support_expectations": [
+    {
+      "report_line_id": "L01",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_khach_san.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn khớp."
+    },
+    {
+      "report_line_id": "L02",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_taxi.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn khớp."
+    }
+  ],
+  "rationale": "Hóa đơn 00002409 được tải lên nhưng không có dòng report nào tham chiếu; cần xác nhận bỏ nhầm hay đính kèm nhầm."
+}

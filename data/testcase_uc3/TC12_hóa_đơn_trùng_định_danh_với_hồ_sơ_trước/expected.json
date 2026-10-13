@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "case_id": "TC12",
+  "title": "Hóa đơn trùng định danh với hồ sơ trước",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_dien_tu.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "ESCALATE",
+    "uncertainty_type": "SUSPICIOUS",
+    "primary_rule": "SET_DUP_001",
+    "findings": [
+      "SET_DUP_001"
+    ],
+    "followup": null
+  },
+  "implementation_status": "GAP_EXPECTED",
+  "accounting_facts": {
+    "report_line_sum": "3240000",
+    "report_total": "3240000",
+    "advance_amount": "4000000",
+    "declared_difference": "760000",
+    "invoice_subtotal": "3000000",
+    "invoice_tax": "240000",
+    "invoice_total": "3240000",
+    "buyer_tax_code": "0319999996",
+    "expected_company_tax_code": "0319999996"
+  },
+  "rationale": "Giữ nguyên số hóa đơn, người bán, ngày và tổng tiền của TC01 để kiểm tra semantic duplicate."
+}

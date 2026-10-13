@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "case_id": "TC05",
+  "title": "Tổng các dòng trên báo cáo không khớp",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_dien_tu.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "uncertainty_type": "FACTUAL_UNKNOWN",
+    "primary_rule": "SET_PAPER_TOTAL_001",
+    "findings": [
+      "SET_PAPER_TOTAL_001"
+    ],
+    "followup": null
+  },
+  "implementation_status": "COVERED",
+  "accounting_facts": {
+    "report_line_sum": "3000000",
+    "report_total": "3500000",
+    "advance_amount": "4000000",
+    "declared_difference": "500000",
+    "invoice_subtotal": "3000000",
+    "invoice_tax": "240000",
+    "invoice_total": "3240000",
+    "buyer_tax_code": "0319999996",
+    "expected_company_tax_code": "0319999996"
+  },
+  "rationale": "Hai dòng cộng 3.000.000 VND nhưng tổng báo cáo ghi 3.500.000 VND."
+}

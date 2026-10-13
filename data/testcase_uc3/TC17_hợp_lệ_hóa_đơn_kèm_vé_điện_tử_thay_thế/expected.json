@@ -1,0 +1,112 @@
+{
+  "schema_version": "2.0",
+  "case_id": "TC17",
+  "title": "Hợp lệ hóa đơn kèm vé điện tử thay thế",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_nha_hang.pdf",
+      "hoa_don_phong_hop.pdf",
+      "ve_dien_tu_bai_do_xe.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "AUTO_PROCESS",
+    "uncertainty_type": "NONE",
+    "primary_rule": null,
+    "findings": [
+      "SET_MULTI_EVIDENCE_MATCH_001",
+      "SET_ALTERNATIVE_DOCUMENT_001"
+    ],
+    "followup": "PENDING_APPROVAL"
+  },
+  "implementation_status": "GAP_EXPECTED",
+  "accounting_facts": {
+    "report_lines": [
+      {
+        "line_id": "L01",
+        "description": "Ăn uống tiếp khách",
+        "invoice_ref": "00001701",
+        "amount": "3240000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L02",
+        "description": "Thuê phòng họp",
+        "invoice_ref": "00001702",
+        "amount": "2160000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L03",
+        "description": "Phí gửi xe",
+        "invoice_ref": "VDT-171026-0385",
+        "amount": "200000",
+        "note": "Vé điện tử thay thế hóa đơn"
+      }
+    ],
+    "report_line_sum": "5600000",
+    "report_total": "5600000",
+    "advance_amount": "6000000",
+    "declared_difference": "400000",
+    "evidence": [
+      {
+        "evidence_id": "EV01",
+        "file": "hoa_don_nha_hang.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00001701",
+        "description": "Dịch vụ ăn uống tiếp khách",
+        "amount": "3240000"
+      },
+      {
+        "evidence_id": "EV02",
+        "file": "hoa_don_phong_hop.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00001702",
+        "description": "Thuê phòng họp",
+        "amount": "2160000"
+      },
+      {
+        "evidence_id": "EV03",
+        "file": "ve_dien_tu_bai_do_xe.pdf",
+        "document_type": "E_TICKET",
+        "reference": "VDT-171026-0385",
+        "description": "Phí gửi xe phục vụ buổi tiếp khách",
+        "amount": "200000"
+      }
+    ]
+  },
+  "line_support_expectations": [
+    {
+      "report_line_id": "L01",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_nha_hang.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn khớp dòng tiếp khách."
+    },
+    {
+      "report_line_id": "L02",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_phong_hop.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn khớp dòng thuê phòng."
+    },
+    {
+      "report_line_id": "L03",
+      "support_type": "ALTERNATIVE_DOCUMENT",
+      "document_files": [
+        "ve_dien_tu_bai_do_xe.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Vé điện tử là tài liệu thay thế và khớp số tiền."
+    }
+  ],
+  "rationale": "Hai hóa đơn và một vé điện tử hỗ trợ đủ ba dòng; tổng 5.600.000 VND."
+}
