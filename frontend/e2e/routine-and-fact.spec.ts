@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 
 const GOOD_PDF = Buffer.from("%PDF-1.4\nchung tu demo\n%%EOF\n");
 
-async function openAndSubmit(page, activityId: string) {
+async function openAndSubmit(page, activityId: string, persona?: string) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Nộp hồ sơ" })).toBeVisible();
   await page.locator("#activity-select").selectOption(activityId);
@@ -19,12 +19,16 @@ async function openAndSubmit(page, activityId: string) {
   await page.getByRole("button", { name: "Đính kèm" }).click();
   await expect(page.getByRole("heading", { name: "Chứng từ (1)" })).toBeVisible();
   await page.getByRole("button", { name: "Nộp hồ sơ" }).click();
+  // Role workspaces (plan R6 UX01): switch to the persona that sees the panel.
+  if (persona) {
+    await page.getByLabel("Vai trò (demo)").selectOption(persona);
+  }
 }
 
 test("routine: one actionable payment, no human recheck", async ({ page }) => {
-  await openAndSubmit(page, "activity:travel-c");
+  // The employee submits; the accountant sees the actionable order.
+  await openAndSubmit(page, "activity:travel-f", "accountant");
 
-  // The accountant sees exactly one instruction of 3.000.000.
   await expect(
     page.getByRole("heading", { name: /Yêu cầu cần thực hiện \(1\)/ }),
   ).toBeVisible();
@@ -38,6 +42,7 @@ test("routine: one actionable payment, no human recheck", async ({ page }) => {
 test("fact: missing payer becomes an answerable card, no instruction", async ({
   page,
 }) => {
+  // The payer FACT is owned by the employee, who sees the question card.
   await openAndSubmit(page, "activity:travel-d");
 
   await expect(

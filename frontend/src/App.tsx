@@ -8,6 +8,7 @@ import { Execution } from "./features/execution";
 import { Intake } from "./features/intake";
 import { Questions } from "./features/questions";
 import { Verify } from "./features/verify";
+import { roleWorkspaces } from "./roles";
 import type { CaseView, SessionPayload } from "./types";
 
 export default function App() {
@@ -30,7 +31,8 @@ export default function App() {
   async function switchPersona(persona: string) {
     try {
       setSession(await api.switchPersona(persona));
-      setCaseView(null);
+      // Keep the loaded case: it is tenant-scoped and visible to every persona,
+      // so the accountant can act on what the employee just submitted.
       setError(null);
     } catch (cause) {
       setError(errorMessage(cause));
@@ -75,11 +77,21 @@ export default function App() {
 
       {session !== null && (
         <main>
-          <Intake session={session} onCase={setCaseView} />
-          <Questions caseView={caseView} onCase={setCaseView} />
-          <Approval caseView={caseView} />
-          <Execution caseView={caseView} onCase={setCaseView} />
-          <Controls caseView={caseView} onCase={setCaseView} />
+          {roleWorkspaces(session.session.persona).includes("intake") && (
+            <Intake session={session} onCase={setCaseView} />
+          )}
+          {roleWorkspaces(session.session.persona).includes("questions") && (
+            <Questions caseView={caseView} onCase={setCaseView} />
+          )}
+          {roleWorkspaces(session.session.persona).includes("approval") && (
+            <Approval caseView={caseView} />
+          )}
+          {roleWorkspaces(session.session.persona).includes("execution") && (
+            <Execution caseView={caseView} onCase={setCaseView} />
+          )}
+          {roleWorkspaces(session.session.persona).includes("controls") && (
+            <Controls caseView={caseView} onCase={setCaseView} />
+          )}
           <Verify />
           <Dossier caseView={caseView} />
         </main>

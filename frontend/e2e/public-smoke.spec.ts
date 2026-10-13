@@ -22,6 +22,8 @@ test("public smoke: main flow is discoverable and runs", async ({ page }) => {
   });
   await page.getByRole("button", { name: "Đính kèm" }).click();
   await page.getByRole("button", { name: "Nộp hồ sơ" }).click();
+  // The accountant sees the actionable order (role workspaces).
+  await page.getByLabel("Vai trò (demo)").selectOption("accountant");
   await expect(page.getByTestId("instruction-PAY")).toBeVisible();
 });
 

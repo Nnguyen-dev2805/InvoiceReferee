@@ -8,10 +8,9 @@ const GOOD_PDF = Buffer.from("%PDF-1.4\nchung tu demo\n%%EOF\n");
 
 test("execution: record actual money updates the projection", async ({ page }) => {
   await page.goto("/");
-  // Switch to the accountant persona so recording is permitted.
-  await page.getByLabel("Vai trò (demo)").selectOption("accountant");
 
-  await page.locator("#activity-select").selectOption("activity:travel-c");
+  // The employee submits (intake is the employee workspace, plan R6 UX01).
+  await page.locator("#activity-select").selectOption("activity:travel-g");
   await page.getByRole("button", { name: "Tạo hồ sơ" }).click();
   await page.getByLabel("Chứng từ (PDF/PNG/JPEG)").setInputFiles({
     name: "hoadon.pdf",
@@ -20,6 +19,9 @@ test("execution: record actual money updates the projection", async ({ page }) =
   });
   await page.getByRole("button", { name: "Đính kèm" }).click();
   await page.getByRole("button", { name: "Nộp hồ sơ" }).click();
+
+  // Switch to the accountant persona, who sees the order and records money.
+  await page.getByLabel("Vai trò (demo)").selectOption("accountant");
 
   // An instruction exists; record a receipt of 2.000.000 with a responsible
   // completion confirmation (a bare amount is not verified money).

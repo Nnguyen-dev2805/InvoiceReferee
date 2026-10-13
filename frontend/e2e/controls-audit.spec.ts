@@ -7,8 +7,8 @@ const GOOD_PDF = Buffer.from("%PDF-1.4\nchung tu demo\n%%EOF\n");
 
 test("controls: stop and resume are audited", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Vai trò (demo)").selectOption("accountant");
 
+  // The employee submits (intake workspace).
   await page.locator("#activity-select").selectOption("activity:travel-e");
   await page.getByRole("button", { name: "Tạo hồ sơ" }).click();
   await page.getByLabel("Chứng từ (PDF/PNG/JPEG)").setInputFiles({
@@ -19,6 +19,8 @@ test("controls: stop and resume are audited", async ({ page }) => {
   await page.getByRole("button", { name: "Đính kèm" }).click();
   await page.getByRole("button", { name: "Nộp hồ sơ" }).click();
 
+  // The accountant controls the root (controls workspace).
+  await page.getByLabel("Vai trò (demo)").selectOption("accountant");
   await page.getByRole("button", { name: "Dừng hồ sơ" }).click();
   // The case state reflects the Stop and the audit list records it.
   await expect(page.getByText(/Đã dừng/)).toBeVisible();
