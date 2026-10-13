@@ -103,6 +103,34 @@ def await_ocr(client: MistralOcrClient, image_bytes: bytes, budget: RunBudget) -
     return asyncio.run(client.ocr_image(image_bytes, budget=budget))
 
 
+def _resolve_m0_inputs(input_dir: Path) -> dict[str, Path | None]:
+    """Map each M0 kind to its probe file, via the technical manifest if present.
+
+    The R1 generator writes ky-thuat/manifest.json mapping folders to kinds; the
+    M0 CLI reads it instead of a hardcoded root layout (plan R8). A legacy flat
+    root (text.pdf/clear_scan.pdf/...) is still accepted.
+    """
+    manifest_path = input_dir / "manifest.json"
+    files: dict[str, Path | None] = {kind: None for kind in M0_CASES}
+    if manifest_path.is_file():
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        for probe in data.get("probes", []):
+            kind = str(probe.get("kind"))
+            folder = input_dir / str(probe.get("folder"))
+            candidate = next(
+                (p for p in sorted(folder.glob("*")) if p.is_file()),
+                None,
+            ) if folder.is_dir() else None
+            if kind in files:
+                files[kind] = candidate
+        return files
+    files["text"] = input_dir / "text.pdf"
+    files["clear_scan"] = input_dir / "clear_scan.pdf"
+    files["unclear_scan"] = input_dir / "unclear_scan.pdf"
+    files["non_document"] = input_dir / "non_document.png"
+    return files
+
+
 def run_m0_live(input_dir: Path, settings: Settings) -> LiveReport:
     budget = RunBudget()
     trace = build_trace(settings)
@@ -124,15 +152,10 @@ def run_m0_live(input_dir: Path, settings: Settings) -> LiveReport:
         },
     )
 
-    files = {
-        "text": input_dir / "text.pdf",
-        "clear_scan": input_dir / "clear_scan.pdf",
-        "unclear_scan": input_dir / "unclear_scan.pdf",
-        "non_document": input_dir / "non_document.png",
-    }
+    files = _resolve_m0_inputs(input_dir)
     for kind in M0_CASES:
-        path = files[kind]
-        if not path.is_file():
+        path = files.get(kind)
+        if path is None or not path.is_file():
             report.attempts.append(
                 LiveAttempt(kind=kind, source=str(path), ok=False, used_ocr=False,
                             error="missing input file")

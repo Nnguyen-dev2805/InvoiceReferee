@@ -7,17 +7,17 @@ The plan owns task acceptance; package/config files own executable commands.
 
 | Field | Current value |
 | --- | --- |
-| Base branch | `final` @ e918642a (remediation head). T1..T10 committed; a post-T10 independent-review remediation pass is committed on top (7 commits). Worktree `.worktrees/hoangha` = `hoang-ha-fresh` (untouched). No `.worktrees/t2` (pruned). |
-| Phase | T1..T10 implemented; **independent-review remediation pass done** (2026-10-13): the 6 Important findings from the post-T10 review are fixed with RED→GREEN tests (see "Remediation" below). T11/T12/T13 remain as before. |
-| Authorized scope now | Fix the reviewed behaviour gaps in the workflow/scorer/evidence pipeline (user-authorized 13/10/2026). Committed on `final`. |
-| Setup review | ACCEPTED at documentation/setup level; clean-clone proof passed (see evidence). |
-| Execution method | Inline execution (executing-plans), single integrator; per-finding TDD + full-suite after each. A whole-branch fresh review has not been run. |
+| Base branch | `final` @ (R8 head). T1..T10 committed; the post-T10 remediation pass (7 commits); then the R0–R8 data/pipeline remediation. |
+| Phase | T1..T10 implemented; post-T10 remediation done; **R0–R8 data/pipeline remediation done** (2026-10-13): 15 real cases with source-borne facts, published corpus, reader-per-mode runtime, durable jobs, raw 6-case pipeline, role workspaces, independent suites, M0 LIVE + LIVE baseline. |
+| Authorized scope now | Execute the PDF-data/pipeline plan (user-authorized 13/10/2026). Committed on `final`. |
+| Setup review | ACCEPTED; clean-clone proof passed. |
+| Execution method | Inline execution (executing-plans), single integrator; per-task TDD + full-suite after each. A whole-branch fresh review has not been run. |
 | Workflow integrator | Inline executor — single writer for workflow/api/domain owned files |
 | Next application task | T11 — needs real feedback (BLOCKED on practitioners). Public hosting + real pilot still BLOCKED. |
-| Last completed application task | T10 (d2f087e) + the 2026-10-13 remediation pass (e918642a). |
-| Product unit/integration/UI/LIVE evidence | After remediation: `uv run pytest` → **188 passed**; `npm run build` exit 0; `vitest` 2 passed; `playwright` 9 passed (Node 24.19.0 via the `.runtime/agent-toolchain.json` hint + `npm-cli.js`). STUB baselines: `invoice-referee evaluate --suite core --mode stub` union=0; `--suite escalation` union=0 release=true. LIVE provider calls NOT_RUN (no credentials/hosting); the read seam is proven offline with an injected reader. Docker build NOT_RUN (docker not installed). |
+| Last completed application task | R0–R8 (data/pipeline remediation). |
+| Product unit/integration/UI/LIVE evidence | `uv run pytest` → **244 passed**; vitest 6; playwright 9; build exit 0. M0 LIVE over the 4 technical probes succeeded (real provider calls). LIVE baseline (development) union=**1** (D05, a case without a real conflict source), correct_auto_completion=9. STUB core/escalation union=0. See [RELEASE_EVIDENCE](RELEASE_EVIDENCE.md). Docker build NOT_RUN. Public hosting + practitioner pilot BLOCKED. |
 | CodeGraph | Re-check with `rtk proxy codegraph status` before relying on it; the index lags writes. |
-| Git handoff | Remediation commits (on `final`): e8745125 (authority scope+amount), de87d7ed (money verification), 1acd8a08 (Stop/Resume execution), c01037d2 (answer loop), 6439c572 (scorer/runner/suites), 2b641e63 (LIVE read), e918642a (UI confirmation). Unpushed (no push authorization). |
+| Git handoff | R0–R8 commits (on `final`): R1 81c45067, R2 2918f83f, R3 d99bef60, R4 c0b058b5+4a7e42dd, R5 53a9c011, R6 cc16347e, R7 c7ba4314, R8 (this). Unpushed (no push authorization). |
 
 ### Remediation pass (2026-10-13, reviewed commit 13a6eb09)
 

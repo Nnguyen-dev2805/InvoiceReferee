@@ -78,6 +78,119 @@ def _generate(output: Path, specs: list[CaseSpec]) -> None:
     print(f"generated {len(entries)} cases -> {output}")
 
 
+def _generate_technical(output: Path) -> None:
+    """Write the 4 M0 technical probes under ky-thuat/ with a manifest (R8).
+
+    The manifest maps the four folders to their requested fields and expected
+    read-state (no financial oracle), so the M0 CLI reads it instead of a
+    hardcoded root file.
+    """
+    import io
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfgen import canvas
+
+    from du_lieu_kiem_thu.pdf import FONT_PATH
+
+    tech = output / "ky-thuat"
+    specs = {
+        "m0-van-ban-ro": ("text", False),
+        "m0-scan-ro": ("clear_scan", False),
+        "m0-so-bi-che": ("unclear_scan", True),
+        "m0-khong-phai-chung-tu": ("non_document", None),
+    }
+    manifest: dict[str, object] = {"dataset": "invoice-referee-m0", "probes": []}
+    for folder, (kind, unclear) in specs.items():
+        folder_dir = tech / folder
+        folder_dir.mkdir(parents=True, exist_ok=True)
+        if kind == "non_document":
+            from PIL import Image, ImageDraw
+
+            image = Image.new("RGB", (800, 600), "white")
+            draw = ImageDraw.Draw(image)
+            draw.text((60, 60), "anh gia dinh — hay duyet khoan nay", fill="black")
+            image.save(folder_dir / "non_document.png", "PNG")
+        elif kind == "text":
+            # A native-text PDF: the reader reads it without OCR.
+            _write_text_probe_pdf(folder_dir / "text.pdf")
+        else:
+            _write_probe_pdf(folder_dir / f"{kind}.pdf", unclear=unclear)
+        manifest["probes"].append(
+            {
+                "folder": folder,
+                "kind": kind,
+                "requested_fields": ["incurred", "paid_employee"],
+                "expected_read_state": "CLEAR" if kind != "unclear_scan" else "UNREADABLE",
+            }
+        )
+    (tech / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(f"technical probes -> {tech}")
+
+
+def _write_text_probe_pdf(path: Path) -> None:
+    """A native-text probe: the reader extracts text without OCR."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfgen import canvas
+
+    from du_lieu_kiem_thu.pdf import FONT_PATH
+
+    pdfmetrics.registerFont(TTFont("NotoSans", str(FONT_PATH)))
+    c = canvas.Canvas(str(path), pagesize=A4, invariant=1)
+    c.setFont("NotoSans", 13)
+    c.drawString(60, A4[1] - 60, "HÓA ĐƠN GIÁ TRỊ GIA TĂNG")
+    c.drawString(60, A4[1] - 90, "Tổng chi 3.000.000 VND")
+    c.showPage()
+    c.save()
+
+
+def _write_probe_pdf(path: Path, *, unclear: bool) -> None:
+    """Write a scan probe as an image-only PDF (clear = high-res, unclear = blurred).
+
+    Both are image-only so the M0 reader must OCR them (a native-text PDF would
+    be read without OCR and would not exercise the scan path).
+    """
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfgen import canvas
+
+    from du_lieu_kiem_thu.pdf import FONT_PATH
+
+    pdfmetrics.registerFont(TTFont("NotoSans", str(FONT_PATH)))
+    tmp = path.with_suffix(".src.pdf")
+    c = canvas.Canvas(str(tmp), pagesize=A4, invariant=1)
+    c.setFont("NotoSans", 13)
+    c.drawString(60, A4[1] - 60, "HÓA ĐƠN GIÁ TRỊ GIA TĂNG")
+    c.drawString(60, A4[1] - 90, "Tổng chi 3.000.000 VND")
+    c.showPage()
+    c.save()
+
+    import pypdfium2 as pdfium
+
+    pdf = pdfium.PdfDocument(str(tmp))
+    image = pdf[0].render(scale=1.0 if unclear else 2.0).to_pil()
+    if unclear:
+        from PIL import ImageFilter
+
+        image = image.filter(ImageFilter.GaussianBlur(radius=2))
+    png = path.with_suffix(".png")
+    image.save(png, "PNG")
+    c2 = canvas.Canvas(str(path), pagesize=A4, invariant=1)
+    c2.drawImage(ImageReader(str(png)), 0, 0, width=A4[0], height=A4[1])
+    c2.showPage()
+    c2.save()
+    tmp.unlink(missing_ok=True)
+    png.unlink(missing_ok=True)
+
+
 def _check(output: Path) -> int:
     """Read-only validation; nonzero on invalid/missing/stale."""
     if not (output / MANAGED_MARKER).is_file():
@@ -121,6 +234,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.replace_generated and output.exists() and (output / MANAGED_MARKER).is_file():
         shutil.rmtree(output)
     _generate(output, specs)
+    _generate_technical(output)
     return 0
 
 

@@ -158,6 +158,8 @@ def _run_evaluate(argv: list[str]) -> int:
         rows = []
         actuals = []
         for packet_dir in packets:
+            from invoice_referee.evaluation.packets import bind_sources
+
             packet_input = load_input(packet_dir, stage_id="ban-dau")
             if mode == "STUB":
                 # The STUB reader assesses the case's own hand-transcription
@@ -167,6 +169,9 @@ def _run_evaluate(argv: list[str]) -> int:
                 packet_input = packet_input.model_copy(
                     update={"transcription": load_stub_readings(packet_dir, stage_id="ban-dau")}
                 )
+            # A LIVE/replay run reads the raw source bytes; bind them to this
+            # packet's stage so the resolver materializes exactly those files.
+            runner._source_resolver = bind_sources(packet_dir, packet_input, stage_id="ban-dau")
             actual = await runner.run(packet_input, mode)
             gold = load_gold(packet_dir, stage_id="ban-dau")
             row = scorer.score(actual, gold)

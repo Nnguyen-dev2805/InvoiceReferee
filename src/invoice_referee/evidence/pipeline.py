@@ -31,14 +31,16 @@ class ReadOutcome:
 
 
 # Literal field cues for the demo extractor (bounded, no model, no confidence).
+# Order matters: a more specific cue (e.g. "công ty trả") is checked before a
+# generic one so a line maps to the right field.
 _FIELD_CUES: tuple[tuple[str, str], ...] = (
-    ("incurred", "incurred"),
-    ("tổng chi", "incurred"),
-    ("total", "incurred"),
-    ("nhân viên trả", "paid_employee"),
-    ("employee paid", "paid_employee"),
     ("công ty trả", "paid_company"),
     ("company paid", "paid_company"),
+    ("nhân viên trả", "paid_employee"),
+    ("employee paid", "paid_employee"),
+    ("tổng chi", "incurred"),
+    ("incurred", "incurred"),
+    ("total", "incurred"),
     ("ứng", "advance"),
     ("advance", "advance"),
     ("hoàn trả", "returned"),
@@ -71,8 +73,30 @@ def transcribe_text(text: str) -> Transcription | None:
         return None
     facts: list[TranscriptionFact] = []
     seen: set[str] = set()
-    lowered = text.lower()
-    for line in text.splitlines():
+    lines = text.splitlines()
+    # A receipt names the payer ("Người thanh toán: <name>") and the amount
+    # ("Đã thanh toán <amount>"). The payer decides whether the portion is the
+    # employee-paid E candidate or the company-direct C portion.
+    payer_line = next(
+        (line for line in lines if "người thanh toán" in line.lower()), ""
+    )
+    amount_line = next(
+        (line for line in lines if "đã thanh toán" in line.lower()), ""
+    )
+    if payer_line and amount_line:
+        nums = _amounts(amount_line)
+        payer_name = payer_line.split(":", 1)[-1].strip().lower()
+        if nums:
+            is_company = "công ty" in payer_name
+            field = "paid_company" if is_company else "paid_employee"
+            facts.append(
+                TranscriptionFact(
+                    field=field, value=nums[0], role="PAYMENT",
+                    quote=amount_line.strip() or "payment",
+                )
+            )
+            seen.add(field)
+    for line in lines:
         line_lower = line.lower()
         for cue, field in _FIELD_CUES:
             if cue in line_lower and field not in seen:
@@ -106,9 +130,6 @@ def transcribe_text(text: str) -> Transcription | None:
     if not facts:
         # Text present but no recognisable field: not a readable business doc.
         return None
-    # A required incurred cost with no coverage is still a valid (partial) read;
-    # the Reconciler decides what is unresolved.
-    _ = lowered
     return Transcription(facts=tuple(facts))
 
 
@@ -128,6 +149,7 @@ async def transcribe_root(
     """
     read_pages = 0
     unread_pages = 0
+    merged: dict[str, TranscriptionFact] = {}
     for source in sources:
         for page in pages:
             text = await reader.ocr_page(source, page)
@@ -136,15 +158,22 @@ async def transcribe_root(
             else:
                 unread_pages += 1
             transcription = transcribe_text(text) if text else None
-            if transcription is not None:
-                return ReadOutcome(
-                    transcription=transcription,
-                    read_pages=read_pages,
-                    unread_pages=unread_pages,
-                    provider_mode=provider_mode,
-                )
+            if transcription is None:
+                continue
+            # Merge facts across the root's documents: each source carries a
+            # different field set (invoice -> incurred, receipt -> paid, slip ->
+            # advance). First writer wins so a field is not overwritten.
+            for fact in transcription.facts:
+                merged.setdefault(fact.field, fact)
+    if not merged:
+        return ReadOutcome(
+            transcription=None,
+            read_pages=read_pages,
+            unread_pages=unread_pages,
+            provider_mode=provider_mode,
+        )
     return ReadOutcome(
-        transcription=None,
+        transcription=Transcription(facts=tuple(merged.values())),
         read_pages=read_pages,
         unread_pages=unread_pages,
         provider_mode=provider_mode,
