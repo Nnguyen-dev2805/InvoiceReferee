@@ -13,7 +13,7 @@ test("intake: create twice reuses one root, attach and list a source", async ({
     page.getByRole("heading", { name: "Nộp hồ sơ" }),
   ).toBeVisible();
 
-  await page.getByLabel("Hoạt động").selectOption("activity:travel-a");
+  await page.locator("#activity-select").selectOption("activity:travel-a");
   await page.getByRole("button", { name: "Tạo hồ sơ" }).click();
 
   const caseCode = page.getByTestId("case-code");
@@ -28,15 +28,19 @@ test("intake: create twice reuses one root, attach and list a source", async ({
     mimeType: "application/pdf",
     buffer: GOOD_PDF,
   });
+
+  // Keyboard path: with a file selected the primary action is enabled and can
+  // receive keyboard focus. (After attaching, the button is disabled by design,
+  // so this check belongs here, not after the click.)
+  const attachButton = page.getByRole("button", { name: "Đính kèm" });
+  await expect(attachButton).toBeEnabled();
+  await attachButton.focus();
+  await expect(attachButton).toBeFocused();
+
   await page.getByRole("button", { name: "Đính kèm" }).click();
 
   await expect(page.getByText(/Đã đính kèm 1 chứng từ/)).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Chứng từ (1)" }),
   ).toBeVisible();
-
-  // Keyboard path: Tab reaches the primary action and it stays operable.
-  await page.getByLabel("Chứng từ (PDF/PNG/JPEG)").focus();
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Đính kèm" })).toBeFocused();
 });

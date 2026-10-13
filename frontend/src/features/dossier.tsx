@@ -82,9 +82,11 @@ export function Dossier({ caseView }: { caseView: CaseView | null }) {
 
           <h3>Số tiền</h3>
           <ul className="money">
-            {Object.entries(caseView.actual_money).map(([key, fact]) => (
-              <MoneyLine key={key} label={MONEY_LABELS[key] ?? key} fact={fact} />
-            ))}
+            {Object.entries(caseView.actual_money)
+              .filter(([key]) => key in MONEY_LABELS)
+              .map(([key, fact]) => (
+                <MoneyLine key={key} label={MONEY_LABELS[key]} fact={fact} />
+              ))}
           </ul>
 
           <h3>Việc cần xử lý ({caseView.issues.length})</h3>

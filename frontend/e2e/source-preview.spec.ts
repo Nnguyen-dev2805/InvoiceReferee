@@ -12,7 +12,7 @@ test("source preview: attach a scan and see it listed with a next action", async
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Nộp hồ sơ" })).toBeVisible();
 
-  await page.getByLabel("Hoạt động").selectOption("activity:travel-a");
+  await page.locator("#activity-select").selectOption("activity:travel-a");
   await page.getByRole("button", { name: "Tạo hồ sơ" }).click();
 
   await page.getByLabel("Chứng từ (PDF/PNG/JPEG)").setInputFiles({
@@ -24,5 +24,7 @@ test("source preview: attach a scan and see it listed with a next action", async
 
   // The source is listed and the dossier shows a clear next action.
   await expect(page.getByRole("heading", { name: "Chứng từ (1)" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Hồ sơ" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Hồ sơ", exact: true }),
+  ).toBeVisible();
 });
