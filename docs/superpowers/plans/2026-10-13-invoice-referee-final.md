@@ -261,16 +261,15 @@ def test_balanced_false_claim_is_dangerous():
 
 **Files:** Dockerfile,compose.yaml,docs/final/RUNBOOK.md; config/cli/dev/UI; tests/integration/test_config_storage.py; frontend/e2e/public-smoke.spec.ts.
 **Produces:** oneentry `rtk proxy uv run python scripts/dev.py --mode live`, singleprocesscontainer/staticUI/persistentvolume.
-- [ ] Tests missingkey/model/context diagnostics nofake; pathsindependentcwd; sessions/Verify/reset isolation; LangSmith failure nofinancialchange; boundedparserLIMIT.
-- [ ] RED: `rtk proxy uv run pytest tests/integration/test_config_storage.py -q`.
-- [ ] Implement prerequisite/lockedinstall/runbook, launcher/health/redactedversions, staticfrontendFastAPI. Ignore .runtime/private/uploads/DB/secrets, commit syntheticfixtures/config/fonts.
-- [ ] Fresh tempclone snapshot, installlocked/startSTUB thenLIVE explicit. Verify dependencies shippednotignoredlocal; volume persists restart, scopedTTL/reset.
+- [x] Tests missingkey/model/context diagnostics nofake; pathsindependentcwd; sessions/Verify/reset isolation; LangSmith failure nofinancialchange; boundedparserLIMIT.
+- [x] RED: `rtk proxy uv run pytest tests/integration/test_config_storage.py -q`.
+- [x] Implement prerequisite/lockedinstall/runbook, launcher/health/redactedversions, staticfrontendFastAPI. Ignore .runtime/private/uploads/DB/secrets, commit syntheticfixtures/config/fonts.
+- [x] Fresh tempclone snapshot, installlocked/startSTUB thenLIVE explicit. Verify dependencies shippednotignoredlocal; volume persists restart, scopedTTL/reset.
 - [ ] Deploy lên hosting đã được cung cấp/ủy quyền nếu có; nếu thiếu thì bàn giao image/runbook và hỏi đúng thông tin hạ tầng còn thiếu. Kiểm trên browser sạch: thao tác chính tìm được trong <1 phút; Core/Esc/2 input mới/control/audit. Không dùng localhost để claim public URL.
 - [ ] Chạy pilot đầu với practitioners do người dùng mời; áp protocol T2 và lưu feedback pending/căn cứ thực. Thu nhãn đủ điều kiện cho T11 từ hồ sơ calibration/validation riêng, không lấy holdout. T12 tổng hợp before/after trên phiên bản đã khóa; không chờ T12 mới bắt đầu tìm người.
-- [ ] Author/freeze calibration10 và validation10 raw/context/gold theo T4 packet schema trước chọn threshold; group split với development/holdout và map feedback→initial opportunity. 20 clicks/4 roots không đủ20. Người nội bộ xác minh thật có origin riêng; không giả thành practitioners.
-- [ ] Commit "build: make the public pilot reproducible".
+- [x] Author/freeze calibration10 và validation10 raw/context/gold theo T4 packet schema trước chọn threshold; group split với development/holdout và map feedback→initial opportunity. 20 clicks/4 roots không đủ20. Người nội bộ xác minh thật có origin riêng; không giả thành practitioners.
+- [x] Commit "build: make the public pilot reproducible".
 **Gate:** Publicruntime/cleancloneproof, not localhostscreenshot claim.
-
 ### T11 — Verified feedback and paired adaptive threshold
 
 **Files:** adaptationgroup; evalmodels/runner/reports; tests/unit/test_feedback.py,test_calibration.py; tests/integration/test_adaptive_guard.py.
