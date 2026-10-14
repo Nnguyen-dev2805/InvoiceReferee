@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from invoice_referee.domain.common import EvidenceRef
+from invoice_referee.domain.documents import OcrSourceResult
 from invoice_referee.domain.evidence import (
     EvidenceUnit,
     Observation,
@@ -19,6 +20,7 @@ from invoice_referee.domain.evidence import (
     SourceRef,
 )
 from invoice_referee.domain.issues import ProcessingProblem
+from invoice_referee.evidence.artifacts import ArtifactStore
 from invoice_referee.evidence.trace import ProviderMode, RunBudget
 
 # Cheap, observable role cues. These are routing hints, not monetary truth.
@@ -185,3 +187,33 @@ class EvidenceReader:
 def relations_for(result: ReadResult) -> tuple[Relation, ...]:
     """No relations are asserted by a read alone (contracts §3)."""
     return result.relations
+
+
+class FileOcrReader:
+    """File-level OCR reader (contracts §12.1, plan E2).
+
+    Every accepted page of one file goes to OCR; native PDF text is not used to
+    skip the provider. Raw provider JSON is persisted through the artifact
+    store. This is the shape E7 wires into the pipeline; the legacy per-page
+    `EvidenceReader.read` stays until E7 removes it.
+    """
+
+    def __init__(self, *, provider: object) -> None:
+        self.provider = provider
+
+    async def read_source(
+        self,
+        source: SourceRef,
+        *,
+        budget: RunBudget,
+        artifacts: ArtifactStore,
+        source_bytes: bytes,
+        expected_pages: int | None = None,
+    ) -> OcrSourceResult:
+        return await self.provider.ocr_file(  # type: ignore[attr-defined]
+            source,
+            budget=budget,
+            artifacts=artifacts,
+            source_bytes=source_bytes,
+            expected_pages=expected_pages,
+        )

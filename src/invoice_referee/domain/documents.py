@@ -14,6 +14,7 @@ from typing import Annotated, Literal, Mapping, TypeAlias
 from pydantic import Field, model_validator
 
 from invoice_referee.domain.common import EvidenceRef, Id, StrictModel
+from invoice_referee.domain.issues import ProcessingProblem
 
 # --- Enums (contracts §12.2/§12.3) -----------------------------------------
 
@@ -140,6 +141,8 @@ class OcrSourceResult(StrictModel):
     model: str
     pages: tuple[OcrPage, ...] = ()
     raw_artifact_ref: str | None = None
+    problems: tuple[ProcessingProblem, ...] = ()
+    complete: bool = True
 
 
 class PageCoverage(StrictModel):

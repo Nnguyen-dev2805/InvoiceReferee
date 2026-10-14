@@ -114,3 +114,42 @@ async def test_reader_cannot_record_money(reader_fixture) -> None:
     step = await reader_fixture.propose(model_action="RECORD_ACTUAL")
     assert step.rejected
     assert reader_fixture.money_side_effects == []
+
+
+async def test_searchable_pdf_uses_ocr_on_every_page(tmp_path: Path) -> None:
+    # A searchable PDF must still go through OCR on every page; native text
+    # must never bypass the provider (contracts §12.1, plan E2 Step 5).
+    from invoice_referee.domain.documents import OcrPage, OcrSourceResult
+    from invoice_referee.evidence.artifacts import ArtifactStore
+    from invoice_referee.evidence.reader import FileOcrReader
+
+    class FakeFileProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+            self.native_text_calls = 0
+
+        async def ocr_file(self, source, *, budget, artifacts, source_bytes, expected_pages=None):
+            self.calls += 1
+            return OcrSourceResult(
+                source_id=source.id,
+                source_digest=source.digest,
+                provider="fake",
+                model="m",
+                pages=(
+                    OcrPage(page=1, markdown="a"),
+                    OcrPage(page=2, markdown="b"),
+                    OcrPage(page=3, markdown="c"),
+                ),
+            )
+
+    provider = FakeFileProvider()
+    reader = FileOcrReader(provider=provider)
+    result = await reader.read_source(
+        _source(tmp_path),
+        budget=RunBudget(),
+        artifacts=ArtifactStore(root=tmp_path / "artifacts"),
+        source_bytes=b"%PDF-1.4 searchable",
+    )
+    assert provider.calls == 1
+    assert tuple(p.page for p in result.pages) == (1, 2, 3)
+    assert provider.native_text_calls == 0
