@@ -18,6 +18,7 @@ const VIEW: CaseView = {
       tenant: "tenant:demo",
       media: "PDF",
       storage_key: "tenant:demo/case:demo/source:1",
+      filename: "hoadon.pdf",
     },
   ],
   issues: [

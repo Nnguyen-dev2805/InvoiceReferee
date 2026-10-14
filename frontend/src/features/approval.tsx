@@ -15,17 +15,27 @@ const EXECUTION_LABELS: Record<string, string> = {
 
 function InstructionRow({ instruction }: { instruction: InstructionView }) {
   return (
-    <li data-testid={`instruction-${instruction.direction}`}>
-      <p>
-        <strong>{DIRECTION_LABELS[instruction.direction] ?? instruction.direction}</strong>:{" "}
-        {formatVnd(instruction.amount)}
-      </p>
-      <p className="muted">
-        Còn lại: {formatVnd(instruction.remaining)} · Trạng thái:{" "}
+    <li
+      data-testid={`instruction-${instruction.direction}`}
+      className="p-3 bg-slate-50 border border-slate-200 rounded space-y-1 text-xs"
+    >
+      <div className="flex items-center justify-between">
+        <span className="font-semibold text-slate-900">
+          <strong>{DIRECTION_LABELS[instruction.direction] ?? instruction.direction}</strong>:{" "}
+          <span className="font-['JetBrains_Mono']">{formatVnd(instruction.amount)}</span>
+        </span>
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 font-['JetBrains_Mono']">
+          {instruction.status}
+        </span>
+      </div>
+      <p className="muted text-[11px] text-slate-500">
+        Còn lại: <span className="font-['JetBrains_Mono']">{formatVnd(instruction.remaining)}</span> · Trạng thái:{" "}
         {instruction.status} · Thực hiện:{" "}
         {EXECUTION_LABELS[instruction.execution_state] ?? instruction.execution_state}
       </p>
-      <p className="muted">Căn cứ: {instruction.basis}</p>
+      <p className="muted text-[11px] text-slate-600 bg-white p-1.5 rounded border border-slate-100">
+        Căn cứ: {instruction.basis}
+      </p>
     </li>
   );
 }
@@ -37,12 +47,19 @@ export function Approval({ caseView }: { caseView: CaseView | null }) {
     (i) => i.status === "ISSUED" || i.status === "PARTIAL",
   );
   return (
-    <section aria-labelledby="approval-title">
-      <h2 id="approval-title">Yêu cầu cần thực hiện ({active.length})</h2>
+    <section aria-labelledby="approval-title" className="bg-white border border-slate-200 rounded p-4 text-xs shadow-sm space-y-3">
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+        <h2 id="approval-title" className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-slate-700 text-sm" aria-hidden="true">assignment_turned_in</span>
+          <span>Yêu cầu cần thực hiện ({active.length})</span>
+        </h2>
+      </div>
       {active.length === 0 ? (
-        <p className="muted">Chưa có yêu cầu chi/thu nào cần thực hiện.</p>
+        <p className="muted text-slate-400 italic text-[11px] py-2 text-center">
+          Chưa có yêu cầu chi/thu nào cần thực hiện.
+        </p>
       ) : (
-        <ul className="instructions">
+        <ul className="instructions space-y-2">
           {active.map((instruction) => (
             <InstructionRow key={instruction.id} instruction={instruction} />
           ))}

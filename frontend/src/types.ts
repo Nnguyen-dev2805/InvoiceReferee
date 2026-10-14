@@ -22,6 +22,7 @@ export interface SourceView {
   tenant: string;
   media: "PDF" | "PNG" | "JPEG";
   storage_key: string;
+  filename: string | null;
 }
 
 export interface IssueView {

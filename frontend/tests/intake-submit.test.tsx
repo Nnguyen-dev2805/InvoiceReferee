@@ -28,13 +28,13 @@ const SESSION: SessionPayload = {
   },
 };
 
-function caseView(version: number, sources: number): CaseView {
+function caseView(version: number, sources: number, filename = "hd.pdf"): CaseView {
   return {
     id: "case:1", version, state: "DRAFT",
     summary: "Công tác Hà Nội · 06/10/2026 · Nguyễn Văn A",
     sources: Array.from({ length: sources }, (_, i) => ({
       id: `source:${i}`, digest: "a".repeat(64), tenant: "tenant:demo",
-      media: "PDF", storage_key: `k${i}`,
+      media: "PDF", storage_key: `k${i}`, filename,
     })),
     issues: [], problems: [], conclusion: null, instructions: [],
     actual_money: {}, audit: [], evidence_report: null,
@@ -78,7 +78,7 @@ describe("Intake submit uploads pending files", () => {
 
     await user.click(screen.getByRole("button", { name: "Tạo hồ sơ" }));
     const file = new File(["%PDF-1.4 x"], "hd.pdf", { type: "application/pdf" });
-    await user.upload(screen.getByLabelText(/Chứng từ/), file);
+    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), file);
     await user.click(screen.getByRole("button", { name: "Nộp hồ sơ" }));
 
     await waitFor(() => {
@@ -91,7 +91,7 @@ describe("Intake submit uploads pending files", () => {
     );
   });
 
-  it("sends a typed paid-claim without any client actor id", async () => {
+  it("sends a typed paid-claim with the server source id and a real quote", async () => {
     let submitBody: Record<string, unknown> | null = null;
     vi.stubGlobal(
       "fetch",
@@ -115,9 +115,12 @@ describe("Intake submit uploads pending files", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Tạo hồ sơ" }));
     const file = new File(["%PDF-1.4 x"], "hd.pdf", { type: "application/pdf" });
-    await user.upload(screen.getByLabelText(/Chứng từ/), file);
+    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), file);
     await user.type(screen.getByLabelText(/Số hóa đơn/), "IR26101001");
     await user.type(screen.getByLabelText(/Số tiền/), "3240000");
+    // Pick the document by its display name (the pending file).
+    await user.selectOptions(screen.getByLabelText(/Chứng từ cho khoản này/), "hd.pdf");
+    await user.type(screen.getByLabelText(/Trích đoạn/), "3.240.000 đ");
     await user.click(screen.getByRole("button", { name: "Nộp hồ sơ" }));
 
     await waitFor(() => expect(submitBody).not.toBeNull());
@@ -126,8 +129,48 @@ describe("Intake submit uploads pending files", () => {
     expect(claims).toHaveLength(1);
     expect(claims[0].invoice_reference).toBe("IR26101001");
     expect(claims[0].amount).toBe(3_240_000);
+    // The ref uses the SERVER source id (not a reconstructed filename) and a
+    // real quote (never the placeholder "nhân viên xác nhận").
+    const refs = claims[0].refs as Array<Record<string, unknown>>;
+    expect(refs[0].source_id).toBe("source:0");
+    expect(refs[0].exact_quote).toBe("3.240.000 đ");
+    expect(refs[0].exact_quote).not.toBe("nhân viên xác nhận");
     // The client never supplies the actor/verifier the server owns.
     expect(claims[0]).not.toHaveProperty("actor");
     expect(claims[0]).not.toHaveProperty("verified_by");
+  });
+
+  it("does not send a claim when no document is selected", async () => {
+    let submitBody: Record<string, unknown> | null = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/api/cases")) {
+          return new Response(JSON.stringify({ case_view: caseView(1, 0) }), { status: 200 });
+        }
+        if (url.endsWith("/sources")) {
+          return new Response(JSON.stringify({ case_view: caseView(2, 1) }), { status: 200 });
+        }
+        if (url.endsWith("/submit")) {
+          submitBody = JSON.parse(String(init?.body ?? "{}"));
+          return new Response(JSON.stringify({ case_view: caseView(3, 1) }), { status: 200 });
+        }
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    render(<Intake session={SESSION} onCase={() => {}} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Tạo hồ sơ" }));
+    const file = new File(["%PDF-1.4 x"], "hd.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), file);
+    await user.type(screen.getByLabelText(/Số hóa đơn/), "IR26101001");
+    await user.type(screen.getByLabelText(/Số tiền/), "3240000");
+    // No document selected, no quote -> the claim is not sent (never default to
+    // the first document).
+    await user.click(screen.getByRole("button", { name: "Nộp hồ sơ" }));
+    await waitFor(() => expect(submitBody).not.toBeNull());
+    const claims = (submitBody as unknown as { employee_paid_claims: unknown[] }).employee_paid_claims;
+    expect(claims).toHaveLength(0);
   });
 });

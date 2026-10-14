@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html class="h-full" lang="vi">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>InvoiceReferee — Bàn làm việc Cấp Thẩm quyền Duyệt Ngoại lệ</title>
+  <!-- Material Symbols Outlined -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+  <!-- Fonts: Geist & JetBrains Mono (100% Identical to Screen 1 & 2) -->
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 18;
+      vertical-align: middle;
+      display: inline-block;
+      line-height: 1;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-['Geist',-apple-system,BlinkMacSystemFont,sans-serif] antialiased h-screen flex flex-col overflow-hidden select-none text-xs">
+  
+  <!-- 1. TOP APPLICATION HEADER (48px / h-12 — 100% IDENTICAL STRUCTURE) -->
+  <header class="h-12 border-b border-slate-200 bg-white flex items-center justify-between px-4 text-xs select-none shrink-0 z-20">
+    <!-- Left: Brand, Breadcrumbs, Dossier & Status Badge -->
+    <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 pr-2 border-r border-slate-200">
+        <div class="w-5 h-5 rounded bg-slate-900 flex items-center justify-center text-white">
+          <span class="material-symbols-outlined text-[13px]">receipt_long</span>
+        </div>
+        <span class="font-semibold tracking-tight text-slate-900 text-[13px]">InvoiceReferee</span>
+      </div>
+      <div class="flex items-center gap-2 text-slate-500 text-xs pl-1">
+        <span>/</span>
+        <span class="text-slate-800 font-medium">Hồ sơ công tác #042 — Q3/2026</span>
+        <span class="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200/70 px-2 py-0.5 rounded text-[11px] font-medium ml-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+          Chờ duyệt ngoại lệ
+        </span>
+      </div>
+    </div>
+    
+    <!-- Right: Persona Dropdown Button (Approver / Director Role) -->
+    <div class="flex items-center gap-2">
+      <button class="flex items-center gap-2 px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-50 text-slate-700 transition-colors">
+        <div class="w-5 h-5 rounded-full bg-purple-50 text-purple-700 border border-purple-300 flex items-center justify-center text-[10px] font-semibold font-['JetBrains_Mono']">
+          HL
+        </div>
+        <span class="font-medium text-slate-800 text-xs">Cấp phê duyệt: Lê Hoàng Long</span>
+        <span class="text-[11px] text-slate-400 font-normal border-l border-slate-200 pl-2">Giám đốc Vận hành</span>
+        <span class="material-symbols-outlined text-slate-400 text-sm">keyboard_arrow_down</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 2. DUAL-PANE WORKSPACE (calc(100vh - 48px) — 100% IDENTICAL SPLIT) -->
+  <div class="h-[calc(100vh-48px)] flex overflow-hidden">
+    
+    <!-- LEFT PANE: Exception Evidence & Context Inspector (50%) -->
+    <section class="w-1/2 border-r border-slate-200 flex flex-col bg-slate-100/70 overflow-hidden">
+      <!-- Tab Bar -->
+      <div class="h-9 bg-white border-b border-slate-200 flex items-center px-2 gap-1 text-xs shrink-0">
+        <!-- Active Tab: Hotel Invoice with Over-limit Highlight -->
+        <button class="bg-slate-100 text-slate-900 font-medium px-3 py-1.5 rounded-t border border-b-0 border-slate-200 flex items-center gap-1.5 text-xs">
+          <span class="material-symbols-outlined text-rose-600 text-sm">picture_as_pdf</span>
+          <span>HD_001284_KhachSan.pdf</span>
+          <span class="text-[10px] bg-amber-100 text-amber-800 px-1 rounded font-medium">Vượt +720k</span>
+        </button>
+        <!-- Inactive Tab: Policy Document -->
+        <button class="text-slate-500 hover:text-slate-800 px-3 py-1.5 flex items-center gap-1.5 transition-colors text-xs">
+          <span class="material-symbols-outlined text-slate-400 text-sm">policy</span>
+          <span>QuyChe_CongTac_HN.pdf</span>
+        </button>
+        <!-- Inactive Tab: Department Budget Report -->
+        <button class="text-slate-500 hover:text-slate-800 px-3 py-1.5 flex items-center gap-1.5 transition-colors text-xs">
+          <span class="material-symbols-outlined text-slate-400 text-sm">bar_chart</span>
+          <span>NganSach_BanKinhDoanh_Q3.pdf</span>
+        </button>
+      </div>
+
+      <!-- Viewer Toolbar (Identical to Screen 1 & 2) -->
+      <div class="h-9 bg-white border-b border-slate-200 flex items-center justify-between px-3 text-xs text-slate-600 shrink-0">
+        <div class="flex items-center gap-1">
+          <button class="p-1 rounded hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors" title="Thu nhỏ">
+            <span class="material-symbols-outlined text-sm">remove</span>
+          </button>
+          <span class="px-1.5 font-['JetBrains_Mono'] text-[11px] text-slate-700">100%</span>
+          <button class="p-1 rounded hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors" title="Phóng to">
+            <span class="material-symbols-outlined text-sm">add</span>
+          </button>
+        </div>
+        <span class="text-[11px] text-slate-500 font-medium">Trang 1 / 1</span>
+        <div class="flex items-center gap-0.5 text-slate-500">
+          <button class="p-1 rounded hover:bg-slate-100 hover:text-slate-800" title="Khớp chiều ngang">
+            <span class="material-symbols-outlined text-sm">fit_screen</span>
+          </button>
+          <button class="p-1 rounded hover:bg-slate-100 hover:text-slate-800" title="Xoay">
+            <span class="material-symbols-outlined text-sm">rotate_right</span>
+          </button>
+          <button class="p-1 rounded hover:bg-slate-100 hover:text-slate-800" title="Tải xuống">
+            <span class="material-symbols-outlined text-sm">download</span>
+          </button>
+          <button class="p-1 rounded hover:bg-slate-100 hover:text-slate-800" title="Toàn màn hình">
+            <span class="material-symbols-outlined text-sm">open_in_full</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Document Viewport (Identical to Screen 1 & 2) -->
+      <div class="flex-1 overflow-auto p-6 flex justify-center items-start bg-slate-200/80 custom-scrollbar">
+        <div class="bg-white border border-slate-300 shadow-sm w-full max-w-[560px] p-7 text-[11px] font-sans text-slate-800 leading-relaxed relative rounded-xs">
+          <!-- Authentic Header -->
+          <div class="text-center pb-4 border-b border-slate-200">
+            <div class="text-[13px] font-semibold text-slate-900 uppercase tracking-tight">HÓA ĐƠN GIÁ TRỊ GIA TĂNG (TIỀN PHÒNG KHÁCH SẠN)</div>
+            <div class="text-[10px] text-slate-500 italic mt-0.5">Bản thể hiện của hóa đơn điện tử — Tra cứu tại hoadondientu.gdt.gov.vn</div>
+            <div class="flex justify-between items-center mt-3 pt-2 border-t border-slate-100 text-[10px] text-slate-600 font-['JetBrains_Mono']">
+              <span>Ký hiệu (Serial): <strong class="text-slate-900 font-medium">1C26TBB</strong></span>
+              <span>Số (No): <strong class="text-slate-900 font-semibold">001284</strong></span>
+              <span>Ngày 12/10/2026</span>
+            </div>
+          </div>
+          <!-- Parties -->
+          <div class="py-3 border-b border-slate-200 space-y-1 text-[11px]">
+            <div><span class="text-slate-500">Đơn vị bán hàng:</span> <strong class="font-medium text-slate-900">CÔNG TY TNHH KHÁCH SẠN VÀ DỊCH VỤ THỦ ĐÔ</strong></div>
+            <div class="flex items-center gap-1 font-['JetBrains_Mono'] text-[10.5px]">
+              <span class="text-slate-500 font-sans text-[11px]">Mã số thuế:</span>
+              <span class="text-slate-900 font-medium">0100109106</span>
+            </div>
+            <div class="text-slate-600"><span class="text-slate-500">Địa chỉ:</span> 184 Phố Quán Thánh, Ba Đình, Hà Nội</div>
+          </div>
+          <div class="py-3 border-b border-slate-200 space-y-1 text-[11px]">
+            <div><span class="text-slate-500">Đơn vị mua hàng:</span> <strong class="font-medium text-slate-900">CÔNG TY CP TẬP ĐOÀN CÔNG NGHỆ VINGROUP</strong></div>
+            <div class="flex items-center gap-1 font-['JetBrains_Mono'] text-[10.5px]">
+              <span class="text-slate-500 font-sans text-[11px]">Mã số thuế:</span>
+              <span class="text-slate-900 font-medium">0101245486</span>
+            </div>
+            <div class="text-slate-600"><span class="text-slate-500">Người mua hàng:</span> <span class="text-slate-900 font-medium">Trần Thị Thu Trang</span></div>
+          </div>
+          <!-- Items Table -->
+          <div class="my-4 border border-slate-200 rounded-xs overflow-hidden">
+            <table class="w-full text-left border-collapse text-[11px]">
+              <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 text-[10px] font-medium">
+                <tr>
+                  <th class="p-2 text-center w-8">STT</th>
+                  <th class="p-2">Tên hàng hóa, dịch vụ</th>
+                  <th class="p-2 text-center w-12">ĐVT</th>
+                  <th class="p-2 text-center w-10">SL</th>
+                  <th class="p-2 text-right">Đơn giá</th>
+                  <th class="p-2 text-right">Thành tiền (₫)</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr class="bg-amber-50/40">
+                  <td class="p-2 text-center font-['JetBrains_Mono'] text-slate-500">1</td>
+                  <td class="p-2 text-slate-900 font-medium">Dịch vụ lưu trú phòng Deluxe (10/10 - 12/10/2026)</td>
+                  <td class="p-2 text-center text-slate-600">Đêm</td>
+                  <td class="p-2 text-center font-['JetBrains_Mono']">2</td>
+                  <td class="p-2 text-right font-['JetBrains_Mono'] font-medium text-amber-900">3.600.000</td>
+                  <td class="p-2 text-right font-['JetBrains_Mono'] font-semibold text-amber-900">7.200.000</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <!-- Financial Summary with Amber Exception Indicator -->
+          <div class="space-y-1.5 pt-1 text-[11px]">
+            <div class="flex justify-between items-center text-slate-600">
+              <span>Cộng tiền hàng (Subtotal):</span>
+              <span class="font-['JetBrains_Mono'] text-slate-900 font-medium">7.200.000 ₫</span>
+            </div>
+            <div class="flex justify-between items-center text-slate-600">
+              <span>Thuế suất GTGT 10%:</span>
+              <span class="font-['JetBrains_Mono'] text-slate-900 font-medium">720.000 ₫</span>
+            </div>
+            <div class="mt-2 pt-2 border-t border-slate-200">
+              <div class="flex justify-between items-center px-2 py-1.5 bg-amber-50/80 border border-amber-300 rounded-xs">
+                <span class="font-medium text-slate-900">Tổng thanh toán (Vượt định mức +720k):</span>
+                <span class="font-['JetBrains_Mono'] font-bold text-amber-900 text-[12px]">7.920.000 ₫</span>
+              </div>
+            </div>
+          </div>
+          <!-- Digital Signature Stamp -->
+          <div class="mt-6 pt-3 border-t border-slate-200 flex justify-end">
+            <div class="border border-slate-200 bg-slate-50 rounded-xs p-2.5 text-left w-64">
+              <div class="flex items-center gap-1.5 text-slate-800 text-[10.5px] font-medium">
+                <span class="material-symbols-outlined text-emerald-600 text-[14px]">check_circle</span>
+                <span>Chữ ký số hợp lệ</span>
+              </div>
+              <div class="text-[9.5px] text-slate-500 mt-1 leading-snug">
+                Ký bởi: CÔNG TY TNHH KHÁCH SẠN VÀ DỊCH VỤ THỦ ĐÔ<br/>
+                Ngày ký: 12/10/2026 14:05:22 GMT+7
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT PANE: Exception Assessment & Decision Console (50%) -->
+    <main class="w-1/2 flex flex-col bg-white overflow-hidden">
+      
+      <!-- Top Metrics Strip (h-12 / 48px — Identical layout) -->
+      <div class="h-12 border-b border-slate-200 px-5 flex items-center justify-between text-xs bg-slate-50/60 shrink-0 select-none">
+        <div class="flex items-center gap-6">
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-500">Tổng hồ sơ:</span>
+            <span class="font-semibold text-slate-900 font-['JetBrains_Mono'] text-xs">8.270.000 ₫</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-500">Phần vượt mức:</span>
+            <span class="font-bold text-amber-700 font-['JetBrains_Mono'] text-xs bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60">+ 720.000 ₫</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-500">Ngân sách Q3 còn lại:</span>
+            <span class="text-emerald-700 font-['JetBrains_Mono'] text-xs font-medium">55.800.000 ₫</span>
+          </div>
+        </div>
+        <span class="text-amber-700 bg-amber-100/70 border border-amber-200 px-2 py-0.5 rounded text-[11px] font-medium">
+          1 mục chờ phê duyệt
+        </span>
+      </div>
+
+      <!-- Exception Analysis & Justification Card -->
+      <div class="p-4 border-b border-slate-200 bg-white shrink-0">
+        <div class="bg-slate-50 border border-slate-200 rounded p-3 text-xs space-y-2.5">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+            <div class="flex items-center gap-1.5 font-semibold text-slate-900">
+              <span class="material-symbols-outlined text-amber-600 text-sm">warning</span>
+              <span>Khoản chi vượt hạn mức định mức: Tiền phòng khách sạn</span>
+            </div>
+            <span class="text-[11px] font-['JetBrains_Mono'] text-slate-500">HĐ_001284 • KS Thủ Đô</span>
+          </div>
+
+          <!-- Comparison Grid -->
+          <div class="grid grid-cols-3 gap-2 bg-white p-2.5 rounded border border-slate-200 font-['JetBrains_Mono'] text-[11.5px]">
+            <div>
+              <div class="text-[10px] font-sans text-slate-400 mb-0.5">Định mức tiêu chuẩn:</div>
+              <div class="text-slate-700 font-medium">3.600.000 ₫ / đêm</div>
+              <div class="text-[10px] font-sans text-slate-400">7.200.000 ₫ / 2 đêm</div>
+            </div>
+            <div>
+              <div class="text-[10px] font-sans text-slate-400 mb-0.5">Thực tế phát sinh (gồm thuế):</div>
+              <div class="text-slate-900 font-semibold">3.960.000 ₫ / đêm</div>
+              <div class="text-[10px] font-sans text-slate-500">7.920.000 ₫ / 2 đêm</div>
+            </div>
+            <div>
+              <div class="text-[10px] font-sans text-slate-400 mb-0.5">Chênh lệch cần duyệt:</div>
+              <div class="text-amber-700 font-bold">+ 360.000 ₫ / đêm</div>
+              <div class="text-[10.5px] font-bold text-amber-700">+ 720.000 ₫ tổng</div>
+            </div>
+          </div>
+
+          <!-- Explanations & Audit Opinions -->
+          <div class="space-y-1.5 text-xs">
+            <div class="p-2 bg-white rounded border border-slate-200">
+              <span class="font-medium text-slate-700 block mb-0.5">Giải trình của nhân viên (Trần Thị Thu Trang):</span>
+              <p class="text-slate-600 leading-relaxed text-[11.5px]">
+                "Khảo sát dự án vào tuần cao điểm tại Hà Nội, các khách sạn trong tầm giá 3.600.000 ₫ đều đã hết phòng. Tôi đã đặt phòng Deluxe tại KS Thủ Đô có mức giá thấp nhất còn lại gần địa điểm họp để đảm bảo tiến độ công việc."
+              </p>
+            </div>
+            <div class="p-2 bg-emerald-50/50 rounded border border-emerald-200/60 flex items-start gap-1.5 text-[11.5px] text-emerald-900">
+              <span class="material-symbols-outlined text-emerald-600 text-xs shrink-0 mt-0.5">verified</span>
+              <div>
+                <span class="font-medium">Ý kiến thẩm tra Kế toán (Nguyễn Văn Hưng):</span>
+                <span class="text-emerald-800"> Hóa đơn GTGT và chữ ký số hợp lệ 100%. Ngân sách quý 3 của Phòng Kinh doanh còn 55.800.000 ₫, đủ khả năng thanh toán. Kính trình Lãnh đạo xem xét phê duyệt đặc cách.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Approver Decision Radio Console -->
+      <div class="p-4 bg-white flex-1 overflow-auto custom-scrollbar">
+        <label class="text-xs font-semibold text-slate-900 block mb-2">
+          Quyết định của Cấp thẩm quyền (Lê Hoàng Long — Giám đốc Vận hành):
+        </label>
+        
+        <div class="space-y-2">
+          <!-- Option 1: Full Approval (Default) -->
+          <label class="flex items-start gap-2.5 p-2.5 rounded border border-slate-300 bg-slate-50/70 cursor-pointer hover:bg-slate-100/50 transition-colors">
+            <input type="radio" name="approver_decision" class="mt-0.5 text-slate-900 focus:ring-0 focus:ring-offset-0" checked/>
+            <div>
+              <div class="font-medium text-slate-900 text-xs flex items-center gap-2">
+                <span>Duyệt toàn bộ khoản chi ngoại lệ (+ 720.000 ₫)</span>
+                <span class="text-[10.5px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-medium">Khuyến nghị</span>
+              </div>
+              <div class="text-[11px] text-slate-500 mt-0.5">
+                Công ty thanh toán toàn bộ 8.270.000 ₫. Số tiền chi trả bổ sung cho nhân viên là 3.270.000 ₫.
+              </div>
+            </div>
+          </label>
+
+          <!-- Option 2: Cap at Policy -->
+          <label class="flex items-start gap-2.5 p-2.5 rounded border border-slate-200 bg-white cursor-pointer hover:bg-slate-50 transition-colors">
+            <input type="radio" name="approver_decision" class="mt-0.5 text-slate-900 focus:ring-0 focus:ring-offset-0"/>
+            <div>
+              <div class="font-medium text-slate-800 text-xs">
+                Chỉ duyệt theo định mức quy chế (Thanh toán 7.550.000 ₫)
+              </div>
+              <div class="text-[11px] text-slate-500 mt-0.5">
+                Phần vượt mức 720.000 ₫ do nhân viên tự chi trả. Số tiền công ty chi trả bổ sung là 2.550.000 ₫.
+              </div>
+            </div>
+          </label>
+
+          <!-- Option 3: Reject -->
+          <label class="flex items-start gap-2.5 p-2.5 rounded border border-slate-200 bg-white cursor-pointer hover:bg-slate-50 transition-colors">
+            <input type="radio" name="approver_decision" class="mt-0.5 text-slate-900 focus:ring-0 focus:ring-offset-0"/>
+            <div>
+              <div class="font-medium text-slate-800 text-xs">
+                Yêu cầu nhân viên giải trình bổ sung hoặc cung cấp thêm chứng cứ
+              </div>
+              <div class="text-[11px] text-slate-500 mt-0.5">
+                Chưa ký duyệt. Chuyển trả hồ sơ về cho nhân viên để làm rõ trước khi quyết định.
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Approver Instruction / Note Input -->
+        <div class="mt-3">
+          <label class="text-[11px] text-slate-600 block mb-1 font-medium">Ý kiến chỉ đạo / Căn cứ phê duyệt:</label>
+          <textarea class="w-full text-xs text-slate-900 bg-white border border-slate-200 rounded p-2 focus:border-slate-400 focus:ring-0 focus:outline-none h-16 resize-none leading-relaxed transition-colors" placeholder="Nhập ý kiến lãnh đạo...">Đồng ý duyệt thanh toán đặc cách do tính cấp bách của dự án công tác và ngân sách quý 3 còn đủ. Lưu ý Phòng Kinh doanh các đợt công tác sau cần lập kế hoạch đặt phòng sớm hơn.</textarea>
+        </div>
+      </div>
+
+      <!-- Pinned Action Toolbar (h-14 / 56px — 100% IDENTICAL FOOTER) -->
+      <footer class="h-14 border-t border-slate-200 px-5 flex items-center justify-between bg-white shrink-0">
+        <!-- Left: Authority Scope -->
+        <div class="flex items-center gap-2 text-[11px] text-slate-600">
+          <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+          <span>Thẩm quyền: Giám đốc Khối Vận hành (Hạn mức phê duyệt tối đa 20.000.000 ₫)</span>
+        </div>
+        <!-- Right: Action Buttons -->
+        <div class="flex items-center gap-2.5">
+          <button class="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-1.5 text-xs font-medium rounded shadow-sm transition-colors">
+            Trả lại hồ sơ
+          </button>
+          <button class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 text-xs font-medium rounded shadow-sm flex items-center gap-1.5 transition-colors">
+            <span class="material-symbols-outlined text-sm">verified_user</span>
+            <span>Ký duyệt quyết định ngoại lệ</span>
+          </button>
+        </div>
+      </footer>
+
+    </main>
+  </div>
+</body>
+</html>

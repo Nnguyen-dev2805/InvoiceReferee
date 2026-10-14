@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-surface" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>InvoiceReferee - Bàn làm việc Kế toán &amp; Đối soát Chi/Thu</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "tertiary": "#46566c",
+            "surface-container-high": "#e2e7ff",
+            "secondary-fixed-dim": "#4edea3",
+            "on-secondary-container": "#00714d",
+            "surface-bright": "#faf8ff",
+            "on-tertiary-container": "#e9f0ff",
+            "inverse-primary": "#b4c5ff",
+            "on-primary-fixed": "#00174b",
+            "surface-tint": "#0053db",
+            "surface-container-lowest": "#ffffff",
+            "on-primary-fixed-variant": "#003ea8",
+            "inverse-surface": "#283044",
+            "on-error": "#ffffff",
+            "tertiary-fixed-dim": "#b7c8e1",
+            "outline": "#737686",
+            "surface-variant": "#dae2fd",
+            "on-tertiary-fixed-variant": "#38485d",
+            "on-background": "#131b2e",
+            "on-secondary-fixed-variant": "#005236",
+            "surface-container-low": "#f2f3ff",
+            "on-error-container": "#93000a",
+            "surface-dim": "#d2d9f4",
+            "primary-container": "#2563eb",
+            "on-tertiary-fixed": "#0b1c30",
+            "surface-container": "#eaedff",
+            "secondary": "#006c49",
+            "tertiary-container": "#5e6e85",
+            "primary": "#004ac6",
+            "primary-fixed-dim": "#b4c5ff",
+            "primary-fixed": "#dbe1ff",
+            "secondary-fixed": "#6ffbbe",
+            "error-container": "#ffdad6",
+            "background": "#faf8ff",
+            "error": "#ba1a1a",
+            "on-primary-container": "#eeefff",
+            "on-surface-variant": "#434655",
+            "on-tertiary": "#ffffff",
+            "on-surface": "#131b2e",
+            "secondary-container": "#6cf8bb",
+            "surface-container-highest": "#dae2fd",
+            "on-primary": "#ffffff",
+            "on-secondary-fixed": "#002113",
+            "tertiary-fixed": "#d3e4fe",
+            "outline-variant": "#c3c6d7",
+            "on-secondary": "#ffffff",
+            "inverse-on-surface": "#eef0ff",
+            "surface": "#faf8ff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem"
+          },
+          "spacing": {
+            "space-lg": "1rem",
+            "margin-sm": "1rem",
+            "gutter-sm": "0.5rem",
+            "margin": "1.5rem",
+            "gutter": "1rem",
+            "margin-lg": "2rem",
+            "space-md": "0.75rem",
+            "space-sm": "0.5rem",
+            "gutter-lg": "1.5rem",
+            "space-xs": "0.25rem",
+            "space-xl": "1.5rem"
+          },
+          "fontFamily": {
+            "headline-xl": ["Geist"],
+            "headline-xl-mobile": ["Geist"],
+            "body-sm": ["Geist"],
+            "body-md": ["Geist"],
+            "headline-lg": ["Geist"],
+            "headline-sm": ["Geist"],
+            "label-md": ["JetBrains Mono"],
+            "label-sm": ["JetBrains Mono"],
+            "title-md": ["Geist"],
+            "numeric-table": ["JetBrains Mono"]
+          },
+          "fontSize": {
+            "headline-xl": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.025em", "fontWeight": "600" }],
+            "headline-xl-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+            "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }],
+            "body-md": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+            "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "-0.015em", "fontWeight": "600" }],
+            "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+            "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "400" }],
+            "title-md": ["15px", { "lineHeight": "22px", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+            "numeric-table": ["13px", { "lineHeight": "18px", "fontWeight": "500" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      font-size: 16px;
+      line-height: 1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    body {
+      font-family: 'Geist', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .font-mono-num {
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body class="h-full bg-surface-container-lowest text-on-surface antialiased flex flex-col overflow-hidden selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- Top Application Header -->
+<header class="flex items-center justify-between px-space-lg w-full h-12 sticky top-0 z-50 bg-surface-container-lowest border-b border-outline-variant shadow-none">
+<!-- Left Navigation Identity -->
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-xs text-primary">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+<span class="text-title-md font-title-md font-bold tracking-tight text-primary">InvoiceReferee</span>
+</div>
+<span class="text-outline-variant select-none">/</span>
+<div class="flex items-center gap-space-xs font-label-md text-label-md text-on-surface-variant">
+<span>Hồ sơ công tác #042 — Q3/2026</span>
+</div>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-label-sm font-label-sm bg-surface-container text-primary border border-outline-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+<span>Chờ đối soát &amp; Lập lệnh chi</span>
+</div>
+</div>
+<!-- Center Navigation Links -->
+<nav class="hidden md:flex items-center gap-space-lg">
+<a class="text-on-surface-variant hover:text-on-surface font-title-md font-normal pb-1 hover:bg-surface-container-high transition-colors duration-150" href="#">Dossiers</a>
+<a class="text-primary border-b-2 border-primary font-title-md font-semibold pb-1" href="#">Reconciliation</a>
+<a class="text-on-surface-variant hover:text-on-surface font-title-md font-normal pb-1 hover:bg-surface-container-high transition-colors duration-150" href="#">Audit Logs</a>
+<a class="text-on-surface-variant hover:text-on-surface font-title-md font-normal pb-1 hover:bg-surface-container-high transition-colors duration-150" href="#">Tax Master</a>
+</nav>
+<!-- Right Header Persona Switcher & Global Actions -->
+<div class="flex items-center gap-space-md">
+<div class="hidden sm:flex items-center gap-space-xs">
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container-high rounded text-label-sm flex items-center" title="Tune Settings">
+<span class="material-symbols-outlined">tune</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container-high rounded text-label-sm flex items-center relative" title="Notifications">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1 right-1 w-1.5 h-1.5 bg-primary rounded-full"></span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-container-high rounded text-label-sm flex items-center" title="Help Guide">
+<span class="material-symbols-outlined">help</span>
+</button>
+</div>
+<div class="h-4 w-px bg-outline-variant"></div>
+<div class="flex items-center gap-space-sm pl-1 cursor-pointer hover:bg-surface-container-low py-1 px-2 rounded-lg transition-colors duration-150">
+<div class="w-7 h-7 rounded-full bg-primary-fixed flex items-center justify-center font-label-md text-label-sm font-semibold text-primary">
+          NH
+        </div>
+<div class="flex flex-col text-left">
+<span class="text-body-sm font-body-sm font-medium text-on-surface leading-tight">Kế toán: Nguyễn Văn Hưng</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant leading-tight">Phòng Tài chính - Kế toán</span>
+</div>
+<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-[10px]">
+          Vai trò: Kế toán thanh toán
+        </span>
+<span class="material-symbols-outlined text-outline-variant text-[14px]">expand_more</span>
+</div>
+</div>
+</header>
+<!-- Dual-Pane Workspace Container -->
+<main class="h-[calc(100vh-48px)] flex flex-1 w-full overflow-hidden bg-background">
+<!-- LEFT PANE: Document Inspector & Source Proofs (48%) -->
+<section class="w-[48%] border-r border-outline-variant bg-surface-container-low flex flex-col h-full shrink-0">
+<!-- Document Tab Header -->
+<div class="h-10 bg-surface-container-lowest border-b border-outline-variant px-2 flex items-center gap-1 shrink-0">
+<!-- Tab 1: Active -->
+<button class="border-b-2 border-primary text-primary font-body-sm font-medium py-2 px-3 bg-surface-container-lowest flex items-center gap-1.5 h-full transition-all">
+<span class="material-symbols-outlined text-[15px] text-error">picture_as_pdf</span>
+<span class="font-mono-num text-label-sm">01_HD_KhachSan.pdf</span>
+</button>
+<!-- Tab 2: Inactive -->
+<button class="text-on-surface-variant hover:text-on-surface font-body-sm py-2 px-3 flex items-center gap-1.5 h-full transition-all hover:bg-surface-container-low">
+<span class="material-symbols-outlined text-[15px]">description</span>
+<span class="font-mono-num text-label-sm">UNC_TamUng_5M.pdf</span>
+<span class="text-[10px] font-mono-num bg-surface-container px-1 py-0.2 rounded text-outline">5.000.000 ₫</span>
+</button>
+<!-- Tab 3: Inactive -->
+<button class="text-on-surface-variant hover:text-on-surface font-body-sm py-2 px-3 flex items-center gap-1.5 h-full transition-all hover:bg-surface-container-low">
+<span class="material-symbols-outlined text-[15px]">rule</span>
+<span class="font-mono-num text-label-sm">QuyChe_CongTac_HN.pdf</span>
+</button>
+</div>
+<!-- Document Controls Toolbar -->
+<div class="h-9 bg-surface-bright border-b border-outline-variant px-3 flex items-center justify-between text-label-sm font-label-sm text-on-surface-variant shrink-0 select-none">
+<div class="flex items-center gap-1">
+<button class="p-1 hover:bg-surface-container rounded border border-outline-variant bg-surface-container-lowest" title="Zoom out">-</button>
+<span class="px-2 font-mono-num text-on-surface">100%</span>
+<button class="p-1 hover:bg-surface-container rounded border border-outline-variant bg-surface-container-lowest" title="Zoom in">+</button>
+</div>
+<div class="flex items-center gap-2">
+<span class="font-mono-num text-outline">Trang 1 / 1</span>
+</div>
+<div class="flex items-center gap-1.5">
+<button class="p-1 hover:bg-surface-container rounded" title="Fit to width">
+<span class="material-symbols-outlined">fit_screen</span>
+</button>
+<button class="p-1 hover:bg-surface-container rounded" title="Rotate">
+<span class="material-symbols-outlined">rotate_right</span>
+</button>
+<button class="p-1 hover:bg-surface-container rounded" title="Download">
+<span class="material-symbols-outlined">download</span>
+</button>
+<button class="p-1 hover:bg-surface-container rounded" title="Full screen">
+<span class="material-symbols-outlined">open_in_full</span>
+</button>
+</div>
+</div>
+<!-- Document Viewport -->
+<div class="flex-1 overflow-auto p-4 flex justify-center bg-surface-variant/30">
+<!-- Realistic A4 Electronic Invoice Paper -->
+<div class="bg-surface-container-lowest shadow-sm border border-outline-variant p-6 max-w-xl w-full text-on-surface text-body-sm leading-relaxed rounded flex flex-col justify-between">
+<div>
+<!-- Invoice Meta Top -->
+<div class="flex justify-between items-start pb-4 border-b border-outline-variant">
+<div>
+<span class="text-[10px] font-label-sm tracking-widest text-outline uppercase">Mẫu số: 01GTKT0/001</span>
+<h1 class="text-body-md font-headline-sm font-bold text-on-surface mt-0.5">HÓA ĐƠN GIÁ TRỊ GIA TĂNG</h1>
+<p class="text-[11px] text-on-surface-variant italic">(TIỀN PHÒNG KHÁCH SẠN / DỊCH VỤ LƯU TRÚ)</p>
+</div>
+<div class="text-right font-label-sm text-label-sm leading-tight text-on-surface">
+<div>Ký hiệu: <span class="font-bold">1C26TBB</span></div>
+<div>Số: <span class="font-bold text-primary">001284</span></div>
+<div>Ngày: <span class="text-on-surface-variant">12/10/2026</span></div>
+</div>
+</div>
+<!-- Seller Entity -->
+<div class="py-3 border-b border-outline-variant/70 text-body-sm">
+<div class="flex items-baseline justify-between">
+<span class="font-semibold text-on-surface">Đơn vị bán hàng: CÔNG TY TNHH KHÁCH SẠN VÀ DỊCH VỤ THỦ ĐÔ</span>
+</div>
+<div class="mt-1 flex items-center gap-2">
+<span>Mã số thuế:</span>
+<span class="font-label-sm text-label-sm font-semibold bg-primary-fixed/40 px-1.5 py-0.5 rounded border border-primary/30 text-primary">0100109106</span>
+<span class="inline-flex items-center text-[10px] text-secondary font-medium gap-0.5">
+<span class="material-symbols-outlined text-[12px]">verified</span> Tổng cục Thuế khớp
+                </span>
+</div>
+<div class="text-on-surface-variant text-[11px] mt-0.5">Địa chỉ: Số 12A Phố Trần Hưng Đạo, P. Phan Chu Trinh, Q. Hoàn Kiếm, Hà Nội</div>
+</div>
+<!-- Buyer Entity -->
+<div class="py-3 border-b border-outline-variant/70 text-body-sm">
+<div>Họ tên người mua: <span class="font-medium text-on-surface">Trần Thị Thu Trang</span> (Bộ phận Phát triển Dự án)</div>
+<div>Tên đơn vị: <span class="font-semibold text-on-surface">CÔNG TY CP TẬP ĐOÀN CÔNG NGHỆ VINGROUP</span></div>
+<div class="mt-0.5 flex items-center gap-2">
+<span>Mã số thuế:</span>
+<span class="font-label-sm text-label-sm font-medium text-on-surface">0101245486</span>
+</div>
+<div class="text-on-surface-variant text-[11px] mt-0.5">Địa chỉ: Khu đô thị sinh thái Vinhomes Riverside, P. Phúc Lợi, Q. Long Biên, Hà Nội</div>
+</div>
+<!-- Itemized Table inside invoice -->
+<div class="mt-4 border border-outline-variant rounded overflow-hidden">
+<table class="w-full text-left text-body-sm border-collapse">
+<thead class="bg-surface-container text-on-surface-variant text-[10px] font-label-md uppercase">
+<tr>
+<th class="p-1.5 border-b border-r border-outline-variant w-8 text-center">STT</th>
+<th class="p-1.5 border-b border-r border-outline-variant">Tên hàng hóa, dịch vụ</th>
+<th class="p-1.5 border-b border-r border-outline-variant w-12 text-center">ĐVT</th>
+<th class="p-1.5 border-b border-r border-outline-variant w-12 text-center">SL</th>
+<th class="p-1.5 border-b border-r border-outline-variant text-right">Đơn giá</th>
+<th class="p-1.5 border-b border-outline-variant text-right">Thành tiền</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/60">
+<tr class="bg-surface-container-lowest">
+<td class="p-1.5 border-r border-outline-variant text-center font-mono-num text-[11px]">1</td>
+<td class="p-1.5 border-r border-outline-variant">
+<div class="font-medium text-on-surface">Dịch vụ lưu trú phòng Deluxe</div>
+<div class="text-[10px] text-outline font-mono-num">Check-in: 10/10/2026 - Check-out: 12/10/2026</div>
+</td>
+<td class="p-1.5 border-r border-outline-variant text-center text-[11px]">Đêm</td>
+<td class="p-1.5 border-r border-outline-variant text-center font-mono-num text-[11px]">2</td>
+<td class="p-1.5 border-r border-outline-variant text-right font-mono-num text-label-sm">3.600.000</td>
+<td class="p-1.5 text-right font-mono-num text-label-sm font-medium">7.200.000</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Invoice Totals Calculation Box -->
+<div class="mt-3 flex justify-end">
+<div class="w-72 font-label-sm text-label-sm space-y-1">
+<div class="flex justify-between text-on-surface-variant">
+<span>Cộng tiền hàng:</span>
+<span class="font-mono-num font-medium text-on-surface">7.200.000 ₫</span>
+</div>
+<div class="flex justify-between text-on-surface-variant">
+<span>Thuế suất GTGT (10%):</span>
+<span class="font-mono-num font-medium text-on-surface">720.000 ₫</span>
+</div>
+<!-- Highlighted Total -->
+<div class="flex justify-between p-2 rounded bg-surface-container border border-dashed border-primary font-bold text-primary mt-2">
+<span>TỔNG CỘNG THANH TOÁN:</span>
+<span class="font-mono-num text-label-md">7.920.000 ₫</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Invoice Footer / Digital Signature -->
+<div class="mt-6 pt-3 border-t border-outline-variant flex items-center justify-between text-[11px]">
+<div class="flex items-center gap-1.5 text-secondary">
+<span class="material-symbols-outlined text-[16px]">verified_user</span>
+<span>Chữ ký số hợp lệ - Ký bởi KS Thủ Đô lúc 14:05:22 12/10/2026</span>
+</div>
+<div class="text-outline font-label-sm">
+              Tra cứu tại: hoadondientu.gdt.gov.vn
+            </div>
+</div>
+</div>
+</div>
+</section>
+<!-- RIGHT PANE: Reconciliation Engine, Audit Check, & Payment Execution (52%) -->
+<section class="w-[52%] bg-surface-container-lowest flex flex-col h-full overflow-hidden">
+<!-- Settlement Mathematical Equation Formula Bar -->
+<div class="p-3 bg-surface-bright border-b border-outline-variant shrink-0">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[16px]">calculate</span>
+<span class="text-body-sm font-headline-sm font-semibold text-on-surface">Phương trình Quyết toán Công tác (S = Thực tế - Tạm ứng)</span>
+</div>
+<span class="font-label-sm text-[11px] text-outline">Công thức: S = A - F</span>
+</div>
+<div class="grid grid-cols-12 items-center bg-surface-container-lowest border border-outline-variant rounded p-2.5">
+<!-- Parameter 1: Total Claimed (A) -->
+<div class="col-span-4 flex flex-col">
+<span class="text-[11px] font-label-sm text-outline-variant uppercase">1. Tổng chi đề nghị (A)</span>
+<span class="font-mono-num font-semibold text-title-md text-on-surface mt-0.5">8.270.000 ₫</span>
+<span class="text-[11px] text-on-surface-variant">3 khoản chi đã nộp đính kèm</span>
+</div>
+<!-- Operator Minus -->
+<div class="col-span-1 text-center font-mono-num text-title-md font-bold text-outline select-none">
+            -
+          </div>
+<!-- Parameter 2: Advance (F) -->
+<div class="col-span-3 flex flex-col">
+<span class="text-[11px] font-label-sm text-outline-variant uppercase">2. Đã tạm ứng (F)</span>
+<span class="font-mono-num font-semibold text-title-md text-on-surface mt-0.5">5.000.000 ₫</span>
+<span class="text-[11px] text-on-surface-variant font-mono-num">Phiếu chi UNC-00982 (08/10)</span>
+</div>
+<!-- Operator Equals -->
+<div class="col-span-1 text-center font-mono-num text-title-md font-bold text-outline select-none">
+            =
+          </div>
+<!-- Result: Net Settlement Diff (S) -->
+<div class="col-span-3 flex flex-col items-end">
+<span class="text-[11px] font-label-sm text-primary uppercase font-medium">3. Chênh lệch quyết toán (S)</span>
+<div class="mt-0.5 px-2.5 py-0.5 rounded border border-primary/40 bg-surface-container font-mono-num font-bold text-title-md text-primary">
+              + 3.270.000 ₫
+            </div>
+<span class="text-[10px] font-label-sm font-semibold tracking-wide text-primary mt-0.5">LỆNH CHI THÊM CHO NHÂN VIÊN</span>
+</div>
+</div>
+</div>
+<!-- Line Item Policy & Verification Table Container -->
+<div class="flex-1 overflow-auto p-3 flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-on-surface-variant text-[16px]">fact_check</span>
+<h2 class="text-body-sm font-semibold text-on-surface uppercase tracking-wide">Bảng kiểm soát từng khoản chi &amp; Tuân thủ chính sách</h2>
+</div>
+<span class="text-[11px] font-label-sm text-secondary font-medium">Đối soát tự động: 3/3 Hợp lệ</span>
+</div>
+<div class="border border-outline-variant rounded overflow-hidden">
+<table class="w-full text-left text-body-sm border-collapse">
+<thead class="sticky top-0 bg-surface-container text-on-surface-variant text-[11px] font-label-md uppercase tracking-wider z-10 border-b border-outline-variant">
+<tr>
+<th class="py-2 px-2.5 border-r border-outline-variant">Khoản chi</th>
+<th class="py-2 px-2.5 border-r border-outline-variant">Đơn vị &amp; MST</th>
+<th class="py-2 px-2.5 border-r border-outline-variant text-right">Thực tế (₫)</th>
+<th class="py-2 px-2.5 border-r border-outline-variant">Hạn mức / Quy chế</th>
+<th class="py-2 px-2.5 border-r border-outline-variant">Kiểm tra căn cứ</th>
+<th class="py-2 px-2.5 text-center">Đánh giá</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Item 1: Tiền khách sạn -->
+<tr class="bg-surface-container/30 hover:bg-surface-container transition-colors">
+<td class="py-2.5 px-2.5 border-r border-outline-variant">
+<div class="font-medium text-on-surface flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                    Tiền phòng KS
+                  </div>
+<div class="text-[10px] text-outline font-label-sm">HĐ: 001284 • 12/10</div>
+</td>
+<td class="py-2.5 px-2.5 border-r border-outline-variant">
+<div class="text-on-surface">KS Thủ Đô</div>
+<div class="font-mono-num text-[11px] text-outline">0100109106</div>
+</td>
+<td class="py-2.5 px-2.5 border-r border-outline-variant text-right font-mono-num text-numeric-table font-semibold text-on-surface">
+                  7.920.000
+                </td>
+<td class="py-2.5 px-2.5 border-r border-outline-variant">
+<span class="font-mono-num text-[11px]">8.000.000</span>
+<div class="text-[10px] text-on-surface-variant">(Định mức QL)</div>
+</td>
+<td class="py-2.5 px-2.5 border-r border-outline-variant">
+<div class="flex items-center gap-1 text-[11px] text-on-surface">
+<span class="material-symbols-outlined text-[13px] text-secondary">check</span>
+<span>Khớp MST &amp; CKS hợp lệ</span>
+</div>
+</td>
+<td class="py-2.5 px-2.5 text-center">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-label-sm font-label-sm bg-secondary-fixed/30 text-secondary border border-secondary/20">
+<span class="material-symbols-outlined text-[12px]">verified</span> Hợp lệ 100%
+                  </span>
+</td>
+</tr>
+<!-- Item 2: Taxi -->
+<tr class="bg-surface-container-lowest hover:bg-surface-container-low transition-colors">
+<td class="py-2.5 px-2.5 border-r border-outline-variant">
+<div class="font-medium text-on-surface flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                    Taxi di chuyển
+                  </div>
+<div class="text-[10px] text-outline font-label-sm">Vé cước điện tử</div>
+</td>
+<td class="py-2.5 px-2.5 border-r border-outline-variant">
+<div class="text-on-surface">Taxi Mai Linh</div>
+<div class="font-mono-num text-[11px] text-outline">0302241580</div>
+</td>
+<td class="py-2.5 px-2.5 border-r border-outline-variant text-right font-mono-num text-numeric-table font-semibold text-on-surface">
+                  350.000
+                </td>
+<td class="py-2.5 px-2.5 border-r border-outline-variant">
+<span class="font-mono-num text-[11px]">500.000</span>
+<div class="text-[10px] text-on-surface-variant">/ chuyến</div>
+</td>
+<td class="py-2.5 px-2.5 border-r border-outline-variant">
+<div class="text-[11px] text-on-surface">Đã có giải trình lộ trình (Đính kèm)</div>
+</td>
+<td class="py-2.5 px-2.5 text-center">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-label-sm font-label-sm bg-secondary-fixed/30 text-secondary border border-secondary/20">
+<span class="material-symbols-outlined text-[12px]">check_circle</span> Hợp lệ
+                  </span>
+</td>
+</tr>
+<!-- Item 3: Vé máy bay -->
+<tr class="bg-surface-container-lowest hover:bg-surface-container-low transition-colors">
+<td class="py-2.5 px-2.5 border-r border-outline-variant">
+<div class="font-medium text-on-surface flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+                    Vé máy bay
+                  </div>
+<div class="text-[10px] text-outline font-label-sm">PNR: VN-829402</div>
+</td>
+<td class="py-2.5 px-2.5 border-r border-outline-variant">
+<div class="text-on-surface">Vietnam Airlines</div>
+<div class="font-mono-num text-[11px] text-outline">0100107518</div>
+</td>
+<td class="py-2.5 px-2.5 border-r border-outline-variant text-right font-mono-num text-numeric-table font-semibold text-on-surface">
+                  2.450.000
+                </td>
+<td class="py-2.5 px-2.5 border-r border-outline-variant">
+<span class="text-[11px] text-on-surface">Đúng giá trị phê duyệt</span>
+</td>
+<td class="py-2.5 px-2.5 border-r border-outline-variant">
+<div class="flex items-center gap-1 text-[11px] text-on-surface">
+<span class="material-symbols-outlined text-[13px] text-secondary">check</span>
+<span>Khớp mã PNR vé điện tử</span>
+</div>
+</td>
+<td class="py-2.5 px-2.5 text-center">
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-label-sm font-label-sm bg-secondary-fixed/30 text-secondary border border-secondary/20">
+<span class="material-symbols-outlined text-[12px]">check_circle</span> Hợp lệ
+                  </span>
+</td>
+</tr>
+<!-- Summary Sub-Row -->
+<tr class="bg-surface-bright font-medium text-body-sm">
+<td class="py-2 px-2.5 border-r border-outline-variant text-right font-semibold text-on-surface" colspan="2">
+                  Tổng hợp chi phí thực tế phát sinh (A):
+                </td>
+<td class="py-2 px-2.5 border-r border-outline-variant text-right font-mono-num text-label-md font-bold text-primary">
+                  10.720.000 ₫
+                </td>
+<td class="py-2 px-2.5 text-[11px] text-outline" colspan="3">
+                  (Đã bao gồm 2.450.000 ₫ vé máy bay công ty thanh toán trực tiếp qua kênh đối tác)
+                </td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Off-System Payment Recording Form -->
+<div class="p-3 bg-surface-container-low border border-outline-variant rounded">
+<div class="flex items-center justify-between pb-2 mb-2 border-b border-outline-variant/60">
+<div class="flex items-center gap-1.5 font-semibold text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-primary text-[16px]">account_balance</span>
+<span>Ghi nhận Ủy nhiệm chi ngân hàng (Thực hiện lệnh chi thêm 3.270.000 ₫)</span>
+</div>
+<span class="font-label-sm text-[10px] bg-surface-container px-2 py-0.5 rounded text-outline border border-outline-variant">Chi ngoài hệ thống ERP</span>
+</div>
+<div class="grid grid-cols-2 gap-2.5 text-body-sm">
+<!-- Field 1: Beneficiary -->
+<div class="space-y-1">
+<label class="text-[11px] font-label-sm text-on-surface-variant block">Người thụ hưởng:</label>
+<div class="relative">
+<input class="w-full text-body-sm bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1.5 text-on-surface font-medium focus:outline-none pr-8 cursor-default" readonly="" type="text" value="Trần Thị Thu Trang — STK: 19034829103829 (Techcombank)"/>
+<span class="material-symbols-outlined text-secondary absolute right-2.5 top-2 text-[14px]">check_circle</span>
+</div>
+</div>
+<!-- Field 2: UNC Number -->
+<div class="space-y-1">
+<label class="text-[11px] font-label-sm text-on-surface-variant block">Số chứng từ / Mã giao dịch UNC:</label>
+<input class="w-full text-label-md font-mono-num bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1.5 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary" type="text" value="UNC-2026-01452"/>
+</div>
+<!-- Field 3: Execution Date -->
+<div class="space-y-1">
+<label class="text-[11px] font-label-sm text-on-surface-variant block">Ngày thực hiện giao dịch:</label>
+<input class="w-full text-label-md font-mono-num bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1.5 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary" type="text" value="14/10/2026"/>
+</div>
+<!-- Field 4: GL / Accounting Description -->
+<div class="space-y-1">
+<label class="text-[11px] font-label-sm text-on-surface-variant block">Nội dung ghi chú hạch toán:</label>
+<input class="w-full text-body-sm bg-surface-container-lowest border border-outline-variant rounded px-2.5 py-1.5 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary" type="text" value="Chi bổ sung quyết toán công tác HN #042"/>
+</div>
+</div>
+</div>
+</div>
+<!-- Pinned Bottom Action Footer Bar -->
+<footer class="h-12 bg-surface-container-lowest border-t border-outline-variant px-4 flex items-center justify-between shrink-0 z-20">
+<!-- Left Audit Validation Tag -->
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[18px]">verified</span>
+<span class="text-body-sm font-medium text-on-surface">Kiểm toán hệ thống: <strong class="text-secondary font-semibold font-mono-num">3/3</strong> chứng từ đạt chuẩn đối soát</span>
+</div>
+<!-- Right Workflow Actions -->
+<div class="flex items-center gap-2">
+<button class="bg-surface-container-lowest text-on-surface border border-outline-variant hover:bg-surface-container-low px-3 py-1.5 rounded text-body-sm font-medium transition-colors">
+            Yêu cầu nhân viên giải trình lại
+          </button>
+<button class="bg-primary text-on-primary hover:bg-primary-container px-4 py-1.5 rounded text-body-sm font-medium flex items-center gap-1.5 shadow-none transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined text-[16px]">check</span>
+<span>Xác nhận &amp; Hoàn tất quyết toán</span>
+</button>
+</div>
+</footer>
+</section>
+</main>
+</body></html>
