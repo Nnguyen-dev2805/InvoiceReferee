@@ -1,75 +1,130 @@
-# LangSmith — kiểm kết nối và coverage của workflow
+# LangSmith — nối tracing vào workflow thật
 
-14/10/2026. HEADa98b7f2f, working tree có thay đổi questions UI. Read-only review;
-không sửa application/config/DB, không gọi OCR/LLM, không gửi trace thử lên cloud.
+14/10/2026. Implementer report. Branch `final`, base HEAD `77760d10`. No commit or
+push (no Git authorization); no database reset; no checkout; no subagent. The
+working tree was clean at start; a concurrent agent's frontend edits are preserved
+(none touched by this task beyond a non-breaking type/field addition).
 
-**Verdict: có cấu hình/adapter và kết nối đọc cloud; M0 đã có traces. Workflow web
-OCR→facts→finance→human response→actual money chưa được instrument tới LangSmith.**
+Closes the gap in the prior read-only review: **the web workflow now emits real
+root/child operation traces to LangSmith**, verified by reading them back from the
+cloud.
 
-## Bằng chứng cấu hình và cloud
+## Write set, consumers, completion
 
-- Settings: langsmith_tracing=True, api_key_configured=True, langsmith_ready=True.
-- SDK installed0.14.8, endpointapi.smith.langchain.com, projectinvoice-referee.
-- Read project thật thành công qua SDK, no remote write; run_count54.
--5run gần nhất được đọc metadata tối thiểu: m0:non_document, m0:unclear_scan,
-  m0:clear_scan, m0:text và một m0:non_document cũ hơn; tất cả run_typechain,
-  không parent. Đây là sample5run, không tuyên bố toàn54run đều cùng loại.
-- Các sample có start_time=end_time. Adapter dùng now cho cả start/end khi caller
-  không truyền thời điểm; không coi duration0 là đo latency provider đúng.
-- Cloud read xác nhận kết nối/quyền đọc; không xác nhận một trace web mới đã upload
-  hoặc permission write của key hiện tại. Không thay đổi credentials và không in key.
-- Evidence `.runtime/langsmith-review-20261014-174737/remote-read.json`.
+| Concern | Files | Consumers |
+| --- | --- | --- |
+| Operation/step recorder | new `evidence/telemetry.py` | workflow, evidence job, pipeline |
+| Span model + sink | `evidence/trace.py` (`TraceSpan` topology/timings/error/metadata; `_send` real start/end + `parent_run_id`; allowlist redaction) | recorder, M0/CLI |
+| Pipeline steps | `evidence/pipeline.py` (`read_root`: OCR per file, confidence, classify, extract, validate, match) | evidence job, draft read |
+| Operation roots + assessment steps | `workflow/service.py` (`execute` per-command root; admission/reconcile/commit; draft reads; `trace_refs` in view) | API, UI debug |
+| Evidence-job root | `workflow/evidence_jobs.py` | durable worker |
+| Composition root | `runtime.py::_wire_trace` | dev server, Verify, CLI |
+| Debug view | `domain/case.py` (`CaseView.trace_refs`), `api/routes.py` (health `langsmith_enabled`/`langsmith_export_errors`), `api/views` (existing raw JSON) | UI debug modal |
+| Frontend debug | `frontend/src/types.ts`, `features/debug_modal.tsx` (technical area only) | UI |
 
-## Source wiring
+## Design (contracts §9)
 
-CodeGraph up-to-date, earlier-engine warning; Codebase Memory coverage tool không
-expose, coverage UNKNOWN. Đã đọc các material functions và scoped literal-search
-toàn `src/invoice_referee/**/*.py` cho build_trace/TraceSpan/record/traceable/
-tracing_context/RunTree/langsmith để xác nhận các callsites trong namespace này.
-Không tuyên bố bao phủ external monkey patches/plugins không thuộc source chain.
+- **Composition root only.** `runtime.build_workflow` builds the recorder from
+  `Settings` and hands it to the real workflow. Tracing off/unkeyed ⇒ a local
+  no-op sink; the recorder always exists. No separate observation pipeline.
+- **Operation roots, not a long-lived case span.** One root per real operation:
+  `command:<kind>` (draft, submit, answer, decide, record_actual, control,
+  override), `settlement-draft-read`, `advance-draft-read`, `evidence-job`.
+  Operations are linked by metadata (root_id/job_id/command_id, read-set
+  versions, basis, provider_mode, code revision), never one open span.
+- **Per-step child spans** with their OWN ids and the root as `parent_run_id`:
+  `ocr:<file>`, `confidence-review`, `classify`, `extract:<type>`,
+  `validate:<type>`, `match`, `admission`, `reconcile`, `commit`, `handler`.
+- **Real timings.** Start/end are wall-clock instants at entry/exit; a span with
+  no end stays open (never `start==end==now` faking latency 0).
+- **Honest skip.** A step that did not run is recorded with an explicit
+  `skipped` reason (e.g. `no_low_confidence_candidates`, `no_settlement_form`),
+  never as a successful provider call.
+- **No network in a txn.** Spans buffer locally; the recorder flushes when the
+  operation exits, which the callers place around (outside) the SQLite
+  transaction.
+- **Never blocks.** A sink failure is captured in `export_errors` (diagnosed, not
+  silently swallowed) and never raises or changes the business result.
+- **Redaction.** Inputs/extra are filtered by key; real secrets
+  (`api_key`, `token`, `authorization`, …) and private content (`raw`, `content`,
+  `pdf`, `image`) are dropped, while numeric metrics whose name merely contains a
+  sensitive word (`token_count`, `total_tokens`) are KEPT.
 
-| Phần | Thực tế |
-|---|---|
-| evidence/trace.py | LocalTrace/LangSmithTrace, client.create_run + update_run, build_trace có sẵn |
-| CLI m0 và m0_live | instantiate adapter + record một span theo technical input |
-| runtime._wire_live | chỉ tạo XkiroClient, FileOcrReader, ArtifactStore; không tạo/truyền trace sink |
-| evidence.pipeline.read_root | không trace parameter/decorator/record quanh OCR/classify/extract/validate/match |
-| XkiroClient.complete_json | raw httpx request, không LangSmith instrumentation hoặc per-call run |
-| CaseWorkflow command/assessment/answer/actual/control | không call trace adapter trong checked chain |
-| Reconciler/issue generation | không có LangSmith spans trong checked source |
-| evaluate CLI/Verify | không instrument end-to-end workflow; không đánh đồng m0 traces với eval/business traces |
+## RED → GREEN (backend)
 
-Các LangSmith callsites ghi run trong app namespace chỉ xuất hiện ở M0 utility
-paths. Adapter hiện tạo flat chain runs; không parent_run_id/child span topology.
-Không chỉ bật LANGSMITH_TRACING là tự quan sát raw-httpx và rule workflow.
+All commands: `rtk proxy uv run --no-sync pytest <path> -p no:cacheprovider`.
 
-## Runtime và kiểm chứng
+| Behaviour | Test file | RED observed | GREEN |
+| --- | --- | --- | --- |
+| root/child ids, no reuse, parallel isolation, real timing, skip, redaction, sink failure | `tests/unit/test_telemetry.py` | module missing | 10 passed |
+| adapter keeps real start/end, no fake close, numeric metrics kept | `tests/unit/test_langsmith_trace.py` | old test encoded fabricated close | 12 passed |
+| runtime composes the recorder; real submit/evidence-job/draft/record_actual emit spans; sink failure safe; cache reuse no OCR | `tests/integration/test_langsmith_runtime_wiring.py` | — | 5 passed |
 
-- GET127.0.0.1:8000/api/health:200, modeLIVE, langsmith_ready=true.
-- Hai case đang trả về từ web có evidence_report.trace_refs=[]. Không tự suy ra
-  mọi trace trên cloud đều không tồn tại chỉ từ refs empty; kết luận dựa thêm
-  runtime composition/source callsites.
-- `rtk proxy uv run --no-sync pytest tests/unit/test_langsmith_trace.py -q -p no:cacheprovider`:
-  exit0,8passed. Tests kiểm adapter/FakeClient/filtering/config, không business
-  pipeline tracing acceptance.
-- Code/AST discovery + scoped raw search, readproject/list5runs metadata:
-  thực hiện thành công; no fake trace/new provider call.
+Backend suite: `rtk proxy uv run --no-sync pytest -p no:cacheprovider` → **588
+passed / 0 failed**. Frontend (Node 24.19.0): `npm test` → **27 passed / 2
+skipped**; `npm run build` → exit 0.
 
-## Giới hạn và bước cần làm nếu được yêu cầu
+## LIVE acceptance (real provider + real LangSmith export)
 
-Chưa có trace toàn bộ một lần xử lý hồ sơ để xem:
-OCR từngtệp, confidence gate, classify/extract, validation/matching,
-admission/history, policy/finance, issue creation, persistence và human recovery.
-Các stages.jsonl mình tạo khi debug là log riêng, không LangSmith export.
+Evidence `.runtime/langsmith-live-20261014/` (git-ignored). Provider LIVE (Mistral
+OCR + X-Kiro `qwen/qwen3.7-flash:free`), context SIMULATED, clock
+`2026-10-10T18:00:00+07:00`.
 
-Cần nối trace sink tại composition root và instrument các operation/job thực,
-root/child IDs riêng, cùng correlation case/job/command/basis/revision. Không giữ
-một root span mở vô thời hạn qua toàn bộ vòng đời nhiều ngày của hồ sơ; phân tách
-operation traces và liên kết bằng metadata. Capture errors/time/model/usage khi
-có, dữ liệu nhạy cảm được kiểm soát; không invent metrics/cost0.
+**TC01 end-to-end** (`run_tc01_live.py`, original PDFs): create → attach → draft
+read → submit → evidence job. Result **READY_TO_EXECUTE, COLLECT 760000**,
+T=E=3.240.000, A=4.000.000, S=−760.000; `trace_refs=[command:submit:…]`;
+`langsmith_enabled=true`, `export_errors=[]`.
 
-Tracing failure không thay đổi business decision, nhưng cần có diagnostics/local
-fallback để tránh silent missing telemetry. Đóng gate bằng một workflow thật và
-đọc lại trace cloud có các spans tương ứng; không chỉ8adapter tests PASS.
+Traces read back from the cloud (`read_trace.py` → `remote-trace-read.json`), all
+roots found, no errors:
 
-Không application fix, DB reset, commit/push hoặc automation/subagent trong review này.
+| Operation root | Children in LangSmith |
+| --- | --- |
+| `command:create_draft` | `handler` |
+| `command:attach_sources` | `handler` |
+| `settlement-draft-read` | `ocr:report_hoan_ung.pdf`, `ocr:hoa_don_dien_tu.pdf`, `confidence-review`, `classify`, `extract:SETTLEMENT_FORM`, `validate:SETTLEMENT_FORM`, `extract:E_INVOICE`, `validate:E_INVOICE`, `match` |
+| `command:submit` | `admission`, `reconcile`, `commit`, `handler` |
+
+**TC08 (FACT) + accountant** (`run_fact_and_accountant.py`): WAITING with
+`expense:allocation` dispute FACT and no instruction; the accountant's
+`command:record_actual` is a SEPARATE operation root (`admission`/`reconcile`/
+`commit`/`handler`); the evidence job root carries the full pipeline + assessment.
+
+**Export-failure non-interference** (`check_export_failure.py`, unreachable
+endpoint): the business result is identical (WAITING, no instruction, same FACTs,
+T/S UNKNOWN, conclusion present) while **19 export errors are diagnosed** — a
+broken LangSmith never loses a conclusion or rolls back money.
+
+**Redaction** (`check_redaction.py`): 66 recent runs scanned for the configured
+keys, bearer tokens, `%PDF` and private markers → **0 violations**.
+
+## Browser evidence (TC01, real socket + built frontend)
+
+Pinned-clock LIVE server (`server.py`) + Playwright (`browser.mjs`):
+`POST /settlement/draft` 200, `POST /submit` 200; the dossier shows T=E=3.240.000,
+A=4.000.000, S=−760.000, "Sẵn sàng phê duyệt"; the DB has one `COLLECT 760000`
+ISSUED instruction; the UI debug area shows the technical trace refs. The run's
+traces landed in LangSmith (2× `settlement-draft-read`, 2× `command:submit`, all
+pipeline/assessment steps). Health:
+`{"langsmith_ready":true,"langsmith_enabled":true,"langsmith_export_errors":0}` —
+config-ready and export-healthy are distinct.
+
+## Constraints honoured
+
+- No change to money, policy, authority or any settled result. The recorder only
+  observes; it never increases input revision, issues an instruction or records
+  money.
+- No network I/O inside a SQLite mutation transaction (buffered, flushed on
+  operation exit).
+- No extra OCR/LLM call to trace; cache reuse adds no OCR call (tested).
+- The `run_settlement_draft` reuse path is not recorded as a provider call.
+- Stop/stale-version/retry/idempotency/authority are untouched (full suite green).
+- No gold/expected enters the application or the trace.
+
+## NOT_RUN / remaining
+
+- The 25-case suite, Docker, public hosting and the practitioner pilot remain
+  NOT_RUN (out of scope).
+- Verify Core4/Escalation5 remains NOT_RUN (`data/kiem-thu` absent).
+- RECORDED_REPLAY tracing is wired by the same composition root but NOT_RUN with
+  a captured recording.

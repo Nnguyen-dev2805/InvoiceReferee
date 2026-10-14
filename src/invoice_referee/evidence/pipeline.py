@@ -212,6 +212,7 @@ async def read_root(
     from invoice_referee.evidence.matching import match_paper_evidence, resolve_evidence_suggestions
     from invoice_referee.evidence.ocr_quality import collect_low_confidence_blocks, review_ocr_quality
     from invoice_referee.evidence.document_validity import validate_document
+    from invoice_referee.evidence.telemetry import step
 
     from invoice_referee.domain.issues import ProcessingProblem
 
@@ -241,50 +242,85 @@ async def read_root(
                 expected_pages = page_count_bytes(payload)
             except Exception:
                 expected_pages = None  # unreadable PDF: provider call reports the problem
-        ocr_results.append(
-            await reader.read_source(
+        with step(
+            f"ocr:{source.filename or source.id}",
+            metadata={"source_id": source.id, "media": source.media},
+        ) as s:
+            result = await reader.read_source(
                 source, budget=budget, artifacts=artifacts, source_bytes=payload,
                 expected_pages=expected_pages, root_id=root_id,
             )
-        )
+            s.outputs["pages"] = len(result.pages)
+            s.outputs["complete"] = result.complete
+        ocr_results.append(result)
     ocr = tuple(ocr_results)
 
     # Confidence gate (one conditional batch).
     candidates = tuple(c for result in ocr for c in collect_low_confidence_blocks(result))
-    review = await review_ocr_quality(candidates, llm=classifier, budget=budget)
+    with step("confidence-review", metadata={"candidates": len(candidates)}) as s:
+        if candidates:
+            review = await review_ocr_quality(candidates, llm=classifier, budget=budget)
+            s.outputs["status"] = review.status
+        else:
+            # No numeric candidates: the model is not called; record the skip
+            # honestly rather than as a successful review.
+            from invoice_referee.domain.documents import ConfidenceReview
 
-    classifications = await classify_documents(ocr, llm=classifier, budget=budget)
+            review = ConfidenceReview(status="SKIPPED_NO_NUMERIC_CANDIDATES", block_assessments=())
+            s.skipped = "no_low_confidence_candidates"
+            s.outputs["status"] = review.status
+
+    with step("classify", metadata={"documents": len(ocr)}) as s:
+        classifications = await classify_documents(ocr, llm=classifier, budget=budget)
+        s.outputs["count"] = len(classifications)
 
     documents = []
     for classification in classifications:
         source = next((r for r in ocr if r.source_id == classification.source_id), None)
         if source is None:
             continue
-        analysis = await extract_document(source, classification, llm=classifier, budget=budget)
-        analysis = validate_document(
-            analysis, source, review, activity_profile=activity_profile
-        )
+        with step(
+            f"extract:{classification.document_type}",
+            metadata={"document_id": classification.document_id, "document_type": classification.document_type},
+        ) as s:
+            analysis = await extract_document(source, classification, llm=classifier, budget=budget)
+            s.outputs["profile_status"] = analysis.profile_status
+        with step(
+            f"validate:{classification.document_type}",
+            metadata={"document_id": classification.document_id},
+        ) as s:
+            analysis = validate_document(
+                analysis, source, review, activity_profile=activity_profile
+            )
+            s.outputs["profile_status"] = analysis.profile_status
+            s.outputs["findings"] = len(analysis.profile_findings)
         documents.append(analysis)
 
     paper = next((d for d in documents if d.document_type == "SETTLEMENT_FORM"), None)
-    if paper is not None:
-        matching = match_paper_evidence(paper, tuple(documents))
-        # One bounded suggestion-resolution batch, only when suggestions exist.
-        if any(link.status == "SUGGEST_LINK" for link in matching.links):
-            matching = await resolve_evidence_suggestions(
-                matching, tuple(documents), llm=classifier, budget=budget
+    with step("match", metadata={"has_paper": paper is not None}) as s:
+        if paper is not None:
+            matching = match_paper_evidence(paper, tuple(documents))
+            s.outputs["links"] = len(matching.links)
+            # One bounded suggestion-resolution batch, only when suggestions exist.
+            if any(link.status == "SUGGEST_LINK" for link in matching.links):
+                matching = await resolve_evidence_suggestions(
+                    matching, tuple(documents), llm=classifier, budget=budget
+                )
+                s.outputs["resolved_suggestions"] = True
+            else:
+                s.outputs["resolved_suggestions"] = False
+        else:
+            s.skipped = "no_settlement_form"
+            matching = EvidenceMatchingResult(
+                findings=(
+                    __import__("invoice_referee.domain.documents", fromlist=["EvidenceMatchFinding"]).EvidenceMatchFinding(
+                        code="SETTLEMENT_FORM_MISSING",
+                        status="UNRESOLVED",
+                        message="Không có giấy quyết toán (SETTLEMENT_FORM) để ghép chứng từ.",
+                        refs=(),
+                    ),
+                )
             )
-    else:
-        matching = EvidenceMatchingResult(
-            findings=(
-                __import__("invoice_referee.domain.documents", fromlist=["EvidenceMatchFinding"]).EvidenceMatchFinding(
-                    code="SETTLEMENT_FORM_MISSING",
-                    status="UNRESOLVED",
-                    message="Không có giấy quyết toán (SETTLEMENT_FORM) để ghép chứng từ.",
-                    refs=(),
-                ),
-            )
-        )
 
     origin = {"LIVE": "LIVE_READ", "RECORDED_REPLAY": "RECORDED_REPLAY"}.get(
         provider_mode, "STUB_TRANSCRIPTION"

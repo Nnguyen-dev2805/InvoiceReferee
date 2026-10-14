@@ -105,6 +105,14 @@ export function DebugModal({
                 <span className="text-slate-400 text-[10px] uppercase font-sans block">Số sự kiện</span>
                 <span className="font-semibold text-slate-800">{audit.length} entries</span>
               </div>
+              {(caseView.trace_refs?.length ?? 0) > 0 && (
+                <div className="border-l border-slate-200 pl-4">
+                  <span className="text-slate-400 text-[10px] uppercase font-sans block">Trace kỹ thuật</span>
+                  <span className="font-semibold text-slate-800" title={caseView.trace_refs?.join("\n")}>
+                    {caseView.trace_refs?.length} operation(s)
+                  </span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-6 text-slate-400 text-xs">

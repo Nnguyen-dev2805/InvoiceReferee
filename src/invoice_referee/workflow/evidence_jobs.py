@@ -31,55 +31,69 @@ async def run_evidence_job(workflow, job_id: str) -> None:
     tenant, root_id, sources, source_bytes, activity_profile = context
     reader, classifier, artifacts, provider_mode = workflow._evidence_wiring()
 
-    with workflow.db.transaction() as cx:
-        workflow._mark_evidence_job(cx, job_id, phase="READING", status="RUNNING")
-    try:
-        report = await read_root(
-            sources=sources,
-            reader=reader,
-            classifier=classifier,
-            artifacts=artifacts,
-            source_bytes=source_bytes,
-            budget=RunBudget(),
-            provider_mode=provider_mode,
-            root_id=root_id,
-            activity_profile=activity_profile,
-        )
-    except Exception as error:  # provider failure -> technical, never a fake success
+    # One operation root for the processing job; spans buffer locally and flush
+    # when the operation exits (after the DB transaction), so no network runs
+    # inside a mutation transaction.
+    with workflow._trace_operation(
+        "evidence-job",
+        metadata={"job_id": job_id, "root_id": root_id, "provider_mode": provider_mode},
+        tags=("operation", "evidence-job"),
+    ) as operation:
         with workflow.db.transaction() as cx:
-            workflow._fail_evidence_job(cx, job_id, error)
-        return
-
-    with workflow.db.transaction() as cx:
-        # A Stop or changed input basis invalidates publication (contracts §6,
-        # §12.5): a stale result must not be presented as current.
-        row = cx.execute("SELECT state FROM cases WHERE id = ?", (root_id,)).fetchone()
-        if row is not None and str(row["state"]) == "STOPPED":
-            workflow._mark_evidence_job(cx, job_id, phase="DONE", status="CANCELLED")
-            return
-        job = cx.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
-        if job is not None and not workflow._evidence_basis_current(cx, job):
-            workflow._mark_evidence_job(cx, job_id, phase="DONE", status="CANCELLED")
-            return
-        # A run that produced nothing usable (no documents, or no FOUND field at
-        # all) is a technical failure, not a cheerful "ready" (never a false
-        # success). The report is still stored so the reason is inspectable.
-        if not _evidence_usable(report):
-            workflow._fail_evidence_job(
-                cx, job_id, "không đọc/trích xuất được dữ liệu dùng được từ chứng từ"
+            workflow._mark_evidence_job(cx, job_id, phase="READING", status="RUNNING")
+        try:
+            report = await read_root(
+                sources=sources,
+                reader=reader,
+                classifier=classifier,
+                artifacts=artifacts,
+                source_bytes=source_bytes,
+                budget=RunBudget(),
+                provider_mode=provider_mode,
+                root_id=root_id,
+                activity_profile=activity_profile,
             )
+        except Exception as error:  # provider failure -> technical, never a fake success
+            operation.error = f"{type(error).__name__}: {error}"[:300]
+            with workflow.db.transaction() as cx:
+                workflow._fail_evidence_job(cx, job_id, error)
             return
-        workflow._publish_evidence_report(cx, tenant=tenant, root_id=root_id, report=report)
-        # After publishing, the typed finance consumer assesses the admission
-        # input built from the CURRENT stored state (plan A5). A Stop or a
-        # changed basis is re-checked here so a stale report is not assessed.
-        workflow._assess_and_commit(
-            cx,
-            workflow._system_session(tenant),
-            workflow._reload(cx, cx.execute("SELECT * FROM cases WHERE id = ?", (root_id,)).fetchone()),
-            workflow._now_iso(),
-        )
-        workflow._mark_evidence_job(cx, job_id, phase="DONE", status="COMPLETED")
+
+        with workflow.db.transaction() as cx:
+            # A Stop or changed input basis invalidates publication (contracts §6,
+            # §12.5): a stale result must not be presented as current.
+            row = cx.execute("SELECT state FROM cases WHERE id = ?", (root_id,)).fetchone()
+            if row is not None and str(row["state"]) == "STOPPED":
+                operation.outputs["outcome"] = "CANCELLED_STOPPED"
+                workflow._mark_evidence_job(cx, job_id, phase="DONE", status="CANCELLED")
+                return
+            job = cx.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+            if job is not None and not workflow._evidence_basis_current(cx, job):
+                operation.outputs["outcome"] = "CANCELLED_STALE_BASIS"
+                workflow._mark_evidence_job(cx, job_id, phase="DONE", status="CANCELLED")
+                return
+            # A run that produced nothing usable (no documents, or no FOUND field at
+            # all) is a technical failure, not a cheerful "ready" (never a false
+            # success). The report is still stored so the reason is inspectable.
+            if not _evidence_usable(report):
+                operation.error = "no usable evidence read"
+                workflow._fail_evidence_job(
+                    cx, job_id, "không đọc/trích xuất được dữ liệu dùng được từ chứng từ"
+                )
+                return
+            operation.outputs["documents"] = len(report.documents)
+            workflow._publish_evidence_report(cx, tenant=tenant, root_id=root_id, report=report)
+            # After publishing, the typed finance consumer assesses the admission
+            # input built from the CURRENT stored state (plan A5). A Stop or a
+            # changed basis is re-checked here so a stale report is not assessed.
+            workflow._assess_and_commit(
+                cx,
+                workflow._system_session(tenant),
+                workflow._reload(cx, cx.execute("SELECT * FROM cases WHERE id = ?", (root_id,)).fetchone()),
+                workflow._now_iso(),
+            )
+            workflow._mark_evidence_job(cx, job_id, phase="DONE", status="COMPLETED")
+        workflow._record_trace_ref(root_id, operation)
 
 
 def _evidence_usable(report) -> bool:

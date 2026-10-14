@@ -88,6 +88,8 @@ export interface CaseView {
   assessment_ready: boolean;
   assessment_blocker: string | null;
   payment_basis: PaymentBasisView[];
+  // Technical/debug trace references (§9); shown only in the debug area.
+  trace_refs?: string[];
 }
 
 export interface CommandResultView {

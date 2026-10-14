@@ -81,9 +81,33 @@ def test_record_sends_filtered_payload_via_client() -> None:
     assert sent["extra"]["prompt_version"] == "p1"
     assert sent["extra"]["logical_run_id"] == "run:1"
     assert len(trace.local.spans) == 1
-    # A completed run is closed so LangSmith persists it.
-    assert client.updates and "end_time" in client.updates[0]
-    assert client.updates[0]["run_id"] == sent["id"]
+
+
+def test_completed_span_is_closed_with_its_own_end_time() -> None:
+    # A span carrying real start/end is closed with those times; the adapter does
+    # not fabricate start==end==now (which would report a fake latency 0).
+    from datetime import UTC, datetime, timedelta
+
+    client = FakeClient()
+    trace = LangSmithTrace(api_key="k", project="p", client=client)
+    start = datetime(2026, 10, 14, 9, 0, tzinfo=UTC)
+    end = start + timedelta(seconds=3)
+    trace.record(TraceSpan(name="read", run_id="run:1", started_at=start, ended_at=end))
+    assert client.runs[0]["start_time"] == start
+    assert client.runs[0]["end_time"] == end
+    assert client.runs[0]["start_time"] != client.runs[0]["end_time"]
+    update = next(u for u in client.updates if "end_time" in u)
+    assert update["end_time"] == end
+    assert update["run_id"] == client.runs[0]["id"]
+
+
+def test_open_span_is_not_faked_closed() -> None:
+    # With no end time the run stays open rather than being closed at `now`.
+    client = FakeClient()
+    trace = LangSmithTrace(api_key="k", project="p", client=client)
+    trace.record(TraceSpan(name="read", run_id="run:1"))
+    assert "end_time" not in client.runs[0]
+    assert not [u for u in client.updates if "end_time" in u]
 
 
 def test_sent_run_id_is_a_uuid() -> None:

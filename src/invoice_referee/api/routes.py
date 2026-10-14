@@ -124,11 +124,19 @@ def _read_context(session: DemoSession) -> CommandContext:
 
 @router.get("/health")
 def health(request: Request) -> dict[str, object]:
-    """Redacted health/versions for the launcher; never exposes a secret."""
+    """Redacted health/versions for the launcher; never exposes a secret.
+
+    `langsmith_ready` is only the CONFIG flag; `langsmith_export_errors` is the
+    observed export state (0 = no failed sends so far). The two are distinct so a
+    green config never hides a broken export.
+    """
     import platform
     import sys
 
     settings = getattr(request.app.state, "settings", None)
+    workflow = getattr(request.app.state, "workflow", None)
+    recorder = getattr(workflow, "trace", None)
+    export_errors = list(getattr(recorder, "export_errors", []) or [])
     return {
         "status": "ok",
         "mode": request.app.state.mode,
@@ -138,6 +146,8 @@ def health(request: Request) -> dict[str, object]:
         "langsmith_ready": bool(getattr(settings, "langsmith_ready", False))
         if settings
         else False,
+        "langsmith_enabled": bool(getattr(recorder, "enabled", False)),
+        "langsmith_export_errors": len(export_errors),
     }
 
 

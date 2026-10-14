@@ -233,3 +233,7 @@ class CaseView(StrictModel):
     # Per-expense paid basis/actor/refs (plan A0/A8); empty until a typed
     # admission has produced a conclusion.
     payment_basis: tuple[PaymentBasisView, ...] = ()
+    # Technical/debug references to the operation traces for this root (§9;
+    # LangSmith wiring). Never a business field; a UI shows these only in a
+    # technical/debug area, not in the employee flow.
+    trace_refs: tuple[str, ...] = ()

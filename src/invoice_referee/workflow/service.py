@@ -371,6 +371,16 @@ class CaseWorkflow:
         self._evidence_artifacts: object | None = None
         self._evidence_source_bytes: dict[str, bytes] = {}
         self._evidence_provider_mode: str = "STUB"
+        # The operation/step trace recorder (contracts §9; LangSmith wiring). It
+        # is always present (a local no-op sink when tracing is disabled), so a
+        # command can open an operation root without a None check. It never
+        # affects business state and its export runs outside any txn.
+        from invoice_referee.evidence.telemetry import TraceRecorder
+
+        self._trace: TraceRecorder = TraceRecorder()
+        # The last operation trace ref per root (persisted to the view/report so a
+        # technical user can find the trace). Never a business field.
+        self._last_trace_ref: dict[str, str] = {}
 
     def enable_live_read(self, transcriber: Callable[..., object], *, provider_mode: str) -> None:
         """Wire a read->transcription callable so submit reads real sources.
@@ -403,6 +413,33 @@ class CaseWorkflow:
         self._evidence_source_bytes = source_bytes or {}
         self._evidence_provider_mode = provider_mode
         self._provider_mode = provider_mode
+
+    def enable_trace(self, recorder) -> None:
+        """Wire the operation/step trace recorder (composition root only)."""
+        self._trace = recorder
+
+    @property
+    def trace(self):
+        return self._trace
+
+    def _trace_operation(
+        self,
+        name: str,
+        *,
+        run_id: str | None = None,
+        metadata: dict[str, object] | None = None,
+        tags: tuple[str, ...] = (),
+    ):
+        """Open a root span for one real operation (flush on exit, no txn)."""
+        return self._trace.operation(name, run_id=run_id, metadata=metadata, tags=tags)
+
+    def _record_trace_ref(self, root_id, operation) -> None:
+        """Remember the operation trace ref for a root (debug reference only)."""
+        if operation is None or root_id is None:
+            return
+        ref = self._trace.trace_ref(operation)
+        if ref:
+            self._last_trace_ref[str(root_id)] = ref
 
     def _evidence_wiring(self):
         return (
@@ -1024,34 +1061,58 @@ class CaseWorkflow:
         if command.kind == "SUBMIT" and self._transcriber is not None:
             await self._read_sources_for_submit(session, command.root_id)
         fingerprint = _fingerprint(context, command)
-        with self.db.transaction() as cx:
-            stored = cx.execute(
-                "SELECT fingerprint, result_json FROM command_log WHERE tenant = ? "
-                "AND actor_id = ? AND command_id = ?",
-                (session.tenant, context.actor_id, context.command_id),
-            ).fetchone()
-            if stored is not None:
-                if stored["fingerprint"] != fingerprint:
-                    raise CommandConflictError(
-                        "command_id đã được dùng cho một nội dung khác."
-                    )
-                previous = CommandResult.model_validate_json(stored["result_json"])
-                return previous.model_copy(update={"duplicate_command": True})
+        # One operation root per command, flushed AFTER the transaction commits
+        # (the context manager exits outside the BEGIN IMMEDIATE block). Child
+        # steps run inside the handler and only BUFFER spans; no network I/O
+        # happens inside the transaction (§4/§9).
+        op_name = f"command:{command.kind.lower()}"
+        command_root = getattr(command, "root_id", None)
+        from invoice_referee.evidence.telemetry import code_revision
 
-            result = handler(cx, session, context, command)
-            cx.execute(
-                "INSERT INTO command_log (tenant, actor_id, command_id, fingerprint, "
-                "result_json, recorded_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    session.tenant,
-                    context.actor_id,
-                    context.command_id,
-                    fingerprint,
-                    result.model_dump_json(),
-                    self._now_iso(),
-                ),
-            )
-            return result
+        with self._trace_operation(
+            op_name,
+            metadata={
+                "command_id": context.command_id,
+                "root_id": command_root,
+                "actor": context.actor_id,
+                "tenant": session.tenant,
+                "provider_mode": self._provider_mode,
+                "code_revision": code_revision(),
+            },
+            tags=("operation", command.kind.lower()),
+        ) as operation:
+            with self.db.transaction() as cx:
+                stored = cx.execute(
+                    "SELECT fingerprint, result_json FROM command_log WHERE tenant = ? "
+                    "AND actor_id = ? AND command_id = ?",
+                    (session.tenant, context.actor_id, context.command_id),
+                ).fetchone()
+                if stored is not None:
+                    if stored["fingerprint"] != fingerprint:
+                        raise CommandConflictError(
+                            "command_id đã được dùng cho một nội dung khác."
+                        )
+                    previous = CommandResult.model_validate_json(stored["result_json"])
+                    operation.outputs["duplicate_command"] = True
+                    return previous.model_copy(update={"duplicate_command": True})
+
+                with self._trace.step("handler", operation=operation) as step:
+                    result = handler(cx, session, context, command)
+                    step.outputs["state"] = result.case_view.state
+                cx.execute(
+                    "INSERT INTO command_log (tenant, actor_id, command_id, fingerprint, "
+                    "result_json, recorded_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        session.tenant,
+                        context.actor_id,
+                        context.command_id,
+                        fingerprint,
+                        result.model_dump_json(),
+                        self._now_iso(),
+                    ),
+                )
+                self._record_trace_ref(command_root, operation)
+                return result
 
     async def _read_sources_for_submit(self, session: DemoSession, root_id: str) -> None:
         """Read the root's sources (LIVE) and persist the transcription (§5, §6).
@@ -1156,11 +1217,17 @@ class CaseWorkflow:
                 )
             )
             source_bytes[source_id] = payload
-        report = await read_root(
-            sources=tuple(sources), reader=reader, classifier=classifier,
-            artifacts=artifacts, source_bytes=source_bytes, budget=RunBudget(),
-            provider_mode=provider_mode, root_id=root_id,
-        )
+        with self._trace_operation(
+            "advance-draft-read",
+            metadata={"root_id": root_id, "provider_mode": provider_mode, "sources": len(sources)},
+            tags=("operation", "advance-draft-read"),
+        ) as operation:
+            report = await read_root(
+                sources=tuple(sources), reader=reader, classifier=classifier,
+                artifacts=artifacts, source_bytes=source_bytes, budget=RunBudget(),
+                provider_mode=provider_mode, root_id=root_id,
+            )
+            operation.outputs["documents"] = len(report.documents)
         # Pick the document that actually carries advance fields; a clear one is
         # preferred over an unresolved one.
         def _score(document) -> int:
@@ -1272,33 +1339,45 @@ class CaseWorkflow:
             )
             source_bytes[source_id] = payload
 
-        report = await read_root(
-            sources=tuple(sources),
-            reader=reader,
-            classifier=classifier,
-            artifacts=artifacts,
-            source_bytes=source_bytes,
-            budget=RunBudget(),
-            provider_mode=provider_mode,
-            root_id=root_id,
-            activity_profile=str(row["profile"]) if "profile" in row.keys() else None,
-        )
-
-        draft = build_settlement_draft(report, sources=tuple(sources))
-
-        # Persist the typed report + its input basis so a submit on the same
-        # sources reuses this read instead of calling OCR/LLM again (W3).
-        with self.db.transaction() as cx:
-            self._store_evidence_report(
-                cx,
-                tenant=session.tenant,
+        # One operation root for the draft read; spans buffer locally and flush
+        # after the transaction below (no network inside the txn).
+        with self._trace_operation(
+            "settlement-draft-read",
+            metadata={"root_id": root_id, "provider_mode": provider_mode, "sources": len(sources)},
+            tags=("operation", "draft-read"),
+        ) as operation:
+            report = await read_root(
+                sources=tuple(sources),
+                reader=reader,
+                classifier=classifier,
+                artifacts=artifacts,
+                source_bytes=source_bytes,
+                budget=RunBudget(),
+                provider_mode=provider_mode,
                 root_id=root_id,
-                report=report,
-                basis={
-                    "sources": sorted(s.digest for s in attached),
-                    "case_version": int(row["version"]),
-                },
+                activity_profile=str(row["profile"]) if "profile" in row.keys() else None,
             )
+
+            draft = build_settlement_draft(report, sources=tuple(sources))
+            operation.outputs["documents"] = len(report.documents)
+            operation.outputs["warnings"] = len(draft.get("warnings", []))
+
+            # Persist the typed report + its input basis so a submit on the same
+            # sources reuses this read instead of calling OCR/LLM again (W3).
+            with self.db.transaction() as cx:
+                self._store_evidence_report(
+                    cx,
+                    tenant=session.tenant,
+                    root_id=root_id,
+                    report=report,
+                    basis={
+                        "sources": sorted(s.digest for s in attached),
+                        "case_version": int(row["version"]),
+                    },
+                )
+                # Persist the operation trace ref alongside the report (debug ref).
+                self._last_trace_ref[root_id] = operation.run_id
+
         return draft
 
     def _create_draft(
@@ -2223,14 +2302,36 @@ class CaseWorkflow:
         # Stop must not create a new instruction (contracts §6).
         if str(row["state"]) == "STOPPED":
             return
-        assessment_input = self._build_assessment_input(cx, session, row, now)
+        from invoice_referee.evidence.telemetry import step
+
+        with step("admission", metadata={"root_id": root_id}) as s:
+            assessment_input = self._build_assessment_input(cx, session, row, now)
+            if assessment_input is not None:
+                rs = assessment_input.read_set
+                s.outputs["expenses"] = len(assessment_input.expense_facts)
+                s.outputs["admission_issues"] = len(assessment_input.admission_issues)
+                s.outputs["input_revision"] = rs.input_revision
+                s.outputs["control_epoch"] = rs.control_epoch
+                s.outputs["context_version"] = rs.context_version
+                s.outputs["ledger_version"] = rs.ledger_version
+                s.outputs["usage_version"] = rs.usage_version
+                s.outputs["provider_mode"] = assessment_input.scope.profile
         if assessment_input is None:
             # Evidence mode with no published report yet: stay EVIDENCE_READY.
             # A LIVE/REPLAY root must never fall back to a seeded STUB
             # transcription (contracts §12.5, plan E7/A5).
             return
-        result = Reconciler().assess(assessment_input)
-        self._commit_assessment(cx, session, row, result, now)
+        with step("reconcile", metadata={"root_id": root_id}) as s:
+            result = Reconciler().assess(assessment_input)
+            s.outputs["state_S"] = result.projection.S.state
+            s.outputs["issues"] = len(result.issues)
+            s.outputs["allowed_effect"] = (
+                None if result.allowed_effect is None
+                else f"{result.allowed_effect.direction}:{result.allowed_effect.amount}"
+            )
+        with step("commit", metadata={"root_id": root_id}) as s:
+            self._commit_assessment(cx, session, row, result, now)
+            s.outputs["committed"] = True
 
     def _build_assessment_input(
         self, cx: sqlite3.Connection, session: DemoSession, row: sqlite3.Row, now: str
@@ -2864,4 +2965,9 @@ class CaseWorkflow:
             assessment_ready=assessment_ready,
             assessment_blocker=assessment_blocker,
             payment_basis=conclusion.payment_basis if conclusion is not None else (),
+            trace_refs=(
+                (self._last_trace_ref[str(row["id"])],)
+                if str(row["id"]) in self._last_trace_ref
+                else ()
+            ),
         )

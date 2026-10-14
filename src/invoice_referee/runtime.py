@@ -58,12 +58,30 @@ def build_workflow(
     workflow = CaseWorkflow(db, uploads_dir=uploads_dir, clock=clock)
     workflow.import_demo_context(context_path, origin="SIMULATED")
     workflow.provider_mode = mode
+    # Compose the trace sink here (the single entry point) and pass it to the
+    # real consumers. Tracing is opt-in from Settings; when off the recorder is a
+    # local no-op sink, so the workflow traces nothing and never calls the cloud.
+    _wire_trace(workflow, settings)
 
     if mode == "LIVE":
         _wire_live(workflow, uploads_dir=uploads_dir, settings=settings)
     elif mode == "RECORDED_REPLAY":
         _wire_replay(workflow, settings=settings)
     return workflow
+
+
+def _wire_trace(workflow: CaseWorkflow, settings: Settings) -> None:
+    """Compose the operation/step trace recorder from Settings.
+
+    `build_trace` returns a LangSmithTrace that is a local no-op when tracing is
+    disabled or unkeyed; the recorder always exists so the workflow can open an
+    operation root without a None check. Never a separate pipeline: the recorder
+    wraps the SAME business workflow and only observes it.
+    """
+    from invoice_referee.evidence.telemetry import TraceRecorder
+    from invoice_referee.evidence.trace import build_trace
+
+    workflow.enable_trace(TraceRecorder(build_trace(settings)))
 
 
 def _wire_live(workflow: CaseWorkflow, *, uploads_dir: str | Path, settings: Settings) -> None:

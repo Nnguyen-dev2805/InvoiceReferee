@@ -373,6 +373,34 @@ uncertainty if provider cannot resolve a snapshot, don't fake exact reproducibil
 - M0 RunBudget/RunManifest ở evidence/trace.py: caps,counters/deadline,mode,
   requested/returned/resolved model, prompt/schema versions, trace refs/usage unknown.
 
+### 9a. Tracing operation/step (chốt 14/10/2026)
+
+- `TraceRecorder` (`evidence/telemetry.py`): `operation(name, *, run_id, metadata,
+  tags)` mở một **root span** cho MỘT operation thật; `step(name, *, operation,
+  metadata, inputs)` mở **child span** dưới root. Mỗi span có ID riêng;
+  child mang `parent_run_id` = root. Span được buffer local, chỉ flush khi
+  operation thoát (ngoài transaction). Module-level `step()` gắn vào operation
+  đang chạy qua contextvar, cho helper lồng nhau (read_root) ghi step mà không
+  phải truyền recorder.
+- Operation roots: `command:<kind>` (create/attach/submit/answer/decide/
+  record_actual/mark_execution/control/override), `settlement-draft-read`,
+  `advance-draft-read`, `evidence-job`. Không giữ một root span mở qua toàn vòng
+  đời hồ sơ; liên kết bằng metadata (root_id/job_id/command_id, read-set
+  versions, basis, provider_mode, code_revision).
+- Processing steps trong `read_root`: `ocr:<file>`, `confidence-review`,
+  `classify`, `extract:<type>`, `validate:<type>`, `match`; trong assessment:
+  `admission`, `reconcile`, `commit`. Bước bỏ qua ghi `skipped` reason (không ghi
+  thành provider call thành công).
+- `TraceSpan` mang `parent_run_id`, `run_type`, `inputs/outputs/error/metadata`,
+  `started_at/ended_at` thực. Sink LangSmith dùng thời gian thật; span không có
+  end giữ mở (không đặt `start==end==now` tạo latency 0 giả). `filter_payload`
+  bỏ secret/private content nhưng GIỮ metric số (`token_count`, `total_tokens`).
+- `build_trace(settings)` tắt khi chưa bật/thiếu key; sink local luôn giữ span;
+  lỗi export ghi vào `export_errors` (không silently swallow) và không đổi kết
+  quả nghiệp vụ. `CaseView.trace_refs` là tham chiếu kỹ thuật (debug), không phải
+  trường nghiệp vụ. `/health` phân biệt `langsmith_ready` (cấu hình) với
+  `langsmith_enabled`/`langsmith_export_errors` (trạng thái export thực tế).
+
 Test helpers tests/factories.py là unit-only: snapshot(T:int,E:int,C:int,A:int,
 P:int,R:int,B:int,coverage:bool=True,**overrides) -> AssessmentInput, với verified
 evidence literals được tạo trực tiếp; không mô phỏng chất lượng OCR. app_fixture

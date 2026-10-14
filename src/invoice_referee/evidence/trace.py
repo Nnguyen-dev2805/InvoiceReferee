@@ -95,22 +95,50 @@ class TraceSpan(StrictModel):
     started_at: UtcDatetime | None = None
     ended_at: UtcDatetime | None = None
     detail: str | None = None
+    # Topology + observed data (contracts §9; 14/10/2026 LangSmith wiring).
+    # Each span carries its OWN run id and an optional parent so a processing
+    # operation is a tree, not a flat list of runs that reuse one id.
+    parent_run_id: str | None = None
+    run_type: str = "chain"
+    inputs: dict[str, object] = {}
+    outputs: dict[str, object] = {}
+    error: str | None = None
+    metadata: dict[str, object] = {}
+    tags: tuple[str, ...] = ()
 
 
 # Keys that must never be sent to telemetry (bank PDFs, secrets, private raw).
-_SENSITIVE_KEYS = ("raw", "content", "payload", "pdf", "image", "api_key", "secret", "token")
+# Substring match on the key name; numeric metrics whose name merely CONTAINS a
+# sensitive word (e.g. ``token_count``) are NOT dropped — only real secrets and
+# private content are.
+_SENSITIVE_SUBSTRINGS = (
+    "raw", "content", "payload", "pdf", "image", "api_key", "apikey",
+    "secret", "authorization", "password", "credential", "bearer",
+)
+# Exact secret key names that contain a sensitive word but are not metrics.
+_SECRET_EXACT = frozenset({"token", "access_token", "auth_token", "id_token", "refresh_token"})
+
+
+def _is_sensitive_key(key: str) -> bool:
+    lowered = key.lower()
+    if lowered in _SECRET_EXACT:
+        return True
+    # A numeric metric (token_count, total_tokens, latency_ms) is kept even when
+    # its name contains a sensitive substring.
+    if lowered.endswith(("_count", "_tokens", "_ms", "_s", "_bytes", "_chars", "_seconds")):
+        return False
+    return any(sensitive in lowered for sensitive in _SENSITIVE_SUBSTRINGS)
 
 
 def filter_payload(payload: dict[str, object]) -> dict[str, object]:
     """Drop sensitive keys before anything leaves the process (§9).
 
     Local audit does not depend on telemetry; this only guards the opt-in path.
+    Numeric metrics (``token_count`` …) are preserved; only secrets and private
+    content are removed.
     """
-    return {
-        key: value
-        for key, value in payload.items()
-        if not any(sensitive in key.lower() for sensitive in _SENSITIVE_KEYS)
-    }
+    return {key: value for key, value in payload.items() if not _is_sensitive_key(key)}
+
 
 
 class LocalTrace:
@@ -149,6 +177,9 @@ class LangSmithTrace:
         self.local = LocalTrace()
         self._client = client
         self._api_key = api_key
+        # Diagnostics for export failures — a failed send is visible, not
+        # silently swallowed while the system still claims tracing is healthy.
+        self.export_errors: list[str] = []
 
     def _ensure_client(self) -> object | None:
         if self._client is not None:
@@ -170,43 +201,66 @@ class LangSmithTrace:
             return
         try:
             self._send(span, filter_payload(payload or {}))
-        except Exception:
-            # Telemetry failure is not a business failure; the local span stands.
-            pass
+        except Exception as error:
+            # Telemetry failure is not a business failure; the local span stands
+            # and the failure is recorded for diagnostics (never silently lost).
+            self.export_errors.append(f"{type(error).__name__}: {error}"[:300])
+
+    def _run_uuid(self, run_id: str) -> str:
+        """A deterministic LangSmith UUID for a logical span id."""
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, run_id))
 
     def _send(self, span: TraceSpan, payload: dict[str, object]) -> None:
-        from datetime import UTC, datetime
-
         client = self._ensure_client()
         if client is None:
             return
         # LangSmith requires a UUID run id; the domain's logical span id (a
         # business key) is kept as metadata, not used as the UUID.
-        run_uuid = uuid.uuid5(uuid.NAMESPACE_URL, span.run_id)
-        now = datetime.now(UTC)
-        # A completed run needs both a start and an end time; an open run is not
-        # persisted, so a single span is written as an ended run.
-        client.create_run(  # type: ignore[attr-defined]
-            id=str(run_uuid),
-            name=span.name,
-            run_type="chain",
-            project_name=self.project,
-            inputs=payload,
-            start_time=span.started_at or now,
-            extra={
-                "logical_run_id": span.run_id,
-                "basis": span.basis,
-                "prompt_version": span.prompt_version,
-                "model": span.model,
-                "agent_id": self.agent_id,
-                "agent_environment": self.agent_environment,
-            },
-        )
-        client.update_run(  # type: ignore[attr-defined]
-            str(run_uuid),
-            end_time=span.ended_at or now,
-            outputs={"detail": span.detail} if span.detail else {},
-        )
+        run_uuid = self._run_uuid(span.run_id)
+        start = span.started_at
+        end = span.ended_at
+        # Real timings only: an open run is closed at the observed end; a span
+        # with no explicit end is left open (LangSmith accepts a null end). We do
+        # NOT set start==end==now by default, which would fabricate latency 0.
+        extra = {
+            "logical_run_id": span.run_id,
+            "basis": span.basis,
+            "prompt_version": span.prompt_version,
+            "model": span.model,
+            "agent_id": self.agent_id,
+            "agent_environment": self.agent_environment,
+            "metadata": dict(span.metadata),
+        }
+        inputs = {**filter_payload(span.inputs), **filter_payload(payload)}
+        create_kwargs: dict[str, object] = {
+            "id": run_uuid,
+            "name": span.name,
+            "run_type": span.run_type,
+            "project_name": self.project,
+            "inputs": inputs,
+            "extra": extra,
+        }
+        if start is not None:
+            create_kwargs["start_time"] = start
+        if end is not None:
+            create_kwargs["end_time"] = end
+        if span.parent_run_id is not None:
+            create_kwargs["parent_run_id"] = self._run_uuid(span.parent_run_id)
+        if span.tags:
+            create_kwargs["tags"] = list(span.tags)
+        client.create_run(**create_kwargs)  # type: ignore[attr-defined]
+        # Close the run with outputs/error when we have them (update_run is the
+        # SDK's way to attach an end/error/outputs after create).
+        update_kwargs: dict[str, object] = {}
+        if span.outputs or span.detail:
+            update_kwargs["outputs"] = {**span.outputs, **({"detail": span.detail} if span.detail else {})}
+        if span.error is not None:
+            update_kwargs["error"] = span.error
+        if end is not None:
+            update_kwargs["end_time"] = end
+        if update_kwargs:
+            client.update_run(run_uuid, **update_kwargs)  # type: ignore[attr-defined]
+
 
 
 def build_trace(settings: object) -> LangSmithTrace:
