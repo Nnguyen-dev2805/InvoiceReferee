@@ -140,3 +140,33 @@ def test_build_workflow_wires_reader_per_mode(tmp_path: Path):
     )
     assert isinstance(wf, CaseWorkflow)
     assert wf.provider_mode == "STUB"
+
+
+def test_build_llm_client_from_settings() -> None:
+    from invoice_referee.config import Settings
+    from invoice_referee.evidence.xkiro import XkiroClient
+    from invoice_referee.runtime import build_llm_client
+
+    settings = Settings(
+        xkiro_api_key="k", xkiro_base_url="https://x.test/v1",
+        invoice_referee_llm_model="llm-1",
+    )
+    client = build_llm_client(settings)
+    assert isinstance(client, XkiroClient)
+    assert client.model == "llm-1"
+
+
+def test_missing_llm_provider_is_reported_not_downgraded() -> None:
+    from invoice_referee.config import Settings
+    from invoice_referee.runtime import build_llm_client
+
+    # Isolate from any real .env credentials: blank every live-required setting.
+    settings = Settings(
+        xkiro_api_key=None,
+        xkiro_base_url=None,
+        invoice_referee_llm_model=None,
+        _env_file=None,  # type: ignore[call-arg]
+    )
+    with pytest.raises(ValueError) as exc:
+        build_llm_client(settings)
+    assert "XKIRO_API_KEY" in str(exc.value)

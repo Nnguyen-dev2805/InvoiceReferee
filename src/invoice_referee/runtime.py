@@ -17,6 +17,28 @@ from invoice_referee.workflow.db import Database
 from invoice_referee.workflow.service import CaseWorkflow
 
 
+def build_llm_client(settings: Settings):
+    """Build the configured X-Kiro LLM client, or fail loudly (plan E4 Step 5).
+
+    A missing provider credential is reported with the setting name; LIVE is
+    never silently downgraded to STUB.
+    """
+    from invoice_referee.evidence.xkiro import XkiroClient
+
+    missing = [
+        name
+        for name in ("XKIRO_API_KEY", "XKIRO_BASE_URL", "INVOICE_REFEREE_LLM_MODEL")
+        if not getattr(settings, name.lower(), None)
+    ]
+    if missing:
+        raise ValueError(f"LLM provider not configured: missing {', '.join(missing)}")
+    return XkiroClient(
+        api_key=settings.xkiro_api_key or "",
+        model=settings.invoice_referee_llm_model or "",
+        base_url=settings.xkiro_base_url or "",
+    )
+
+
 def build_workflow(
     settings: Settings,
     mode: ProviderMode,
