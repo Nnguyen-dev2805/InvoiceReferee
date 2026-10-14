@@ -199,3 +199,37 @@ async def test_overlapping_units_are_rejected() -> None:
     ]})
     with pytest.raises(XkiroError):
         await classify_documents(ocr, llm=llm, budget=RunBudget())
+
+
+async def test_unknown_model_type_falls_back_to_unknown_not_crash() -> None:
+    # A model may return a free-form label ("INVOICE"); it must map to UNKNOWN
+    # rather than raising a ValidationError that crashes the pipeline.
+    ocr = (_ocr("source:1", (_page(1, "HÓA ĐƠN"),)),)
+    llm = FakeLlm({"documents": [
+        {"source_id": "source:1", "page_range": [1, 1],
+         "document_type": "INVOICE", "roles": ["ORIGINAL_EXPENSE_EVIDENCE"]}
+    ]})
+    result = await classify_documents(ocr, llm=llm, budget=RunBudget())
+    assert result[0].document_type == "UNKNOWN"
+    assert result[0].roles == ("UNKNOWN",)
+
+
+async def test_unknown_role_is_dropped() -> None:
+    ocr = (_ocr("source:1", (_page(1, "x"),)),)
+    llm = FakeLlm({"documents": [
+        {"source_id": "source:1", "page_range": [1, 1],
+         "document_type": "E_INVOICE", "roles": ["INVOICE_ROLE", "ORIGINAL_EXPENSE_EVIDENCE"]}
+    ]})
+    result = await classify_documents(ocr, llm=llm, budget=RunBudget())
+    assert result[0].roles == ("ORIGINAL_EXPENSE_EVIDENCE",)
+
+
+async def test_unknown_alternative_type_is_dropped() -> None:
+    ocr = (_ocr("source:1", (_page(1, "x"),)),)
+    llm = FakeLlm({"documents": [
+        {"source_id": "source:1", "page_range": [1, 1],
+         "document_type": "E_INVOICE", "roles": ["ORIGINAL_EXPENSE_EVIDENCE"],
+         "alternative_document_types": ["INVOICE", "PAPER_RECEIPT"]}
+    ]})
+    result = await classify_documents(ocr, llm=llm, budget=RunBudget())
+    assert result[0].alternative_document_types == ("PAPER_RECEIPT",)

@@ -46,7 +46,7 @@ async def run_evidence_job(workflow, job_id: str) -> None:
         )
     except Exception as error:  # provider failure -> technical, never a fake success
         with workflow.db.transaction() as cx:
-            workflow._fail_evidence_job(cx, job_id, str(error))
+            workflow._fail_evidence_job(cx, job_id, error)
         return
 
     with workflow.db.transaction() as cx:

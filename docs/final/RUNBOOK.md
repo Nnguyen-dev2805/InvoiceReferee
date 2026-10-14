@@ -13,19 +13,34 @@ bằng chứng runtime.
   `XKIRO_API_KEY`, `XKIRO_BASE_URL`, `INVOICE_REFEREE_LLM_MODEL`.
   LangSmith là **opt-in**, không bắt buộc.
 
-## 2. Clean clone → chạy STUB
+## 2. Clean clone → chạy mặc định (LIVE)
+
+**Mặc định là LIVE**: server đọc tài liệu bạn upload (Mistral OCR + model). Điền
+`.env` trước (xem §3).
 
 ```bash
 git clone <repo> && cd InvoiceReferee
-cp .env.example .env            # điền key nếu muốn LIVE; để trống chạy STUB
+cp .env.example .env            # điền key để chạy LIVE (xem §3)
 uv sync --frozen                # cài đúng uv.lock
 npm --prefix frontend ci        # cài frontend
 npm --prefix frontend run build # tạo frontend/dist (server phục vụ tĩnh)
-uv run python scripts/dev.py --mode stub --port 8000
+uv run python scripts/dev.py --port 8000   # mặc định LIVE
 ```
 
 Mở `http://127.0.0.1:8000`. Thao tác chính nằm trong <1 phút: chọn hoạt động →
 Tạo hồ sơ → đính kèm chứng từ → Nộp hồ sơ → xem yêu cầu/câu hỏi.
+
+Ba chế độ (đều tường minh, không tự hạ cấp):
+
+| Chế độ | Lệnh | Ý nghĩa |
+| --- | --- | --- |
+| **LIVE** (mặc định) | `scripts/dev.py` | Đọc tài liệu thật; cần key trong `.env`. |
+| **STUB** | `scripts/dev.py --mode stub` | Bản ghi tay có sẵn, chạy offline (không cần key). |
+| **RECORDED_REPLAY** | `scripts/dev.py --mode replay` | Phát lại bản ghi provider (chưa có recording). |
+
+> Lưu ý: ở LIVE, pipeline chứng cứ đọc xong và dừng ở `EVIDENCE_READY`; phần nối
+> chứng cứ → tài chính (`EVIDENCE_ADMISSION_NOT_CONNECTED`) chưa được viết, nên
+> LIVE **chưa** phát hành yêu cầu chi/thu. Đường ra kết luận tài chính hiện là STUB.
 
 Kiểm tra health (đã lọc secret):
 
@@ -35,14 +50,15 @@ curl -s http://127.0.0.1:8000/api/health
 
 ## 3. Chạy LIVE
 
-Điền `.env` rồi:
+Điền `.env` (5 key, xem `.env.example`) rồi chạy mặc định — không cần cờ `--mode`:
 
 ```bash
-uv run python scripts/dev.py --mode live --port 8000
+uv run python scripts/dev.py --port 8000
+# hoặc tường minh: uv run python scripts/dev.py --mode live --port 8000
 ```
 
-Thiếu key ⇒ lệnh **dừng và in tên biến thiếu**, không tự hạ cấp. Không có chế độ
-giả lập ngầm.
+Thiếu key ⇒ lệnh **dừng (exit 2) và in tên biến thiếu**, không tự hạ cấp. Không có
+chế độ giả lập ngầm. Chạy offline để demo/test: thêm `--mode stub`.
 
 ## 4. Container (single process, volume bền)
 

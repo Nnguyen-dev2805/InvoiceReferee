@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import httpx
 
 from invoice_referee.evidence.trace import (
+    DEFAULT_LLM_TIMEOUT_S,
     DEFAULT_MAX_LLM_INPUT_CHARS,
     DEFAULT_MAX_LLM_OUTPUT_CHARS,
     RunBudget,
@@ -42,7 +43,7 @@ class XkiroClient:
     api_key: str
     model: str
     base_url: str
-    timeout_s: float = 20.0
+    timeout_s: float = DEFAULT_LLM_TIMEOUT_S
     transport: httpx.AsyncBaseTransport | None = None
     max_input_chars: int = DEFAULT_MAX_LLM_INPUT_CHARS
     max_output_chars: int = DEFAULT_MAX_LLM_OUTPUT_CHARS

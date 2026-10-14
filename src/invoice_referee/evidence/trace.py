@@ -20,6 +20,9 @@ ProviderMode = Literal["LIVE", "RECORDED_REPLAY", "STUB"]
 DEFAULT_MAX_LLM_ATTEMPTS = 12
 DEFAULT_MAX_OCR_ATTEMPTS = 10
 DEFAULT_HTTP_TIMEOUT_S = 20
+# The LLM (a free/slow model in the pilot) needs a longer bounded budget than
+# OCR; a 20s cap timed out real classification calls (lead call, plan E3).
+DEFAULT_LLM_TIMEOUT_S = 60
 DEFAULT_PROCESSING_DEADLINE_S = 90
 DEFAULT_THRESHOLD = 0.75
 

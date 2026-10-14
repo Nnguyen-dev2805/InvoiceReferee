@@ -194,3 +194,22 @@ def test_score_below_threshold_is_not_eligible_alone() -> None:
 def test_proposed_ref_needs_a_real_locator() -> None:
     with pytest.raises(Exception):
         EvidenceRef(source_id="s", source_sha256="a" * 64, exact_quote="x")  # no locator
+
+
+def test_llm_and_ocr_timeouts_are_separate_and_bounded() -> None:
+    from invoice_referee.evidence.trace import (
+        DEFAULT_HTTP_TIMEOUT_S,
+        DEFAULT_LLM_TIMEOUT_S,
+    )
+
+    # OCR stays fast; the LLM (a free/slow model) gets a longer bounded budget.
+    assert DEFAULT_HTTP_TIMEOUT_S == 20
+    assert DEFAULT_LLM_TIMEOUT_S >= 60
+
+
+def test_xkiro_client_uses_the_llm_timeout_default() -> None:
+    from invoice_referee.evidence.trace import DEFAULT_LLM_TIMEOUT_S
+    from invoice_referee.evidence.xkiro import XkiroClient
+
+    client = XkiroClient(api_key="k", model="m", base_url="https://x/v1")
+    assert client.timeout_s == DEFAULT_LLM_TIMEOUT_S

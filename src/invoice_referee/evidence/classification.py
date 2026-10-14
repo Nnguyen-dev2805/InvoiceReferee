@@ -104,7 +104,10 @@ async def classify_documents(
         source_id = str(entry.get("source_id") or "")
         if source_id not in expected:
             raise XkiroError(f"classification named an unknown source: {source_id}")
-        document_type = str(entry.get("document_type") or "UNKNOWN")
+        raw_type = str(entry.get("document_type") or "UNKNOWN")
+        # A model may return a free-form label; anything outside the code-owned
+        # taxonomy maps to UNKNOWN (never a guessed schema, never a crash).
+        document_type = raw_type if raw_type in DEFAULT_TYPE_ROLES else "UNKNOWN"
         allowed = compatible_roles(document_type)
         # Keep only roles the code map allows for this type.
         roles = tuple(
@@ -144,7 +147,8 @@ async def classify_documents(
                 roles=roles,
                 role_refs={role: (_ref(source_id, digest, start, quote),) for role in roles},
                 alternative_document_types=tuple(
-                    entry.get("alternative_document_types") or ()
+                    alt for alt in (entry.get("alternative_document_types") or ())
+                    if alt in DEFAULT_TYPE_ROLES
                 ),
                 classification_confidence=entry.get("classification_confidence"),
                 signals=tuple(entry.get("signals") or ()),

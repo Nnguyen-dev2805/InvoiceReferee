@@ -501,10 +501,14 @@ class CaseWorkflow:
             "UPDATE cases SET state = 'TECHNICAL_ERROR', updated_at = ? WHERE id = ?",
             (self._now_iso(), root_id),
         )
+        # Keep the provider error class + a short message so a failure is
+        # diagnosable, without leaking secrets (redacted to a bounded length).
+        detail = f"{type(message).__name__}: {message}" if not isinstance(message, str) else message
+        detail = (detail or "").strip().replace("\n", " ")[:300]
         problem = ProcessingProblem(
             kind="TECHNICAL",
             affected_fields=(),
-            message="đọc chứng cứ thất bại (lỗi kỹ thuật)",
+            message=f"đọc chứng cứ thất bại (lỗi kỹ thuật): {detail or 'không rõ'}",
             relevance="MATERIAL",
             blocking=True,
             next_action="retry_or_report_technical",

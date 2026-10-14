@@ -79,7 +79,8 @@ def format_diagnostics(
     )
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """The dev-server CLI. Default mode is LIVE (the app reads real uploads)."""
     parser = argparse.ArgumentParser(description="InvoiceReferee demo server")
     parser.add_argument("--mode", choices=("stub", "replay", "live"), default="live")
     parser.add_argument("--host", default="127.0.0.1")
@@ -87,7 +88,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--db", default=str(DEFAULT_DB))
     parser.add_argument("--uploads", default=str(DEFAULT_UPLOADS))
     parser.add_argument("--context", default=str(DEFAULT_CONTEXT))
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
 
     mode = args.mode.upper()
     settings = Settings()

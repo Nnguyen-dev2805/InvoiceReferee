@@ -10,8 +10,9 @@ services:
       - "8000:8000"
     env_file:
       - .env
-    environment:
-      INVOICE_REFEREE_MODE: stub
+    # The server defaults to LIVE (reads uploaded documents); pass `--mode stub`
+    # to scripts/dev.py for the offline demo. There is no mode env override —
+    # the app does not read one, so none is set here.
     volumes:
       # Persistent DB + uploads survive a restart.
       - referee-data:/data
