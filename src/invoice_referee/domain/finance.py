@@ -20,6 +20,11 @@ from invoice_referee.domain.common import (
 from invoice_referee.domain.evidence import ReadState
 
 ExpenseEligibility = Literal["ELIGIBLE", "INELIGIBLE", "UNKNOWN"]
+# Whether the expense's payment status is established by the basis (contracts §3).
+# PAID = the paid portions are verified; UNPAID = the basis establishes nothing
+# has been paid yet; UNKNOWN = there is not enough basis to tell (missing
+# evidence of payment never proves a zero). Eligibility is a separate axis.
+PaymentState = Literal["PAID", "UNPAID", "UNKNOWN"]
 MoneyKind = Literal[
     "ADVANCE_RECEIVED",
     "REIMBURSEMENT_RECEIVED",
@@ -85,6 +90,12 @@ class Expense(StrictModel):
     payments: tuple[ExpensePayment, ...] = ()
     eligibility: ExpenseEligibility
     refs: tuple[EvidenceRef, ...] = ()
+    # Whether the basis establishes the payment status of this cost. A cost with
+    # no admitted payment is UNKNOWN (not proven-unpaid); a source that states
+    # "nothing paid yet" is UNPAID (a verified zero); PAID means the paid
+    # portions are verified. Defaults to UNKNOWN so a new/typed expense is never
+    # silently treated as paid or as a proven debt (contracts §3).
+    payment_state: PaymentState = "UNKNOWN"
 
 
 class RecordMoneyInput(StrictModel):

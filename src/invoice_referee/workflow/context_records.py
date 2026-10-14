@@ -39,18 +39,17 @@ def _context_ref(digest: str, record_key: str, quote: str) -> EvidenceRef:
     )
 
 
-def persist_context(
+def store_snapshot(
     cx: sqlite3.Connection,
     context: OrganizationContext,
     origin: str,
     *,
     imported_at: str | None = None,
 ) -> str:
-    """Persist one immutable context snapshot and project its relational rows.
+    """Store one immutable snapshot row (no relational projection). Returns digest.
 
-    Returns the payload digest. A repeated import of the same payload is a no-op
-    (the digest is the primary key); a changed payload adds a new version and
-    leaves the older snapshot intact.
+    A repeated import of the same payload is a no-op (the digest is the primary
+    key); a changed payload adds a new version and leaves the older intact.
     """
     tenant = context.organization_id or context.tenant
     raw = json.dumps(context.model_dump(mode="json"), sort_keys=True, ensure_ascii=False)
@@ -72,7 +71,22 @@ def persist_context(
             "origin, imported_at) VALUES (?, ?, ?, ?, ?, ?)",
             (tenant, digest, version, raw, origin, now),
         )
+    return digest
 
+
+def persist_context(
+    cx: sqlite3.Connection,
+    context: OrganizationContext,
+    origin: str,
+    *,
+    imported_at: str | None = None,
+) -> str:
+    """Persist one immutable context snapshot and project its relational rows.
+
+    Returns the payload digest.
+    """
+    tenant = context.organization_id or context.tenant
+    digest = store_snapshot(cx, context, origin, imported_at=imported_at)
     _project_relational(cx, context, tenant=tenant, digest=digest)
     return digest
 
@@ -152,22 +166,36 @@ def _budget_for(
     return None
 
 
+def _snapshot_contains_activity(context: OrganizationContext, activity: str) -> bool:
+    primary = context.activity or {}
+    if str(primary.get("activity_id") or "") == activity:
+        return True
+    for entry in context.activities:
+        if str(entry.get("id") or entry.get("activity_id") or "") == activity:
+            return True
+    return False
+
+
 def load_context(
     cx: sqlite3.Connection, tenant: str, activity: str, as_of: datetime
 ) -> OrganizationContext | None:
-    """Load the newest stored context snapshot for a tenant, or None.
+    """Load the newest stored context snapshot for a tenant, scoped to `activity`.
 
-    The snapshot is loaded whole: the caller reads policies/budgets/ledger/
-    coverage from it, so nothing the importer stored is dropped on restart.
+    The snapshot is loaded whole (policies/budgets/ledger/coverage survive a
+    restart), but only the newest snapshot that actually CONTAINS `activity` is
+    returned: a snapshot for another activity must not be used as this
+    activity's context (plan A5/D). Returns None when no snapshot names it.
     """
-    row = cx.execute(
+    rows = cx.execute(
         "SELECT payload_json FROM context_snapshots WHERE tenant = ? "
-        "ORDER BY version DESC LIMIT 1",
+        "ORDER BY version DESC",
         (tenant,),
-    ).fetchone()
-    if row is None:
-        return None
-    return OrganizationContext.model_validate_json(row["payload_json"])
+    ).fetchall()
+    for row in rows:
+        context = OrganizationContext.model_validate_json(row["payload_json"])
+        if _snapshot_contains_activity(context, activity):
+            return context
+    return None
 
 
 def context_policies(

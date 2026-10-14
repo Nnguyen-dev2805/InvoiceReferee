@@ -111,7 +111,7 @@ def _org(*, advance: int = 4_000_000, coverage: bool = True) -> OrganizationCont
             "as_of": "2026-10-10T18:00:00+07:00", "fund_ids": ["company:bank"],
             "flow_kinds": ["ADVANCE_RECEIVED", "REIMBURSEMENT_RECEIVED", "EMPLOYEE_RETURN", "REVERSAL", "OBSERVED_UNALLOCATED"],
             "opening_by_fund": {"company:bank": 0}, "ledger_version": "ledger:v1",
-            "witness_keys": [],
+            "witness_keys": ["coverage:1"],
         }
     return OrganizationContext.model_validate({
         "organization_id": "tenant:demo", "profile": "TRAVEL",

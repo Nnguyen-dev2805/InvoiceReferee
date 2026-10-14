@@ -21,6 +21,7 @@ builds the typed input they consume.
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from invoice_referee.domain.case import AssessmentInput, CaseScope, ReadSet
@@ -141,6 +142,94 @@ def _match_expense_documents(
     return out
 
 
+def coverage_is_valid(
+    coverage: CoverageRecord | None, *, scope: CaseScope, as_of: datetime
+) -> bool:
+    """Whether a coverage record is a VALID basis for a zero A/P/R (contracts §3).
+
+    A coverage OBJECT is not a valid coverage. It must name the scope
+    (employee/activity), cover the assessment time (`start <= as_of <=
+    coverage.as_of`), list a non-empty fund set and flow-kind set, state an
+    opening balance, and carry witness refs. A stale (as_of before the decision)
+    or incomplete coverage cannot establish a zero, so it must not produce an
+    instruction.
+    """
+    if coverage is None:
+        return False
+    if coverage.scope not in (scope.activity, scope.tenant):
+        return False
+    if not (coverage.start <= as_of <= coverage.as_of):
+        return False
+    if not coverage.funds or not coverage.flow_kinds:
+        return False
+    if coverage.opening_balance is None:
+        return False
+    if not coverage.witness_refs:
+        return False
+    return True
+
+
+def _normalize_name(value: object) -> str:
+    """Format-only name normalization (whitespace + case). No fuzzy matching."""
+    import unicodedata
+
+    text = unicodedata.normalize("NFC", str(value or "")).strip().casefold()
+    return " ".join(text.split())
+
+
+def _claimant_name(organization: OrganizationContext, employee: str) -> str | None:
+    for person in organization.people:
+        if str(person.get("id")) == employee:
+            return str(person.get("name") or "")
+    return None
+
+
+def _declared_name(paper: DocumentAnalysis | None) -> tuple[str, tuple[EvidenceRef, ...]] | None:
+    if paper is None:
+        return None
+    for candidate in paper.fields:
+        if candidate.field == "declared_name" and candidate.state == "FOUND":
+            return str(candidate.value), candidate.refs
+    return None
+
+
+def _claimant_binding_issue(
+    paper: DocumentAnalysis | None,
+    organization: OrganizationContext,
+    employee: str,
+) -> BusinessIssue | None:
+    """A FACT when the document's declared claimant does not bind to the dossier.
+
+    A different name is not automatically fraud, but it must not be ignored: the
+    code emits a specific issue to confirm/correct/record a valid alias. Only
+    format-normalized differences count as equal (no fuzzy match).
+    """
+    declared = _declared_name(paper)
+    if declared is None:
+        return None
+    literal_name, refs = declared
+    context_name = _claimant_name(organization, employee)
+    if context_name is None:
+        return None
+    if _normalize_name(literal_name) == _normalize_name(context_name):
+        return None
+    return BusinessIssue(
+        id="issue:fact:claimant-binding",
+        kind="FACT",
+        field_or_rule="expense:claimant_binding",
+        owner="employee",
+        basis=(
+            f"Hồ sơ gắn với '{context_name}', nhưng giấy quyết toán khai '{literal_name}'."
+        ),
+        refs=refs,
+        question=(
+            f"Xác nhận/correct người đề nghị: hồ sơ đang gắn '{context_name}', "
+            f"tài liệu khai '{literal_name}'. Xác nhận đây là cùng một người "
+            f"(ghi nhận alias) hoặc sửa lại cho đúng."
+        ),
+    )
+
+
 def _claim_index(confirmations: tuple[Confirmation, ...]) -> dict[str, Confirmation]:
     index: dict[str, Confirmation] = {}
     for confirmation in confirmations:
@@ -192,9 +281,30 @@ def admit_evidence(
     # receipt is recorded would miscompute S and the Q32 bound (plan A1/A3).
     ctx_ledger = context_ledger(organization, digest=org_digest)
     merged_ledger, _conflicts = merge_ledger(ctx_ledger, tuple(ledger))
-    effective_coverage = coverage if coverage is not None else context_coverage(
+    candidate_coverage = coverage if coverage is not None else context_coverage(
         organization, digest=org_digest
     )
+    # A coverage OBJECT is not a valid coverage: it must cover the assessment
+    # time and name scope/funds/kinds/opening/witnesses (contracts §3). An
+    # invalid (stale/incomplete/wrong-scope) coverage is not a zero basis, so it
+    # is dropped here (A/P/R stay UNKNOWN) and raised as a scoped FACT issue.
+    if candidate_coverage is not None and not coverage_is_valid(
+        candidate_coverage, scope=scope, as_of=as_of
+    ):
+        issues.append(
+            BusinessIssue(
+                id="issue:fact:coverage-invalid",
+                kind="FACT",
+                field_or_rule="ledger:coverage",
+                owner="accountant",
+                basis="Coverage hiện có không bao phủ thời điểm đánh giá hoặc thiếu scope/quỹ/loại dòng tiền/số dư đầu kỳ/căn cứ.",
+                refs=candidate_coverage.witness_refs,
+                question="Xác minh coverage lịch sử đủ scope/thời gian/quỹ/loại dòng tiền/số dư đầu kỳ cho thời điểm quyết định.",
+            )
+        )
+        effective_coverage: CoverageRecord | None = None
+    else:
+        effective_coverage = candidate_coverage
     budgets = context_budgets(organization, activity=scope.activity, digest=org_digest)
     policies = context_policies(organization, digest=org_digest, profile=scope.profile)
     grants = context_grants(organization, digest=org_digest)
@@ -208,6 +318,13 @@ def admit_evidence(
 
     matched = _match_expense_documents(report, paper)
     claims = _claim_index(confirmations)
+
+    # Claimant binding: the document's declared claimant must bind to the
+    # dossier's responsible claimant. A mismatch is a FACT to resolve (never
+    # silently ignored, never auto-interpreted as fraud).
+    binding_issue = _claimant_binding_issue(paper, organization, scope.employee)
+    if binding_issue is not None:
+        issues.append(binding_issue)
 
     # A/P/R known only when coverage exists; used to bound the Q32 path.
     a_known = effective_coverage is not None
@@ -244,6 +361,10 @@ def admit_evidence(
         # canonical cost identity. Ref-less rows still carry the document refs.
         payments: list[ExpensePayment] = []
         eligibility = "UNKNOWN"
+        # Payment status is its own axis: with no admitted payment the basis does
+        # not establish the payment status, so it stays UNKNOWN (never a proven
+        # debt). An accepted Q32 portion verifies the paid amount -> PAID.
+        payment_state = "UNKNOWN"
         claim = matched_claims[index - 1]
         if claim is not None and bound_ok:
             claim_amount = int(_as_decimal(claim.value) or 0)
@@ -261,6 +382,7 @@ def admit_evidence(
                 )
             )
             eligibility = "ELIGIBLE"
+            payment_state = "PAID"
         elif claim is not None:
             # The declaration is not usable as a bounded E (the total exceeds a
             # limit, or S is unknown); keep the cost as a FACT to resolve, never
@@ -291,6 +413,7 @@ def admit_evidence(
                 payments=tuple(payments),
                 eligibility=eligibility,  # type: ignore[arg-type]
                 refs=refs,
+                payment_state=payment_state,  # type: ignore[arg-type]
             )
         )
 

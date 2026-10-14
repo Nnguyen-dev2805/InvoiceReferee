@@ -428,6 +428,7 @@ class CaseWorkflow:
                     tenant=row["tenant"],
                     media=row["media"],
                     storage_key=row["storage_key"],
+                    filename=row["filename"],
                 )
                 for row in connection.execute(
                     "SELECT * FROM case_sources WHERE root_id = ? ORDER BY attached_at, source_id",
@@ -755,6 +756,10 @@ class CaseWorkflow:
                         digest,
                     ),
                 )
+            # Store a typed snapshot the admission consumer reads, built from the
+            # SAME demo data (plan A5/D): one source of truth. Budgets/grants/
+            # witnesses are projected so the catalog and the typed consumer agree.
+            self._store_demo_snapshot(cx, data, tenant=tenant, origin=origin, digest=digest)
             cx.execute(
                 "INSERT INTO context_imports (tenant, digest, origin, imported_at, note) "
                 "VALUES (?, ?, ?, ?, ?)",
@@ -774,6 +779,78 @@ class CaseWorkflow:
                 origin=origin,
             )
         return digest
+
+    def _store_demo_snapshot(
+        self, cx: sqlite3.Connection, data, *, tenant: str, origin: str, digest: str
+    ) -> None:
+        """Store a typed OrganizationContext snapshot from the demo context.
+
+        The demo schema and the typed schema are different, so this maps the
+        demo records (activities/budgets/grants/people/witnesses) into ONE
+        OrganizationContext payload that the admission consumer reads. It does
+        NOT invent money, budgets or history the demo context does not declare;
+        an activity with no budget simply carries no budget.
+        """
+        from invoice_referee.domain.organization import OrganizationContext
+        from invoice_referee.workflow.context_records import store_snapshot
+
+        activities = tuple(
+            {
+                "id": activity.id,
+                "activity_id": activity.id,
+                "name": activity.name,
+                "occurred_at": activity.occurred_at.isoformat() if activity.occurred_at else None,
+                "purpose": activity.purpose,
+                "status": activity.status,
+            }
+            for activity in data.activities
+        )
+        budgets = tuple(
+            {
+                "id": activity.budget.record_key if activity.budget else f"budget:{activity.id}",
+                "activity": activity.id,
+                "amount": activity.budget.amount,
+                "effect_range": [
+                    activity.budget.effect_from.isoformat() if activity.budget.effect_from else None,
+                    None,
+                ],
+                "actor": "employee:approver",
+            }
+            for activity in data.activities
+            if activity.budget is not None
+        )
+        grants = tuple(
+            {
+                "id": grant.id,
+                "version": grant.version,
+                "actor": grant.actor,
+                "actions": list(grant.actions),
+                "scope": grant.scope,
+                "max_amount": grant.max_amount,
+                "effective_from": grant.effective_from.isoformat(),
+                "effective_to": grant.effective_to.isoformat() if grant.effective_to else None,
+                "allowed_profiles": list(grant.allowed_profiles),
+            }
+            for grant in data.grants
+        )
+        context = OrganizationContext.model_validate(
+            {
+                "organization_id": tenant,
+                "tenant": tenant,
+                "profile": "TRAVEL",
+                "data_origin": "SIMULATED",
+                "activity": None,
+                "activities": activities,
+                "people": tuple({"id": p.id, "name": p.name} for p in data.people),
+                "budgets": budgets,
+                "grants": grants,
+                "witnesses": tuple(
+                    {"record_key": w.record_key, "quote": w.quote, "kind": w.kind}
+                    for w in data.witnesses
+                ),
+            }
+        )
+        store_snapshot(cx, context, origin, imported_at=self._now_iso())
 
     def import_company_context(
         self, context: "object", *, origin: str = "SIMULATED"
@@ -947,6 +1024,7 @@ class CaseWorkflow:
                     tenant=source["tenant"],
                     media=source["media"],
                     storage_key=source["storage_key"],
+                    filename=source["filename"],
                 )
                 for source in connection.execute(
                     "SELECT * FROM case_sources WHERE root_id = ? ORDER BY attached_at, source_id",
@@ -1132,13 +1210,13 @@ class CaseWorkflow:
             return
         root_id = str(row["id"])
         activity = str(row["activity"])
-        sources = {
-            (str(r["filename"]), str(r["digest"])): str(r["source_id"])
-            for r in cx.execute(
-                "SELECT source_id, filename, digest FROM case_sources WHERE root_id = ?",
-                (root_id,),
-            ).fetchall()
-        }
+        sources = {}
+        for r in cx.execute(
+            "SELECT source_id, filename, digest FROM case_sources WHERE root_id = ?",
+            (root_id,),
+        ).fetchall():
+            sources[(str(r["filename"]), str(r["digest"]))] = str(r["source_id"])
+            sources[(str(r["source_id"]), str(r["digest"]))] = str(r["source_id"])
         for claim in claims:
             resolved_refs = []
             for ref in claim.refs:
@@ -1197,6 +1275,13 @@ class CaseWorkflow:
         self._require_version(row, context.expected_case_version)
         now = self._now_iso()
         root_id = str(row["id"])
+        # The declaration must name this dossier's activity: a submit cannot
+        # fold evidence into a different activity than the root (contracts §3).
+        declared_activity = command.declaration.activity_id
+        if declared_activity and declared_activity != str(row["activity"]):
+            raise UnsupportedCommandError(
+                "Khai báo không khớp hoạt động của hồ sơ này."
+            )
         # Q32 typed employee paid-claims (plan A2): the client states the claim;
         # the server resolves the file refs to the uploaded bytes and derives the
         # actor/scope/time. A foreign digest/ref is rejected before any write.
@@ -1761,7 +1846,7 @@ class CaseWorkflow:
         # Stop must not create a new instruction (contracts §6).
         if str(row["state"]) == "STOPPED":
             return
-        assessment_input = self._build_assessment_input(cx, session, row)
+        assessment_input = self._build_assessment_input(cx, session, row, now)
         if assessment_input is None:
             # Evidence mode with no published report yet: stay EVIDENCE_READY.
             # A LIVE/REPLAY root must never fall back to a seeded STUB
@@ -1771,17 +1856,20 @@ class CaseWorkflow:
         self._commit_assessment(cx, session, row, result, now)
 
     def _build_assessment_input(
-        self, cx: sqlite3.Connection, session: DemoSession, row: sqlite3.Row
+        self, cx: sqlite3.Connection, session: DemoSession, row: sqlite3.Row, now: str
     ):
         """Build the typed AssessmentInput, or None when the evidence report is absent.
 
         In evidence mode (LIVE/RECORDED_REPLAY) the typed admission mapper is the
         only consumer: it reads the CURRENT stored report + context + confirmations
         (never a seeded STUB transcription). In STUB mode the hand-transcription
-        path is used as before.
+        path is used as before. `now` is the server/harness clock instant; it is
+        passed through so coverage freshness and every time-scoped gate use the
+        same assessment time (never a client-supplied clock).
         """
         from invoice_referee.workflow.snapshots import build_assessment_input
 
+        as_of = datetime.fromisoformat(now)
         root_id = str(row["id"])
         if self._evidence_reader is not None:
             from invoice_referee.domain.evidence import ReadResult
@@ -1797,7 +1885,7 @@ class CaseWorkflow:
                 return None
             report = ReadResult.model_validate_json(report_row["report_json"])
             return build_evidence_assessment_input(
-                cx, tenant=session.tenant, root_id=root_id, report=report
+                cx, tenant=session.tenant, root_id=root_id, report=report, as_of=as_of
             )
         transcription = self._transcription_for(cx, root_id)
         return build_assessment_input(
@@ -1808,6 +1896,7 @@ class CaseWorkflow:
             activity=str(row["activity"]),
             profile=str(row["profile"]),
             transcription=transcription,
+            as_of=as_of,
         )
 
     def _commit_assessment(
@@ -2227,6 +2316,7 @@ class CaseWorkflow:
                 tenant=source["tenant"],
                 media=source["media"],
                 storage_key=source["storage_key"],
+                filename=source["filename"],
             )
             for source in cx.execute(
                 "SELECT * FROM case_sources WHERE root_id = ? "

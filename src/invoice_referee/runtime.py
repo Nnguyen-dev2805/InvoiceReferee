@@ -46,10 +46,16 @@ def build_workflow(
     db: Database,
     uploads_dir: str | Path,
     context_path: str | Path,
+    clock=None,
 ) -> CaseWorkflow:
-    """Build the workflow for one mode and import the demo context."""
+    """Build the workflow for one mode and import the demo context.
+
+    `clock` is an optional server/harness clock. The web entry leaves it None
+    (real UTC); a historical-fixture harness injects a controlled clock so the
+    assessment time is explicit and reproducible. It is never a client value.
+    """
     db.migrate()
-    workflow = CaseWorkflow(db, uploads_dir=uploads_dir)
+    workflow = CaseWorkflow(db, uploads_dir=uploads_dir, clock=clock)
     workflow.import_demo_context(context_path, origin="SIMULATED")
     workflow.provider_mode = mode
 

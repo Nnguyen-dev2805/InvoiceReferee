@@ -100,8 +100,15 @@ def project_finance(
         P = _known("projection:P", _sum_ledger(ledger, _MONEY_KINDS["P"]))
         R = _known("projection:R", _sum_ledger(ledger, _MONEY_KINDS["R"]))
 
-    # unpaid: verified outstanding against gross paid (never T - E - C).
-    if T.state != "KNOWN":
+    # unpaid: verified outstanding against gross paid (never T - E - C). It is
+    # KNOWN only when the basis establishes the payment status of every expense:
+    # a verified-unpaid cost (PAID portions summing to less than T) or a verified
+    # zero. A cost with no admitted payment is UNKNOWN, because missing evidence
+    # of payment does not prove a supplier debt (contracts §3–§4).
+    unpaid_unknown = T.state != "KNOWN" or any(
+        expense.payment_state == "UNKNOWN" for expense in expenses
+    )
+    if unpaid_unknown:
         unpaid: Fact[Vnd] = _unknown("projection:unpaid")
     else:
         unpaid = _known("projection:unpaid", max(int(T.value or 0) - gross_paid, 0))

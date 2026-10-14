@@ -85,16 +85,21 @@ def build_evidence_assessment_input(
     tenant: str,
     root_id: str,
     report: ReadResult,
-    as_of: datetime | None = None,
+    as_of: datetime,
 ) -> AssessmentInput:
-    """Assemble the typed admission input from the stored report + current state."""
+    """Assemble the typed admission input from the stored report + current state.
+
+    `as_of` is the assessment instant, taken from the server/harness clock by
+    the caller (never the client): it drives coverage freshness and every
+    time-scoped gate consistently through admission and policy.
+    """
     row = cx.execute(
         "SELECT * FROM cases WHERE id = ? AND tenant = ?", (root_id, tenant)
     ).fetchone()
     if row is None:
         raise ValueError(f"case {root_id} not found in tenant {tenant}")
 
-    organization = load_context(cx, tenant, str(row["activity"]), as_of or datetime.now(UTC))
+    organization = load_context(cx, tenant, str(row["activity"]), as_of)
     if organization is None:
         organization = OrganizationContext.model_validate({"organization_id": tenant})
 
@@ -119,5 +124,5 @@ def build_evidence_assessment_input(
         ledger=_load_recorded_money(cx, tenant, root_id),
         coverage=None,
         read_set=read_set,
-        as_of=as_of or datetime.now(UTC),
+        as_of=as_of,
     )

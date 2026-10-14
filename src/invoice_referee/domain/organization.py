@@ -40,5 +40,9 @@ class OrganizationContext(StrictModel):
     ledger: tuple[dict[str, object], ...] = ()
     coverage: dict[str, object] | None = None
     witnesses: tuple[dict[str, object], ...] = ()
+    # The other activities the demo context declares (id + name + purpose), so a
+    # snapshot built from the demo importer can be scoped per activity without
+    # inventing per-activity money it never had (plan A5/D).
+    activities: tuple[dict[str, object], ...] = ()
     financial_as_of: str | None = None
     data_origin: str | None = None

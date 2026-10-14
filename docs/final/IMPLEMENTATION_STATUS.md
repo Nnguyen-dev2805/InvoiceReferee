@@ -7,17 +7,17 @@ The plan owns task acceptance; package/config files own executable commands.
 
 | Field | Current value |
 | --- | --- |
-| Base branch | `final` @ 5f27c8f4 (after R0–R8 + the evidence-pipeline E0–E8 branch + the UC03 pilot test kit). |
-| Phase | T1..T10 + R0–R8 done. Evidence pipeline E0–E8 implemented. **Tier A extraction fixes + evidence→finance admission A0–A8 implemented** (2026-10-14, uncommitted): SETTLEMENT_FORM field aliases + `line_items` parsing (Tier A); A0 basis/claim DTOs; A1 immutable context snapshots; A2 Q32 claims at the command boundary; A3 pure `admit_evidence`; A4 reconciler honors basis/completeness; A5 typed consumer wired with Stop/version protection; A6 actual-execution loop closure; A7 baseline-test repair (suite now fully green); A8 typed claim UI + basis transparency. |
-| Authorized scope now | Tier A + plan A0–A8 (user-authorized 14/10/2026, inline). **Uncommitted — no Git authorization given.** |
+| Base branch | `final` @ 0be840c4 (after R0–R8 + evidence-pipeline E0–E8 + Tier A extraction fixes + evidence→finance admission A0–A8). |
+| Phase | T1..T10 + R0–R8 done. Evidence pipeline E0–E8 + admission A0–A8 implemented. **F01-LIVE-investigation five-group fix implemented** (2026-10-14, uncommitted): (A) unknown payment no longer becomes a verified unpaid amount (`Expense.payment_state` gates `unpaid`); (B) claimant/activity binding FACT (`expense:claimant_binding`, submit activity-scope check); (C) coverage validity + assessment clock threaded from the workflow/harness clock through admission/policy; (D) one context import path (demo import writes a typed `context_snapshots` row; `load_context` is activity-scoped); (E) UI claim references the server source id with a real quote (no first-source default, no fabricated quote). |
+| Authorized scope now | F01 investigation five-group repair (user-authorized 14/10/2026). **Uncommitted — no Git authorization given.** Concurrent frontend (Tailwind) edits by another agent are preserved. |
 | Setup review | ACCEPTED; clean-clone proof passed. |
-| Execution method | Inline execution (executing-plans), single integrator; per-task TDD (RED observed → GREEN) + full-suite after each. No subagent review (user-directed). |
+| Execution method | Inline execution, single integrator; per-group TDD (RED observed → GREEN) + full-suite after each. No subagent review (user-directed). |
 | Workflow integrator | Inline executor — single writer for workflow/api/domain owned files |
-| Next application task | Whole-branch review of the Tier A + A0–A8 range, then user-authorized commit. T11 still BLOCKED on practitioners. |
-| Last completed application task | Tier A + evidence→finance admission A0–A8 (A7/A8 done). |
-| Product unit/integration/UI/LIVE evidence | `uv run pytest` → **413 passed / 0 failed** (first fully green run; the 11 legacy-corpus failures are resolved by in-repo regeneration of the retired STUB corpus under git-ignored `.runtime/legacy-corpus/`, plan A7). Frontend vitest **13 passed**, build exit 0 on pinned Node 24.19.0. Pilot F01/F02/F03 typed path reaches exact gold effects (COLLECT 760000 / PAY 400000 / no zero instruction) with real provider reads. **M0 LIVE NOT_RUN** (no live authorization); RECORDED_REPLAY captures NOT_RECORDED. Docker build NOT_RUN. Public hosting + practitioner pilot BLOCKED. |
+| Next application task | Whole-branch review of the five-group fix range, then user-authorized commit. T11 still BLOCKED on practitioners. |
+| Last completed application task | F01-LIVE-investigation five-group fix (A–E) + LIVE F01 verification. |
+| Product unit/integration/UI/LIVE evidence | `uv run pytest` → **444 passed / 0 failed**. Frontend vitest **14 passed**, build exit 0 on pinned Node 24.19.0. **LIVE F01 (controlled clock 2026-10-10T18:00+07, SIMULATED context, real Mistral/X-Kiro)** → READY_TO_EXECUTE, COLLECT 760000, T=E=3240000, A=4000000, S=-760000, unpaid KNOWN 0, basis EMPLOYEE_DECLARATION_Q32; negative variants (stale coverage @14/10, claimant mismatch, unknown payer) all block with the right FACT and unpaid UNKNOWN. HTTP + browser upload→claim→reconcile exercised. **M0 LIVE NOT_RUN**; RECORDED_REPLAY captures NOT_RECORDED. Docker build NOT_RUN. Public hosting + practitioner pilot BLOCKED. |
 | CodeGraph | Re-check with `rtk proxy codegraph status` before relying on it; the index lags writes. |
-| Git handoff | Prior evidence-branch commits (on `final`, unpushed): b82a556c (E0 docs) … 83632655 (review fix pass), 5f27c8f4 (pilot kit). Tier A + A0–A8 are **uncommitted working-tree changes** (no Git authorization). |
+| Git handoff | Commits on `final` (unpushed): 700e557b (Tier A), 231a94f6 (A0–A8), 0be840c4 (provider vocabulary + VN money). The five-group fix is **uncommitted working-tree changes** (no Git authorization). |
 
 ### Evidence pipeline E0–E8 (2026-10-14)
 

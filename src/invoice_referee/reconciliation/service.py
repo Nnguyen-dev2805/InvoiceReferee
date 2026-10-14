@@ -90,7 +90,17 @@ class Reconciler:
         # Admission issues/problems are material conditions the evidence layer
         # found; they suppress any affirmative effect/conclusion until resolved
         # (plan A4). They are merged with the policy issues, not a second engine.
-        merged_issues = tuple(input.admission_issues) + tuple(issues)
+        # Deduplicate by (kind, field_or_rule): the admission issue is kept when
+        # both layers raise the same condition (it carries the concrete basis).
+        merged: list = list(input.admission_issues)
+        seen = {(i.kind, i.field_or_rule) for i in merged}
+        for issue in issues:
+            key = (issue.kind, issue.field_or_rule)
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(issue)
+        merged_issues = tuple(merged)
         if input.admission_issues or input.admission_problems:
             allowed_effect = None
         return AssessmentResult(

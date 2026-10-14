@@ -194,6 +194,11 @@ def build_assessment_input(
             else:
                 eligibility_state = "UNKNOWN"
 
+            # The hand-transcription is a verified literal basis: when it states
+            # payment portions the status is PAID, otherwise the source states
+            # the cost is not yet paid (UNPAID), never a missing-data UNKNOWN.
+            payment_state = "PAID" if payments else "UNPAID"
+
             expenses.append(
                 Expense(
                     id="expense:1",
@@ -211,6 +216,7 @@ def build_assessment_input(
                     payments=tuple(payments),
                     eligibility=eligibility_state,  # type: ignore[arg-type]
                     refs=(_ref(src_id, src_digest, 1, "expense"),),
+                    payment_state=payment_state,  # type: ignore[arg-type]
                 )
             )
 

@@ -43,6 +43,10 @@ class SourceRef(StrictModel):
     tenant: Id
     media: Media
     storage_key: str = Field(min_length=1)
+    # The uploaded file's display name. Optional for backward compatibility; the
+    # view exposes it so a client can present/select the right document instead
+    # of guessing a filename from the opaque storage key (plan A8/E).
+    filename: str | None = None
 
 
 class EvidenceUnit(StrictModel):

@@ -9,7 +9,7 @@ a zero instruction. A duplicate external key does not double count.
 from __future__ import annotations
 
 import hashlib
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -75,7 +75,10 @@ async def _typed_case(
 
     db = Database(tmp_path / "app.sqlite")
     db.migrate()
-    wf = CaseWorkflow(db, uploads_dir=tmp_path / "uploads")
+    # Pin the harness clock to the pilot's historical decision instant so the
+    # context coverage (through 10/10) is valid (plan A3/C: controlled clock).
+    pilot_clock = datetime(2026, 10, 10, 18, 0, tzinfo=timezone(timedelta(hours=7)))
+    wf = CaseWorkflow(db, uploads_dir=tmp_path / "uploads", clock=lambda: pilot_clock)
     wf.enable_evidence_read(reader=object(), classifier=object(), artifacts_root=tmp_path / "a")
     wf.import_company_context(org, origin="SIMULATED")
 

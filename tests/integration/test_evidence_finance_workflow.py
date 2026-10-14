@@ -8,7 +8,7 @@ version/Stop protection as the STUB path. A missing report stays EVIDENCE_READY
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 from invoice_referee.domain.documents import DocumentAnalysis, DocumentLine, FieldCandidate
@@ -60,10 +60,16 @@ def _report() -> ReadResult:
     return ReadResult(provider_mode="LIVE", data_origin="LIVE_READ", documents=(paper, invoice))
 
 
+# The pilot's historical decision instant (2026-10-10T18:00+07:00 == 11:00 UTC);
+# the harness clock is pinned to it so the context coverage is valid at the
+# decision time (plan A3/C: controlled clock).
+PILOT_CLOCK = datetime(2026, 10, 10, 18, 0, tzinfo=timezone(timedelta(hours=7)))
+
+
 def _workflow(tmp_path: Path) -> CaseWorkflow:
     db = Database(tmp_path / "app.sqlite")
     db.migrate()
-    wf = CaseWorkflow(db, uploads_dir=tmp_path / "uploads")
+    wf = CaseWorkflow(db, uploads_dir=tmp_path / "uploads", clock=lambda: PILOT_CLOCK)
     # Wire the evidence pipeline (a sentinel reader is enough: the test only
     # needs `_evidence_reader is not None` to select the typed consumer).
     wf.enable_evidence_read(
@@ -154,3 +160,56 @@ async def test_stop_before_commit_writes_no_instruction(tmp_path: Path) -> None:
     with wf.db.transaction() as cx:
         n = cx.execute("SELECT COUNT(*) AS n FROM instructions WHERE root_id = ?", (root,)).fetchone()
     assert int(n["n"]) == 0
+
+
+async def test_workflow_clock_reaches_admission_as_of(tmp_path: Path) -> None:
+    # The assessment time must come from the workflow clock (server/harness),
+    # not datetime.now, so coverage freshness and every gate use the same
+    # instant.
+    wf = _workflow(tmp_path)
+    root = await _seed_case(wf)
+    _publish(wf, root)
+    captured: dict[str, object] = {}
+
+    import invoice_referee.workflow.evidence_assessment as ea
+
+    real = ea.build_evidence_assessment_input
+
+    def spy(cx, **kwargs):
+        captured["as_of"] = kwargs.get("as_of")
+        return real(cx, **kwargs)
+
+    ea.build_evidence_assessment_input = spy  # type: ignore[assignment]
+    try:
+        await _admit_and_commit(wf, root)
+    finally:
+        ea.build_evidence_assessment_input = real  # type: ignore[assignment]
+    assert captured.get("as_of") == PILOT_CLOCK
+
+
+async def test_stale_context_coverage_blocks_the_effect(tmp_path: Path) -> None:
+    # A clock AFTER the context coverage (through 10/10) must not issue an
+    # instruction: the coverage is stale for that decision time (contract §3).
+    from datetime import UTC, datetime
+
+    wf = _workflow(tmp_path)
+    root = await _seed_case(wf)
+    _publish(wf, root)
+    wf._clock = lambda: datetime(2026, 10, 14, 11, 0, tzinfo=UTC)
+    from invoice_referee.domain.commands import Declaration, EmployeePaidClaim, Submit
+
+    session_id = wf._query_one("SELECT session_id FROM demo_sessions LIMIT 1")["session_id"]
+    from invoice_referee.domain.case import CommandContext
+
+    await wf.execute(
+        CommandContext(session_id=str(session_id), actor_id=EMPLOYEE, command_id="cmd:claim",
+                      expected_case_version=wf._query_one("SELECT version FROM cases WHERE id = ?", (root,))["version"]),
+        Submit(root_id=root, declaration=Declaration(activity_id=ACTIVITY, declared_purpose="Công tác"),
+               employee_paid_claims=(EmployeePaidClaim(invoice_reference="IR26101001", amount=3_240_000, refs=(_uploaded_ref(),), reason="đã trả"),)),
+    )
+    await _admit_and_commit(wf, root)
+    with wf.db.transaction() as cx:
+        n = cx.execute("SELECT COUNT(*) AS n FROM instructions WHERE root_id = ?", (root,)).fetchone()
+        issue = cx.execute("SELECT 1 FROM case_issues WHERE root_id = ? AND field_or_rule = 'ledger:coverage'", (root,)).fetchone()
+    assert int(n["n"]) == 0
+    assert issue is not None

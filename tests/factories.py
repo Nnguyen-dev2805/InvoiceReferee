@@ -197,13 +197,21 @@ def expense(
     payments: tuple[ExpensePayment, ...] = (),
     eligibility: str = "ELIGIBLE",
     activity: str = ACTIVITY,
+    payment_state: str | None = None,
 ) -> Expense:
-    """A verified expense with a literal incurred cost and payment portions."""
+    """A verified expense with a literal incurred cost and payment portions.
+
+    `payment_state` defaults to PAID when payment portions are supplied and
+    UNPAID otherwise (a literal test figure is a verified basis), so legacy
+    builders keep their KNOWN-unpaid behaviour. Pass it explicitly to model an
+    unverified payment status.
+    """
     incurred_fact = (
         known(f"{expense_id}:incurred", incurred, expense_id)
         if incurred is not None
         else unknown(f"{expense_id}:incurred", expense_id)
     )
+    state = payment_state if payment_state is not None else ("PAID" if payments else "UNPAID")
     return Expense(
         id=expense_id,
         economic_key=f"invoice:{expense_id}",
@@ -213,6 +221,7 @@ def expense(
         payments=tuple(payments),
         eligibility=eligibility,  # type: ignore[arg-type]
         refs=(ref(expense_id),),
+        payment_state=state,  # type: ignore[arg-type]
     )
 
 

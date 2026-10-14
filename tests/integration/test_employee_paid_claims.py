@@ -41,6 +41,17 @@ def _claim(*, digest: str = SHA, amount: int = 3_240_000) -> EmployeePaidClaim:
     )
 
 
+async def _real_source_id(app_fixture: AppFixture, root: str) -> tuple[str, str]:
+    cx = app_fixture.db.connect()
+    try:
+        row = cx.execute(
+            "SELECT source_id, digest FROM case_sources WHERE root_id = ? LIMIT 1", (root,)
+        ).fetchone()
+    finally:
+        cx.close()
+    return str(row["source_id"]), str(row["digest"])
+
+
 async def _submit(fx: AppFixture, root: str, *, version: int, claims: tuple[EmployeePaidClaim, ...]):
     return await fx.workflow.execute(
         fx.ctx(expected_case_version=version),
@@ -104,3 +115,41 @@ async def test_stale_version_conflicts_without_partial_write(app_fixture: AppFix
     finally:
         cx.close()
     assert int(n) == 0
+
+
+async def test_claim_can_reference_a_server_source_id(app_fixture: AppFixture) -> None:
+    # The UI must be able to reference the document by its server source_id (the
+    # stable, server-checked id), not a reconstructed filename. The backend
+    # accepts a ref whose source_id IS the case source id.
+    root = await _draft_with_source(app_fixture)
+    source_id, digest = await _real_source_id(app_fixture, root)
+    claim = EmployeePaidClaim(
+        invoice_reference="IR26101001", amount=3_240_000,
+        refs=(EvidenceRef(source_id=source_id, source_sha256=digest, page=1, exact_quote="3.240.000 đ"),),
+        reason="đã trực tiếp thanh toán",
+    )
+    result = await _submit(app_fixture, root, version=2, claims=(claim,))
+    assert result.case_view.id == root
+    cx = app_fixture.db.connect()
+    try:
+        rows = cx.execute(
+            "SELECT refs_json FROM case_confirmations WHERE root_id = ?", (root,)
+        ).fetchall()
+    finally:
+        cx.close()
+    assert rows, "a server-source-id claim must be accepted and persisted"
+
+
+async def test_submit_for_another_activity_is_rejected(app_fixture: AppFixture) -> None:
+    # A submit that declares a different activity than the root must not be
+    # folded into this dossier (the declaration is not free-floating).
+    root = await _draft_with_source(app_fixture)
+    with pytest.raises(UnsupportedCommandError):
+        await app_fixture.workflow.execute(
+            app_fixture.ctx(expected_case_version=2),
+            Submit(
+                root_id=root,
+                declaration=Declaration(activity_id="activity:other", declared_purpose="Công tác"),
+                employee_paid_claims=(_claim(),),
+            ),
+        )
