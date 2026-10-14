@@ -138,4 +138,30 @@ describe("App case restore on reload", () => {
     });
     expect(order).toEqual(["session", "cases"]);
   });
+
+  it("does not render duplicate create case button in dossier detail view", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetch({
+        "/api/demo/session": SESSION,
+        "/api/cases": { cases: [CASE] },
+      }),
+    );
+
+    render(<App />);
+
+    // Click on the case row to navigate to detail view
+    await waitFor(() => {
+      expect(screen.getByText(CASE.summary)).toBeInTheDocument();
+    });
+    const caseRow = screen.getByText(CASE.summary);
+    caseRow.click();
+
+    // Now in detail view: Back button is present, but "+ Tạo hồ sơ mới" should NOT be in the detail workspace
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Quay lại/ })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: "+ Tạo hồ sơ mới" })).not.toBeInTheDocument();
+  });
 });
+

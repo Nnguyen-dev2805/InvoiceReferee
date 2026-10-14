@@ -246,7 +246,13 @@ def get_source_content(request: Request, root_id: str, source_id: str) -> FileRe
         if matching.media == "PDF"
         else ("image/png" if matching.media == "PNG" else "image/jpeg")
     )
-    return FileResponse(file_path, media_type=media_type, filename=matching.filename or "document.pdf")
+    return FileResponse(
+        file_path,
+        media_type=media_type,
+        filename=matching.filename or "document.pdf",
+        content_disposition_type="inline",
+    )
+
 
 
 @router.post("/cases/{root_id}/sources")
@@ -397,6 +403,13 @@ async def submit_case(
                 activity_id=payload.activity_id,
                 declared_purpose=payload.declared_purpose,
                 notes=payload.notes,
+                declared_name=payload.declared_name,
+                destination=payload.destination,
+                trip_start=payload.trip_start,
+                trip_end=payload.trip_end,
+                declared_advance=payload.declared_advance,
+                incurred_total=payload.incurred_total,
+                original_declared_advance=payload.original_declared_advance,
             ),
             employee_paid_claims=claims,
         ),

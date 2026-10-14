@@ -92,13 +92,11 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
   }
 
   return (
-    <section aria-labelledby="advance-title" className="bg-white border border-slate-200 rounded-xl p-5 text-xs shadow-xs space-y-4">
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-        <div>
-          <h2 id="advance-title" className="text-sm font-bold text-slate-900 tracking-tight">
-            Ghi nhận tiền ứng thực nhận
-          </h2>
-        </div>
+    <section aria-labelledby="advance-title" className="space-y-4 select-none text-xs">
+      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+        <h2 id="advance-title" className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+          Ghi nhận tiền ứng thực nhận
+        </h2>
       </div>
 
       <div className="flex items-center gap-2.5">
@@ -107,7 +105,7 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
           aria-label="Phương thức ứng"
           value={method}
           onChange={(event) => setMethod(event.target.value as "TRANSFER" | "CASH")}
-          className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:border-slate-800 shadow-2xs cursor-pointer"
+          className="bg-white border border-slate-300 rounded px-2.5 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:border-slate-900 shadow-2xs cursor-pointer"
         >
           <option value="TRANSFER">Chuyển khoản</option>
           <option value="CASH">Tiền mặt</option>
@@ -124,17 +122,17 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
             const file = event.target.files?.[0];
             if (file) void read(file);
           }}
-          className="mt-1.5 block w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-300 file:text-xs file:font-semibold file:bg-white file:text-slate-700 hover:file:bg-slate-50 cursor-pointer"
+          className="mt-1.5 block w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-slate-300 file:text-xs file:font-semibold file:bg-white file:text-slate-700 hover:file:bg-slate-50 cursor-pointer"
         />
       </label>
 
       {draft !== null && (
-        <div className="space-y-3 bg-slate-50/80 p-4 rounded-xl border border-slate-200" data-testid="advance-draft">
+        <div className="space-y-3 bg-slate-50/70 p-4 rounded-lg border border-slate-200" data-testid="advance-draft">
           <p className="text-xs text-slate-500 font-medium">
             Bản nháp từ chứng từ · {draft.instrument_method ?? "—"} · {STATUS_LABELS[draft.instrument_status]}
           </p>
           {draft.missing_fields.length > 0 && (
-            <p className="text-xs text-amber-800 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+            <p className="text-xs text-amber-800 bg-amber-50 p-2.5 rounded border border-amber-200">
               Thiếu/mờ trường: {draft.missing_fields.join(", ")} — vui lòng bổ sung.
             </p>
           )}
@@ -144,7 +142,7 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
               aria-label="Số tiền thực nhận"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
-              className="mt-1 w-full bg-white border border-slate-300 rounded-lg px-3 py-2 font-mono-nums text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+              className="mt-1 w-full bg-white border border-slate-300 rounded px-3 py-1.5 font-mono-nums text-xs text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
             />
           </label>
           <label className="block text-slate-700 font-semibold text-xs">
@@ -153,7 +151,7 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
               aria-label="Mã giao dịch hoặc số phiếu"
               value={reference}
               onChange={(event) => setReference(event.target.value)}
-              className="mt-1 w-full bg-white border border-slate-300 rounded-lg px-3 py-2 font-mono-nums text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+              className="mt-1 w-full bg-white border border-slate-300 rounded px-3 py-1.5 font-mono-nums text-xs text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
             />
           </label>
           <label className="block text-slate-700 font-semibold text-xs">
@@ -162,7 +160,7 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
               aria-label="Trạng thái theo nguồn"
               value={status}
               onChange={(event) => setStatus(event.target.value)}
-              className="mt-1 w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs cursor-pointer"
+              className="mt-1 w-full bg-white border border-slate-300 rounded px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs cursor-pointer"
             >
               {Object.entries(STATUS_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
@@ -176,7 +174,7 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
               value={completionClaim}
               onChange={(event) => setCompletionClaim(event.target.value)}
               placeholder="Ví dụ: Đã kiểm tra chứng từ và giao đủ tiền cho nhân viên"
-              className="mt-1 w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+              className="mt-1 w-full bg-white border border-slate-300 rounded px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
             />
           </label>
           <div className="pt-1">
@@ -184,7 +182,7 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
               type="button"
               onClick={() => void confirm()}
               disabled={busy || amount === ""}
-              className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-2xs transition-colors disabled:opacity-40 cursor-pointer"
+              className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-1.5 rounded shadow-2xs transition-colors disabled:opacity-40 cursor-pointer"
             >
               Xác nhận ghi nhận
             </button>
@@ -193,10 +191,10 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
       )}
 
       {notice !== null && (
-        <p role="status" className="p-3 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs">{notice}</p>
+        <p role="status" className="p-2.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs">{notice}</p>
       )}
       {error !== null && (
-        <p role="alert" className="error p-3 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-xs">{error}</p>
+        <p role="alert" className="error p-2.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-xs">{error}</p>
       )}
     </section>
   );

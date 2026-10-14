@@ -37,6 +37,14 @@ function roleMatchesOwner(role: string, owner: string, kind: string): boolean {
   return owner === role;
 }
 
+function formatOwner(owner: string): string {
+  if (owner === "org-data") return "Dữ liệu tổ chức";
+  if (owner === "accountant") return "Kế toán";
+  if (owner === "approver") return "Người phê duyệt";
+  if (owner === "employee" || owner.startsWith("employee")) return "Nhân viên đề nghị";
+  return owner;
+}
+
 /** One answerable question card: known basis, the exact answer required, owner. */
 export function QuestionCard({
   issue,
@@ -77,20 +85,20 @@ export function QuestionCard({
 
   return (
     <li
-      className="p-5 bg-white border border-slate-200 rounded-xl space-y-3.5 text-xs shadow-xs hover:border-slate-300 transition-colors"
+      className="p-4 bg-white border border-slate-200 border-l-4 border-l-amber-500 rounded-lg space-y-3 text-xs shadow-2xs transition-colors"
       data-testid={`question-${issue.kind}`}
     >
       {/* Target & Status bar */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+      <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <span className="font-mono-nums font-semibold text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded text-[11px] border border-slate-200">
+          <span className="font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px] border border-slate-200">
             {formatIssueTarget(issue.field_or_rule)}
           </span>
           <span className="text-[11px] font-medium text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
             {KIND_LABELS[issue.kind] ?? issue.kind}
           </span>
         </div>
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200 shadow-2xs">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
           <span>Cần bạn giải trình</span>
         </span>
@@ -98,16 +106,16 @@ export function QuestionCard({
 
       {/* Question & Known Basis */}
       <div className="space-y-1.5">
-        <h4 className="font-bold text-slate-900 text-xs leading-relaxed">
+        <h4 className="font-semibold text-slate-900 text-xs leading-relaxed">
           {issue.question}
         </h4>
-        <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
+        <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded border border-slate-200/80">
           <span>Căn cứ hiện tại: <strong className="text-slate-800">{issue.basis}</strong></span>
         </div>
       </div>
 
       {/* Input Form */}
-      <div className="space-y-2.5 pt-1">
+      <div className="space-y-2 pt-1">
         <div>
           <label htmlFor={`answer-${issue.id}`} className="text-slate-800 block font-semibold mb-1">
             Nội dung giải trình / xác nhận:
@@ -116,7 +124,7 @@ export function QuestionCard({
               value={value}
               onChange={(event) => setValue(event.target.value)}
               placeholder="Nhập nội dung giải trình hoặc xác nhận thực tế..."
-              className="w-full mt-1 bg-white border border-slate-300 rounded-lg text-xs px-3.5 py-2 text-slate-900 focus:outline-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 shadow-2xs"
+              className="w-full mt-1 bg-white border border-slate-300 rounded text-xs px-3 py-1.5 text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
             />
           </label>
         </div>
@@ -128,7 +136,7 @@ export function QuestionCard({
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="Ví dụ: Theo phiếu chuyển tiền ngân hàng, email phê duyệt..."
-              className="w-full mt-1 bg-white border border-slate-300 rounded-lg text-xs px-3.5 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 shadow-2xs"
+              className="w-full mt-1 bg-white border border-slate-300 rounded text-xs px-3 py-1.5 text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
             />
           </label>
         </div>
@@ -140,14 +148,14 @@ export function QuestionCard({
           type="button"
           onClick={() => void submit()}
           disabled={busy || value.trim() === ""}
-          className="bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs px-4 py-2 rounded-lg shadow-2xs transition-colors disabled:opacity-40 cursor-pointer"
+          className="bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs px-3.5 py-1.5 rounded shadow-2xs transition-colors disabled:opacity-40 cursor-pointer"
         >
           {busy ? "Đang gửi…" : "Gửi giải trình"}
         </button>
       </div>
 
       {error !== null && (
-        <p role="alert" className="error p-2.5 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-xs">
+        <p role="alert" className="error p-2.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-xs">
           {error}
         </p>
       )}
@@ -172,74 +180,73 @@ export function Questions({
   const otherIssues = caseView.issues.filter((issue) => !myIssues.includes(issue));
 
   return (
-    <section aria-labelledby="questions-title" className="bg-white border border-slate-200 rounded-xl p-5 text-xs shadow-xs space-y-4 select-none">
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-        <div>
-          <h2 id="questions-title" className="text-sm font-bold text-slate-900 tracking-tight">
-            Vấn đề cần giải quyết ({caseView.issues.length})
-          </h2>
-        </div>
-      </div>
-
+    <section aria-labelledby="questions-title" className="space-y-4 select-none text-xs">
       {/* 1. Actionable Issues for Current Role */}
-      {myIssues.length > 0 ? (
-        <ul className="questions space-y-3">
-          {myIssues.map((issue) => (
-            <QuestionCard key={issue.id} issue={issue} caseView={caseView} onCase={onCase} />
-          ))}
-        </ul>
-      ) : (
-        <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 text-xs space-y-1">
-          <p className="font-semibold text-slate-800">
-            Không có câu hỏi nào thuộc thẩm quyền của vai trò hiện tại.
-          </p>
-          <p className="text-[11px] text-slate-500">
-            Các vấn đề còn lại thuộc thẩm quyền xử lý của bộ phận khác.
-          </p>
+      {myIssues.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <h2 id="questions-title" className="text-xs font-semibold text-slate-900">
+              Vấn đề cần bạn giải trình ({myIssues.length})
+            </h2>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-900 border border-amber-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              <span>Cần xử lý</span>
+            </span>
+          </div>
+
+          <ul className="questions space-y-3">
+            {myIssues.map((issue) => (
+              <QuestionCard key={issue.id} issue={issue} caseView={caseView} onCase={onCase} />
+            ))}
+          </ul>
         </div>
       )}
 
-      {/* 2. Pending Issues Assigned to Other Roles (Compact informational view) */}
+      {/* 2. Pending Issues Assigned to Other Roles (Quiet, non-intrusive) */}
       {otherIssues.length > 0 && (
-        <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-3.5 space-y-2.5 mt-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Vấn đề đang chờ bộ phận khác xử lý ({otherIssues.length})
+        <div className="space-y-2">
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+            <h3 className="text-xs font-semibold text-slate-700">
+              Vấn đề đang chờ bộ phận khác ({otherIssues.length})
             </h3>
-            <span className="text-[10px] text-slate-400 font-medium">
+            <span className="text-[11px] text-slate-400 font-normal">
               Tự động cập nhật
             </span>
           </div>
 
-          <ul className="divide-y divide-slate-200/80 text-xs">
-            {otherIssues.map((issue) => (
-              <li key={issue.id} className="py-2.5 flex items-start justify-between gap-3">
-                <div className="space-y-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-800 truncate">
+          <div className="border border-slate-200 rounded-lg overflow-hidden bg-white divide-y divide-slate-100 shadow-2xs">
+            <ul className="divide-y divide-slate-100 text-xs">
+              {otherIssues.map((issue) => (
+                <li
+                  key={issue.id}
+                  className="p-3.5 flex items-start justify-between gap-4 hover:bg-slate-50/50 transition-colors"
+                >
+                  <div className="space-y-1.5 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                        {formatIssueTarget(issue.field_or_rule)}
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        Phụ trách: <strong className="font-semibold text-slate-700">{formatOwner(issue.owner)}</strong>
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-900 font-medium leading-relaxed">
                       {issue.question}
-                    </span>
-                    <span className="text-[10px] font-mono-nums px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 shrink-0">
-                      {formatIssueTarget(issue.field_or_rule)}
+                    </p>
+                    <p className="text-[11px] text-slate-500 leading-normal">
+                      Căn cứ: {issue.basis}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0 pt-0.5">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                      Chờ xử lý
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500">
-                    Căn cứ: {issue.basis}
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <span className="text-[11px] font-semibold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200 block">
-                    {issue.owner === "org-data"
-                      ? "Dữ liệu tổ chức"
-                      : issue.owner === "accountant"
-                      ? "Kế toán"
-                      : issue.owner}
-                  </span>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">Chờ xử lý</span>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
     </section>

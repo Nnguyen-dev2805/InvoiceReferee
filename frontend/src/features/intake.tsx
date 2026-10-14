@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api, attachSources, errorMessage, settlementDraft, submitCase } from "../api";
 import { formatVnd } from "../format";
 import type { CaseView, SessionPayload } from "../types";
+import { DocumentViewer } from "./document_viewer";
 
 export interface SettlementExpenseDraft {
   description: string;
@@ -11,66 +12,63 @@ export interface SettlementExpenseDraft {
   source_filename?: string;
   status?: string;
   matched_invoice?: string;
+  suggested_invoice?: string;
 }
 
 export interface IntakeDraftState {
-  declared_name: string;
-  activity_name: string;
-  occurred_at: string;
-  declared_purpose: string;
-  incurred_total: number;
-  declared_advance: number;
+  declared_name: string | null;
+  activity_name: string | null;
+  occurred_at: string | null;
+  declared_purpose: string | null;
+  incurred_total: number | null;
+  declared_advance: number | null;
   expenses: SettlementExpenseDraft[];
   notes: string;
-  original_advance: number;
+  original_advance: number | null;
 }
+
+const EMPTY_DRAFT: IntakeDraftState = {
+  declared_name: null,
+  activity_name: null,
+  occurred_at: null,
+  declared_purpose: null,
+  incurred_total: null,
+  declared_advance: null,
+  expenses: [],
+  notes: "",
+  original_advance: null,
+};
 
 export function Intake({
   session,
   onCase,
+  onBack,
 }: {
   session: SessionPayload;
   onCase: (view: CaseView) => void;
+  onBack?: () => void;
 }) {
   const [step, setStep] = useState<"upload" | "reading" | "review">("upload");
   const [caseView, setCaseView] = useState<CaseView | null>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [selectedPreviewIndex, setSelectedPreviewIndex] = useState<number>(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  // The activity the draft is bound to. The employee chooses by name (never a
+  // backend id). Empty until the draft is read and the employee picks one.
+  const [activityId, setActivityId] = useState<string>("");
 
-  // Draft state populated after OCR reading
-  const [draft, setDraft] = useState<IntakeDraftState>({
-    declared_name: session?.session?.actor_name || "Nguyễn An",
-    activity_name: "Công tác Hà Nội",
-    occurred_at: "2026-10-06",
-    declared_purpose: "Làm việc với khách hàng tại Hà Nội",
-    incurred_total: 0,
-    declared_advance: 0,
-    expenses: [],
-    notes: "",
-    original_advance: 0,
-  });
-
-  // Local object URL for previewing selected file
-  const previewUrl = useMemo(() => {
-    if (files.length === 0 || selectedPreviewIndex >= files.length) return null;
-    try {
-      return URL.createObjectURL(files[selectedPreviewIndex]);
-    } catch {
-      return null;
-    }
-  }, [files, selectedPreviewIndex]);
+  // Draft state: null until a real read produces it. No demo defaults.
+  const [draft, setDraft] = useState<IntakeDraftState>(EMPTY_DRAFT);
 
   function removeFile(index: number) {
     setFiles((prev) => prev.filter((_, i) => i !== index));
-    if (selectedPreviewIndex >= index && selectedPreviewIndex > 0) {
-      setSelectedPreviewIndex(selectedPreviewIndex - 1);
-    }
   }
 
-  // Bước 2: “Đọc chứng từ”
+  // Bước 2: “Đọc chứng từ”. Upload first, then read the SAME sources through the
+  // OCR pipeline (no fabricated fallback). A failure keeps the files and offers
+  // retry; it never shows a successful draft.
   async function handleReadDocuments() {
     if (files.length === 0) {
       setError("Vui lòng chọn ít nhất một tệp chứng từ.");
@@ -80,127 +78,100 @@ export function Intake({
     setBusy(true);
     setError(null);
     setStatus(null);
+    setWarnings([]);
     setStep("reading");
 
     try {
-      // 1. Khởi tạo hồ sơ nháp trên hệ thống
+      // 1. A draft root with an UNBOUND proposed activity; the real activity is
+      //    chosen after reading (the activity fields are not invented here).
       const activity = {
         mode: "new" as const,
-        name: "Hồ sơ quyết toán công tác",
+        name: "Hồ sơ quyết toán chi phí",
         occurred_at: new Date().toISOString(),
-        declared_purpose: "Quyết toán công tác",
+        declared_purpose: "Quyết toán chi phí công việc",
       };
       const created = await api.createCase(activity);
       let currentCase = created.case_view;
 
-      // 2. Tải các tệp chứng từ lên máy chủ
+      // 2. Upload the sources.
       const attached = await attachSources(currentCase.id, files, currentCase.version);
       currentCase = attached.case_view;
       setCaseView(currentCase);
 
-      // 3. Trích xuất bản nháp (OCR & bóc tách cấu trúc)
-      let extractedName = session?.session?.actor_name || "Nguyễn An";
-      let extractedActivity = "Công tác Hà Nội";
-      let extractedDate = "2026-10-06";
-      let extractedPurpose = "Làm việc với khách hàng tại Hà Nội";
-      let extractedTotal = 0;
-      let extractedAdvance = 0;
-      let extractedExpenses: SettlementExpenseDraft[] = [];
-
-      try {
-        const resp = await settlementDraft(currentCase.id, files);
-        if (resp.declared_name) extractedName = resp.declared_name;
-        if (resp.activity_name) extractedActivity = resp.activity_name;
-        if (resp.occurred_at) extractedDate = resp.occurred_at;
-        if (resp.declared_purpose) extractedPurpose = resp.declared_purpose;
-        if (resp.incurred_total !== null && resp.incurred_total !== undefined) {
-          extractedTotal = resp.incurred_total;
-        }
-        if (resp.declared_advance !== null && resp.declared_advance !== undefined) {
-          extractedAdvance = resp.declared_advance;
-        }
-        if (resp.expenses && resp.expenses.length > 0) {
-          extractedExpenses = resp.expenses.map((e) => ({
-            description: e.description,
-            invoice_no: e.invoice_no,
-            amount: e.amount,
-            source_filename: e.source_filename,
-            status: e.status || "CLEAR",
-            matched_invoice: e.matched_invoice,
-          }));
-        }
-      } catch {
-        // Fallback: suy đoán từ tên tệp hoặc mặc định hợp lệ
-        extractedName = session?.session?.actor_name || "Nguyễn An";
-        extractedActivity = "Công tác Hà Nội";
-        extractedDate = "2026-10-06";
-        extractedPurpose = "Làm việc với khách hàng tại Hà Nội";
-        extractedTotal = 3240000;
-        extractedAdvance = 4000000;
-        extractedExpenses = [
-          {
-            description: "Bữa ăn phục vụ công việc trong chuyến công tác",
-            invoice_no: "IR26101001",
-            amount: 3240000,
-            source_filename: files[0]?.name || "01-giay-quyet-toan.pdf",
-            status: "CLEAR",
-            matched_invoice: files[1]?.name || "02-hoa-don-dich-vu.pdf",
-          },
-        ];
-      }
-
+      // 3. Read the draft through the OCR pipeline. On failure, surface the
+      //    error and keep the files; no demo facts are invented.
+      const resp = await settlementDraft(currentCase.id, files);
+      setWarnings(resp.warnings ?? []);
       setDraft({
-        declared_name: extractedName,
-        activity_name: extractedActivity,
-        occurred_at: extractedDate,
-        declared_purpose: extractedPurpose,
-        incurred_total: extractedTotal || extractedExpenses.reduce((s, e) => s + e.amount, 0),
-        declared_advance: extractedAdvance,
-        expenses: extractedExpenses,
+        declared_name: resp.declared_name,
+        activity_name: resp.activity_name,
+        occurred_at: resp.occurred_at,
+        declared_purpose: resp.declared_purpose,
+        incurred_total: resp.incurred_total,
+        declared_advance: resp.declared_advance,
+        expenses: (resp.expenses ?? []).map((e) => ({
+          description: e.description,
+          invoice_no: e.invoice_no,
+          amount: e.amount,
+          source_filename: e.source_filename,
+          status: e.status || "UNMATCHED",
+          matched_invoice: e.matched_invoice,
+          suggested_invoice: e.suggested_invoice,
+        })),
         notes: "",
-        original_advance: extractedAdvance,
+        original_advance: resp.declared_advance,
       });
-
+      // Pre-select a matching catalog activity by purpose/name when one exists.
+      // If none matches, pre-select the dossier's own NEW activity so the employee
+      // is not stuck with an empty choice (it enters the authorization follow-up).
+      const guess = session.activity_catalog.find(
+        (a) =>
+          resp.declared_purpose !== null &&
+          (a.purpose === resp.declared_purpose || a.name === resp.activity_name),
+      );
+      setActivityId(guess?.id ?? currentCase.activity ?? "");
       setStep("review");
     } catch (cause) {
-      setError(errorMessage(cause));
+      setError(
+        `Không đọc được chứng từ: ${errorMessage(cause)}. Kiểm tra kết nối và thử lại; tệp đã tải vẫn được giữ.`,
+      );
       setStep("upload");
     } finally {
       setBusy(false);
     }
   }
 
-  // Bước 4: “Xác nhận và nộp hồ sơ”
+  // Bước 4: “Xác nhận và nộp hồ sơ”. Sends the confirmed draft (edits + notes)
+  // so the server persists it; the async worker result is polled below.
   async function handleConfirmAndSubmit() {
     if (!caseView) return;
+    if (!activityId) {
+      setError("Vui lòng chọn hoạt động cho hồ sơ trước khi nộp.");
+      return;
+    }
     setBusy(true);
     setError(null);
     setStatus(null);
 
     try {
-      // Ghi nhận ghi chú nếu nhân viên sửa khác bản OCR gốc
-      const notesParts: string[] = [];
-      if (draft.declared_advance !== draft.original_advance) {
-        notesParts.push(
-          `Nhân viên điều chỉnh tiền tạm ứng kê khai: ${formatVnd(draft.declared_advance)} (bản OCR đọc: ${formatVnd(draft.original_advance)})`,
-        );
-      }
-      if (draft.notes.trim()) {
-        notesParts.push(draft.notes.trim());
-      }
-      const finalNotes = notesParts.length > 0 ? notesParts.join(" · ") : "Nhân viên xác nhận nội dung kê khai từ chứng từ.";
-
       const result = await submitCase(
         caseView.id,
-        caseView.activity ?? "activity:new",
-        draft.declared_purpose,
+        activityId,
+        draft.declared_purpose ?? "Quyết toán chi phí",
         caseView.version,
         [],
+        {
+          notes: draft.notes.trim() || null,
+          declared_name: draft.declared_name,
+          destination: draft.activity_name,
+          declared_advance: draft.declared_advance,
+          incurred_total: draft.incurred_total,
+          original_declared_advance: draft.original_advance,
+        },
       );
-
       setCaseView(result.case_view);
       onCase(result.case_view);
-      setStatus("Đã xác nhận và nộp hồ sơ thành công.");
+      setStatus("Đã nộp hồ sơ. Hệ thống đang đối soát…");
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -208,29 +179,76 @@ export function Intake({
     }
   }
 
-  // Chênh lệch dự toán: T - A
-  const netDifference = draft.incurred_total - draft.declared_advance;
+  // Chênh lệch kê khai dự kiến: T - A (chỉ khi cả hai số đã biết). Đây KHÔNG
+  // phải kết luận tài chính S — S chính thức chỉ có sau đối soát.
+  const netDifference =
+    draft.incurred_total !== null && draft.declared_advance !== null
+      ? draft.incurred_total - draft.declared_advance
+      : null;
 
-  return (
-    <div className="space-y-4">
-      {/* Global Error Banner */}
-      {error !== null && (
-        <div role="alert" className="p-3 rounded-lg bg-rose-50 text-rose-900 border border-rose-200 text-xs">
-          {error}
-        </div>
-      )}
+  // P1-5: after submit the backend processes asynchronously. Poll the visible
+  // case (bounded) until it leaves PROCESSING, so the UI shows the server's
+  // current version/state instead of a stale v3/"Đang xử lý". Stops on unmount
+  // or a terminal state.
+  useEffect(() => {
+    if (caseView === null || caseView.state !== "PROCESSING") return;
+    let cancelled = false;
+    let attempts = 0;
+    const timer = window.setInterval(async () => {
+      attempts += 1;
+      try {
+        const fresh = await api.getCase(caseView.id);
+        if (cancelled) return;
+        setCaseView(fresh);
+        onCase(fresh);
+        if (fresh.state !== "PROCESSING" || attempts >= 40) {
+          window.clearInterval(timer);
+        }
+      } catch {
+        if (attempts >= 40) window.clearInterval(timer);
+      }
+    }, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [caseView, onCase]);
 
-      {/* Global Status Banner */}
-      {status !== null && (
-        <div role="status" className="p-3 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs">
-          {status}
-        </div>
-      )}
+  if (step === "upload" || step === "reading") {
+    return (
+      <main className="h-[calc(100vh-48px)] overflow-y-auto custom-scrollbar p-6 bg-slate-50 flex justify-center flex-1">
+        <div className="w-full max-w-3xl space-y-4">
+          {onBack && (
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+              >
+                <span className="font-mono">←</span>
+                <span>Quay lại</span>
+              </button>
+            </div>
+          )}
 
-      {/* ------------------------------------------------------------- */}
-      {/* BƯỚC 1: TẢI TÀI LIỆU                                           */}
-      {/* ------------------------------------------------------------- */}
-      {step === "upload" && (
+          {/* Global Error Banner */}
+          {error !== null && (
+            <div role="alert" className="p-3 rounded-lg bg-rose-50 text-rose-900 border border-rose-200 text-xs">
+              {error}
+            </div>
+          )}
+
+          {/* Global Status Banner */}
+          {status !== null && (
+            <div role="status" className="p-3 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs">
+              {status}
+            </div>
+          )}
+
+          {/* ------------------------------------------------------------- */}
+          {/* BƯỚC 1: TẢI TÀI LIỆU                                           */}
+          {/* ------------------------------------------------------------- */}
+          {step === "upload" && (
         <section aria-labelledby="intake-title" className="bg-white border border-slate-200 rounded-xl p-6 text-xs shadow-xs space-y-6">
           <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
             <div>
@@ -378,13 +396,28 @@ export function Intake({
                 <h2 id="review-title" className="text-base font-bold text-slate-900 tracking-tight">
                   Kiểm tra bản nháp hồ sơ
                 </h2>
-                <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  ● Đã trích xuất
+                <span
+                  className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                    warnings.length === 0
+                      ? "text-emerald-800 bg-emerald-50 border-emerald-200"
+                      : "text-amber-800 bg-amber-50 border-amber-200"
+                  }`}
+                >
+                  {warnings.length === 0 ? "● Đã trích xuất" : "● Cần kiểm tra"}
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-normal mt-0.5">
                 Xem tài liệu gốc bên cạnh để đối chiếu. Trường đọc rõ được điền sẵn; bạn có thể chỉnh sửa nếu AI đọc sai.
               </p>
+              {warnings.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {warnings.map((w, i) => (
+                    <li key={i} className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                      ⚠ {w}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <button
@@ -400,42 +433,7 @@ export function Intake({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
             {/* CỘT TRÁI: TÀI LIỆU GỐC (5 / 12) */}
             <div className="lg:col-span-5 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs flex flex-col h-[680px]">
-              {/* File switcher bar */}
-              <div className="p-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto custom-scrollbar">
-                <span className="text-[11px] font-semibold text-slate-500 uppercase px-1 shrink-0">
-                  Tài liệu gốc:
-                </span>
-                {files.map((f, idx) => (
-                  <button
-                    key={f.name}
-                    type="button"
-                    onClick={() => setSelectedPreviewIndex(idx)}
-                    className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer truncate max-w-[140px] shrink-0 ${
-                      selectedPreviewIndex === idx
-                        ? "bg-slate-950 text-white font-semibold shadow-2xs"
-                        : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
-                    }`}
-                    title={f.name}
-                  >
-                    {f.name}
-                  </button>
-                ))}
-              </div>
-
-              {/* Document iframe / preview container */}
-              <div className="flex-1 bg-slate-100 overflow-hidden relative">
-                {previewUrl ? (
-                  <iframe
-                    src={previewUrl}
-                    title="Bản xem trước tài liệu gốc"
-                    className="w-full h-full border-none"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
-                    Không có tài liệu xem trước
-                  </div>
-                )}
-              </div>
+              <DocumentViewer caseView={caseView} pendingFiles={files} />
             </div>
 
             {/* CỘT PHẢI: THÔNG TIN ĐÃ TRÍCH XUẤT (7 / 12) */}
@@ -444,47 +442,66 @@ export function Intake({
               <div className="space-y-3 pb-4 border-b border-slate-100">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Thông tin công tác &amp; Nhân viên
+                    Thông tin hoạt động &amp; Nhân viên
                   </h3>
                   <span className="text-[11px] text-slate-400">
-                    Người đề nghị: <strong className="text-slate-800">{draft.declared_name}</strong>
+                    Người đề nghị: <strong className="text-slate-800">{draft.declared_name ?? "Chưa đọc được"}</strong>
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="sm:col-span-2">
+                    <label htmlFor="draft-activity" className="text-slate-700 block font-semibold text-xs mb-1">
+                      Hoạt động của hồ sơ:
+                    </label>
+                    <select
+                      id="draft-activity"
+                      aria-label="Hoạt động của hồ sơ"
+                      value={activityId}
+                      onChange={(e) => setActivityId(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+                    >
+                      <option value="">— Chọn hoạt động —</option>
+                      {session.activity_catalog.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                          {a.occurred_at ? ` · ${a.occurred_at.slice(0, 10)}` : ""}
+                        </option>
+                      ))}
+                      {caseView?.activity ? (
+                        <option value={caseView.activity}>
+                          ＋ Hoạt động mới: {draft.activity_name ?? draft.declared_purpose ?? "theo chứng từ"}
+                        </option>
+                      ) : null}
+                    </select>
+                    <span className="text-[10px] text-slate-400 block mt-1">
+                      Danh mục do hệ thống cung cấp; không cần nhập mã nội bộ. Nếu hoạt động chưa có
+                      trong danh mục, chọn “Hoạt động mới” — hồ sơ sẽ vào luồng xin bổ sung ngân sách/quyền.
+                    </span>
+                  </div>
+
+                  <div className="sm:col-span-2">
                     <label htmlFor="draft-activity-name" className="text-slate-700 block font-semibold text-xs mb-1">
-                      Tên chuyến công tác:
+                      Nội dung hoạt động (đọc từ giấy):
                     </label>
                     <input
                       id="draft-activity-name"
-                      value={draft.activity_name}
+                      value={draft.activity_name ?? ""}
                       onChange={(e) => setDraft((prev) => ({ ...prev, activity_name: e.target.value }))}
+                      placeholder="Chưa đọc được"
                       className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
                     />
                   </div>
 
-                  <div>
-                    <label htmlFor="draft-occurred-at" className="text-slate-700 block font-semibold text-xs mb-1">
-                      Ngày diễn ra:
-                    </label>
-                    <input
-                      id="draft-occurred-at"
-                      type="date"
-                      value={draft.occurred_at}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, occurred_at: e.target.value }))}
-                      className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 font-mono-nums focus:outline-none focus:border-slate-800 shadow-2xs"
-                    />
-                  </div>
-
-                  <div>
+                  <div className="sm:col-span-2">
                     <label htmlFor="draft-purpose" className="text-slate-700 block font-semibold text-xs mb-1">
-                      Mục đích công tác:
+                      Mục đích:
                     </label>
                     <input
                       id="draft-purpose"
-                      value={draft.declared_purpose}
+                      value={draft.declared_purpose ?? ""}
                       onChange={(e) => setDraft((prev) => ({ ...prev, declared_purpose: e.target.value }))}
+                      placeholder="Chưa đọc được"
                       className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
                     />
                   </div>
@@ -505,7 +522,7 @@ export function Intake({
                 <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs">
                   {draft.expenses.length === 0 ? (
                     <div className="p-4 text-center text-slate-400 text-xs">
-                      Chưa tìm thấy dòng chi tiết; bạn có thể bổ sung thủ công.
+                      Chưa đọc được dòng chi tiết từ chứng từ. Kiểm tra lại tệp đã tải hoặc thử đọc lại.
                     </div>
                   ) : (
                     <table className="w-full text-left border-collapse text-xs">
@@ -521,9 +538,17 @@ export function Intake({
                           <tr key={idx} className="hover:bg-slate-50/50">
                             <td className="py-2.5 px-3">
                               <span className="font-medium text-slate-900 block">{item.description}</span>
-                              {item.matched_invoice && (
+                              {item.matched_invoice ? (
                                 <span className="text-[10px] text-emerald-700 font-mono-nums block mt-0.5">
                                   ✓ Khớp tệp: {item.matched_invoice}
+                                </span>
+                              ) : item.suggested_invoice ? (
+                                <span className="text-[10px] text-slate-500 block mt-0.5">
+                                  ? Có thể liên quan: {item.suggested_invoice} (chưa xác nhận)
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-amber-700 block mt-0.5">
+                                  ⚠ Chưa liên kết được chứng từ cho khoản này
                                 </span>
                               )}
                             </td>
@@ -541,28 +566,32 @@ export function Intake({
                 </div>
               </div>
 
-              {/* 3. Tổng chi & Số tiền tạm ứng kê khai (Trọng tâm nhân viên đối chiếu) */}
+              {/* 3. Tổng chi & Ứng NHÂN VIÊN KÊ KHAI (không phải A đã xác minh) */}
               <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200 space-y-3.5">
                 <div className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                  Đối chiếu tổng tiền &amp; Tạm ứng
+                  Tổng chi &amp; Ứng nhân viên kê khai
                 </div>
+                <p className="text-[11px] text-slate-500">
+                  Đây là số nhân viên kê khai trên giấy, chưa phải số ứng công ty đã thực nhận.
+                  Ứng thực nhận và chênh lệch chính thức chỉ có sau khi hệ thống đối soát lịch sử.
+                </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {/* Tổng chi phí T */}
+                  {/* Tổng chi phí kê khai */}
                   <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
                     <span className="text-[11px] text-slate-500 block font-medium">
-                      Tổng chi phí đề nghị (T):
+                      Tổng chi phí kê khai:
                     </span>
                     <strong className="text-sm font-bold text-slate-900 font-mono-nums block mt-1">
-                      {formatVnd(draft.incurred_total)}
+                      {draft.incurred_total !== null ? formatVnd(draft.incurred_total) : "Chưa đọc được"}
                     </strong>
                   </div>
 
-                  {/* Tiền tạm ứng A - Có thể chỉnh sửa */}
+                  {/* Ứng nhân viên kê khai - Có thể chỉnh sửa */}
                   <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
                     <div className="flex items-center justify-between">
                       <label htmlFor="draft-advance" className="text-[11px] text-slate-700 block font-semibold">
-                        Tiền tạm ứng đã nhận (A):
+                        Ứng nhân viên kê khai:
                       </label>
                       {draft.declared_advance !== draft.original_advance && (
                         <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
@@ -573,34 +602,37 @@ export function Intake({
                     <input
                       id="draft-advance"
                       type="number"
-                      value={draft.declared_advance || ""}
+                      value={draft.declared_advance ?? ""}
                       onChange={(e) =>
                         setDraft((prev) => ({
                           ...prev,
-                          declared_advance: Number(e.target.value) || 0,
+                          declared_advance: e.target.value === "" ? null : Number(e.target.value),
                         }))
                       }
                       className="w-full mt-1 bg-slate-50/50 border border-slate-300 rounded text-xs px-2.5 py-1 font-mono-nums font-bold text-slate-900 focus:outline-none focus:border-slate-800"
                     />
                     <span className="text-[10px] text-slate-400 block mt-1">
-                      Nhân viên xác nhận số tiền đã nhận. Sửa lại nếu AI đọc sai.
+                      Số ứng nhân viên kê khai; sửa lại nếu AI đọc sai. Không thay đổi số ứng công ty đã ghi nhận.
                     </span>
                   </div>
                 </div>
 
-                {/* Kết luận chênh lệch dự kiến */}
+                {/* Chênh lệch kê khai dự kiến (chỉ khi biết cả hai số) */}
                 <div className="pt-1 flex items-center justify-between border-t border-slate-200/80 text-xs">
                   <span className="font-medium text-slate-600">
-                    Chênh lệch dự kiến (T - A):
+                    Chênh lệch kê khai dự kiến (T - Ứng kê khai):
                   </span>
                   <span className={`font-mono-nums font-bold text-sm ${
-                    netDifference < 0 ? "text-amber-700" : netDifference > 0 ? "text-emerald-700" : "text-slate-900"
+                    netDifference === null ? "text-slate-400"
+                      : netDifference < 0 ? "text-amber-700" : netDifference > 0 ? "text-emerald-700" : "text-slate-900"
                   }`}>
-                    {netDifference < 0
-                      ? `-${formatVnd(Math.abs(netDifference))} (Nhân viên hoàn lại)`
+                    {netDifference === null
+                      ? "Chưa xác định"
+                      : netDifference < 0
+                      ? `-${formatVnd(Math.abs(netDifference))} (Nhân viên có thể hoàn lại)`
                       : netDifference > 0
-                      ? `+${formatVnd(netDifference)} (Công ty chi bổ sung)`
-                      : "0 ₫ (Cân bằng)"}
+                      ? `+${formatVnd(netDifference)} (Công ty có thể chi bổ sung)`
+                      : "0 ₫ (Cân bằng kê khai)"}
                   </span>
                 </div>
               </div>

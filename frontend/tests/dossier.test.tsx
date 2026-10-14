@@ -62,7 +62,7 @@ describe("Dossier", () => {
     );
     // Unknown figure: explicit, never a fabricated zero.
     expect(screen.getByTestId("money-Ứng thực nhận")).toHaveTextContent(
-      "Chưa xác minh",
+      "—",
     );
     // Rule-backed issue with its owner and basis.
     expect(screen.getByText(/Chính sách/)).toBeInTheDocument();
@@ -84,4 +84,18 @@ describe("Dossier", () => {
     render(<Dossier caseView={null} />);
     expect(screen.getByText(/Chưa có hồ sơ nào được mở/)).toBeInTheDocument();
   });
+
+  it("renders net settlement S in the money ledger when known", () => {
+    const knownView: CaseView = {
+      ...VIEW,
+      actual_money: {
+        ...VIEW.actual_money,
+        S: { key: "projection:S", value: 2_000_000, state: "KNOWN" },
+      },
+    };
+    render(<Dossier caseView={knownView} />);
+    expect(screen.getByTestId("money-Chênh lệch (S)")).toHaveTextContent("2.000.000");
+  });
 });
+
+

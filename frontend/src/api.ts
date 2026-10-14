@@ -71,6 +71,16 @@ export async function submitCase(
     refs: Array<{ source_id: string; source_sha256: string; page: number; exact_quote: string }>;
     reason: string;
   }> = [],
+  declaration: {
+    notes?: string | null;
+    declared_name?: string | null;
+    destination?: string | null;
+    trip_start?: string | null;
+    trip_end?: string | null;
+    declared_advance?: number | null;
+    incurred_total?: number | null;
+    original_declared_advance?: number | null;
+  } = {},
 ): Promise<CommandResultView> {
   return request<CommandResultView>(
     `/api/cases/${rootId}/submit`,
@@ -78,6 +88,7 @@ export async function submitCase(
       activity_id: activityId,
       declared_purpose: declaredPurpose,
       employee_paid_claims: employeePaidClaims,
+      ...declaration,
     },
     newCommandId(),
     version,
@@ -182,6 +193,7 @@ export interface SettlementExpenseItem {
   source_filename?: string;
   status?: string;
   matched_invoice?: string;
+  suggested_invoice?: string;
   seller?: string;
 }
 
@@ -205,6 +217,9 @@ export interface SettlementDraftResponse {
   expenses: SettlementExpenseItem[];
   warnings: string[];
   invoices: SettlementInvoiceItem[];
+  field_states?: Record<string, string>;
+  provider_mode?: string | null;
+  data_origin?: string | null;
 }
 
 export async function settlementDraft(

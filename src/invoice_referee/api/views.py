@@ -69,6 +69,14 @@ class SubmitRequest(ApiModel):
     declared_purpose: str
     notes: str | None = None
     employee_paid_claims: list[PaidClaimRequest] = Field(default_factory=list)
+    # The employee-confirmed draft (W4). A declaration, not a verified fact.
+    declared_name: str | None = None
+    destination: str | None = None
+    trip_start: str | None = None
+    trip_end: str | None = None
+    declared_advance: int | None = None
+    incurred_total: int | None = None
+    original_declared_advance: int | None = None
 
 
 class AnswerRequest(ApiModel):

@@ -328,18 +328,9 @@ export function Dashboard({
               {search.trim() !== "" || filter !== "ALL"
                 ? "Không có hồ sơ nào khớp với bộ lọc hoặc từ khóa tìm kiếm."
                 : isEmployee
-                ? "Bạn chưa có hồ sơ nào. Bấm '+ Tạo hồ sơ mới' để gửi đề nghị thanh toán."
+                ? "Bạn chưa có hồ sơ nào. Bấm '+ Tạo hồ sơ mới' ở góc trên để gửi đề nghị thanh toán."
                 : "Hàng đợi đang trống. Các hồ sơ nộp sẽ tự động hiển thị tại đây."}
             </p>
-            {isEmployee && search.trim() === "" && filter === "ALL" && (
-              <button
-                type="button"
-                onClick={onCreateNew}
-                className="mt-2 inline-flex items-center px-3 py-1.5 rounded text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 transition-colors shadow-2xs cursor-pointer"
-              >
-                <span className="text-white font-medium">+ Tạo hồ sơ mới</span>
-              </button>
-            )}
           </div>
         ) : (
           <table className="w-full text-left text-xs border-collapse">

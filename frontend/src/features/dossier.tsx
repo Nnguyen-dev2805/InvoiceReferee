@@ -37,7 +37,7 @@ export const MONEY_LABELS: Record<string, string> = {
   S: "Chênh lệch (S)",
 };
 
-const UNKNOWN_LABEL = "Chưa xác minh";
+const UNKNOWN_LABEL = "—";
 
 export function formatMoney(value: number | null): string {
   if (value === null) return UNKNOWN_LABEL;
@@ -68,13 +68,13 @@ export function MoneyLine({
   return (
     <li
       data-testid={`money-${label}`}
-      className={`flex items-center justify-between px-4 py-2.5 text-xs transition-colors ${
+      className={`flex items-center justify-between px-4 py-2 text-xs transition-colors ${
         highlight
-          ? "bg-slate-50/80 font-semibold text-slate-900 border-t border-slate-200"
+          ? "bg-slate-50 font-semibold text-slate-900"
           : "hover:bg-slate-50/50 text-slate-700"
       }`}
     >
-      <span className={highlight ? "font-bold text-slate-900 text-xs" : "text-slate-700 font-medium"}>
+      <span className={highlight ? "font-semibold text-slate-900 text-xs" : "text-slate-600 font-medium"}>
         {label}:
       </span>
       <div className="text-right shrink-0">
@@ -83,9 +83,10 @@ export function MoneyLine({
             known
               ? highlight
                 ? "text-slate-950 font-bold font-mono-nums tabular-nums"
-                : "text-slate-900 font-semibold font-mono-nums tabular-nums"
-              : "text-slate-400 italic font-normal font-sans"
+                : "text-slate-900 font-medium font-mono-nums tabular-nums"
+              : "text-slate-400 font-normal select-none"
           }`}
+          title={known ? undefined : "Chưa xác minh"}
         >
           {known ? formatMoney(fact.value) : UNKNOWN_LABEL}
         </strong>
@@ -120,129 +121,74 @@ export function Dossier({
     return (
       <section
         aria-labelledby="dossier-title"
-        className="bg-white border border-slate-200 rounded-xl p-8 text-xs text-center space-y-2 shadow-xs"
+        className="py-12 text-xs text-center space-y-2 select-none"
       >
-        <h2 id="dossier-title" className="text-sm font-semibold text-slate-800">
+        <h2 id="dossier-title" className="text-sm font-semibold text-slate-700">
           Hồ sơ quyết toán
         </h2>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-400">
           Chưa có hồ sơ nào được mở. Hãy chọn hoạt động và tạo hồ sơ để đối soát.
         </p>
       </section>
     );
   }
 
-  // Derive net settlement S and status
-  const netS = caseView.actual_money?.S?.value ?? null;
-  const netSKnown = caseView.actual_money?.S?.state === "KNOWN" && netS !== null;
-  const isPayToEmployee = netSKnown && netS > 0;
-  const isCollectFromEmployee = netSKnown && netS < 0;
-  const isBalanced = netSKnown && netS === 0;
-
   return (
     <section
       aria-labelledby="dossier-title"
-      className="bg-white border border-slate-200 rounded-xl p-5 text-xs space-y-5 select-none shadow-xs"
+      className="space-y-6 select-none text-xs"
     >
       {/* Header Info */}
-      <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 id="dossier-title" className="text-sm font-bold text-slate-900 tracking-tight">
-              Hồ sơ đối soát
-            </h2>
-            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700 font-mono-nums border border-slate-200">
-              v{caseView.version}
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">
-            {formatSummary(caseView.summary)}
-          </p>
-        </div>
-
-        <span
-          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-2xs border ${
-            caseView.state === "READY_TO_EXECUTE"
-              ? "bg-emerald-50 text-emerald-900 border-emerald-200/90"
-              : caseView.state === "WAITING"
-              ? "bg-amber-50 text-amber-900 border-amber-200/90"
-              : caseView.state === "SETTLED"
-              ? "bg-blue-50 text-blue-900 border-blue-200/90"
-              : caseView.state === "STOPPED"
-              ? "bg-rose-50 text-rose-900 border-rose-200/90"
-              : "bg-slate-100 text-slate-800 border-slate-200"
-          }`}
-        >
+      <div className="pb-4 border-b border-slate-100 space-y-1.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <h2 id="dossier-title" className="text-base font-bold text-slate-900 tracking-tight">
+            Hồ sơ đối soát
+          </h2>
+          <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-600 font-mono-nums border border-slate-200">
+            v{caseView.version}
+          </span>
           <span
-            className={`w-1.5 h-1.5 rounded-full ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
               caseView.state === "READY_TO_EXECUTE"
-                ? "bg-emerald-500"
+                ? "bg-emerald-50 text-emerald-900 border-emerald-200/90"
                 : caseView.state === "WAITING"
-                ? "bg-amber-500"
+                ? "bg-amber-50 text-amber-900 border-amber-200/90"
                 : caseView.state === "SETTLED"
-                ? "bg-blue-500"
+                ? "bg-blue-50 text-blue-900 border-blue-200/90"
                 : caseView.state === "STOPPED"
-                ? "bg-rose-500"
-                : "bg-slate-400"
+                ? "bg-rose-50 text-rose-900 border-rose-200/90"
+                : "bg-slate-100 text-slate-700 border-slate-200"
             }`}
-          />
-          <span>{STATE_LABELS[caseView.state] ?? caseView.state}</span>
-        </span>
-      </div>
-
-      {/* Hero KPI Card: Net Settlement Conclusion (Thay thế biến S rời rạc) */}
-      <div className={`p-4 rounded-xl border transition-all ${
-        isPayToEmployee
-          ? "bg-emerald-50/70 border-emerald-200 text-emerald-950"
-          : isCollectFromEmployee
-          ? "bg-amber-50/70 border-amber-200 text-amber-950"
-          : isBalanced
-          ? "bg-blue-50/70 border-blue-200 text-blue-950"
-          : "bg-slate-50 border-slate-200 text-slate-800"
-      }`}>
-        <div className="flex items-center justify-between gap-4">
-          <div className="space-y-1">
-            <span className="text-[11px] uppercase font-bold tracking-wider text-slate-500 block">
-              Quyết toán chênh lệch (S)
-            </span>
-            <p className="text-xs font-medium text-slate-700">
-              {isPayToEmployee
-                ? "Công ty chi trả bổ sung cho nhân viên:"
-                : isCollectFromEmployee
-                ? "Nhân viên hoàn nộp lại cho công ty:"
-                : isBalanced
-                ? "Hồ sơ đã cân bằng:"
-                : "Số tiền chênh lệch:"}
-            </p>
-          </div>
-          <div className="text-right shrink-0">
-            {netSKnown ? (
-              <span className={`text-2xl font-bold font-mono-nums block tracking-tight ${
-                isPayToEmployee ? "text-emerald-700" : isCollectFromEmployee ? "text-amber-800" : "text-slate-900"
-              }`}>
-                {isCollectFromEmployee ? `-${formatVnd(Math.abs(netS))}` : `+${formatVnd(netS)}`}
-              </span>
-            ) : (
-              <span className="inline-block text-xs font-medium italic text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-2xs font-sans">
-                {UNKNOWN_LABEL}
-              </span>
-            )}
-          </div>
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                caseView.state === "READY_TO_EXECUTE"
+                  ? "bg-emerald-500"
+                  : caseView.state === "WAITING"
+                  ? "bg-amber-500"
+                  : caseView.state === "SETTLED"
+                  ? "bg-blue-500"
+                  : caseView.state === "STOPPED"
+                  ? "bg-rose-500"
+                  : "bg-slate-400"
+              }`}
+            />
+            <span>{STATE_LABELS[caseView.state] ?? caseView.state}</span>
+          </span>
         </div>
+        <p className="text-xs text-slate-500 font-normal">
+          {formatSummary(caseView.summary)}
+        </p>
       </div>
 
       {/* Structured Reconciliation Ledger Table */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-            Bảng đối soát chi tiết dòng tiền
-          </h3>
-          <span className="text-[11px] text-slate-400 font-mono-nums">
-            Đơn vị: VNĐ
-          </span>
-        </div>
+      <div className="space-y-2">
+        <h3 className="text-xs font-semibold text-slate-900">
+          Chi tiết dòng tiền đối soát
+        </h3>
 
-        <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
+        <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs">
+
           <ul className="money divide-y divide-slate-100">
             {Object.entries(caseView.actual_money)
               .filter(([key]) => key in MONEY_LABELS)
@@ -257,14 +203,15 @@ export function Dossier({
           </ul>
         </div>
       </div>
+
       {/* Payment Basis (Căn cứ pháp lý & nhân viên xác nhận) */}
       {caseView.payment_basis.length > 0 && (
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
             Căn cứ xác nhận chi trả
           </h3>
           <div
-            className="border border-slate-200 rounded-xl overflow-hidden bg-white divide-y divide-slate-100 shadow-xs"
+            className="border border-slate-200 rounded-lg overflow-hidden bg-white divide-y divide-slate-100 shadow-2xs"
             data-testid="payment-basis"
           >
             {caseView.payment_basis.map((basis) => (
@@ -278,13 +225,13 @@ export function Dossier({
                     {BASIS_LABELS[basis.kind] ?? basis.kind}
                   </span>
                   {basis.actor && (
-                    <span className="text-[11px] text-slate-500 block font-mono-nums">
+                    <span className="text-[11px] text-slate-500 block">
                       Người chịu trách nhiệm: {basis.actor}
                     </span>
                   )}
                 </div>
                 {basis.rule_id && (
-                  <span className="text-[11px] font-mono-nums font-semibold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded border border-slate-200">
+                  <span className="text-[11px] font-mono-nums font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
                     Điều khoản: {basis.rule_id}
                   </span>
                 )}
@@ -296,18 +243,18 @@ export function Dossier({
 
       {/* Issues / Exceptions to resolve (Hidden when interactive Questions workspace is present) */}
       {!hideIssues && caseView.issues.length > 0 && (
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+            <h3 className="text-xs font-semibold text-slate-900">
               Vấn đề cần xử lý ({caseView.issues.length})
             </h3>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200 shadow-2xs">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-900 border border-amber-200">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
               <span>Chờ giải quyết</span>
             </span>
           </div>
 
-          <div className="border border-slate-200 rounded-xl overflow-hidden bg-white divide-y divide-slate-100 shadow-xs">
+          <div className="border border-slate-200 rounded-lg overflow-hidden bg-white divide-y divide-slate-100 shadow-2xs">
             {caseView.issues.map((issue) => {
               const kindLabel = ISSUE_LABELS[issue.kind] ?? issue.kind;
               return (
@@ -324,7 +271,7 @@ export function Dossier({
                         Người xử lý: {issue.owner}
                       </span>
                     </div>
-                    <span className="text-[11px] font-mono-nums text-slate-500 font-medium">
+                    <span className="text-[11px] text-slate-600 font-medium">
                       {formatIssueTarget(issue.field_or_rule)}
                     </span>
                   </div>

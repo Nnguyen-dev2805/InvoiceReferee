@@ -278,6 +278,7 @@ async def test_get_source_content_serves_uploaded_file(app_fixture):
     assert response.status_code == 200
     assert response.content == GOOD_PDF
     assert response.headers["content-type"] == "application/pdf"
+    assert "inline" in response.headers.get("content-disposition", "")
 
     # Other tenant blocked
     tenant_b = app_fixture.client_for(tenant=TENANT_B)

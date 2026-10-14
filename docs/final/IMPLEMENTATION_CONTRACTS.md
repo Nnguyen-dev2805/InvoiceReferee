@@ -94,6 +94,37 @@ của Hoangha, không bắt routine chờ kế toán duyệt.
 - **Điểm tự xử lý cuối:** E vượt 8tr là AUTHORITY; |S| vượt 4tr là AUTHORITY; TC14
   E~121tr/S1tr vượt demo 20tr; TC13 loại chi cá nhân nhưng vẫn quyết toán ứng (T3/T5).
 
+### 3b. Luồng nộp hồ sơ trên web (chốt 14/10/2026, plan TC01 web fix)
+
+Luồng: upload → **Đọc chứng từ** → kiểm tra bản nháp → **Xác nhận và nộp hồ sơ**.
+
+- **Một pipeline OCR cho cả bản nháp và đối soát.** Bản nháp (`POST
+  /cases/{id}/settlement/draft`) đọc qua đúng pipeline §12 (OCR → phân loại → trích
+  xuất → validate → match); **không** còn đường `pypdf.extract_text` + regex. PDF có
+  text, PDF scan và PNG/JPEG đều đi qua OCR. Bản nháp mang source refs + trạng thái
+  trường.
+- **Dùng lại kết quả đọc khi nộp.** Bản đọc được persist kèm `input_basis_json`
+  (tập digest nguồn + version). Khi nộp với đúng nguồn đó, hệ thống **không gọi lại
+  OCR/LLM**; đổi nguồn thì vô hiệu hoá bản đọc. Một workflow, không pipeline song song.
+- **Không dữ liệu mẫu.** Không tự điền số/người/hoạt động khi đọc lỗi; trường chưa
+  đọc được giữ `null`/UNKNOWN, không thành 0; không hiện "Cân bằng" khi số chưa biết.
+  Lỗi đọc hiển thị lỗi + giữ tệp + cho thử lại; không báo "Đã trích xuất" giả.
+- **Gắn hoạt động do server kiểm.** Hồ sơ nháp tạo trước khi biết hoạt động (không
+  bịa PROPOSED có ngày hiện tại). Nhân viên chọn hoạt động **theo tên** trong danh
+  mục; khi nộp, server rebind hồ sơ nháp sang hoạt động AUTHORIZED đúng (hoặc từ
+  chối nếu không có trong danh mục). Profile/ngân sách/quyền/lịch sử lấy theo scope
+  hoạt động đã gắn; không mượn context hoạt động khác.
+- **Lưu bản nháp đã xác nhận.** `Declaration` mang giá trị nhân viên xác nhận +
+  `original_declared_advance`; server lưu `case_declarations.draft_json` (confirmed +
+  original + `corrected_fields` + actor + thời điểm). Sửa ứng kê khai (vd 4tr→4,5tr)
+  là **declaration/correction**, không ghi đè ledger A thực nhận của công ty; đối
+  soát so khai báo với lịch sử và xử lý mâu thuẫn. Enforce owner/expected version.
+- **Cập nhật bất đồng bộ.** Sau nộp, UI polling có giới hạn tới khi hồ sơ rời
+  PROCESSING hoặc cần người; dừng khi rời trang. Version/state do server quyết định.
+- **Nhãn tiền đúng mức.** Bản nháp gọi số nhân viên nhập là **"Ứng nhân viên kê
+  khai"** và **"Tổng chi phí kê khai"**, chênh lệch là **"Chênh lệch kê khai dự
+  kiến"**; A/E/S chính thức chỉ từ projection sau đối soát.
+
 ## 4. Tiền, event và instruction
 
 T=sum incurred costs đã xác minh, không cắt về B; E=sum eligible employee-paid

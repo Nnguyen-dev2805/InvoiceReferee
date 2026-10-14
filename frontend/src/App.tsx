@@ -262,27 +262,15 @@ export default function App() {
             />
           </main>
         ) : viewMode === "intake" ? (
-          <main className="h-[calc(100vh-48px)] overflow-y-auto custom-scrollbar p-6 bg-slate-50 flex justify-center flex-1">
-            <div className="w-full max-w-5xl space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("dashboard")}
-                  className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
-                >
-                  ← Quay lại
-                </button>
-              </div>
-              <Intake
-                session={session}
-                onCase={(newCase) => {
-                  setCaseView(newCase);
-                  setViewMode("detail");
-                  void restoreLatestCase();
-                }}
-              />
-            </div>
-          </main>
+          <Intake
+            session={session}
+            onBack={() => setViewMode("dashboard")}
+            onCase={(newCase) => {
+              setCaseView(newCase);
+              setViewMode("detail");
+              void restoreLatestCase();
+            }}
+          />
         ) : (
           /* DUAL-PANE SPLIT WORKSPACE (calc(100vh - 48px)) */
           <main className="h-[calc(100vh-48px)] flex flex-col md:flex-row overflow-hidden flex-1">
@@ -292,110 +280,112 @@ export default function App() {
             </div>
 
             {/* RIGHT PANE: Role-Based Action & Audit Workspace (50%) */}
-            <div className="w-full md:w-1/2 h-1/2 md:h-full overflow-y-auto custom-scrollbar p-5 space-y-5 bg-slate-50/80">
-              {/* Back to Dashboard bar */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("dashboard")}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
-                >
-                  <span className="text-slate-400">←</span>
-                  <span>Quay lại</span>
-                </button>
+            <div className="w-full md:w-1/2 h-1/2 md:h-full overflow-hidden flex flex-col bg-white">
+              {/* Sleek Subheader Bar (h-11) */}
+              <div className="h-11 border-b border-slate-200 px-5 flex items-center justify-between shrink-0 bg-white z-10">
                 <div className="flex items-center gap-2">
-                  {caseList.length > 1 && caseView !== null && (
-                    <div className="flex items-center bg-white border border-slate-300 rounded-lg px-2.5 py-1 shadow-2xs hover:border-slate-400 transition-colors">
-                      <label htmlFor="detail-case-select" className="sr-only">
-                        Chọn hồ sơ khác
-                      </label>
-                      <select
-                        id="detail-case-select"
-                        value={caseView.id}
-                        onChange={(e) => {
-                          const found = caseList.find((c) => c.id === e.target.value);
-                          if (found) setCaseView(found);
-                        }}
-                        className="text-xs font-mono-nums font-semibold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
-                      >
-                        {caseList.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            Hồ sơ #{c.id.replace("case:", "").slice(0, 8)} (v{c.version})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  {activePanels.includes("intake") && (
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("intake")}
-                      className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 shadow-2xs transition-colors cursor-pointer"
-                      title="Tạo hồ sơ quyết toán mới"
-                    >
-                      + Tạo hồ sơ mới
-                    </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("dashboard")}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+                  >
+                    <span className="font-mono">←</span>
+                    <span>Quay lại</span>
+                  </button>
+                  <span className="text-slate-300">/</span>
+                  {caseView && (
+                    caseList.length > 1 ? (
+                      <div className="relative inline-flex items-center">
+                        <label htmlFor="detail-case-select" className="sr-only">
+                          Chọn hồ sơ khác
+                        </label>
+                        <select
+                          id="detail-case-select"
+                          value={caseView.id}
+                          onChange={(e) => {
+                            const found = caseList.find((c) => c.id === e.target.value);
+                            if (found) setCaseView(found);
+                          }}
+                          className="text-xs font-mono-nums font-semibold text-slate-900 bg-transparent hover:bg-slate-100 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer transition-colors"
+                        >
+                          {caseList.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              Hồ sơ #{c.id.replace("case:", "").slice(0, 8)} (v{c.version})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-mono-nums font-semibold text-slate-900">
+                        Hồ sơ #{caseView.id.replace("case:", "").slice(0, 8)}{" "}
+                        <span className="text-slate-400 font-normal">(v{caseView.version})</span>
+                      </span>
+                    )
                   )}
                 </div>
               </div>
 
-              {/* 1. Dossier (Bảng đối soát tài chính & Lịch sử) */}
-              {activePanels.includes("dossier") && (
-                <Dossier
-                  caseView={caseView}
-                  hideIssues={activePanels.includes("questions") && (caseView?.issues.length ?? 0) > 0}
-                />
-              )}
+              {/* Scrollable Canvas for Workspaces */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+                {/* 1. Dossier (Bảng đối soát tài chính & Lịch sử) */}
+                {activePanels.includes("dossier") && (
+                  <Dossier
+                    caseView={caseView}
+                    hideIssues={activePanels.includes("questions") && (caseView?.issues.length ?? 0) > 0}
+                  />
+                )}
 
-              {/* 2. Questions Workspace */}
-              {activePanels.includes("questions") && (
-                <Questions
-                  caseView={caseView}
-                  onCase={(newCase) => {
-                    setCaseView(newCase);
-                    void restoreLatestCase();
-                  }}
-                  currentRole={currentRole}
-                />
-              )}
+                {/* 2. Questions Workspace */}
+                {activePanels.includes("questions") && (
+                  <Questions
+                    caseView={caseView}
+                    onCase={(newCase) => {
+                      setCaseView(newCase);
+                      void restoreLatestCase();
+                    }}
+                    currentRole={currentRole}
+                  />
+                )}
 
-              {/* 3. Approval Workspace */}
-              {activePanels.includes("approval") && (
-                <Approval caseView={caseView} />
-              )}
+                {/* 3. Approval Workspace */}
+                {activePanels.includes("approval") && (
+                  <Approval caseView={caseView} />
+                )}
 
-              {/* 4. Advance Workspace */}
-              {activePanels.includes("advance") && (
-                <Advance
-                  caseView={caseView}
-                  onCase={(newCase) => {
-                    setCaseView(newCase);
-                    void restoreLatestCase();
-                  }}
-                />
-              )}
+                {/* 4. Advance Workspace */}
+                {activePanels.includes("advance") && (
+                  <Advance
+                    caseView={caseView}
+                    onCase={(newCase) => {
+                      setCaseView(newCase);
+                      void restoreLatestCase();
+                    }}
+                  />
+                )}
 
-              {/* 5. Execution Workspace */}
-              {activePanels.includes("execution") && (
-                <Execution
-                  caseView={caseView}
-                  onCase={(newCase) => {
-                    setCaseView(newCase);
-                    void restoreLatestCase();
-                  }}
-                />
-              )}
+                {/* 5. Execution Workspace */}
+                {activePanels.includes("execution") && (
+                  <Execution
+                    caseView={caseView}
+                    onCase={(newCase) => {
+                      setCaseView(newCase);
+                      void restoreLatestCase();
+                    }}
+                  />
+                )}
 
-              {/* 6. Controls Workspace */}
-              {activePanels.includes("controls") && (
-                <Controls
-                  caseView={caseView}
-                  onCase={(newCase) => {
-                    setCaseView(newCase);
-                    void restoreLatestCase();
-                  }}
-                />
-              )}
+                {/* 6. Controls Workspace */}
+                {activePanels.includes("controls") && (
+                  <Controls
+                    caseView={caseView}
+                    onCase={(newCase) => {
+                      setCaseView(newCase);
+                      void restoreLatestCase();
+                    }}
+                    currentRole={currentRole}
+                  />
+                )}
+              </div>
             </div>
           </main>
         )

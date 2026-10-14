@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS case_declarations (
     revision   INTEGER NOT NULL,
     purpose    TEXT NOT NULL,
     notes      TEXT,
+    -- The employee-confirmed draft (W4): the confirmed field values plus the
+    -- original OCR values, as JSON, so a correction is auditable and the
+    -- reconciliation can consume the confirmed declaration.
+    draft_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
     PRIMARY KEY (root_id, revision)
 );
@@ -257,6 +261,9 @@ CREATE TABLE IF NOT EXISTS case_evidence_reports (
     root_id       TEXT PRIMARY KEY REFERENCES cases(id),
     tenant        TEXT NOT NULL,
     report_json   TEXT NOT NULL,
+    -- The source digest set + case version the report was read from, so a submit
+    -- can reuse a still-valid read instead of re-running OCR (report P1-1/W3).
+    input_basis_json TEXT NOT NULL DEFAULT '{}',
     created_at    TEXT NOT NULL
 );
 

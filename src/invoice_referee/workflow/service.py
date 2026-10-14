@@ -533,14 +533,23 @@ class CaseWorkflow:
             ),
         )
 
+    def _store_evidence_report(
+        self, cx, *, tenant: str, root_id: str, report, basis: dict | None = None
+    ) -> None:
+        """Persist the typed report with its input basis (no state change)."""
+        cx.execute(
+            "INSERT OR REPLACE INTO case_evidence_reports (root_id, tenant, report_json, "
+            "input_basis_json, created_at) VALUES (?, ?, ?, ?, ?)",
+            (
+                root_id, tenant, report.model_dump_json(),
+                json.dumps(basis or {}, ensure_ascii=False), self._now_iso(),
+            ),
+        )
+
     def _publish_evidence_report(
         self, cx, *, tenant: str, root_id: str, report, session=None
     ) -> None:
-        cx.execute(
-            "INSERT OR REPLACE INTO case_evidence_reports (root_id, tenant, report_json, "
-            "created_at) VALUES (?, ?, ?, ?)",
-            (root_id, tenant, report.model_dump_json(), self._now_iso()),
-        )
+        self._store_evidence_report(cx, tenant=tenant, root_id=root_id, report=report)
         # The typed report is published; the case becomes EVIDENCE_READY. The
         # finance consumer then assesses the typed admission input from the
         # CURRENT stored state (plan A5). A Stop/changed basis before this point
@@ -549,6 +558,40 @@ class CaseWorkflow:
             "UPDATE cases SET state = 'EVIDENCE_READY', updated_at = ? WHERE id = ?",
             (self._now_iso(), root_id),
         )
+
+    def _reusable_report(self, cx: sqlite3.Connection, tenant: str, root_id: str):
+        """A stored report whose input basis still matches the case, or None.
+
+        A preview draft persists the report + the source digest set it was read
+        from. On submit, if the case still has exactly those sources, the read is
+        reused so OCR/LLM is not called again just because the employee confirmed
+        (report P1-1/W3). A changed source set invalidates it.
+        """
+        from invoice_referee.domain.evidence import ReadResult
+
+        row = cx.execute(
+            "SELECT report_json, input_basis_json FROM case_evidence_reports WHERE root_id = ?",
+            (root_id,),
+        ).fetchone()
+        if row is None or not row["report_json"]:
+            return None
+        try:
+            basis = json.loads(row["input_basis_json"] or "{}")
+        except (TypeError, ValueError):
+            return None
+        current = sorted(
+            str(r["digest"])
+            for r in cx.execute(
+                "SELECT digest FROM case_sources WHERE root_id = ?", (root_id,)
+            )
+        )
+        if basis.get("sources") != current:
+            return None
+        report = ReadResult.model_validate_json(row["report_json"])
+        # A failed/empty read is not a reusable report.
+        if not any(f.state == "FOUND" for d in report.documents for f in d.fields):
+            return None
+        return report
 
     def _claim_next_evidence_job(self) -> str | None:
         with self.db.transaction() as cx:
@@ -1143,15 +1186,20 @@ class CaseWorkflow:
         root_id: str,
         uploads: tuple[tuple[str, str, bytes], ...],
     ) -> dict[str, object]:
-        """Read uploaded settlement documents into a prefilled draft for employee review.
+        """Read uploaded settlement documents through the OCR pipeline into a draft.
 
-        Extracts employee, activity, trip destination, purpose, dates, line items,
-        incurred total and declared advance from the settlement form and attached invoices.
-        Provider I/O runs OUTSIDE any transaction.
+        Uses the SAME §12 evidence pipeline (OCR -> classify -> extract -> validate
+        -> match) the reconciler consumes, so a PDF with text, a scanned PDF and a
+        PNG/JPEG all go through one path (report P1-1). The typed report is
+        persisted so a later submit can reuse it (W3). Provider I/O runs OUTSIDE
+        any transaction; a provider failure raises, never a fabricated draft.
         """
-        import io
-        import re
-        import pypdf
+        import hashlib
+
+        from invoice_referee.domain.evidence import SourceRef
+        from invoice_referee.evidence.pipeline import read_root
+        from invoice_referee.evidence.trace import RunBudget
+        from invoice_referee.reconciliation.settlement_draft import build_settlement_draft
 
         connection = self.db.connect()
         try:
@@ -1164,132 +1212,93 @@ class CaseWorkflow:
         if row is None:
             raise NotFoundError("Hồ sơ không tồn tại trong tenant này.")
 
-        draft: dict[str, object] = {
-            "declared_name": None,
-            "destination": None,
-            "activity_name": None,
-            "trip_start": None,
-            "trip_end": None,
-            "occurred_at": None,
-            "declared_purpose": None,
-            "incurred_total": None,
-            "declared_advance": None,
-            "expenses": [],
-            "warnings": [],
-            "invoices": [],
+        reader, classifier, artifacts, provider_mode = self._evidence_wiring()
+        if reader is None:
+            raise UnsupportedCommandError(
+                "Chưa cấu hình đọc chứng từ (LIVE) cho môi trường này."
+            )
+
+        # Read the case's ATTACHED sources (the same bytes submit will reuse), so
+        # the persisted report's basis matches on submit and OCR is not re-run
+        # (W3). Uploads carry any not-yet-attached bytes; they are matched by
+        # filename+digest and stored transiently for this read only.
+        connection = self.db.connect()
+        try:
+            attached = tuple(
+                SourceRef(
+                    id=row2["source_id"], digest=row2["digest"], tenant=row2["tenant"],
+                    media=row2["media"], storage_key=row2["storage_key"],
+                    filename=row2["filename"],
+                )
+                for row2 in connection.execute(
+                    "SELECT * FROM case_sources WHERE root_id = ? ORDER BY attached_at, source_id",
+                    (root_id,),
+                )
+            )
+        finally:
+            connection.close()
+
+        upload_by_digest = {
+            hashlib.sha256(payload).hexdigest(): (filename, media, payload)
+            for filename, media, payload in uploads
         }
-
-        expenses: list[dict[str, object]] = []
-        invoices: list[dict[str, object]] = []
-
-        for filename, media, payload in uploads:
-            text = ""
-            if media == "PDF":
-                try:
-                    reader = pypdf.PdfReader(io.BytesIO(payload))
-                    text = "\n".join(p.extract_text() or "" for p in reader.pages)
-                except Exception:
-                    continue
-
-            lower_text = text.lower()
-            if "quyết toán" in lower_text or "đề nghị thanh toán" in lower_text or "bảng kê" in lower_text:
-                name_m = re.search(r"Người đề nghị:\s*([^\n]+)", text, re.IGNORECASE)
-                if name_m:
-                    draft["declared_name"] = name_m.group(1).strip()
-
-                loc_m = re.search(r"Nơi công tác:\s*([^\n]+)", text, re.IGNORECASE)
-                if loc_m:
-                    draft["destination"] = loc_m.group(1).strip()
-                    draft["activity_name"] = f"Công tác {draft['destination']}"
-
-                purp_m = re.search(r"Mục đích:\s*([^\n]+)", text, re.IGNORECASE)
-                if purp_m:
-                    draft["declared_purpose"] = purp_m.group(1).strip()
-
-                date_m = re.search(
-                    r"từ\s*(\d{2}/\d{2}/\d{4})\s*đến\s*(\d{2}/\d{2}/\d{4})", text, re.IGNORECASE
+        sources: list[SourceRef] = list(attached)
+        source_bytes: dict[str, bytes] = {}
+        for source in attached:
+            payload = self._evidence_source_bytes.get(source.id)
+            if payload is None:
+                path = self.uploads_dir / source.storage_key
+                if path.is_file():
+                    payload = path.read_bytes()
+            if payload is None:
+                payload = upload_by_digest.get(source.digest, (None, None, None))[2]  # type: ignore[assignment]
+            if payload is not None:
+                source_bytes[source.id] = payload
+        # Any uploaded file not yet attached is read transiently (so the preview
+        # still works before attach); it will not be part of the submit basis.
+        attached_digests = {s.digest for s in attached}
+        for index, (filename, media, payload) in enumerate(uploads, start=1):
+            digest = hashlib.sha256(payload).hexdigest()
+            if digest in attached_digests:
+                continue
+            source_id = f"source:preview:{digest[:16]}:{index}"
+            sources.append(
+                SourceRef(
+                    id=source_id, digest=digest, tenant=session.tenant,
+                    media=media,  # type: ignore[arg-type]
+                    storage_key=f"{session.tenant}/{root_id}/{source_id}",
+                    filename=filename,
                 )
-                if date_m:
-                    draft["trip_start"] = date_m.group(1)
-                    draft["trip_end"] = date_m.group(2)
-                    d, m, y = date_m.group(1).split("/")
-                    draft["occurred_at"] = f"{y}-{m}-{d}"
+            )
+            source_bytes[source_id] = payload
 
-                tot_m = re.search(r"Tổng chi phí[^\n\d]*([\d.,]+)\s*đ", text, re.IGNORECASE)
-                if tot_m:
-                    draft["incurred_total"] = int(tot_m.group(1).replace(".", "").replace(",", ""))
+        report = await read_root(
+            sources=tuple(sources),
+            reader=reader,
+            classifier=classifier,
+            artifacts=artifacts,
+            source_bytes=source_bytes,
+            budget=RunBudget(),
+            provider_mode=provider_mode,
+            root_id=root_id,
+            activity_profile=str(row["profile"]) if "profile" in row.keys() else None,
+        )
 
-                adv_m = re.search(r"tạm ứng[^\n\d]*([\d.,]+)\s*đ", text, re.IGNORECASE)
-                if adv_m:
-                    draft["declared_advance"] = int(adv_m.group(1).replace(".", "").replace(",", ""))
+        draft = build_settlement_draft(report, sources=tuple(sources))
 
-                # Parse table line items: STT, Description, InvoiceNo, Amount
-                raw_lines = [l.strip() for l in text.splitlines() if l.strip()]
-                for i, line in enumerate(raw_lines):
-                    if line.isdigit() and i + 3 < len(raw_lines):
-                        desc = raw_lines[i + 1]
-                        inv = raw_lines[i + 2]
-                        amt_str = raw_lines[i + 3]
-                        m = re.search(r"([\d.,]+)\s*đ?", amt_str)
-                        if m and any(c in inv for c in ["IR", "HD", "0", "1", "2", "-"]):
-                            try:
-                                val = int(m.group(1).replace(".", "").replace(",", ""))
-                                if val > 0:
-                                    expenses.append({
-                                        "description": desc,
-                                        "invoice_no": inv,
-                                        "amount": val,
-                                        "source_filename": filename,
-                                        "status": "CLEAR",
-                                    })
-                            except ValueError:
-                                pass
-
-            elif "hóa đơn" in lower_text or "invoice" in lower_text:
-                inv_no_m = re.search(r"Số hóa đơn:\s*([A-Za-z0-9\-_]+)", text, re.IGNORECASE)
-                seller_m = re.search(r"Đơn vị bán:\s*([^\n]+)", text, re.IGNORECASE)
-                tot_m = re.search(r"Tổng cộng thanh toán\s*([\d.,]+)\s*đ", text, re.IGNORECASE)
-                invoices.append({
-                    "filename": filename,
-                    "invoice_no": inv_no_m.group(1) if inv_no_m else None,
-                    "seller": seller_m.group(1).strip() if seller_m else None,
-                    "amount": int(tot_m.group(1).replace(".", "").replace(",", "")) if tot_m else None,
-                })
-
-        draft["expenses"] = expenses
-        draft["invoices"] = invoices
-
-        for exp in expenses:
-            inv_no = exp.get("invoice_no")
-            if inv_no:
-                matching_inv = next((inv for inv in invoices if inv.get("invoice_no") == inv_no), None)
-                if matching_inv:
-                    exp["matched_invoice"] = matching_inv.get("filename")
-                    exp["seller"] = matching_inv.get("seller")
-                else:
-                    exp["status"] = "WARNING"
-
-        warnings: list[str] = []
-        if draft["declared_advance"] is None:
-            warnings.append("Không trích xuất được số tiền tạm ứng trên giấy; nhân viên vui lòng kiểm tra.")
-        if draft["incurred_total"] is None and expenses:
-            draft["incurred_total"] = sum(int(e["amount"]) for e in expenses if isinstance(e.get("amount"), int))
-
-        draft["warnings"] = warnings
-
-        # Optionally update the case record if new activity name or occurred_at was found
-        if draft.get("activity_name") or draft.get("occurred_at"):
-            with self.db.transaction() as cx:
-                cx.execute(
-                    "UPDATE cases SET activity_name = COALESCE(?, activity_name), "
-                    "activity_occurred_at = COALESCE(?, activity_occurred_at) WHERE id = ?",
-                    (
-                        draft.get("activity_name"),
-                        draft.get("occurred_at"),
-                        root_id,
-                    ),
-                )
-
+        # Persist the typed report + its input basis so a submit on the same
+        # sources reuses this read instead of calling OCR/LLM again (W3).
+        with self.db.transaction() as cx:
+            self._store_evidence_report(
+                cx,
+                tenant=session.tenant,
+                root_id=root_id,
+                report=report,
+                basis={
+                    "sources": sorted(s.digest for s in attached),
+                    "case_version": int(row["version"]),
+                },
+            )
         return draft
 
     def _create_draft(
@@ -1413,15 +1422,16 @@ class CaseWorkflow:
         row = self._require_root(cx, session, command.root_id)
         self._require_version(row, context.expected_case_version)
         now = self._now_iso()
-        revision = int(row["input_revision"]) + 1
+        revision = self._next_declaration_revision(cx, str(row["id"]))
         cx.execute(
-            "INSERT INTO case_declarations (root_id, revision, purpose, notes, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO case_declarations (root_id, revision, purpose, notes, draft_json, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
             (
                 str(row["id"]),
                 revision,
                 command.declaration.declared_purpose,
                 command.declaration.notes,
+                self._declaration_draft_json(command.declaration, actor=context.actor_id, now=now),
                 now,
             ),
         )
@@ -1438,6 +1448,50 @@ class CaseWorkflow:
         return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
 
     # -- submission and assessment -------------------------------------------
+    @staticmethod
+    def _next_declaration_revision(cx: sqlite3.Connection, root_id: str) -> int:
+        row = cx.execute(
+            "SELECT COALESCE(MAX(revision), 0) AS r FROM case_declarations WHERE root_id = ?",
+            (root_id,),
+        ).fetchone()
+        return int(row["r"]) + 1
+
+    @staticmethod
+    def _declaration_draft_json(declaration, *, actor: str, now: str) -> str:
+        """The confirmed draft as auditable JSON (W4).
+
+        Stores the employee-confirmed values AND the original OCR values, the
+        server actor and the time. A correction is a declaration, not a verified
+        fact: `corrected_fields` records which fields the employee changed.
+        """
+        confirmed = {
+            "declared_name": declaration.declared_name,
+            "destination": declaration.destination,
+            "trip_start": declaration.trip_start,
+            "trip_end": declaration.trip_end,
+            "declared_advance": declaration.declared_advance,
+            "incurred_total": declaration.incurred_total,
+        }
+        corrected: list[str] = []
+        if (
+            declaration.original_declared_advance is not None
+            and declaration.declared_advance is not None
+            and declaration.original_declared_advance != declaration.declared_advance
+        ):
+            corrected.append("declared_advance")
+        return json.dumps(
+            {
+                "confirmed": confirmed,
+                "original": {
+                    "declared_advance": declaration.original_declared_advance,
+                },
+                "corrected_fields": corrected,
+                "actor": actor,
+                "observed_at": now,
+            },
+            ensure_ascii=False,
+        )
+
     def _record_employee_paid_claims(
         self,
         cx: sqlite3.Connection,
@@ -1524,17 +1578,71 @@ class CaseWorkflow:
         self._require_version(row, context.expected_case_version)
         now = self._now_iso()
         root_id = str(row["id"])
-        # The declaration must name this dossier's activity: a submit cannot
-        # fold evidence into a different activity than the root (contracts §3).
+        # P1-3: a draft root is created against a PROPOSED placeholder before the
+        # activity is known (so the upload does not fabricate one). At submit the
+        # declaration names the activity the employee chose; when the root is
+        # still that unbound placeholder, rebind it to the AUTHORIZED catalog
+        # activity (server-verified). A non-catalog activity is rejected. An
+        # already-bound root must still match its own activity.
         declared_activity = command.declaration.activity_id
-        if declared_activity and declared_activity != str(row["activity"]):
-            raise UnsupportedCommandError(
-                "Khai báo không khớp hoạt động của hồ sơ này."
+        current_activity = str(row["activity"])
+        if declared_activity and declared_activity != current_activity:
+            if current_activity.startswith(PROPOSED_ACTIVITY_PREFIX):
+                entry = self.catalog_entry(session.tenant, declared_activity)
+                if entry is None or entry.status != "AUTHORIZED":
+                    raise UnsupportedCommandError(
+                        "Hoạt động không có trong danh mục; không thể gắn hồ sơ."
+                    )
+                cx.execute(
+                    "UPDATE cases SET activity = ?, activity_name = ?, "
+                    "activity_occurred_at = ?, profile = ? WHERE id = ?",
+                    (
+                        entry.activity_id,
+                        entry.name,
+                        (entry.occurred_at or self._clock()).isoformat(),
+                        entry.profile,
+                        root_id,
+                    ),
+                )
+                row = self._reload(cx, row)
+            else:
+                raise UnsupportedCommandError(
+                    "Khai báo không khớp hoạt động của hồ sơ này."
+                )
+        elif current_activity.startswith(PROPOSED_ACTIVITY_PREFIX):
+            # The employee kept the root's own NEW activity (it was not in the
+            # catalog). Name it from the confirmed draft content so the dossier
+            # does not carry the generic placeholder. It stays PROPOSED: no
+            # budget/grant is fabricated; it enters the authorization follow-up
+            # (requirement: a genuinely new activity asks for B/authority).
+            name = (
+                command.declaration.destination
+                or command.declaration.declared_purpose
+                or str(row["activity_name"])
             )
+            cx.execute(
+                "UPDATE cases SET activity_name = ? WHERE id = ?", (name, root_id)
+            )
+            row = self._reload(cx, row)
         # Q32 typed employee paid-claims (plan A2): the client states the claim;
         # the server resolves the file refs to the uploaded bytes and derives the
         # actor/scope/time. A foreign digest/ref is rejected before any write.
         self._record_employee_paid_claims(cx, session, row, command, now)
+        # The employee-confirmed draft (W4): persist the confirmed values + notes
+        # and the original OCR value as an auditable declaration. This is what the
+        # reconciliation consumes; it never overwrites the actual company ledger.
+        cx.execute(
+            "INSERT INTO case_declarations (root_id, revision, purpose, notes, "
+            "draft_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                root_id,
+                self._next_declaration_revision(cx, root_id),
+                command.declaration.declared_purpose,
+                command.declaration.notes,
+                self._declaration_draft_json(command.declaration, actor=context.actor_id, now=now),
+                now,
+            ),
+        )
         # A submit is a durable job (contracts §6, §10.4): one active job per
         # root, READ -> ASSESS -> DONE. A crash mid-job leaves it recoverable
         # rather than half-applied. The read already ran outside the txn.
@@ -1547,10 +1655,21 @@ class CaseWorkflow:
             if existing is not None
             else store.enqueue(cx, tenant=session.tenant, root_id=root_id, kind="SUBMIT", now=now)
         )
-        # In evidence mode (LIVE/RECORDED_REPLAY) the submit enqueues a durable
-        # evidence job and returns immediately; the worker produces the typed
-        # report. It never runs the finance assessment (contracts §12.5, plan E7).
+        # In evidence mode (LIVE/RECORDED_REPLAY) the submit normally enqueues a
+        # durable evidence job and returns immediately; the worker produces the
+        # typed report (contracts §12.5, plan E7). BUT when the employee already
+        # reviewed a draft on the SAME sources, that read is reused: the stored
+        # report is assessed directly instead of calling OCR/LLM again (W3). A
+        # changed source set is not reused, so it re-reads.
         if self._evidence_reader is not None:
+            reusable = self._reusable_report(cx, session.tenant, root_id)
+            if reusable is not None:
+                store.mark(cx, job_id, phase="ASSESSING", status="RUNNING", now=now)
+                self._assess_and_commit(cx, session, row, now)
+                store.mark(cx, job_id, phase="DONE", status="COMPLETED", now=now)
+                return CommandResult(
+                    case_view=self._case_view(cx, self._reload(cx, row)), job_id=job_id
+                )
             # Persist the input basis at enqueue so a source change before the
             # worker publishes invalidates the stale result (contracts §6).
             basis = self._evidence_basis(cx, session.tenant, root_id)

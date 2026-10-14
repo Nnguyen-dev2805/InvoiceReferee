@@ -35,6 +35,19 @@ class Declaration(StrictModel):
     activity_id: Id
     declared_purpose: str
     notes: str | None = None
+    # The employee-confirmed draft (W4). These are the values the employee saw
+    # and possibly corrected on the review screen. They are DECLARATIONS, not
+    # verified facts: the server stores both the confirmed value and the original
+    # OCR value, and reconciliation compares the declaration against company
+    # history rather than overwriting it. All optional for backward compatibility.
+    declared_name: str | None = None
+    destination: str | None = None
+    trip_start: str | None = None
+    trip_end: str | None = None
+    declared_advance: Vnd | None = None
+    incurred_total: Vnd | None = None
+    # The OCR value the employee reviewed, kept so a correction is auditable.
+    original_declared_advance: Vnd | None = None
 
 
 class EmployeePaidClaim(StrictModel):
