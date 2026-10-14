@@ -19,14 +19,38 @@ export default function App() {
   const loadSession = useCallback(async () => {
     try {
       setSession(await api.session());
+      return true;
+    } catch (cause) {
+      setError(errorMessage(cause));
+      return false;
+    }
+  }, []);
+
+  // A reload must not lose the dossier: the case lives in the DB, so after the
+  // session cookie is established we restore the most recently updated case the
+  // session can see. Sequencing matters — /api/cases needs the session cookie
+  // that /api/demo/session sets, or a fresh browser gets a 401.
+  const restoreLatestCase = useCallback(async () => {
+    try {
+      const { cases } = await api.listCases();
+      if (cases.length > 0) {
+        const latest = cases.reduce((best, candidate) =>
+          candidate.version >= best.version ? candidate : best,
+        );
+        setCaseView(latest);
+      }
     } catch (cause) {
       setError(errorMessage(cause));
     }
   }, []);
 
   useEffect(() => {
-    void loadSession();
-  }, [loadSession]);
+    void (async () => {
+      if (await loadSession()) {
+        await restoreLatestCase();
+      }
+    })();
+  }, [loadSession, restoreLatestCase]);
 
   async function switchPersona(persona: string) {
     try {
