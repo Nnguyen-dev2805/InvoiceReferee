@@ -108,6 +108,7 @@ class MistralOcrClient:
         source_bytes: bytes | None = None,
         expected_pages: int | None = None,
         artifact_version: str = "ocr-v1",
+        root_id: str = "",
     ) -> OcrSourceResult:
         """OCR every page of one file and retain the raw response.
 
@@ -153,6 +154,7 @@ class MistralOcrClient:
 
         raw_ref = artifacts.write(
             tenant=source.tenant,
+            root_id=root_id,
             source_id=source.id,
             source_digest=source.digest,
             version=artifact_version,

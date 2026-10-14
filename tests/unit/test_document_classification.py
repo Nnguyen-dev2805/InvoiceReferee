@@ -177,3 +177,25 @@ async def test_unexpected_source_id_is_rejected() -> None:
     )
     with pytest.raises(XkiroError):
         await classify_documents(ocr, llm=llm, budget=RunBudget())
+
+
+async def test_out_of_range_page_is_rejected() -> None:
+    ocr = (_ocr("source:1", (_page(1, "x"),)),)  # only 1 page
+    llm = FakeLlm({"documents": [
+        {"source_id": "source:1", "page_range": [1, 9],
+         "document_type": "E_INVOICE", "roles": ["ORIGINAL_EXPENSE_EVIDENCE"]}
+    ]})
+    with pytest.raises(XkiroError):
+        await classify_documents(ocr, llm=llm, budget=RunBudget())
+
+
+async def test_overlapping_units_are_rejected() -> None:
+    ocr = (_ocr("source:1", (_page(1, "a"), _page(2, "b"))),)
+    llm = FakeLlm({"documents": [
+        {"source_id": "source:1", "page_range": [1, 2], "document_type": "E_INVOICE",
+         "roles": ["ORIGINAL_EXPENSE_EVIDENCE"]},
+        {"source_id": "source:1", "page_range": [2, 2], "document_type": "PAPER_RECEIPT",
+         "roles": ["ORIGINAL_EXPENSE_EVIDENCE"]},
+    ]})
+    with pytest.raises(XkiroError):
+        await classify_documents(ocr, llm=llm, budget=RunBudget())

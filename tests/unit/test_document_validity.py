@@ -150,3 +150,33 @@ def test_clean_document_is_clear() -> None:
     )
     result = validate_document(analysis, ocr, ConfidenceReview(status="SKIPPED_NO_NUMERIC_CANDIDATES"))
     assert result.profile_status in ("CLEAR", "NEEDS_HUMAN")
+
+
+def test_empty_invoice_fails_required_fields() -> None:
+    # A document with no FOUND required fields must not be CLEAR.
+    ocr = _ocr((OcrWord(text="x", confidence=0.9),))
+    analysis = _analysis(())
+    result = validate_document(analysis, ocr, ConfidenceReview(status="SKIPPED_NO_NUMERIC_CANDIDATES"))
+    assert result.profile_status == "NEEDS_HUMAN"
+    assert any(f.code == "REQUIRED_FIELD_MISSING" for f in result.profile_findings)
+
+
+def test_unrelated_flagged_block_does_not_block_a_clean_field() -> None:
+    # A flagged block that does NOT touch this field's quote must not block it.
+    ocr = _ocr((OcrWord(text="450.000", confidence=0.95),))
+    analysis = _analysis((_found("total_amount", "450000"),))
+    review = ConfidenceReview(
+        status="ASSESSED",
+        block_assessments=(
+            BlockAssessment(
+                candidate_id="source:1:p9:b9",  # a different page/block
+                importance="NON_CRITICAL",
+                quality_state="UNCERTAIN",
+                review_action="ASK_HUMAN",
+                reason="unrelated low-confidence block",
+            ),
+        ),
+    )
+    result = validate_document(analysis, ocr, review)
+    total = next(f for f in result.fields if f.field == "total_amount")
+    assert total.state == "FOUND"

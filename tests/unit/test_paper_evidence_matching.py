@@ -243,3 +243,21 @@ async def test_suggestion_resolution_cannot_create_a_new_pair() -> None:
 
     resolved = await resolve_evidence_suggestions(result, docs, llm=Llm(), budget=RunBudget())
     assert resolved.links == result.links
+
+
+def test_first_explicit_allocation_cannot_exceed_source_total() -> None:
+    # A row claiming 600 against a 500 invoice must not auto-link.
+    paper = _paper(rows=(("Dòng 1", "600000", ("HQ1",), None),))
+    docs = (_invoice("DOC-1", number="HQ1", total="500000"),)
+    result = match_paper_evidence(paper, docs)
+    assert not any(link.status == "AUTO_LINK" for link in result.links)
+    assert result.findings
+
+
+def test_unmatched_ids_are_source_ids_not_document_ids() -> None:
+    # An unrelated amount/description -> score < 0.50 -> genuinely unmatched.
+    paper = _paper(rows=(("Dòng 1", "100000", (), None),))
+    docs = (_invoice("DOC-1", issuer="Nhà cung cấp khác", total="999999"),)
+    result = match_paper_evidence(paper, docs)
+    # The DTO field is unmatched_source_ids; the values must be source ids.
+    assert result.unmatched_source_ids == ("source:1",)

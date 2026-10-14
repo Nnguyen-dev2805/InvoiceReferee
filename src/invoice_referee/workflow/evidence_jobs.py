@@ -42,6 +42,7 @@ async def run_evidence_job(workflow, job_id: str) -> None:
             source_bytes=source_bytes,
             budget=RunBudget(),
             provider_mode=provider_mode,
+            root_id=root_id,
         )
     except Exception as error:  # provider failure -> technical, never a fake success
         with workflow.db.transaction() as cx:
@@ -49,9 +50,14 @@ async def run_evidence_job(workflow, job_id: str) -> None:
         return
 
     with workflow.db.transaction() as cx:
-        # A Stop or changed basis invalidates publication (contracts §6, §12.5).
+        # A Stop or changed input basis invalidates publication (contracts §6,
+        # §12.5): a stale result must not be presented as current.
         row = cx.execute("SELECT state FROM cases WHERE id = ?", (root_id,)).fetchone()
         if row is not None and str(row["state"]) == "STOPPED":
+            workflow._mark_evidence_job(cx, job_id, phase="DONE", status="CANCELLED")
+            return
+        job = cx.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if job is not None and not workflow._evidence_basis_current(cx, job):
             workflow._mark_evidence_job(cx, job_id, phase="DONE", status="CANCELLED")
             return
         workflow._publish_evidence_report(cx, tenant=tenant, root_id=root_id, report=report)

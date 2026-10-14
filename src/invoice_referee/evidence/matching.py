@@ -196,32 +196,27 @@ def match_paper_evidence(
             allocated_amount = total if status == "AUTO_LINK" else None
             if status == "AUTO_LINK":
                 # An explicit-ref match consumes the row's stated amount; any
-                # other auto-link consumes the whole source total. A second row
-                # may reuse a source only with an explicit, amount-bounded
-                # allocation (it repeats the ref and states an amount).
-                first_use = (
-                    amount
-                    if (invoice_exact and amount is not None)
-                    else (total if total is not None else Decimal("0"))
-                )
+                # other auto-link consumes the whole source total. Every
+                # explicit allocation must be amount-bounded by the source
+                # total, including the first use.
                 already = allocated.get(document.document_id)
-                if already is None:
-                    allocated[document.document_id] = first_use
-                    allocated_amount = first_use
-                else:
-                    allocation_ok = (
-                        invoice_exact
-                        and amount is not None
-                        and total is not None
-                        and (already + amount) <= total
-                    )
-                    if allocation_ok:
-                        allocated[document.document_id] = already + amount
-                        allocated_amount = amount
-                    else:
+                if invoice_exact and amount is not None:
+                    over = total is not None and (already or Decimal("0")) + amount > total
+                    if over:
                         status = "SUGGEST_LINK"
                         allocated_amount = None
-                        explanation += " Evidence đã ghép khoản khác; cần xác nhận phân bổ."
+                        explanation += " Phân bổ vượt giá trị chứng từ; cần xác nhận."
+                    else:
+                        allocated[document.document_id] = (
+                            already or Decimal("0")
+                        ) + amount
+                        allocated_amount = amount
+                elif already is None:
+                    allocated[document.document_id] = total if total is not None else Decimal("0")
+                else:
+                    status = "SUGGEST_LINK"
+                    allocated_amount = None
+                    explanation += " Evidence đã ghép khoản khác; cần xác nhận phân bổ."
             row_links.append(
                 EvidenceLink(
                     item_id=item_id,
@@ -327,7 +322,7 @@ def match_paper_evidence(
             )
 
     unmatched = tuple(
-        d.document_id
+        d.source_id
         for d in matchable
         if d.document_id not in auto_linked
         and not any(link.document_id == d.document_id for link in links)

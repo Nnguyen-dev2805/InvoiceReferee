@@ -109,7 +109,11 @@ def main(argv: list[str] | None = None) -> int:
         args.db, args.uploads, args.context, mode=mode, settings=settings
     )
     app = create_app(
-        workflow, mode=mode, settings=settings, frontend_dir=FRONTEND_DIST
+        workflow,
+        mode=mode,
+        settings=settings,
+        frontend_dir=FRONTEND_DIST,
+        evidence_worker=(mode in ("LIVE", "RECORDED_REPLAY")),
     )
     print(
         format_diagnostics(

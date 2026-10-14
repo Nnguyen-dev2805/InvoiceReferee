@@ -447,6 +447,34 @@ class CaseWorkflow:
                 source_bytes[source.id] = payload
         return tenant, root_id, sources, source_bytes
 
+    def _evidence_basis(self, cx: sqlite3.Connection, tenant: str, root_id: str) -> dict:
+        """The input basis (source digest set + case version) for a job (§6)."""
+        sources = [
+            str(row["digest"])
+            for row in cx.execute(
+                "SELECT digest FROM case_sources WHERE root_id = ? ORDER BY source_id",
+                (root_id,),
+            )
+        ]
+        case = cx.execute("SELECT version FROM cases WHERE id = ?", (root_id,)).fetchone()
+        return {
+            "tenant": tenant,
+            "root_id": root_id,
+            "sources": sources,
+            "case_version": int(case["version"]) if case is not None else None,
+        }
+
+    def _evidence_basis_current(self, cx: sqlite3.Connection, job: sqlite3.Row) -> bool:
+        stored = job["input_basis_json"] if "input_basis_json" in job.keys() else None
+        if not stored:
+            return True
+        try:
+            basis = json.loads(stored)
+        except (TypeError, ValueError):
+            return True
+        current = self._evidence_basis(cx, str(job["tenant"]), str(job["root_id"]))
+        return basis.get("sources") == current.get("sources")
+
     def _mark_evidence_job(
         self, cx: sqlite3.Connection, job_id: str, *, phase: str, status: str
     ) -> None:
@@ -456,9 +484,40 @@ class CaseWorkflow:
         )
 
     def _fail_evidence_job(self, cx: sqlite3.Connection, job_id: str, message: str) -> None:
+        # A provider/artifact/OCR failure is visible: the case becomes
+        # TECHNICAL_ERROR with a typed problem, never a silent PROCESSING (E7).
         cx.execute(
             "UPDATE jobs SET phase = 'DONE', status = 'FAILED', updated_at = ? WHERE id = ?",
             (self._now_iso(), job_id),
+        )
+        row = cx.execute("SELECT tenant, root_id FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if row is None:
+            return
+        from invoice_referee.domain.evidence import ReadResult
+        from invoice_referee.domain.issues import ProcessingProblem
+
+        root_id = str(row["root_id"])
+        cx.execute(
+            "UPDATE cases SET state = 'TECHNICAL_ERROR', updated_at = ? WHERE id = ?",
+            (self._now_iso(), root_id),
+        )
+        problem = ProcessingProblem(
+            kind="TECHNICAL",
+            affected_fields=(),
+            message="đọc chứng cứ thất bại (lỗi kỹ thuật)",
+            relevance="MATERIAL",
+            blocking=True,
+            next_action="retry_or_report_technical",
+        )
+        cx.execute(
+            "INSERT OR REPLACE INTO case_evidence_reports (root_id, tenant, report_json, "
+            "created_at) VALUES (?, ?, ?, ?)",
+            (
+                root_id,
+                str(row["tenant"]),
+                ReadResult(problems=(problem,)).model_dump_json(),
+                self._now_iso(),
+            ),
         )
 
     def _publish_evidence_report(self, cx, *, tenant: str, root_id: str, report) -> None:
@@ -1117,10 +1176,13 @@ class CaseWorkflow:
         # evidence job and returns immediately; the worker produces the typed
         # report. It never runs the finance assessment (contracts §12.5, plan E7).
         if self._evidence_reader is not None:
+            # Persist the input basis at enqueue so a source change before the
+            # worker publishes invalidates the stale result (contracts §6).
+            basis = self._evidence_basis(cx, session.tenant, root_id)
             cx.execute(
-                "UPDATE jobs SET submit_requested = 1, status = 'QUEUED', updated_at = ? "
-                "WHERE id = ?",
-                (now, job_id),
+                "UPDATE jobs SET submit_requested = 1, status = 'QUEUED', "
+                "input_basis_json = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(basis, ensure_ascii=False), now, job_id),
             )
             cx.execute(
                 "UPDATE cases SET state = 'PROCESSING', version = version + 1, "
@@ -2184,6 +2246,11 @@ class CaseWorkflow:
             evidence_report = ReadResult.model_validate_json(report_row["report_json"])
             assessment_ready = False
             assessment_blocker = "EVIDENCE_ADMISSION_NOT_CONNECTED"
+            # In evidence mode the finance result is not current: a stale
+            # conclusion/instruction must not be shown alongside the evidence
+            # report (plan E7). History stays in audit.
+            conclusion = None
+            instructions = ()
         return CaseView(
             id=row["id"],
             version=int(row["version"]),
@@ -2193,7 +2260,7 @@ class CaseWorkflow:
             ),
             sources=sources,
             issues=issues,
-            problems=(),
+            problems=(evidence_report.problems if evidence_report is not None else ()),
             conclusion=conclusion,
             instructions=instructions,
             actual_money=actual_money,

@@ -128,7 +128,7 @@ async def test_searchable_pdf_uses_ocr_on_every_page(tmp_path: Path) -> None:
             self.calls = 0
             self.native_text_calls = 0
 
-        async def ocr_file(self, source, *, budget, artifacts, source_bytes, expected_pages=None):
+        async def ocr_file(self, source, *, budget, artifacts, source_bytes, expected_pages=None, root_id=""):
             self.calls += 1
             return OcrSourceResult(
                 source_id=source.id,

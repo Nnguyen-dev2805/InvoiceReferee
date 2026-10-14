@@ -209,6 +209,7 @@ class FileOcrReader:
         artifacts: ArtifactStore,
         source_bytes: bytes,
         expected_pages: int | None = None,
+        root_id: str = "",
     ) -> OcrSourceResult:
         return await self.provider.ocr_file(  # type: ignore[attr-defined]
             source,
@@ -216,4 +217,5 @@ class FileOcrReader:
             artifacts=artifacts,
             source_bytes=source_bytes,
             expected_pages=expected_pages,
+            root_id=root_id,
         )

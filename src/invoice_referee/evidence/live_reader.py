@@ -15,6 +15,19 @@ from invoice_referee.evidence.mistral import MistralOcrClient
 from invoice_referee.evidence.pdf import native_text, render_page_png
 
 
+def build_file_ocr_provider(*, settings) -> MistralOcrClient:
+    """Build the file-level OCR provider from Settings (plan E7).
+
+    Returns a `MistralOcrClient` whose `ocr_file` OCRs every accepted page; the
+    caller wraps it in a `FileOcrReader`. A blank model/key is reported by the
+    LIVE readiness check, not silently defaulted here.
+    """
+    return MistralOcrClient(
+        api_key=getattr(settings, "mistral_api_key", "") or "",
+        model=getattr(settings, "mistral_ocr_model", "") or "",
+    )
+
+
 class MistralPageReader:
     """Read one page of one stored source as text (native text, else OCR)."""
 

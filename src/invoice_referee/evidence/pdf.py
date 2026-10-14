@@ -54,3 +54,12 @@ def page_count(pdf_path: Path) -> int:
     import pypdf
 
     return len(pypdf.PdfReader(str(pdf_path)).pages)
+
+
+def page_count_bytes(pdf_bytes: bytes) -> int:
+    """Count pages from in-memory PDF bytes (plan E7 page-coverage check)."""
+    import io
+
+    import pypdf
+
+    return len(pypdf.PdfReader(io.BytesIO(pdf_bytes)).pages)

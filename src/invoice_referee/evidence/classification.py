@@ -97,6 +97,7 @@ async def classify_documents(
         raise XkiroError("classification returned no documents")
 
     results: list[DocumentClassification] = []
+    claimed_pages: dict[str, list[range]] = {}
     for entry in documents:
         if not isinstance(entry, dict):
             raise XkiroError("malformed classification entry")
@@ -113,6 +114,18 @@ async def classify_documents(
             roles = allowed
         page_range = entry.get("page_range") or [1, 1]
         start, end = int(page_range[0]), int(page_range[1])
+        # The model proposes a range; code validates it against the OCR pages
+        # and rejects an out-of-range or overlapping incompatible unit (plan E4).
+        page_numbers = set(page_text[source_id])
+        if start < 1 or end < start or not set(range(start, end + 1)) <= page_numbers:
+            raise XkiroError(
+                f"classification page range {start}-{end} is outside source {source_id}"
+            )
+        this_range = range(start, end + 1)
+        for prior in claimed_pages.get(source_id, []):
+            if set(prior) & set(this_range):
+                raise XkiroError(f"overlapping document units for source {source_id}")
+        claimed_pages.setdefault(source_id, []).append(this_range)
         # Code owns the document id (model ids are discarded).
         document_id = f"{source_id}:{start}-{end}:{document_type}"
         digest = digest_by_id[source_id]

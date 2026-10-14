@@ -196,6 +196,7 @@ async def read_root(
     source_bytes: dict[str, bytes],
     budget: RunBudget,
     provider_mode: ProviderMode,
+    root_id: str = "",
 ) -> "ReadResult":
     """Run the evidence pipeline: OCR -> confidence -> classify -> extract ->
     validate -> match. Stops before reconciliation/policy/finance (plan E7).
@@ -207,18 +208,42 @@ async def read_root(
     from invoice_referee.domain.evidence import ReadResult
     from invoice_referee.evidence.classification import classify_documents
     from invoice_referee.evidence.extraction import extract_document
-    from invoice_referee.evidence.matching import match_paper_evidence
+    from invoice_referee.evidence.matching import match_paper_evidence, resolve_evidence_suggestions
     from invoice_referee.evidence.ocr_quality import collect_low_confidence_blocks, review_ocr_quality
     from invoice_referee.evidence.document_validity import validate_document
 
+    from invoice_referee.domain.issues import ProcessingProblem
+
     ocr_results = []
+    source_problems: list[ProcessingProblem] = []
     for source in sources:
         payload = source_bytes.get(source.id)
         if payload is None:
+            # A missing source is NOT silently dropped: it is a material
+            # technical problem, never a reduced source set (plan E7).
+            source_problems.append(
+                ProcessingProblem(
+                    kind="TECHNICAL",
+                    affected_fields=(source.id,),
+                    message=f"nguồn {source.id} không đọc được bytes",
+                    relevance="MATERIAL",
+                    blocking=True,
+                    next_action="reupload_source",
+                )
+            )
             continue
+        expected_pages = None
+        if source.media == "PDF":
+            try:
+                from invoice_referee.evidence.pdf import page_count_bytes
+
+                expected_pages = page_count_bytes(payload)
+            except Exception:
+                expected_pages = None  # unreadable PDF: provider call reports the problem
         ocr_results.append(
             await reader.read_source(
-                source, budget=budget, artifacts=artifacts, source_bytes=payload
+                source, budget=budget, artifacts=artifacts, source_bytes=payload,
+                expected_pages=expected_pages, root_id=root_id,
             )
         )
     ocr = tuple(ocr_results)
@@ -241,6 +266,11 @@ async def read_root(
     paper = next((d for d in documents if d.document_type == "SETTLEMENT_FORM"), None)
     if paper is not None:
         matching = match_paper_evidence(paper, tuple(documents))
+        # One bounded suggestion-resolution batch, only when suggestions exist.
+        if any(link.status == "SUGGEST_LINK" for link in matching.links):
+            matching = await resolve_evidence_suggestions(
+                matching, tuple(documents), llm=classifier, budget=budget
+            )
     else:
         matching = EvidenceMatchingResult(
             findings=(
@@ -256,7 +286,7 @@ async def read_root(
     origin = {"LIVE": "LIVE_READ", "RECORDED_REPLAY": "RECORDED_REPLAY"}.get(
         provider_mode, "STUB_TRANSCRIPTION"
     )
-    problems = tuple(p for result in ocr for p in result.problems)
+    problems = tuple(source_problems) + tuple(p for result in ocr for p in result.problems)
     return ReadResult(
         provider_mode=provider_mode,
         data_origin=origin,

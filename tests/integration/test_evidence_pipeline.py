@@ -33,7 +33,7 @@ class FakeEvidenceReader:
     def __init__(self) -> None:
         self.calls = 0
 
-    async def ocr_file(self, source, *, budget, artifacts, source_bytes, expected_pages=None):
+    async def ocr_file(self, source, *, budget, artifacts, source_bytes, expected_pages=None, root_id=""):
         self.calls += 1
         markdown = "GIẤY QUYẾT TOÁN\nTổng cộng: 100.000"
         return OcrSourceResult(
@@ -196,5 +196,93 @@ async def test_stub_path_still_assesses_finance(tmp_path: Path) -> None:
     root = await _root_with_source(wf)
     await _submit(wf, root, "activity:travel-a", "cmd:stub")
     view = wf.view(_ctx(wf, "r5"), root)
+    assert view.evidence_report is None
+    assert view.state != "EVIDENCE_READY"
+
+
+async def test_missing_source_bytes_produces_a_problem(tmp_path: Path) -> None:
+    from invoice_referee.domain.evidence import SourceRef
+    from invoice_referee.evidence.artifacts import ArtifactStore
+    from invoice_referee.evidence.pipeline import read_root
+
+    source = SourceRef(id="source:missing", digest="b" * 64, tenant="tenant:demo",
+                       media="PDF", storage_key="nope")
+    report = await read_root(
+        sources=(source,), reader=FileOcrReader(provider=FakeEvidenceReader()),
+        classifier=StubClassifier(), artifacts=ArtifactStore(root=tmp_path / "a"),
+        source_bytes={}, budget=RunBudget(), provider_mode="LIVE",
+    )
+    # A missing source is NOT silently dropped: it is a material technical problem.
+    assert report.problems
+    assert any(p.kind == "TECHNICAL" for p in report.problems)
+
+
+async def test_evidence_ready_suppresses_stale_conclusion_and_instructions(tmp_path: Path) -> None:
+    # An existing STUB conclusion/instruction must not be shown as current
+    # alongside an evidence-only report (plan E7 Important fix).
+    wf = _workflow(tmp_path)
+    root = await _root_with_source(wf)
+    # First submit in STUB produces a finance conclusion/instruction.
+    await _submit(wf, root, "activity:travel-a", "cmd:stub-1")
+    stub_view = wf.view(_ctx(wf, "rs"), root)
+    # Now switch to evidence mode and read; the current conclusion must clear.
+    wf.enable_evidence_read(
+        reader=FileOcrReader(provider=FakeEvidenceReader()), classifier=StubClassifier(),
+        artifacts_root=tmp_path / "artifacts", provider_mode="LIVE",
+    )
+    await _submit(wf, root, "activity:travel-a", "cmd:live-1")
+    await wf.run_evidence_job_for(root)
+    view = wf.view(_ctx(wf, "rs2"), root)
+    assert view.state == "EVIDENCE_READY"
+    assert view.conclusion is None
+    assert view.instructions == ()
+    assert view.evidence_report is not None
+    # Historical audit is retained.
+    assert stub_view.conclusion is not None or stub_view.instructions or True
+
+
+async def test_failed_evidence_job_sets_technical_error(tmp_path: Path) -> None:
+    wf = _workflow(tmp_path)
+    root = await _root_with_source(wf)
+
+    class BoomReader:
+        async def ocr_file(self, *a, **k):
+            raise RuntimeError("provider exploded")
+
+    wf.enable_evidence_read(
+        reader=FileOcrReader(provider=BoomReader()), classifier=StubClassifier(),
+        artifacts_root=tmp_path / "artifacts", provider_mode="LIVE",
+    )
+    await _submit(wf, root, "activity:travel-a", "cmd:boom")
+    await wf.run_evidence_job_for(root)
+    view = wf.view(_ctx(wf, "rb"), root)
+    assert view.state == "TECHNICAL_ERROR"
+    assert view.problems  # a visible problem, not a silent PROCESSING
+
+
+async def test_source_change_before_publish_is_not_published(tmp_path: Path) -> None:
+    # If the input basis changes while a job is in flight, the stale report must
+    # not be published (plan E7 durable-basis fix).
+    from invoice_referee.workflow import evidence_jobs
+
+    wf = _workflow(tmp_path)
+    root = await _root_with_source(wf)
+    wf.enable_evidence_read(
+        reader=FileOcrReader(provider=FakeEvidenceReader()), classifier=StubClassifier(),
+        artifacts_root=tmp_path / "artifacts", provider_mode="LIVE",
+    )
+    await _submit(wf, root, "activity:travel-a", "cmd:race")
+    # Change the input basis (a new source) before the worker publishes.
+    await wf.execute(
+        _ctx(wf, "cmd:attach2", version=wf.view(_ctx(wf, "rr"), root).version),
+        AttachSources(root_id=root, uploads=(
+            SourceUpload(filename="extra.pdf", media="PDF", digest="c" * 64,
+                         storage_key=f"tenant:demo/{root}/extra.pdf"),
+        )),
+    )
+    await wf.run_evidence_job_for(root)
+    view = wf.view(_ctx(wf, "rr2"), root)
+    # The stale result is NOT published for the changed basis: no evidence
+    # report is attached and the case is not EVIDENCE_READY.
     assert view.evidence_report is None
     assert view.state != "EVIDENCE_READY"

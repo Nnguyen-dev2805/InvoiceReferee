@@ -203,3 +203,27 @@ async def test_artifact_path_is_tenant_scoped(tmp_path: Path) -> None:
     )
     tenants = {p.name for p in (tmp_path / "artifacts").iterdir() if p.is_dir()}
     assert tenants == {"tenant:a", "tenant:b"}
+
+
+async def test_artifact_root_id_is_in_the_path_and_capped(tmp_path: Path) -> None:
+    from invoice_referee.evidence.artifacts import MAX_ARTIFACT_BYTES_PER_ROOT, ArtifactWriteError
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_ocr_json([_page(0, "x")]))
+
+    store = ArtifactStore(root=tmp_path / "artifacts")
+    client = _client(handler)
+    result = await client.ocr_file(
+        _source(), budget=RunBudget(), artifacts=store,
+        source_bytes=b"%PDF-1.4 x", root_id="case:1",
+    )
+    # The opaque ref is scoped by tenant AND root.
+    assert "case_1" in result.raw_artifact_ref.split("/")
+
+    # A per-root aggregate cap is enforced.
+    store2 = ArtifactStore(root=tmp_path / "a2", max_root_bytes=10)
+    with pytest.raises(ArtifactWriteError):
+        await client.ocr_file(
+            _source(), budget=RunBudget(), artifacts=store2,
+            source_bytes=b"%PDF-1.4 x", root_id="case:1",
+        )

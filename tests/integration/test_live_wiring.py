@@ -170,3 +170,34 @@ def test_missing_llm_provider_is_reported_not_downgraded() -> None:
     with pytest.raises(ValueError) as exc:
         build_llm_client(settings)
     assert "XKIRO_API_KEY" in str(exc.value)
+
+
+def test_build_workflow_live_wires_the_evidence_pipeline(tmp_path: Path) -> None:
+    # LIVE must compose the §12 evidence pipeline (FileOcrReader + X-Kiro),
+    # not the legacy native-text transcriber (plan E7 Critical fix).
+    from invoice_referee.config import Settings
+    from invoice_referee.runtime import build_workflow
+
+    settings = Settings(
+        mistral_api_key="m", mistral_ocr_model="mistral-ocr-1",
+        xkiro_api_key="k", xkiro_base_url="https://x.test/v1",
+        invoice_referee_llm_model="llm-1", _env_file=None,  # type: ignore[call-arg]
+    )
+    wf = build_workflow(
+        settings, "LIVE", db=Database(tmp_path / "r.sqlite"),
+        uploads_dir=tmp_path / "up", context_path=Path("data/demo/company-context.json"),
+    )
+    assert getattr(wf, "_evidence_reader", None) is not None
+    assert getattr(wf, "_evidence_classifier", None) is not None
+    assert getattr(wf, "_transcriber", None) is None  # legacy path not used in LIVE
+
+
+def test_build_workflow_stub_does_not_wire_evidence(tmp_path: Path) -> None:
+    from invoice_referee.config import Settings
+    from invoice_referee.runtime import build_workflow
+
+    wf = build_workflow(
+        Settings(_env_file=None), "STUB", db=Database(tmp_path / "r.sqlite"),  # type: ignore[call-arg]
+        uploads_dir=tmp_path / "up", context_path=Path("data/demo/company-context.json"),
+    )
+    assert getattr(wf, "_evidence_reader", None) is None

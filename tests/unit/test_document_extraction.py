@@ -161,3 +161,39 @@ async def test_second_schema_failure_is_unresolved() -> None:
     analysis = await extract_document(_ocr(), _classification(), llm=llm, budget=RunBudget())
     assert analysis.profile_status in ("NEEDS_HUMAN", "UNKNOWN")
     assert llm.calls <= 2  # at most one repair
+
+
+async def test_line_field_with_fabricated_quote_is_demoted() -> None:
+    llm = FakeLlm(
+        {
+            "fields": [],
+            "lines": [
+                {"id": "model", "fields": [
+                    {"field": "amount", "state": "FOUND", "value": "600000",
+                     "quote": "Số tiền bịa hoàn toàn không có trong nguồn"},
+                ]},
+            ],
+        }
+    )
+    analysis = await extract_document(_ocr(), _classification(), llm=llm, budget=RunBudget())
+    line = analysis.line_items[0]
+    amount = next(f for f in line.fields if f.field == "amount")
+    assert amount.state != "FOUND"
+
+
+async def test_line_field_with_mismatching_value_is_demoted() -> None:
+    # The quote exists ("Tổng cộng: 450.000") but the value is not derivable.
+    llm = FakeLlm(
+        {
+            "fields": [],
+            "lines": [
+                {"id": "model", "fields": [
+                    {"field": "amount", "state": "FOUND", "value": "999000",
+                     "quote": "Tổng cộng: 450.000"},
+                ]},
+            ],
+        }
+    )
+    analysis = await extract_document(_ocr(), _classification(), llm=llm, budget=RunBudget())
+    amount = next(f for f in analysis.line_items[0].fields if f.field == "amount")
+    assert amount.state != "FOUND"

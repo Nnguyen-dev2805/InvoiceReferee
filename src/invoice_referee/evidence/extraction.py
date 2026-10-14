@@ -75,6 +75,38 @@ def _ref(ocr: OcrSourceResult, page: int, quote: str) -> EvidenceRef:
     )
 
 
+def _validate_field(
+    entry: object,
+    *,
+    ocr: OcrSourceResult,
+    haystack: str,
+    default_page: int,
+) -> FieldCandidate:
+    """Build one FieldCandidate, verifying provenance for FOUND (plan E5).
+
+    A quote must be in this document's own pages AND the normalized value must
+    be derivable from that quote; otherwise the field is demoted to UNREADABLE.
+    Used for both top-level fields and per-row line fields.
+    """
+    if not isinstance(entry, dict):
+        return FieldCandidate(field="", state="NOT_APPLICABLE")
+    state = str(entry.get("state") or "NOT_APPLICABLE")
+    field_name = str(entry.get("field") or "")
+    if state != "FOUND":
+        return FieldCandidate(field=field_name, state=state)  # type: ignore[arg-type]
+    quote = str(entry.get("quote") or "")
+    page = int(entry.get("page") or default_page)
+    value = entry.get("value")
+    if not _quote_supported(quote, haystack) or not _value_supported(value, quote):
+        return FieldCandidate(field=field_name, state="UNREADABLE")
+    return FieldCandidate(
+        field=field_name,
+        state="FOUND",
+        value=value if isinstance(value, (str, int, Decimal, bool)) else str(value),
+        refs=(_ref(ocr, page, quote),),
+    )
+
+
 async def extract_document(
     ocr: OcrSourceResult,
     classification: DocumentClassification,
@@ -101,52 +133,20 @@ async def extract_document(
     if not isinstance(raw_fields, list) or not isinstance(raw_lines, list):
         return _unresolved(ocr, classification)
 
-    fields: list[FieldCandidate] = []
-    for entry in raw_fields:
-        if not isinstance(entry, dict):
-            continue
-        state = str(entry.get("state") or "NOT_APPLICABLE")
-        field_name = str(entry.get("field") or "")
-        if state != "FOUND":
-            fields.append(FieldCandidate(field=field_name, state=state))  # type: ignore[arg-type]
-            continue
-        quote = str(entry.get("quote") or "")
-        page = int(entry.get("page") or classification.page_range[0])
-        value = entry.get("value")
-        # Provenance: the quote must be in this document's own pages AND the
-        # normalized value must be supported by that quote.
-        if not _quote_supported(quote, haystack) or not _value_supported(value, quote):
-            fields.append(
-                FieldCandidate(
-                    field=field_name,
-                    state="UNREADABLE",
-                    refs=(),
-                )
-            )
-            continue
-        fields.append(
-            FieldCandidate(
-                field=field_name,
-                state="FOUND",
-                value=value if isinstance(value, (str, int, Decimal, bool)) else str(value),
-                refs=(_ref(ocr, page, quote),),
-            )
-        )
+    fields: list[FieldCandidate] = [
+        _validate_field(entry, ocr=ocr, haystack=haystack, default_page=classification.page_range[0])
+        for entry in raw_fields
+        if isinstance(entry, dict)
+    ]
 
     lines: list[DocumentLine] = []
     for index, entry in enumerate(raw_lines, start=1):
         if not isinstance(entry, dict):
             continue
-        # Code owns the line id; the model's id is discarded.
+        # Code owns the line id; the model's id is discarded. Line fields get
+        # the same provenance validation as top-level fields (plan E5).
         line_fields = tuple(
-            FieldCandidate(
-                field=str(f.get("field") or ""),
-                state=str(f.get("state") or "NOT_APPLICABLE"),  # type: ignore[arg-type]
-                value=f.get("value"),
-                refs=(_ref(ocr, int(f.get("page") or 1), str(f.get("quote") or "line")),)
-                if f.get("state") == "FOUND"
-                else (),
-            )
+            _validate_field(f, ocr=ocr, haystack=haystack, default_page=classification.page_range[0])
             for f in entry.get("fields", [])
             if isinstance(f, dict)
         )

@@ -61,35 +61,40 @@ def build_workflow(
 
 
 def _wire_live(workflow: CaseWorkflow, *, uploads_dir: str | Path, settings: Settings) -> None:
-    from invoice_referee.evidence.live_reader import MistralPageReader
-    from invoice_referee.evidence.pipeline import transcribe_root
-    from invoice_referee.evidence.trace import RunBudget
+    """Compose the §12 evidence pipeline for LIVE (plan E7).
 
-    async def transcriber(*, sources, budget=None, provider_mode="LIVE"):
-        return await transcribe_root(
-            reader=MistralPageReader(
-                uploads_dir=uploads_dir, settings=settings, budget=budget or RunBudget()
-            ),
-            sources=sources,
-            budget=budget or RunBudget(),
-            provider_mode=provider_mode,
-        )
+    The LIVE runtime uses the file-level OCR reader + the configured X-Kiro
+    classifier; the legacy native-text transcriber is not used. Provider I/O
+    runs in the durable evidence worker, outside any SQLite transaction.
+    """
+    from invoice_referee.evidence.live_reader import build_file_ocr_provider
+    from invoice_referee.evidence.reader import FileOcrReader
 
-    workflow.enable_live_read(transcriber, provider_mode="LIVE")
+    llm = build_llm_client(settings)
+    reader = FileOcrReader(provider=build_file_ocr_provider(settings=settings))
+    workflow.enable_evidence_read(
+        reader=reader,
+        classifier=llm,
+        artifacts_root=Path(uploads_dir).parent / "artifacts",
+        provider_mode="LIVE",
+    )
 
 
 def _wire_replay(workflow: CaseWorkflow, *, settings: Settings) -> None:
-    from invoice_referee.evidence.pipeline import transcribe_root
+    """Compose the evidence pipeline for RECORDED_REPLAY (plan E7).
+
+    Replay needs a captured recording; without one the read is a miss (never a
+    fabricated page), so the case stays unresolved.
+    """
+    from invoice_referee.evidence.reader import FileOcrReader
     from invoice_referee.evidence.replay import ReplayReader
-    from invoice_referee.evidence.trace import RunBudget
 
     recording = getattr(settings, "replay_recording", None)
-    reader = ReplayReader(Path(recording)) if recording else ReplayReader(Path("/nonexistent"))
-
-    async def transcriber(*, sources, budget=None, provider_mode="RECORDED_REPLAY"):
-        return await transcribe_root(
-            reader=reader, sources=sources, budget=budget or RunBudget(),
-            provider_mode=provider_mode,
-        )
-
-    workflow.enable_live_read(transcriber, provider_mode="RECORDED_REPLAY")
+    provider = ReplayReader(Path(recording)) if recording else ReplayReader(Path("/nonexistent"))
+    llm = build_llm_client(settings)
+    workflow.enable_evidence_read(
+        reader=FileOcrReader(provider=provider),
+        classifier=llm,
+        artifacts_root=Path(getattr(settings, "uploads_dir", ".")).parent / "artifacts",
+        provider_mode="RECORDED_REPLAY",
+    )

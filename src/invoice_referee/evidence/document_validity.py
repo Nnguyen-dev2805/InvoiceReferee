@@ -2,17 +2,14 @@
 
 `validate_document` is synchronous and side-effect free. It checks that every
 FOUND value is bound to an exact quote in this document's own pages, applies the
-per-type profile (required/critical fields), and enforces the critical-field
-confidence guard:
+per-type profile (required/any-of/allowed fields), and enforces the critical-field
+confidence guard bound to the field's *own* block(s):
 
-- a critical field is unresolved when its bound words are not READABLE, or its
-  digit-bearing text has no numeric score, or the effective verification flag
-  is set for a field the E3 review flagged; and
-- the model cannot lower code-owned criticality, and an omitted model field
-  label cannot evade the guard (the guard binds by quote overlap, not label).
-
-The field-to-word mapping is block-local offset based: a FOUND field's quote is
-matched against the OCR blocks of the same page to find the words it covers.
+- a critical field is unresolved when the assessment for the block that carries
+  its quote is flagged (effective verification), or its bound words are not
+  READABLE, or its digit-bearing text has no numeric score; and
+- the model cannot lower code-owned criticality, and an unrelated flagged block
+  does not block a clean field (the guard binds by quote→block, not globally).
 """
 
 from __future__ import annotations
@@ -37,8 +34,8 @@ def _has_digits(text: str) -> bool:
     return any(ch in _DIGITS for ch in text)
 
 
-def _field_words(ocr: OcrSourceResult, field: FieldCandidate):
-    """Words covered by a FOUND field's quote, found by block-local content."""
+def _field_blocks(ocr: OcrSourceResult, field: FieldCandidate):
+    """(page, block_id, words) blocks whose content carries this field's quote."""
     if not field.refs:
         return []
     quote = field.refs[0].exact_quote
@@ -49,13 +46,16 @@ def _field_words(ocr: OcrSourceResult, field: FieldCandidate):
             continue
         for block in page.blocks:
             if quote and quote in block.content:
-                covered.extend(block.words)
+                covered.append((page.page, block.id, block.words))
     return covered
 
 
-def _verification_flag(review: ConfidenceReview, ocr: OcrSourceResult, quote: str) -> bool:
-    """The effective_requires_verification flag for the block touching a quote."""
+def _block_flagged(review: ConfidenceReview, ocr: OcrSourceResult, page: int, block_id: str) -> bool:
+    """Whether the review flagged the block whose candidate id matches this one."""
+    candidate_id = f"{ocr.source_id}:p{page}:{block_id}"
     for assessment in review.block_assessments:
+        if assessment.candidate_id != candidate_id:
+            continue
         if assessment.review_action in ("ASK_HUMAN", "DEFER_TO_POLICY"):
             return True
         if effective_requires_verification(
@@ -83,7 +83,6 @@ def validate_document(
             new_fields.append(field)
             continue
 
-        # 1. Provenance: the quote must be in this document's own pages.
         pages_text = "\n".join(
             page.markdown
             for page in ocr.pages
@@ -94,38 +93,54 @@ def validate_document(
             new_fields.append(FieldCandidate(field=field.field, state="UNREADABLE"))
             findings.append(
                 DocumentProfileIssue(
-                    code="QUOTE_NOT_IN_SOURCE",
-                    field=field.field,
-                    status="INVALID",
-                    message="quote not found in the document's own pages",
-                    blocking=True,
+                    code="QUOTE_NOT_IN_SOURCE", field=field.field, status="INVALID",
+                    message="quote not found in the document's own pages", blocking=True,
                 )
             )
             continue
 
-        # 2. Critical-field confidence guard.
         if field.field in critical:
-            words = _field_words(ocr, field)
+            blocks = _field_blocks(ocr, field)
+            words = [w for _, _, ws in blocks for w in ws]
             has_numeric = [w for w in words if w.confidence is not None]
-            digit_field = field.field in EXACT_ACCOUNTING_VALUE_FIELDS or _has_digits(
-                str(field.value)
+            digit_field = field.field in EXACT_ACCOUNTING_VALUE_FIELDS or _has_digits(str(field.value))
+            flagged = any(
+                _block_flagged(review, ocr, page, block_id) for page, block_id, _ in blocks
             )
-            flagged = _verification_flag(review, ocr, quote)
             if flagged or (digit_field and not has_numeric and words):
                 new_fields.append(FieldCandidate(field=field.field, state="UNREADABLE"))
                 needs_human = True
                 findings.append(
                     DocumentProfileIssue(
-                        code="CRITICAL_FIELD_UNVERIFIED",
-                        field=field.field,
-                        status="UNRESOLVED",
-                        message="critical field lacks verified confidence",
-                        blocking=True,
+                        code="CRITICAL_FIELD_UNVERIFIED", field=field.field, status="UNRESOLVED",
+                        message="critical field lacks verified confidence", blocking=True,
                     )
                 )
                 continue
 
         new_fields.append(field)
+
+    # Profile: required fields must be FOUND; any-of sets need at least one.
+    if profile is not None:
+        found = {f.field for f in new_fields if f.state == "FOUND"}
+        for required in profile.required_fields:
+            if required not in found:
+                needs_human = True
+                findings.append(
+                    DocumentProfileIssue(
+                        code="REQUIRED_FIELD_MISSING", field=required, status="UNRESOLVED",
+                        message=f"required field '{required}' is missing", blocking=True,
+                    )
+                )
+        if profile.any_of_fields and not (set(profile.any_of_fields) & found):
+            needs_human = True
+            findings.append(
+                DocumentProfileIssue(
+                    code="REQUIRED_FIELD_MISSING", field="|".join(profile.any_of_fields),
+                    status="UNRESOLVED",
+                    message="none of the any-of fields is present", blocking=True,
+                )
+            )
 
     profile_status = "NEEDS_HUMAN" if needs_human or findings else "CLEAR"
     return analysis.model_copy(

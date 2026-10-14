@@ -25,19 +25,36 @@ class ArtifactWriteError(RuntimeError):
 class ArtifactStore:
     """Writes raw provider JSON under a tenant/root/source-digest key."""
 
-    def __init__(self, *, root: str | Path) -> None:
+    def __init__(
+        self,
+        *,
+        root: str | Path,
+        max_root_bytes: int = MAX_ARTIFACT_BYTES_PER_ROOT,
+    ) -> None:
         self.root = Path(root)
+        self.max_root_bytes = max_root_bytes
 
-    def _rel_path(self, *, tenant: str, source_id: str, source_digest: str, version: str) -> Path:
+    def _rel_path(
+        self, *, tenant: str, root_id: str, source_id: str, source_digest: str, version: str
+    ) -> Path:
         # Keep the opaque reference relative; never expose an absolute path in
-        # SQLite/API payloads. The digest and version make the key stable.
+        # SQLite/API payloads. tenant/root/source-digest scope the artifact.
+        safe_root = root_id.replace("/", "_").replace(":", "_")
         digest = hashlib.sha256(f"{source_id}:{source_digest}:{version}".encode()).hexdigest()[:16]
-        return Path(tenant) / f"{digest}.json"
+        return Path(tenant) / safe_root / f"{digest}.json"
+
+    def _root_bytes(self, tenant: str, root_id: str) -> int:
+        safe_root = root_id.replace("/", "_").replace(":", "_")
+        directory = self.root / tenant / safe_root
+        if not directory.is_dir():
+            return 0
+        return sum(p.stat().st_size for p in directory.glob("*.json"))
 
     def write(
         self,
         *,
         tenant: str,
+        root_id: str,
         source_id: str,
         source_digest: str,
         version: str,
@@ -49,8 +66,13 @@ class ArtifactStore:
                 f"raw OCR artifact {len(encoded)} bytes exceeds "
                 f"{MAX_ARTIFACT_BYTES_PER_SOURCE} per source"
             )
+        if self._root_bytes(tenant, root_id) + len(encoded) > self.max_root_bytes:
+            raise ArtifactWriteError(
+                f"root {root_id} artifact bytes exceed {self.max_root_bytes}"
+            )
         rel = self._rel_path(
-            tenant=tenant, source_id=source_id, source_digest=source_digest, version=version
+            tenant=tenant, root_id=root_id, source_id=source_id,
+            source_digest=source_digest, version=version,
         )
         target = self.root / rel
         target.parent.mkdir(parents=True, exist_ok=True)
