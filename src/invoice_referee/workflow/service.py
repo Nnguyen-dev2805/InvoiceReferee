@@ -524,14 +524,18 @@ class CaseWorkflow:
             ),
         )
 
-    def _publish_evidence_report(self, cx, *, tenant: str, root_id: str, report) -> None:
+    def _publish_evidence_report(
+        self, cx, *, tenant: str, root_id: str, report, session=None
+    ) -> None:
         cx.execute(
             "INSERT OR REPLACE INTO case_evidence_reports (root_id, tenant, report_json, "
             "created_at) VALUES (?, ?, ?, ?)",
             (root_id, tenant, report.model_dump_json(), self._now_iso()),
         )
-        # The evidence pipeline does not assess finance: the case is
-        # EVIDENCE_READY with no conclusion/instruction (contracts §12.5).
+        # The typed report is published; the case becomes EVIDENCE_READY. The
+        # finance consumer then assesses the typed admission input from the
+        # CURRENT stored state (plan A5). A Stop/changed basis before this point
+        # is caught by the caller's re-check, so a stale report is not assessed.
         cx.execute(
             "UPDATE cases SET state = 'EVIDENCE_READY', updated_at = ? WHERE id = ?",
             (self._now_iso(), root_id),
@@ -576,6 +580,19 @@ class CaseWorkflow:
 
     def _now_iso(self) -> str:
         return self._clock().isoformat()
+
+    def _system_session(self, tenant: str) -> DemoSession:
+        """A server-owned session for the evidence worker's typed assessment.
+
+        The worker assesses with the system referee identity; it is not a user
+        command, so no client session/actor is required (plan A5).
+        """
+        return DemoSession(
+            session_id="session:evidence-worker",
+            tenant=tenant,
+            persona="system",
+            actor_id="system:referee",
+        )
 
     # -- demo sessions -------------------------------------------------------
     def start_session(
@@ -763,14 +780,16 @@ class CaseWorkflow:
     ) -> str:
         """Import a typed OrganizationContext through the same validated path.
 
-        Maps the A.1 records (activity/authorization, budgets, grants, people,
-        ledger, coverage, witnesses) into the same tables the demo importer
-        uses, so the app and the evaluator share one importer (plan A.1). No
-        expected/route value is stored; the ledger is trusted server fixture.
+        Persists the full validated payload as an immutable snapshot (so
+        policies/budgets/ledger/coverage survive restart) AND projects the
+        activity/people/grants/witnesses rows the existing commands read
+        (plan A1). No expected/route value is stored; the ledger is trusted
+        server fixture.
         """
         import json as _json
 
-        from invoice_referee.evaluation.models import OrganizationContext
+        from invoice_referee.domain.organization import OrganizationContext
+        from invoice_referee.workflow.context_records import persist_context
 
         data = (
             context
@@ -778,70 +797,9 @@ class CaseWorkflow:
             else OrganizationContext.model_validate(context)
         )
         tenant = data.organization_id or data.tenant
-        raw = _json.dumps(data.model_dump(mode="json"), sort_keys=True, ensure_ascii=False)
-        digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
         now = self._now_iso()
         with self.db.transaction() as cx:
-            activity = data.activity or {}
-            activity_id = str(activity.get("activity_id") or "")
-            if activity_id:
-                authorization = activity.get("authorization")
-                budget = _budget_for(data.budgets, activity_id)
-                cx.execute(
-                    "INSERT INTO context_activities (activity_id, tenant, name, occurred_at, "
-                    "purpose, budget_amount, budget_effect_from, status) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
-                    "ON CONFLICT(tenant, activity_id) DO UPDATE SET name=excluded.name, "
-                    "occurred_at=excluded.occurred_at, purpose=excluded.purpose, "
-                    "budget_amount=excluded.budget_amount, "
-                    "budget_effect_from=excluded.budget_effect_from, status=excluded.status",
-                    (
-                        activity_id,
-                        tenant,
-                        str(activity.get("name") or activity_id),
-                        activity.get("occurred_at"),
-                        str(activity.get("purpose") or ""),
-                        int(budget["amount"]) if budget else None,
-                        (budget["effect_range"][0] if budget else None),
-                        "AUTHORIZED" if authorization is not None else "PROPOSED",
-                    ),
-                )
-            for person in data.people:
-                cx.execute(
-                    "INSERT OR REPLACE INTO context_people (id, tenant, name) VALUES (?, ?, ?)",
-                    (str(person["id"]), tenant, str(person["name"])),
-                )
-            for grant in data.grants:
-                cx.execute(
-                    "INSERT OR REPLACE INTO context_grants (grant_id, tenant, version, actor, "
-                    "actions_json, scope, allowed_profiles_json, max_amount, effective_from, "
-                    "effective_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        str(grant["id"]),
-                        tenant,
-                        str(grant.get("version", "v1")),
-                        str(grant["actor"]),
-                        _json.dumps(list(grant.get("actions", [])), ensure_ascii=False),
-                        str(grant["scope"]),
-                        _json.dumps(list(grant.get("allowed_profiles", [])), ensure_ascii=False),
-                        int(grant["max_amount"]),
-                        str(grant["effective_from"]),
-                        grant.get("effective_to"),
-                    ),
-                )
-            for witness in data.witnesses:
-                cx.execute(
-                    "INSERT OR REPLACE INTO context_witnesses (tenant, kind, record_key, quote, "
-                    "source_id, source_sha256) VALUES (?, ?, ?, ?, ?, ?)",
-                    (
-                        tenant,
-                        "LEDGER_COVERAGE",
-                        str(witness["record_key"]),
-                        str(witness["quote"]),
-                        "source:company-context",
-                        digest,
-                    ),
-                )
+            digest = persist_context(cx, data, origin, imported_at=now)
             cx.execute(
                 "INSERT INTO context_imports (tenant, digest, origin, imported_at, note) "
                 "VALUES (?, ?, ?, ?, ?)",
@@ -1153,6 +1111,81 @@ class CaseWorkflow:
         return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
 
     # -- submission and assessment -------------------------------------------
+    def _record_employee_paid_claims(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        row: sqlite3.Row,
+        command: "Submit",
+        now: str,
+    ) -> None:
+        """Persist Q32 employee paid-claims as scoped confirmations (plan A2).
+
+        The client states the claim; the server derives the actor (session),
+        scope (root activity) and time (now), and resolves each file ref to an
+        uploaded source of this root by filename + digest. A ref that does not
+        resolve is rejected before any row is written, so a bad claim cannot
+        leave a partial confirmation.
+        """
+        claims = getattr(command, "employee_paid_claims", ())
+        if not claims:
+            return
+        root_id = str(row["id"])
+        activity = str(row["activity"])
+        sources = {
+            (str(r["filename"]), str(r["digest"])): str(r["source_id"])
+            for r in cx.execute(
+                "SELECT source_id, filename, digest FROM case_sources WHERE root_id = ?",
+                (root_id,),
+            ).fetchall()
+        }
+        for claim in claims:
+            resolved_refs = []
+            for ref in claim.refs:
+                filename = ref.source_id[len("file:"):] if ref.source_id.startswith("file:") else ref.source_id
+                source_id = sources.get((filename, ref.source_sha256))
+                if source_id is None:
+                    raise UnsupportedCommandError(
+                        f"Chứng từ '{filename}' không khớp tệp đã tải lên hồ sơ này."
+                    )
+                resolved_refs.append(ref.model_copy(update={"source_id": source_id}))
+            fact_key = f"expense:{claim.invoice_reference}:employee_paid"
+            confirmation_id = (
+                "confirmation:"
+                + hashlib.sha256((root_id + fact_key).encode()).hexdigest()[:16]
+            )
+            cx.execute(
+                "INSERT OR REPLACE INTO case_confirmations (id, tenant, root_id, fact_key, "
+                "value, actor, scope, refs_json, reason, observed_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    confirmation_id,
+                    session.tenant,
+                    root_id,
+                    fact_key,
+                    str(claim.amount),
+                    session.actor_id,
+                    activity,
+                    json.dumps(
+                        [ref.model_dump(mode="json") for ref in resolved_refs],
+                        ensure_ascii=False,
+                    ),
+                    claim.reason,
+                    now,
+                ),
+            )
+        self._audit(
+            cx,
+            tenant=session.tenant,
+            root_id=root_id,
+            session_id=session.session_id,
+            actor=session.actor_id,
+            action="RECORD_EMPLOYEE_PAID_CLAIMS",
+            detail=json.dumps(
+                {"claims": [c.invoice_reference for c in claims]}, ensure_ascii=False
+            ),
+        )
+
     def _submit(
         self,
         cx: sqlite3.Connection,
@@ -1164,6 +1197,10 @@ class CaseWorkflow:
         self._require_version(row, context.expected_case_version)
         now = self._now_iso()
         root_id = str(row["id"])
+        # Q32 typed employee paid-claims (plan A2): the client states the claim;
+        # the server resolves the file refs to the uploaded bytes and derives the
+        # actor/scope/time. A foreign digest/ref is rejected before any write.
+        self._record_employee_paid_claims(cx, session, row, command, now)
         # A submit is a durable job (contracts §6, §10.4): one active job per
         # root, READ -> ASSESS -> DONE. A crash mid-job leaves it recoverable
         # rather than half-applied. The read already ran outside the txn.
@@ -1718,21 +1755,52 @@ class CaseWorkflow:
     ) -> None:
         """Assess the current snapshot and commit issues/conclusion/instruction atomically."""
         from invoice_referee.reconciliation.service import Reconciler
-        from invoice_referee.workflow.snapshots import build_assessment_input
 
         root_id = str(row["id"])
         # Stop is atomic with the commit: a worker whose snapshot predates a
         # Stop must not create a new instruction (contracts §6).
         if str(row["state"]) == "STOPPED":
             return
-        # Evidence-only guard (contracts §12.5, plan E7): when the §12 pipeline
-        # is wired, a LIVE/REPLAY read is authoritative and must NOT be assessed
-        # by the finance consumer. This also covers Answer/Resume/Decide so they
-        # cannot fall back to a seeded STUB transcription.
-        if self._evidence_reader is not None:
+        assessment_input = self._build_assessment_input(cx, session, row)
+        if assessment_input is None:
+            # Evidence mode with no published report yet: stay EVIDENCE_READY.
+            # A LIVE/REPLAY root must never fall back to a seeded STUB
+            # transcription (contracts §12.5, plan E7/A5).
             return
+        result = Reconciler().assess(assessment_input)
+        self._commit_assessment(cx, session, row, result, now)
+
+    def _build_assessment_input(
+        self, cx: sqlite3.Connection, session: DemoSession, row: sqlite3.Row
+    ):
+        """Build the typed AssessmentInput, or None when the evidence report is absent.
+
+        In evidence mode (LIVE/RECORDED_REPLAY) the typed admission mapper is the
+        only consumer: it reads the CURRENT stored report + context + confirmations
+        (never a seeded STUB transcription). In STUB mode the hand-transcription
+        path is used as before.
+        """
+        from invoice_referee.workflow.snapshots import build_assessment_input
+
+        root_id = str(row["id"])
+        if self._evidence_reader is not None:
+            from invoice_referee.domain.evidence import ReadResult
+            from invoice_referee.workflow.evidence_assessment import (
+                build_evidence_assessment_input,
+            )
+
+            report_row = cx.execute(
+                "SELECT report_json FROM case_evidence_reports WHERE root_id = ?",
+                (root_id,),
+            ).fetchone()
+            if report_row is None or not report_row["report_json"]:
+                return None
+            report = ReadResult.model_validate_json(report_row["report_json"])
+            return build_evidence_assessment_input(
+                cx, tenant=session.tenant, root_id=root_id, report=report
+            )
         transcription = self._transcription_for(cx, root_id)
-        assessment_input = build_assessment_input(
+        return build_assessment_input(
             cx,
             tenant=session.tenant,
             root_id=root_id,
@@ -1741,7 +1809,17 @@ class CaseWorkflow:
             profile=str(row["profile"]),
             transcription=transcription,
         )
-        result = Reconciler().assess(assessment_input)
+
+    def _commit_assessment(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        row: sqlite3.Row,
+        result,
+        now: str,
+    ) -> None:
+        """Persist issues/conclusion/instruction for an assessed result atomically."""
+        root_id = str(row["id"])
 
         # Persist issues. The stable id is derived from the recovery key
         # (kind + field/rule), never from a model-authored name, and is stored
@@ -2209,6 +2287,7 @@ class CaseWorkflow:
                 basis=result.cost_basis,
                 actor_or_system="system:referee",
                 decided_at=datetime.fromisoformat(conclusion_row["decided_at"]),
+                payment_basis=result.payment_basis,
             )
 
         instructions = tuple(
@@ -2248,13 +2327,15 @@ class CaseWorkflow:
             from invoice_referee.domain.evidence import ReadResult
 
             evidence_report = ReadResult.model_validate_json(report_row["report_json"])
-            assessment_ready = False
-            assessment_blocker = "EVIDENCE_ADMISSION_NOT_CONNECTED"
-            # In evidence mode the finance result is not current: a stale
-            # conclusion/instruction must not be shown alongside the evidence
-            # report (plan E7). History stays in audit.
-            conclusion = None
-            instructions = ()
+            if conclusion is None:
+                # The report is published but the typed admission has not yet
+                # produced a conclusion (the worker has not assessed, or a Stop
+                # held it): show the report and mark the assessment pending. Once
+                # the consumer runs, the real conclusion/instruction is shown
+                # (plan A5; the E7 "never assess" guard is released here).
+                assessment_ready = False
+                assessment_blocker = "EVIDENCE_ASSESSMENT_PENDING"
+                instructions = ()
         return CaseView(
             id=row["id"],
             version=int(row["version"]),
@@ -2275,4 +2356,5 @@ class CaseWorkflow:
             evidence_report=evidence_report,
             assessment_ready=assessment_ready,
             assessment_blocker=assessment_blocker,
+            payment_basis=conclusion.payment_basis if conclusion is not None else (),
         )

@@ -141,17 +141,17 @@ reason:str)` in commands.py; no actor/verifier/state from client.
 Server derives actor/scope/time; fixture `employee-confirmation.json` is authoring input
 mapped to this DTO after uploaded SourceRefs resolve by filename+digest.
 
-- [ ] Write RED: bool/float money rejected; client actor/verifier/known fields rejected;
+- [x] Write RED: bool/float money rejected; client actor/verifier/known fields rejected;
   Q32 basis retained as employee declaration, not INDEPENDENT_PAYMENT; `amount_words`
   critical; compatibility constructors STUB explicitly UNSPECIFIED_LEGACY.
-- [ ] Run `rtk proxy uv run --no-sync pytest tests/unit/test_admission_contracts.py`;
+- [x] Run `rtk proxy uv run --no-sync pytest tests/unit/test_admission_contracts.py`;
   observe intended failures before modifying code.
-- [ ] Implement DTO/refinement above; no financial action yet. Add conditional
+- [x] Implement DTO/refinement above; no financial action yet. Add conditional
   admission issues/problems to AssessmentInput; preserve existing strict DTO behavior.
-- [ ] Update `_case_view` to derive PaymentBasisView from current admitted expenses
+- [x] Update `_case_view` to derive PaymentBasisView from current admitted expenses
   and persist the same tuple on the conclusion. Future frontend field names are
   `payment_basis[].kind/actor/refs/rule_id`, not a generic confidence label.
-- [ ] GREEN same command; record source/type contracts and update assigned checkbox.
+- [x] GREEN same command; record source/type contracts and update assigned checkbox.
 
 ## A1 — Import and load complete scoped organization context
 
@@ -162,17 +162,17 @@ tests/integration/test_organization_context_records.py.
 **Consumes:** current context JSON including pilot ledger/coverage/policies.
 **Produces:** persist_context/load_context signatures above; full metadata survives restart.
 
-- [ ] RED: import pilot→restart→ledger amount A and coverage/opening/funds/as_of preserved;
+- [x] RED: import pilot→restart→ledger amount A and coverage/opening/funds/as_of preserved;
   policy/budget end/actor/grant retained; context without coverage does not imply P/R0;
   wrong tenant/activity/grant rejected; older snapshot retained after version update.
-- [ ] Run focused tests and observe failure from fields currently dropped.
-- [ ] Persist validated payload/digest/version atomically with relational projections,
+- [x] Run focused tests and observe failure from fields currently dropped.
+- [x] Persist validated payload/digest/version atomically with relational projections,
   import log/audit; validate record IDs/types/party/scope/witness keys and grant semantics.
   Make EvidenceRefs use actual context digest/record quote, not fake PDF page.
-- [ ] Merge context ledger with actual-money events scoped by tenant+employee+activity.
+- [x] Merge context ledger with actual-money events scoped by tenant+employee+activity.
   Deduplicate same external key; conflicting copies remain FACT, no doubled A.
   Context import cannot edit existing confirmed actual event/reversal history.
-- [ ] GREEN focused tests; migration checked against an old DB, no delete/reset required.
+- [x] GREEN focused tests; migration checked against an old DB, no delete/reset required.
 
 ## A2 — Accept responsible Q32 claims through real command boundary
 
@@ -182,15 +182,15 @@ tests/integration/test_employee_paid_claims.py.
 **Consumes:** EmployeePaidClaim and server session; references to uploaded bytes.
 **Produces:** scoped Confirmation records with actor/observed_at/source binding.
 
-- [ ] RED: employee own scope can confirm own invoice; another employee/client role
+- [x] RED: employee own scope can confirm own invoice; another employee/client role
   cannot; digest stale/ref not root rejected; repeated command id idempotent; case
   version stale yields conflict without partial write. Submit with complete claim
   creates no fake FACT card merely to collect the same confirmation again.
-- [ ] Run focused RED; extend Submit/API typed payload, resolve file refs to SourceRef
+- [x] Run focused RED; extend Submit/API typed payload, resolve file refs to SourceRef
   and derive actor/scope/time server-side. Keep revisions/confirmations auditable.
-- [ ] AnswerIssue updates only the fact key/basis addressed, preserving dependencies.
+- [x] AnswerIssue updates only the fact key/basis addressed, preserving dependencies.
   Do not use generic `expense:payer` to pay every invoice in a multi-row root.
-- [ ] GREEN focused tests; tests mutate amount/source after confirmation and require recheck.
+- [x] GREEN focused tests; tests mutate amount/source after confirmation and require recheck.
 
 ## A3 — Pure evidence admission, without a second policy engine
 
@@ -199,10 +199,10 @@ tests/unit/test_evidence_admission.py.
 
 **Consumes/Produces:** `admit_evidence` signature above → AssessmentInput.
 
-- [ ] RED: pilot clear fields+ctx+claim yields separate Expense records with source refs;
+- [x] RED: pilot clear fields+ctx+claim yields separate Expense records with source refs;
   missing/unreadable/conflict money stays UNKNOWN; invoice signature/payment wording
   alone never creates ExpensePayment or A/P/R. Missing coverage stays unknown.
-- [ ] RED: empty/unknown-only report or unclassified material source never implies
+- [x] RED: empty/unknown-only report or unclassified material source never implies
   T=E=0; `expense_set_complete=false` preserves UNKNOWN totals even with no parsed
   Expense rows. Known personal-only exclusion retains gross source amount/refs but
   verified business T/E0; missing expense must not follow the personal-exclusion path.
@@ -215,18 +215,18 @@ tests/unit/test_evidence_admission.py.
 - [ ] RED: invoice+bank+acceptance supports one expense, no doubled total; allocations
   bounded by source; exact-ref1.0/LLM_RESOLVED link cannot waive cost/payer/activity
   conflicts. Wrong buyer identity is binding FACT, no blanket tax-law rule.
-- [ ] Run focused RED, implement pure mapper. Admit service occurrence and activity link
+- [x] Run focused RED, implement pure mapper. Admit service occurrence and activity link
   from source+compatible responsible context; source state FOUND is necessary but not
   sufficient. Canonical cost identity uses issuer/document identity, not amount/date/hash
   alone. Missing identity requires scoped confirmation; no fabricated bank txn key.
-- [ ] For Q32, create ExpensePayment with declaration basis/actor and confirmation key
+- [x] For Q32, create ExpensePayment with declaration basis/actor and confirmation key
   (labelled confirmation identity, not a bank transaction). Only inside both8/4 with
   service evidence and no material conflict. Unknown S cannot be treated as within4;
   ask for missing money facts before accepting the bounded path.
-- [ ] Preserve every unresolved/material row/source in snapshot; build owner-specific
+- [x] Preserve every unresolved/material row/source in snapshot; build owner-specific
   admission issues with known values/excerpts/dependencies. READ_ERROR/LIMIT is a
   ProcessingProblem, not an accountant business question.
-- [ ] GREEN focused tests; assert no mutation of ReadResult/raw artifacts and no model calls.
+- [x] GREEN focused tests; assert no mutation of ReadResult/raw artifacts and no model calls.
 
 ## A4 — Reconciler honors admitted basis, issues and policy conditions
 
@@ -236,22 +236,22 @@ tests/unit/test_admitted_finance.py + existing finance/policy tests.
 **Consumes:** Admission AssessmentInput, existing pure policy/grants.
 **Produces:** AssessmentResult; allowed_effect None while gates unresolved.
 
-- [ ] RED literal pilot: F01 S=-760000/COLLECT760000; F02 S=400000/PAY400000;
+- [x] RED literal pilot: F01 S=-760000/COLLECT760000; F02 S=400000/PAY400000;
   F03 S0/BALANCED/no effect. Basis Q32 visible and no actual ledger event invented.
-- [ ] RED boundaries E8m/8m+1, abs(S)4m/4m+1, approver20m/20m+1, budget/time/scope
+- [x] RED boundaries E8m/8m+1, abs(S)4m/4m+1, approver20m/20m+1, budget/time/scope
   mismatch. FACT dependencies precede authority where needed; known facts do not
   create duplicate questions. Small S does not waive E recognition authority.
-- [ ] Run RED. Merge admission issues/problems into existing policy result; unresolved
+- [x] Run RED. Merge admission issues/problems into existing policy result; unresolved
   material conditions suppress effects/affirmative conclusion. Keep partial facts,
   not a partial financial approval. Compute integer VND with no float/default0.
-- [ ] Per-expense basis/refs/actor survive projection and conclusion. A/P/R and zero
+- [x] Per-expense basis/refs/actor survive projection and conclusion. A/P/R and zero
   claims derive scoped ledger/coverage, not printed/declaration totals. No policy caps
   or deadline copied from Hoangha; live config uses accepted rulebook.
-- [ ] Pass `expense_set_complete` explicitly to project_finance; if false, T/E and
+- [x] Pass `expense_set_complete` explicitly to project_finance; if false, T/E and
   affected S remain UNKNOWN, not sum(empty)=0. Legacy default compatibility is only
   for explicitly tagged STUB/test snapshots whose builder/factory sets True; every typed LIVE/REPLAY admission sets
   completeness from validated rows/material-source coverage. Test the empty-set trap.
-- [ ] GREEN focused + existing finance/policy tests; STUB compatibility remains clearly simulated.
+- [x] GREEN focused + existing finance/policy tests; STUB compatibility remains clearly simulated.
 
 ## A5 — Wire the consumer with atomic version/Stop protection
 
@@ -261,19 +261,19 @@ evidence_jobs.py, controls.py as required; tests/integration/test_evidence_finan
 **Consumes:** build_evidence_assessment_input signature and existing Reconciler.
 **Produces:** real LIVE/REPLAY financial branch after all prior gates pass.
 
-- [ ] RED: submit enqueues/reads without provider I/O in SQLite transaction; after report
+- [x] RED: submit enqueues/reads without provider I/O in SQLite transaction; after report
   published and data valid, pilots reach exact states/effects. Missing report/admission
   not implemented still EVIDENCE_READY, never seeded transcription in LIVE/REPLAY.
-- [ ] RED: Stop or input/context/ledger/usage epoch change during read/confirm prevents
+- [x] RED: Stop or input/context/ledger/usage epoch change during read/confirm prevents
   stale commit; Resume recomputes current basis; replay Submit/Answer/Decide no duplicate
   instruction, existing OPEN/UNKNOWN execution retained as unknown.
-- [ ] Run RED. Build snapshot from current organization payload/ledger/confirmations and
+- [x] Run RED. Build snapshot from current organization payload/ledger/confirmations and
   stored report. Use **real** ReadSet counters, not constants1/0 from STUB builder.
-- [ ] Change `_assess_and_commit` only to dispatch the fully wired typed consumer;
+- [x] Change `_assess_and_commit` only to dispatch the fully wired typed consumer;
   never just remove the early-return. Same consumer covers Submit/Answer/Decide/Resume/
   RecordActual. Recheck captured input/control/context/ledger/usage before commit and
   reserve economic usage with eligibility/issue atomically.
-- [ ] GREEN integration; context updates invalidate affected cost/money basis; unknown
+- [x] GREEN integration; context updates invalidate affected cost/money basis; unknown
   source relevance blocks affected conclusion until responsibly quarantined.
 
 ## A6 — Actual execution, coverage changes and loop closure
@@ -281,16 +281,16 @@ evidence_jobs.py, controls.py as required; tests/integration/test_evidence_finan
 **Files:** service RecordActual/MarkExecution, instructions.py, snapshots.py;
 tests/integration/test_pilot_money_execution.py.
 
-- [ ] RED: initial instruction is not money received. F01 completed return760000 makes
+- [x] RED: initial instruction is not money received. F01 completed return760000 makes
   R760000/S0; F02 completed reimbursement400000 makes P400000/S0. F03 never issues zero.
   Pending/failed/wrong payee/wrong kind/scope don't settle. Repeat key doesn't double count.
 - [ ] RED: partials, reversal, overpay and OPEN/UNKNOWN execution preserve gross actuals/
   incidents and don't silently close or reissue; source/authority changes invalidate
   pending remainder while retaining history and old execution state.
-- [ ] Run RED, bind responsible money confirmation+source to the original instruction;
+- [x] Run RED, bind responsible money confirmation+source to the original instruction;
   real timestamp/verifier server-derived. Validate event against updated coverage/as_of;
   do not mutate historical coverage quote or keep old known-zero after a new flow.
-- [ ] GREEN focused + existing actual-money/controls tests; read audit records for actor,
+- [x] GREEN focused + existing actual-money/controls tests; read audit records for actor,
   amount, source refs, reason, basis and effect. App still does not transfer bank money.
 
 ## A7 — Packet loading, scoring and baseline-test cleanup
@@ -298,21 +298,21 @@ tests/integration/test_pilot_money_execution.py.
 **Files:** evaluation/packets.py, runner.py, scorer.py/suites.py;
 tests/integration/test_uc03_pilot_workflow.py; legacy raw/data_publish/verify tests.
 
-- [ ] RED: load pilot input without reading gold, submit claims with resolved refs,
+- [x] RED: load pilot input without reading gold, submit claims with resolved refs,
   import all context; changing gold cannot change actual result. Score actual state/
   direction/amount/basis separately from expected. Report current guard outcome as
   incomplete, never a pass on future-finance gold.
-- [ ] Add literal pilot allowed/evidence adapter; keep actual model confidence/blockIDs
+- [x] Add literal pilot allowed/evidence adapter; keep actual model confidence/blockIDs
   absent until real recording exists. Hand source checks can seed STUB tests only;
   do not fake RECORDED_REPLAY captures from gold or native text.
-- [ ] Repair the11 stale baseline tests by temporary **legacy STUB fixtures** or explicit
+- [x] Repair the11 stale baseline tests by temporary **legacy STUB fixtures** or explicit
   replacement tests for new contract; preserve their concrete money/control assertions.
   No `skip`/weakened assertion just to green suite, no restoring discarded corpus to
   repo or running old company-direct gold as accepted LIVE product behavior.
 - [ ] Add development variants with FACT and known-paid AUTHORITY for Core4/Escalation5;
   routine F01/F02/F03 plus appropriate issues. Keep25 reference cases/evidence lanes
   separate; don't label3pilot as full contest coverage or independent holdout.
-- [ ] Run targeted evaluation tests then `rtk proxy uv run --no-sync pytest`;
+- [x] Run targeted evaluation tests then `rtk proxy uv run --no-sync pytest`;
   gate all pass or report exact blockers before advance. REAL provider quality remains
   separate authorized LIVE gate with raw trace/capture and independent held-out inputs.
 
@@ -321,19 +321,19 @@ tests/integration/test_uc03_pilot_workflow.py; legacy raw/data_publish/verify te
 **Files:** frontend types/api/intake/dossier and corresponding tests; API views;
 docs/final/RUNBOOK.md/IMPLEMENTATION_STATUS.md, pilot checklist.
 
-- [ ] RED UI/API: employee confirms paid invoices without entering backend actor IDs;
+- [x] RED UI/API: employee confirms paid invoices without entering backend actor IDs;
   accountant execution follows actual instruction; approver only sees required decisions.
   Q32 shows “Lời xác nhận của nhân viên”, not bank-confirmed; unknown/history/cash
   distinctions remain clear. Runtime server owns role/grant/version/command checks.
-- [ ] Implement typed confirmation submit/view fields without UI redesign or new framework.
+- [x] Implement typed confirmation submit/view fields without UI redesign or new framework.
   Backend issue cards carry known facts, exact source/quote, requested answer and effect;
   technical failure card separate. Update current contract labels consistently.
-- [ ] Resolve Node24 and verify node + npm's own Node in the same environment; run
+- [x] Resolve Node24 and verify node + npm's own Node in the same environment; run
   package-defined component/build/browser tests. UI NOT_RUN if only components checked.
 - [ ] Manually exercise F01/F02/F03 from upload through recorded completion (after A5/A6),
   then Stop/stale/duplicate and FACT/AUTHORITY follow-up. Record mode, revision, commands,
   outputs, source/model/prompt versions and limits. Do not claim LIVE when using fake.
-- [ ] Update status/evidence/checklists only from results; keep public deployment/practitioner
+- [x] Update status/evidence/checklists only from results; keep public deployment/practitioner
   feedback/adaptation/holdout gaps explicit. No claims about winning the contest from
   these3case results alone.
 

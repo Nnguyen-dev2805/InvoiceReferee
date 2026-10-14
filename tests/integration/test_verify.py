@@ -58,7 +58,7 @@ async def test_non_stub_run_does_not_use_seeded_transcription(app_fixture, tmp_p
     assert actual.state != "SETTLED"
 
 
-async def test_core_and_escalation_suites_pass_on_the_corpus() -> None:
+async def test_core_and_escalation_suites_pass_on_the_corpus(legacy_corpus) -> None:
     # The R7 gate: Core4 and Escalation5 select the right cases and the release
     # gate is union=0 (independent gold, real command surface).
     from pathlib import Path
@@ -70,7 +70,7 @@ async def test_core_and_escalation_suites_pass_on_the_corpus() -> None:
     from invoice_referee.workflow.db import Database
     from invoice_referee.workflow.service import CaseWorkflow
 
-    corpus = Path(__file__).resolve().parents[2] / "data" / "kiem-thu"
+    corpus = legacy_corpus
     import tempfile
 
     tmp = Path(tempfile.mkdtemp())

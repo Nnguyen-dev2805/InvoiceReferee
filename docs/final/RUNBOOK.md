@@ -38,9 +38,12 @@ Ba chế độ (đều tường minh, không tự hạ cấp):
 | **STUB** | `scripts/dev.py --mode stub` | Bản ghi tay có sẵn, chạy offline (không cần key). |
 | **RECORDED_REPLAY** | `scripts/dev.py --mode replay` | Phát lại bản ghi provider (chưa có recording). |
 
-> Lưu ý: ở LIVE, pipeline chứng cứ đọc xong và dừng ở `EVIDENCE_READY`; phần nối
-> chứng cứ → tài chính (`EVIDENCE_ADMISSION_NOT_CONNECTED`) chưa được viết, nên
-> LIVE **chưa** phát hành yêu cầu chi/thu. Đường ra kết luận tài chính hiện là STUB.
+> Lưu ý: ở LIVE, sau khi pipeline chứng cứ đọc xong, consumer typed (plan A5) chạy
+> admission mapper thuần → Reconciler và phát hành yêu cầu chi/thu thật khi mọi gate
+> đủ căn cứ (ví dụ pilot F01 → COLLECT 760.000, F02 → PAY 400.000). Nếu report đã
+> publish nhưng consumer chưa chạy, case ở `EVIDENCE_READY`
+> (`assessment_blocker=EVIDENCE_ASSESSMENT_PENDING`). Q32 là lời xác nhận của nhân
+> viên (không phải xác minh ngân hàng), chỉ trong ngưỡng E≤8tr/|S|≤4tr.
 
 Kiểm tra health (đã lọc secret):
 

@@ -29,6 +29,7 @@ from invoice_referee.domain.finance import (
     CoverageRecord,
     Expense,
     MoneyEvent,
+    PaymentBasisView,
     Projection,
 )
 from invoice_referee.domain.issues import BusinessIssue, ProcessingProblem
@@ -105,6 +106,13 @@ class AssessmentInput(StrictModel):
     previous_eligibility: EligibilityDecision | None = None
     read_set: ReadSet
     as_of: UtcDatetime
+    # Admission outputs (plan A0/A3): unresolved material conditions that must
+    # suppress effects/affirmative conclusion, and whether the typed expense set
+    # is complete. When incomplete, T/E and affected S stay UNKNOWN — sum(empty)
+    # must never become a known zero.
+    admission_issues: tuple[BusinessIssue, ...] = ()
+    admission_problems: tuple[ProcessingProblem, ...] = ()
+    expense_set_complete: bool = False
 
 
 class FinancialEffect(StrictModel):
@@ -125,6 +133,10 @@ class AssessmentResult(StrictModel):
     allowed_effect: FinancialEffect | None = None
     cost_basis: str
     money_basis: str
+    # Per-expense paid basis/actor/refs (plan A0/A4). The reconciler fills this
+    # from the admitted expenses; the persisted conclusion carries it and the
+    # view exposes it. Default empty keeps STUB/legacy snapshots compatible.
+    payment_basis: tuple[PaymentBasisView, ...] = ()
 
 
 class CommandContext(StrictModel):
@@ -152,6 +164,9 @@ class SettlementConclusion(StrictModel):
     refs: tuple[EvidenceRef, ...] = ()
     actor_or_system: str
     decided_at: UtcDatetime
+    # Per-expense paid basis/actor/refs (plan A0/A8). Derived from the admitted
+    # expenses; Q32 is a responsible employee confirmation, not a bank fact.
+    payment_basis: tuple[PaymentBasisView, ...] = ()
 
 
 class Instruction(StrictModel):
@@ -197,3 +212,6 @@ class CaseView(StrictModel):
     evidence_report: "ReadResult | None" = None
     assessment_ready: bool = True
     assessment_blocker: str | None = None
+    # Per-expense paid basis/actor/refs (plan A0/A8); empty until a typed
+    # admission has produced a conclusion.
+    payment_basis: tuple[PaymentBasisView, ...] = ()

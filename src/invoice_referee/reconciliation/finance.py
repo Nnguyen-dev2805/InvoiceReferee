@@ -54,9 +54,17 @@ def project_finance(
     expenses: tuple[Expense, ...],
     ledger: tuple[MoneyEvent, ...],
     coverage: CoverageRecord | None,
+    *,
+    expense_set_complete: bool = True,
 ) -> Projection:
-    # T: total verified incurred cost; UNKNOWN if any expense cost is unresolved.
-    t_unknown = any(expense.incurred.state != "KNOWN" for expense in expenses)
+    # T: total verified incurred cost; UNKNOWN if any expense cost is unresolved
+    # OR the typed expense set is not complete. An empty set with complete=False
+    # is NOT a known zero: sum(empty) must never become a money conclusion
+    # (plan A4). STUB/legacy builders set complete=True explicitly.
+    t_unknown = (
+        not expense_set_complete
+        or any(expense.incurred.state != "KNOWN" for expense in expenses)
+    )
     T: Fact[Vnd] = (
         _unknown("projection:T")
         if t_unknown
@@ -64,7 +72,10 @@ def project_finance(
     )
 
     # E: eligible employee-paid portions. C: company-direct portions.
-    e_unknown = any(expense.eligibility == "UNKNOWN" for expense in expenses)
+    e_unknown = (
+        not expense_set_complete
+        or any(expense.eligibility == "UNKNOWN" for expense in expenses)
+    )
     eligible_paid = 0
     company_direct = 0
     gross_paid = 0

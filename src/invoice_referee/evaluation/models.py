@@ -18,6 +18,11 @@ from pydantic import Field
 
 from invoice_referee.domain.common import Id, StrictModel, UtcDatetime
 from invoice_referee.domain.evidence import EvidenceRole
+from invoice_referee.domain.organization import OrganizationContext
+
+__all__ = ["OrganizationContext"]
+
+
 
 Split = Literal["development", "calibration", "validation", "holdout"]
 Strata = Literal["routine", "FACT", "POLICY", "AUTHORITY", "TECHNICAL"]
@@ -29,36 +34,6 @@ class PacketSource(StrictModel):
     filename: str = Field(min_length=1)
     media: Literal["PDF", "PNG", "JPEG"]
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-
-
-class OrganizationContext(StrictModel):
-    """Genuine simulated observable ledger/context — never the expected E/S.
-
-    R1 adds the typed records the importer turns into domain PolicyVersion /
-    Grant / BudgetDecision / MoneyEvent / CoverageRecord (plan A.1). The legacy
-    ``tenant``/``profile``/``records``/``budget_amount`` fields are retained so
-    the pre-R2 generator keeps loading; R2 removes them once build_packets.py is
-    gone.
-    """
-
-    tenant: Id = "tenant:demo"
-    profile: str = "TRAVEL"
-    # Simulated observable records only; no `expected`/`forced` routing fields.
-    records: tuple[str, ...] = ()
-    # The activity's verified budget B, if one exists (observable org data).
-    budget_amount: int | None = None
-    # Typed records (plan A.1).
-    organization_id: str | None = None
-    activity: dict[str, object] | None = None
-    people: tuple[dict[str, object], ...] = ()
-    policies: tuple[dict[str, object], ...] = ()
-    budgets: tuple[dict[str, object], ...] = ()
-    grants: tuple[dict[str, object], ...] = ()
-    ledger: tuple[dict[str, object], ...] = ()
-    coverage: dict[str, object] | None = None
-    witnesses: tuple[dict[str, object], ...] = ()
-    financial_as_of: str | None = None
-    data_origin: str | None = None
 
 
 class Submission(StrictModel):

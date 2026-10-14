@@ -134,6 +134,21 @@ CREATE TABLE IF NOT EXISTS context_imports (
     note        TEXT NOT NULL
 );
 
+-- Immutable organization-context snapshots (plan A1). The full validated
+-- payload is stored verbatim so a restart loads the exact context an assessment
+-- rested on; the relational activity/grant/people projection above stays for the
+-- existing authorization checks. A new import adds a version; an old snapshot is
+-- never overwritten.
+CREATE TABLE IF NOT EXISTS context_snapshots (
+    tenant      TEXT NOT NULL,
+    digest      TEXT NOT NULL,
+    version     INTEGER NOT NULL,
+    payload_json TEXT NOT NULL,
+    origin      TEXT NOT NULL,
+    imported_at TEXT NOT NULL,
+    PRIMARY KEY (tenant, digest)
+);
+
 -- Persistent jobs (contracts §6, §10.4). A preview/read job has no financial
 -- effect; one active job per root. `phase` tracks READING/ASSESSING/DONE.
 CREATE TABLE IF NOT EXISTS jobs (

@@ -443,6 +443,9 @@ def snapshot(
         ),
         "exceptions": (),
         "previous_eligibility": None,
+        # This is an explicitly-tagged STUB/test snapshot: the literal figures
+        # are the whole expense set, so it is complete by construction (plan A4).
+        "expense_set_complete": True,
         "read_set": ReadSet(
             input_revision=1,
             control_epoch=0,

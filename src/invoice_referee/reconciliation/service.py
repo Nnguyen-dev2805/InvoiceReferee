@@ -11,6 +11,7 @@ import hashlib
 import json
 
 from invoice_referee.domain.case import AssessmentInput, AssessmentResult
+from invoice_referee.domain.finance import PaymentBasisView
 from invoice_referee.reconciliation.finance import project_finance
 from invoice_referee.reconciliation.policy import evaluate_policy
 
@@ -51,20 +52,54 @@ def _money_basis(input: AssessmentInput) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _payment_basis(input: AssessmentInput) -> tuple[PaymentBasisView, ...]:
+    """Per-expense paid basis from the admitted payments (plan A0/A4).
+
+    Only an explicit non-legacy basis is reported: an UNSPECIFIED_LEGACY portion
+    (a STUB/test compatibility record) is never presented as a verified basis.
+    """
+    views: list[PaymentBasisView] = []
+    for expense in input.expense_facts:
+        for portion in expense.payments:
+            if portion.basis_kind == "UNSPECIFIED_LEGACY":
+                continue
+            views.append(
+                PaymentBasisView(
+                    expense_id=expense.id,
+                    kind=portion.basis_kind,
+                    actor=portion.responsible_actor,
+                    refs=portion.refs,
+                    rule_id="Q32" if portion.basis_kind == "EMPLOYEE_DECLARATION_Q32" else None,
+                )
+            )
+    return tuple(views)
+
+
 class Reconciler:
     """Pure projection + policy assessment over an immutable snapshot."""
 
     def assess(self, input: AssessmentInput) -> AssessmentResult:
         projection = project_finance(
-            input.scope, input.expense_facts, input.ledger, input.coverage
+            input.scope,
+            input.expense_facts,
+            input.ledger,
+            input.coverage,
+            expense_set_complete=input.expense_set_complete,
         )
         issues, authorizations, allowed_effect = evaluate_policy(input, projection)
+        # Admission issues/problems are material conditions the evidence layer
+        # found; they suppress any affirmative effect/conclusion until resolved
+        # (plan A4). They are merged with the policy issues, not a second engine.
+        merged_issues = tuple(input.admission_issues) + tuple(issues)
+        if input.admission_issues or input.admission_problems:
+            allowed_effect = None
         return AssessmentResult(
             projection=projection,
-            issues=issues,
-            problems=(),
+            issues=merged_issues,
+            problems=tuple(input.admission_problems),
             required_authorizations=authorizations,
             allowed_effect=allowed_effect,
             cost_basis=_cost_basis(input),
             money_basis=_money_basis(input),
+            payment_basis=_payment_basis(input),
         )

@@ -29,10 +29,15 @@ def test_old_evaluation_packets_are_gone() -> None:
     assert not old.exists(), "data/evaluation must be removed in R2"
 
 
-def test_new_corpus_exists_and_is_managed() -> None:
-    corpus = PROJECT_ROOT / "data" / "kiem-thu"
+def test_new_corpus_is_regenerated_and_managed(legacy_corpus) -> None:
+    # The retired `data/kiem-thu` corpus is not checked into the repo (plan A7);
+    # its in-repo generator reproduces the same managed STUB fixtures on demand.
+    corpus = legacy_corpus
     assert (corpus / "manifest.json").is_file()
     assert (corpus / "case-01-cong-ty-chi-them").is_dir()
+    assert (corpus / ".invoice-referee-managed").is_file()
+    # The corpus is generated under git-ignored .runtime/, never restored to data/.
+    assert not (PROJECT_ROOT / "data" / "kiem-thu").exists()
 
 
 def test_uc3_is_reference_only_not_loaded_as_final() -> None:

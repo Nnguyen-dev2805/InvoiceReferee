@@ -87,6 +87,14 @@ Cập nhật phạm vi 14/10/2026 (§14/§15, ADR006/ADR007):
   của nhân viên + chứng từ dịch vụ, chỉ trong ngưỡng `E<=8tr`, `abs(S)<=4tr`, khi
   không mâu thuẫn trọng yếu; provenance/`verified_by` phản ánh actor là nhân viên và
   view ghi rõ mức căn cứ là "lời xác nhận", không phải giao dịch ngân hàng đã xác minh.
+  Mức căn cứ là enum đóng `PaymentBasisKind` = `INDEPENDENT_PAYMENT` /
+  `FINANCIAL_CONFIRMATION` / `EMPLOYEE_DECLARATION_Q32` / `UNSPECIFIED_LEGACY`
+  (A0). `ExpensePayment` mang `basis_kind` (mặc định `UNSPECIFIED_LEGACY` cho
+  constructor STUB/test) và `responsible_actor`; admission LIVE/REPLAY không nhận
+  `UNSPECIFIED_LEGACY`. `PaymentBasisView(expense_id, kind, actor, refs, rule_id)`
+  là view dẫn xuất, không tạo ledger event. Client khai báo khoản đã trả qua
+  `EmployeePaidClaim(invoice_reference, amount, refs, reason)` (amount là VND
+  integer; client **không** cấp actor/verifier/known); server suy actor/scope/time.
 
 MoneyEvent kinds ADVANCE_RECEIVED/REIMBURSEMENT_RECEIVED/EMPLOYEE_RETURN/
 REVERSAL/OBSERVED_UNALLOCATED; external_key=(origin_namespace,transaction_ref)
@@ -618,9 +626,13 @@ giữ và E0 pin; profile/critical-field matrix pin tại Hoangha revision `1ee3
   job đọc xong ⇒ **trạng thái riêng `EVIDENCE_READY`** (thêm vào `CaseState`; khác
   `WAITING` vốn nghĩa "business issue/execution chưa rõ"), `conclusion=None`, không
   instruction; `assessment_ready=false`,
-  `assessment_blocker=EVIDENCE_ADMISSION_NOT_CONNECTED`. Ưu tiên `CaseView` chèn
+  `assessment_blocker=EVIDENCE_ASSESSMENT_PENDING` (plan A5 releases the earlier
+  `EVIDENCE_ADMISSION_NOT_CONNECTED` guard once the typed admission consumer is
+  wired). Ưu tiên `CaseView` chèn
   `EVIDENCE_READY` ngay dưới `TECHNICAL_ERROR`, trên `WAITING`; không tạo question
-  card. Guard trong `_assess_and_commit` (không chỉ `_submit`) để Answer/Resume/Decide
+  card. Sau khi consumer typed chạy, `CaseView` hiển thị conclusion/instruction
+  thật (EVIDENCE_READY chỉ còn khi report đã publish nhưng chưa assess). Guard
+  trong `_build_assessment_input` (không chỉ `_submit`) để Answer/Resume/Decide
   không rơi lại transcription STUB. STUB giữ nguyên đường assessment hiện có.
 - **`SETTLEMENT_FORM` là giấy quyết toán upload** (paper). Nếu root không có
   `SETTLEMENT_FORM`, pipeline vẫn OCR/phân loại/trích xuất chứng từ nhưng **bỏ qua

@@ -38,7 +38,7 @@ function caseView(version: number, sources: number): CaseView {
     })),
     issues: [], problems: [], conclusion: null, instructions: [],
     actual_money: {}, audit: [], evidence_report: null,
-    assessment_ready: true, assessment_blocker: null,
+    assessment_ready: true, assessment_blocker: null, payment_basis: [],
   };
 }
 
@@ -89,5 +89,45 @@ describe("Intake submit uploads pending files", () => {
     expect(calls.findIndex((c) => c.endsWith("/sources"))).toBeLessThan(
       calls.findIndex((c) => c.endsWith("/submit")),
     );
+  });
+
+  it("sends a typed paid-claim without any client actor id", async () => {
+    let submitBody: Record<string, unknown> | null = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/api/cases")) {
+          return new Response(JSON.stringify({ case_view: caseView(1, 0) }), { status: 200 });
+        }
+        if (url.endsWith("/sources")) {
+          return new Response(JSON.stringify({ case_view: caseView(2, 1) }), { status: 200 });
+        }
+        if (url.endsWith("/submit")) {
+          submitBody = JSON.parse(String(init?.body ?? "{}"));
+          return new Response(JSON.stringify({ case_view: caseView(3, 1) }), { status: 200 });
+        }
+        return new Response("{}", { status: 200 });
+      }),
+    );
+
+    render(<Intake session={SESSION} onCase={() => {}} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Tạo hồ sơ" }));
+    const file = new File(["%PDF-1.4 x"], "hd.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText(/Chứng từ/), file);
+    await user.type(screen.getByLabelText(/Số hóa đơn/), "IR26101001");
+    await user.type(screen.getByLabelText(/Số tiền/), "3240000");
+    await user.click(screen.getByRole("button", { name: "Nộp hồ sơ" }));
+
+    await waitFor(() => expect(submitBody).not.toBeNull());
+    const claims = (submitBody as unknown as { employee_paid_claims: Array<Record<string, unknown>> })
+      .employee_paid_claims;
+    expect(claims).toHaveLength(1);
+    expect(claims[0].invoice_reference).toBe("IR26101001");
+    expect(claims[0].amount).toBe(3_240_000);
+    // The client never supplies the actor/verifier the server owns.
+    expect(claims[0]).not.toHaveProperty("actor");
+    expect(claims[0]).not.toHaveProperty("verified_by");
   });
 });

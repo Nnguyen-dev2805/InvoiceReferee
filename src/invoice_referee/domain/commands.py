@@ -12,7 +12,7 @@ from typing import Annotated, Literal, Union
 from pydantic import Field
 
 from invoice_referee.domain.case import CaseView
-from invoice_referee.domain.common import EvidenceRef, Id, StrictModel, UtcDatetime
+from invoice_referee.domain.common import EvidenceRef, Id, StrictModel, UtcDatetime, Vnd
 from invoice_referee.domain.evidence import Media
 from invoice_referee.domain.finance import RecordMoneyInput
 from invoice_referee.domain.issues import Answer, DecisionCommand
@@ -35,6 +35,22 @@ class Declaration(StrictModel):
     activity_id: Id
     declared_purpose: str
     notes: str | None = None
+
+
+class EmployeePaidClaim(StrictModel):
+    """A responsible employee's claim that they paid one invoice (ADR0007, Q32).
+
+    The client states the claim (invoice reference, integer VND amount, the
+    evidence refs, and a reason). It may NOT supply the actor, verifier or any
+    known/verified state — the server derives those from the session and the
+    uploaded source bytes. A claim is a bounded employee declaration, never an
+    independently verified bank fact.
+    """
+
+    invoice_reference: str = Field(min_length=1)
+    amount: Vnd
+    refs: tuple[EvidenceRef, ...] = ()
+    reason: str
 
 
 class SourceUpload(StrictModel):
@@ -65,6 +81,8 @@ class Submit(StrictModel):
     kind: Literal["SUBMIT"] = "SUBMIT"
     root_id: Id
     declaration: Declaration
+    # Q32 typed claims the responsible employee states at submit (plan A0/A2).
+    employee_paid_claims: tuple[EmployeePaidClaim, ...] = ()
 
 
 class AnswerIssue(StrictModel):

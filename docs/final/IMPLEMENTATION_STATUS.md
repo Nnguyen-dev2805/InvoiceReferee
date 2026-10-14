@@ -7,17 +7,17 @@ The plan owns task acceptance; package/config files own executable commands.
 
 | Field | Current value |
 | --- | --- |
-| Base branch | `final` @ 9a7f84cd (after R0–R8 + the doc/data cleanup + the evidence-pipeline E0–E8 branch). |
-| Phase | T1..T10 + R0–R8 done. **Evidence pipeline E0–E8 implemented** (2026-10-14): docs promoted; strict document/evidence DTOs; all-page OCR + raw artifacts; conditional OCR-confidence gate + X-Kiro caps; document type/role classification + per-type profiles; typed extraction with provenance + profile validation; ported Hoangha matcher + bounded suggestion resolution; the §12 pipeline wired into `final`'s durable job/worker with a typed `ReadResult` and `EVIDENCE_READY`; the 75-case UC-03 corpus imported. Employee-paid scope narrowing (Q32–Q34) is documented but **finance/admissibility code is NOT yet migrated** to it (a later plan). |
-| Authorized scope now | Implement the Hoangha-evidence plan E0–E8 (user-authorized 14/10/2026, inline). Committed on `final`; **not pushed**. |
+| Base branch | `final` @ 5f27c8f4 (after R0–R8 + the evidence-pipeline E0–E8 branch + the UC03 pilot test kit). |
+| Phase | T1..T10 + R0–R8 done. Evidence pipeline E0–E8 implemented. **Tier A extraction fixes + evidence→finance admission A0–A8 implemented** (2026-10-14, uncommitted): SETTLEMENT_FORM field aliases + `line_items` parsing (Tier A); A0 basis/claim DTOs; A1 immutable context snapshots; A2 Q32 claims at the command boundary; A3 pure `admit_evidence`; A4 reconciler honors basis/completeness; A5 typed consumer wired with Stop/version protection; A6 actual-execution loop closure; A7 baseline-test repair (suite now fully green); A8 typed claim UI + basis transparency. |
+| Authorized scope now | Tier A + plan A0–A8 (user-authorized 14/10/2026, inline). **Uncommitted — no Git authorization given.** |
 | Setup review | ACCEPTED; clean-clone proof passed. |
-| Execution method | Inline execution (executing-plans), single integrator; per-task TDD + full-suite after each. A whole-branch fresh review (opus) was run over 68c5e2eb..6d62198b and its Critical/Important findings fixed in one pass. |
+| Execution method | Inline execution (executing-plans), single integrator; per-task TDD (RED observed → GREEN) + full-suite after each. No subagent review (user-directed). |
 | Workflow integrator | Inline executor — single writer for workflow/api/domain owned files |
-| Next application task | Finance/admissibility mapping of the evidence report into `AssessmentInput` (the deferred `EVIDENCE_ADMISSION_NOT_CONNECTED` adapter, Q32/Q34). T11 still BLOCKED on practitioners. |
-| Last completed application task | Evidence pipeline E0–E8 + whole-branch review fix pass. |
-| Product unit/integration/UI/LIVE evidence | `uv run pytest` → **331 passed / 11 failed** (the 11 are pre-existing from 68c5e2eb removing `data/kiem-thu`, not this branch); frontend vitest 6, build exit 0 on pinned Node 24.19.0. **M0 LIVE NOT_RUN** (no live authorization); RECORDED_REPLAY captures NOT_RECORDED. Docker build NOT_RUN. Public hosting + practitioner pilot BLOCKED. |
+| Next application task | Whole-branch review of the Tier A + A0–A8 range, then user-authorized commit. T11 still BLOCKED on practitioners. |
+| Last completed application task | Tier A + evidence→finance admission A0–A8 (A7/A8 done). |
+| Product unit/integration/UI/LIVE evidence | `uv run pytest` → **413 passed / 0 failed** (first fully green run; the 11 legacy-corpus failures are resolved by in-repo regeneration of the retired STUB corpus under git-ignored `.runtime/legacy-corpus/`, plan A7). Frontend vitest **13 passed**, build exit 0 on pinned Node 24.19.0. Pilot F01/F02/F03 typed path reaches exact gold effects (COLLECT 760000 / PAY 400000 / no zero instruction) with real provider reads. **M0 LIVE NOT_RUN** (no live authorization); RECORDED_REPLAY captures NOT_RECORDED. Docker build NOT_RUN. Public hosting + practitioner pilot BLOCKED. |
 | CodeGraph | Re-check with `rtk proxy codegraph status` before relying on it; the index lags writes. |
-| Git handoff | Evidence branch commits (on `final`): b82a556c (E0 docs), 2d6438b9 (E1), 9a804daa (E2), c44015d4 (E3), 46cb676d (E4), 844d7aec (E5), 2fe17fc4 (E6), 741a5a9e (E7), 6d62198b (E8), 9a7f84cd (E0 tick), 83632655 (review fix pass). Unpushed (no push authorization). |
+| Git handoff | Prior evidence-branch commits (on `final`, unpushed): b82a556c (E0 docs) … 83632655 (review fix pass), 5f27c8f4 (pilot kit). Tier A + A0–A8 are **uncommitted working-tree changes** (no Git authorization). |
 
 ### Evidence pipeline E0–E8 (2026-10-14)
 

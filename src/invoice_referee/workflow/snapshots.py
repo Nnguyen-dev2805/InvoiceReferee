@@ -371,6 +371,11 @@ def build_assessment_input(
             usage_version=1,
         ),
         as_of=as_of or datetime.now(UTC),
+        # This is the STUB hand-transcription path: the transcription is the
+        # whole typed expense set for the root, so it is complete by
+        # construction. A typed LIVE/REPLAY admission sets completeness from its
+        # own validated rows/material coverage instead (plan A4).
+        expense_set_complete=True,
     )
 
 

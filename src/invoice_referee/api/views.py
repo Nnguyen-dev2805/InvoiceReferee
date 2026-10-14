@@ -12,7 +12,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from invoice_referee.domain.common import UtcDatetime
+from invoice_referee.domain.common import EvidenceRef, UtcDatetime
 from invoice_referee.workflow.service import (
     PERSONAS,
     CaseWorkflow,
@@ -50,10 +50,25 @@ class PersonaSwitchRequest(ApiModel):
     persona: Literal["employee", "accountant", "approver"]
 
 
+class PaidClaimRequest(ApiModel):
+    """A client's typed Q32 employee paid-claim (plan A2).
+
+    The client states the invoice reference, integer VND amount, the source refs
+    and a reason. It cannot supply the actor/verifier/known state — the server
+    derives those from the session and the uploaded bytes.
+    """
+
+    invoice_reference: str
+    amount: int
+    refs: list[EvidenceRef] = Field(default_factory=list)
+    reason: str
+
+
 class SubmitRequest(ApiModel):
     activity_id: str
     declared_purpose: str
     notes: str | None = None
+    employee_paid_claims: list[PaidClaimRequest] = Field(default_factory=list)
 
 
 class AnswerRequest(ApiModel):

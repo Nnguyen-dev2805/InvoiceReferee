@@ -125,7 +125,9 @@ async def _submit(wf: CaseWorkflow, root: str, activity: str, command_id: str):
     )
 
 
-async def test_live_evidence_never_assesses_finance(tmp_path: Path) -> None:
+async def test_live_evidence_assesses_finance_after_read(tmp_path: Path) -> None:
+    # A5 releases the E7 "never assess" guard: after a completed read the typed
+    # admission consumer runs and the case reaches a real finance state.
     wf = _workflow(tmp_path)
     root = await _root_with_source(wf)
     wf.enable_evidence_read(
@@ -136,25 +138,35 @@ async def test_live_evidence_never_assesses_finance(tmp_path: Path) -> None:
     await wf.run_evidence_job_for(root)
 
     view = wf.view(_ctx(wf, "r3"), root)
-    assert view.state == "EVIDENCE_READY"
-    assert view.conclusion is None
-    assert view.instructions == ()
     assert view.evidence_report is not None
     assert view.evidence_report.documents
-    assert view.assessment_ready is False
-    assert view.assessment_blocker == "EVIDENCE_ADMISSION_NOT_CONNECTED"
+    assert view.assessment_ready is True
+    assert view.assessment_blocker is None
+    # The fake report has no line rows/context coverage, so the finance gates
+    # are open (WAITING) with real typed issues — not a cheerful "ready".
+    assert view.state == "WAITING"
+    assert view.conclusion is not None
 
 
-async def test_evidence_ready_state_distinct_from_waiting(tmp_path: Path) -> None:
+async def test_evidence_ready_until_assessment_runs(tmp_path: Path) -> None:
+    # Publishing the report without the consumer running leaves EVIDENCE_READY
+    # with the assessment marked pending (the report is present, no conclusion).
+    from invoice_referee.domain.evidence import ReadResult
+
     wf = _workflow(tmp_path)
     root = await _root_with_source(wf)
     wf.enable_evidence_read(
         reader=FileOcrReader(provider=FakeEvidenceReader()), classifier=StubClassifier(),
         artifacts_root=tmp_path / "artifacts", provider_mode="LIVE",
     )
-    await _submit(wf, root, "activity:travel-a", "cmd:submit2")
-    await wf.run_evidence_job_for(root)
-    assert wf.view(_ctx(wf, "r4"), root).state == "EVIDENCE_READY"
+    with wf.db.transaction() as cx:
+        wf._publish_evidence_report(
+            cx, tenant="tenant:demo", root_id=root, report=ReadResult()
+        )
+    view = wf.view(_ctx(wf, "r4"), root)
+    assert view.state == "EVIDENCE_READY"
+    assert view.assessment_ready is False
+    assert view.assessment_blocker == "EVIDENCE_ASSESSMENT_PENDING"
 
 
 async def test_equal_digest_two_roots_has_independent_artifacts(tmp_path: Path) -> None:
@@ -222,15 +234,16 @@ async def test_missing_source_bytes_produces_a_problem(tmp_path: Path) -> None:
     assert any(p.kind == "TECHNICAL" for p in report.problems)
 
 
-async def test_evidence_ready_suppresses_stale_conclusion_and_instructions(tmp_path: Path) -> None:
-    # An existing STUB conclusion/instruction must not be shown as current
-    # alongside an evidence-only report (plan E7 Important fix).
+async def test_stub_conclusion_replaced_by_typed_assessment(tmp_path: Path) -> None:
+    # A prior STUB conclusion must not stand as current once the evidence
+    # consumer re-assesses the typed report (plan A5). The stale instruction is
+    # cleared and the report drives the new state.
     wf = _workflow(tmp_path)
     root = await _root_with_source(wf)
-    # First submit in STUB produces a finance conclusion/instruction.
+    # First submit in STUB produces a finance conclusion.
     await _submit(wf, root, "activity:travel-a", "cmd:stub-1")
     stub_view = wf.view(_ctx(wf, "rs"), root)
-    # Now switch to evidence mode and read; the current conclusion must clear.
+    # Now switch to evidence mode and read; the typed consumer re-assesses.
     wf.enable_evidence_read(
         reader=FileOcrReader(provider=FakeEvidenceReader()), classifier=StubClassifier(),
         artifacts_root=tmp_path / "artifacts", provider_mode="LIVE",
@@ -238,12 +251,13 @@ async def test_evidence_ready_suppresses_stale_conclusion_and_instructions(tmp_p
     await _submit(wf, root, "activity:travel-a", "cmd:live-1")
     await wf.run_evidence_job_for(root)
     view = wf.view(_ctx(wf, "rs2"), root)
-    assert view.state == "EVIDENCE_READY"
-    assert view.conclusion is None
-    assert view.instructions == ()
     assert view.evidence_report is not None
-    # Historical audit is retained.
-    assert stub_view.conclusion is not None or stub_view.instructions or True
+    assert view.assessment_ready is True
+    # The typed assessment replaced the STUB conclusion (a fresh BLOCKED/WAITING
+    # state from the real gates), not the old STUB one.
+    assert view.conclusion is not None
+    assert view.state == "WAITING"
+    _ = stub_view  # historical view retained in the command log/audit
 
 
 async def test_failed_evidence_job_sets_technical_error(tmp_path: Path) -> None:

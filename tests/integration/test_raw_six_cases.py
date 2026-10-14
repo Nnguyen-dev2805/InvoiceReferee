@@ -34,8 +34,8 @@ def raw_workflow(tmp_path: Path):
 
 
 @pytest.mark.parametrize("slug", SIX)
-async def test_case_runs_through_raw_pipeline(raw_workflow, slug: str) -> None:
-    case_dir = CORPUS / slug
+async def test_case_runs_through_raw_pipeline(raw_workflow, legacy_corpus, slug: str) -> None:
+    case_dir = legacy_corpus / slug
     packet = load_input(case_dir, stage_id="ban-dau")
     gold = load_gold(case_dir, stage_id="ban-dau")
 
@@ -53,9 +53,9 @@ async def test_case_runs_through_raw_pipeline(raw_workflow, slug: str) -> None:
         assert actual.instructions == (), f"{slug} must not auto-issue on a human-required route"
 
 
-async def test_d01_reaches_the_gold(raw_workflow) -> None:
+async def test_d01_reaches_the_gold(raw_workflow, legacy_corpus) -> None:
     # D01 is the routine case: T8/E5/C3/A2 => S3 => one PAY 3m.
-    case_dir = CORPUS / "case-01-cong-ty-chi-them"
+    case_dir = legacy_corpus / "case-01-cong-ty-chi-them"
     packet = load_input(case_dir, stage_id="ban-dau")
     from invoice_referee.evaluation.packets import load_stub_readings
 
@@ -68,8 +68,8 @@ async def test_d01_reaches_the_gold(raw_workflow) -> None:
     assert actual.money_states["S"] == "KNOWN"
 
 
-async def test_d03_is_balanced_settled(raw_workflow) -> None:
-    case_dir = CORPUS / "case-03-quyet-toan-can-bang"
+async def test_d03_is_balanced_settled(raw_workflow, legacy_corpus) -> None:
+    case_dir = legacy_corpus / "case-03-quyet-toan-can-bang"
     packet = load_input(case_dir, stage_id="ban-dau")
     from invoice_referee.evaluation.packets import load_stub_readings
 
@@ -81,7 +81,7 @@ async def test_d03_is_balanced_settled(raw_workflow) -> None:
     assert actual.instructions == ()
 
 
-async def test_d04_answer_closes_the_fact_then_escalates(raw_workflow) -> None:
+async def test_d04_answer_closes_the_fact_then_escalates(raw_workflow, legacy_corpus) -> None:
     # D04 initial: payer unknown -> FACT. The owner's answer establishes E5 and
     # the workflow moves on (a single answer does not resolve every gate).
     from invoice_referee.domain.case import CommandContext
@@ -97,7 +97,7 @@ async def test_d04_answer_closes_the_fact_then_escalates(raw_workflow) -> None:
     from invoice_referee.domain.commands import AnswerIssue
     from invoice_referee.evaluation.packets import load_stub_readings
 
-    case_dir = CORPUS / "case-04-chua-ro-nguoi-thanh-toan"
+    case_dir = legacy_corpus / "case-04-chua-ro-nguoi-thanh-toan"
     packet = load_input(case_dir, stage_id="ban-dau")
     workflow = raw_workflow
     # Import the case context and seed the STUB reading for the activity.

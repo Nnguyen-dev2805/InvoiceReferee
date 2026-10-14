@@ -347,6 +347,17 @@ async def submit_case(
     session = _require_session(request)
     workflow = _workflow(request)
     context = _command_context(request, session, require_version=True)
+    from invoice_referee.domain.commands import EmployeePaidClaim
+
+    claims = tuple(
+        EmployeePaidClaim(
+            invoice_reference=claim.invoice_reference,
+            amount=claim.amount,
+            refs=tuple(claim.refs),
+            reason=claim.reason,
+        )
+        for claim in payload.employee_paid_claims
+    )
     return await workflow.execute(
         context,
         Submit(
@@ -356,6 +367,7 @@ async def submit_case(
                 declared_purpose=payload.declared_purpose,
                 notes=payload.notes,
             ),
+            employee_paid_claims=claims,
         ),
     )
 

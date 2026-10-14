@@ -54,6 +54,20 @@ export interface EvidenceReport {
   match_findings: unknown[];
 }
 
+export type PaymentBasisKind =
+  | "INDEPENDENT_PAYMENT"
+  | "FINANCIAL_CONFIRMATION"
+  | "EMPLOYEE_DECLARATION_Q32"
+  | "UNSPECIFIED_LEGACY";
+
+export interface PaymentBasisView {
+  expense_id: string;
+  kind: PaymentBasisKind;
+  actor: string | null;
+  refs: unknown[];
+  rule_id: string | null;
+}
+
 export interface CaseView {
   id: string;
   version: number;
@@ -69,6 +83,7 @@ export interface CaseView {
   evidence_report: EvidenceReport | null;
   assessment_ready: boolean;
   assessment_blocker: string | null;
+  payment_basis: PaymentBasisView[];
 }
 
 export interface CommandResultView {

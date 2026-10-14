@@ -8,6 +8,7 @@ under test, only to observe stored state.
 
 from __future__ import annotations
 
+import sys
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -564,6 +565,34 @@ async def app_fixture(tmp_path: Path):
         yield fixture
     finally:
         await fixture.close()
+
+
+# -- legacy STUB corpus (plan A7) --------------------------------------------
+# The retired `data/kiem-thu` corpus is NOT restored to the repo. Its in-repo
+# generator regenerates the same STUB fixtures deterministically into a
+# git-ignored location, so the legacy baseline tests keep their concrete
+# money/control assertions without checking a discarded tree into git.
+_LEGACY_CORPUS_DIR = PROJECT_ROOT / ".runtime" / "legacy-corpus"
+
+
+@pytest.fixture(scope="session")
+def legacy_corpus() -> Path:
+    """Regenerate the retired STUB corpus under .runtime/ and return its path."""
+    import subprocess
+
+    marker = _LEGACY_CORPUS_DIR / "manifest.json"
+    if not marker.is_file():
+        _LEGACY_CORPUS_DIR.mkdir(parents=True, exist_ok=True)
+        subprocess.run(
+            [
+                sys.executable, str(PROJECT_ROOT / "scripts" / "sinh_du_lieu_kiem_thu.py"),
+                "--output", str(_LEGACY_CORPUS_DIR),
+            ],
+            check=True,
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+        )
+    return _LEGACY_CORPUS_DIR
 
 
 # -- reader fixture (contracts §9): read-only model proposals, no money ------

@@ -40,6 +40,15 @@ const VIEW: CaseView = {
     A: { key: "projection:A", value: null, state: "UNKNOWN" },
   },
   audit: ["2026-10-13 · employee:employee-a · CREATE_DRAFT"],
+  payment_basis: [
+    {
+      expense_id: "expense:1",
+      kind: "EMPLOYEE_DECLARATION_Q32",
+      actor: "employee:employee-a",
+      refs: [],
+      rule_id: "Q32",
+    },
+  ],
 };
 
 describe("Dossier", () => {
@@ -60,6 +69,14 @@ describe("Dossier", () => {
       screen.getByText(/Căn cứ: Tổng chi 10.000.000 vượt ngân sách 8.000.000/),
     ).toBeInTheDocument();
     expect(screen.getByText(/Người xử lý: approver/)).toBeInTheDocument();
+  });
+
+  it("labels a Q32 basis as an employee confirmation, not bank-verified", () => {
+    render(<Dossier caseView={VIEW} />);
+    const basis = screen.getByTestId("basis-expense:1");
+    expect(basis).toHaveTextContent("Lời xác nhận của nhân viên");
+    // The label must never claim bank verification for a Q32 declaration.
+    expect(basis).not.toHaveTextContent(/ngân hàng/i);
   });
 
   it("shows an empty state when no case is open", () => {

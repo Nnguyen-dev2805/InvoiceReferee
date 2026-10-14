@@ -3,11 +3,22 @@ import type { CaseView } from "../types";
 const STATE_LABELS: Record<string, string> = {
   DRAFT: "Bản nháp",
   PROCESSING: "Đang xử lý",
+  EVIDENCE_READY: "Đã đọc chứng từ",
   WAITING: "Chờ người xử lý",
   TECHNICAL_ERROR: "Lỗi xử lý",
   READY_TO_EXECUTE: "Sẵn sàng thực hiện",
   SETTLED: "Đã cân bằng",
   STOPPED: "Đã dừng",
+};
+
+// A payment basis is labelled by what actually established it: a Q32 employee
+// declaration is NOT a bank-verified fact (ADR0007), so the label must not
+// imply bank verification.
+const BASIS_LABELS: Record<string, string> = {
+  INDEPENDENT_PAYMENT: "Chứng từ thanh toán độc lập",
+  FINANCIAL_CONFIRMATION: "Xác nhận tài chính",
+  EMPLOYEE_DECLARATION_Q32: "Lời xác nhận của nhân viên",
+  UNSPECIFIED_LEGACY: "Chưa xác định căn cứ",
 };
 
 const ISSUE_LABELS: Record<string, string> = {
@@ -88,6 +99,20 @@ export function Dossier({ caseView }: { caseView: CaseView | null }) {
                 <MoneyLine key={key} label={MONEY_LABELS[key]} fact={fact} />
               ))}
           </ul>
+
+          {caseView.payment_basis.length > 0 && (
+            <>
+              <h3>Căn cứ chi trả</h3>
+              <ul className="payment-basis" data-testid="payment-basis">
+                {caseView.payment_basis.map((basis) => (
+                  <li key={basis.expense_id} data-testid={`basis-${basis.expense_id}`}>
+                    {BASIS_LABELS[basis.kind] ?? basis.kind}
+                    {basis.actor ? ` · ${basis.actor}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
 
           <h3>Việc cần xử lý ({caseView.issues.length})</h3>
           {caseView.issues.length === 0 ? (

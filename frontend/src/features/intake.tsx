@@ -23,6 +23,11 @@ export function Intake({
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // A Q32 employee paid-claim: the employee states which invoice they paid and
+  // how much. The server derives the actor/scope/time; the UI never asks for a
+  // backend actor id (plan A8).
+  const [claimInvoice, setClaimInvoice] = useState("");
+  const [claimAmount, setClaimAmount] = useState("");
 
   async function createCase() {
     setBusy(true);
@@ -64,11 +69,30 @@ export function Intake({
         current = attached.case_view;
         setFiles([]);
       }
+      // A typed claim references an uploaded source by filename + digest; the
+      // storage key's last segment is the uploaded filename.
+      const claims =
+        claimInvoice.trim() !== "" && claimAmount.trim() !== ""
+          ? [
+              {
+                invoice_reference: claimInvoice.trim(),
+                amount: Number(claimAmount),
+                refs: current.sources.slice(0, 1).map((source) => ({
+                  source_id: `file:${source.storage_key.split("/").pop()}`,
+                  source_sha256: source.digest,
+                  page: 1,
+                  exact_quote: "nhân viên xác nhận",
+                })),
+                reason: "Nhân viên xác nhận đã trực tiếp thanh toán khoản chi này.",
+              },
+            ]
+          : [];
       const result = await submitCase(
         current.id,
         activityId,
         "Công tác",
         current.version,
+        claims,
       );
       setCaseView(result.case_view);
       onCase(result.case_view);
@@ -188,6 +212,36 @@ export function Intake({
           />
         </label>
       </p>
+      <fieldset>
+        <legend>Khoản nhân viên đã trả (nếu có)</legend>
+        <p className="muted">
+          Nhân viên xác nhận trực tiếp đã thanh toán khoản chi này. Đây là lời
+          xác nhận của nhân viên, không phải xác minh ngân hàng.
+        </p>
+        <p>
+          <label htmlFor="claim-invoice">
+            Số hóa đơn
+            <input
+              id="claim-invoice"
+              value={claimInvoice}
+              onChange={(event) => setClaimInvoice(event.target.value)}
+            />
+          </label>
+        </p>
+        <p>
+          <label htmlFor="claim-amount">
+            Số tiền (VND)
+            <input
+              id="claim-amount"
+              type="number"
+              min={0}
+              value={claimAmount}
+              onChange={(event) => setClaimAmount(event.target.value)}
+            />
+          </label>
+        </p>
+      </fieldset>
+
       <p>
         <button
           type="button"

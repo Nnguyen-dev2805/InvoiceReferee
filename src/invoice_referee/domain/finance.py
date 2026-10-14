@@ -30,6 +30,17 @@ MoneyKind = Literal[
 VerificationState = Literal["OBSERVED", "CONFIRMED", "REJECTED"]
 AllocationState = Literal["UNALLOCATED", "ALLOCATED", "UNKNOWN"]
 
+# How an employee-paid portion is established (ADR0007). A Q32 employee
+# declaration is NOT an independently verified bank fact; it is a scoped,
+# responsible confirmation bounded to E<=8m and abs(S)<=4m. LIVE admission must
+# never present UNSPECIFIED_LEGACY as a verified basis.
+PaymentBasisKind = Literal[
+    "INDEPENDENT_PAYMENT",
+    "FINANCIAL_CONFIRMATION",
+    "EMPLOYEE_DECLARATION_Q32",
+    "UNSPECIFIED_LEGACY",
+]
+
 
 class ExpensePayment(StrictModel):
     """A verified payment portion of one expense (payer/amount/binding)."""
@@ -41,6 +52,26 @@ class ExpensePayment(StrictModel):
     expense_id: Id
     received_state: ReadState
     refs: tuple[EvidenceRef, ...] = ()
+    # The confirmation basis and the responsible actor. A compatibility
+    # constructor (STUB/test) leaves the basis UNSPECIFIED_LEGACY; LIVE/REPLAY
+    # admission must set an explicit basis and actor (plan A0/A3).
+    basis_kind: PaymentBasisKind = "UNSPECIFIED_LEGACY"
+    responsible_actor: Id | None = None
+
+
+class PaymentBasisView(StrictModel):
+    """A read-only view of how one expense's paid portion is established.
+
+    This is derived from the admitted expenses, not a separate ledger event: no
+    money moves because a basis view exists. Q32 is labelled a responsible
+    employee confirmation, never an independent bank fact (ADR0007).
+    """
+
+    expense_id: Id
+    kind: PaymentBasisKind
+    actor: Id | None = None
+    refs: tuple[EvidenceRef, ...] = ()
+    rule_id: str | None = None
 
 
 class Expense(StrictModel):

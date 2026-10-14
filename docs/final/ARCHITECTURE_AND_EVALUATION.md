@@ -527,10 +527,12 @@ text không bỏ qua OCR) → confidence gate → phân loại `document_type`/`
 → trích xuất có trạng thái + provenance theo schema từng loại → validation profile →
 matching với **giấy quyết toán upload (`SETTLEMENT_FORM`)**. Không có `SETTLEMENT_FORM`
 ⇒ bỏ qua matching và ghi finding `SETTLEMENT_FORM_MISSING` (evidence-only, không chặn
-nộp); khai báo in-app không phải `SETTLEMENT_FORM`. Đầu ra LIVE/RECORDED_REPLAY **chưa**
-đi vào Reconciler hay phát hành kết luận tiền: `assessment_ready=false`,
-`assessment_blocker=EVIDENCE_ADMISSION_NOT_CONNECTED`, và trạng thái case là
-**`EVIDENCE_READY`** (mới, tách khỏi `WAITING`). `final` vẫn là chủ workflow/DB/audit/
+nộp); khai báo in-app không phải `SETTLEMENT_FORM`. Đầu ra LIVE/RECORDED_REPLAY đi vào
+Reconciler qua một **admission mapper thuần** (§16): khi report đã publish nhưng chưa
+assess, `assessment_ready=false`, `assessment_blocker=EVIDENCE_ASSESSMENT_PENDING`, và
+trạng thái case là **`EVIDENCE_READY`** (mới, tách khỏi `WAITING`); sau khi consumer
+typed chạy, `CaseView` hiển thị conclusion/instruction thật (plan A5 đã mở guard
+`EVIDENCE_ADMISSION_NOT_CONNECTED` trước đây). `final` vẫn là chủ workflow/DB/audit/
 tiền; không port repository/database/settlement lifecycle thứ hai của Hoangha.
 
 ### 15.2. Quyết định đã chốt

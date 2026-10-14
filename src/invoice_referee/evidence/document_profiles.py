@@ -71,7 +71,7 @@ _SETTLEMENT_FORM = DocumentProfile(
         "printed_total": "CRITICAL",
         "printed_return": "CRITICAL",
         "printed_reimbursement": "CRITICAL",
-        "amount_words": "NON_CRITICAL",
+        "amount_words": "CRITICAL",
         "case_no_evidence_reason": "NON_CRITICAL",
     },
     allowed_fields=(

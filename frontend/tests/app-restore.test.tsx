@@ -47,7 +47,8 @@ const CASE: CaseView = {
   audit: [],
   evidence_report: { provider_mode: "LIVE", data_origin: "LIVE_READ", documents: [], links: [], row_matches: [], match_findings: [] },
   assessment_ready: false,
-  assessment_blocker: "EVIDENCE_ADMISSION_NOT_CONNECTED",
+  assessment_blocker: "EVIDENCE_ASSESSMENT_PENDING",
+  payment_basis: [],
 };
 
 function mockFetch(routes: Record<string, unknown>) {

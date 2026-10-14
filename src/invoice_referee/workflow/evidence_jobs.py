@@ -69,6 +69,15 @@ async def run_evidence_job(workflow, job_id: str) -> None:
             )
             return
         workflow._publish_evidence_report(cx, tenant=tenant, root_id=root_id, report=report)
+        # After publishing, the typed finance consumer assesses the admission
+        # input built from the CURRENT stored state (plan A5). A Stop or a
+        # changed basis is re-checked here so a stale report is not assessed.
+        workflow._assess_and_commit(
+            cx,
+            workflow._system_session(tenant),
+            workflow._reload(cx, cx.execute("SELECT * FROM cases WHERE id = ?", (root_id,)).fetchone()),
+            workflow._now_iso(),
+        )
         workflow._mark_evidence_job(cx, job_id, phase="DONE", status="COMPLETED")
 
 

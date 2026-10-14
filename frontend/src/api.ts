@@ -65,10 +65,20 @@ export async function submitCase(
   activityId: string,
   declaredPurpose: string,
   version: number,
+  employeePaidClaims: Array<{
+    invoice_reference: string;
+    amount: number;
+    refs: Array<{ source_id: string; source_sha256: string; page: number; exact_quote: string }>;
+    reason: string;
+  }> = [],
 ): Promise<CommandResultView> {
   return request<CommandResultView>(
     `/api/cases/${rootId}/submit`,
-    { activity_id: activityId, declared_purpose: declaredPurpose },
+    {
+      activity_id: activityId,
+      declared_purpose: declaredPurpose,
+      employee_paid_claims: employeePaidClaims,
+    },
     newCommandId(),
     version,
   );
