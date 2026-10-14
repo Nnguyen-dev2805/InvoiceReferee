@@ -203,10 +203,10 @@ def seed() -> None:
         _advance(
             "transfer:ADV-UC03-F01", "activity:link-adv-a", 4_000_000, "ADV-UC03-F01"
         ),
-        _advance("transfer:ADV-LIVE-B", "activity:link-adv-b", 4_000_000, "ADV-LIVE-B"),
     ]
-    # Per-activity snapshots: adv-A carries the advance history, adv-B starts
-    # with none (scenario 2 records it through the UI).
+    # Per-activity snapshots with scope-homogeneous ledgers (the admission
+    # contract sums one activity's history): adv-A carries its advance,
+    # adv-B starts with none (scenario 2 records it through the UI).
     wf.import_company_context(
         _context(
             TENANT,
@@ -221,17 +221,51 @@ def seed() -> None:
         _context(TENANT, "activity:link-adv-b", "Tạm ứng B", "TU-LIVE-002", ledger=[]),
         origin="SIMULATED",
     )
+    # A third twin for scenario 2 (same purpose/amount, no history): the
+    # accountant records its advance through the UI without colliding with
+    # the dossiers scenarios 1 and 3 already own.
+    wf.import_company_context(
+        _context(TENANT, "activity:link-adv-c", "Tạm ứng C", "TU-LIVE-003", ledger=[]),
+        origin="SIMULATED",
+    )
     # The catalog dossier references used by DOCUMENT_REFERENCE linking.
     with wf.db.transaction() as cx:
         for activity_id, ref in (
             ("activity:link-adv-a", "TU-LIVE-001"),
             ("activity:link-adv-b", "TU-LIVE-002"),
+            ("activity:link-adv-c", "TU-LIVE-003"),
         ):
             cx.execute(
                 "UPDATE context_activities SET references_json = ? "
                 "WHERE tenant = ? AND activity_id = ?",
                 (json.dumps([ref]), TENANT, activity_id),
             )
+    # The dev server imports --context at startup AFTER this seed (REPLACE
+    # semantics): give it a demo-shaped file that keeps the tenant's canonical
+    # people names (matching the vouchers) and company name, but carries NO
+    # activity (so it never shadows the per-activity snapshots for
+    # load_context) and no ledger. Without this, the stock demo file would
+    # rename employee-a and the payee check would (correctly but unhelpfully)
+    # block every record.
+    CONTEXT_PATH.write_text(
+        json.dumps(
+            {
+                "data_origin": "SIMULATED",
+                "note": "Link-live tenant people/company (SIMULATED, not corporate authority).",
+                "organization": {"id": TENANT, "name": COMPANY},
+                "people": [
+                    {"id": EMPLOYEE, "name": "Nguyễn An"},
+                    {"id": ACCOUNTANT, "name": "Trần Thị B (kế toán)"},
+                    {"id": "employee:approver", "name": "Lê Văn C (người quyết định)"},
+                ],
+                "activities": [],
+                "grants": [],
+                "witnesses": [],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
     print("[link-live] seeded contexts for", TENANT)
 
 
@@ -272,9 +306,7 @@ def main() -> int:
             "--uploads",
             str(UPLOADS_DIR),
             "--context",
-            str(CONTEXT_PATH)
-            if CONTEXT_PATH.exists()
-            else "data/demo/company-context.json",
+            str(CONTEXT_PATH),
         ],
         cwd=str(PROJECT_ROOT),
         stdout=backend_log,
@@ -289,8 +321,21 @@ def main() -> int:
         if health.get("mode") != "LIVE" or not health.get("live_ready"):
             raise RuntimeError(f"LIVE healthcheck failed: {health}")
         env = dict(os.environ, LINK_LIVE_PORT=str(PORT), LINK_LIVE_RUN=RUN_ID)
+        playwright_cmd = [
+            "npx",
+            "playwright",
+            "test",
+            "--config",
+            "playwright.link-live.config.ts",
+        ]
+        # LINK_SCENARIOS selects a subset (Playwright --grep), so passed
+        # dossiers are not re-run: e.g. "2. no advance|5. reloading|4. voucher".
+        grep_pattern = os.environ.get("LINK_SCENARIOS", "").strip()
+        if grep_pattern:
+            playwright_cmd += ["--grep", grep_pattern]
+            print(f"[Harness] scenario filter: {grep_pattern}")
         res = subprocess.run(
-            ["npx", "playwright", "test", "--config", "playwright.link-live.config.ts"],
+            playwright_cmd,
             cwd=str(PROJECT_ROOT / "frontend"),
             env=env,
             capture_output=True,

@@ -132,7 +132,7 @@ export function Verify({
   if (onClose) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-        <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-2xl w-full p-6 animate-in fade-in zoom-in-95 duration-150">
+        <div className="bg-white rounded border border-slate-200 shadow-xl max-w-2xl w-full p-6 animate-in fade-in zoom-in-95 duration-150">
           {content}
         </div>
       </div>
@@ -140,7 +140,7 @@ export function Verify({
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5 text-xs shadow-xs">
+    <div className="bg-white border border-slate-200 rounded p-5 text-xs">
       {content}
     </div>
   );

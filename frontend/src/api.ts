@@ -174,6 +174,7 @@ export async function advanceDraft(
   event_at: string | null;
   missing_fields: string[];
   requires_confirmation: boolean;
+  already_recorded?: boolean;
   refs?: Array<{ source_id: string; source_sha256: string; page: number | null; exact_quote: string }>;
 }> {
   const form = new FormData();

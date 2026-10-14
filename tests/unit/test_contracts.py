@@ -417,3 +417,39 @@ def test_parse_vnd_handles_real_provider_formatting() -> None:
     assert parse_vnd("") is None
     assert parse_vnd(None) is None
     assert parse_vnd(True) is None  # bool is never money
+
+
+def test_voucher_date_only_forms_resolve_to_hcm_midnight() -> None:
+    from datetime import timedelta
+
+    from invoice_referee.domain.finance import RecordMoneyInput
+
+    for raw in ("2026-10-05", "05/10/2026"):
+        money = RecordMoneyInput(
+            external_key="bank:T-1",
+            claimed_kind="ADVANCE_RECEIVED",
+            claimed_scope="activity:travel-a",
+            payer="company:demo",
+            payee="employee:employee-a",
+            amount=4_000_000,
+            event_at=raw,  # type: ignore[arg-type]
+            reason="r",
+        )
+        assert money.event_at == datetime(2026, 10, 4, 17, 0, tzinfo=UTC)
+        assert money.event_at.utcoffset() == timedelta(0)
+
+
+def test_nonsense_voucher_date_is_rejected() -> None:
+    from invoice_referee.domain.finance import RecordMoneyInput
+
+    with pytest.raises(ValidationError):
+        RecordMoneyInput(
+            external_key="bank:T-1",
+            claimed_kind="ADVANCE_RECEIVED",
+            claimed_scope="activity:travel-a",
+            payer="company:demo",
+            payee="employee:employee-a",
+            amount=4_000_000,
+            event_at="32/13/2026",  # type: ignore[arg-type]
+            reason="r",
+        )

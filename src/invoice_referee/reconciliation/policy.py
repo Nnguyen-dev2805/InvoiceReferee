@@ -173,7 +173,25 @@ def evaluate_policy(
     all_disputed = bool(input.expense_facts) and all(
         expense.id in input.disputed_expense_ids for expense in input.expense_facts
     )
-    if projection.E.state == "UNKNOWN" and not all_disputed:
+    invoice_payer_questions = {
+        issue.field_or_rule
+        for issue in input.admission_issues
+        if issue.kind == "FACT"
+        and issue.field_or_rule.startswith("expense:")
+        and issue.field_or_rule.endswith(":employee_paid")
+    }
+    unresolved_payment_count = sum(
+        expense.payment_state == "UNKNOWN" for expense in input.expense_facts
+    )
+    has_invoice_specific_coverage = (
+        unresolved_payment_count > 0
+        and len(invoice_payer_questions) >= unresolved_payment_count
+    )
+    if (
+        projection.E.state == "UNKNOWN"
+        and not all_disputed
+        and not has_invoice_specific_coverage
+    ):
         # An incurred cost with no established payer is a FACT owned by the
         # verifier; it must not become an E=0 money conclusion (§3, §10.2).
         issues.append(

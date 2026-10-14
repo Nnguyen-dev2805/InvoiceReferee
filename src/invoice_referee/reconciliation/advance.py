@@ -50,6 +50,10 @@ class AdvanceDraft(NamedTuple):
     refs: tuple[EvidenceRef, ...]
     missing_fields: tuple[str, ...]
     requires_confirmation: bool = True
+    # True when this exact transaction identity is already in company history
+    # (14/10/2026): reloading it must not raise A again — the accountant can
+    # still confirm (idempotent), but the UI says so upfront.
+    already_recorded: bool = False
 
 
 def _field(document: DocumentAnalysis, name: str) -> FieldCandidate | None:

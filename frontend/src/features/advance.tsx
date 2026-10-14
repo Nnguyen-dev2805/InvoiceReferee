@@ -22,6 +22,7 @@ type Draft = {
   event_at: string | null;
   missing_fields: string[];
   requires_confirmation: boolean;
+  already_recorded: boolean;
   refs: DraftRef[];
 };
 
@@ -59,7 +60,11 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
     setSelectedFileName(file.name);
     try {
       const result = await advanceDraft(caseView.id, [file], method);
-      setDraft({ ...result, refs: result.refs ?? [] });
+      setDraft({
+        ...result,
+        refs: result.refs ?? [],
+        already_recorded: result.already_recorded ?? false,
+      });
       setAmount(result.amount !== null ? String(result.amount) : "");
       setReference(result.transaction_reference ?? "");
       setPayer(result.payer_name ?? "");
@@ -156,37 +161,46 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
         </div>
 
         <div>
-          <label className="block text-slate-700 font-medium text-xs mb-1.5">
-            Chứng từ tạm ứng (Ủy nhiệm chi / Phiếu chi):
-          </label>
-          <div className="border border-dashed border-slate-300 hover:border-slate-400 bg-slate-50/40 rounded p-3 text-center transition-colors">
-            <label
-              htmlFor="advance-file-input"
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded border border-slate-200 cursor-pointer transition-colors"
-            >
-              <span>{selectedFileName ? "Đổi tệp chứng từ" : "Chọn tệp chứng từ ứng"}</span>
-              <input
-                id="advance-file-input"
-                type="file"
-                aria-label="Chứng từ ứng"
-                accept=".pdf,.png,.jpg,.jpeg"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void read(file);
-                }}
-                className="sr-only"
-              />
-            </label>
+          <label
+            htmlFor="advance-file-input"
+            className="border border-dashed border-slate-300 hover:border-slate-500 bg-slate-50/50 hover:bg-slate-50 rounded p-6 text-center flex flex-col items-center justify-center cursor-pointer transition-colors block group"
+          >
+            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-slate-900 group-hover:bg-slate-200 mb-3 transition-colors">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
             {selectedFileName ? (
-              <span className="text-[11px] text-emerald-700 font-medium block mt-1.5">
-                ✓ {selectedFileName}
-              </span>
+              <>
+                <span className="font-semibold text-slate-800 block text-xs">
+                  {selectedFileName}
+                </span>
+                <span className="text-[11px] text-emerald-700 font-medium block mt-1">
+                  ✓ Đã tải lên — Nhấn để chọn tệp chứng từ khác
+                </span>
+              </>
             ) : (
-              <span className="text-[11px] text-slate-400 block mt-1">
-                Hỗ trợ PDF, PNG, JPG (tự động nhận diện số tiền và mã tham chiếu)
-              </span>
+              <>
+                <span className="font-semibold text-slate-800 block text-xs">
+                  Nhấn để chọn tệp hoặc kéo thả tài liệu vào đây
+                </span>
+                <span className="text-[11px] text-slate-500 block mt-1 max-w-md">
+                  Hỗ trợ PDF, PNG, JPG (Ủy nhiệm chi ngân hàng, giấy báo nợ, phiếu chi tiền mặt)
+                </span>
+              </>
             )}
-          </div>
+            <input
+              id="advance-file-input"
+              type="file"
+              aria-label="Chứng từ ứng"
+              accept=".pdf,.png,.jpg,.jpeg"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void read(file);
+              }}
+              className="sr-only"
+            />
+          </label>
         </div>
       </div>
 
@@ -208,6 +222,12 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
           {draft.missing_fields.length > 0 && (
             <p className="text-xs text-amber-800 bg-amber-50 p-2.5 rounded-md border border-amber-200">
               ⚠ Thiếu hoặc mờ trường: {draft.missing_fields.join(", ")} — vui lòng bổ sung thông tin bên dưới.
+            </p>
+          )}
+
+          {draft.already_recorded && (
+            <p className="text-xs text-slate-700 bg-slate-100 p-2.5 rounded-md border border-slate-300">
+              ⓘ Mã giao dịch này đã có trong lịch sử công ty — ghi nhận lại không làm tăng ứng thực nhận (idempotent).
             </p>
           )}
 

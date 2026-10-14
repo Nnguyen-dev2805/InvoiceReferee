@@ -9,6 +9,14 @@ const KIND_LABELS: Record<string, string> = {
   AUTHORITY: "Thẩm quyền phê duyệt",
 };
 
+function employeePaidInvoiceReference(fieldOrRule: string): string | null {
+  const prefix = "expense:";
+  const suffix = ":employee_paid";
+  if (!fieldOrRule.startsWith(prefix) || !fieldOrRule.endsWith(suffix)) return null;
+  const reference = fieldOrRule.slice(prefix.length, -suffix.length).trim();
+  return reference || null;
+}
+
 export function formatVndInText(text: string): string {
   return text.replace(/\b\d+\b/g, (match) => {
     const num = parseInt(match, 10);
@@ -99,6 +107,7 @@ export function QuestionCard({
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const invoiceReference = employeePaidInvoiceReference(issue.field_or_rule);
 
   async function submit() {
     setBusy(true);
@@ -145,25 +154,43 @@ export function QuestionCard({
       <div className="space-y-3 pt-1">
         <div>
           <label htmlFor={`answer-${issue.id}`} className="text-slate-700 block text-xs font-medium mb-1.5">
-            Nội dung giải trình / xác nhận:
+            {invoiceReference
+              ? `Số tiền VND nhân viên trực tiếp thanh toán cho hóa đơn ${invoiceReference}`
+              : "Nội dung giải trình / xác nhận:"}
           </label>
-          <textarea
-            id={`answer-${issue.id}`}
-            rows={3}
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            className="w-full bg-white border border-slate-300 rounded text-xs p-2.5 text-slate-900 focus:outline-none focus:border-slate-800 resize-y transition-colors"
-          />
+          {invoiceReference ? (
+            <input
+              id={`answer-${issue.id}`}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-2 text-slate-900 focus:outline-none focus:border-slate-800 transition-colors"
+            />
+          ) : (
+            <textarea
+              id={`answer-${issue.id}`}
+              rows={3}
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              className="w-full bg-white border border-slate-300 rounded text-xs p-2.5 text-slate-900 focus:outline-none focus:border-slate-800 resize-y transition-colors"
+            />
+          )}
         </div>
         <div>
           <label htmlFor={`reason-${issue.id}`} className="text-slate-600 block text-[11px] font-medium mb-1.5">
-            Căn cứ / Ghi chú đính kèm (tùy chọn):
+            {invoiceReference
+              ? "Lý do / xác nhận cụ thể"
+              : "Căn cứ / Ghi chú đính kèm (tùy chọn):"}
           </label>
           <input
             id={`reason-${issue.id}`}
             type="text"
             value={reason}
             onChange={(event) => setReason(event.target.value)}
+            required={invoiceReference !== null}
             className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800 transition-colors"
           />
         </div>
@@ -174,7 +201,7 @@ export function QuestionCard({
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={busy || value.trim() === ""}
+          disabled={busy || value.trim() === "" || (invoiceReference !== null && reason.trim() === "")}
           className="font-medium text-xs px-4 py-1.5 rounded transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed bg-slate-900 hover:bg-slate-800 text-white cursor-pointer"
         >
           {busy ? "Đang gửi…" : "Gửi giải trình"}

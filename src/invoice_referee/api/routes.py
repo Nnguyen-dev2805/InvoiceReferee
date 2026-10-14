@@ -509,6 +509,7 @@ async def record_actual(
                 instrument_method=money.instrument_method,
                 instrument_status=money.instrument_status,
                 instrument_reference=money.instrument_reference,
+                refs=tuple(money.refs),
             ),
         ),
     )

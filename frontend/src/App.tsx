@@ -256,15 +256,23 @@ export default function App() {
               currentRole={currentRole}
               onSelectCase={(c) => {
                 setCaseView(c);
-                setViewMode("detail");
+                if (c.state === "DRAFT" && currentRole === "employee") {
+                  setViewMode("intake");
+                } else {
+                  setViewMode("detail");
+                }
               }}
-              onCreateNew={() => setViewMode("intake")}
+              onCreateNew={() => {
+                setCaseView(null);
+                setViewMode("intake");
+              }}
             />
           </main>
         ) : viewMode === "intake" ? (
           <Intake
             session={session}
             onBack={() => setViewMode("dashboard")}
+            existingCase={caseView?.state === "DRAFT" ? caseView : null}
             onCase={(newCase) => {
               setCaseView(newCase);
               setViewMode("detail");
@@ -304,7 +312,12 @@ export default function App() {
                           value={caseView.id}
                           onChange={(e) => {
                             const found = caseList.find((c) => c.id === e.target.value);
-                            if (found) setCaseView(found);
+                            if (found) {
+                              setCaseView(found);
+                              if (found.state === "DRAFT" && currentRole === "employee") {
+                                setViewMode("intake");
+                              }
+                            }
                           }}
                           className="text-xs font-mono-nums font-semibold text-slate-900 bg-transparent hover:bg-slate-100 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer transition-colors"
                         >
@@ -327,6 +340,31 @@ export default function App() {
 
               {/* Scrollable Canvas for Workspaces */}
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+                {/* DRAFT Resumption Banner */}
+                {caseView?.state === "DRAFT" && (
+                  <div className="bg-amber-50/80 border border-amber-200 rounded p-3.5 text-xs flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                        <strong className="text-amber-950 font-semibold text-xs">
+                          Hồ sơ này đang ở dạng Bản nháp và chưa được nộp.
+                        </strong>
+                      </div>
+                      <p className="text-amber-800 text-[11px] leading-relaxed">
+                        Chứng từ đã tải lên và trích xuất sẵn. Hãy mở lại bản nháp để kiểm tra và xác nhận nộp hồ sơ.
+                      </p>
+                    </div>
+                    {currentRole === "employee" && (
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("intake")}
+                        className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded text-xs transition-colors cursor-pointer shrink-0"
+                      >
+                        Tiếp tục nộp hồ sơ →
+                      </button>
+                    )}
+                  </div>
+                )}
                 {/* 1. Dossier (Bảng đối soát tài chính & Lịch sử) */}
                 {activePanels.includes("dossier") && (
                   <Dossier

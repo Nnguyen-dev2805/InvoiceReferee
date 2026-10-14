@@ -342,3 +342,22 @@ the authorized task range. [AGENTS.md](../../../AGENTS.md#execute-and-hand-off)
 defines the portable process; installed local execution skills are optional helpers
 subject to the adapter above. Keep milestone review at T3/T7/T8/T9/T11 regardless
 of method. No application implementation occurred in the planning/setup turns.
+
+## Post-plan correction — TC02/TC03 LIVE harness and invoice-scoped Q32 answer
+
+- [x] Remove the TC02/TC03 startup context shadow: the backend's later demo import
+  no longer names the pre-seeded typed activities; verify both snapshots survive
+  the actual production startup importer.
+- [x] Run the harness on `scripts/dev.py` without runtime monkeypatches. Correct
+  draft amount/activity selectors and accountant navigation without weakening the
+  financial, state, instruction or persistence assertions.
+- [x] Add LIVE answer-loop regressions: an employee answer is bound to the exact
+  invoice, amount, authenticated employee, activity and source refs; one invoice's
+  claim cannot apply to another; generic payer answers and invalid/non-Q32 results
+  are not reported as successful.
+- [x] Full Python suite, frontend suite/build and diff check pass.
+- [ ] Complete Playwright acceptance after the final selector changes. The latest
+  real-provider run timed out OCR on TC02 at the 60-second client limit; TC03
+  submitted and persisted `SETTLED` with no instructions, but the browser stopped
+  at an outdated accountant-dashboard locator. Reload/instruction UI checks were
+  NOT_RUN. No extra provider run was made after those findings.

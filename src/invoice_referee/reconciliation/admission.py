@@ -489,13 +489,37 @@ def _declared_advance(
     return None
 
 
-def _claim_index(confirmations: tuple[Confirmation, ...]) -> dict[str, Confirmation]:
+def _invoice_reference(document: DocumentAnalysis | None) -> str | None:
+    if document is None:
+        return None
+    value = _field(document, "document_number")
+    reference = str(value).strip() if value is not None else ""
+    return reference or None
+
+
+def _claim_index(
+    confirmations: tuple[Confirmation, ...], *, scope: CaseScope
+) -> dict[str, Confirmation]:
     index: dict[str, Confirmation] = {}
     for confirmation in confirmations:
         # fact_key = expense:<invoice_reference>:employee_paid
-        parts = confirmation.fact_key.split(":")
-        if len(parts) >= 3 and parts[0] == "expense" and parts[-1] == "employee_paid":
-            index[parts[1]] = confirmation
+        prefix, suffix = "expense:", ":employee_paid"
+        if not (
+            confirmation.fact_key.startswith(prefix)
+            and confirmation.fact_key.endswith(suffix)
+        ):
+            continue
+        invoice_reference = confirmation.fact_key[len(prefix) : -len(suffix)].strip()
+        amount = _as_decimal(confirmation.value)
+        if (
+            not invoice_reference
+            or confirmation.actor != scope.employee
+            or confirmation.scope != scope.activity
+            or amount is None
+            or amount <= 0
+        ):
+            continue
+        index[invoice_reference] = confirmation
     return index
 
 
@@ -611,7 +635,14 @@ def admit_evidence(
     )
 
     matched, unreferenced_documents = _match_expense_documents(report, paper)
-    claims = _claim_index(confirmations)
+    claims = _claim_index(confirmations, scope=scope)
+    invoice_reference_counts: dict[str, int] = {}
+    for entry in matched:
+        invoice_reference = _invoice_reference(entry.document)
+        if invoice_reference is not None:
+            invoice_reference_counts[invoice_reference] = (
+                invoice_reference_counts.get(invoice_reference, 0) + 1
+            )
 
     # Allocation: the sum of the rows that share one source must not exceed that
     # source's total (T4, TC22). A payment proof is not a second invoice, so it is
@@ -718,8 +749,15 @@ def admit_evidence(
     # bounds the Q32 DECLARATION path only; the invoice basis (demo policy) does
     # not fabricate E=0 when the total is large — authority is gated by policy.
     matched_claims = [
-        _claim_for(claims, entry.refs, report, index)
-        for index, entry in enumerate(matched, start=1)
+        _claim_for(
+            claims,
+            entry,
+            unique_invoice_reference=(
+                (invoice_reference := _invoice_reference(entry.document)) is not None
+                and invoice_reference_counts.get(invoice_reference) == 1
+            ),
+        )
+        for entry in matched
     ]
     total_claimed = sum(
         int(_as_decimal(c.value) or 0) for c in matched_claims if c is not None
@@ -789,6 +827,35 @@ def admit_evidence(
                     refs=entry.paper_refs,
                     question=(
                         "Cung cấp chứng từ gốc hoặc xác lập dịch vụ/số tiền/người trả cho khoản này."
+                    ),
+                )
+            )
+        invoice_reference = _invoice_reference(entry.document)
+        if (
+            not disputed
+            and not invoice_bound
+            and binding_fact is None
+            and claim is None
+            and entry.document is not None
+            and entry.document.profile_status == "CLEAR"
+            and invoice_reference is not None
+            and invoice_reference_counts.get(invoice_reference) == 1
+            and refs
+        ):
+            issues.append(
+                BusinessIssue(
+                    id=f"issue:fact:employee-paid:{expense_id}",
+                    kind="FACT",
+                    field_or_rule=f"expense:{invoice_reference}:employee_paid",
+                    owner="employee",
+                    basis=(
+                        f"Hóa đơn {invoice_reference} ghi nhận khoản chi {int(amount)} VND; "
+                        "chưa có căn cứ gắn người trả với hóa đơn này."
+                    ),
+                    refs=refs,
+                    question=(
+                        f"Bạn trực tiếp đã thanh toán bao nhiêu VND cho hóa đơn "
+                        f"{invoice_reference}? Không vượt quá {int(amount)} VND."
                     ),
                 )
             )
@@ -900,29 +967,19 @@ def admit_evidence(
 
 def _claim_for(
     claims: dict[str, Confirmation],
-    refs: tuple[EvidenceRef, ...],
-    report: ReadResult,
-    index: int,
+    entry: _MatchedExpense,
+    *,
+    unique_invoice_reference: bool,
 ) -> Confirmation | None:
-    """The Q32 confirmation that matches this admitted expense, if any.
-
-    A single-row root with a single claim is unambiguous. With multiple rows the
-    claim must name a document number that appears in the matched document's
-    refs (its `document_number` FOUND value).
-    """
-    if not claims:
+    """Return only the scoped claim for this exact, uniquely matched invoice."""
+    if not claims or not unique_invoice_reference:
         return None
-    if len(claims) == 1 and index == 1:
-        return next(iter(claims.values()))
-    numbers = {
-        str(_field(d, "document_number"))
-        for d in report.documents
-        if _field(d, "document_number") is not None
-    }
-    for number, claim in claims.items():
-        if number in numbers:
-            return claim
-    return None
+    invoice_reference = _invoice_reference(entry.document)
+    claim = claims.get(invoice_reference) if invoice_reference is not None else None
+    amount = _as_decimal(claim.value) if claim is not None else None
+    if amount is None or amount > entry.amount:
+        return None
+    return claim
 
 
 def _economic_key(document: DocumentAnalysis | None, index: int) -> str:

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Annotated, Any, Generic, Literal, TypeVar
+from zoneinfo import ZoneInfo
 
 from pydantic import (
     AfterValidator,
@@ -31,10 +32,31 @@ FactState = Literal["KNOWN", "UNKNOWN", "CONFLICT"]
 T = TypeVar("T")
 
 
+import re
+
+# Voucher/source dates the OCR pipeline actually produces (14/10/2026,
+# ADR0008): a bare ISO day or a Vietnamese DD/MM/YYYY day. Both resolve to
+# midnight in Asia/Ho_Chi_Minh (the display zone of contracts §1) so the
+# source transaction day is kept instead of 422ing the accountant's record.
+# Anything else still parses as strict ISO-8601; naive full datetimes stay
+# rejected by `_to_utc`.
+_ISO_DAY = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
+_VN_DAY = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
+
+
 def _parse_iso_datetime(value: Any) -> Any:
     """Accept an ISO-8601 string (FastAPI JSON bodies parse to a dict first)."""
     if isinstance(value, str):
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        text = value.strip()
+        match = _ISO_DAY.match(text)
+        if match is not None:
+            year, month, day = (int(part) for part in match.groups())
+            return datetime(year, month, day, tzinfo=ZoneInfo("Asia/Ho_Chi_Minh"))
+        match = _VN_DAY.match(text)
+        if match is not None:
+            day, month, year = (int(part) for part in match.groups())
+            return datetime(year, month, day, tzinfo=ZoneInfo("Asia/Ho_Chi_Minh"))
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
     return value
 
 
@@ -47,7 +69,9 @@ def _to_utc(value: datetime) -> datetime:
 
 # Every timestamp in the domain uses this type: aware, ISO-8601 at the JSON
 # boundary, stored normalized to UTC so comparisons never mix naive/aware.
-UtcDatetime = Annotated[datetime, BeforeValidator(_parse_iso_datetime), AfterValidator(_to_utc)]
+UtcDatetime = Annotated[
+    datetime, BeforeValidator(_parse_iso_datetime), AfterValidator(_to_utc)
+]
 
 
 class StrictModel(BaseModel):

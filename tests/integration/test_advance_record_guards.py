@@ -66,18 +66,20 @@ def _workflow(tmp_path: Path) -> CaseWorkflow:
     return wf
 
 
-async def _seed_draft(wf: CaseWorkflow) -> str:
+async def _seed_draft(
+    wf: CaseWorkflow, tag: str = "x", activity: str = ACTIVITY
+) -> str:
     session = wf.start_session(tenant=TENANT, persona="employee", actor_id=EMPLOYEE)
     created = await wf.execute(
         CommandContext(
             session_id=session.session_id,
             actor_id=EMPLOYEE,
-            command_id="cmd:1",
+            command_id=f"cmd:1:{tag}",
             expected_case_version=0,
         ),
         CreateDraft(
             activity_data=ActivityData(
-                activity_id=ACTIVITY,
+                activity_id=activity,
                 name="a",
                 occurred_at="2026-10-06T09:00:00+07:00",
                 declared_purpose="p",
@@ -85,12 +87,12 @@ async def _seed_draft(wf: CaseWorkflow) -> str:
         ),
     )
     root = created.case_view.id
-    digest = hashlib.sha256(b"pdf").hexdigest()
+    digest = hashlib.sha256(f"pdf:{tag}".encode()).hexdigest()
     await wf.execute(
         CommandContext(
             session_id=session.session_id,
             actor_id=EMPLOYEE,
-            command_id="cmd:2",
+            command_id=f"cmd:2:{tag}",
             expected_case_version=created.case_view.version,
         ),
         AttachSources(
@@ -289,3 +291,57 @@ async def test_key_without_namespace_is_rejected_not_fabricated(
         .fetchone()
     )
     assert int(rows["n"]) == 0
+
+
+async def test_foreign_source_ref_is_rejected(tmp_path: Path) -> None:
+    from invoice_referee.domain.common import EvidenceRef
+
+    wf = _workflow(tmp_path)
+    root = await _seed_draft(wf)
+    other = await _seed_draft(wf, tag="other", activity="activity:other")
+    foreign = wf._query_one(
+        "SELECT source_id, digest FROM case_sources WHERE root_id = ?", (other,)
+    )
+    session = wf.start_session(
+        tenant=TENANT, persona="accountant", actor_id="employee:accountant-demo"
+    )
+    version = int(
+        wf._query_one("SELECT version FROM cases WHERE id = ?", (root,))["version"]
+    )
+    from invoice_referee.domain.case import CommandContext
+    from invoice_referee.domain.commands import RecordActual
+    from invoice_referee.domain.finance import RecordMoneyInput
+
+    with pytest.raises(UnsupportedCommandError):
+        await wf.execute(
+            CommandContext(
+                session_id=session.session_id,
+                actor_id="employee:accountant-demo",
+                command_id="cmd:foreign-ref",
+                expected_case_version=version,
+            ),
+            RecordActual(
+                root_id=root,
+                money=RecordMoneyInput(
+                    external_key="bank:ADV-FOREIGN",
+                    claimed_kind="ADVANCE_RECEIVED",
+                    claimed_scope=ACTIVITY,
+                    payer="company:demo",
+                    payee=EMPLOYEE,
+                    amount=4_000_000,
+                    event_at=datetime(2026, 10, 5, 9, 0, tzinfo=UTC),
+                    completion_claim="x",
+                    refs=(
+                        EvidenceRef(
+                            source_id=str(foreign["source_id"]),
+                            source_sha256=str(foreign["digest"]),
+                            page=1,
+                            exact_quote="4.000.000",
+                        ),
+                    ),
+                    reason="r",
+                    instrument_method="TRANSFER",
+                    instrument_status="COMPLETED",
+                ),
+            ),
+        )

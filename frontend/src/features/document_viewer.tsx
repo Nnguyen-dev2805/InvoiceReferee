@@ -147,8 +147,18 @@ export function DocumentViewer({
               </p>
             </div>
             {onFilesSelected && (
-              <label className="inline-flex items-center bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded cursor-pointer transition-colors shadow-2xs">
-                <span>Chọn tệp PDF / Ảnh</span>
+              <label className="w-full max-w-sm border border-dashed border-slate-300 hover:border-slate-500 bg-white hover:bg-slate-50 rounded p-6 text-center flex flex-col items-center justify-center cursor-pointer transition-colors block group">
+                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-slate-900 group-hover:bg-slate-200 mb-3 transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </div>
+                <span className="font-semibold text-slate-800 block text-xs">
+                  Nhấn để chọn tệp hoặc kéo thả tài liệu vào đây
+                </span>
+                <span className="text-[11px] text-slate-500 block mt-1">
+                  Hỗ trợ PDF, PNG, JPG
+                </span>
                 <input
                   type="file"
                   multiple

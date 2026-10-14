@@ -309,6 +309,32 @@ def _fingerprint(context: CommandContext, command: CaseCommand) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _invoice_paid_reference(fact_key: str) -> str | None:
+    prefix, suffix = "expense:", ":employee_paid"
+    if not fact_key.startswith(prefix) or not fact_key.endswith(suffix):
+        return None
+    reference = fact_key[len(prefix) : -len(suffix)].strip()
+    return reference or None
+
+
+def _employee_paid_amount(value: object) -> int | None:
+    """Parse an exact positive VND integer from the employee answer field."""
+    import re
+
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        amount = value
+    elif isinstance(value, str):
+        text = value.strip()
+        if not re.fullmatch(r"\d+|\d{1,3}(?:[. ]\d{3})+", text):
+            return None
+        amount = int(text.replace(".", "").replace(" ", ""))
+    else:
+        return None
+    return amount if amount > 0 else None
+
+
 # -- validated synthetic context models (contracts §10.4) --------------------
 
 
@@ -2415,10 +2441,120 @@ class CaseWorkflow:
                 "Việc này thuộc người xử lý khác; câu trả lời không được áp dụng."
             )
         now = self._now_iso()
-        # The answer is persisted as a responsible confirmation keyed by the
-        # issue's field/rule, so the re-assessment consumes the supplied value
-        # instead of recomputing the same issue back to OPEN (contracts §3, §5).
         fact_key = str(issue["field_or_rule"])
+        invoice_reference = _invoice_paid_reference(fact_key)
+        confirmation_value: object = answer.value
+        confirmation_refs = answer.refs
+        invoice_issue_refs = ()
+        if self._evidence_reader is not None and fact_key == "expense:payer":
+            raise UnsupportedCommandError(
+                "Xác nhận người trả phải gắn với đúng hóa đơn và số tiền."
+            )
+        if invoice_reference is not None:
+            if (
+                session.persona != "employee"
+                or context.actor_id != str(row["employee"])
+                or session.actor_id != str(row["employee"])
+            ):
+                raise UnsupportedCommandError(
+                    "Chỉ nhân viên đứng tên hồ sơ mới xác nhận khoản tự thanh toán."
+                )
+            amount = _employee_paid_amount(answer.value)
+            if amount is None:
+                raise UnsupportedCommandError(
+                    "Nhập số tiền VND nguyên dương đã trực tiếp thanh toán cho hóa đơn."
+                )
+            if not answer.reason.strip():
+                raise UnsupportedCommandError(
+                    "Cần ghi lý do/xác nhận chịu trách nhiệm cho khoản thanh toán."
+                )
+
+            report_row = cx.execute(
+                "SELECT report_json FROM case_evidence_reports WHERE root_id = ?",
+                (str(row["id"]),),
+            ).fetchone()
+            if report_row is None or not report_row["report_json"]:
+                raise UnsupportedCommandError(
+                    "Không còn bản đọc nguồn để xác định hóa đơn của câu trả lời."
+                )
+            from invoice_referee.domain.evidence import ReadResult
+            from invoice_referee.domain.issues import BusinessIssue
+
+            report = ReadResult.model_validate_json(report_row["report_json"])
+            matching_documents = []
+            for document in report.documents:
+                document_number = next(
+                    (
+                        candidate.value
+                        for candidate in document.fields
+                        if candidate.field == "document_number"
+                        and candidate.state == "FOUND"
+                    ),
+                    None,
+                )
+                if (
+                    document_number is not None
+                    and str(document_number).strip() == invoice_reference
+                    and document.profile_status == "CLEAR"
+                ):
+                    matching_documents.append(document)
+            if len(matching_documents) != 1:
+                raise UnsupportedCommandError(
+                    "Không thể ràng buộc câu trả lời với đúng một hóa đơn đã đọc rõ."
+                )
+            invoice = matching_documents[0]
+            total_raw = next(
+                (
+                    candidate.value
+                    for candidate in invoice.fields
+                    if candidate.field == "total_amount" and candidate.state == "FOUND"
+                ),
+                None,
+            )
+            from invoice_referee.domain.common import parse_vnd
+
+            invoice_total = parse_vnd(total_raw)
+            if invoice_total is None or amount > invoice_total:
+                raise UnsupportedCommandError(
+                    "Số tiền xác nhận vượt số tiền hóa đơn hoặc hóa đơn chưa có tổng hợp lệ."
+                )
+
+            issue_payload = BusinessIssue.model_validate_json(issue["payload_json"])
+            source_refs = {
+                (ref.source_id, ref.source_sha256)
+                for ref in invoice.refs
+            }
+            source_refs.update(
+                (ref.source_id, ref.source_sha256)
+                for candidate in invoice.fields
+                if candidate.state == "FOUND"
+                for ref in candidate.refs
+            )
+            source_refs.update(
+                (ref.source_id, ref.source_sha256)
+                for line in invoice.line_items
+                for candidate in line.fields
+                if candidate.state == "FOUND"
+                for ref in candidate.refs
+            )
+            if not issue_payload.refs or any(
+                (ref.source_id, ref.source_sha256) not in source_refs
+                for ref in issue_payload.refs
+            ):
+                raise UnsupportedCommandError(
+                    "Câu hỏi không còn locator gắn với hóa đơn đã đọc."
+                )
+
+            # Q32 is a scoped employee declaration, not independent payment proof:
+            # payer comes from the authenticated case employee, amount from the
+            # answer, activity from the server-owned case, and refs from this issue.
+            confirmation_value = amount
+            confirmation_refs = issue_payload.refs
+            invoice_issue_refs = issue_payload.refs
+
+        # The answer is persisted under the issue's recovery key. Invoice-scoped
+        # Q32 keys match the LIVE consumer's per-invoice claim index; other answer
+        # kinds keep their existing fact/value behavior.
         if answer.value is not None and str(answer.value).strip() != "":
             confirmation_id = f"confirmation:{hashlib.sha256((str(row['id']) + fact_key).encode()).hexdigest()[:16]}"
             cx.execute(
@@ -2430,11 +2566,11 @@ class CaseWorkflow:
                     session.tenant,
                     str(row["id"]),
                     fact_key,
-                    str(answer.value),
+                    str(confirmation_value),
                     context.actor_id,
                     str(row["activity"]),
                     json.dumps(
-                        [ref.model_dump(mode="json") for ref in answer.refs],
+                        [ref.model_dump(mode="json") for ref in confirmation_refs],
                         ensure_ascii=False,
                     ),
                     answer.reason,
@@ -2455,7 +2591,24 @@ class CaseWorkflow:
             detail=json.dumps({"issue": answer.issue_id}, ensure_ascii=False),
         )
         self._assess_and_commit(cx, session, self._reload(cx, row), now)
-        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+        view = self._case_view(cx, self._reload(cx, row))
+        if invoice_reference is not None:
+            still_open = cx.execute(
+                "SELECT 1 FROM case_issues WHERE root_id = ? AND field_or_rule = ? "
+                "AND status = 'OPEN' LIMIT 1",
+                (str(row["id"]), fact_key),
+            ).fetchone()
+            basis_applied = any(
+                basis.kind == "EMPLOYEE_DECLARATION_Q32"
+                and basis.actor == str(row["employee"])
+                and all(ref in basis.refs for ref in invoice_issue_refs)
+                for basis in view.payment_basis
+            )
+            if still_open is not None or not basis_applied:
+                raise UnsupportedCommandError(
+                    "Câu trả lời chưa tạo được căn cứ cho hóa đơn này; kiểm tra số tiền, người trả và phạm vi."
+                )
+        return CommandResult(case_view=view)
 
     def _decide(
         self,

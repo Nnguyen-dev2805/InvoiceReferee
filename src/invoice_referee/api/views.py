@@ -117,6 +117,9 @@ class MoneyInput(ApiModel):
         None
     )
     instrument_reference: str | None = None
+    # Source refs from the read voucher (page/quote locators). The server
+    # verifies them; a foreign digest is rejected before any write (14/10/2026).
+    refs: list[EvidenceRef] = Field(default_factory=list)
 
 
 class RecordActualRequest(ApiModel):

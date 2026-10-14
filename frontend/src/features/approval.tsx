@@ -67,7 +67,7 @@ export function Approval({ caseView }: { caseView: CaseView | null }) {
       </div>
 
       {active.length === 0 ? (
-        <div className="bg-slate-50/60 border border-dashed border-slate-200 rounded-lg p-5 text-center text-xs space-y-1.5">
+        <div className="bg-slate-50/60 border border-dashed border-slate-200 rounded p-5 text-center text-xs space-y-1.5">
           <p className="font-semibold text-slate-700">Chưa có lệnh chi hoặc thu cần thực hiện</p>
           <p className="text-slate-500 max-w-sm mx-auto text-[11px]">
             Sau khi hồ sơ được đối soát tài chính và cấp thẩm quyền phê duyệt, các lệnh thanh toán (chi bổ sung hoặc thu hồi) sẽ xuất hiện tại đây.
