@@ -20,6 +20,7 @@ from typing import Any
 from invoice_referee.domain.common import parse_vnd
 from invoice_referee.domain.documents import DocumentAnalysis, FieldCandidate
 from invoice_referee.domain.evidence import ReadResult, SourceRef
+from invoice_referee.reconciliation.document_arithmetic import check_document_arithmetic
 
 # The settlement-form fields the review screen surfaces.
 _SURFACED_FIELDS = (
@@ -177,6 +178,19 @@ def build_settlement_draft(
         warnings.append("Chưa đọc được số tiền tạm ứng trên giấy; nhân viên vui lòng kiểm tra.")
     if printed_total is None and not expenses:
         warnings.append("Chưa đọc được tổng chi phí; nhân viên vui lòng kiểm tra.")
+    # Document-internal arithmetic (TC06/TC11): the SAME findings the reconciler
+    # turns into blocking FACTs are surfaced here, so the employee sees the
+    # contradiction on the review screen — not a silent "looks fine" draft.
+    arithmetic_findings: list[dict[str, object]] = []
+    for document in report.documents:
+        for finding in check_document_arithmetic(document):
+            arithmetic_findings.append({
+                "code": finding.code,
+                "basis": finding.basis,
+                "question": finding.question,
+                "refs": [ref.model_dump(mode="json") for ref in finding.refs],
+            })
+            warnings.append(finding.basis)
 
     # The "activity content" shown on the review screen: a travel paper names its
     # destination, but a non-travel paper (client reception, office purchase) has
@@ -201,6 +215,7 @@ def build_settlement_draft(
         "expenses": expenses,
         "invoices": invoices,
         "warnings": warnings,
+        "arithmetic_findings": arithmetic_findings,
         "field_states": field_states,
         "provider_mode": report.provider_mode,
         "data_origin": report.data_origin,

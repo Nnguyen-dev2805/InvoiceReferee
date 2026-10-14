@@ -306,13 +306,16 @@ export function Dashboard({
         </nav>
 
         {/* Quick Search */}
-        <div className="pb-2">
+        <div className="pb-2 flex items-center gap-2">
+          <label htmlFor="search-cases" className="text-xs text-slate-500 font-medium shrink-0">
+            Tìm kiếm:
+          </label>
           <input
+            id="search-cases"
             type="text"
-            placeholder="Tìm theo mã hoặc tên hồ sơ…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full sm:w-56 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 focus:border-slate-400 rounded px-2.5 py-1 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none transition-colors"
+            className="w-full sm:w-56 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 focus:border-slate-400 rounded px-2.5 py-1 text-xs text-slate-900 focus:outline-none transition-colors"
           />
         </div>
       </div>

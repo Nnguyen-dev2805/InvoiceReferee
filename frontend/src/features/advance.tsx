@@ -36,6 +36,8 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+
   if (caseView === null) return null;
 
   async function read(file: File) {
@@ -43,6 +45,7 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
     setBusy(true);
     setError(null);
     setNotice(null);
+    setSelectedFileName(file.name);
     try {
       const result = await advanceDraft(caseView.id, [file], method);
       setDraft(result);
@@ -84,6 +87,7 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
       onCase(result.case_view);
       setNotice("Đã ghi nhận tiền ứng thực nhận.");
       setDraft(null);
+      setSelectedFileName(null);
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -91,110 +95,170 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
     }
   }
 
+  const numericAmount = Number(amount);
+  const formattedPreview = !isNaN(numericAmount) && numericAmount > 0 ? formatVnd(numericAmount) : null;
+
   return (
     <section aria-labelledby="advance-title" className="space-y-4 select-none text-xs">
       <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-        <h2 id="advance-title" className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-          Ghi nhận tiền ứng thực nhận
+        <h2 id="advance-title" className="text-xs font-semibold text-slate-900">
+          Ghi nhận tạm ứng từ chứng từ
         </h2>
       </div>
 
-      <div className="flex items-center gap-2.5">
-        <label className="text-slate-700 font-semibold text-xs">Phương thức:</label>
-        <select
-          aria-label="Phương thức ứng"
-          value={method}
-          onChange={(event) => setMethod(event.target.value as "TRANSFER" | "CASH")}
-          className="bg-white border border-slate-300 rounded px-2.5 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:border-slate-900 shadow-2xs cursor-pointer"
-        >
-          <option value="TRANSFER">Chuyển khoản</option>
-          <option value="CASH">Tiền mặt</option>
-        </select>
+      <div className="bg-slate-50/60 border border-slate-200 rounded-lg p-3.5 space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-slate-700 font-medium text-xs">Phương thức ứng:</label>
+          <select
+            aria-label="Phương thức ứng"
+            value={method}
+            onChange={(event) => setMethod(event.target.value as "TRANSFER" | "CASH")}
+            className="bg-white border border-slate-300 rounded-md px-2.5 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:border-slate-800 shadow-2xs cursor-pointer"
+          >
+            <option value="TRANSFER">Chuyển khoản ngân hàng</option>
+            <option value="CASH">Tiền mặt</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-slate-700 font-medium text-xs mb-1.5">
+            Chứng từ tạm ứng (Ủy nhiệm chi / Phiếu chi):
+          </label>
+          <div className="border border-dashed border-slate-300 hover:border-slate-400 bg-white rounded-lg p-3.5 text-center transition-colors">
+            <label
+              htmlFor="advance-file-input"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-md border border-slate-200 cursor-pointer transition-colors"
+            >
+              <span>{selectedFileName ? "Đổi tệp chứng từ" : "Chọn tệp chứng từ ứng"}</span>
+              <input
+                id="advance-file-input"
+                type="file"
+                aria-label="Chứng từ ứng"
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void read(file);
+                }}
+                className="sr-only"
+              />
+            </label>
+            {selectedFileName ? (
+              <span className="text-[11px] text-emerald-700 font-medium block mt-1.5">
+                ✓ {selectedFileName}
+              </span>
+            ) : (
+              <span className="text-[11px] text-slate-400 block mt-1">
+                Hỗ trợ PDF, PNG, JPG (tự động nhận diện số tiền và mã tham chiếu)
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
-      <label className="block text-slate-700 font-semibold text-xs">
-        Chứng từ ứng (PDF/PNG/JPEG)
-        <input
-          type="file"
-          aria-label="Chứng từ ứng"
-          accept=".pdf,.png,.jpg,.jpeg"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) void read(file);
-          }}
-          className="mt-1.5 block w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-slate-300 file:text-xs file:font-semibold file:bg-white file:text-slate-700 hover:file:bg-slate-50 cursor-pointer"
-        />
-      </label>
-
       {draft !== null && (
-        <div className="space-y-3 bg-slate-50/70 p-4 rounded-lg border border-slate-200" data-testid="advance-draft">
-          <p className="text-xs text-slate-500 font-medium">
-            Bản nháp từ chứng từ · {draft.instrument_method ?? "—"} · {STATUS_LABELS[draft.instrument_status]}
-          </p>
+        <div className="space-y-3 bg-white p-4 rounded-lg border border-slate-200 shadow-2xs" data-testid="advance-draft">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span className="text-xs font-semibold text-slate-900">Bản nháp trích xuất từ chứng từ</span>
+              <span className="text-[11px] font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                {draft.instrument_method === "TRANSFER" ? "Chuyển khoản" : draft.instrument_method === "CASH" ? "Tiền mặt" : draft.instrument_method ?? "—"}
+              </span>
+            </div>
+            <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              {STATUS_LABELS[draft.instrument_status] ?? draft.instrument_status}
+            </span>
+          </div>
+
           {draft.missing_fields.length > 0 && (
-            <p className="text-xs text-amber-800 bg-amber-50 p-2.5 rounded border border-amber-200">
-              Thiếu/mờ trường: {draft.missing_fields.join(", ")} — vui lòng bổ sung.
+            <p className="text-xs text-amber-800 bg-amber-50 p-2.5 rounded-md border border-amber-200">
+              ⚠ Thiếu hoặc mờ trường: {draft.missing_fields.join(", ")} — vui lòng bổ sung thông tin bên dưới.
             </p>
           )}
-          <label className="block text-slate-700 font-semibold text-xs">
-            Số tiền thực nhận:
-            <input
-              aria-label="Số tiền thực nhận"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              className="mt-1 w-full bg-white border border-slate-300 rounded px-3 py-1.5 font-mono-nums text-xs text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
-            />
-          </label>
-          <label className="block text-slate-700 font-semibold text-xs">
-            Mã giao dịch / số phiếu:
-            <input
-              aria-label="Mã giao dịch hoặc số phiếu"
-              value={reference}
-              onChange={(event) => setReference(event.target.value)}
-              className="mt-1 w-full bg-white border border-slate-300 rounded px-3 py-1.5 font-mono-nums text-xs text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
-            />
-          </label>
-          <label className="block text-slate-700 font-semibold text-xs">
-            Trạng thái theo nguồn:
-            <select
-              aria-label="Trạng thái theo nguồn"
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              className="mt-1 w-full bg-white border border-slate-300 rounded px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs cursor-pointer"
-            >
-              {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-slate-700 font-semibold text-xs">
-            Xác nhận có trách nhiệm của kế toán:
-            <input
-              aria-label="Xác nhận của kế toán"
-              value={completionClaim}
-              onChange={(event) => setCompletionClaim(event.target.value)}
-              placeholder="Ví dụ: Đã kiểm tra chứng từ và giao đủ tiền cho nhân viên"
-              className="mt-1 w-full bg-white border border-slate-300 rounded px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
-            />
-          </label>
-          <div className="pt-1">
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-1">
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="advance-amount" className="block text-slate-700 font-medium text-xs">
+                  Số tiền thực nhận:
+                </label>
+                {formattedPreview && (
+                  <span className="text-[11px] font-mono-nums tabular-nums text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                    {formattedPreview}
+                  </span>
+                )}
+              </div>
+              <input
+                id="advance-amount"
+                aria-label="Số tiền thực nhận"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 font-mono-nums tabular-nums font-semibold text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+              />
+            </div>
+
+            <div className="sm:col-span-1">
+              <label htmlFor="advance-ref" className="block text-slate-700 font-medium text-xs mb-1">
+                Mã giao dịch / Số phiếu:
+              </label>
+              <input
+                id="advance-ref"
+                aria-label="Mã giao dịch hoặc số phiếu"
+                value={reference}
+                onChange={(event) => setReference(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 font-mono-nums text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="advance-status" className="block text-slate-700 font-medium text-xs mb-1">
+                Trạng thái theo nguồn:
+              </label>
+              <select
+                id="advance-status"
+                aria-label="Trạng thái theo nguồn"
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs cursor-pointer"
+              >
+                {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="advance-claim" className="block text-slate-700 font-medium text-xs mb-1">
+                Xác nhận có trách nhiệm của kế toán:
+              </label>
+              <input
+                id="advance-claim"
+                aria-label="Xác nhận của kế toán"
+                value={completionClaim}
+                onChange={(event) => setCompletionClaim(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2">
             <button
               type="button"
               onClick={() => void confirm()}
               disabled={busy || amount === ""}
-              className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-1.5 rounded shadow-2xs transition-colors disabled:opacity-40 cursor-pointer"
+              className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors disabled:opacity-40 cursor-pointer"
             >
-              Xác nhận ghi nhận
+              {busy ? "Đang xử lý…" : "Xác nhận ghi nhận"}
             </button>
           </div>
         </div>
       )}
 
       {notice !== null && (
-        <p role="status" className="p-2.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs">{notice}</p>
+        <p role="status" className="p-2.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs">{notice}</p>
       )}
       {error !== null && (
-        <p role="alert" className="error p-2.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-xs">{error}</p>
+        <p role="alert" className="error p-2.5 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-xs">{error}</p>
       )}
     </section>
   );

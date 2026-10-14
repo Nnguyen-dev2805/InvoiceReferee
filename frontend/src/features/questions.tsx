@@ -9,7 +9,31 @@ const KIND_LABELS: Record<string, string> = {
   AUTHORITY: "Thẩm quyền phê duyệt",
 };
 
+export function formatVndInText(text: string): string {
+  return text.replace(/\b\d+\b/g, (match) => {
+    const num = parseInt(match, 10);
+    if (num >= 1900 && num <= 2099 && match.length === 4) return match;
+    if (num < 1000) return match;
+    return num.toLocaleString("vi-VN") + " đ";
+  });
+}
+
 export function formatIssueTarget(fieldOrRule: string): string {
+  if (fieldOrRule.includes("arithmetic:return") || fieldOrRule === "return") {
+    return "Khớp số tiền hoàn ứng";
+  }
+  if (fieldOrRule.includes("arithmetic:reimburse") || fieldOrRule === "reimburse") {
+    return "Khớp số tiền chi thêm";
+  }
+  if (fieldOrRule.includes("arithmetic:tax") || fieldOrRule === "tax") {
+    return "Khớp số tiền thuế";
+  }
+  if (fieldOrRule.includes("payer")) return "Người chi trả thực tế";
+  if (fieldOrRule.includes("paid_basis")) return "Căn cứ thanh toán khoản chi";
+  if (fieldOrRule.includes("claimant_binding")) return "Định danh người đề nghị";
+  if (fieldOrRule.includes("buyer_binding")) return "Định danh người mua hàng";
+  if (fieldOrRule.includes("missing_evidence")) return "Chứng từ bắt buộc";
+
   const match = fieldOrRule.match(/expense(?::expense)?:(\d+)/);
   if (match) {
     const expenseNum = match[1];
@@ -17,11 +41,14 @@ export function formatIssueTarget(fieldOrRule: string): string {
     if (fieldOrRule.includes("payer")) return `Khoản chi #${expenseNum} (Người trả)`;
     return `Khoản chi #${expenseNum}`;
   }
-  if (fieldOrRule.includes("paid_basis")) return "Căn cứ thanh toán khoản chi";
-  if (fieldOrRule.includes("payer")) return "Người chi trả thực tế";
   if (fieldOrRule === "budget:B") return "Ngân sách hoạt động (B)";
   if (fieldOrRule === "coverage") return "Lịch sử đối chiếu ứng/hoàn";
-  return `#${fieldOrRule.split(":").pop()}`;
+
+  const rawLast = fieldOrRule.split(":").pop() ?? fieldOrRule;
+  if (rawLast === "return") return "Khoản hoàn ứng";
+  if (rawLast === "reimburse") return "Khoản chi thêm";
+  if (rawLast === "advance") return "Khoản tạm ứng";
+  return `#${rawLast}`;
 }
 
 function roleMatchesOwner(role: string, owner: string, kind: string): boolean {
@@ -85,13 +112,13 @@ export function QuestionCard({
 
   return (
     <li
-      className="p-4 bg-white border border-slate-200 border-l-4 border-l-amber-500 rounded-lg space-y-3 text-xs shadow-2xs transition-colors"
+      className="p-5 bg-white border border-slate-200 border-l-4 border-l-amber-500 rounded-xl space-y-4 text-xs shadow-xs hover:border-slate-300 transition-all"
       data-testid={`question-${issue.kind}`}
     >
       {/* Target & Status bar */}
-      <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px] border border-slate-200">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-semibold text-slate-800 bg-slate-100 px-2.5 py-1 rounded text-xs border border-slate-200">
             {formatIssueTarget(issue.field_or_rule)}
           </span>
           <span className="text-[11px] font-medium text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
@@ -99,58 +126,90 @@ export function QuestionCard({
           </span>
         </div>
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-          <span>Cần bạn giải trình</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          <span>Chờ giải trình</span>
         </span>
       </div>
 
       {/* Question & Known Basis */}
-      <div className="space-y-1.5">
-        <h4 className="font-semibold text-slate-900 text-xs leading-relaxed">
-          {issue.question}
+      <div className="space-y-2">
+        <h4 className="font-semibold text-slate-900 text-sm leading-relaxed">
+          {formatVndInText(issue.question)}
         </h4>
-        <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded border border-slate-200/80">
-          <span>Căn cứ hiện tại: <strong className="text-slate-800">{issue.basis}</strong></span>
-        </div>
+        {issue.basis && (
+          <div className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-lg border border-slate-200/80 text-xs text-slate-700">
+            <svg className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="space-y-0.5 min-w-0">
+              <span className="text-[11px] font-medium text-slate-500 block">Căn cứ ghi nhận:</span>
+              <p className="font-medium text-slate-800 leading-relaxed">{formatVndInText(issue.basis)}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input Form */}
-      <div className="space-y-2 pt-1">
+      <div className="space-y-3 pt-1">
         <div>
-          <label htmlFor={`answer-${issue.id}`} className="text-slate-800 block font-semibold mb-1">
+          <label htmlFor={`answer-${issue.id}`} className="text-slate-800 block text-xs font-semibold mb-1.5">
             Nội dung giải trình / xác nhận:
-            <input
-              id={`answer-${issue.id}`}
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              placeholder="Nhập nội dung giải trình hoặc xác nhận thực tế..."
-              className="w-full mt-1 bg-white border border-slate-300 rounded text-xs px-3 py-1.5 text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
-            />
           </label>
+          <textarea
+            id={`answer-${issue.id}`}
+            rows={2}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            className="w-full bg-white border border-slate-300 rounded-lg text-xs p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 shadow-2xs resize-y transition-colors"
+          />
         </div>
         <div>
-          <label htmlFor={`reason-${issue.id}`} className="text-slate-600 block text-[11px] font-medium mb-1">
+          <label htmlFor={`reason-${issue.id}`} className="text-slate-600 block text-[11px] font-medium mb-1.5">
             Căn cứ / Ghi chú đính kèm (tùy chọn):
-            <input
-              id={`reason-${issue.id}`}
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              placeholder="Ví dụ: Theo phiếu chuyển tiền ngân hàng, email phê duyệt..."
-              className="w-full mt-1 bg-white border border-slate-300 rounded text-xs px-3 py-1.5 text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
-            />
           </label>
+          <input
+            id={`reason-${issue.id}`}
+            type="text"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 shadow-2xs transition-colors"
+          />
         </div>
       </div>
 
-      {/* Submit Button */}
-      <div className="pt-1">
+      {/* Submit Row */}
+      <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+        <div className="text-[11px] text-slate-500">
+          {value.trim() === "" ? (
+            <span className="text-slate-400">Vui lòng nhập nội dung để gửi giải trình</span>
+          ) : (
+            <span className="text-emerald-700 font-medium flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Sẵn sàng gửi
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => void submit()}
           disabled={busy || value.trim() === ""}
-          className="bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs px-3.5 py-1.5 rounded shadow-2xs transition-colors disabled:opacity-40 cursor-pointer"
+          className="inline-flex items-center gap-1.5 font-medium text-xs px-4 py-2 rounded-lg transition-all duration-150 disabled:opacity-50 disabled:bg-slate-100 disabled:text-slate-400 disabled:border disabled:border-slate-200 disabled:cursor-not-allowed bg-slate-900 hover:bg-slate-800 text-white shadow-2xs cursor-pointer active:scale-[0.98]"
         >
-          {busy ? "Đang gửi…" : "Gửi giải trình"}
+          {busy ? (
+            <>
+              <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span>Đang gửi…</span>
+            </>
+          ) : (
+            <>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+              <span>Gửi giải trình</span>
+            </>
+          )}
         </button>
       </div>
 
@@ -231,10 +290,10 @@ export function Questions({
                       </span>
                     </div>
                     <p className="text-xs text-slate-900 font-medium leading-relaxed">
-                      {issue.question}
+                      {formatVndInText(issue.question)}
                     </p>
                     <p className="text-[11px] text-slate-500 leading-normal">
-                      Căn cứ: {issue.basis}
+                      Căn cứ: {formatVndInText(issue.basis)}
                     </p>
                   </div>
                   <div className="text-right shrink-0 pt-0.5">

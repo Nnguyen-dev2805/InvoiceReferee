@@ -724,3 +724,30 @@ giữ và E0 pin; profile/critical-field matrix pin tại Hoangha revision `1ee3
   `workflow/evidence_jobs.py::run_evidence_job`; `drain_evidence_jobs(workflow, stop)`
   claim QUEUED transactionally, chạy một job một lúc; FastAPI lifespan sở hữu task.
   Persist `jobs.input_basis_json` (additive migration) + `attempts_json`.
+
+### 12.6. Gate số học tài liệu và numeric provenance (chốt 14/10/2026)
+
+- `check_document_arithmetic(document) -> tuple[ArithmeticFinding,...]` pure sync
+  (`reconciliation/document_arithmetic.py`). `ArithmeticFinding(code, field_or_rule,
+  basis, question, refs)`.
+- Kiểm theo **loại tài liệu** và các field đã có căn cứ:
+  - `SETTLEMENT_FORM`: `declared_advance − printed_total` phải bằng `printed_return`
+    (`code=settlement-return`) hoặc `printed_total − declared_advance` phải bằng
+    `printed_reimbursement` (`code=settlement-reimburse`).
+  - `E_INVOICE`: `subtotal + tax + service_charge − discount` phải bằng `total_amount`
+    (`code=invoice-total`). Ticket/receipt không bị bắt có VAT fields.
+- Thành phần trọng yếu (`tax`/`discount`/`service_charge`) ở trạng thái `UNREADABLE`/
+  `AMBIGUOUS` ⇒ `code=invoice-components-unread`, **không** mặc định bằng 0. `NOT_PRESENT`
+  là không áp dụng. Số nguồn nguyên bản được giữ; số tính lại chỉ để đối chiếu trong
+  `basis`/`question`, không ghi đè tổng.
+- Dùng integer VND/`parse_vnd`, không float/dung sai tuỳ ý: lệch 60k/100k phải là FACT.
+- `admit_evidence` biến mỗi finding thành `BusinessIssue(kind=FACT, owner=employee,
+  field_or_rule=expense:arithmetic:*)`; Reconciler đặt `allowed_effect=None` khi có FACT
+  này, và `_commit_assessment` không phát hành instruction. Approval/EXCEPT_POLICY chung
+  **không** waive FACT này. Cùng kết quả cho draft (`build_settlement_draft` phơi
+  `arithmetic_findings`/`warnings`) và submit.
+- **Numeric provenance** (`evidence/extraction.py::_value_supported`): giá trị money
+  phải là token số độc lập của quote; `8%` (rate) và digit-run dính chữ (`IR26E`) không
+  phải money. Giá trị có chữ (số chứng từ) bind theo skeleton alphanumeric hoặc theo
+  run số dài nhất của chính nó, nên số serial-prefix (`IR26E00000101`) khớp đúng phần
+  của nó và số sai bị từ chối.

@@ -84,12 +84,13 @@ def signature_row(columns) -> Table:
     return result
 
 
-def write_pdf(path: Path, title: str, story) -> None:
+def write_pdf(path: Path, title: str, story, *, left_margin: float = 46, right_margin: float = 46,
+              top_margin: float = 42, bottom_margin: float = 40) -> None:
     def canvas_factory(*args, **kwargs):
         kwargs["invariant"] = 1
         return Canvas(*args, **kwargs)
-    doc = SimpleDocTemplate(str(path), pagesize=A4, leftMargin=46, rightMargin=46,
-                            topMargin=42, bottomMargin=40, title=title,
+    doc = SimpleDocTemplate(str(path), pagesize=A4, leftMargin=left_margin, rightMargin=right_margin,
+                            topMargin=top_margin, bottomMargin=bottom_margin, title=title,
                             author="InvoiceReferee synthetic corpus")
     doc.build(story, canvasmaker=canvas_factory)
 
@@ -151,55 +152,328 @@ def render_invoice(case, inp: Path) -> None:
     write_pdf(inp / "02-hoa-don-dich-vu.pdf", "Hóa đơn dịch vụ", invoice)
 
 
-def render_advance_documents(case, inp: Path) -> None:
+def _advance_paragraph(text: str, *, size: float = 10, center: bool = False, right: bool = False,
+                       color=colors.HexColor("#0f172a"), leading: float | None = None) -> Paragraph:
+    lead = leading if leading is not None else (size * 1.38)
+    align = 1 if center else (2 if right else 0)
+    style = ParagraphStyle(
+        f"adv_{size}_{align}_{color.hexval()}_{lead}",
+        fontName="PilotNoto",
+        fontSize=size,
+        leading=lead,
+        textColor=color,
+        alignment=align,
+    )
+    return Paragraph(escape(str(text)).replace("\n", "<br/>"), style)
+
+
+def render_advance_documents(case, inp: Path, *, status: str = "Hoàn tất") -> None:
     """F01-only: two alternative advance-basis documents for the SAME 4m advance.
 
     One transfer receipt and one cash voucher; only one is used per test branch,
     so the 4.000.000 đ advance is never counted twice.
     """
     cid, _, number, _, _, _, _, total, advance, _ = case
+    claimant = CLAIMANT_NAME
     purpose = "Ứng tiền cho chuyến công tác Hà Nội từ 06/10/2026 đến 10/10/2026"
     advance_words = "Bốn triệu đồng"
-    transfer = [paragraph("CÔNG TY INVOICEREFEREE", size=12),
-                paragraph("BIÊN NHẬN CHUYỂN KHOẢN", size=16, center=True),
-                paragraph("(Bản ghi mô phỏng — không phải giao dịch ngân hàng thật)", size=9, center=True),
-                Spacer(1, 8),
-                table([["Mã giao dịch", f"FT-{cid}-0001"],
-                       ["Ngày giao dịch", "05/10/2026"],
-                       ["Trạng thái", "Hoàn tất"],
-                       ["Bên chuyển", "Công ty InvoiceReferee"],
-                       ["Tài khoản chuyển", "Ngân hàng Demo — 0123456789"],
-                       ["Bên nhận", CLAIMANT_NAME],
-                       ["Tài khoản nhận", "Ngân hàng Demo — 9876543210"],
-                       ["Số tiền", money(advance)],
-                       ["Nội dung", purpose],
-                       ["Tham chiếu khoản ứng", f"ADV-{cid}"]], [150, 353], header=False),
-                Spacer(1, 14),
-                signature_row([["Người lập", "Ký bởi: Trần Bình", "Ký ngày: 05/10/2026"]])]
-    write_pdf(inp / TRANSFER_DOC, "Biên nhận chuyển khoản", transfer)
 
-    cash = [paragraph("CÔNG TY INVOICEREFEREE", size=12),
-            paragraph("PHIẾU CHI TIỀN MẶT", size=16, center=True),
-            paragraph("(Bản ghi mô phỏng — không phải giao dịch ngân hàng thật)", size=9, center=True),
-            Spacer(1, 8),
-            table([["Số phiếu", f"PC-{cid}-0001"],
-                   ["Ngày", "05/10/2026"],
-                   ["Công ty chi", "Công ty InvoiceReferee"],
-                   ["Người nhận", CLAIMANT_NAME],
-                   ["Lý do", purpose],
-                   ["Số tiền", money(advance)],
-                   ["Số tiền bằng chữ", advance_words],
-                   ["Số tiền đã giao", money(advance)],
-                   ["Số tiền đã nhận", money(advance)],
-                   ["Ngày giao nhận", "05/10/2026"],
-                   ["Tham chiếu khoản ứng", f"ADV-{cid}"]], [150, 353], header=False),
-            Spacer(1, 14),
-            signature_row([
-                ["Người phê duyệt", "Ký bởi: Lê Minh", "Ký ngày: 05/10/2026"],
-                ["Kế toán / người giao tiền", "Ký bởi: Trần Bình", "Ký ngày: 05/10/2026"],
-                ["Người nhận tiền", f"Ký bởi: {CLAIMANT_NAME}", "Ký ngày: 05/10/2026"],
-            ])]
-    write_pdf(inp / CASH_DOC, "Phiếu chi tiền mặt", cash)
+    adv_margin = 52.0  # 18.3 mm
+    usable_w = 595.275 - 2 * adv_margin  # 491.275 pt
+
+    c_text = colors.HexColor("#0f172a")        # Slate 900
+    c_text_sec = colors.HexColor("#334155")    # Slate 700
+    c_muted = colors.HexColor("#64748b")       # Slate 500
+    c_border = colors.HexColor("#cbd5e1")      # Slate 300
+    c_border_light = colors.HexColor("#e2e8f0") # Slate 200
+    c_card_bg = colors.HexColor("#f8fafc")     # Slate 50
+    c_header_bg = colors.HexColor("#f1f5f9")   # Slate 100
+    c_success = colors.HexColor("#15803d")     # Emerald 700
+
+    # 1. BIÊN NHẬN CHUYỂN KHOẢN
+    transfer_story = []
+
+    # A. Header công ty; metadata mã giao dịch/ngày đặt gọn
+    t_header = Table([
+        [
+            Table([
+                [_advance_paragraph("CÔNG TY INVOICEREFEREE", size=11, color=c_text)],
+                [_advance_paragraph("Địa chỉ: 128 Nguyễn Văn Linh, Quận 7, TP. Hồ Chí Minh", size=9, color=c_muted)],
+            ], colWidths=[300], style=[("VALIGN", (0, 0), (-1, -1), "TOP"), ("PADDING", (0, 0), (-1, -1), 0)]),
+            Table([
+                [_advance_paragraph(f"Mã giao dịch: FT-{cid}-0001", size=9.5, right=True, color=c_text)],
+                [_advance_paragraph("Ngày giao dịch: 05/10/2026", size=9, right=True, color=c_text_sec)],
+            ], colWidths=[usable_w - 300], style=[("VALIGN", (0, 0), (-1, -1), "TOP"), ("PADDING", (0, 0), (-1, -1), 0)]),
+        ]
+    ], colWidths=[300, usable_w - 300])
+    t_header.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.75, c_border),
+    ]))
+    transfer_story.append(t_header)
+    transfer_story.append(Spacer(1, 18))
+
+    # B. Tiêu đề
+    transfer_story.append(_advance_paragraph("BIÊN NHẬN CHUYỂN KHOẢN", size=19, center=True, color=c_text, leading=24))
+    transfer_story.append(Spacer(1, 16))
+
+    # C. Khối số tiền nổi bật, kèm trạng thái giao dịch bằng chữ
+    status_color = c_success if any(w in status.casefold() for w in ("hoàn tất", "thành công")) else c_text_sec
+    t_amount = Table([
+        [_advance_paragraph("SỐ TIỀN THỰC NHẬN", size=9, center=True, color=c_muted, leading=12)],
+        [_advance_paragraph(money(advance), size=25, center=True, color=c_text, leading=34)],
+        [_advance_paragraph(f"Trạng thái giao dịch: {status}", size=10.5, center=True, color=status_color, leading=15)],
+    ], colWidths=[usable_w])
+    t_amount.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BACKGROUND", (0, 0), (-1, -1), c_card_bg),
+        ("BOX", (0, 0), (-1, -1), 0.75, c_border),
+        ("TOPPADDING", (0, 0), (-1, 0), 12),
+        ("BOTTOMPADDING", (0, -1), (-1, -1), 12),
+    ]))
+    transfer_story.append(t_amount)
+    transfer_story.append(Spacer(1, 18))
+
+    # D. Hai cột cân đối: Bên chuyển & Bên nhận
+    half_w = (usable_w - 12) / 2
+    left_inner = Table([
+        [_advance_paragraph("Bên chuyển", size=8.5, color=c_muted)],
+        [_advance_paragraph("Công ty InvoiceReferee", size=10.5, color=c_text, leading=14)],
+        [Spacer(1, 6)],
+        [_advance_paragraph("Tài khoản chuyển", size=8.5, color=c_muted)],
+        [_advance_paragraph("Ngân hàng Demo — 0123456789", size=10, color=c_text_sec, leading=14)],
+    ], colWidths=[half_w - 20], style=[
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("PADDING", (0, 0), (-1, -1), 0),
+    ])
+
+    t_left = Table([
+        [_advance_paragraph("THÔNG TIN BÊN CHUYỂN", size=9.5, color=c_text_sec, leading=14)],
+        [left_inner],
+    ], colWidths=[half_w])
+    t_left.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), c_header_bg),
+        ("BACKGROUND", (0, 1), (-1, 1), colors.white),
+        ("BOX", (0, 0), (-1, -1), 0.5, c_border_light),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.5, c_border_light),
+        ("PADDING", (0, 0), (-1, -1), 10),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+
+    right_inner = Table([
+        [_advance_paragraph("Bên nhận", size=8.5, color=c_muted)],
+        [_advance_paragraph(claimant, size=10.5, color=c_text, leading=14)],
+        [Spacer(1, 6)],
+        [_advance_paragraph("Tài khoản nhận", size=8.5, color=c_muted)],
+        [_advance_paragraph("Ngân hàng Demo — 9876543210", size=10, color=c_text_sec, leading=14)],
+    ], colWidths=[half_w - 20], style=[
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("PADDING", (0, 0), (-1, -1), 0),
+    ])
+
+    t_right = Table([
+        [_advance_paragraph("THÔNG TIN BÊN NHẬN", size=9.5, color=c_text_sec, leading=14)],
+        [right_inner],
+    ], colWidths=[half_w])
+    t_right.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), c_header_bg),
+        ("BACKGROUND", (0, 1), (-1, 1), colors.white),
+        ("BOX", (0, 0), (-1, -1), 0.5, c_border_light),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.5, c_border_light),
+        ("PADDING", (0, 0), (-1, -1), 10),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+
+    t_cols = Table([[t_left, "", t_right]], colWidths=[half_w, 12, half_w])
+    t_cols.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    transfer_story.append(t_cols)
+    transfer_story.append(Spacer(1, 18))
+
+    # E. Nội dung chuyển tiền và tham chiếu khoản ứng, dùng toàn chiều rộng
+    t_details = Table([
+        [_advance_paragraph("Nội dung chuyển tiền", size=9.5, color=c_muted),
+         _advance_paragraph(purpose, size=10, color=c_text, leading=14)],
+        [_advance_paragraph("Tham chiếu khoản ứng", size=9.5, color=c_muted),
+         _advance_paragraph(f"ADV-{cid}", size=10, color=c_text, leading=14)],
+    ], colWidths=[145, usable_w - 145])
+    t_details.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.5, c_border_light),
+        ("BACKGROUND", (0, 0), (0, -1), c_card_bg),
+        ("PADDING", (0, 0), (-1, -1), 9),
+    ]))
+    transfer_story.append(t_details)
+    transfer_story.append(Spacer(1, 36))
+
+    # F. Người lập: “Ký bởi: …”, “Ký ngày: …”
+    sig_w = 200
+    sig_table = Table([
+        [_advance_paragraph("Người lập biên nhận", size=10, center=True, color=c_text)],
+        [_advance_paragraph("(Ký, ghi rõ họ tên)", size=8.5, center=True, color=c_muted)],
+        [Spacer(1, 46)],
+        [_advance_paragraph("Ký bởi: Trần Bình", size=9.5, center=True, color=c_text)],
+        [_advance_paragraph("Ký ngày: 05/10/2026", size=8.5, center=True, color=c_muted)],
+    ], colWidths=[sig_w], style=[
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ])
+    t_sig = Table([["", sig_table]], colWidths=[usable_w - sig_w, sig_w])
+    t_sig.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("PADDING", (0, 0), (-1, -1), 0),
+    ]))
+    transfer_story.append(t_sig)
+
+    write_pdf(inp / TRANSFER_DOC, "Biên nhận chuyển khoản", transfer_story,
+              left_margin=adv_margin, right_margin=adv_margin, top_margin=adv_margin, bottom_margin=adv_margin)
+
+    # 2. PHIẾU CHI TIỀN MẶT
+    cash_story = []
+
+    # A. Header công ty; số phiếu/ngày
+    t_cash_header = Table([
+        [
+            Table([
+                [_advance_paragraph("CÔNG TY INVOICEREFEREE", size=11, color=c_text)],
+                [_advance_paragraph("Địa chỉ: 128 Nguyễn Văn Linh, Quận 7, TP. Hồ Chí Minh", size=9, color=c_muted)],
+            ], colWidths=[300], style=[("VALIGN", (0, 0), (-1, -1), "TOP"), ("PADDING", (0, 0), (-1, -1), 0)]),
+            Table([
+                [_advance_paragraph(f"Số phiếu: PC-{cid}-0001", size=9.5, right=True, color=c_text)],
+                [_advance_paragraph("Ngày: 05/10/2026", size=9, right=True, color=c_text_sec)],
+            ], colWidths=[usable_w - 300], style=[("VALIGN", (0, 0), (-1, -1), "TOP"), ("PADDING", (0, 0), (-1, -1), 0)]),
+        ]
+    ], colWidths=[300, usable_w - 300])
+    t_cash_header.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.75, c_border),
+    ]))
+    cash_story.append(t_cash_header)
+    cash_story.append(Spacer(1, 18))
+
+    # B. Tiêu đề
+    cash_story.append(_advance_paragraph("PHIẾU CHI TIỀN MẶT", size=19, center=True, color=c_text, leading=24))
+    cash_story.append(Spacer(1, 16))
+
+    # C. Số tiền chi nổi bật; số tiền bằng chữ ngay bên dưới
+    t_cash_amount = Table([
+        [_advance_paragraph("SỐ TIỀN CHI", size=9, center=True, color=c_muted, leading=12)],
+        [_advance_paragraph(money(advance), size=25, center=True, color=c_text, leading=34)],
+        [_advance_paragraph(f"Số tiền bằng chữ: {advance_words}.", size=10.5, center=True, color=c_text_sec, leading=15)],
+    ], colWidths=[usable_w])
+    t_cash_amount.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BACKGROUND", (0, 0), (-1, -1), c_card_bg),
+        ("BOX", (0, 0), (-1, -1), 0.75, c_border),
+        ("TOPPADDING", (0, 0), (-1, 0), 12),
+        ("BOTTOMPADDING", (0, -1), (-1, -1), 12),
+    ]))
+    cash_story.append(t_cash_amount)
+    cash_story.append(Spacer(1, 18))
+
+    # D. Người nhận, lý do chi, tham chiếu khoản ứng
+    t_cash_details = Table([
+        [_advance_paragraph("Công ty chi", size=9.5, color=c_muted),
+         _advance_paragraph("Công ty InvoiceReferee", size=10, color=c_text, leading=14)],
+        [_advance_paragraph("Người nhận tiền", size=9.5, color=c_muted),
+         _advance_paragraph(claimant, size=10, color=c_text, leading=14)],
+        [_advance_paragraph("Lý do chi", size=9.5, color=c_muted),
+         _advance_paragraph(purpose, size=10, color=c_text, leading=14)],
+        [_advance_paragraph("Tham chiếu khoản ứng", size=9.5, color=c_muted),
+         _advance_paragraph(f"ADV-{cid}", size=10, color=c_text, leading=14)],
+    ], colWidths=[145, usable_w - 145])
+    t_cash_details.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.5, c_border_light),
+        ("BACKGROUND", (0, 0), (0, -1), c_card_bg),
+        ("PADDING", (0, 0), (-1, -1), 8),
+    ]))
+    cash_story.append(t_cash_details)
+    cash_story.append(Spacer(1, 16))
+
+    # E. Nhóm xác nhận giao nhận: số tiền đã giao, số tiền đã nhận, ngày giao nhận
+    handover_w = usable_w / 3
+    col1_content = Table([
+        [_advance_paragraph("Số tiền đã giao", size=8.5, center=True, color=c_muted)],
+        [_advance_paragraph(money(advance), size=10.5, center=True, color=c_text, leading=14)],
+    ], colWidths=[handover_w - 16], style=[("ALIGN", (0, 0), (-1, -1), "CENTER"), ("PADDING", (0, 0), (-1, -1), 0)])
+
+    col2_content = Table([
+        [_advance_paragraph("Số tiền đã nhận", size=8.5, center=True, color=c_muted)],
+        [_advance_paragraph(money(advance), size=10.5, center=True, color=c_text, leading=14)],
+    ], colWidths=[handover_w - 16], style=[("ALIGN", (0, 0), (-1, -1), "CENTER"), ("PADDING", (0, 0), (-1, -1), 0)])
+
+    col3_content = Table([
+        [_advance_paragraph("Ngày giao nhận", size=8.5, center=True, color=c_muted)],
+        [_advance_paragraph("05/10/2026", size=10.5, center=True, color=c_text, leading=14)],
+    ], colWidths=[handover_w - 16], style=[("ALIGN", (0, 0), (-1, -1), "CENTER"), ("PADDING", (0, 0), (-1, -1), 0)])
+
+    t_handover = Table([[col1_content, col2_content, col3_content]], colWidths=[handover_w, handover_w, handover_w])
+    t_handover.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.5, c_border_light),
+        ("BACKGROUND", (0, 0), (-1, -1), c_card_bg),
+        ("PADDING", (0, 0), (-1, -1), 8),
+    ]))
+    cash_story.append(t_handover)
+    cash_story.append(Spacer(1, 32))
+
+    # F. Ba block chữ ký bằng nhau trên MỘT HÀNG NGANG:
+    #    Người phê duyệt | Kế toán/người giao tiền | Người nhận tiền
+    sig_cols = [
+        [
+            _advance_paragraph("Người phê duyệt", size=9.5, center=True, color=c_text),
+            _advance_paragraph("(Ký, ghi rõ họ tên)", size=8.5, center=True, color=c_muted),
+            Spacer(1, 46),
+            _advance_paragraph("Ký bởi: Lê Minh", size=9.5, center=True, color=c_text),
+            _advance_paragraph("Ký ngày: 05/10/2026", size=8.5, center=True, color=c_muted),
+        ],
+        [
+            _advance_paragraph("Kế toán / người giao tiền", size=9.5, center=True, color=c_text),
+            _advance_paragraph("(Ký, ghi rõ họ tên)", size=8.5, center=True, color=c_muted),
+            Spacer(1, 46),
+            _advance_paragraph("Ký bởi: Trần Bình", size=9.5, center=True, color=c_text),
+            _advance_paragraph("Ký ngày: 05/10/2026", size=8.5, center=True, color=c_muted),
+        ],
+        [
+            _advance_paragraph("Người nhận tiền", size=9.5, center=True, color=c_text),
+            _advance_paragraph("(Ký, ghi rõ họ tên)", size=8.5, center=True, color=c_muted),
+            Spacer(1, 46),
+            _advance_paragraph(f"Ký bởi: {claimant}", size=9.5, center=True, color=c_text),
+            _advance_paragraph("Ký ngày: 05/10/2026", size=8.5, center=True, color=c_muted),
+        ],
+    ]
+    sub_tables = [
+        Table([[item] for item in col], colWidths=[handover_w], style=[
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ])
+        for col in sig_cols
+    ]
+    t_sig_cash = Table([sub_tables], colWidths=[handover_w, handover_w, handover_w])
+    t_sig_cash.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("PADDING", (0, 0), (-1, -1), 0),
+    ]))
+    cash_story.append(t_sig_cash)
+
+    write_pdf(inp / CASH_DOC, "Phiếu chi tiền mặt", cash_story,
+              left_margin=adv_margin, right_margin=adv_margin, top_margin=adv_margin, bottom_margin=adv_margin)
 
 
 def json_write(path: Path, value) -> None:
@@ -268,6 +542,7 @@ def generate(output: Path) -> None:
     output.mkdir(parents=True, exist_ok=True)
     (output / MARKER).write_text("UC03 pilot input generator v1\n")
     pdfmetrics.registerFont(TTFont("PilotNoto", str(FONT)))
+    pdfmetrics.registerFontFamily("PilotNoto", normal="PilotNoto", bold="PilotNoto", italic="PilotNoto", boldItalic="PilotNoto")
     entries = []
     for case in CASES:
         cid, folder, number, _, _, _, _, total, _, _ = case

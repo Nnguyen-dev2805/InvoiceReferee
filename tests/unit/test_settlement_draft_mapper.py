@@ -127,3 +127,24 @@ def test_draft_carries_source_refs_and_field_states() -> None:
     draft = build_settlement_draft(_report(documents=(_paper(), _invoice()), links=(_link(),)), sources=_sources())
     assert draft["field_states"]["declared_name"] == "FOUND"
     assert draft["expenses"][0]["refs"], "the row must carry a source ref"
+
+
+def test_draft_surfaces_the_paper_arithmetic_contradiction() -> None:
+    # TC06: the paper prints ứng 4m − chi 3.24m = 760k but the refund says 700k.
+    # The SAME finding the reconciler blocks on must show on the review screen.
+    paper = _paper().model_copy(update={"fields": (
+        _found("declared_name", "NGUYỄN MINH AN", "Người đề nghị: NGUYỄN MINH AN"),
+        _found("purpose", "Chi phí tiếp khách", "Nội dung: Chi phí tiếp khách"),
+        _found("printed_total", "3240000", "3.240.000"),
+        _found("declared_advance", "4000000", "4.000.000"),
+        _found("printed_return", "700000", "700.000"),
+    )})
+    draft = build_settlement_draft(_report(documents=(paper, _invoice()), links=(_link(),)), sources=_sources())
+    assert draft["arithmetic_findings"], "the refund contradiction must surface"
+    assert any("60000" in str(f["basis"]) for f in draft["arithmetic_findings"])
+    assert any("60000" in w for w in draft["warnings"])
+
+
+def test_draft_with_consistent_numbers_has_no_arithmetic_finding() -> None:
+    draft = build_settlement_draft(_report(documents=(_paper(), _invoice()), links=(_link(),)), sources=_sources())
+    assert draft["arithmetic_findings"] == []

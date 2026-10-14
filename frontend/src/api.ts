@@ -216,10 +216,18 @@ export interface SettlementDraftResponse {
   declared_advance: number | null;
   expenses: SettlementExpenseItem[];
   warnings: string[];
+  arithmetic_findings?: SettlementArithmeticFinding[];
   invoices: SettlementInvoiceItem[];
   field_states?: Record<string, string>;
   provider_mode?: string | null;
   data_origin?: string | null;
+}
+
+export interface SettlementArithmeticFinding {
+  code: string;
+  basis: string;
+  question: string;
+  refs: unknown[];
 }
 
 export async function settlementDraft(

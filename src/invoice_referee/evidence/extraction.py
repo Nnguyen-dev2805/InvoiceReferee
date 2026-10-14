@@ -26,6 +26,12 @@ from invoice_referee.evidence.xkiro import XkiroSchemaError
 
 _DIGITS = re.compile(r"\d")
 _NUMBER = re.compile(r"(\d{1,3}(?:[.\s]\d{3})+|\d+)")
+# A percentage token ("8%", "8 %") is a RATE, never a money/quantity value. The
+# tokenizer must drop it or `Thuế GTGT (8%): 400.000` would offer `8` as money.
+_PERCENT = re.compile(r"\d+(?:[.,]\d+)?\s*%")
+# A digit-run inside an alphanumeric identifier ("IR26E", "1C26TAA") is part of a
+# code, not a money/quantity token: `IR26E` must not offer `26` as a value.
+_TOKEN = re.compile(r"\d[\d.,]*")
 
 # Model synonyms → the profile vocabulary (plan §12). Code owns this map so a
 # correctly-read invoice is not reported as missing required fields.
@@ -110,6 +116,39 @@ def _normalize_number(text: str) -> Decimal | None:
         return None
 
 
+def _numeric_tokens(quote: str) -> set[int]:
+    """The standalone numeric tokens a quote really offers as money/quantity.
+
+    A percentage ("8%") is a rate and an alphanumeric code digit-run ("IR26E")
+    is part of an identifier: neither is a money token. The tokenizer removes
+    percentages, then keeps only digit-runs that are NOT glued to a letter on
+    either side, so `Thuế GTGT (8%): 400.000` offers exactly {400000}.
+    """
+    stripped = _PERCENT.sub(" ", quote or "")
+    tokens: set[int] = set()
+    for match in _TOKEN.finditer(stripped):
+        start, end = match.start(), match.end()
+        before = stripped[start - 1] if start > 0 else ""
+        after = stripped[end] if end < len(stripped) else ""
+        if before.isalpha() or after.isalpha():
+            continue  # part of an identifier, not a standalone number
+        try:
+            tokens.add(int(match.group(0).replace(".", "").replace(" ", "")))
+        except ValueError:
+            continue
+    return tokens
+
+
+def _digits_only(text: str) -> bool:
+    """Whether the text is a bare money/number after stripping currency words."""
+    stripped = re.sub(r"(?i)\b(vnd|đ|dong|đồng)\b", "", text).strip()
+    return bool(stripped) and re.fullmatch(r"[\d.,\s]+", stripped) is not None
+
+
+def _alnum(text: str) -> str:
+    return re.sub(r"[^0-9a-z]", "", text.lower())
+
+
 def _source_pages_text(ocr: OcrSourceResult, page_range: tuple[int, int]) -> str:
     start, end = page_range
     return "\n".join(
@@ -148,7 +187,15 @@ def _date_supported(iso: str, quote: str) -> bool | None:
 
 
 def _value_supported(value: object, quote: str) -> bool:
-    """The normalized value must be derivable from the exact quote."""
+    """The normalized value must be derivable from the exact quote.
+
+    Token-based provenance (not "the first number in the quote"): a money value
+    is supported when it appears as a standalone numeric token of the quote — a
+    percentage ("8%") or a digit-run glued to letters ("IR26E") is not money. An
+    identifier value ("IR26E00000101") is supported when its alphanumeric
+    skeleton, or each of its digit-runs, appears in the quote, so a serial-prefix
+    reading still binds to its own parts and a wrong number is rejected.
+    """
     if value is None:
         return False
     # A row's `invoice_refs` is a list; every element must appear in the quote.
@@ -161,13 +208,25 @@ def _value_supported(value: object, quote: str) -> bool:
     date_ok = _date_supported(text, quote)
     if date_ok is not None:
         return date_ok
-    # Money/number: the digits must appear in the quote (formatting aside).
-    if _DIGITS.search(text) and _DIGITS.search(quote):
-        quote_num = _normalize_number(quote)
+    # Money/number: the value must be a real numeric token of the quote.
+    if _digits_only(text):
         value_num = _normalize_number(text)
-        if quote_num is not None and value_num is not None:
-            return quote_num == value_num
-        return text in quote
+        if value_num is None:
+            return False
+        return int(value_num) in _numeric_tokens(quote)
+    # Identifier/code (has letters): bind by the alphanumeric skeleton, or by the
+    # value's own document-number digit-run, so a serial-prefix reading
+    # ("IR26E00000101") still matches the quote's serial + number parts while a
+    # wrong number is rejected.
+    if _DIGITS.search(text):
+        quote_alnum = _alnum(quote)
+        if _alnum(text) in quote_alnum:
+            return True
+        runs = re.findall(r"\d+", text)
+        if not runs:
+            return False
+        longest = max(runs, key=len)
+        return int(longest) in _numeric_tokens(quote)
     return text in quote or text.lower() in quote.lower()
 
 

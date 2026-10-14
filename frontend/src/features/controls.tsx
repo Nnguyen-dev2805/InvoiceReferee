@@ -66,24 +66,6 @@ export function Controls({
           {error}
         </p>
       )}
-
-      {currentRole === "accountant" && (
-        <div className="pt-1 space-y-1.5">
-          <h3 className="text-[11px] font-semibold text-slate-700">
-            Nhật ký thao tác kiểm soát
-          </h3>
-          <ul
-            className="audit space-y-1 max-h-40 overflow-y-auto custom-scrollbar bg-slate-50 p-3 rounded border border-slate-200 font-mono-nums text-[11px] text-slate-700"
-            data-testid="controls-audit"
-          >
-            {caseView.audit.map((line, index) => (
-              <li key={`${index}-${line}`} className="leading-relaxed">
-                {line}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </section>
   );
 }

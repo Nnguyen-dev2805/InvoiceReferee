@@ -37,6 +37,7 @@ from invoice_referee.domain.finance import (
 )
 from invoice_referee.domain.issues import BusinessIssue, ProcessingProblem
 from invoice_referee.domain.organization import OrganizationContext
+from invoice_referee.reconciliation.document_arithmetic import check_document_arithmetic
 from invoice_referee.workflow.context_records import (
     context_budgets,
     context_category_policies,
@@ -669,6 +670,25 @@ def admit_evidence(
     )
     if binding_issue is not None:
         issues.append(binding_issue)
+
+    # Document-internal arithmetic (TC06/TC11): a readable number is not a
+    # consistent number. The paper's own advance−cost=refund relation and the
+    # invoice's subtotal+tax=total relation are checked in code; a contradiction
+    # becomes a blocking FACT so no affirmative financial effect is issued while
+    # it is open. The source numbers are preserved (never silently rewritten).
+    for document in report.documents:
+        for finding in check_document_arithmetic(document):
+            issues.append(
+                BusinessIssue(
+                    id=f"issue:fact:arithmetic:{document.document_id}:{finding.code}",
+                    kind="FACT",
+                    field_or_rule=finding.field_or_rule,
+                    owner="employee",
+                    basis=finding.basis,
+                    refs=finding.refs or document.refs,
+                    question=finding.question,
+                )
+            )
 
     # A/P/R known only when coverage exists; used to bound the Q32 path.
     a_known = effective_coverage is not None

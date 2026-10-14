@@ -523,7 +523,6 @@ export function Intake({
                   id="draft-activity-name"
                   value={draft.activity_name ?? ""}
                   onChange={(e) => setDraft((prev) => ({ ...prev, activity_name: e.target.value }))}
-                  placeholder="Chưa đọc được"
                   className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
                 />
               </div>
@@ -536,7 +535,6 @@ export function Intake({
                   id="draft-purpose"
                   value={draft.declared_purpose ?? ""}
                   onChange={(e) => setDraft((prev) => ({ ...prev, declared_purpose: e.target.value }))}
-                  placeholder="Chưa đọc được"
                   className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
                 />
               </div>
@@ -703,7 +701,6 @@ export function Intake({
               id="draft-notes"
               value={draft.notes}
               onChange={(e) => setDraft((prev) => ({ ...prev, notes: e.target.value }))}
-              placeholder="Ví dụ: Đã kiểm tra hóa đơn và xác nhận số tiền ứng thực tế..."
               className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
             />
           </div>
