@@ -1,0 +1,600 @@
+{
+  "source_root": "/Users/tnhatnguyendev2805/Documents/Projects/InvoiceReferee/.worktrees/hoangha",
+  "head": "1ee33487e2770ebd9e5ae65b994bbd3f3a4dd7a8",
+  "scope": "tracked handwritten production/test/tooling/template/config source plus two notebooks and requirements; generated egg-info/.archify/cache and persisted logs/PNG diagram outputs excluded; notebook output data not fresh runtime proof",
+  "files": [
+    {
+      "path": ".env.example",
+      "owner": "01-domain-config",
+      "lines": 20,
+      "sha256": "63baa5328c91f5684d114431c7754d6b9c12ba0e68758fb9431ccb9ae6bc5256"
+    },
+    {
+      "path": ".gitignore",
+      "owner": "01-domain-config",
+      "lines": 16,
+      "sha256": "c6105ed5d8f5a34cb891297a3290da393bad354164bff2285ddbdf5b57535941"
+    },
+    {
+      "path": ".streamlit/config.toml",
+      "owner": "07-streamlit-inventory",
+      "lines": 13,
+      "sha256": "06aca1b5e691f4369f9ddf8150cb1d98ec8775e5ca2783c07d10ce9c6dfe59f1"
+    },
+    {
+      "path": "app/__init__.py",
+      "owner": "06-fastapi-frontend",
+      "lines": 1,
+      "sha256": "abc53c7c8956e77b06e59b500661214b584e233d402a48619e0ac944b45683eb"
+    },
+    {
+      "path": "app/components/__init__.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 1,
+      "sha256": "c01b8462deeebad5a5c3341cb34cb154978b78a80b3c1ec8241784f04b699d28"
+    },
+    {
+      "path": "app/components/bbox_overlay.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 118,
+      "sha256": "73a6af9a3c072a8a6d02e24172e8e825b4199f62f001a960c3ba47337d559f3c"
+    },
+    {
+      "path": "app/components/sidebar.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 34,
+      "sha256": "2e8a0b137c516a7e870efd793636e18919d1f1e81af6bba8938e174df130ee52"
+    },
+    {
+      "path": "app/components/submission_form.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 164,
+      "sha256": "756897379474db6807ccb42826c54d45eecb002fe4074995a8905a39bd63db38"
+    },
+    {
+      "path": "app/fastapi_app.py",
+      "owner": "06-fastapi-frontend",
+      "lines": 62,
+      "sha256": "63461b5f29383dccc037d794ea06c08fc99dc2887208ee4845f6c2e811c2aa04"
+    },
+    {
+      "path": "app/state/__init__.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 1,
+      "sha256": "76542a0f318ab2aa8a6837975a506ded5d6f081a5520fefa089228c7261d4387"
+    },
+    {
+      "path": "app/state/submission_state.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 31,
+      "sha256": "3379310401d094a88a47aa83e709f6ad35c74a387b276673bf1ad7021c471226"
+    },
+    {
+      "path": "app/static/css/app.css",
+      "owner": "06-fastapi-frontend",
+      "lines": 363,
+      "sha256": "80585422b999dcb7817a33792a6ed725ce507dfd2feda6e02e8c6e5d3189bafd"
+    },
+    {
+      "path": "app/static/js/settlement-form.js",
+      "owner": "06-fastapi-frontend",
+      "lines": 353,
+      "sha256": "d70b7726cff46eced27bcbd66036357cc68eeef4f05ddf51eed9da1a582986e2"
+    },
+    {
+      "path": "app/streamlit_app.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 99,
+      "sha256": "947dfe3481cb3b3cba8acc2e83f61e6ada15591a8790c73dce59ee86faf8d867"
+    },
+    {
+      "path": "app/styles.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 270,
+      "sha256": "5338ad97bbeeb42133a123757a444a950826702a24e00c6e5eedd24778220682"
+    },
+    {
+      "path": "app/templates/accounting/_finding_body.html",
+      "owner": "06-fastapi-frontend",
+      "lines": 68,
+      "sha256": "4cddbfc0f0d7d300e0667a810ca57002ca5f9bb601cf5ff4674a0ef9e03e2b3a"
+    },
+    {
+      "path": "app/templates/accounting/case_detail.html",
+      "owner": "06-fastapi-frontend",
+      "lines": 390,
+      "sha256": "1f5b71edf9bb01f1cb03bbf4438bc70555beb5a6b30e7526928f7dead2945eca"
+    },
+    {
+      "path": "app/templates/accounting/queue.html",
+      "owner": "06-fastapi-frontend",
+      "lines": 97,
+      "sha256": "2dd43c4034f0593ab71e84001927a90d55caaa80775db050aa1868b5b06bd387"
+    },
+    {
+      "path": "app/templates/base.html",
+      "owner": "06-fastapi-frontend",
+      "lines": 37,
+      "sha256": "bc0cc2b72fecf575a0ff18459618452a280f11d39820dc9948e06982b4fc3bf3"
+    },
+    {
+      "path": "app/templates/employee/case_status.html",
+      "owner": "06-fastapi-frontend",
+      "lines": 36,
+      "sha256": "d45c989194dd1a91a30beb0db2ccbe0e2d5281b431227d9509364e3baebb801b"
+    },
+    {
+      "path": "app/templates/employee/new_settlement.html",
+      "owner": "06-fastapi-frontend",
+      "lines": 141,
+      "sha256": "fb0db169ee7433184f7f8c0074c86167a5223820685a45e8a39f8ea1eab9f4af"
+    },
+    {
+      "path": "app/views/__init__.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 1,
+      "sha256": "2c318d9735506fc7e0dcab44b3dff3e6559757410a05b5a9f7c190810684c428"
+    },
+    {
+      "path": "app/views/accounting_review.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 560,
+      "sha256": "e5dc726a554fd6f5c4f8c62b87d0e56821ba51aa9bc4361629e85a2a9dee2a5b"
+    },
+    {
+      "path": "app/views/employee_submission.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 65,
+      "sha256": "676c1e966b0047d3763ea59172a7c7d16207dc13b4b9e73abbf96e82266b3c56"
+    },
+    {
+      "path": "app/views/ocr_debug.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 369,
+      "sha256": "9ac6064faf971557b82e3596573018fa3f939fc10248ba8abd4e505ad09aa488"
+    },
+    {
+      "path": "app/web/__init__.py",
+      "owner": "06-fastapi-frontend",
+      "lines": 1,
+      "sha256": "401bf308f987edc0a367ca07682571c419240a92ae63f049fb6c32ebbd3c8569"
+    },
+    {
+      "path": "app/web/ocr_preview.py",
+      "owner": "06-fastapi-frontend",
+      "lines": 103,
+      "sha256": "b40331bb1865c21d9f054ee7a443d6fd37ca8bfdba6a0bbcb9cd31f50b0c1ab4"
+    },
+    {
+      "path": "app/web/routes.py",
+      "owner": "06-fastapi-frontend",
+      "lines": 871,
+      "sha256": "28e6161ffb6c6eff87ffa8ffcedcbf9a475247bdf0fc35fc7934ab458e37288f"
+    },
+    {
+      "path": "app/web/runtime.py",
+      "owner": "06-fastapi-frontend",
+      "lines": 72,
+      "sha256": "9eac05434cb6f16d5632cb571e7dbadc27dea087a44f13c83e69de60f20a05f8"
+    },
+    {
+      "path": "docs/new/assets/employee_workflow.html",
+      "owner": "09-data-tooling",
+      "lines": 93,
+      "sha256": "8de6e33694be78e10a084ea0632b743df390b8111decd42404e66acd8890821f"
+    },
+    {
+      "path": "docs/new/assets/system_workflow.html",
+      "owner": "09-data-tooling",
+      "lines": 103,
+      "sha256": "710832db5c61077cf9a488aea1f21977723a385dbe1d09f837be5967b6bbf18c"
+    },
+    {
+      "path": "pyproject.toml",
+      "owner": "01-domain-config",
+      "lines": 29,
+      "sha256": "a1ed3f7d9f27c1bcc46471ba527823261976dfa27c42f01edc6312ec7440baed"
+    },
+    {
+      "path": "scripts/generate_uc3_testcases.py",
+      "owner": "09-data-tooling",
+      "lines": 1981,
+      "sha256": "264335b1ce3bbfaec04deeb1db132d5e25479a47429bf4a08ceeaf1339b270a8"
+    },
+    {
+      "path": "scripts/qa_uc3_testcases.py",
+      "owner": "09-data-tooling",
+      "lines": 184,
+      "sha256": "42625dc79086d73f4b8d53757c569e864fc0d382407266aba7f03e6849ff1c04"
+    },
+    {
+      "path": "scripts/restructure_mistral_ocr.py",
+      "owner": "09-data-tooling",
+      "lines": 55,
+      "sha256": "35b74598c6f6b5b2383dfe4342a10a2977551b131edf0ab5ca515313bae33244"
+    },
+    {
+      "path": "src/invoice_referee/__init__.py",
+      "owner": "01-domain-config",
+      "lines": 3,
+      "sha256": "72b0e7ccdb2592a90f544cd64db05e8d94946d8d17d551d46ddbd055a356c366"
+    },
+    {
+      "path": "src/invoice_referee/application/__init__.py",
+      "owner": "04-settlement-matching-policy",
+      "lines": 18,
+      "sha256": "f41fbc166dcec13e5fcc34f3f4853e8ffd6df4d1df7b6bc9c5ac10ca5da531d3"
+    },
+    {
+      "path": "src/invoice_referee/application/decision_guard.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 90,
+      "sha256": "d42cee5f7535081f4fc76a383a2769a357d13c6695c5ca3b9657beddb9b6fab9"
+    },
+    {
+      "path": "src/invoice_referee/application/paper_evidence_matching.py",
+      "owner": "04-settlement-matching-policy",
+      "lines": 434,
+      "sha256": "636a6f5bfa6cffbbf0bee34387da408b5b3e25eab08e0ac1920fd87c64f00088"
+    },
+    {
+      "path": "src/invoice_referee/application/process_case.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 837,
+      "sha256": "bc338ab3b33f0f1a389c5fb936c2e47d8385ecbd11a98eff65b790e55862a1dd"
+    },
+    {
+      "path": "src/invoice_referee/application/process_settlement.py",
+      "owner": "04-settlement-matching-policy",
+      "lines": 1008,
+      "sha256": "4a31b5833fdc8addbe8f56a30d392d405c2309f77bca0189421be6203ef698c0"
+    },
+    {
+      "path": "src/invoice_referee/application/review_settlement.py",
+      "owner": "05-storage-lifecycle",
+      "lines": 101,
+      "sha256": "75a670d0430a75ff5dd27e0e0103986330e20b8327746256f6335d4679fbda6d"
+    },
+    {
+      "path": "src/invoice_referee/application/settlement_summary.py",
+      "owner": "05-storage-lifecycle",
+      "lines": 90,
+      "sha256": "080db8b5e2136ef9d77bf92aaf97e5c0814991db25d61c56d3864bab578e6472"
+    },
+    {
+      "path": "src/invoice_referee/application/submit_case.py",
+      "owner": "05-storage-lifecycle",
+      "lines": 121,
+      "sha256": "435e526cb5d7d4c97b73ecc8d4555b29e3b51e348bb3b318e35fa7338f067fea"
+    },
+    {
+      "path": "src/invoice_referee/application/submit_settlement.py",
+      "owner": "05-storage-lifecycle",
+      "lines": 167,
+      "sha256": "08ef7c9a34cdc9b1782820f7db6de1dc7b692d0638cd4d8525f612e966a1ce6b"
+    },
+    {
+      "path": "src/invoice_referee/config.py",
+      "owner": "01-domain-config",
+      "lines": 53,
+      "sha256": "107e6f5e0e3e06e30fc6505b61c35f96d6948dda78516b06ab39710844331412"
+    },
+    {
+      "path": "src/invoice_referee/domain/__init__.py",
+      "owner": "01-domain-config",
+      "lines": 125,
+      "sha256": "3850e5d011d3d5b6e3b7994f0ba112ff1847de3f58c4005930fb20e3993ec1f3"
+    },
+    {
+      "path": "src/invoice_referee/domain/decisions.py",
+      "owner": "01-domain-config",
+      "lines": 52,
+      "sha256": "017b7faf02e85f34886e40690c8812c822f24335ec3ec9ba930b4768e1d60a79"
+    },
+    {
+      "path": "src/invoice_referee/domain/errors.py",
+      "owner": "01-domain-config",
+      "lines": 9,
+      "sha256": "86d19861b37cbf467c5eb7238b5dd80d36bf8f1b00a66366c6cf98b631a56f95"
+    },
+    {
+      "path": "src/invoice_referee/domain/processing.py",
+      "owner": "01-domain-config",
+      "lines": 224,
+      "sha256": "396d3a1a8480b3cd3b50929a9d9204002e1faede2a99fc6f50534f00d9651baf"
+    },
+    {
+      "path": "src/invoice_referee/domain/settlement.py",
+      "owner": "01-domain-config",
+      "lines": 339,
+      "sha256": "5c25ce72d6ba562c8d7af58fe3269142aa01f3fe00009946f2d71447ad1bbc9d"
+    },
+    {
+      "path": "src/invoice_referee/domain/submission.py",
+      "owner": "01-domain-config",
+      "lines": 67,
+      "sha256": "cbe91ff803617d70ba9c09c1eac104c75b7c3e9a723490ac79bac4b38b115450"
+    },
+    {
+      "path": "src/invoice_referee/extraction/__init__.py",
+      "owner": "02-ocr-quality",
+      "lines": 41,
+      "sha256": "6534034fdcaf04957024dc0cc5fe893977f48f0c4aa26c6732103591d5ebbb6c"
+    },
+    {
+      "path": "src/invoice_referee/extraction/confidence.py",
+      "owner": "02-ocr-quality",
+      "lines": 42,
+      "sha256": "68ec46ee9e0c552b716725669a69b1decf62fd408304cf1a94bec57e0510ed4e"
+    },
+    {
+      "path": "src/invoice_referee/extraction/conflict_reasoning.py",
+      "owner": "03-llm-contracts",
+      "lines": 130,
+      "sha256": "5ea27777a505b66757dd10833937a30a2ae9bc533c27f631e15dc28f13b83b38"
+    },
+    {
+      "path": "src/invoice_referee/extraction/evidence_reconciliation.py",
+      "owner": "03-llm-contracts",
+      "lines": 27,
+      "sha256": "407b382ce756c97960c5cb4ef3e79425fc4588ea9724f8f300a90aa4f3b35881"
+    },
+    {
+      "path": "src/invoice_referee/extraction/kimi_reasoning.py",
+      "owner": "03-llm-contracts",
+      "lines": 572,
+      "sha256": "0cb6b26055eff3b8bf53af85ee31ec9996356368fbe8f1c78bd856b31bf73126"
+    },
+    {
+      "path": "src/invoice_referee/extraction/mistral_ocr.py",
+      "owner": "02-ocr-quality",
+      "lines": 86,
+      "sha256": "32d97d4fca7ed66e2534a5b8f5f410c0b4ffa922770679f1e1377322b05b263f"
+    },
+    {
+      "path": "src/invoice_referee/extraction/network_resilience.py",
+      "owner": "02-ocr-quality",
+      "lines": 104,
+      "sha256": "345ebb1fc0b2b93875d1aadb0a7ea51bff2611112c5874e2845d2f3d8e86f21c"
+    },
+    {
+      "path": "src/invoice_referee/extraction/ocr_quality.py",
+      "owner": "02-ocr-quality",
+      "lines": 89,
+      "sha256": "b2bd69ab3819cb0e5a9374935fe87e9a59ff5befb52ac5e8d38026450a1a027f"
+    },
+    {
+      "path": "src/invoice_referee/extraction/word_block_mapper.py",
+      "owner": "02-ocr-quality",
+      "lines": 355,
+      "sha256": "27cac0681d7c9f567ec847348859dc06b97c50742f0e682086e98aeef42684ba"
+    },
+    {
+      "path": "src/invoice_referee/policy/__init__.py",
+      "owner": "04-settlement-matching-policy",
+      "lines": 20,
+      "sha256": "823e15ca5d45f225edc0726946b33ff4a9057bc63d834da771b6c794e6f44cac"
+    },
+    {
+      "path": "src/invoice_referee/policy/document_validity.py",
+      "owner": "04-settlement-matching-policy",
+      "lines": 627,
+      "sha256": "2caed2d942b8ca7ac25f5cf036218dbe8c9579af9219b60dc33b8241b54f125f"
+    },
+    {
+      "path": "src/invoice_referee/policy/inventory.py",
+      "owner": "07-streamlit-inventory",
+      "lines": 568,
+      "sha256": "f4b7b5fe97c8bd7e309d324c9125fa58fd683e986f6604353d9cb4a1992fc4bf"
+    },
+    {
+      "path": "src/invoice_referee/policy/settlement.py",
+      "owner": "04-settlement-matching-policy",
+      "lines": 338,
+      "sha256": "4b4b09986d79d30a49dc8327e1707b3814d186d0caa9b48c41ff3d7103002d1d"
+    },
+    {
+      "path": "src/invoice_referee/storage/__init__.py",
+      "owner": "05-storage-lifecycle",
+      "lines": 19,
+      "sha256": "3712c5dd03eb10070ca5f21592eec414d8b8f18d74eefe3818f2805f84ba35ed"
+    },
+    {
+      "path": "src/invoice_referee/storage/base.py",
+      "owner": "05-storage-lifecycle",
+      "lines": 17,
+      "sha256": "5085e91124a2928ad8f3a36d7965ff3938066e437600ba461f4fc9ea4879f695"
+    },
+    {
+      "path": "src/invoice_referee/storage/local_case_store.py",
+      "owner": "05-storage-lifecycle",
+      "lines": 158,
+      "sha256": "8374f2465be93de30e41a1a04afc689308a0dcb0c554a3001e74bad0afd19d19"
+    },
+    {
+      "path": "src/invoice_referee/storage/local_evidence_repository.py",
+      "owner": "05-storage-lifecycle",
+      "lines": 158,
+      "sha256": "af681072640d491acdbf8efce0f1ad8cbc55566788b4a7d0ed2891fd8bd23ad9"
+    },
+    {
+      "path": "src/invoice_referee/storage/sqlite_settlement_repository.py",
+      "owner": "05-storage-lifecycle",
+      "lines": 1279,
+      "sha256": "7a88599035415b0823bb9117c3c6df35466178dc849b2c4ea8d523f8033c6bb9"
+    },
+    {
+      "path": "tests/integration/test_fastapi_app.py",
+      "owner": "08-tests",
+      "lines": 274,
+      "sha256": "cc6243a08be847f23d8dd75bd29b9f39f073458a050da5fb294fb2b08ec0fe2d"
+    },
+    {
+      "path": "tests/integration/test_streamlit_app.py",
+      "owner": "08-tests",
+      "lines": 190,
+      "sha256": "7d705eb3c7e2fa7621721b3a6eddf8e92d74dfc76cc6b9d2f5bd30ed2afa8ffa"
+    },
+    {
+      "path": "tests/unit/test_accounting_case_view.py",
+      "owner": "08-tests",
+      "lines": 159,
+      "sha256": "f56efd449278fd52ce2a35342608940ced1959097667dd7335f5dac81a11c906"
+    },
+    {
+      "path": "tests/unit/test_accounting_review.py",
+      "owner": "08-tests",
+      "lines": 132,
+      "sha256": "ee7553d8fa876e872aa1743d2e367e73f5e8bf098e5cb05886f5f6e8636eec56"
+    },
+    {
+      "path": "tests/unit/test_bbox_overlay.py",
+      "owner": "08-tests",
+      "lines": 43,
+      "sha256": "621aa3360e9d94662ab8f48e59948c3f311e9b916aef986a220491a483e84f24"
+    },
+    {
+      "path": "tests/unit/test_document_validity.py",
+      "owner": "08-tests",
+      "lines": 315,
+      "sha256": "5ab301e473780f8f2220c67ef4ff49981797425b64c8cd6f88e513f807676571"
+    },
+    {
+      "path": "tests/unit/test_evidence_repository.py",
+      "owner": "08-tests",
+      "lines": 68,
+      "sha256": "3a86b32c65f80404a30280c5b60ecdef265656de2d922f5534565f2994b1ca9b"
+    },
+    {
+      "path": "tests/unit/test_inventory_policy.py",
+      "owner": "08-tests",
+      "lines": 395,
+      "sha256": "3d72b663e627f8f0a3d370b7bc6a0fc787a3b091f0d82e3e11cf16f06daf07ee"
+    },
+    {
+      "path": "tests/unit/test_kimi_reasoning.py",
+      "owner": "08-tests",
+      "lines": 350,
+      "sha256": "e4772f39053638444b3e9b5e3fd98bb4b34825df39f41a87960724f02b2ba1b1"
+    },
+    {
+      "path": "tests/unit/test_local_case_store.py",
+      "owner": "08-tests",
+      "lines": 39,
+      "sha256": "83b295efc997bce85a0fa771d17623a4b616c764da688b0700ea202be907b4f9"
+    },
+    {
+      "path": "tests/unit/test_mistral_ocr.py",
+      "owner": "08-tests",
+      "lines": 82,
+      "sha256": "4dbfc30359b307bc15fea792345a6b9a6e8c37843e1e59a2004be5742a69dae3"
+    },
+    {
+      "path": "tests/unit/test_network_resilience.py",
+      "owner": "08-tests",
+      "lines": 58,
+      "sha256": "0f8603d00afe71eac9f4a49f5dfdec96b68ba2fd39585d1275caa7817441611a"
+    },
+    {
+      "path": "tests/unit/test_ocr_preview.py",
+      "owner": "08-tests",
+      "lines": 54,
+      "sha256": "f25af1353b5e82c54e93ce504544e183b0f708c3b35002ace08ef5d50dd9776e"
+    },
+    {
+      "path": "tests/unit/test_ocr_quality.py",
+      "owner": "08-tests",
+      "lines": 78,
+      "sha256": "c9b980d3fc0b3119232db489497c66e315ae368fe943ec0ccd04caef6fa34678"
+    },
+    {
+      "path": "tests/unit/test_paper_evidence_matching.py",
+      "owner": "08-tests",
+      "lines": 312,
+      "sha256": "e0b04ba14aec59a462c48f8e66a78b51f9558728004cba72f0301ec7a34f3cf6"
+    },
+    {
+      "path": "tests/unit/test_process_case.py",
+      "owner": "08-tests",
+      "lines": 904,
+      "sha256": "f2588f5bb32c3fb51cf080782ff8e8a18617daac37cc8d1a693028689defb141"
+    },
+    {
+      "path": "tests/unit/test_settlement_policy.py",
+      "owner": "08-tests",
+      "lines": 291,
+      "sha256": "228db8d59521740234bc9d848561ef5c44b1aba993ac4b790d7cd4887b78efd3"
+    },
+    {
+      "path": "tests/unit/test_settlement_summary.py",
+      "owner": "08-tests",
+      "lines": 55,
+      "sha256": "6364ccc900ebb2bad6d91a938281197197bdbcb6d547d6948ed0067415b4b189"
+    },
+    {
+      "path": "tests/unit/test_sqlite_settlement_repository.py",
+      "owner": "08-tests",
+      "lines": 902,
+      "sha256": "4541dbd925e5647317cd6f0c27c88b86c0546a7fb075fe34b44dcafc27070abd"
+    },
+    {
+      "path": "tests/unit/test_submit_case.py",
+      "owner": "08-tests",
+      "lines": 79,
+      "sha256": "91dbac0e1fc8752f738bd8dc7eb9f61f8d9a35784c23c2704b093abeb4d7c974"
+    },
+    {
+      "path": "tests/unit/test_uc3_testcase_catalog.py",
+      "owner": "08-tests",
+      "lines": 55,
+      "sha256": "48f417207c97c658f9d3ebef452405b03606f0cbc417e4298380eb3c9e01aaef"
+    },
+    {
+      "path": "tests/unit/test_word_block_mapper.py",
+      "owner": "08-tests",
+      "lines": 135,
+      "sha256": "5a05368c16d35c48d6f3889d0a7192b99bbbd268008f730c26cf5d1679d2d0f2"
+    },
+    {
+      "path": "tests/unit/test_word_confidence.py",
+      "owner": "08-tests",
+      "lines": 65,
+      "sha256": "bffb271a6e944d5624e5a88eb04e2576e59ce1d357a3904ac52789170e541a29"
+    },
+    {
+      "path": "tools/generate_uc3_testcases_v2.py",
+      "owner": "09-data-tooling",
+      "lines": 991,
+      "sha256": "c76434466e00b5f5512f0a5bf82e8935e9d40f149de9fbc5a5ff30aac63ba73a"
+    },
+    {
+      "path": "requirements.txt",
+      "owner": "15-experiments-environment",
+      "lines": 11,
+      "sha256": "1d49aaed98146b65390b31754c96132837684a10ac05580b4fbff3627c6ced81"
+    },
+    {
+      "path": "notebooks/easyocr_hoa_don.ipynb",
+      "owner": "15-experiments-environment",
+      "lines": 399,
+      "sha256": "a2a5c05f69e63981224ef2fd2c654031ad09dde69573f911b4ef7cf086e3e1dd",
+      "code_cells": 9,
+      "code_lines": 84,
+      "note": "physical JSON lines include persisted outputs; review all code/markdown cells, do not execute or treat outputs as current runtime evidence"
+    },
+    {
+      "path": "notebooks/test_kimi_vision.ipynb",
+      "owner": "15-experiments-environment",
+      "lines": 243,
+      "sha256": "3090724230af4fc14a310c1228a49ec87fcbefa8d9c17d5d52324ef58c939841",
+      "code_cells": 4,
+      "code_lines": 112,
+      "note": "physical JSON lines include persisted outputs; review all code/markdown cells, do not execute or treat outputs as current runtime evidence"
+    }
+  ],
+  "initial_file_count": 94,
+  "final_file_count": 97,
+  "core_lines": 21196,
+  "notebook_code_cells": 13,
+  "notebook_code_lines": 196
+}

@@ -1,0 +1,1225 @@
+{
+  "source_head": "1ee33487e2770ebd9e5ae65b994bbd3f3a4dd7a8",
+  "errors": [],
+  "cases": [
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC01",
+      "gold_path": "data/testcase_uc3/TC01_hợp_lệ_nhân_viên_hoàn_trả_tiền_thừa/expected.json",
+      "automation_decision": "AUTO_PROCESS",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC02",
+      "gold_path": "data/testcase_uc3/TC02_hợp_lệ_công_ty_thanh_toán_thêm/expected.json",
+      "automation_decision": "AUTO_PROCESS",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC03",
+      "gold_path": "data/testcase_uc3/TC03_hợp_lệ_không_phát_sinh_chênh_lệch/expected.json",
+      "automation_decision": "AUTO_PROCESS",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC04",
+      "gold_path": "data/testcase_uc3/TC04_hợp_lệ_nhiều_mặt_hàng_thiết_bị/expected.json",
+      "automation_decision": "AUTO_PROCESS",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC05",
+      "gold_path": "data/testcase_uc3/TC05_tổng_các_dòng_trên_báo_cáo_không_khớp/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_TOTAL_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC06",
+      "gold_path": "data/testcase_uc3/TC06_chênh_lệch_quyết_toán_ghi_sai/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_SETTLEMENT_DIFF_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC07",
+      "gold_path": "data/testcase_uc3/TC07_số_tiền_bằng_chữ_trên_báo_cáo_không_khớp/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_CONSISTENCY_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC08",
+      "gold_path": "data/testcase_uc3/TC08_báo_cáo_và_hóa_đơn_lệch_số_tiền/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_AMOUNT_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC09",
+      "gold_path": "data/testcase_uc3/TC09_mã_số_thuế_người_mua_thuộc_công_ty_khác/expected.json",
+      "automation_decision": "ESCALATE",
+      "primary_rule": "SET_BUYER_TAX_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC10",
+      "gold_path": "data/testcase_uc3/TC10_hóa_đơn_thiếu_mã_số_thuế_người_mua/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_REQUIRED_FIELD_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC11",
+      "gold_path": "data/testcase_uc3/TC11_số_học_trên_hóa_đơn_không_nhất_quán/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_ARITH_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC12",
+      "gold_path": "data/testcase_uc3/TC12_hóa_đơn_trùng_định_danh_với_hồ_sơ_trước/expected.json",
+      "automation_decision": "ESCALATE",
+      "primary_rule": "SET_DUP_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC13",
+      "gold_path": "data/testcase_uc3/TC13_khoản_chi_rượu_bia_cần_chuyển_policy/expected.json",
+      "automation_decision": "ESCALATE",
+      "primary_rule": "SET_CATEGORY_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC14",
+      "gold_path": "data/testcase_uc3/TC14_tổng_hồ_sơ_vượt_thẩm_quyền_100_triệu/expected.json",
+      "automation_decision": "ESCALATE",
+      "primary_rule": "SET_AUTH_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC15",
+      "gold_path": "data/testcase_uc3/TC15_evidence_cùng_số_tiền_nhưng_sai_nội_dung/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_MATCH_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC16",
+      "gold_path": "data/testcase_uc3/TC16_hợp_lệ_ba_hóa_đơn_trong_một_báo_cáo_công_tác/expected.json",
+      "automation_decision": "AUTO_PROCESS",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC17",
+      "gold_path": "data/testcase_uc3/TC17_hợp_lệ_hóa_đơn_kèm_vé_điện_tử_thay_thế/expected.json",
+      "automation_decision": "AUTO_PROCESS",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC18",
+      "gold_path": "data/testcase_uc3/TC18_hợp_lệ_một_dòng_dùng_hai_tài_liệu_thay_thế/expected.json",
+      "automation_decision": "AUTO_PROCESS",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC19",
+      "gold_path": "data/testcase_uc3/TC19_thiếu_chứng_từ_và_không_có_lý_do_cho_một_dòng/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_EVIDENCE_REQUIRED"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC20",
+      "gold_path": "data/testcase_uc3/TC20_có_lý_do_cho_dòng_không_có_chứng_từ/expected.json",
+      "automation_decision": "ACCOUNTANT_REVIEW",
+      "primary_rule": "SET_PAPER_EVIDENCE_EXCEPTION"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC21",
+      "gold_path": "data/testcase_uc3/TC21_một_hóa_đơn_được_khai_báo_nhưng_chưa_đính_kèm/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_EVIDENCE_MISSING_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC22",
+      "gold_path": "data/testcase_uc3/TC22_một_hóa_đơn_bị_dùng_vượt_giá_trị_cho_hai_dòng/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_EVIDENCE_REUSE_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC23",
+      "gold_path": "data/testcase_uc3/TC23_hợp_lệ_một_hóa_đơn_phân_bổ_cho_nhiều_dòng/expected.json",
+      "automation_decision": "AUTO_PROCESS",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC24",
+      "gold_path": "data/testcase_uc3/TC24_có_hóa_đơn_đính_kèm_nhưng_không_xuất_hiện_trên_report/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_UNREFERENCED_EVIDENCE_001"
+    },
+    {
+      "corpus": "testcase_uc3",
+      "case_id": "TC25",
+      "gold_path": "data/testcase_uc3/TC25_tài_liệu_thay_thế_lệch_số_tiền_với_report/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_ALTERNATIVE_AMOUNT_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "01_quyet_toan_so_tien-TC01",
+      "gold_path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc01_hoan_tra_tien_thua/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "01_quyet_toan_so_tien-TC02",
+      "gold_path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc02_cong_ty_thanh_toan_them/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "01_quyet_toan_so_tien-TC03",
+      "gold_path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc03_khong_chenh_lech/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "01_quyet_toan_so_tien-TC04",
+      "gold_path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc04_nhieu_dong_hop_le/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "01_quyet_toan_so_tien-TC05",
+      "gold_path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc05_tong_dong_khong_khop/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_TOTAL_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "01_quyet_toan_so_tien-TC06",
+      "gold_path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc06_chenh_lech_ghi_sai/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_SETTLEMENT_DIFF_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "01_quyet_toan_so_tien-TC07",
+      "gold_path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc07_so_tien_bang_chu_khong_khop/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_CONSISTENCY_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "01_quyet_toan_so_tien-TC08",
+      "gold_path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc08_thieu_so_tien_tam_ung/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_ADV_AMOUNT_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "01_quyet_toan_so_tien-TC09",
+      "gold_path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc09_thieu_tong_cong/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_TOTAL_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "01_quyet_toan_so_tien-TC10",
+      "gold_path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc10_vuot_tham_quyen/expected.json",
+      "automation_decision": "ESCALATE",
+      "primary_rule": "SET_AUTH_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "02_hop_le_chung_tu-TC01",
+      "gold_path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc01_hoa_don_dien_tu_day_du/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "02_hop_le_chung_tu-TC02",
+      "gold_path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc02_hoa_don_thieu_mst_nguoi_mua/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_DOCUMENT_REQUIRED_FIELDS_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "02_hop_le_chung_tu-TC03",
+      "gold_path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc03_mst_nguoi_mua_khac/expected.json",
+      "automation_decision": "RECOMMEND_REJECT",
+      "primary_rule": "SET_BUYER_IDENTITY_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "02_hop_le_chung_tu-TC04",
+      "gold_path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc04_hoa_don_thieu_so/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_DOCUMENT_REQUIRED_FIELDS_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "02_hop_le_chung_tu-TC05",
+      "gold_path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc05_mst_nguoi_ban_sai_dinh_dang/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_DOCUMENT_REQUIRED_FIELDS_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "02_hop_le_chung_tu-TC06",
+      "gold_path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc06_ve_may_bay_hop_le/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "02_hop_le_chung_tu-TC07",
+      "gold_path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc07_chuyen_khoan_chua_thanh_cong/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_DOCUMENT_VALIDITY_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "02_hop_le_chung_tu-TC08",
+      "gold_path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc08_khong_phan_loai_duoc_chung_tu/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_DOCUMENT_CLASSIFICATION_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "02_hop_le_chung_tu-TC09",
+      "gold_path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc09_hoa_don_so_hoc_khong_khop/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_DOCUMENT_CONSISTENCY_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "02_hop_le_chung_tu-TC10",
+      "gold_path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc10_nguoi_mua_khach_le/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_DOCUMENT_REQUIRED_FIELDS_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "03_policy_khoan_chi-TC01",
+      "gold_path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc01_taxi_trong_han_muc/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "03_policy_khoan_chi-TC02",
+      "gold_path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc02_taxi_vuot_han_muc/expected.json",
+      "automation_decision": "ESCALATE",
+      "primary_rule": "SET_LIMIT_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "03_policy_khoan_chi-TC03",
+      "gold_path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc03_tiep_khach_trong_han_muc/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "03_policy_khoan_chi-TC04",
+      "gold_path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc04_tiep_khach_vuot_han_muc/expected.json",
+      "automation_decision": "ESCALATE",
+      "primary_rule": "SET_LIMIT_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "03_policy_khoan_chi-TC05",
+      "gold_path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc05_chi_tieu_ca_nhan/expected.json",
+      "automation_decision": "RECOMMEND_REJECT",
+      "primary_rule": "SET_CATEGORY_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "03_policy_khoan_chi-TC06",
+      "gold_path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc06_ruou_bia_theo_chinh_sach/expected.json",
+      "automation_decision": "ACCOUNTANT_REVIEW",
+      "primary_rule": "SET_PROHIBITED_ITEM_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "03_policy_khoan_chi-TC07",
+      "gold_path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc07_nop_dung_han_30_ngay/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "03_policy_khoan_chi-TC08",
+      "gold_path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc08_nop_qua_han_31_ngay/expected.json",
+      "automation_decision": "ACCOUNTANT_REVIEW",
+      "primary_rule": "SET_DEADLINE_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "03_policy_khoan_chi-TC09",
+      "gold_path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc09_ngay_chi_chua_xac_dinh/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_EXPENSE_DATE_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "03_policy_khoan_chi-TC10",
+      "gold_path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc10_danh_muc_chua_xac_dinh/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_CATEGORY_UNKNOWN_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "04_bang_chung_va_matching-TC01",
+      "gold_path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc01_khop_so_hoa_don_va_so_tien/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "04_bang_chung_va_matching-TC02",
+      "gold_path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc02_cung_so_tien_sai_noi_dung/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_MATCH_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "04_bang_chung_va_matching-TC03",
+      "gold_path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc03_khop_so_hoa_don_lech_so_tien/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_AMOUNT_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "04_bang_chung_va_matching-TC04",
+      "gold_path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc04_thieu_chung_tu_khong_ly_do/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_EVIDENCE_REQUIRED"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "04_bang_chung_va_matching-TC05",
+      "gold_path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc05_khong_chung_tu_co_ly_do/expected.json",
+      "automation_decision": "ACCOUNTANT_REVIEW",
+      "primary_rule": "SET_PAPER_EVIDENCE_EXCEPTION"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "04_bang_chung_va_matching-TC06",
+      "gold_path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc06_bang_chung_chuyen_khoan_thay_the/expected.json",
+      "automation_decision": "ACCOUNTANT_REVIEW",
+      "primary_rule": "SET_PAPER_EVIDENCE_EXCEPTION"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "04_bang_chung_va_matching-TC07",
+      "gold_path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc07_ve_dien_tu_thay_the/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "04_bang_chung_va_matching-TC08",
+      "gold_path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc08_chung_tu_dinh_kem_khong_co_tren_report/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_UNMATCHED_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "04_bang_chung_va_matching-TC09",
+      "gold_path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc09_so_hoa_don_khai_bao_nhung_thieu_file/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_EVIDENCE_REQUIRED"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "04_bang_chung_va_matching-TC10",
+      "gold_path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc10_evidence_gan_phu_hop_nhung_mo_ho/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_MATCH_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "05_ho_so_phuc_hop-TC01",
+      "gold_path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc01_ba_hoa_don_cong_tac_hop_le/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "05_ho_so_phuc_hop-TC02",
+      "gold_path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc02_mot_hoa_don_phan_bo_hai_dong/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "05_ho_so_phuc_hop-TC03",
+      "gold_path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc03_phan_bo_vuot_gia_tri_hoa_don/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_EVIDENCE_REUSE_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "05_ho_so_phuc_hop-TC04",
+      "gold_path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc04_mot_dong_hai_hoa_don/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "05_ho_so_phuc_hop-TC05",
+      "gold_path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc05_hoa_don_va_chuyen_khoan/expected.json",
+      "automation_decision": "READY_FOR_APPROVAL",
+      "primary_rule": null
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "05_ho_so_phuc_hop-TC06",
+      "gold_path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc06_hoa_don_trung_voi_ho_so_truoc/expected.json",
+      "automation_decision": "RECOMMEND_REJECT",
+      "primary_rule": "SET_DUPLICATE_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "05_ho_so_phuc_hop-TC07",
+      "gold_path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc07_file_doi_ten_nhung_trung_noi_dung/expected.json",
+      "automation_decision": "RECOMMEND_REJECT",
+      "primary_rule": "SET_DUPLICATE_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "05_ho_so_phuc_hop-TC08",
+      "gold_path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc08_hon_hop_goc_thay_the_khong_chung_tu/expected.json",
+      "automation_decision": "ACCOUNTANT_REVIEW",
+      "primary_rule": "SET_PAPER_EVIDENCE_EXCEPTION"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "05_ho_so_phuc_hop-TC09",
+      "gold_path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc09_chung_tu_dinh_kem_du_thua/expected.json",
+      "automation_decision": "REQUEST_INFO",
+      "primary_rule": "SET_PAPER_UNMATCHED_001"
+    },
+    {
+      "corpus": "testcase_uc3_v2",
+      "case_id": "05_ho_so_phuc_hop-TC10",
+      "gold_path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc10_sai_mst_va_lech_so_tien/expected.json",
+      "automation_decision": "RECOMMEND_REJECT",
+      "primary_rule": "SET_BUYER_IDENTITY_001"
+    }
+  ],
+  "inputs": [
+    {
+      "path": "data/testcase_uc3/TC01_hợp_lệ_nhân_viên_hoàn_trả_tiền_thừa/report_hoan_ung.pdf",
+      "sha256": "6af4c063a3662ad568f30536c58213cb95fd7e48018892ab8f14df7a312d977c"
+    },
+    {
+      "path": "data/testcase_uc3/TC01_hợp_lệ_nhân_viên_hoàn_trả_tiền_thừa/hoa_don_dien_tu.pdf",
+      "sha256": "d8dddd4e839e8fa89c059bee610b9a85457757d577e7ec9ce352c9ad158f3019"
+    },
+    {
+      "path": "data/testcase_uc3/TC02_hợp_lệ_công_ty_thanh_toán_thêm/report_hoan_ung.pdf",
+      "sha256": "5361b509da576e842896bf9df302af98336a76dd4406019af1da50cf3d3fcfe2"
+    },
+    {
+      "path": "data/testcase_uc3/TC02_hợp_lệ_công_ty_thanh_toán_thêm/hoa_don_dien_tu.pdf",
+      "sha256": "03e5473e19ce2c368cc1b696afd21f7e687c8170b094f9b19bbae4c6f4ce1d6d"
+    },
+    {
+      "path": "data/testcase_uc3/TC03_hợp_lệ_không_phát_sinh_chênh_lệch/report_hoan_ung.pdf",
+      "sha256": "18f981f5fd6ecc541d316bdb4a0c8e51f44d5322e2cc69d88dbfebabc24d6b93"
+    },
+    {
+      "path": "data/testcase_uc3/TC03_hợp_lệ_không_phát_sinh_chênh_lệch/hoa_don_dien_tu.pdf",
+      "sha256": "7e21f2f2403196bec51dfa86c0f054671a1466a958a8187feeb1df40530a3011"
+    },
+    {
+      "path": "data/testcase_uc3/TC04_hợp_lệ_nhiều_mặt_hàng_thiết_bị/report_hoan_ung.pdf",
+      "sha256": "c401a2cdd8dcc9e1d48348d1a40df832a2993a331a596538e89ecf020b394f6c"
+    },
+    {
+      "path": "data/testcase_uc3/TC04_hợp_lệ_nhiều_mặt_hàng_thiết_bị/hoa_don_dien_tu.pdf",
+      "sha256": "b8c5b4efa03083986be17496845179ddcb9c5a490dc9d8dd0a23b7c42ceccebf"
+    },
+    {
+      "path": "data/testcase_uc3/TC05_tổng_các_dòng_trên_báo_cáo_không_khớp/report_hoan_ung.pdf",
+      "sha256": "b86695951b340957cba2a39aafc474c77e50d209d9ad2430ff4fe94141378d67"
+    },
+    {
+      "path": "data/testcase_uc3/TC05_tổng_các_dòng_trên_báo_cáo_không_khớp/hoa_don_dien_tu.pdf",
+      "sha256": "6216eae3e32cdf2394d97de0e90ccf0fce60f90596ff230fef1d2db28e96008c"
+    },
+    {
+      "path": "data/testcase_uc3/TC06_chênh_lệch_quyết_toán_ghi_sai/report_hoan_ung.pdf",
+      "sha256": "8ff6df5d8a361ae2d00e2d767f858a6288a0168b227663cfbc11b50b00130c00"
+    },
+    {
+      "path": "data/testcase_uc3/TC06_chênh_lệch_quyết_toán_ghi_sai/hoa_don_dien_tu.pdf",
+      "sha256": "3625468be7503fa3b973b81fdc9740b98c5451acca96d2a073ba490437751890"
+    },
+    {
+      "path": "data/testcase_uc3/TC07_số_tiền_bằng_chữ_trên_báo_cáo_không_khớp/report_hoan_ung.pdf",
+      "sha256": "b86b3fb5efa4467bfad39bd3661134fb3d0f42acad6f0cbc0c93ca261bd7fa9c"
+    },
+    {
+      "path": "data/testcase_uc3/TC07_số_tiền_bằng_chữ_trên_báo_cáo_không_khớp/hoa_don_dien_tu.pdf",
+      "sha256": "26b8605079ac11c75a874e9466abf4391285dcd94994178dd067a014565c47de"
+    },
+    {
+      "path": "data/testcase_uc3/TC08_báo_cáo_và_hóa_đơn_lệch_số_tiền/report_hoan_ung.pdf",
+      "sha256": "2e6cee3a5bfe2d6878ab2a6008845a33a1855152d50589553a2bc41926b3d940"
+    },
+    {
+      "path": "data/testcase_uc3/TC08_báo_cáo_và_hóa_đơn_lệch_số_tiền/hoa_don_dien_tu.pdf",
+      "sha256": "3211a01c1fa54983aeb5809936c1f68396b043ff8395016b937656cfdbf9b817"
+    },
+    {
+      "path": "data/testcase_uc3/TC09_mã_số_thuế_người_mua_thuộc_công_ty_khác/report_hoan_ung.pdf",
+      "sha256": "7b49e2e0168200e6532513d13251a7910e9e58a3e59a3fd1656737fa56f32d5d"
+    },
+    {
+      "path": "data/testcase_uc3/TC09_mã_số_thuế_người_mua_thuộc_công_ty_khác/hoa_don_dien_tu.pdf",
+      "sha256": "bcfa80a1a46117d9c8aa20db1644b74ac67c6193d954432a6184ffa3c5c313e2"
+    },
+    {
+      "path": "data/testcase_uc3/TC10_hóa_đơn_thiếu_mã_số_thuế_người_mua/report_hoan_ung.pdf",
+      "sha256": "082c2147228cd1d5f9ec938008fe0e9d118fc0af4ce931ff4dfd70b22c006cf2"
+    },
+    {
+      "path": "data/testcase_uc3/TC10_hóa_đơn_thiếu_mã_số_thuế_người_mua/hoa_don_dien_tu.pdf",
+      "sha256": "51579a3d6c2e467ff69fb21446ae75e3f8c25588d2066e2401cf194f0b778d8f"
+    },
+    {
+      "path": "data/testcase_uc3/TC11_số_học_trên_hóa_đơn_không_nhất_quán/report_hoan_ung.pdf",
+      "sha256": "6ad1a550687c94c4b2fd08edeed79e52a9cdd5ee4efbd7c8532e23e41e36269f"
+    },
+    {
+      "path": "data/testcase_uc3/TC11_số_học_trên_hóa_đơn_không_nhất_quán/hoa_don_dien_tu.pdf",
+      "sha256": "1ae75778de46915cf9c3434605165fbeed5cced0a7000c566de940b3f0b720c4"
+    },
+    {
+      "path": "data/testcase_uc3/TC12_hóa_đơn_trùng_định_danh_với_hồ_sơ_trước/report_hoan_ung.pdf",
+      "sha256": "02248e2e6963fe3abe8f469762be6f33b255875dd71b768f78c957e169c4b803"
+    },
+    {
+      "path": "data/testcase_uc3/TC12_hóa_đơn_trùng_định_danh_với_hồ_sơ_trước/hoa_don_dien_tu.pdf",
+      "sha256": "45a547bf6e9aba2147adbf431e1759309030087f3301a1906f5e321395cc6620"
+    },
+    {
+      "path": "data/testcase_uc3/TC13_khoản_chi_rượu_bia_cần_chuyển_policy/report_hoan_ung.pdf",
+      "sha256": "9ab08caf796cd86b1535b8629ceb35846d5c4db157c59932ce206bd5391f8c03"
+    },
+    {
+      "path": "data/testcase_uc3/TC13_khoản_chi_rượu_bia_cần_chuyển_policy/hoa_don_dien_tu.pdf",
+      "sha256": "9acf672a2d723d60f16ccdb48eaf1bbf1356d59e6be76adc8bab8c5ad005a5b5"
+    },
+    {
+      "path": "data/testcase_uc3/TC14_tổng_hồ_sơ_vượt_thẩm_quyền_100_triệu/report_hoan_ung.pdf",
+      "sha256": "dedf0e0493e94b4a9443e25defebb78675ade1a7bee74c5948a02885309a9cd6"
+    },
+    {
+      "path": "data/testcase_uc3/TC14_tổng_hồ_sơ_vượt_thẩm_quyền_100_triệu/hoa_don_dien_tu.pdf",
+      "sha256": "4c3abef57943fdb9ea48554df77a6a29b7173a5a54edf6348a3df28ba0feec95"
+    },
+    {
+      "path": "data/testcase_uc3/TC15_evidence_cùng_số_tiền_nhưng_sai_nội_dung/report_hoan_ung.pdf",
+      "sha256": "40845e70cf423ddb1cf94a17642b0031072b5cbcfd09fadf52eba7d6ff4d8da5"
+    },
+    {
+      "path": "data/testcase_uc3/TC15_evidence_cùng_số_tiền_nhưng_sai_nội_dung/hoa_don_dien_tu.pdf",
+      "sha256": "7fb7ec1859d0e2c2d859491617a58dd34c90ab0dafc47add0e676f1ffdf0cedb"
+    },
+    {
+      "path": "data/testcase_uc3/TC16_hợp_lệ_ba_hóa_đơn_trong_một_báo_cáo_công_tác/report_hoan_ung.pdf",
+      "sha256": "2c5da32c468bfd26a816f11ae28307537324131ba2eb57153026f547f3094131"
+    },
+    {
+      "path": "data/testcase_uc3/TC16_hợp_lệ_ba_hóa_đơn_trong_một_báo_cáo_công_tác/hoa_don_khach_san.pdf",
+      "sha256": "689b74e5fc165aaab7bcf3d2dd460cdccc81774459bd886bd9c8c3c83d175b51"
+    },
+    {
+      "path": "data/testcase_uc3/TC16_hợp_lệ_ba_hóa_đơn_trong_một_báo_cáo_công_tác/hoa_don_ve_may_bay.pdf",
+      "sha256": "1b4a595cf05f36ab6b4e6d62d8003b66fdd6404ad020afedf7cbe8d8e7437e52"
+    },
+    {
+      "path": "data/testcase_uc3/TC16_hợp_lệ_ba_hóa_đơn_trong_một_báo_cáo_công_tác/hoa_don_taxi.pdf",
+      "sha256": "3be0d44400459dfb29f7126a9231632249592d54ba3e01082fecd0f2c1e440b3"
+    },
+    {
+      "path": "data/testcase_uc3/TC17_hợp_lệ_hóa_đơn_kèm_vé_điện_tử_thay_thế/report_hoan_ung.pdf",
+      "sha256": "7d5342dda35c90d215449d504295d322b51548f4e11efce5761c5b2a5094f838"
+    },
+    {
+      "path": "data/testcase_uc3/TC17_hợp_lệ_hóa_đơn_kèm_vé_điện_tử_thay_thế/hoa_don_nha_hang.pdf",
+      "sha256": "163a2b5e5bfd6ae2802220c467faa0d96b5260aedaed1140a9dfdc3853eb7a08"
+    },
+    {
+      "path": "data/testcase_uc3/TC17_hợp_lệ_hóa_đơn_kèm_vé_điện_tử_thay_thế/hoa_don_phong_hop.pdf",
+      "sha256": "642502d5821139383386c0550b2e19f02de2546037498fa96959bad5d8e6e01f"
+    },
+    {
+      "path": "data/testcase_uc3/TC17_hợp_lệ_hóa_đơn_kèm_vé_điện_tử_thay_thế/ve_dien_tu_bai_do_xe.pdf",
+      "sha256": "90a29084321eb05883e520a50676b02e81cf7b04f0b9a873eb005f39a3a4c9cd"
+    },
+    {
+      "path": "data/testcase_uc3/TC18_hợp_lệ_một_dòng_dùng_hai_tài_liệu_thay_thế/report_hoan_ung.pdf",
+      "sha256": "a591a6e2311e8baee6e7e467d9ac0a399a09c834ece658bc06895cdf0e9367c0"
+    },
+    {
+      "path": "data/testcase_uc3/TC18_hợp_lệ_một_dòng_dùng_hai_tài_liệu_thay_thế/hoa_don_linh_kien.pdf",
+      "sha256": "10560d52458c84ae384c0f93c567f5afb1046487a03976d9e7c358024b581417"
+    },
+    {
+      "path": "data/testcase_uc3/TC18_hợp_lệ_một_dòng_dùng_hai_tài_liệu_thay_thế/bien_ban_nghiem_thu.pdf",
+      "sha256": "72b46c3a1b9a08d40e6f80d1a85d9f97374b2074466bbed39c0c7f7b6135ea05"
+    },
+    {
+      "path": "data/testcase_uc3/TC18_hợp_lệ_một_dòng_dùng_hai_tài_liệu_thay_thế/xac_nhan_chuyen_khoan.pdf",
+      "sha256": "3f4480a8b2ca5ebcf93767baf2421e38aeb129fa8fd6b885d4280cd748563796"
+    },
+    {
+      "path": "data/testcase_uc3/TC19_thiếu_chứng_từ_và_không_có_lý_do_cho_một_dòng/report_hoan_ung.pdf",
+      "sha256": "490ceb2fd097860b445085f737a3a6976d5fabf25f91844d9dae3ab06f6fb0c2"
+    },
+    {
+      "path": "data/testcase_uc3/TC19_thiếu_chứng_từ_và_không_có_lý_do_cho_một_dòng/hoa_don_khach_san.pdf",
+      "sha256": "b66033f1719320d69930564653b5375ae247c4bc78dbe805131a517cb4e3aa8f"
+    },
+    {
+      "path": "data/testcase_uc3/TC19_thiếu_chứng_từ_và_không_có_lý_do_cho_một_dòng/hoa_don_taxi.pdf",
+      "sha256": "b0cf654f02e40eb12fdab9e51eff2d19759eaee196da816e581a7d2356770e5b"
+    },
+    {
+      "path": "data/testcase_uc3/TC20_có_lý_do_cho_dòng_không_có_chứng_từ/report_hoan_ung.pdf",
+      "sha256": "341b7cb972560d139ddcef74e7845baa2c92a7b0af96fc06f75a0142088958d4"
+    },
+    {
+      "path": "data/testcase_uc3/TC20_có_lý_do_cho_dòng_không_có_chứng_từ/hoa_don_nhien_lieu.pdf",
+      "sha256": "58038726ca102ef4b5da47be0c424b94dfb1f69fe7774104530e83ce515de96f"
+    },
+    {
+      "path": "data/testcase_uc3/TC20_có_lý_do_cho_dòng_không_có_chứng_từ/ve_dien_tu_cao_toc.pdf",
+      "sha256": "e47c995dcaec75ee8d6566d08968d16d1a89914dbc982f0029b446ddf6fe7584"
+    },
+    {
+      "path": "data/testcase_uc3/TC21_một_hóa_đơn_được_khai_báo_nhưng_chưa_đính_kèm/report_hoan_ung.pdf",
+      "sha256": "480b0fce2c74713afd84fe2abd232b5eb406b1fbc378ad9f2e231a7f352275a0"
+    },
+    {
+      "path": "data/testcase_uc3/TC21_một_hóa_đơn_được_khai_báo_nhưng_chưa_đính_kèm/hoa_don_thue_hoi_truong.pdf",
+      "sha256": "6af3f4aeceffa8417bd42b3c53cb70cfedb470d7da9a8eff1e7ed8de9988bd12"
+    },
+    {
+      "path": "data/testcase_uc3/TC21_một_hóa_đơn_được_khai_báo_nhưng_chưa_đính_kèm/hoa_don_in_an.pdf",
+      "sha256": "f62132779909c611156edcd025b5b74a62bfbdd2a0a1fe9d6386754af0900c78"
+    },
+    {
+      "path": "data/testcase_uc3/TC22_một_hóa_đơn_bị_dùng_vượt_giá_trị_cho_hai_dòng/report_hoan_ung.pdf",
+      "sha256": "cb6c3bdb3d6f3afce98a263cbfd3ac382181a6e84424ef2d8c21f806baf1e578"
+    },
+    {
+      "path": "data/testcase_uc3/TC22_một_hóa_đơn_bị_dùng_vượt_giá_trị_cho_hai_dòng/hoa_don_thiet_bi.pdf",
+      "sha256": "dd1a28efe5dd0d4cfefb023527e62c857ec71bea04deaa5f7081f899559e5713"
+    },
+    {
+      "path": "data/testcase_uc3/TC22_một_hóa_đơn_bị_dùng_vượt_giá_trị_cho_hai_dòng/hoa_don_van_chuyen.pdf",
+      "sha256": "bc42a55e74d8f7d2d1b76f74589f8d8aff008e7b3568bebf4e94432269649bcb"
+    },
+    {
+      "path": "data/testcase_uc3/TC23_hợp_lệ_một_hóa_đơn_phân_bổ_cho_nhiều_dòng/report_hoan_ung.pdf",
+      "sha256": "0c7274b30aacae98a01a66dd9cfd362ca46133c1fc02538ea916b10c1013d0ee"
+    },
+    {
+      "path": "data/testcase_uc3/TC23_hợp_lệ_một_hóa_đơn_phân_bổ_cho_nhiều_dòng/hoa_don_van_phong_pham.pdf",
+      "sha256": "294e59c200b0443829683d8c439009ffd240db2e4a5bb7c2f6c9527386c5a9c6"
+    },
+    {
+      "path": "data/testcase_uc3/TC23_hợp_lệ_một_hóa_đơn_phân_bổ_cho_nhiều_dòng/hoa_don_muc_in.pdf",
+      "sha256": "0c94bce5a697c9d5249ad40596fbc74a136778c6941a34f97169402ef5649084"
+    },
+    {
+      "path": "data/testcase_uc3/TC24_có_hóa_đơn_đính_kèm_nhưng_không_xuất_hiện_trên_report/report_hoan_ung.pdf",
+      "sha256": "4c641814be9f141606657e2bda91222e47f1dda722e23440d9edc1e026fde154"
+    },
+    {
+      "path": "data/testcase_uc3/TC24_có_hóa_đơn_đính_kèm_nhưng_không_xuất_hiện_trên_report/hoa_don_khach_san.pdf",
+      "sha256": "dcdf79e819850526f3d9a16929c2e23e6001d0c456df62e5393184e469ad3031"
+    },
+    {
+      "path": "data/testcase_uc3/TC24_có_hóa_đơn_đính_kèm_nhưng_không_xuất_hiện_trên_report/hoa_don_taxi.pdf",
+      "sha256": "322544a0fc8a6aaddccfbbbbe3840f862c62b64c20c07de759c48b27a5bb6575"
+    },
+    {
+      "path": "data/testcase_uc3/TC24_có_hóa_đơn_đính_kèm_nhưng_không_xuất_hiện_trên_report/hoa_don_khong_khai_bao.pdf",
+      "sha256": "a2b479db87e131e5eb2e514c7fb8108136ea29ddb0842f864e4c6e977ebd2357"
+    },
+    {
+      "path": "data/testcase_uc3/TC25_tài_liệu_thay_thế_lệch_số_tiền_với_report/report_hoan_ung.pdf",
+      "sha256": "6dc3ba18fdc7d42ab40b9c56fa8d20a9d0c6fbc934cb6e59862d3d30b29b4872"
+    },
+    {
+      "path": "data/testcase_uc3/TC25_tài_liệu_thay_thế_lệch_số_tiền_với_report/hoa_don_ve_tau.pdf",
+      "sha256": "9b1ee2de2ed767f294ee53ae223aadef11753fa7579a82b98c1d6644ac925944"
+    },
+    {
+      "path": "data/testcase_uc3/TC25_tài_liệu_thay_thế_lệch_số_tiền_với_report/hoa_don_khach_san.pdf",
+      "sha256": "1f7ae1d7951ab4f4d4ba9494349cbbc9e83c8d8bcf1973cbc00d1dcecb578d60"
+    },
+    {
+      "path": "data/testcase_uc3/TC25_tài_liệu_thay_thế_lệch_số_tiền_với_report/phieu_thu_di_chuyen.pdf",
+      "sha256": "5ecb81997c968f5636ded712b09f80777e0bbce602df7d6eccf73146c12366de"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc01_hoan_tra_tien_thua/request_form.pdf",
+      "sha256": "e7626f55113de93ee5677b5f89fd775fdabe54bcdf82e626ed9b0d6e297505be"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc01_hoan_tra_tien_thua/hoa_don_0001701.pdf",
+      "sha256": "be124a6d91f740e082d74e8ee87e0e3eb51cf234c2856086fac5536b77c26779"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc02_cong_ty_thanh_toan_them/request_form.pdf",
+      "sha256": "f6968baef16395dc1413ecb644c84e68f81d2fe9f9f1d5417c7101a191ee80b6"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc02_cong_ty_thanh_toan_them/hoa_don_0001702.pdf",
+      "sha256": "8471174a1216aeace0dca16795e5397d4d5cf9d256e666a9af52f8b57796d037"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc03_khong_chenh_lech/request_form.pdf",
+      "sha256": "19d0b75f947a6a48d4138907f34dd0b50b5b840fdf56d9da871dcee538730940"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc03_khong_chenh_lech/hoa_don_0001703.pdf",
+      "sha256": "69a35451422a75731ffc7bdc8a5a8af701c1beec54e4d09670857331052554e2"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc04_nhieu_dong_hop_le/request_form.pdf",
+      "sha256": "209b131dc047c8e4df43bae5ba8c9c9053028c9ac0a0fdc2fe65cf727bb3eb19"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc04_nhieu_dong_hop_le/hoa_don_0001704.pdf",
+      "sha256": "8b7fa13e53bbc13dc0c4b088a6ebbe374711331b5c3f319d5b1c19ebb294b357"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc04_nhieu_dong_hop_le/hoa_don_0001705.pdf",
+      "sha256": "d77919c778b38b7a9216e66c21f680fc2b1d8a342780bbc3e3c05405c9281b3c"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc04_nhieu_dong_hop_le/hoa_don_0001706.pdf",
+      "sha256": "8850e96456c0263c258f2538a0923c52a7af734913b23bd9295dbbccd95bf793"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc05_tong_dong_khong_khop/request_form.pdf",
+      "sha256": "e9bf2afb5eb039e262a617004a368863fb2e7132752b786ade929f59ae8b9b98"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc05_tong_dong_khong_khop/hoa_don_0001707.pdf",
+      "sha256": "dbffc9bd1681c5e199868b5064a500610476c381afec0af39cf40321a0178486"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc05_tong_dong_khong_khop/hoa_don_0001708.pdf",
+      "sha256": "f36a14b96760f50bba08a4ed14e7d60686529d377c6391f1eefe2dcbaffe874a"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc06_chenh_lech_ghi_sai/request_form.pdf",
+      "sha256": "52dc54427ffbe2eea0cd85978430b8d409c5bdbe4a75a892bdced57a887756cf"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc06_chenh_lech_ghi_sai/hoa_don_0001709.pdf",
+      "sha256": "252e733d24b5ff844a59210204b7c8da7a1a7d6da1b0e776360ee910d53c2dce"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc07_so_tien_bang_chu_khong_khop/request_form.pdf",
+      "sha256": "2e4f04d35b53307f5c5652d389609b0f302d07e5658a56967acf79e27158c954"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc07_so_tien_bang_chu_khong_khop/hoa_don_0001710.pdf",
+      "sha256": "aa0cc680fca5438a286c46fc0977809252e8d9ef8604689cc7fc673a2973223e"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc08_thieu_so_tien_tam_ung/request_form.pdf",
+      "sha256": "0aaab97d18560466a3743a8344f7f05bc7e38ea80206b38431dbd4376ccd221b"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc08_thieu_so_tien_tam_ung/hoa_don_0001711.pdf",
+      "sha256": "0a2fc986b5e150ce23a00ca6421fe7fe924084aff2b3350cc5ed4a4e42350d9e"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc09_thieu_tong_cong/request_form.pdf",
+      "sha256": "59bdd7229568ccf3a0c92659ee1ae4d40610adcbd0ef62e2a57d5108e75b0157"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc09_thieu_tong_cong/hoa_don_0001712.pdf",
+      "sha256": "2b85c54b46c9d6d3342cce3cda9324bd6dee1063d78019982935e1df90a34136"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc10_vuot_tham_quyen/request_form.pdf",
+      "sha256": "867bf1fe3c6e46422b2355130c48a5bf4e576ad6d0fb716e134911418c4b4dac"
+    },
+    {
+      "path": "data/testcase_uc3_v2/01_quyet_toan_so_tien/01_quyet_toan_so_tien-tc10_vuot_tham_quyen/hoa_don_0001713.pdf",
+      "sha256": "562c483b281b5ffe8c24056ae96cd8d47737acdfa0fcf6ced70a2399e410f96e"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc01_hoa_don_dien_tu_day_du/request_form.pdf",
+      "sha256": "ca7f2aa436f200088622a7af0d42ed0a4f965c62638fe3461e02e65048a31c70"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc01_hoa_don_dien_tu_day_du/hoa_don_0001801.pdf",
+      "sha256": "111e9902b9ee918b5c2f781b2b011da043c1fb49b5fc6c4c39e05464a17e61e6"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc02_hoa_don_thieu_mst_nguoi_mua/request_form.pdf",
+      "sha256": "e02819021e1eed8b834cc2b447fd4979381a095475ffbbc953924d6218f4b090"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc02_hoa_don_thieu_mst_nguoi_mua/hoa_don_0001802.pdf",
+      "sha256": "dab070e6cfff302e223cf865617488338f68752d03fb7e6670a8196633863987"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc03_mst_nguoi_mua_khac/request_form.pdf",
+      "sha256": "44addda42b316043feaad245be87f14305033a3169f03007823f14053097b431"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc03_mst_nguoi_mua_khac/hoa_don_0001803.pdf",
+      "sha256": "1e54f4abf7af98bd957b9e48e637c3d434f56ea813951b319c7de0b2abe4315d"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc04_hoa_don_thieu_so/request_form.pdf",
+      "sha256": "4929b2832c72802fb7d5718c174ecafc9bd7ce5da71f8dd31a071b185a0ecf0a"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc04_hoa_don_thieu_so/hoa_don_thieu_so.pdf",
+      "sha256": "7d34d913a64ebc3238b783c557d015567c2a0e01770e9a875ae72c4ca79d27d1"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc05_mst_nguoi_ban_sai_dinh_dang/request_form.pdf",
+      "sha256": "46f57c3b2141665fbef3b3e1bd0f07930a378c24f8436f2fd91d9c7ddabc7e97"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc05_mst_nguoi_ban_sai_dinh_dang/hoa_don_0001805.pdf",
+      "sha256": "32e4f7f13cdab07660d2f8c3952a68aa3aa7e36643dc2f2158d8851a4a502e00"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc06_ve_may_bay_hop_le/request_form.pdf",
+      "sha256": "d46daa30d96bcc7b400d36f622821d8c401aec088aaa41a3164e22ccbb068b05"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc06_ve_may_bay_hop_le/chung_tu_VN-ABC123.pdf",
+      "sha256": "ff1510f391c2fa1958906e5c6befdd8a3a97b4a5dcb711b9c1d4eb987de256ab"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc07_chuyen_khoan_chua_thanh_cong/request_form.pdf",
+      "sha256": "0ced1adbb4928ee0da73e6909c54105d35b7d70485b6adcbe260d165b512d4e4"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc07_chuyen_khoan_chua_thanh_cong/chung_tu_GD-1807.pdf",
+      "sha256": "391f51ef0bfce156b0321d183a57bc44af87ff96031751100e8074f60b6a88e3"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc08_khong_phan_loai_duoc_chung_tu/request_form.pdf",
+      "sha256": "ee4ba53430b8a07979e04b34ef3b7591319bdea6f1eb13e3b11fe3f66c388f69"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc08_khong_phan_loai_duoc_chung_tu/chung_tu_DOC-1808.pdf",
+      "sha256": "5181b9b0db4b6d1a4b724c914f3f867a326c07a40777a02eb3690b7354a51754"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc09_hoa_don_so_hoc_khong_khop/request_form.pdf",
+      "sha256": "e525400af8f7b9312c515dee3d8a3ebf38c7aea1714a7897874c611f8b52f497"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc09_hoa_don_so_hoc_khong_khop/hoa_don_0001809.pdf",
+      "sha256": "2f658c51f6597eabb722befe893fcf141344ce75793bb9f28b74aaabc1de5f69"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc10_nguoi_mua_khach_le/request_form.pdf",
+      "sha256": "31ad28ac78ecc716361a9a81677d34d190f572b28f03eaa98585245bb284c71f"
+    },
+    {
+      "path": "data/testcase_uc3_v2/02_hop_le_chung_tu/02_hop_le_chung_tu-tc10_nguoi_mua_khach_le/hoa_don_0001810.pdf",
+      "sha256": "0a37a1be7f02aec854a271954c139aaf035079a5cd9330c1232fdc3cd0d3c300"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc01_taxi_trong_han_muc/request_form.pdf",
+      "sha256": "23cae15aaf1111a94a2d71afcf73da6d823c187c278890c487d2e8f64fdb1f73"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc01_taxi_trong_han_muc/hoa_don_0001901.pdf",
+      "sha256": "20f4a5ec9db7677875427b461d31b6523c67f9071f12e4ccb0c9e425ce58e5f2"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc02_taxi_vuot_han_muc/request_form.pdf",
+      "sha256": "2210322b52c413d40032c651b6008f64eb91b5d26acb54e531395475b67ab025"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc02_taxi_vuot_han_muc/hoa_don_0001902.pdf",
+      "sha256": "cb8c3da8b526caa3e2c0642e379748420200c882997ae3c1a0ea1fd06b767726"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc03_tiep_khach_trong_han_muc/request_form.pdf",
+      "sha256": "72c439b913ce17101c4c3adbf14f1e4b49fced67578a55398a9208255877b6cb"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc03_tiep_khach_trong_han_muc/hoa_don_0001903.pdf",
+      "sha256": "4dc9c8915ce0d12f8469162a2738cce5d3cc8b8790e182bd75d8038527a80c4c"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc04_tiep_khach_vuot_han_muc/request_form.pdf",
+      "sha256": "9c75b38a80793bc86a16bae011ad9338a0e559c16d818ca56d7a5a79cc5ef6f2"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc04_tiep_khach_vuot_han_muc/hoa_don_0001904.pdf",
+      "sha256": "7af612d94a65f37046ac86c3156323aaadc0784b28771fac66503aad23db05df"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc05_chi_tieu_ca_nhan/request_form.pdf",
+      "sha256": "f758dafcab464a3ef4e01e99932da4acf2c49f0955932204746a648b350ac15b"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc05_chi_tieu_ca_nhan/hoa_don_0001905.pdf",
+      "sha256": "a8499faa6049b56563c15ebce6c9a804958b1a814120dbb94b486211fa0812ca"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc06_ruou_bia_theo_chinh_sach/request_form.pdf",
+      "sha256": "3c8db440de9ddeb1aa4bf1981b16b38824c6a905f60b06e898221f8296049129"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc06_ruou_bia_theo_chinh_sach/hoa_don_0001906.pdf",
+      "sha256": "bdb8ab3fd0e495ff98a22496d34fb70450ff54d3831519059d376efdc2028a69"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc07_nop_dung_han_30_ngay/request_form.pdf",
+      "sha256": "7e18690134c4142cd473f83659dfa9a6df61956daa7f9aac3630feb9570d031d"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc07_nop_dung_han_30_ngay/hoa_don_0001907.pdf",
+      "sha256": "716af7771cc240015c14d095e73ac2e22d8dd2879f215ea4c301b000dcc1b118"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc08_nop_qua_han_31_ngay/request_form.pdf",
+      "sha256": "87db7954a0a176b03b4a79cb7cca7ddfaf9db256f602f38c7ad6453135737c53"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc08_nop_qua_han_31_ngay/hoa_don_0001908.pdf",
+      "sha256": "9dd70928da2ce497556547261fe27c9eca09d3b6cf7de4a52eacf93b3a3ace32"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc09_ngay_chi_chua_xac_dinh/request_form.pdf",
+      "sha256": "2aaaa8ec7a491f4d27f472db4c8be940572dad1fd111808ca86c6c5364b526f5"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc09_ngay_chi_chua_xac_dinh/hoa_don_0001909.pdf",
+      "sha256": "70b0071943d31e82f3c10e0c919abefbc4ab19ba08281f3ffe6345ec6e653cc9"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc10_danh_muc_chua_xac_dinh/request_form.pdf",
+      "sha256": "ac093a6480fb10df7330706f5b2760aadb2cfeb20c2c5330da121372eae62370"
+    },
+    {
+      "path": "data/testcase_uc3_v2/03_policy_khoan_chi/03_policy_khoan_chi-tc10_danh_muc_chua_xac_dinh/hoa_don_0001910.pdf",
+      "sha256": "c7620b70507826001df4519aac14825f143b77e038b78d08263857ba0bee662d"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc01_khop_so_hoa_don_va_so_tien/request_form.pdf",
+      "sha256": "6a7747a726ed00891e30bb315354bfa292eef6649f3a408807e153db844964e5"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc01_khop_so_hoa_don_va_so_tien/hoa_don_0002001.pdf",
+      "sha256": "ae525ba5ed8af7ed50b1331007c235e4d736642dd1f88630ec6d57a5e3dfef49"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc02_cung_so_tien_sai_noi_dung/request_form.pdf",
+      "sha256": "fd0f1dafc288ef264bdeafc5095dd16454c7b3007ee5adf70ff4b27a72424a7c"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc02_cung_so_tien_sai_noi_dung/hoa_don_0002002.pdf",
+      "sha256": "93b0cae488f0bd938c7e994138d855cba8eb453dd7010de9f8f401c9f2b453d8"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc03_khop_so_hoa_don_lech_so_tien/request_form.pdf",
+      "sha256": "5a8a446be83f1e706deafa9ef1cb27a7a308d3659662f3407266c9b15589b810"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc03_khop_so_hoa_don_lech_so_tien/hoa_don_0002003.pdf",
+      "sha256": "2cd7a8d3aefbeb19c864e46388d247407146fe79e39cf03266c438350951ac09"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc04_thieu_chung_tu_khong_ly_do/request_form.pdf",
+      "sha256": "75e0f1d8ff5a62e2bd44b70c4dbc98ff579100310cc54645361dce0d80267f2d"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc05_khong_chung_tu_co_ly_do/request_form.pdf",
+      "sha256": "08844a5c2c0537907bc05eb150a60882352972d184c4a3743176b0133895d486"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc06_bang_chung_chuyen_khoan_thay_the/request_form.pdf",
+      "sha256": "27e5c230f032f4a0e95be6b29322349fd48c7ac0dcfcc92430da8e8ae33b46e0"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc06_bang_chung_chuyen_khoan_thay_the/chung_tu_GD-2006.pdf",
+      "sha256": "d50f84e5963e7ee1bfab91caeb3d7f94823999edc48141a7dbf040bd0c096a0d"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc07_ve_dien_tu_thay_the/request_form.pdf",
+      "sha256": "d0e6cc1569daabce2eeb8148d450ca6e0e5ca6f74e25bec8157e7ba97bd91242"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc07_ve_dien_tu_thay_the/chung_tu_VDT-2007.pdf",
+      "sha256": "01625322fe513caf143d09b5f3aed91c52a239f75a1e75ee9f7278f916d43290"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc08_chung_tu_dinh_kem_khong_co_tren_report/request_form.pdf",
+      "sha256": "a90fdee867bf83fe2c15a317ca8622e1c3ebc53327ff5db4e1d762ee19269302"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc08_chung_tu_dinh_kem_khong_co_tren_report/hoa_don_0002008.pdf",
+      "sha256": "ab66723d9fde4f96422738d52d5fb404947d8f8db54bebee8eb640a4afcfb781"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc08_chung_tu_dinh_kem_khong_co_tren_report/hoa_don_0002099.pdf",
+      "sha256": "ee5e74ec7173ff97965a78233d0879b0340d842219a453e8fb42d5c26eb7727a"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc09_so_hoa_don_khai_bao_nhung_thieu_file/request_form.pdf",
+      "sha256": "f1ce77e8bc3de890a0671341513adc827b8d955c9ab257bc40be8e6ce1c078f5"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc10_evidence_gan_phu_hop_nhung_mo_ho/request_form.pdf",
+      "sha256": "5461e466682a5372a2db168dd8076483d88b1755c7a54f1e52c824aa01ddbe5d"
+    },
+    {
+      "path": "data/testcase_uc3_v2/04_bang_chung_va_matching/04_bang_chung_va_matching-tc10_evidence_gan_phu_hop_nhung_mo_ho/hoa_don_0002010.pdf",
+      "sha256": "0767c455a3724158a4713f4c3804e9c5cbda81f51f80ab940f2c0d1ea27447ba"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc01_ba_hoa_don_cong_tac_hop_le/request_form.pdf",
+      "sha256": "ced7316d24c26dec7b44f68952510fd7872b62caec46d34540cb6cf5a5d7109a"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc01_ba_hoa_don_cong_tac_hop_le/chung_tu_VN-5001.pdf",
+      "sha256": "489cafe530ade3f2bc2d2df8b3ad7cd7135778b905cfe7ab26ef734ec737be70"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc01_ba_hoa_don_cong_tac_hop_le/hoa_don_0005002.pdf",
+      "sha256": "677add1df91c3526b58480b5a69f46986a139878c4a23a67ab5b544b47c7c4fe"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc01_ba_hoa_don_cong_tac_hop_le/hoa_don_0005003.pdf",
+      "sha256": "cefff61ad39296ac11c1c06de3adb5a41a571dccd2da48193603315e08928e4f"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc02_mot_hoa_don_phan_bo_hai_dong/request_form.pdf",
+      "sha256": "c0513abf3961742dcd4a4723180f75c823d49945d48276e78da196beebe01694"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc02_mot_hoa_don_phan_bo_hai_dong/hoa_don_0005004.pdf",
+      "sha256": "9aaff4f57db9668f00f09d4b0ed414c5a8768e8ae6a769882c9c12b5854d907c"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc03_phan_bo_vuot_gia_tri_hoa_don/request_form.pdf",
+      "sha256": "7bcdb6c402ee4138fe321f32af9ca543e6d7602834a4d60027dec272d696bd02"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc03_phan_bo_vuot_gia_tri_hoa_don/hoa_don_0005005.pdf",
+      "sha256": "f0fb18dbcfd4e27a36d988f810152fe5c2588a5c3930babba53a36e54f538dfe"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc04_mot_dong_hai_hoa_don/request_form.pdf",
+      "sha256": "04a1396e053e63b298915a83358e846e81c608fc093d9dcdd2866ac09e3e72cd"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc04_mot_dong_hai_hoa_don/hoa_don_0005006.pdf",
+      "sha256": "aca8c12fbe648108e2e48c42923c225cb2a47557ee6eff8ce99b6bf1567cab0d"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc04_mot_dong_hai_hoa_don/hoa_don_0005007.pdf",
+      "sha256": "68de3887547ad6f68b9cde841909c17857f51fd2b4f8fc595e79ad8fdc1cce2a"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc05_hoa_don_va_chuyen_khoan/request_form.pdf",
+      "sha256": "cfff9d9d780baea61632d672544b1eefba64febaf6ec7898536aa25048a7315b"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc05_hoa_don_va_chuyen_khoan/hoa_don_0005008.pdf",
+      "sha256": "9d98155f6b2b33e0be7c419ca2b6c88da83d96ab7f605bcd837dd79745948afb"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc05_hoa_don_va_chuyen_khoan/chung_tu_GD-5008.pdf",
+      "sha256": "79c184c539c9d935c4d95213cc64af70371859896b221301c38ebbddb70abaed"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc06_hoa_don_trung_voi_ho_so_truoc/request_form.pdf",
+      "sha256": "92dabf6d635189094c2d414fb8b1967f453af3063e741220bffd99a64a4994d2"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc06_hoa_don_trung_voi_ho_so_truoc/hoa_don_0005009.pdf",
+      "sha256": "140c5ac41b5f9d63b457d5b32378942b2451d64df2e43c6c42cb2a0d0ffe0df2"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc07_file_doi_ten_nhung_trung_noi_dung/request_form.pdf",
+      "sha256": "416f1a34aa7bbfcdf267b0ea4dbbeb85b26805a8badb692141374369ff2ff04a"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc07_file_doi_ten_nhung_trung_noi_dung/ban_sao_hoa_don_0005010.pdf",
+      "sha256": "208e57f6947d4f1e6f618bd8f71dd498011dac386ba938a8cfc2b24fc99ecaa5"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc08_hon_hop_goc_thay_the_khong_chung_tu/request_form.pdf",
+      "sha256": "e0b80cfb20bc9f21841dd0b351a356fd358bf0cd2c8d40c5fd23bd2895919b82"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc08_hon_hop_goc_thay_the_khong_chung_tu/hoa_don_0005011.pdf",
+      "sha256": "fce741186eafaa69db2bc3ccaf59da21d952ca6e922322fd29aa1c37ce8ac3ff"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc08_hon_hop_goc_thay_the_khong_chung_tu/chung_tu_VDT-5012.pdf",
+      "sha256": "a833152c5e954a6168a905c3f5c0e052047da5d643f26250db1da405b2097293"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc09_chung_tu_dinh_kem_du_thua/request_form.pdf",
+      "sha256": "eb16b997c3e2841cf5fc19730afc96635c88e4de807c4a2dce3ceeb26558826b"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc09_chung_tu_dinh_kem_du_thua/hoa_don_0005013.pdf",
+      "sha256": "0c5a9f86969638509f21df706580b01c8cde8be40320d85242ab79429ab11b63"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc09_chung_tu_dinh_kem_du_thua/hoa_don_0005014.pdf",
+      "sha256": "3166615eddbb381334f47754702e20cbbf0a225808f8426510c332e84a843532"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc09_chung_tu_dinh_kem_du_thua/hoa_don_0005015.pdf",
+      "sha256": "d61dc65bf271a46d6ee966e88b933e729d9b633307101477cd3a94f7f39f0f6d"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc10_sai_mst_va_lech_so_tien/request_form.pdf",
+      "sha256": "6725856d286e07c70a5b1a0b83a2e74b2788d0b3023a58ed4c55be1d59f33a49"
+    },
+    {
+      "path": "data/testcase_uc3_v2/05_ho_so_phuc_hop/05_ho_so_phuc_hop-tc10_sai_mst_va_lech_so_tien/hoa_don_0005016.pdf",
+      "sha256": "e784c51a3451de1f91e4c648c574fb24ed3f6b5d4abb87a5aabc699f76448b2a"
+    }
+  ]
+}
