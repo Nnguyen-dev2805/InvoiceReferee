@@ -176,11 +176,8 @@ export function Questions({
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
         <div>
           <h2 id="questions-title" className="text-sm font-bold text-slate-900 tracking-tight">
-            Vấn đề &amp; Câu hỏi giải trình ({caseView.issues.length})
+            Vấn đề cần giải quyết ({caseView.issues.length})
           </h2>
-          <p className="text-xs text-slate-500 font-medium">
-            Giải trình các điểm ngoại lệ để hệ thống đối soát và mở khóa phê duyệt thanh toán
-          </p>
         </div>
       </div>
 
@@ -197,7 +194,7 @@ export function Questions({
             Không có câu hỏi nào thuộc thẩm quyền của vai trò hiện tại.
           </p>
           <p className="text-[11px] text-slate-500">
-            Các vấn đề còn lại đang thuộc thẩm quyền xử lý của Kế toán hoặc Quản trị hệ thống.
+            Các vấn đề còn lại thuộc thẩm quyền xử lý của bộ phận khác.
           </p>
         </div>
       )}

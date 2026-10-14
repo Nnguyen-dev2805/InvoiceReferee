@@ -46,6 +46,29 @@ class BudgetDecision(StrictModel):
     refs: tuple[EvidenceRef, ...] = ()
 
 
+class CategoryPolicy(StrictModel):
+    """A versioned per-item category cap and submission window (T3).
+
+    Imported from Hoangha's accepted rules: work/client meal <=5,000,000 VND per
+    canonical expense, taxi/ride <=2,000,000 VND per canonical expense, and a
+    30-calendar-day submission window from the established expense date. A
+    category with no explicit cap still passes ordinary B/authority gates; it is
+    never an implicit unlimited PASS. Bound to a policy version and scope.
+    """
+
+    id: Id
+    version: str
+    effective_from: UtcDatetime
+    effective_to: UtcDatetime | None = None
+    profile: str | None = None
+    # category -> per-item cap (VND). A category absent from this map has no
+    # separate cap (only the ordinary gates apply).
+    per_item_caps: dict[str, Vnd] = {}
+    submission_window_days: int | None = None
+    # Categories explicitly excluded from business recognition (e.g. PERSONAL).
+    excluded_categories: tuple[str, ...] = ()
+
+
 class ExceptionDecision(StrictModel):
     """A scoped exception: exact rule, expenses, action and maximum effect."""
 

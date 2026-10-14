@@ -47,7 +47,7 @@ DTO có thể có nested types nội bộ, không phải mỗi type/file/service
 | Claim | Căn cứ được nhận | Không đủ riêng lẻ |
 | --- | --- | --- |
 | Incurred expense/T | Final expense document và evidence service/activity incurred hoặc confirmation đúng trách nhiệm | Forecast/request/face value đang tranh chấp |
-| Employee-paid/E candidate | **Policy demo (chốt 14/10/2026): hóa đơn gốc hợp lệ, gắn đúng nhân viên và hồ sơ, là căn cứ khoản nhân viên đã trả** (`EMPLOYEE_PAID_INVOICE`), không cần giấy xác nhận thanh toán riêng; hoặc payment proof ghi payer/amount/expense; hoặc confirmation tài chính hợp lệ; hoặc **lời xác nhận chịu trách nhiệm của nhân viên + chứng từ dịch vụ** trong ngưỡng tự xử lý E<=8tr, abs(S)<=4tr (Q32/ADR007) | Guest/buyer công ty trên invoice không phải người trả; tên/chữ ký/`TM-CK` trên hóa đơn tự nó; lời khai chi tiền ngoài ngưỡng |
+| Employee-paid/E candidate | **Policy demo (chốt 14/10/2026): hóa đơn gốc hợp lệ, gắn đúng nhân viên và hồ sơ, là căn cứ khoản nhân viên đã trả** (`EMPLOYEE_PAID_INVOICE`), không cần giấy xác nhận thanh toán riêng. Hóa đơn **chỉ ghi công ty mua** vẫn bind được bằng **composite**: người đề nghị trên giấy khớp nhân viên, dòng giấy tham chiếu hóa đơn, công ty mua khớp tổ chức scope, không có nguồn trái chiều (T2). Nếu hóa đơn ghi tên người mua khác hoặc nguồn ghi người trả khác → FACT/ngoài scope, không bịa confirmation. Hoặc payment proof ghi payer/amount/expense; hoặc confirmation tài chính hợp lệ; hoặc **lời xác nhận chịu trách nhiệm của nhân viên + chứng từ dịch vụ** trong ngưỡng tự xử lý E<=8tr, abs(S)<=4tr (Q32/ADR007) | Guest/buyer công ty trên invoice không phải người trả; tên/chữ ký/`TM-CK` trên hóa đơn tự nó; lời khai chi tiền ngoài ngưỡng |
 | Company-direct/C | Company supplier payment có binding expense + actor/context đúng scope | Tên công ty trên hóa đơn |
 | A/P/R/received | Confirmed completed transfer/cash receipt/ledger có payer/payee/scope; reversal phải có event gốc | Requested/approved/debit-only/pending |
 | Activity purpose/link | Employee declaration được policy nhận + context compatible, không contradiction | Amount/date giống nhau hoặc opaque LLM confidence |
@@ -68,6 +68,31 @@ material money/source không được bị bỏ rồi kết luận zero. Known u
 affected conclusion. Source encrypted/corrupt/over-limit là processing problem.
 Policy/grant/B có effective interval; policy eligibility theo expense time,
 grant hành động theo decision/commit time; retroactive effect phải explicit.
+
+### 3a. Phạm vi chi phí mở rộng (chốt 14/10/2026, plan general-expense)
+
+Một quy trình quyết toán chi phí công việc do nhân viên trả (có ứng hoặc đã xác
+minh không ứng), gồm công tác, tiếp khách tại chỗ, mua văn phòng phẩm/thiết bị nhỏ
+và dịch vụ vận hành nhỏ. Giữ nguyên 8/4/20 và B độc lập; không mang hạn mức 100tr
+của Hoangha, không bắt routine chờ kế toán duyệt.
+
+- **Hồ sơ hoạt động do server/context sở hữu** (`TRAVEL` hoặc `WORK_EXPENSE`); giấy
+  quyết toán dùng chung (định danh/mục đích/tổng/số bằng chữ) + refinement công tác.
+  Giấy ngoài công tác **không** bị ép khai `trip_*` (T1).
+- **Hạn mức theo loại khoản (mỗi khoản canonical):** tiếp khách/bữa ăn ≤5.000.000 đ;
+  taxi/đi lại ≤2.000.000 đ; **hạn nộp 30 ngày** từ ngày phát sinh có căn cứ; chi cá
+  nhân bị loại khỏi chi phí công việc. Loại không có hạn riêng vẫn qua B/8/4/20 và
+  căn cứ; **không** là PASS vô hạn (T3). Ngày nguồn thiếu là FACT, không thay bằng
+  ngày nộp.
+- **Phân bổ nhiều dòng một chứng từ:** tổng phân bổ không vượt tổng nguồn; chứng từ
+  hỗ trợ (payment proof/acceptance) **không** thành expense thứ hai; nguồn thừa chưa
+  tham chiếu là FACT relevance (T4).
+- **Thiếu chứng từ có lý do (TC20):** FACT trước (dịch vụ/số tiền/người trả chưa
+  xác lập), rồi POLICY đúng rule `expense:missing_required_evidence`; chỉ actor có
+  grant `EXCEPT_POLICY` đúng rule/khoản/scope/effect mới duyệt; từ chối cho
+  disposition loại trừ đã biết. Không màn hình giải trình riêng (T5).
+- **Điểm tự xử lý cuối:** E vượt 8tr là AUTHORITY; |S| vượt 4tr là AUTHORITY; TC14
+  E~121tr/S1tr vượt demo 20tr; TC13 loại chi cá nhân nhưng vẫn quyết toán ứng (T3/T5).
 
 ## 4. Tiền, event và instruction
 

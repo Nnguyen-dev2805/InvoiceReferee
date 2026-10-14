@@ -32,9 +32,16 @@ class OrganizationContext(StrictModel):
     budget_amount: int | None = None
     # Typed records (plan A.1).
     organization_id: str | None = None
+    # The scoped organization's legal name (T2): used to bind a company-buyer-only
+    # invoice to the dossier via composite claimant/company/activity identity.
+    company_name: str | None = None
     activity: dict[str, object] | None = None
     people: tuple[dict[str, object], ...] = ()
     policies: tuple[dict[str, object], ...] = ()
+    # Versioned per-item category caps + submission window (T3). Each entry:
+    # {id, version, effective_from, effective_to?, profile?, per_item_caps?,
+    #  submission_window_days?, excluded_categories?}.
+    category_policies: tuple[dict[str, object], ...] = ()
     budgets: tuple[dict[str, object], ...] = ()
     grants: tuple[dict[str, object], ...] = ()
     ledger: tuple[dict[str, object], ...] = ()

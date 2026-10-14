@@ -66,9 +66,6 @@ export function Execution({
           <h2 id="execution-title" className="text-sm font-bold text-slate-900 tracking-tight">
             Ghi nhận dòng tiền thực tế
           </h2>
-          <p className="text-xs text-slate-500 font-medium">
-            Kế toán ghi nhận ủy nhiệm chi, chuyển khoản ngân hàng hoặc tiền mặt
-          </p>
         </div>
       </div>
 

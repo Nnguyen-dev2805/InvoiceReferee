@@ -112,6 +112,8 @@ class CatalogActivity:
     purpose: str
     status: str
     budget_amount: int | None
+    # Server-owned business profile (T1): TRAVEL or WORK_EXPENSE.
+    profile: str = "TRAVEL"
 
     @property
     def has_budget(self) -> bool:
@@ -298,6 +300,8 @@ class _DemoActivity(_ContextModel):
     occurred_at: datetime | None = None
     purpose: str
     status: Literal["AUTHORIZED", "PROPOSED"] = "AUTHORIZED"
+    # Server-owned business profile (T1); defaults to TRAVEL for older contexts.
+    profile: str = "TRAVEL"
     budget: _DemoBudget | None = None
     # Optional STUB hand-transcription for the dev/UI path (contracts §5).
     transcription: tuple[dict[str, object], ...] | None = None
@@ -409,7 +413,7 @@ class CaseWorkflow:
         )
 
     def _evidence_context(self, job_id: str):
-        """Return (tenant, root_id, sources, source_bytes) for a job, or None."""
+        """Return (tenant, root_id, sources, source_bytes, profile) for a job, or None."""
         from invoice_referee.domain.evidence import SourceRef
 
         connection = self.db.connect()
@@ -421,6 +425,10 @@ class CaseWorkflow:
                 return None
             tenant = str(job["tenant"])
             root_id = str(job["root_id"])
+            case_row = connection.execute(
+                "SELECT profile FROM cases WHERE id = ?", (root_id,)
+            ).fetchone()
+            profile = str(case_row["profile"]) if case_row is not None else None
             sources = tuple(
                 SourceRef(
                     id=row["source_id"],
@@ -446,7 +454,7 @@ class CaseWorkflow:
                     payload = path.read_bytes()
             if payload is not None:
                 source_bytes[source.id] = payload
-        return tenant, root_id, sources, source_bytes
+        return tenant, root_id, sources, source_bytes, profile
 
     def _evidence_basis(self, cx: sqlite3.Connection, tenant: str, root_id: str) -> dict:
         """The input basis (source digest set + case version) for a job (§6)."""
@@ -681,13 +689,13 @@ class CaseWorkflow:
                 budget = activity.budget
                 cx.execute(
                     "INSERT INTO context_activities (activity_id, tenant, name, "
-                    "occurred_at, purpose, budget_amount, budget_effect_from, status) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                    "occurred_at, purpose, budget_amount, budget_effect_from, status, profile) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
                     "ON CONFLICT(tenant, activity_id) DO UPDATE SET name = excluded.name, "
                     "occurred_at = excluded.occurred_at, purpose = excluded.purpose, "
                     "budget_amount = excluded.budget_amount, "
                     "budget_effect_from = excluded.budget_effect_from, "
-                    "status = excluded.status",
+                    "status = excluded.status, profile = excluded.profile",
                     (
                         activity.id,
                         tenant,
@@ -699,6 +707,7 @@ class CaseWorkflow:
                         if budget and budget.effect_from
                         else None,
                         activity.status,
+                        activity.profile,
                     ),
                 )
             # Seed a demo STUB transcription for activities that declare one, so
@@ -802,6 +811,7 @@ class CaseWorkflow:
                 "occurred_at": activity.occurred_at.isoformat() if activity.occurred_at else None,
                 "purpose": activity.purpose,
                 "status": activity.status,
+                "profile": activity.profile,
             }
             for activity in data.activities
         )
@@ -911,6 +921,7 @@ class CaseWorkflow:
                 purpose=row["purpose"],
                 status=row["status"],
                 budget_amount=row["budget_amount"],
+                profile=row["profile"] if "profile" in row.keys() else "TRAVEL",
             )
             for row in rows
         )
@@ -1126,6 +1137,161 @@ class CaseWorkflow:
             method_hint=method_hint,
         )
 
+    async def read_settlement_draft(
+        self,
+        session: DemoSession,
+        root_id: str,
+        uploads: tuple[tuple[str, str, bytes], ...],
+    ) -> dict[str, object]:
+        """Read uploaded settlement documents into a prefilled draft for employee review.
+
+        Extracts employee, activity, trip destination, purpose, dates, line items,
+        incurred total and declared advance from the settlement form and attached invoices.
+        Provider I/O runs OUTSIDE any transaction.
+        """
+        import io
+        import re
+        import pypdf
+
+        connection = self.db.connect()
+        try:
+            row = connection.execute(
+                "SELECT * FROM cases WHERE id = ? AND tenant = ?",
+                (root_id, session.tenant),
+            ).fetchone()
+        finally:
+            connection.close()
+        if row is None:
+            raise NotFoundError("Hồ sơ không tồn tại trong tenant này.")
+
+        draft: dict[str, object] = {
+            "declared_name": None,
+            "destination": None,
+            "activity_name": None,
+            "trip_start": None,
+            "trip_end": None,
+            "occurred_at": None,
+            "declared_purpose": None,
+            "incurred_total": None,
+            "declared_advance": None,
+            "expenses": [],
+            "warnings": [],
+            "invoices": [],
+        }
+
+        expenses: list[dict[str, object]] = []
+        invoices: list[dict[str, object]] = []
+
+        for filename, media, payload in uploads:
+            text = ""
+            if media == "PDF":
+                try:
+                    reader = pypdf.PdfReader(io.BytesIO(payload))
+                    text = "\n".join(p.extract_text() or "" for p in reader.pages)
+                except Exception:
+                    continue
+
+            lower_text = text.lower()
+            if "quyết toán" in lower_text or "đề nghị thanh toán" in lower_text or "bảng kê" in lower_text:
+                name_m = re.search(r"Người đề nghị:\s*([^\n]+)", text, re.IGNORECASE)
+                if name_m:
+                    draft["declared_name"] = name_m.group(1).strip()
+
+                loc_m = re.search(r"Nơi công tác:\s*([^\n]+)", text, re.IGNORECASE)
+                if loc_m:
+                    draft["destination"] = loc_m.group(1).strip()
+                    draft["activity_name"] = f"Công tác {draft['destination']}"
+
+                purp_m = re.search(r"Mục đích:\s*([^\n]+)", text, re.IGNORECASE)
+                if purp_m:
+                    draft["declared_purpose"] = purp_m.group(1).strip()
+
+                date_m = re.search(
+                    r"từ\s*(\d{2}/\d{2}/\d{4})\s*đến\s*(\d{2}/\d{2}/\d{4})", text, re.IGNORECASE
+                )
+                if date_m:
+                    draft["trip_start"] = date_m.group(1)
+                    draft["trip_end"] = date_m.group(2)
+                    d, m, y = date_m.group(1).split("/")
+                    draft["occurred_at"] = f"{y}-{m}-{d}"
+
+                tot_m = re.search(r"Tổng chi phí[^\n\d]*([\d.,]+)\s*đ", text, re.IGNORECASE)
+                if tot_m:
+                    draft["incurred_total"] = int(tot_m.group(1).replace(".", "").replace(",", ""))
+
+                adv_m = re.search(r"tạm ứng[^\n\d]*([\d.,]+)\s*đ", text, re.IGNORECASE)
+                if adv_m:
+                    draft["declared_advance"] = int(adv_m.group(1).replace(".", "").replace(",", ""))
+
+                # Parse table line items: STT, Description, InvoiceNo, Amount
+                raw_lines = [l.strip() for l in text.splitlines() if l.strip()]
+                for i, line in enumerate(raw_lines):
+                    if line.isdigit() and i + 3 < len(raw_lines):
+                        desc = raw_lines[i + 1]
+                        inv = raw_lines[i + 2]
+                        amt_str = raw_lines[i + 3]
+                        m = re.search(r"([\d.,]+)\s*đ?", amt_str)
+                        if m and any(c in inv for c in ["IR", "HD", "0", "1", "2", "-"]):
+                            try:
+                                val = int(m.group(1).replace(".", "").replace(",", ""))
+                                if val > 0:
+                                    expenses.append({
+                                        "description": desc,
+                                        "invoice_no": inv,
+                                        "amount": val,
+                                        "source_filename": filename,
+                                        "status": "CLEAR",
+                                    })
+                            except ValueError:
+                                pass
+
+            elif "hóa đơn" in lower_text or "invoice" in lower_text:
+                inv_no_m = re.search(r"Số hóa đơn:\s*([A-Za-z0-9\-_]+)", text, re.IGNORECASE)
+                seller_m = re.search(r"Đơn vị bán:\s*([^\n]+)", text, re.IGNORECASE)
+                tot_m = re.search(r"Tổng cộng thanh toán\s*([\d.,]+)\s*đ", text, re.IGNORECASE)
+                invoices.append({
+                    "filename": filename,
+                    "invoice_no": inv_no_m.group(1) if inv_no_m else None,
+                    "seller": seller_m.group(1).strip() if seller_m else None,
+                    "amount": int(tot_m.group(1).replace(".", "").replace(",", "")) if tot_m else None,
+                })
+
+        draft["expenses"] = expenses
+        draft["invoices"] = invoices
+
+        for exp in expenses:
+            inv_no = exp.get("invoice_no")
+            if inv_no:
+                matching_inv = next((inv for inv in invoices if inv.get("invoice_no") == inv_no), None)
+                if matching_inv:
+                    exp["matched_invoice"] = matching_inv.get("filename")
+                    exp["seller"] = matching_inv.get("seller")
+                else:
+                    exp["status"] = "WARNING"
+
+        warnings: list[str] = []
+        if draft["declared_advance"] is None:
+            warnings.append("Không trích xuất được số tiền tạm ứng trên giấy; nhân viên vui lòng kiểm tra.")
+        if draft["incurred_total"] is None and expenses:
+            draft["incurred_total"] = sum(int(e["amount"]) for e in expenses if isinstance(e.get("amount"), int))
+
+        draft["warnings"] = warnings
+
+        # Optionally update the case record if new activity name or occurred_at was found
+        if draft.get("activity_name") or draft.get("occurred_at"):
+            with self.db.transaction() as cx:
+                cx.execute(
+                    "UPDATE cases SET activity_name = COALESCE(?, activity_name), "
+                    "activity_occurred_at = COALESCE(?, activity_occurred_at) WHERE id = ?",
+                    (
+                        draft.get("activity_name"),
+                        draft.get("occurred_at"),
+                        root_id,
+                    ),
+                )
+
+        return draft
+
     def _create_draft(
         self,
         cx: sqlite3.Connection,
@@ -1136,9 +1302,17 @@ class CaseWorkflow:
         activity = command.activity_data
         employee = session.actor_id
         known = cx.execute(
-            "SELECT 1 FROM context_activities WHERE activity_id = ? AND tenant = ?",
+            "SELECT profile FROM context_activities WHERE activity_id = ? AND tenant = ?",
             (activity.activity_id, session.tenant),
         ).fetchone()
+        # The activity's business profile is server/context-owned (T1): a known
+        # activity uses its catalog profile; an unknown proposed activity defaults
+        # to the general WORK_EXPENSE profile (not a global TRAVEL).
+        activity_profile = (
+            str(known["profile"])
+            if known is not None and "profile" in known.keys() and known["profile"]
+            else ("TRAVEL" if known is not None else "WORK_EXPENSE")
+        )
         if known is None:
             # ProposedActivity: the draft grants no activity/B authority (§10.4).
             cx.execute(
@@ -1167,7 +1341,7 @@ class CaseWorkflow:
                 session.tenant,
                 employee,
                 activity.activity_id,
-                DEFAULT_ACTIVITY_PROFILE,
+                activity_profile,
                 activity.name,
                 activity.occurred_at.isoformat(),
                 now,

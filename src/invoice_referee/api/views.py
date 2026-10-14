@@ -171,6 +171,7 @@ def session_payload(
                 "purpose": entry.purpose,
                 "status": entry.status,
                 "budget_amount": entry.budget_amount,
+                "profile": entry.profile,
             }
             for entry in workflow.catalog(session.tenant)
         ],

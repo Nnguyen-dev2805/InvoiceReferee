@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, errorMessage } from "./api";
 import { Advance } from "./features/advance";
@@ -17,6 +17,16 @@ import type { CaseView, SessionPayload } from "./types";
 
 export type ViewMode = "dashboard" | "detail" | "intake";
 
+function cleanActorName(name: string): string {
+  return name.replace(/\s*\([^)]*\)\s*$/, "").trim();
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  employee: "Nhân viên",
+  accountant: "Kế toán",
+  approver: "Người phê duyệt",
+};
+
 export default function App() {
   const [session, setSession] = useState<SessionPayload | null>(null);
   const [caseView, setCaseView] = useState<CaseView | null>(null);
@@ -24,7 +34,28 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
   const [isDebugOpen, setIsDebugOpen] = useState(false);
+  const [isPersonaOpen, setIsPersonaOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
+  const personaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (personaRef.current && !personaRef.current.contains(event.target as Node)) {
+        setIsPersonaOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsPersonaOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   const loadSession = useCallback(async () => {
     try {
@@ -96,30 +127,30 @@ export default function App() {
         {session === null ? (
           <p className="text-slate-400 text-xs">Đang kết nối…</p>
         ) : (
-          <div className="flex items-center gap-2.5">
-
+          <div className="flex items-center gap-2">
             {/* Engineer Benchmark Button */}
             <button
               type="button"
               onClick={() => setIsVerifyOpen(true)}
-              className="hidden sm:inline-flex items-center px-2.5 py-1 rounded text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-colors cursor-pointer"
-              title="Mở công cụ kiểm chuẩn độc lập (Benchmark)"
+              className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer"
+              title="Kiểm chuẩn độc lập"
             >
-              Kiểm chuẩn (Verify)
+              Kiểm chuẩn
             </button>
 
-            {/* Debug & Audit Trail Button */}
+            {/* Audit Trail Button */}
             <button
               type="button"
               onClick={() => setIsDebugOpen(true)}
-              className="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-colors cursor-pointer"
-              title="Xem nhật ký kiểm toán và dữ liệu kỹ thuật hồ sơ"
+              className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer"
+              title="Nhật ký kiểm toán"
             >
-              Debug / Audit
+              Kiểm toán
             </button>
 
-            {/* Persona Switcher */}
-            <div className="flex items-center bg-white border border-slate-300 rounded px-2.5 py-1 hover:border-slate-400 transition-colors">
+            {/* Custom Persona Switcher Dropdown */}
+            <div className="relative" ref={personaRef}>
+              {/* Accessible hidden select for backward-compatibility & testing */}
               <label htmlFor="persona-select" className="sr-only">
                 Vai trò người dùng (Persona)
               </label>
@@ -128,14 +159,75 @@ export default function App() {
                 aria-label="Vai trò (demo)"
                 value={session.session.persona}
                 onChange={(event) => void switchPersona(event.target.value)}
-                className="text-xs font-medium text-slate-900 bg-transparent focus:outline-none cursor-pointer"
+                className="sr-only"
+                tabIndex={-1}
               >
                 {session.personas.map((persona) => (
                   <option key={persona.id} value={persona.id}>
-                    {persona.actor_name} ({persona.label})
+                    {cleanActorName(persona.actor_name)} ({persona.label})
                   </option>
                 ))}
               </select>
+
+              {/* Persona Trigger Button */}
+              {(() => {
+                const currentPersonaId = session.session.persona;
+                const roleLabel = ROLE_LABELS[currentPersonaId] ?? currentPersonaId;
+                const currentName = cleanActorName(session.session.actor_name);
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setIsPersonaOpen(!isPersonaOpen)}
+                    className="flex items-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-md px-2.5 py-1 text-xs font-medium text-slate-800 transition-colors cursor-pointer"
+                    aria-expanded={isPersonaOpen}
+                    aria-haspopup="true"
+                    title="Chuyển đổi vai trò"
+                  >
+                    <span className="font-semibold text-slate-900">{currentName}</span>
+                    <span className="text-slate-400">·</span>
+                    <span className="text-slate-500 font-normal">{roleLabel}</span>
+                    <span className="text-slate-400 text-[10px] ml-0.5">▾</span>
+                  </button>
+                );
+              })()}
+
+              {/* Persona Popover Menu */}
+              {isPersonaOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-lg shadow-lg p-1 z-50 select-none">
+                  <div className="space-y-0.5">
+                    {session.personas.map((persona) => {
+                      const isCurrent = persona.id === session.session.persona;
+                      const name = cleanActorName(persona.actor_name);
+                      const role = ROLE_LABELS[persona.id] ?? persona.label;
+                      return (
+                        <button
+                          key={persona.id}
+                          type="button"
+                          onClick={() => {
+                            void switchPersona(persona.id);
+                            setIsPersonaOpen(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-md flex items-center justify-between transition-colors cursor-pointer text-xs ${
+                            isCurrent
+                              ? "bg-slate-100 text-slate-950 font-medium"
+                              : "hover:bg-slate-50 text-slate-700 font-normal"
+                          }`}
+                        >
+                          <span className={isCurrent ? "font-semibold text-slate-900" : "text-slate-800"}>
+                            {name}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[11px] text-slate-400 font-normal">{role}</span>
+                            <span className="w-3 text-right text-slate-900 text-xs font-bold">
+                              {isCurrent ? "✓" : ""}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -171,18 +263,15 @@ export default function App() {
           </main>
         ) : viewMode === "intake" ? (
           <main className="h-[calc(100vh-48px)] overflow-y-auto custom-scrollbar p-6 bg-slate-50 flex justify-center flex-1">
-            <div className="w-full max-w-3xl space-y-4">
+            <div className="w-full max-w-5xl space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                 <button
                   type="button"
                   onClick={() => setViewMode("dashboard")}
                   className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                 >
-                  ← Quay lại Bàn làm việc
+                  ← Quay lại
                 </button>
-                <span className="text-xs font-semibold text-slate-800">
-                  Quy trình nộp đề nghị thanh toán mới
-                </span>
               </div>
               <Intake
                 session={session}
@@ -212,7 +301,7 @@ export default function App() {
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                 >
                   <span className="text-slate-400">←</span>
-                  <span>Quay lại Bàn làm việc</span>
+                  <span>Quay lại</span>
                 </button>
                 <div className="flex items-center gap-2">
                   {caseList.length > 1 && caseView !== null && (

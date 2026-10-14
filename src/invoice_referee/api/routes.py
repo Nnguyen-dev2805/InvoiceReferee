@@ -511,6 +511,30 @@ async def advance_draft(
     return draft._asdict()
 
 
+@router.post("/cases/{root_id}/settlement/draft")
+async def settlement_draft(
+    request: Request,
+    root_id: str,
+    files: list[UploadFile] = File(...),
+) -> dict[str, object]:
+    """Read uploaded settlement documents and return a prefilled draft for review."""
+    session = _require_session(request)
+    workflow = _workflow(request)
+    if not files:
+        raise HTTPException(status_code=400, detail="Chưa chọn chứng từ.")
+    uploads: list[tuple[str, str, bytes]] = []
+    for upload in files:
+        data = await upload.read()
+        media = _sniff_media(data)
+        if media is None:
+            raise HTTPException(status_code=415, detail="Chỉ nhận PDF, PNG hoặc JPEG.")
+        if len(data) > workflow.max_source_bytes:
+            raise HTTPException(status_code=413, detail="Tệp vượt giới hạn dung lượng.")
+        uploads.append((upload.filename or "tep", media, data))
+    draft = await workflow.read_settlement_draft(session, root_id, tuple(uploads))
+    return draft
+
+
 @router.post("/cases/{root_id}/control")
 async def control_case(
     request: Request, root_id: str, payload: views.ControlRequest

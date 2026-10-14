@@ -103,6 +103,8 @@ export interface CatalogActivity {
   purpose: string;
   status: "AUTHORIZED" | "PROPOSED";
   budget_amount: number | null;
+  // Server-owned business profile (T1): TRAVEL or WORK_EXPENSE.
+  profile?: string;
 }
 
 export interface PersonaView {

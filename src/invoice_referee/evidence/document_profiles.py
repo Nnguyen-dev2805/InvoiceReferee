@@ -56,14 +56,23 @@ _COMMON_INVOICE = (
 # SETTLEMENT_FORM: the final workflow's own paper settlement form. Criticality
 # is a lead call (plan E0): identity, trip context, the printed totals and the
 # per-row amount/reference decide the money, so they are critical.
+#
+# T1: the paper contract is COMMON (identity/purpose/total/words) with a
+# travel-specific refinement. Trip fields are required only when the activity
+# profile is TRAVEL; a general (WORK_EXPENSE) paper is not forced to carry trip
+# context (see `required_fields_for`). The stored `required_fields` is the common
+# baseline; the travel refinement adds trip context.
+_SETTLEMENT_FORM_COMMON = (
+    "declared_name",
+    "purpose",
+)
+_SETTLEMENT_FORM_TRAVEL = (
+    "trip_destination",
+    "trip_start",
+    "trip_end",
+)
 _SETTLEMENT_FORM = DocumentProfile(
-    required_fields=(
-        "declared_name",
-        "trip_destination",
-        "trip_start",
-        "trip_end",
-        "purpose",
-    ),
+    required_fields=_SETTLEMENT_FORM_COMMON,
     any_of_fields=("printed_total", "printed_return", "printed_reimbursement"),
     field_importance={
         "declared_name": "CRITICAL",
@@ -98,6 +107,22 @@ _SETTLEMENT_FORM = DocumentProfile(
         "printed_reimbursement": "money",
     },
 )
+
+
+def required_fields_for(document_type: str, activity_profile: str | None) -> tuple[str, ...]:
+    """The required fields for a document type under an activity profile.
+
+    Common settlement fields apply to every profile; the TRAVEL refinement adds
+    trip context. Non-settlement types are profile-agnostic. This keeps one
+    paper contract with a travel-specific refinement rather than a global
+    hard-coded TRAVEL requirement (plan T1).
+    """
+    profile = DOCUMENT_PROFILES.get(document_type)
+    if profile is None:
+        return ()
+    if document_type == "SETTLEMENT_FORM" and activity_profile == "TRAVEL":
+        return _SETTLEMENT_FORM_COMMON + _SETTLEMENT_FORM_TRAVEL
+    return profile.required_fields
 
 _E_INVOICE = DocumentProfile(
     required_fields=("issuer_name", "document_number", "document_date", "total_amount"),

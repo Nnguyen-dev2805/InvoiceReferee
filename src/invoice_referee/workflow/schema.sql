@@ -83,6 +83,9 @@ CREATE TABLE IF NOT EXISTS context_activities (
     budget_amount      INTEGER,
     budget_effect_from TEXT,
     status             TEXT NOT NULL,
+    -- Server-owned business profile (T1): TRAVEL or WORK_EXPENSE. Drives the
+    -- paper contract refinement; never a client-supplied value.
+    profile            TEXT NOT NULL DEFAULT 'TRAVEL',
     -- Activity context is per tenant: the same activity id in another tenant
     -- is a separate (proposed) record, never this tenant's catalog entry.
     PRIMARY KEY (tenant, activity_id)

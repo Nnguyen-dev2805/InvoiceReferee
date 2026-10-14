@@ -21,7 +21,7 @@ from invoice_referee.domain.documents import (
     FieldCandidate,
     OcrSourceResult,
 )
-from invoice_referee.evidence.document_profiles import DOCUMENT_PROFILES
+from invoice_referee.evidence.document_profiles import DOCUMENT_PROFILES, required_fields_for
 from invoice_referee.evidence.ocr_quality import (
     EXACT_ACCOUNTING_VALUE_FIELDS,
     effective_requires_verification,
@@ -70,6 +70,8 @@ def validate_document(
     analysis: DocumentAnalysis,
     ocr: OcrSourceResult,
     review: ConfidenceReview,
+    *,
+    activity_profile: str | None = None,
 ) -> DocumentAnalysis:
     profile = DOCUMENT_PROFILES.get(analysis.document_type)
     critical = profile.critical_fields if profile else frozenset()
@@ -123,7 +125,7 @@ def validate_document(
     # Profile: required fields must be FOUND; any-of sets need at least one.
     if profile is not None:
         found = {f.field for f in new_fields if f.state == "FOUND"}
-        for required in profile.required_fields:
+        for required in required_fields_for(analysis.document_type, activity_profile):
             if required not in found:
                 needs_human = True
                 findings.append(

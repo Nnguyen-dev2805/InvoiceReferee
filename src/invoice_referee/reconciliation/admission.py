@@ -21,7 +21,7 @@ builds the typed input they consume.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import NamedTuple
 
@@ -39,6 +39,7 @@ from invoice_referee.domain.issues import BusinessIssue, ProcessingProblem
 from invoice_referee.domain.organization import OrganizationContext
 from invoice_referee.workflow.context_records import (
     context_budgets,
+    context_category_policies,
     context_coverage,
     context_grants,
     context_ledger,
@@ -73,6 +74,60 @@ def _field(document: DocumentAnalysis, name: str) -> object | None:
     for candidate in document.fields:
         if candidate.field == name and candidate.state == "FOUND":
             return candidate.value
+    return None
+
+
+# Code-owned category keywords (T3), ASCII-normalized to match `_normalize_text`.
+# The model may also propose a category; this is the deterministic fallback over
+# the settlement row + document text.
+_CATEGORY_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("TAXI", ("taxi", "grab", "xe om", "xe cong nghe")),
+    ("WORK_CLIENT_MEAL", ("tiep khach", "an uong", "nha hang", "bua an", "cafe", "chieu dai")),
+    ("LODGING", ("khach san", "luu tru", "hotel", "phong nghi")),
+    ("TRAVEL", ("ve may bay", "ve tau", "ve xe", "di chuyen", "cong tac phi")),
+    ("OFFICE_PURCHASE", ("van phong pham", "may in", "thiet bi", "giay in", "muc in", "mua sam")),
+    ("OPERATIONS", ("sua chua", "bao tri", "in an", "dich vu", "van hanh")),
+    ("PERSONAL", ("ca nhan", "gia dinh")),
+)
+
+
+def _normalize_text(value: object) -> str:
+    import unicodedata
+
+    text = unicodedata.normalize("NFD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return text.lower()
+
+
+def _infer_category(description: str, documents: tuple[DocumentAnalysis, ...]) -> str | None:
+    haystack = _normalize_text(description)
+    for document in documents:
+        for candidate in document.fields:
+            if candidate.state == "FOUND" and candidate.field in ("description", "service_charge"):
+                haystack += " " + _normalize_text(candidate.value)
+        for line in document.line_items:
+            for candidate in line.fields:
+                if candidate.state == "FOUND" and candidate.field == "description":
+                    haystack += " " + _normalize_text(candidate.value)
+    for category, tokens in _CATEGORY_KEYWORDS:
+        if any(token in haystack for token in tokens):
+            return category
+    return None
+
+
+def _source_date(document: DocumentAnalysis | None) -> datetime | None:
+    if document is None:
+        return None
+    for name in ("document_date", "event_at"):
+        raw = _field(document, name)
+        if raw is None:
+            continue
+        text = str(raw)
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+            try:
+                return datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
     return None
 
 
@@ -115,34 +170,100 @@ def _settlement_rows(
 
 
 class _MatchedExpense(NamedTuple):
-    """One admitted cost: its amount, refs and the matched original document."""
+    """One admitted cost: its amount, refs, matched document and row context."""
 
     amount: Decimal
     refs: tuple[EvidenceRef, ...]
     document: DocumentAnalysis | None
+    description: str = ""
+    no_evidence_reason: str | None = None
+    paper_refs: tuple[EvidenceRef, ...] = ()
+
+
+def _normalize_ref(value: str) -> str:
+    import re
+
+    return re.sub(r"[^A-Z0-9]", "", value.upper())
+
+
+def _refs_match(a: str, b: str) -> bool:
+    """Whether two invoice references name the same document.
+
+    A real model may read the invoice number with the serial prefix
+    ("IR26E00000101") while the paper row references the numeric part
+    ("00000101"). Two refs match when normalized they are equal or one is a
+    suffix of the other (the numeric document number is the stable part).
+    """
+    na, nb = _normalize_ref(a), _normalize_ref(b)
+    if not na or not nb:
+        return False
+    return na == nb or na.endswith(nb) or nb.endswith(na)
 
 
 def _match_expense_documents(
     report: ReadResult, paper: DocumentAnalysis | None
 ) -> list[_MatchedExpense]:
-    """One matched original-expense document (with its amount + refs) per cost."""
+    """One admitted cost per settlement row, matched to an original document.
+
+    Each paper row is a cost. A row links to an original document by its invoice
+    reference; an uncovered row is preserved (not silently dropped) so its missing
+    required evidence can be raised as a FACT/POLICY (T5). When the paper has no
+    rows, each original document is its own cost.
+    """
     rows = _settlement_rows(paper)
-    out: list[_MatchedExpense] = []
     original = [
         d for d in report.documents if d.document_type in _ORIGINAL_EXPENSE_TYPES
     ]
+    by_ref: dict[str, DocumentAnalysis] = {}
+    for document in original:
+        number = _field(document, "document_number")
+        if number is not None:
+            by_ref[_normalize_ref(str(number))] = document
+    out: list[_MatchedExpense] = []
+
+    def _find_doc(ref: str) -> DocumentAnalysis | None:
+        for key, document in by_ref.items():
+            if _refs_match(ref, key):
+                return document
+        return None
+    if rows:
+        for line in paper.line_items if paper is not None else ():
+            description = str(_line_field(line, "description") or "")
+            amount = _as_decimal(_line_field(line, "amount"))
+            reason_value = _line_field(line, "no_evidence_reason")
+            reason = str(reason_value) if reason_value is not None else None
+            refs_value = _line_field(line, "invoice_refs") or ()
+            if isinstance(refs_value, str):
+                refs_value = (refs_value,)
+            matched_doc = None
+            for ref in refs_value:
+                matched_doc = _find_doc(str(ref))
+                if matched_doc is not None:
+                    break
+            # The admitted cost is the ROW's stated amount (bounded by the source
+            # total), not the whole document total: two rows may share one invoice
+            # and must not each count the full source (T4, TC23).
+            cost = amount
+            if cost is None and matched_doc is not None:
+                cost = _as_decimal(_field(matched_doc, "total_amount"))
+            if cost is None:
+                continue
+            out.append(_MatchedExpense(
+                cost, _document_refs(matched_doc) if matched_doc is not None else (),
+                matched_doc, description, reason,
+            ))
+        # Any original document not referenced by a row is a relevance FACT (T4,
+        # TC24): preserved as a zero-cost marker is wrong, so it is reported and
+        # NOT admitted as a second cost.
+        matched_docs = {id(d.document) for d in out if d.document is not None}
+        return out, tuple(d for d in original if id(d) not in matched_docs)
+    # No paper rows: each original document is its own cost.
     for document in original:
         total = _as_decimal(_field(document, "total_amount"))
         if total is None:
             continue
-        out.append(_MatchedExpense(total, _document_refs(document), document))
-    # When the paper states rows but no document matched, fall back to the row's
-    # own stated amount so an unresolved-but-present row is not silently zero.
-    if not out:
-        for description, amount, refs in rows:
-            if amount is not None:
-                out.append(_MatchedExpense(amount, (), None))
-    return out
+        out.append(_MatchedExpense(total, _document_refs(document), document, ""))
+    return out, ()
 
 
 def coverage_is_valid(
@@ -267,32 +388,90 @@ def _claimant_binding_issue(
     return None
 
 
+def _buyer_name(document: DocumentAnalysis) -> str | None:
+    value = _field(document, "buyer_name")
+    return str(value) if value is not None else None
+
+
+def _invoice_binding(
+    document: DocumentAnalysis | None,
+    paper: DocumentAnalysis | None,
+    organization: OrganizationContext,
+    employee: str,
+) -> tuple[bool, BusinessIssue | None]:
+    """Whether a valid invoice binds to the employee, plus any blocking FACT.
+
+    Two ways to bind (T2, demo employee-paid policy):
+    1. the invoice names a buyer PERSON who matches the dossier employee; or
+    2. composite: the invoice names only the company buyer, the company matches the
+       scoped organization identity, the paper claimant matches the employee, and
+       the paper row links the invoice (its invoice reference).
+
+    A present natural-person buyer that mismatches, or a company buyer that
+    mismatches, is a blocking FACT (never a silent pass). An invoice that names
+    neither a buyer person nor a matching company buyer does not bind.
+    """
+    if document is None or document.profile_status != "CLEAR":
+        return False, None
+    if document.document_type not in _ORIGINAL_EXPENSE_TYPES:
+        return False, None
+    if _field(document, "total_amount") is None:
+        return False, None
+    context_name = _claimant_name(organization, employee)
+    if context_name is None:
+        return False, None
+    person = _buyer_person_name(document)
+    if person is not None:
+        if _normalize_name(person[0]) == _normalize_name(context_name):
+            return True, None
+        return False, BusinessIssue(
+            id="issue:fact:claimant-binding", kind="FACT",
+            field_or_rule="expense:claimant_binding", owner="employee",
+            basis=f"Chứng từ ghi người mua '{person[0]}', hồ sơ gắn '{context_name}'.",
+            refs=person[1],
+            question="Xác nhận/correct người mua trên chứng từ hoặc sửa lại cho đúng.",
+        )
+    # Composite binding: company buyer + paper claimant + row invoice link.
+    buyer_company = _buyer_name(document)
+    company_name = organization.company_name
+    if buyer_company is None or company_name is None:
+        return False, None
+    if _normalize_name(buyer_company) != _normalize_name(company_name):
+        return False, BusinessIssue(
+            id="issue:fact:buyer-binding", kind="FACT",
+            field_or_rule="expense:buyer_binding", owner="employee",
+            basis=f"Bên mua trên hóa đơn '{buyer_company}' không khớp tổ chức '{company_name}'.",
+            refs=_document_refs(document)[:1],
+            question="Xác nhận bên mua trên hóa đơn khớp tổ chức của hồ sơ.",
+        )
+    # The paper claimant must match, and a paper row must reference this invoice.
+    if _declared_name(paper) is not None:
+        declared, _ = _declared_name(paper)  # type: ignore[misc]
+        if _normalize_name(declared) != _normalize_name(context_name):
+            return False, None
+    number = _field(document, "document_number")
+    if number is None or paper is None:
+        return False, None
+    target = str(number)
+    for line in paper.line_items:
+        refs_value = _line_field(line, "invoice_refs") or ()
+        if isinstance(refs_value, str):
+            refs_value = (refs_value,)
+        if any(_refs_match(str(r), target) for r in refs_value):
+            return True, None
+    return False, None
+
+
 def _invoice_is_employee_paid_basis(
     document: DocumentAnalysis | None,
     organization: OrganizationContext,
     employee: str,
+    *,
+    paper: DocumentAnalysis | None = None,
 ) -> bool:
-    """Whether a valid, bound, clear original invoice establishes the employee-paid cost.
-
-    Demo policy (user chốt 14/10/2026): a valid invoice bound to the right
-    employee and dossier is accepted as the basis for an employee-paid cost, with
-    no separate payer confirmation. It requires a CLEAR profile, a FOUND total,
-    and — when the invoice names a buyer person — that the buyer binds to the
-    dossier's employee. The company buyer is never a payer.
-    """
-    if document is None or document.profile_status != "CLEAR":
-        return False
-    if document.document_type not in _ORIGINAL_EXPENSE_TYPES:
-        return False
-    if _field(document, "total_amount") is None:
-        return False
-    buyer = _buyer_person_name(document)
-    if buyer is None:
-        return False
-    context_name = _claimant_name(organization, employee)
-    if context_name is None:
-        return False
-    return _normalize_name(buyer[0]) == _normalize_name(context_name)
+    """Whether a valid, bound, clear original invoice establishes the employee-paid cost."""
+    bound, _issue = _invoice_binding(document, paper, organization, employee)
+    return bound
 
 
 def _declared_advance(
@@ -419,6 +598,9 @@ def admit_evidence(
     budgets = context_budgets(organization, activity=scope.activity, digest=org_digest)
     policies = context_policies(organization, digest=org_digest, profile=scope.profile)
     grants = context_grants(organization, digest=org_digest)
+    category_policies = context_category_policies(
+        organization, digest=org_digest, profile=scope.profile
+    )
 
     # Classify each material source as resolved or unresolved.
     material_unresolved = any(
@@ -427,8 +609,53 @@ def admit_evidence(
         d.document_type == "UNKNOWN" for d in report.documents
     )
 
-    matched = _match_expense_documents(report, paper)
+    matched, unreferenced_documents = _match_expense_documents(report, paper)
     claims = _claim_index(confirmations)
+
+    # Allocation: the sum of the rows that share one source must not exceed that
+    # source's total (T4, TC22). A payment proof is not a second invoice, so it is
+    # not counted here (only original-expense types are matched above).
+    allocation_totals: dict[str, int] = {}
+    for entry in matched:
+        if entry.document is None:
+            continue
+        key = entry.document.document_id
+        allocation_totals[key] = allocation_totals.get(key, 0) + int(entry.amount)
+    for entry in matched:
+        if entry.document is None:
+            continue
+        doc_total = _as_decimal(_field(entry.document, "total_amount"))
+        if doc_total is None:
+            continue
+        if allocation_totals[entry.document.document_id] > int(doc_total):
+            issues.append(
+                BusinessIssue(
+                    id=f"issue:fact:allocation:{entry.document.document_id}",
+                    kind="FACT",
+                    field_or_rule=f"expense:allocation:{entry.document.document_id}",
+                    owner="employee",
+                    basis=(
+                        f"Tổng phân bổ {allocation_totals[entry.document.document_id]} vượt "
+                        f"tổng chứng từ {int(doc_total)}."
+                    ),
+                    refs=entry.document.refs,
+                    question="Xác nhận phân bổ các dòng trên chứng từ không vượt tổng chứng từ.",
+                )
+            )
+    # An extra source the paper does not reference is a relevance FACT (TC24),
+    # never silently added as a cost or dropped.
+    for document in unreferenced_documents:
+        issues.append(
+            BusinessIssue(
+                id=f"issue:fact:relevance:{document.document_id}",
+                kind="FACT",
+                field_or_rule=f"expense:relevance:{document.document_id}",
+                owner="employee",
+                basis="Có chứng từ chưa được tham chiếu bởi dòng nào trên giấy đề nghị.",
+                refs=document.refs,
+                question="Xác nhận chứng từ này có liên quan tới hồ sơ hay không (bổ sung/khoanh vùng).",
+            )
+        )
 
     # Claimant binding: any declared person on the paper or on an original
     # document (invoice buyer) must bind to the dossier's responsible employee.
@@ -488,8 +715,38 @@ def admit_evidence(
         claim = matched_claims[index - 1]
         # Demo policy: a valid invoice bound to the right employee/dossier is the
         # employee-paid basis, with no separate payer confirmation (chốt
-        # 14/10/2026). It is a demo-policy basis, never a bank-verified fact.
-        if _invoice_is_employee_paid_basis(entry.document, organization, scope.employee):
+        # 14/10/2026). Composite binding allows a company-buyer-only invoice when
+        # the paper claimant + company identity + row link agree (T2). It is a
+        # demo-policy basis, never a bank-verified fact.
+        invoice_bound, binding_fact = _invoice_binding(
+            entry.document, paper, organization, scope.employee
+        )
+        if binding_fact is not None:
+            issues.append(binding_fact)
+        # A paper row with no matched original evidence is not silently dropped:
+        # its service/value/payment basis is unestablished, so it is a FACT. A
+        # stated reason is a declaration, not proof (T5). The POLICY escalation
+        # (`expense:missing_required_evidence`) and its scoped exception are
+        # applied by the policy engine once the facts are established.
+        if entry.document is None:
+            issues.append(
+                BusinessIssue(
+                    id=f"issue:fact:missing_evidence:{expense_id}",
+                    kind="FACT",
+                    field_or_rule=f"{expense_id}:missing_evidence",
+                    owner="employee",
+                    basis=(
+                        f"Khoản '{entry.description or expense_id}' chưa có chứng từ gốc "
+                        "xác lập dịch vụ/số tiền/nhân viên đã trả."
+                        + (f" Lý do khai: {entry.no_evidence_reason}." if entry.no_evidence_reason else "")
+                    ),
+                    refs=entry.paper_refs,
+                    question=(
+                        "Cung cấp chứng từ gốc hoặc xác lập dịch vụ/số tiền/người trả cho khoản này."
+                    ),
+                )
+            )
+        if invoice_bound:
             payments.append(
                 ExpensePayment(
                     external_key=f"invoice:{scope.activity}:{expense_id}",
@@ -553,6 +810,10 @@ def admit_evidence(
                 eligibility=eligibility,  # type: ignore[arg-type]
                 refs=refs,
                 payment_state=payment_state,  # type: ignore[arg-type]
+                category=_infer_category(
+                    entry.description, (entry.document,) if entry.document else ()
+                ),
+                source_date=_source_date(entry.document),
             )
         )
 
@@ -571,6 +832,7 @@ def admit_evidence(
         policy=policies,
         grants=grants,
         budget=budgets,
+        category_policy=category_policies,
         exceptions=(),
         previous_eligibility=None,
         read_set=read_set,

@@ -28,7 +28,7 @@ async def run_evidence_job(workflow, job_id: str) -> None:
     context = workflow._evidence_context(job_id)
     if context is None:
         return
-    tenant, root_id, sources, source_bytes = context
+    tenant, root_id, sources, source_bytes, activity_profile = context
     reader, classifier, artifacts, provider_mode = workflow._evidence_wiring()
 
     with workflow.db.transaction() as cx:
@@ -43,6 +43,7 @@ async def run_evidence_job(workflow, job_id: str) -> None:
             budget=RunBudget(),
             provider_mode=provider_mode,
             root_id=root_id,
+            activity_profile=activity_profile,
         )
     except Exception as error:  # provider failure -> technical, never a fake success
         with workflow.db.transaction() as cx:

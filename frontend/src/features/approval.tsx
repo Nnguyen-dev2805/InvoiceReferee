@@ -63,11 +63,8 @@ export function Approval({ caseView }: { caseView: CaseView | null }) {
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
         <div>
           <h2 id="approval-title" className="text-sm font-bold text-slate-900 tracking-tight">
-            Lệnh chi / thu cần thực hiện ({active.length})
+            Lệnh chi / thu ({active.length})
           </h2>
-          <p className="text-xs text-slate-500 font-medium">
-            Chỉ thị thanh toán hoặc thu hồi tiền sau khi đối soát xong
-          </p>
         </div>
       </div>
 

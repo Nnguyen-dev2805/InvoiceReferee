@@ -36,9 +36,9 @@ export function parseAuditLine(line: string) {
     let humanAction = rawAction;
     if (rawAction === "CREATE_DRAFT") humanAction = "Khởi tạo hồ sơ nháp";
     else if (rawAction === "ATTACH_SOURCES") humanAction = "Tải lên chứng từ gốc";
-    else if (rawAction === "RECORD_EMPLOYEE_PAID_CLAIMS") humanAction = "Ghi nhận xác nhận thanh toán (Q32)";
+    else if (rawAction === "RECORD_EMPLOYEE_PAID_CLAIMS") humanAction = "Ghi nhận xác nhận thanh toán";
     else if (rawAction === "ASSESS") humanAction = "Thẩm định & Đối soát tài chính";
-    else if (rawAction === "EMERGENCY_STOP" || rawAction === "STOP") humanAction = "Dừng xử lý khẩn cấp (§6)";
+    else if (rawAction === "EMERGENCY_STOP" || rawAction === "STOP") humanAction = "Dừng xử lý khẩn cấp";
     else if (rawAction === "RESUME") humanAction = "Tiếp tục xử lý hồ sơ";
     else if (rawAction === "RECORD_ACTUAL_MONEY") humanAction = "Ghi nhận dòng tiền thực tế";
 
@@ -67,10 +67,10 @@ export function DebugModal({
         <div className="flex items-center justify-between pb-3.5 border-b border-slate-200 shrink-0">
           <div>
             <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-              Nhật ký kiểm toán &amp; Debug hồ sơ
+              Nhật ký kiểm toán
             </h2>
             <p className="text-[11px] text-slate-500 font-medium">
-              Toàn bộ lịch sử can thiệp, mốc thời gian và trạng thái kỹ thuật (Audit Trail)
+              Lịch sử các thao tác và mốc thời gian xử lý (Audit Trail)
             </p>
           </div>
 

@@ -99,6 +99,14 @@ class Expense(StrictModel):
     # portions are verified. Defaults to UNKNOWN so a new/typed expense is never
     # silently treated as paid or as a proven debt (contracts §3).
     payment_state: PaymentState = "UNKNOWN"
+    # Source-backed business category (T3). A code-owned proposal from the source
+    # text; None when the category is not established. The category decides which
+    # per-item cap applies (never a keyword substring in the policy engine).
+    category: str | None = None
+    # The established expense date from the source/validated context. Distinct
+    # from `incurred_at` (the assessment instant); a missing source date is a
+    # FACT, never substituted with the report submit date (T3).
+    source_date: UtcDatetime | None = None
 
 
 class RecordMoneyInput(StrictModel):

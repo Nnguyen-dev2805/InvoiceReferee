@@ -49,7 +49,7 @@ describe("Intake submit uploads pending files", () => {
     vi.stubGlobal("fetch", vi.fn());
     render(<Intake session={SESSION} onCase={() => {}} />);
     expect(screen.queryByRole("button", { name: "Đính kèm" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Nộp hồ sơ" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Đọc chứng từ" })).toBeInTheDocument();
   });
 
   it("uploads the selected file then submits, in that order", async () => {
@@ -66,6 +66,22 @@ describe("Intake submit uploads pending files", () => {
         if (url.endsWith("/sources")) {
           return new Response(JSON.stringify({ case_view: caseView(2, 1) }), { status: 200 });
         }
+        if (url.endsWith("/settlement/draft")) {
+          return new Response(JSON.stringify({
+            declared_name: "Nguyễn Văn A",
+            destination: "Hà Nội",
+            activity_name: "Công tác Hà Nội",
+            trip_start: "06/10/2026",
+            trip_end: "10/10/2026",
+            occurred_at: "2026-10-06",
+            declared_purpose: "Công tác",
+            incurred_total: 3240000,
+            declared_advance: 4000000,
+            expenses: [{ description: "Bữa ăn", invoice_no: "IR26101001", amount: 3240000, status: "CLEAR" }],
+            warnings: [],
+            invoices: [],
+          }), { status: 200 });
+        }
         if (url.endsWith("/submit")) {
           return new Response(JSON.stringify({ case_view: caseView(3, 1) }), { status: 200 });
         }
@@ -76,10 +92,15 @@ describe("Intake submit uploads pending files", () => {
     render(<Intake session={SESSION} onCase={() => {}} />);
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: "Tạo hồ sơ" }));
     const file = new File(["%PDF-1.4 x"], "hd.pdf", { type: "application/pdf" });
     await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), file);
-    await user.click(screen.getByRole("button", { name: "Nộp hồ sơ" }));
+    await user.click(screen.getByRole("button", { name: "Đọc chứng từ" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Xác nhận và nộp hồ sơ" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Xác nhận và nộp hồ sơ" }));
 
     await waitFor(() => {
       expect(calls.some((c) => c.endsWith("/sources"))).toBe(true);
@@ -91,7 +112,8 @@ describe("Intake submit uploads pending files", () => {
     );
   });
 
-  it("sends a typed paid-claim with the server source id and a real quote", async () => {
+  // Temporarily skipped: personal claim section removed from intake UI per user instruction ("bỏ chi tiết bằng cá nhân đi, lát tôi sẽ thêm sau")
+  it.skip("sends a typed paid-claim with the server source id and a real quote", async () => {
     let submitBody: Record<string, unknown> | null = null;
     vi.stubGlobal(
       "fetch",
@@ -140,7 +162,7 @@ describe("Intake submit uploads pending files", () => {
     expect(claims[0]).not.toHaveProperty("verified_by");
   });
 
-  it("does not send a claim when no document is selected", async () => {
+  it.skip("does not send a claim when no document is selected", async () => {
     let submitBody: Record<string, unknown> | null = null;
     vi.stubGlobal(
       "fetch",

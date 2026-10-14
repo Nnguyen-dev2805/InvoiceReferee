@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from invoice_referee.domain.common import EvidenceRef, Fact
 from invoice_referee.domain.finance import CoverageRecord, MoneyEvent
 from invoice_referee.domain.organization import OrganizationContext
-from invoice_referee.domain.policy import BudgetDecision, Grant, PolicyVersion
+from invoice_referee.domain.policy import BudgetDecision, CategoryPolicy, Grant, PolicyVersion
 
 
 def _parse_dt(value: object) -> datetime:
@@ -95,19 +95,29 @@ def _project_relational(
     cx: sqlite3.Connection, context: OrganizationContext, *, tenant: str, digest: str
 ) -> None:
     """Project activity/people/grants/witnesses for the existing commands."""
-    activity = context.activity or {}
-    activity_id = str(activity.get("activity_id") or "")
-    if activity_id:
+    # The primary activity plus any declared additional activities (T1). A
+    # context may name several activities (the demo catalog); each carries its
+    # own server-owned business profile.
+    declared: list[dict[str, object]] = []
+    if context.activity:
+        declared.append(context.activity)
+    declared.extend(context.activities)
+    for activity in declared:
+        activity_id = str(activity.get("activity_id") or activity.get("id") or "")
+        if not activity_id:
+            continue
         authorization = activity.get("authorization")
         budget = _budget_for(context.budgets, activity_id)
+        status = str(activity.get("status") or ("AUTHORIZED" if authorization is not None else "PROPOSED"))
         cx.execute(
             "INSERT INTO context_activities (activity_id, tenant, name, occurred_at, "
-            "purpose, budget_amount, budget_effect_from, status) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+            "purpose, budget_amount, budget_effect_from, status, profile) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(tenant, activity_id) DO UPDATE SET name=excluded.name, "
             "occurred_at=excluded.occurred_at, purpose=excluded.purpose, "
             "budget_amount=excluded.budget_amount, "
-            "budget_effect_from=excluded.budget_effect_from, status=excluded.status",
+            "budget_effect_from=excluded.budget_effect_from, status=excluded.status, "
+            "profile=excluded.profile",
             (
                 activity_id,
                 tenant,
@@ -116,7 +126,8 @@ def _project_relational(
                 str(activity.get("purpose") or ""),
                 int(budget["amount"]) if budget else None,
                 (budget["effect_range"][0] if budget else None),
-                "AUTHORIZED" if authorization is not None else "PROPOSED",
+                status,
+                str(activity.get("profile") or context.profile or "TRAVEL"),
             ),
         )
     for person in context.people:
@@ -211,6 +222,36 @@ def context_policies(
                 effective_to=_parse_dt(policy["effective_to"]) if policy.get("effective_to") else None,
                 profile=str(policy.get("profile") or profile),
                 rules=tuple(str(r) for r in policy.get("rules", [])),
+            )
+        )
+    return tuple(out)
+
+
+def context_category_policies(
+    context: OrganizationContext, *, digest: str, profile: str | None = None
+) -> tuple[CategoryPolicy, ...]:
+    """The versioned category policy in force for this context (T3)."""
+    out: list[CategoryPolicy] = []
+    for policy in context.category_policies:
+        declared_profile = policy.get("profile")
+        if declared_profile is not None and profile is not None and str(declared_profile) != profile:
+            continue
+        out.append(
+            CategoryPolicy(
+                id=str(policy["id"]),
+                version=str(policy.get("version", "v1")),
+                effective_from=_parse_dt(policy["effective_from"]),
+                effective_to=_parse_dt(policy["effective_to"]) if policy.get("effective_to") else None,
+                profile=str(declared_profile) if declared_profile is not None else profile,
+                per_item_caps={
+                    str(k): int(v) for k, v in (policy.get("per_item_caps") or {}).items()
+                },
+                submission_window_days=(
+                    int(policy["submission_window_days"])
+                    if policy.get("submission_window_days") is not None
+                    else None
+                ),
+                excluded_categories=tuple(str(c) for c in policy.get("excluded_categories", [])),
             )
         )
     return tuple(out)

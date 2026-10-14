@@ -197,6 +197,7 @@ async def read_root(
     budget: RunBudget,
     provider_mode: ProviderMode,
     root_id: str = "",
+    activity_profile: str | None = None,
 ) -> "ReadResult":
     """Run the evidence pipeline: OCR -> confidence -> classify -> extract ->
     validate -> match. Stops before reconciliation/policy/finance (plan E7).
@@ -260,7 +261,9 @@ async def read_root(
         if source is None:
             continue
         analysis = await extract_document(source, classification, llm=classifier, budget=budget)
-        analysis = validate_document(analysis, source, review)
+        analysis = validate_document(
+            analysis, source, review, activity_profile=activity_profile
+        )
         documents.append(analysis)
 
     paper = next((d for d in documents if d.document_type == "SETTLEMENT_FORM"), None)

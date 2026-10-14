@@ -52,10 +52,10 @@ export function Verify({
       <div className="flex items-center justify-between pb-3 border-b border-slate-200">
         <div>
           <h2 id="verify-title" className="text-sm font-bold text-slate-900">
-            Kiểm chứng độc lập (Benchmark Runner)
+            Kiểm chuẩn độc lập
           </h2>
           <p className="text-[11px] text-slate-500">
-            Chạy bộ test suite đối soát với gold oracle độc lập (Contracts §7 &amp; §11)
+            Đo lường độ chính xác dựa trên bộ dữ liệu kiểm chuẩn độc lập (Benchmark)
           </p>
         </div>
 

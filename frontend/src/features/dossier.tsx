@@ -3,19 +3,19 @@ import type { CaseView } from "../types";
 
 const STATE_LABELS: Record<string, string> = {
   DRAFT: "Bản nháp",
-  PROCESSING: "Đang xử lý OCR & Thẩm định",
-  EVIDENCE_READY: "Đã đọc xong chứng từ",
-  WAITING: "Chờ người xử lý ngoại lệ",
-  TECHNICAL_ERROR: "Lỗi xử lý kỹ thuật",
-  READY_TO_EXECUTE: "Sẵn sàng duyệt & Thực thi",
-  SETTLED: "Đã cân bằng & Quyết toán",
-  STOPPED: "Đã tạm dừng (§6)",
+  PROCESSING: "Đang xử lý",
+  EVIDENCE_READY: "Đã đọc chứng từ",
+  WAITING: "Chờ xử lý ngoại lệ",
+  TECHNICAL_ERROR: "Lỗi kỹ thuật",
+  READY_TO_EXECUTE: "Sẵn sàng phê duyệt",
+  SETTLED: "Đã quyết toán",
+  STOPPED: "Đã tạm dừng",
 };
 
 const BASIS_LABELS: Record<string, string> = {
   INDEPENDENT_PAYMENT: "Chứng từ thanh toán độc lập",
-  FINANCIAL_CONFIRMATION: "Xác nhận đối soát tài chính",
-  EMPLOYEE_PAID_INVOICE: "Hóa đơn gắn đúng nhân viên (căn cứ theo policy demo)",
+  FINANCIAL_CONFIRMATION: "Đối soát tài chính xác nhận",
+  EMPLOYEE_PAID_INVOICE: "Hóa đơn thanh toán cá nhân",
   EMPLOYEE_DECLARATION_Q32: "Lời xác nhận của nhân viên",
   UNSPECIFIED_LEGACY: "Chưa xác định căn cứ",
 };
@@ -58,7 +58,6 @@ export function MoneyLine({
   label,
   fact,
   highlight = false,
-  subtext,
 }: {
   label: string;
   fact: { value: number | null; state: string };
@@ -69,18 +68,15 @@ export function MoneyLine({
   return (
     <li
       data-testid={`money-${label}`}
-      className={`flex items-center justify-between px-4 py-3 text-xs transition-colors ${
+      className={`flex items-center justify-between px-4 py-2.5 text-xs transition-colors ${
         highlight
           ? "bg-slate-50/80 font-semibold text-slate-900 border-t border-slate-200"
           : "hover:bg-slate-50/50 text-slate-700"
       }`}
     >
-      <div className="flex flex-col pr-4">
-        <span className={highlight ? "font-bold text-slate-900 text-xs" : "text-slate-700 font-medium"}>
-          {label}:
-        </span>
-        {subtext && <span className="text-[11px] text-slate-400 font-normal mt-0.5">{subtext}</span>}
-      </div>
+      <span className={highlight ? "font-bold text-slate-900 text-xs" : "text-slate-700 font-medium"}>
+        {label}:
+      </span>
       <div className="text-right shrink-0">
         <strong
           className={`text-xs ${
@@ -207,16 +203,16 @@ export function Dossier({
         <div className="flex items-center justify-between gap-4">
           <div className="space-y-1">
             <span className="text-[11px] uppercase font-bold tracking-wider text-slate-500 block">
-              Kết luận quyết toán chênh lệch (S)
+              Quyết toán chênh lệch (S)
             </span>
             <p className="text-xs font-medium text-slate-700">
               {isPayToEmployee
-                ? "Công ty cần chi trả bổ sung cho nhân viên:"
+                ? "Công ty chi trả bổ sung cho nhân viên:"
                 : isCollectFromEmployee
-                ? "Nhân viên cần hoàn nộp lại cho công ty:"
+                ? "Nhân viên hoàn nộp lại cho công ty:"
                 : isBalanced
-                ? "Hồ sơ đã cân bằng chính xác, không phát sinh chênh lệch:"
-                : "Số tiền chênh lệch chưa xác minh:"}
+                ? "Hồ sơ đã cân bằng:"
+                : "Số tiền chênh lệch:"}
             </p>
           </div>
           <div className="text-right shrink-0">
@@ -242,7 +238,7 @@ export function Dossier({
             Bảng đối soát chi tiết dòng tiền
           </h3>
           <span className="text-[11px] text-slate-400 font-mono-nums">
-            Đơn vị: VNĐ (Số nguyên)
+            Đơn vị: VNĐ
           </span>
         </div>
 
@@ -256,12 +252,6 @@ export function Dossier({
                   label={MONEY_LABELS[key]}
                   fact={fact}
                   highlight={key === "T" || key === "S" || key === "unpaid"}
-                  subtext={
-                    key === "T" ? "Tổng các khoản chi kê khai trên bảng kê" :
-                    key === "E" ? "Chi phí hợp lệ sau đối soát định mức chính sách" :
-                    key === "A" ? "Tạm ứng ban đầu nhân viên thực nhận" :
-                    key === "S" ? "Chênh lệch quyết toán ròng S = E - A - P + R" : undefined
-                  }
                 />
               ))}
           </ul>

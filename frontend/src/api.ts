@@ -175,6 +175,53 @@ export async function advanceDraft(
   return parse(response);
 }
 
+export interface SettlementExpenseItem {
+  description: string;
+  invoice_no?: string;
+  amount: number;
+  source_filename?: string;
+  status?: string;
+  matched_invoice?: string;
+  seller?: string;
+}
+
+export interface SettlementInvoiceItem {
+  filename: string;
+  invoice_no: string | null;
+  seller: string | null;
+  amount: number | null;
+}
+
+export interface SettlementDraftResponse {
+  declared_name: string | null;
+  destination: string | null;
+  activity_name: string | null;
+  trip_start: string | null;
+  trip_end: string | null;
+  occurred_at: string | null;
+  declared_purpose: string | null;
+  incurred_total: number | null;
+  declared_advance: number | null;
+  expenses: SettlementExpenseItem[];
+  warnings: string[];
+  invoices: SettlementInvoiceItem[];
+}
+
+export async function settlementDraft(
+  rootId: string,
+  files: File[],
+): Promise<SettlementDraftResponse> {
+  const form = new FormData();
+  for (const file of files) form.append("files", file);
+  const response = await fetch(`/api/cases/${rootId}/settlement/draft`, {
+    method: "POST",
+    headers: { "X-Command-Id": newCommandId() },
+    body: form,
+    credentials: "same-origin",
+  });
+  return parse<SettlementDraftResponse>(response);
+}
+
 export async function attachSources(
   rootId: string,
   files: File[],

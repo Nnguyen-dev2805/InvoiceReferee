@@ -98,9 +98,6 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
           <h2 id="advance-title" className="text-sm font-bold text-slate-900 tracking-tight">
             Ghi nhận tiền ứng thực nhận
           </h2>
-          <p className="text-xs text-slate-500 font-medium">
-            Kế toán tải chứng từ ứng, kiểm tra bản nháp và xác nhận. Đã duyệt ứng không tự thành đã nhận.
-          </p>
         </div>
       </div>
 

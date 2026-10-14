@@ -39,9 +39,6 @@ export function Controls({
           <h2 id="controls-title" className="text-sm font-bold text-slate-900 tracking-tight">
             Kiểm soát quy trình hồ sơ
           </h2>
-          <p className="text-xs text-slate-500 font-medium">
-            Tạm dừng khẩn cấp hoặc kích hoạt tiếp tục xử lý hồ sơ
-          </p>
         </div>
       </div>
 

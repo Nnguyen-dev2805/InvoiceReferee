@@ -35,6 +35,7 @@ from invoice_referee.domain.finance import (
 from invoice_referee.domain.issues import BusinessIssue, ProcessingProblem
 from invoice_referee.domain.policy import (
     BudgetDecision,
+    CategoryPolicy,
     ExceptionDecision,
     Grant,
     PolicyVersion,
@@ -102,6 +103,9 @@ class AssessmentInput(StrictModel):
     policy: tuple[PolicyVersion, ...] = ()
     grants: tuple[Grant, ...] = ()
     budget: tuple[BudgetDecision, ...] = ()
+    # Versioned per-item category caps + submission window (T3). Empty means no
+    # category policy is in force for this scope.
+    category_policy: tuple[CategoryPolicy, ...] = ()
     exceptions: tuple[ExceptionDecision, ...] = ()
     previous_eligibility: EligibilityDecision | None = None
     read_set: ReadSet
