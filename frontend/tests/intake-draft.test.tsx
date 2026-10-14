@@ -104,7 +104,7 @@ describe("Intake draft (W5)", () => {
     expect(document.body.textContent ?? "").not.toContain("Cân bằng");
   });
 
-  it("sends the confirmed draft (activity + advance + notes) on submit", async () => {
+  it("sends the confirmed draft (no activity pick, merged purpose, notes) on submit", async () => {
     let submitBody: Record<string, unknown> | null = null;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -114,6 +114,7 @@ describe("Intake draft (W5)", () => {
         declared_name: "NGUYỄN MINH AN", destination: null, activity_name: null, trip_start: null, trip_end: null,
         occurred_at: null, declared_purpose: "Chi phí tiếp khách", incurred_total: 3240000, declared_advance: 4000000,
         expenses: [], warnings: [], invoices: [],
+        link: { status: "NOT_FOUND", activity_id: null, basis: null, candidates: [], reasons: ["Không tìm thấy hồ sơ khớp."], conflicting_fields: [], owner: null, requires_confirmation: false, inherited: false },
       }), { status: 200 });
       if (url.endsWith("/submit")) {
         submitBody = JSON.parse(String(init?.body ?? "{}"));
@@ -126,16 +127,88 @@ describe("Intake draft (W5)", () => {
     await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
     await user.click(screen.getByRole("button", { name: "Đọc chứng từ" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Xác nhận và nộp hồ sơ" })).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText("Hoạt động của hồ sơ"), "activity:tc01");
+    // No standing-activity dropdown in the normal flow; one merged content field.
+    expect(screen.queryByLabelText("Hoạt động của hồ sơ")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Nội dung đề nghị quyết toán:")).toBeInTheDocument();
     await user.clear(screen.getByLabelText("Ứng nhân viên kê khai:"));
     await user.type(screen.getByLabelText("Ứng nhân viên kê khai:"), "4500000");
     await user.type(screen.getByLabelText(/Ghi chú của nhân viên/), "Đã kiểm tra hóa đơn");
     await user.click(screen.getByRole("button", { name: "Xác nhận và nộp hồ sơ" }));
     await waitFor(() => expect(submitBody).not.toBeNull());
     const body = submitBody as unknown as Record<string, unknown>;
-    expect(body.activity_id).toBe("activity:tc01");
+    // The backend owns the link: no activity choice is sent.
+    expect(body.activity_id).toBeNull();
+    expect(body.confirmed_activity_id).toBeNull();
     expect(body.declared_advance).toBe(4_500_000);
     expect(body.original_declared_advance).toBe(4_000_000);
     expect(body.notes).toBe("Đã kiểm tra hóa đơn");
+  });
+
+  it("asks which advance the dossier settles when the link is weak", async () => {
+    let submitBody: Record<string, unknown> | null = null;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/cases")) return new Response(JSON.stringify({ case_view: caseView(1, 0) }), { status: 200 });
+      if (url.endsWith("/sources")) return new Response(JSON.stringify({ case_view: caseView(2, 1) }), { status: 200 });
+      if (url.endsWith("/settlement/draft")) return new Response(JSON.stringify({
+        declared_name: "NGUYỄN MINH AN", destination: null, activity_name: null, trip_start: null, trip_end: null,
+        occurred_at: null, declared_purpose: "Tạm ứng đi công tác", incurred_total: 3240000, declared_advance: 4000000,
+        expenses: [], warnings: [], invoices: [],
+        link: {
+          status: "NEEDS_CONFIRMATION", activity_id: null, basis: null,
+          candidates: [
+            { activity_id: "activity:adv-1", name: "Tạm ứng 1", basis: "WEAK_SIMILARITY", amount: 4000000, occurred_at: "2026-10-01", employee: "employee:a" },
+            { activity_id: "activity:adv-2", name: "Tạm ứng 2", basis: "WEAK_SIMILARITY", amount: 4000000, occurred_at: "2026-10-02", employee: "employee:a" },
+          ],
+          reasons: ["Chỉ có căn cứ yếu."], conflicting_fields: [], owner: "employee",
+          requires_confirmation: true, inherited: false,
+        },
+      }), { status: 200 });
+      if (url.endsWith("/submit")) {
+        submitBody = JSON.parse(String(init?.body ?? "{}"));
+        return new Response(JSON.stringify({ case_view: caseView(3, 1, "PROCESSING") }), { status: 200 });
+      }
+      return new Response("{}", { status: 200 });
+    }));
+    render(<Intake session={SESSION} onCase={() => {}} />);
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
+    await user.click(screen.getByRole("button", { name: "Đọc chứng từ" }));
+    await waitFor(() => expect(screen.getByText("Hồ sơ này quyết toán cho khoản tạm ứng nào?")).toBeInTheDocument());
+    // Submitting without a choice is refused client-side.
+    await user.click(screen.getByRole("button", { name: "Xác nhận và nộp hồ sơ" }));
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(submitBody).toBeNull();
+    // Confirming one candidate forwards only the confirmation.
+    await user.click(screen.getByLabelText(/Tạm ứng 2/));
+    await user.click(screen.getByRole("button", { name: "Xác nhận và nộp hồ sơ" }));
+    await waitFor(() => expect(submitBody).not.toBeNull());
+    const body = submitBody as unknown as Record<string, unknown>;
+    expect(body.activity_id).toBeNull();
+    expect(body.confirmed_activity_id).toBe("activity:adv-2");
+  });
+
+  it("resumes an existing draft case directly into the review step", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/settlement/draft")) {
+        return new Response(JSON.stringify({
+          declared_name: "NGUYỄN MINH AN", destination: null, activity_name: null, trip_start: null, trip_end: null,
+          occurred_at: null, declared_purpose: "Chi phí tiếp khách", incurred_total: 3240000, declared_advance: 4000000,
+          expenses: [{ description: "Chi phí tiếp khách", invoice_no: "00000101", amount: 3240000, status: "CLEAR" }],
+          warnings: [], invoices: [],
+        }), { status: 200 });
+      }
+      return new Response("{}", { status: 200 });
+    }));
+
+    const existingDraft = caseView(2, 2, "DRAFT");
+    render(<Intake session={SESSION} onCase={() => {}} existingCase={existingDraft} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Xác nhận và nộp hồ sơ" })).toBeInTheDocument();
+      expect(screen.getByText("Bản nháp hồ sơ quyết toán")).toBeInTheDocument();
+      expect(screen.getByText("Chi phí tiếp khách")).toBeInTheDocument();
+    });
   });
 });

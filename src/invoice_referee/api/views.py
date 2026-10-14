@@ -65,7 +65,8 @@ class PaidClaimRequest(ApiModel):
 
 
 class SubmitRequest(ApiModel):
-    activity_id: str
+    activity_id: str | None = None
+    confirmed_activity_id: str | None = None
     declared_purpose: str
     notes: str | None = None
     employee_paid_claims: list[PaidClaimRequest] = Field(default_factory=list)
@@ -112,7 +113,9 @@ class MoneyInput(ApiModel):
     # The "record actual money" form's source metadata (plan D): the observed
     # instrument method/status/reference. The server still decides verification.
     instrument_method: Literal["TRANSFER", "CASH"] | None = None
-    instrument_status: Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"] | None = None
+    instrument_status: Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"] | None = (
+        None
+    )
     instrument_reference: str | None = None
 
 
@@ -175,7 +178,9 @@ def session_payload(
             {
                 "id": entry.activity_id,
                 "name": entry.name,
-                "occurred_at": entry.occurred_at.isoformat() if entry.occurred_at else None,
+                "occurred_at": entry.occurred_at.isoformat()
+                if entry.occurred_at
+                else None,
                 "purpose": entry.purpose,
                 "status": entry.status,
                 "budget_amount": entry.budget_amount,

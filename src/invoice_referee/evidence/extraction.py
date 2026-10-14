@@ -85,6 +85,10 @@ _SETTLEMENT_FORM_ALIASES: dict[str, str] = {
     "total_amount_words": "amount_words",
     "advance_amount": "declared_advance",
     "advanced_amount": "declared_advance",
+    "advance_no": "advance_reference",
+    "advance_code": "advance_reference",
+    "advance_ref": "advance_reference",
+    "dossier_no": "advance_reference",
     "refund_amount": "printed_return",
     "return_amount": "printed_return",
     "additional_payment_requested": "printed_reimbursement",
@@ -151,9 +155,7 @@ def _alnum(text: str) -> str:
 
 def _source_pages_text(ocr: OcrSourceResult, page_range: tuple[int, int]) -> str:
     start, end = page_range
-    return "\n".join(
-        page.markdown for page in ocr.pages if start <= page.page <= end
-    )
+    return "\n".join(page.markdown for page in ocr.pages if start <= page.page <= end)
 
 
 def _quote_supported(quote: str, haystack: str) -> bool:
@@ -269,7 +271,11 @@ def _validate_field(
     value = entry.get("value")
     # A FOUND value needs an exact quote from the source AND a value derivable
     # from it; without a quote it cannot be FOUND (plan E5).
-    if not quote or not _quote_supported(quote, haystack) or not _value_supported(value, quote):
+    if (
+        not quote
+        or not _quote_supported(quote, haystack)
+        or not _value_supported(value, quote)
+    ):
         return FieldCandidate(field=field_name, state="UNREADABLE")
     return FieldCandidate(
         field=field_name,
@@ -329,13 +335,14 @@ async def extract_document(
     )
     system = (
         "Extract the fields and the TABLE ROWS of this document from its OCR text. "
-        "Reply as JSON {\"fields\": [...], \"line_items\": [...]}. Each field object "
+        'Reply as JSON {"fields": [...], "line_items": [...]}. Each field object '
         "uses EXACTLY these keys: field (the field name), state (one of FOUND, "
         "NOT_PRESENT, UNREADABLE, AMBIGUOUS, NOT_APPLICABLE), value (only when "
         "state=FOUND), quote (the exact substring copied from the OCR text; "
         "required when state=FOUND), page (1-based). Do not rename these keys "
-        "(never use 'name')." + vocabulary_clause +
-        " Each line_items entry is ONE COST ROW of a table and "
+        "(never use 'name')."
+        + vocabulary_clause
+        + " Each line_items entry is ONE COST ROW of a table and "
         "uses EXACTLY one key: fields, an array of the same field objects for that "
         "row, using row field names description, amount, invoice_refs (an array of "
         "the document-number strings the row references) and no_evidence_reason. "
@@ -359,8 +366,11 @@ async def extract_document(
     document_type = classification.document_type
     fields: list[FieldCandidate] = [
         _validate_field(
-            entry, ocr=ocr, haystack=haystack,
-            default_page=classification.page_range[0], document_type=document_type,
+            entry,
+            ocr=ocr,
+            haystack=haystack,
+            default_page=classification.page_range[0],
+            document_type=document_type,
         )
         for entry in raw_fields
         if isinstance(entry, dict)
@@ -376,8 +386,11 @@ async def extract_document(
         # the same provenance validation as top-level fields (plan E5).
         line_fields = tuple(
             _validate_field(
-                f, ocr=ocr, haystack=haystack,
-                default_page=classification.page_range[0], document_type=document_type,
+                f,
+                ocr=ocr,
+                haystack=haystack,
+                default_page=classification.page_range[0],
+                document_type=document_type,
             )
             for f in entry.get("fields", [])
             if isinstance(f, dict)
@@ -385,7 +398,11 @@ async def extract_document(
         if not line_fields:
             continue
         index = len(lines) + 1
-        lines.append(DocumentLine(id=f"{classification.document_id}:line:{index}", fields=line_fields))
+        lines.append(
+            DocumentLine(
+                id=f"{classification.document_id}:line:{index}", fields=line_fields
+            )
+        )
 
     return DocumentAnalysis(
         source_id=ocr.source_id,

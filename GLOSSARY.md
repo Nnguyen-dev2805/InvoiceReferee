@@ -85,6 +85,14 @@ _Avoid_: Đồng nhất với giao dịch ngân hàng đã được xác minh ho
 Quy ước nghiệp vụ cho demo (chốt 14/10/2026): hóa đơn gốc hợp lệ, gắn đúng nhân viên và hồ sơ, được chấp nhận làm căn cứ khoản chi nhân viên đã thanh toán, không cần giấy xác nhận thanh toán riêng.
 _Avoid_: Gọi là xác minh ngân hàng hoặc tạo giao dịch ngân hàng/confirmation giả; coi bên mua là công ty trên hóa đơn là người trả.
 
+**Liên kết hồ sơ (backend tự quyết)**:
+Việc backend xác định hồ sơ tạm ứng/công việc cho một quyết toán từ căn cứ mạnh (kế thừa/số hồ sơ/mã giao dịch), chỉ hỏi người khi căn cứ yếu hoặc mâu thuẫn.
+_Avoid_: Bắt nhân viên chọn mã hoạt động thường trực; tự gắn theo tên/ngày/số tiền giống nhau hoặc phần tử đầu danh sách.
+
+**Định danh giao dịch ứng**:
+Mã giao dịch/số phiếu có namespace gắn đúng nguồn (`<namespace>:<reference>`), khác với internal event_id do server cấp; thiếu thì giữ chưa giải quyết, không bịa UUID.
+_Avoid_: Dùng UUID thay mã thiếu rồi tuyên bố đã chống trùng; gộp hai nguồn khác namespace vì trùng số.
+
 **Loại tài liệu**:
 Nhãn phân loại nội dung một tài liệu (hóa đơn, biên nhận, vé, chứng từ thanh toán, giấy quyết toán, …), do model đề xuất và code kiểm.
 _Avoid_: Đồng nhất với vai trò chứng cứ của tài liệu đó trong hồ sơ.

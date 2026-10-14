@@ -4,6 +4,13 @@ import { advanceDraft, errorMessage, recordActual } from "../api";
 import { formatVnd } from "../format";
 import type { CaseView } from "../types";
 
+type DraftRef = {
+  source_id: string;
+  source_sha256: string;
+  page: number | null;
+  exact_quote: string;
+};
+
 type Draft = {
   source_id: string;
   amount: number | null;
@@ -15,6 +22,7 @@ type Draft = {
   event_at: string | null;
   missing_fields: string[];
   requires_confirmation: boolean;
+  refs: DraftRef[];
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -30,6 +38,9 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
   const [draft, setDraft] = useState<Draft | null>(null);
   const [amount, setAmount] = useState("");
   const [reference, setReference] = useState("");
+  const [payer, setPayer] = useState("");
+  const [payee, setPayee] = useState("");
+  const [eventAt, setEventAt] = useState("");
   const [status, setStatus] = useState<string>("COMPLETED");
   const [completionClaim, setCompletionClaim] = useState("");
   const [busy, setBusy] = useState(false);
@@ -48,9 +59,12 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
     setSelectedFileName(file.name);
     try {
       const result = await advanceDraft(caseView.id, [file], method);
-      setDraft(result);
+      setDraft({ ...result, refs: result.refs ?? [] });
       setAmount(result.amount !== null ? String(result.amount) : "");
       setReference(result.transaction_reference ?? "");
+      setPayer(result.payer_name ?? "");
+      setPayee(result.payee_name ?? "");
+      setEventAt(result.event_at ?? "");
       setStatus(result.instrument_status);
       setNotice("Đã đọc chứng từ và điền bản nháp. Kiểm tra/sửa rồi xác nhận.");
     } catch (cause) {
@@ -66,26 +80,47 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
       setError("Kế toán cần xác nhận có trách nhiệm đã kiểm tra và giao/nhận tiền.");
       return;
     }
+    // No fabricated identity: a missing transaction code stays an unresolved
+    // draft — the server rejects a UUID minted in place of the real reference.
+    if (reference.trim() === "") {
+      setError("Thiếu mã giao dịch / số phiếu: bổ sung đúng thông tin thiếu, không tự bịa định danh.");
+      return;
+    }
+    if (payer.trim() === "" || payee.trim() === "") {
+      setError("Thiếu bên chi hoặc người nhận trên chứng từ: kế toán xử lý đúng thông tin thiếu.");
+      return;
+    }
+    // The transaction time comes from the source document, never the confirm
+    // moment (recorded_at is the server's own clock).
+    if (eventAt.trim() === "") {
+      setError("Thiếu ngày giao dịch trên chứng từ: bổ sung ngày thực tế, không dùng thời điểm xác nhận.");
+      return;
+    }
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
       const result = await recordActual(caseView.id, {
-        external_key: `${method.toLowerCase()}:${reference || crypto.randomUUID()}`,
+        external_key: `${method.toLowerCase()}:${reference.trim()}`,
         claimed_kind: "ADVANCE_RECEIVED",
         claimed_scope: caseView.activity ?? "",
-        payer: "company:demo",
-        payee: caseView.employee ?? "",
+        payer: payer.trim(),
+        payee: payee.trim(),
         amount: Number(amount),
-        event_at: new Date().toISOString(),
+        event_at: eventAt.trim(),
         completion_claim: completionClaim,
+        refs: draft.refs ?? [],
         reason: "Ghi nhận tiền ứng thực nhận",
         instrument_method: method,
         instrument_status: status,
-        instrument_reference: reference || null,
+        instrument_reference: reference.trim() || null,
       });
       onCase(result.case_view);
-      setNotice("Đã ghi nhận tiền ứng thực nhận.");
+      setNotice(
+        status === "COMPLETED"
+          ? "Đã ghi nhận tiền ứng thực nhận."
+          : "Đã lưu chứng từ để đối chiếu (trạng thái nguồn chưa hoàn tất nên chưa thành ứng thực nhận đã xác minh).",
+      );
       setDraft(null);
       setSelectedFileName(null);
     } catch (cause) {
@@ -210,6 +245,49 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
               />
             </div>
 
+            <div className="sm:col-span-1">
+              <label htmlFor="advance-payer" className="block text-slate-700 font-medium text-xs mb-1">
+                Bên chi (theo chứng từ):
+              </label>
+              <input
+                id="advance-payer"
+                aria-label="Bên chi theo chứng từ"
+                value={payer}
+                onChange={(event) => setPayer(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+              />
+            </div>
+
+            <div className="sm:col-span-1">
+              <label htmlFor="advance-payee" className="block text-slate-700 font-medium text-xs mb-1">
+                Người nhận (theo chứng từ):
+              </label>
+              <input
+                id="advance-payee"
+                aria-label="Người nhận theo chứng từ"
+                value={payee}
+                onChange={(event) => setPayee(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="advance-event-at" className="block text-slate-700 font-medium text-xs mb-1">
+                Ngày giao dịch (theo chứng từ, giữ nguyên):
+              </label>
+              <input
+                id="advance-event-at"
+                aria-label="Ngày giao dịch theo chứng từ"
+                value={eventAt}
+                onChange={(event) => setEventAt(event.target.value)}
+                placeholder="2026-10-05"
+                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+              />
+              <span className="text-[11px] text-slate-400 block mt-1">
+                Giữ ngày trên chứng từ; thời điểm kế toán xác nhận do máy chủ ghi riêng.
+              </span>
+            </div>
+
             <div className="sm:col-span-2">
               <label htmlFor="advance-status" className="block text-slate-700 font-medium text-xs mb-1">
                 Trạng thái theo nguồn:
@@ -225,6 +303,11 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
+              {status !== "COMPLETED" && (
+                <span className="text-[11px] text-amber-800 block mt-1">
+                  Trạng thái chưa hoàn tất: chứng từ được lưu để đối chiếu, chưa thành ứng thực nhận đã xác minh.
+                </span>
+              )}
             </div>
 
             <div className="sm:col-span-2">

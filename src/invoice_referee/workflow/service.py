@@ -54,7 +54,10 @@ from invoice_referee.workflow.controls import (
 )
 from invoice_referee.workflow.db import Database
 from invoice_referee.workflow.money import can_reverse, net_by_kind, verify_money_claim
-from invoice_referee.workflow.instructions import InstructionState, reconcile_instruction
+from invoice_referee.workflow.instructions import (
+    InstructionState,
+    reconcile_instruction,
+)
 
 DEFAULT_TENANT = "tenant:demo"
 DEFAULT_PERSONA = "employee"
@@ -114,10 +117,33 @@ class CatalogActivity:
     budget_amount: int | None
     # Server-owned business profile (T1): TRAVEL or WORK_EXPENSE.
     profile: str = "TRAVEL"
+    # Namespaced advance/dossier references this activity is known by
+    # (e.g. "TU-2026-001"); used for DOCUMENT_REFERENCE linking (14/10/2026).
+    references: tuple[str, ...] = ()
 
     @property
     def has_budget(self) -> bool:
         return self.budget_amount is not None
+
+
+def _activity_references(row) -> tuple[str, ...]:
+    """Parse the server-owned dossier references for one activity row.
+
+    Stored as JSON in ``context_activities.references_json`` (migration v6).
+    A missing column (pre-v6 DB) or bad payload yields no references — never
+    a fabricated link.
+    """
+    try:
+        raw = row["references_json"] if "references_json" in row.keys() else "[]"
+    except (KeyError, TypeError, ValueError):
+        return ()
+    try:
+        values = json.loads(raw or "[]")
+    except (TypeError, ValueError):
+        return ()
+    if not isinstance(values, list):
+        return ()
+    return tuple(str(v) for v in values if isinstance(v, str) and str(v).strip())
 
 
 def default_actor(persona: str, tenant: str) -> str:
@@ -132,7 +158,9 @@ def default_actor(persona: str, tenant: str) -> str:
 
 
 def _root_id(tenant: str, employee: str, activity: str) -> str:
-    digest = hashlib.sha256(f"{tenant}|{employee}|{activity}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(
+        f"{tenant}|{employee}|{activity}".encode("utf-8")
+    ).hexdigest()
     return f"case:{digest[:20]}"
 
 
@@ -169,7 +197,9 @@ def _context_issue(root_id: str) -> BusinessIssue:
     )
 
 
-def _budget_for(budgets: tuple[dict[str, object], ...], activity_id: str) -> dict[str, object] | None:
+def _budget_for(
+    budgets: tuple[dict[str, object], ...], activity_id: str
+) -> dict[str, object] | None:
     for budget in budgets:
         if str(budget.get("activity")) == activity_id:
             return budget
@@ -273,7 +303,9 @@ def _fingerprint(context: CommandContext, command: CaseCommand) -> str:
         "expected_case_version": context.expected_case_version,
         "command": _meaningful_payload(command),
     }
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    canonical = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
@@ -382,7 +414,9 @@ class CaseWorkflow:
         # technical user can find the trace). Never a business field.
         self._last_trace_ref: dict[str, str] = {}
 
-    def enable_live_read(self, transcriber: Callable[..., object], *, provider_mode: str) -> None:
+    def enable_live_read(
+        self, transcriber: Callable[..., object], *, provider_mode: str
+    ) -> None:
         """Wire a read->transcription callable so submit reads real sources.
 
         The callable receives keyword args (sources, budget, provider_mode) and
@@ -493,7 +527,9 @@ class CaseWorkflow:
                 source_bytes[source.id] = payload
         return tenant, root_id, sources, source_bytes, profile
 
-    def _evidence_basis(self, cx: sqlite3.Connection, tenant: str, root_id: str) -> dict:
+    def _evidence_basis(
+        self, cx: sqlite3.Connection, tenant: str, root_id: str
+    ) -> dict:
         """The input basis (source digest set + case version) for a job (§6)."""
         sources = [
             str(row["digest"])
@@ -502,7 +538,9 @@ class CaseWorkflow:
                 (root_id,),
             )
         ]
-        case = cx.execute("SELECT version FROM cases WHERE id = ?", (root_id,)).fetchone()
+        case = cx.execute(
+            "SELECT version FROM cases WHERE id = ?", (root_id,)
+        ).fetchone()
         return {
             "tenant": tenant,
             "root_id": root_id,
@@ -529,14 +567,18 @@ class CaseWorkflow:
             (phase, status, self._now_iso(), job_id),
         )
 
-    def _fail_evidence_job(self, cx: sqlite3.Connection, job_id: str, message: str) -> None:
+    def _fail_evidence_job(
+        self, cx: sqlite3.Connection, job_id: str, message: str
+    ) -> None:
         # A provider/artifact/OCR failure is visible: the case becomes
         # TECHNICAL_ERROR with a typed problem, never a silent PROCESSING (E7).
         cx.execute(
             "UPDATE jobs SET phase = 'DONE', status = 'FAILED', updated_at = ? WHERE id = ?",
             (self._now_iso(), job_id),
         )
-        row = cx.execute("SELECT tenant, root_id FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        row = cx.execute(
+            "SELECT tenant, root_id FROM jobs WHERE id = ?", (job_id,)
+        ).fetchone()
         if row is None:
             return
         from invoice_referee.domain.evidence import ReadResult
@@ -549,7 +591,11 @@ class CaseWorkflow:
         )
         # Keep the provider error class + a short message so a failure is
         # diagnosable, without leaking secrets (redacted to a bounded length).
-        detail = f"{type(message).__name__}: {message}" if not isinstance(message, str) else message
+        detail = (
+            f"{type(message).__name__}: {message}"
+            if not isinstance(message, str)
+            else message
+        )
         detail = (detail or "").strip().replace("\n", " ")[:300]
         problem = ProcessingProblem(
             kind="TECHNICAL",
@@ -578,8 +624,11 @@ class CaseWorkflow:
             "INSERT OR REPLACE INTO case_evidence_reports (root_id, tenant, report_json, "
             "input_basis_json, created_at) VALUES (?, ?, ?, ?, ?)",
             (
-                root_id, tenant, report.model_dump_json(),
-                json.dumps(basis or {}, ensure_ascii=False), self._now_iso(),
+                root_id,
+                tenant,
+                report.model_dump_json(),
+                json.dumps(basis or {}, ensure_ascii=False),
+                self._now_iso(),
             ),
         )
 
@@ -709,7 +758,9 @@ class CaseWorkflow:
                 action="SESSION_START",
                 detail=json.dumps({"persona": persona}, ensure_ascii=False),
             )
-        return DemoSession(session_id=session_id, tenant=tenant, persona=persona, actor_id=actor)
+        return DemoSession(
+            session_id=session_id, tenant=tenant, persona=persona, actor_id=actor
+        )
 
     def session(self, session_id: str) -> DemoSession:
         row = self._query_one(
@@ -745,7 +796,10 @@ class CaseWorkflow:
                 ),
             )
         return DemoSession(
-            session_id=session_id, tenant=current.tenant, persona=persona, actor_id=actor
+            session_id=session_id,
+            tenant=current.tenant,
+            persona=persona,
+            actor_id=actor,
         )
 
     # -- demo context --------------------------------------------------------
@@ -780,7 +834,9 @@ class CaseWorkflow:
                         activity.id,
                         tenant,
                         activity.name,
-                        activity.occurred_at.isoformat() if activity.occurred_at else None,
+                        activity.occurred_at.isoformat()
+                        if activity.occurred_at
+                        else None,
                         activity.purpose,
                         budget.amount if budget else None,
                         budget.effect_from.isoformat()
@@ -792,7 +848,10 @@ class CaseWorkflow:
                 )
             # Seed a demo STUB transcription for activities that declare one, so
             # the STUB dev/UI path can assess without a provider (contracts §5).
-            from invoice_referee.evaluation.models import Transcription, TranscriptionFact
+            from invoice_referee.evaluation.models import (
+                Transcription,
+                TranscriptionFact,
+            )
 
             for activity in data.activities:
                 if activity.transcription is None:
@@ -848,7 +907,9 @@ class CaseWorkflow:
             # Store a typed snapshot the admission consumer reads, built from the
             # SAME demo data (plan A5/D): one source of truth. Budgets/grants/
             # witnesses are projected so the catalog and the typed consumer agree.
-            self._store_demo_snapshot(cx, data, tenant=tenant, origin=origin, digest=digest)
+            self._store_demo_snapshot(
+                cx, data, tenant=tenant, origin=origin, digest=digest
+            )
             cx.execute(
                 "INSERT INTO context_imports (tenant, digest, origin, imported_at, note) "
                 "VALUES (?, ?, ?, ?, ?)",
@@ -862,7 +923,11 @@ class CaseWorkflow:
                 actor="system:context-import",
                 action="CONTEXT_IMPORT",
                 detail=json.dumps(
-                    {"digest": digest, "origin": origin, "activities": len(data.activities)},
+                    {
+                        "digest": digest,
+                        "origin": origin,
+                        "activities": len(data.activities),
+                    },
                     ensure_ascii=False,
                 ),
                 origin=origin,
@@ -888,7 +953,9 @@ class CaseWorkflow:
                 "id": activity.id,
                 "activity_id": activity.id,
                 "name": activity.name,
-                "occurred_at": activity.occurred_at.isoformat() if activity.occurred_at else None,
+                "occurred_at": activity.occurred_at.isoformat()
+                if activity.occurred_at
+                else None,
                 "purpose": activity.purpose,
                 "status": activity.status,
                 "profile": activity.profile,
@@ -897,11 +964,15 @@ class CaseWorkflow:
         )
         budgets = tuple(
             {
-                "id": activity.budget.record_key if activity.budget else f"budget:{activity.id}",
+                "id": activity.budget.record_key
+                if activity.budget
+                else f"budget:{activity.id}",
                 "activity": activity.id,
                 "amount": activity.budget.amount,
                 "effect_range": [
-                    activity.budget.effect_from.isoformat() if activity.budget.effect_from else None,
+                    activity.budget.effect_from.isoformat()
+                    if activity.budget.effect_from
+                    else None,
                     None,
                 ],
                 "actor": "employee:approver",
@@ -918,7 +989,9 @@ class CaseWorkflow:
                 "scope": grant.scope,
                 "max_amount": grant.max_amount,
                 "effective_from": grant.effective_from.isoformat(),
-                "effective_to": grant.effective_to.isoformat() if grant.effective_to else None,
+                "effective_to": grant.effective_to.isoformat()
+                if grant.effective_to
+                else None,
                 "allowed_profiles": list(grant.allowed_profiles),
             }
             for grant in data.grants
@@ -973,9 +1046,15 @@ class CaseWorkflow:
                 (tenant, digest, origin, now, "typed company context"),
             )
             self._audit(
-                cx, tenant=tenant, root_id=None, session_id=None,
-                actor="system:context-import", action="CONTEXT_IMPORT",
-                detail=_json.dumps({"digest": digest, "origin": origin}, ensure_ascii=False),
+                cx,
+                tenant=tenant,
+                root_id=None,
+                session_id=None,
+                actor="system:context-import",
+                action="CONTEXT_IMPORT",
+                detail=_json.dumps(
+                    {"digest": digest, "origin": origin}, ensure_ascii=False
+                ),
                 origin=origin,
             )
         return digest
@@ -1002,6 +1081,7 @@ class CaseWorkflow:
                 status=row["status"],
                 budget_amount=row["budget_amount"],
                 profile=row["profile"] if "profile" in row.keys() else "TRAVEL",
+                references=_activity_references(row),
             )
             for row in rows
         )
@@ -1019,7 +1099,9 @@ class CaseWorkflow:
         )
         return str(row["name"]) if row is not None else actor_id
 
-    def last_context_import(self, tenant: str = DEFAULT_TENANT) -> dict[str, str] | None:
+    def last_context_import(
+        self, tenant: str = DEFAULT_TENANT
+    ) -> dict[str, str] | None:
         row = self._query_one(
             "SELECT digest, origin, imported_at, note FROM context_imports "
             "WHERE tenant = ? ORDER BY id DESC LIMIT 1",
@@ -1035,7 +1117,9 @@ class CaseWorkflow:
         }
 
     # -- commands ------------------------------------------------------------
-    async def execute(self, context: CommandContext, command: CaseCommand) -> CommandResult:
+    async def execute(
+        self, context: CommandContext, command: CaseCommand
+    ) -> CommandResult:
         session = self.session(context.session_id)
         handlers: dict[str, Callable[..., CommandResult]] = {
             "CREATE_DRAFT": self._create_draft,
@@ -1114,7 +1198,9 @@ class CaseWorkflow:
                 self._record_trace_ref(command_root, operation)
                 return result
 
-    async def _read_sources_for_submit(self, session: DemoSession, root_id: str) -> None:
+    async def _read_sources_for_submit(
+        self, session: DemoSession, root_id: str
+    ) -> None:
         """Read the root's sources (LIVE) and persist the transcription (§5, §6).
 
         Runs outside the mutation transaction. A run with no readable page
@@ -1211,28 +1297,49 @@ class CaseWorkflow:
             source_id = f"source:{hashlib.sha256(payload).hexdigest()[:16]}:adv{index}"
             sources.append(
                 SourceRef(
-                    id=source_id, digest=hashlib.sha256(payload).hexdigest(),
-                    tenant=session.tenant, media=media,  # type: ignore[arg-type]
-                    storage_key=f"{session.tenant}/{root_id}/{source_id}", filename=filename,
+                    id=source_id,
+                    digest=hashlib.sha256(payload).hexdigest(),
+                    tenant=session.tenant,
+                    media=media,  # type: ignore[arg-type]
+                    storage_key=f"{session.tenant}/{root_id}/{source_id}",
+                    filename=filename,
                 )
             )
             source_bytes[source_id] = payload
         with self._trace_operation(
             "advance-draft-read",
-            metadata={"root_id": root_id, "provider_mode": provider_mode, "sources": len(sources)},
+            metadata={
+                "root_id": root_id,
+                "provider_mode": provider_mode,
+                "sources": len(sources),
+            },
             tags=("operation", "advance-draft-read"),
         ) as operation:
             report = await read_root(
-                sources=tuple(sources), reader=reader, classifier=classifier,
-                artifacts=artifacts, source_bytes=source_bytes, budget=RunBudget(),
-                provider_mode=provider_mode, root_id=root_id,
+                sources=tuple(sources),
+                reader=reader,
+                classifier=classifier,
+                artifacts=artifacts,
+                source_bytes=source_bytes,
+                budget=RunBudget(),
+                provider_mode=provider_mode,
+                root_id=root_id,
             )
             operation.outputs["documents"] = len(report.documents)
+
         # Pick the document that actually carries advance fields; a clear one is
         # preferred over an unresolved one.
         def _score(document) -> int:
             fields = {f.field for f in document.fields if f.state == "FOUND"}
-            score = len(fields & {"amount", "payee_name", "transaction_reference", "transaction_status"})
+            score = len(
+                fields
+                & {
+                    "amount",
+                    "payee_name",
+                    "transaction_reference",
+                    "transaction_status",
+                }
+            )
             if document.profile_status == "CLEAR":
                 score += 1
             return score
@@ -1243,7 +1350,9 @@ class CaseWorkflow:
                 "Không đọc được dữ liệu khoản ứng từ chứng từ đã tải lên."
             )
         return draft_advance_from_document(
-            candidates[0], scope=str(row["activity"]), employee=str(row["employee"]),
+            candidates[0],
+            scope=str(row["activity"]),
+            employee=str(row["employee"]),
             method_hint=method_hint,
         )
 
@@ -1266,7 +1375,9 @@ class CaseWorkflow:
         from invoice_referee.domain.evidence import SourceRef
         from invoice_referee.evidence.pipeline import read_root
         from invoice_referee.evidence.trace import RunBudget
-        from invoice_referee.reconciliation.settlement_draft import build_settlement_draft
+        from invoice_referee.reconciliation.settlement_draft import (
+            build_settlement_draft,
+        )
 
         connection = self.db.connect()
         try:
@@ -1293,8 +1404,11 @@ class CaseWorkflow:
         try:
             attached = tuple(
                 SourceRef(
-                    id=row2["source_id"], digest=row2["digest"], tenant=row2["tenant"],
-                    media=row2["media"], storage_key=row2["storage_key"],
+                    id=row2["source_id"],
+                    digest=row2["digest"],
+                    tenant=row2["tenant"],
+                    media=row2["media"],
+                    storage_key=row2["storage_key"],
                     filename=row2["filename"],
                 )
                 for row2 in connection.execute(
@@ -1331,7 +1445,9 @@ class CaseWorkflow:
             source_id = f"source:preview:{digest[:16]}:{index}"
             sources.append(
                 SourceRef(
-                    id=source_id, digest=digest, tenant=session.tenant,
+                    id=source_id,
+                    digest=digest,
+                    tenant=session.tenant,
                     media=media,  # type: ignore[arg-type]
                     storage_key=f"{session.tenant}/{root_id}/{source_id}",
                     filename=filename,
@@ -1343,7 +1459,11 @@ class CaseWorkflow:
         # after the transaction below (no network inside the txn).
         with self._trace_operation(
             "settlement-draft-read",
-            metadata={"root_id": root_id, "provider_mode": provider_mode, "sources": len(sources)},
+            metadata={
+                "root_id": root_id,
+                "provider_mode": provider_mode,
+                "sources": len(sources),
+            },
             tags=("operation", "draft-read"),
         ) as operation:
             report = await read_root(
@@ -1355,7 +1475,9 @@ class CaseWorkflow:
                 budget=RunBudget(),
                 provider_mode=provider_mode,
                 root_id=root_id,
-                activity_profile=str(row["profile"]) if "profile" in row.keys() else None,
+                activity_profile=str(row["profile"])
+                if "profile" in row.keys()
+                else None,
             )
 
             draft = build_settlement_draft(report, sources=tuple(sources))
@@ -1375,10 +1497,189 @@ class CaseWorkflow:
                         "case_version": int(row["version"]),
                     },
                 )
+                # Backend dossier link (14/10/2026): the server decides which
+                # advance/work dossier this settlement belongs to; the draft
+                # carries the decision for review, never an activity dropdown.
+                from invoice_referee.reconciliation.settlement_link import (
+                    link_to_payload,
+                )
+
+                link = self._settlement_link_for(
+                    cx,
+                    tenant=session.tenant,
+                    employee=str(row["employee"]),
+                    case_activity=str(row["activity"]),
+                    report=report,
+                )
+                draft["link"] = link_to_payload(link)
+                operation.outputs["link"] = link.status
                 # Persist the operation trace ref alongside the report (debug ref).
                 self._last_trace_ref[root_id] = operation.run_id
 
         return draft
+
+    async def get_settlement_draft(
+        self, session: DemoSession, root_id: str
+    ) -> dict[str, object]:
+        """Return the persisted settlement draft for an existing case.
+
+        Rebuilds the employee review draft from the stored typed report when
+        its source basis still matches (W3 reuse); a stale/missing report is
+        a typed failure, never a fabricated draft.
+        """
+        from invoice_referee.reconciliation.settlement_draft import (
+            build_settlement_draft,
+        )
+
+        self._require_session_root(session, root_id)
+        with self.db.transaction() as cx:
+            report = self._reusable_report(cx, session.tenant, root_id)
+            if report is None:
+                raise UnsupportedCommandError(
+                    "Chưa có bản đọc còn hiệu lực cho hồ sơ này; tải chứng từ và đọc lại."
+                )
+            sources = tuple(
+                {
+                    "id": row["source_id"],
+                    "digest": row["digest"],
+                    "tenant": row["tenant"],
+                    "media": row["media"],
+                    "storage_key": row["storage_key"],
+                    "filename": row["filename"],
+                }
+                for row in cx.execute(
+                    "SELECT * FROM case_sources WHERE root_id = ? ORDER BY attached_at, source_id",
+                    (root_id,),
+                )
+            )
+            case = cx.execute("SELECT * FROM cases WHERE id = ?", (root_id,)).fetchone()
+            link = self._settlement_link_for(
+                cx,
+                tenant=session.tenant,
+                employee=str(case["employee"]),
+                case_activity=str(case["activity"]),
+                report=report,
+            )
+        from invoice_referee.domain.evidence import SourceRef
+        from invoice_referee.reconciliation.settlement_link import link_to_payload
+
+        refs = tuple(SourceRef(**s) for s in sources)  # type: ignore[arg-type]
+        draft = build_settlement_draft(report, sources=refs)
+        draft["link"] = link_to_payload(link)
+        return draft
+
+    def _settlement_link_for(
+        self,
+        cx: sqlite3.Connection,
+        *,
+        tenant: str,
+        employee: str,
+        case_activity: str,
+        report,
+    ):
+        """Backend dossier link for one settlement report (14/10/2026).
+
+        Thin wiring over the pure ``settlement_link`` module: the catalog and
+        the company ledger history are server-owned; the employee never picks
+        a standing activity code.
+        """
+        from invoice_referee.reconciliation.settlement_link import (
+            catalog_from_entries,
+            ledger_from_events,
+            link_settlement,
+        )
+
+        # Bound means an AUTHORIZED catalog entry — not a prefix: a custom
+        # non-catalog id is an unbound (PROPOSED) draft even without the
+        # generated `activity:proposed:` prefix.
+        catalog_entries = [
+            {
+                "activity_id": entry.activity_id,
+                "name": entry.name,
+                "status": entry.status,
+                "purpose": entry.purpose,
+                "references": list(entry.references),
+            }
+            for entry in self.catalog(tenant)
+        ]
+        proposed = all(e["activity_id"] != case_activity for e in catalog_entries)
+        catalog = catalog_from_entries(catalog_entries)
+        # Company ledger history = recorded money events plus the witnessed
+        # imported ledgers across ALL snapshots newest-first (a transaction
+        # code already in company history links by namespaced identity,
+        # whichever store holds it; a later import without ledger history
+        # must not hide an earlier witnessed one).
+        seen_keys: set[str] = set()
+        raw_events: list[dict[str, object]] = []
+        for row in cx.execute(
+            "SELECT external_key, scope, payee, amount, kind FROM money_events "
+            "WHERE tenant = ?",
+            (tenant,),
+        ):
+            raw_events.append(
+                {
+                    "external_key": row["external_key"],
+                    "activity": row["scope"],
+                    "employee": row["payee"],
+                    "amount": int(row["amount"]),
+                    "kind": row["kind"],
+                }
+            )
+            seen_keys.add(str(row["external_key"]))
+        for snapshot in cx.execute(
+            "SELECT payload_json FROM context_snapshots WHERE tenant = ? "
+            "ORDER BY version DESC",
+            (tenant,),
+        ):
+            if not snapshot["payload_json"]:
+                continue
+            try:
+                payload = json.loads(snapshot["payload_json"])
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(payload, dict) or not isinstance(
+                payload.get("ledger"), list
+            ):
+                continue
+            for item in payload["ledger"]:
+                if not isinstance(item, dict):
+                    continue
+                key = str(item.get("external_key") or "")
+                if not key or key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                raw_events.append(
+                    {
+                        "external_key": key,
+                        "activity": item.get("activity") or item.get("scope") or "",
+                        "employee": item.get("employee") or item.get("payee") or "",
+                        "amount": int(item.get("amount") or 0),
+                        "kind": item.get("kind") or "",
+                    }
+                )
+        ledger = ledger_from_events(raw_events)  # type: ignore[arg-type]
+        return link_settlement(
+            report,
+            employee=employee,
+            current_activity=None if proposed else case_activity,
+            current_activity_proposed=proposed,
+            catalog=catalog,
+            ledger=ledger,
+        )
+
+    def _require_session_root(self, session: DemoSession, root_id: str):
+        """Check the case exists in this tenant; tenant isolation first."""
+        connection = self.db.connect()
+        try:
+            row = connection.execute(
+                "SELECT id FROM cases WHERE id = ? AND tenant = ?",
+                (root_id, session.tenant),
+            ).fetchone()
+        finally:
+            connection.close()
+        if row is None:
+            raise NotFoundError("Hồ sơ không tồn tại trong tenant này.")
+        return row
 
     def _create_draft(
         self,
@@ -1510,7 +1811,9 @@ class CaseWorkflow:
                 revision,
                 command.declaration.declared_purpose,
                 command.declaration.notes,
-                self._declaration_draft_json(command.declaration, actor=context.actor_id, now=now),
+                self._declaration_draft_json(
+                    command.declaration, actor=context.actor_id, now=now
+                ),
                 now,
             ),
         )
@@ -1550,6 +1853,9 @@ class CaseWorkflow:
             "trip_end": declaration.trip_end,
             "declared_advance": declaration.declared_advance,
             "incurred_total": declaration.incurred_total,
+            # Backend dossier link (14/10/2026): the employee's confirmation of
+            # a weak link, if any. The decided activity is on the case row.
+            "confirmed_activity_id": declaration.confirmed_activity_id,
         }
         corrected: list[str] = []
         if (
@@ -1602,7 +1908,11 @@ class CaseWorkflow:
         for claim in claims:
             resolved_refs = []
             for ref in claim.refs:
-                filename = ref.source_id[len("file:"):] if ref.source_id.startswith("file:") else ref.source_id
+                filename = (
+                    ref.source_id[len("file:") :]
+                    if ref.source_id.startswith("file:")
+                    else ref.source_id
+                )
                 source_id = sources.get((filename, ref.source_sha256))
                 if source_id is None:
                     raise UnsupportedCommandError(
@@ -1646,6 +1956,141 @@ class CaseWorkflow:
             ),
         )
 
+    def _bind_proposed_dossier(
+        self,
+        cx,
+        session,
+        row,
+        root_id: str,
+        current_activity: str,
+        *,
+        confirmed_activity: str | None,
+        declaration,
+    ):
+        """Bind a PROPOSED draft root to its dossier at submit (14/10/2026).
+
+        The backend link decides; the employee only confirms a weak link or
+        corrects within their scope. A LINKED dossier rebinds silently. A
+        weak/conflicting basis asks the right owner instead of guessing. No
+        link fabricates a budget/grant: an unlinked draft stays PROPOSED and
+        enters the authorization follow-up. A rebind that would collide with
+        an existing dossier for the same scope is a conflict — the old
+        dossier is never overwritten, and sources/ledger are never moved
+        implicitly.
+        """
+        report = self._reusable_report(cx, session.tenant, root_id)
+        link = None
+        if report is not None:
+            link = self._settlement_link_for(
+                cx,
+                tenant=session.tenant,
+                employee=str(row["employee"]),
+                case_activity=current_activity,
+                report=report,
+            )
+        if confirmed_activity and confirmed_activity != current_activity:
+            entry = self.catalog_entry(session.tenant, confirmed_activity)
+            if entry is None or entry.status != "AUTHORIZED":
+                raise UnsupportedCommandError(
+                    "Hoạt động không có trong danh mục; không thể gắn hồ sơ."
+                )
+            if link is not None and link.status == "CONFLICT":
+                raise UnsupportedCommandError(
+                    "Các căn cứ mạnh trỏ tới các hồ sơ khác nhau; kế toán xác minh "
+                    "trước khi gắn. " + " ".join(link.reasons)
+                )
+            self._rebind_case_activity(cx, session, row, root_id, entry)
+            return self._reload(cx, row)
+        if confirmed_activity and link is not None and link.status == "CONFLICT":
+            # The client echoed the draft's own activity, but the documents
+            # carry contradicting strong bases — a material conflict for the
+            # accountant, never a silent keep.
+            raise UnsupportedCommandError(
+                "Chứng từ mang căn cứ mạnh trái với hồ sơ đã gắn; giữ mâu thuẫn "
+                "để kế toán xác minh. " + " ".join(link.reasons)
+            )
+        if link is not None:
+            if link.status == "LINKED" and link.activity_id is not None:
+                entry = self.catalog_entry(session.tenant, link.activity_id)
+                if entry is None or entry.status != "AUTHORIZED":
+                    raise UnsupportedCommandError(
+                        "Hồ sơ được liên kết không còn trong danh mục; kế toán kiểm tra."
+                    )
+                self._rebind_case_activity(cx, session, row, root_id, entry)
+                return self._reload(cx, row)
+            if link.status == "NEEDS_CONFIRMATION":
+                names = ", ".join(
+                    f"{c.name} ({c.activity_id})" for c in link.candidates
+                )
+                raise UnsupportedCommandError(
+                    "Hồ sơ này quyết toán cho khoản tạm ứng nào? "
+                    f"Ứng viên: {names}. Nhân viên xác nhận một hồ sơ trong phạm vi."
+                )
+            if link.status == "CONFLICT":
+                raise UnsupportedCommandError(
+                    "Các căn cứ mạnh trỏ tới các hồ sơ khác nhau; giữ mâu thuẫn "
+                    "để kế toán xác minh. " + " ".join(link.reasons)
+                )
+        # NOT_FOUND (or no typed report): the draft is accepted as an
+        # independent, server-managed dossier. It stays PROPOSED: no
+        # budget/grant is fabricated; genuinely new scope asks for
+        # B/authority (FACT, then AUTHORITY once verified missing).
+        name = (
+            declaration.destination
+            or declaration.declared_purpose
+            or str(row["activity_name"])
+        )
+        cx.execute("UPDATE cases SET activity_name = ? WHERE id = ?", (name, root_id))
+        return self._reload(cx, row)
+
+    def _rebind_case_activity(self, cx, session, row, root_id: str, entry) -> None:
+        """Move a PROPOSED root onto an AUTHORIZED catalog activity.
+
+        A colliding dossier for the same (tenant, employee, activity) is a
+        conflict: continue that dossier instead of duplicating it. An unknown
+        activity date stays unknown — never the upload time.
+        """
+        employee = str(row["employee"])
+        clash = cx.execute(
+            "SELECT id FROM cases WHERE tenant = ? AND employee = ? AND activity = ? "
+            "AND id != ?",
+            (session.tenant, employee, entry.activity_id, root_id),
+        ).fetchone()
+        if clash is not None:
+            raise CommandConflictError(
+                f"Hồ sơ cho hoạt động này đã tồn tại ({clash['id']}); "
+                "tiếp tục hồ sơ đó thay vì tạo hồ sơ mới."
+            )
+        occurred = (
+            entry.occurred_at.isoformat()
+            if entry.occurred_at is not None
+            else row["activity_occurred_at"]
+        )
+        cx.execute(
+            "UPDATE cases SET activity = ?, activity_name = ?, "
+            "activity_occurred_at = ?, profile = ? WHERE id = ?",
+            (entry.activity_id, entry.name, occurred, entry.profile, root_id),
+        )
+
+    def _check_link_conflict(self, cx, session, row) -> None:
+        """An AUTHORIZED root keeps its inherited link; contradicting strong
+        refs are a material conflict for the accountant, never a silent keep."""
+        report = self._reusable_report(cx, session.tenant, str(row["id"]))
+        if report is None:
+            return
+        link = self._settlement_link_for(
+            cx,
+            tenant=session.tenant,
+            employee=str(row["employee"]),
+            case_activity=str(row["activity"]),
+            report=report,
+        )
+        if link.status == "CONFLICT":
+            raise UnsupportedCommandError(
+                "Chứng từ mang căn cứ mạnh trái với hồ sơ đã gắn; giữ mâu thuẫn "
+                "để kế toán xác minh. " + " ".join(link.reasons)
+            )
+
     def _submit(
         self,
         cx: sqlite3.Connection,
@@ -1657,52 +2102,34 @@ class CaseWorkflow:
         self._require_version(row, context.expected_case_version)
         now = self._now_iso()
         root_id = str(row["id"])
-        # P1-3: a draft root is created against a PROPOSED placeholder before the
-        # activity is known (so the upload does not fabricate one). At submit the
-        # declaration names the activity the employee chose; when the root is
-        # still that unbound placeholder, rebind it to the AUTHORIZED catalog
-        # activity (server-verified). A non-catalog activity is rejected. An
-        # already-bound root must still match its own activity.
-        declared_activity = command.declaration.activity_id
+        # Backend dossier linking (14/10/2026): the server decides which
+        # advance/work dossier this settlement belongs to. The employee never
+        # picks a standing activity code; they only confirm when the basis is
+        # weak/conflicting (confirmed_activity_id), within their own scope.
+        # An old client's activity_id is treated as that confirmation.
         current_activity = str(row["activity"])
-        if declared_activity and declared_activity != current_activity:
-            if current_activity.startswith(PROPOSED_ACTIVITY_PREFIX):
-                entry = self.catalog_entry(session.tenant, declared_activity)
-                if entry is None or entry.status != "AUTHORIZED":
-                    raise UnsupportedCommandError(
-                        "Hoạt động không có trong danh mục; không thể gắn hồ sơ."
-                    )
-                cx.execute(
-                    "UPDATE cases SET activity = ?, activity_name = ?, "
-                    "activity_occurred_at = ?, profile = ? WHERE id = ?",
-                    (
-                        entry.activity_id,
-                        entry.name,
-                        (entry.occurred_at or self._clock()).isoformat(),
-                        entry.profile,
-                        root_id,
-                    ),
-                )
-                row = self._reload(cx, row)
-            else:
+        confirmed_activity = (
+            command.declaration.confirmed_activity_id or command.declaration.activity_id
+        )
+        # Bound means an AUTHORIZED catalog entry — a custom non-catalog id is
+        # an unbound draft even without the generated `activity:proposed:` prefix.
+        bound = self.catalog_entry(session.tenant, current_activity) is not None
+        if not bound:
+            row = self._bind_proposed_dossier(
+                cx,
+                session,
+                row,
+                root_id,
+                current_activity,
+                confirmed_activity=confirmed_activity,
+                declaration=command.declaration,
+            )
+        else:
+            if confirmed_activity and confirmed_activity != current_activity:
                 raise UnsupportedCommandError(
                     "Khai báo không khớp hoạt động của hồ sơ này."
                 )
-        elif current_activity.startswith(PROPOSED_ACTIVITY_PREFIX):
-            # The employee kept the root's own NEW activity (it was not in the
-            # catalog). Name it from the confirmed draft content so the dossier
-            # does not carry the generic placeholder. It stays PROPOSED: no
-            # budget/grant is fabricated; it enters the authorization follow-up
-            # (requirement: a genuinely new activity asks for B/authority).
-            name = (
-                command.declaration.destination
-                or command.declaration.declared_purpose
-                or str(row["activity_name"])
-            )
-            cx.execute(
-                "UPDATE cases SET activity_name = ? WHERE id = ?", (name, root_id)
-            )
-            row = self._reload(cx, row)
+            self._check_link_conflict(cx, session, row)
         # Q32 typed employee paid-claims (plan A2): the client states the claim;
         # the server resolves the file refs to the uploaded bytes and derives the
         # actor/scope/time. A foreign digest/ref is rejected before any write.
@@ -1718,7 +2145,9 @@ class CaseWorkflow:
                 self._next_declaration_revision(cx, root_id),
                 command.declaration.declared_purpose,
                 command.declaration.notes,
-                self._declaration_draft_json(command.declaration, actor=context.actor_id, now=now),
+                self._declaration_draft_json(
+                    command.declaration, actor=context.actor_id, now=now
+                ),
                 now,
             ),
         )
@@ -1732,7 +2161,9 @@ class CaseWorkflow:
         job_id = (
             str(existing["id"])
             if existing is not None
-            else store.enqueue(cx, tenant=session.tenant, root_id=root_id, kind="SUBMIT", now=now)
+            else store.enqueue(
+                cx, tenant=session.tenant, root_id=root_id, kind="SUBMIT", now=now
+            )
         )
         # In evidence mode (LIVE/RECORDED_REPLAY) the submit normally enqueues a
         # durable evidence job and returns immediately; the worker produces the
@@ -1791,7 +2222,13 @@ class CaseWorkflow:
         if issue is None:
             raise NotFoundError("Không tìm thấy việc cần xử lý này.")
         # Only the issue's owner may answer it (contracts §5).
-        if issue["owner"] not in (context.actor_id, "employee", "accountant", "approver", "org-data"):
+        if issue["owner"] not in (
+            context.actor_id,
+            "employee",
+            "accountant",
+            "approver",
+            "org-data",
+        ):
             raise UnsupportedCommandError("Bạn không phải người xử lý việc này.")
         if _owner_persona(issue["owner"]) not in ("any", session.persona):
             raise UnsupportedCommandError(
@@ -1885,6 +2322,96 @@ class CaseWorkflow:
         self._assess_and_commit(cx, session, self._reload(cx, row), now)
         return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
 
+    def _advance_party_block(
+        self, cx: sqlite3.Connection, tenant: str, dossier_employee: str, money
+    ) -> str | None:
+        """Block CONFIRMED A for a mismatched advance voucher (14/10/2026).
+
+        Returns the blocking reason, or None when the parties check out. Thin
+        wiring over the pure ``check_advance_parties``: the payee must be this
+        dossier's employee (id or display name); the payer must be the tenant's
+        configured company source (organization name or ``company:*`` id).
+        """
+        from invoice_referee.reconciliation.advance_identity import (
+            check_advance_parties,
+        )
+
+        company_name = self._tenant_company_name(cx, tenant)
+        expected: list[str] = []
+        if company_name:
+            expected.append(company_name)
+        check = check_advance_parties(
+            payee_name=money.payee,
+            employee=dossier_employee,
+            payer_name=money.payer,
+            expected_payer_names=tuple(expected),
+            employee_aliases=(self.display_name(tenant, dossier_employee),),
+        )
+        return None if check.ok else check.reason
+
+    def _tenant_company_name(self, cx: sqlite3.Connection, tenant: str) -> str | None:
+        """The configured company name: newest snapshot that carries one."""
+        for row in cx.execute(
+            "SELECT payload_json FROM context_snapshots WHERE tenant = ? "
+            "ORDER BY version DESC",
+            (tenant,),
+        ):
+            if not row["payload_json"]:
+                continue
+            try:
+                payload = json.loads(row["payload_json"])
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            name = payload.get("company_name")
+            if name:
+                return str(name)
+        return None
+
+    def _same_party(self, tenant: str, a: str, b: str) -> bool:
+        """Whether two party strings name the same person (id or display name)."""
+        import unicodedata
+
+        def _norm(value: object) -> str:
+            text = unicodedata.normalize("NFD", str(value or ""))
+            text = "".join(ch for ch in text if not unicodedata.combining(ch))
+            return " ".join(text.casefold().split())
+
+        if _norm(a) == _norm(b):
+            return True
+        return _norm(self.display_name(tenant, a)) == _norm(b) or _norm(a) == _norm(
+            self.display_name(tenant, b)
+        )
+
+    def _snapshot_ledger_entry(
+        self, cx: sqlite3.Connection, tenant: str, external_key: str
+    ) -> dict[str, object] | None:
+        """One witnessed ledger entry by external key, newest snapshot first."""
+        for row in cx.execute(
+            "SELECT payload_json FROM context_snapshots WHERE tenant = ? "
+            "ORDER BY version DESC",
+            (tenant,),
+        ):
+            if not row["payload_json"]:
+                continue
+            try:
+                payload = json.loads(row["payload_json"])
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            ledger = payload.get("ledger")
+            if not isinstance(ledger, list):
+                continue
+            for item in ledger:
+                if (
+                    isinstance(item, dict)
+                    and str(item.get("external_key") or "") == external_key
+                ):
+                    return item
+        return None
+
     def _record_actual(
         self,
         cx: sqlite3.Connection,
@@ -1901,23 +2428,87 @@ class CaseWorkflow:
                 "Phạm vi ghi nhận không khớp hoạt động của hồ sơ này."
             )
         # The accountant (or a granted actor) records actual money (§5).
-        if session.persona not in ("accountant", "approver") and not self._actor_has_grant(
+        if session.persona not in (
+            "accountant",
+            "approver",
+        ) and not self._actor_has_grant(
             cx, session.tenant, context.actor_id, "RECORD_ACTUAL", money.claimed_scope
         ):
             raise UnsupportedCommandError("Bạn không có quyền ghi nhận tiền thực tế.")
         now = self._now_iso()
         root_id = str(row["id"])
+        # External identity is namespaced (14/10/2026): "<namespace>:<reference>".
+        # A missing/blank identity stays an unresolved draft — the server never
+        # mints a UUID in place of the missing transaction code and then claims
+        # dedup protection. The key is unique per tenant, and two sources under
+        # different namespaces are different transactions.
+        from invoice_referee.reconciliation.advance_identity import build_external_key
+
+        namespace, _, reference = money.external_key.partition(":")
+        if build_external_key(namespace, reference) is None:
+            raise UnsupportedCommandError(
+                "Thiếu mã giao dịch có namespace (ví dụ ngân hàng:số UNC, quỹ:số phiếu); "
+                "giữ chứng từ chưa giải quyết, không tự bịa định danh."
+            )
         # external_key is unique per tenant: a re-sent transaction is not counted
-        # twice, and the same key with a different payload is a conflict (§4).
+        # twice, and the same key with a different MATERIAL payload (kind,
+        # amount, payer, payee or scope — not just amount/kind) is a conflict
+        # (§4, 14/10/2026). The same reference under a different namespace is a
+        # different key, never an implicit merge.
+        from invoice_referee.reconciliation.advance_identity import check_record_payload
+
         existing = cx.execute(
             "SELECT * FROM money_events WHERE tenant = ? AND external_key = ?",
             (session.tenant, money.external_key),
         ).fetchone()
         if existing is not None:
-            if (
-                int(existing["amount"]) != money.amount
-                or existing["kind"] != money.claimed_kind
-            ):
+            stored = {
+                "kind": existing["kind"],
+                "amount": int(existing["amount"]),
+                "payer": existing["payer"],
+                "payee": existing["payee"],
+                "scope": existing["scope"],
+            }
+            claim = {
+                "kind": money.claimed_kind,
+                "amount": money.amount,
+                "payer": money.payer,
+                "payee": money.payee,
+                "scope": money.claimed_scope,
+            }
+            if check_record_payload(stored, claim) == "CONFLICT":
+                raise CommandConflictError(
+                    "external_key đã dùng cho một giao dịch khác nội dung."
+                )
+            return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+        # The witnessed imported ledger is the same transaction history under
+        # another store: re-recording it must not raise A a second time.
+        snapshot_hit = self._snapshot_ledger_entry(
+            cx, session.tenant, money.external_key
+        )
+        if snapshot_hit is not None:
+            stored = {
+                "kind": str(snapshot_hit.get("kind") or ""),
+                "amount": int(snapshot_hit.get("amount") or 0),
+                "payer": str(snapshot_hit.get("payer") or ""),
+                "payee": str(snapshot_hit.get("payee") or ""),
+                "scope": str(
+                    snapshot_hit.get("scope") or snapshot_hit.get("activity") or ""
+                ),
+            }
+            claim = {
+                "kind": money.claimed_kind,
+                "amount": money.amount,
+                "payer": money.payer,
+                "payee": money.payee,
+                "scope": money.claimed_scope,
+            }
+            # The snapshot stores employee ids while the UI sends the voucher's
+            # payee name: resolve through the tenant's display names before
+            # calling it a conflict.
+            if self._same_party(session.tenant, stored["payee"], claim["payee"]):
+                stored = dict(stored, payee=claim["payee"])
+            if check_record_payload(stored, claim) == "CONFLICT":
                 raise CommandConflictError(
                     "external_key đã dùng cho một giao dịch khác nội dung."
                 )
@@ -1928,6 +2519,23 @@ class CaseWorkflow:
         # The server decides verification/allocation from the claim's evidence
         # (contracts §3–§4): a bare statement stays OBSERVED and never fulfills.
         verification = verify_money_claim(money, responsible_actor=context.actor_id)
+        # Advance guard (14/10/2026): an ADVANCE_RECEIVED whose voucher payee is
+        # not this dossier's employee, or whose payer is not the configured
+        # company source, is kept OBSERVED — it never becomes confirmed A.
+        # The event is preserved for audit; only verified money projects.
+        advance_block_reason: str | None = None
+        if kind == "ADVANCE_RECEIVED":
+            advance_block_reason = self._advance_party_block(
+                cx, session.tenant, str(row["employee"]), money
+            )
+            if advance_block_reason is not None:
+                from invoice_referee.workflow.money import MoneyVerification
+
+                verification = MoneyVerification(
+                    verification_state="OBSERVED",
+                    allocation_state="UNALLOCATED",
+                    reason=advance_block_reason,
+                )
         event = MoneyEvent(
             id=event_id,
             external_key=money.external_key,
@@ -1984,7 +2592,17 @@ class CaseWorkflow:
             actor=context.actor_id,
             action="RECORD_ACTUAL",
             detail=json.dumps(
-                {"kind": event.kind, "amount": event.amount, "key": event.external_key},
+                {
+                    "kind": event.kind,
+                    "amount": event.amount,
+                    "key": event.external_key,
+                    "verification": event.verification_state,
+                    **(
+                        {"advance_block": advance_block_reason}
+                        if advance_block_reason is not None
+                        else {}
+                    ),
+                },
                 ensure_ascii=False,
             ),
         )
@@ -2004,7 +2622,9 @@ class CaseWorkflow:
         row = self._require_root(cx, session, command.root_id)
         # MarkExecution belongs to the accountant with a grant on the root (§10.1).
         if session.persona not in ("accountant", "approver"):
-            raise UnsupportedCommandError("Chỉ kế toán/người có quyền đánh dấu thực hiện.")
+            raise UnsupportedCommandError(
+                "Chỉ kế toán/người có quyền đánh dấu thực hiện."
+            )
         now = self._now_iso()
         cx.execute(
             "UPDATE instructions SET execution_state = ?, updated_at = ? WHERE id = ? "
@@ -2019,7 +2639,10 @@ class CaseWorkflow:
             actor=context.actor_id,
             action="MARK_EXECUTION",
             detail=json.dumps(
-                {"instruction": command.instruction_id, "state": command.execution_state},
+                {
+                    "instruction": command.instruction_id,
+                    "state": command.execution_state,
+                },
                 ensure_ascii=False,
             ),
         )
@@ -2199,13 +2822,17 @@ class CaseWorkflow:
                 )
             else:
                 matching = tuple(
-                    e for e in events if e.kind == "EMPLOYEE_RETURN" and e.payee == "company:demo"
+                    e
+                    for e in events
+                    if e.kind == "EMPLOYEE_RETURN" and e.payee == "company:demo"
                 )
             fulfilled = net_by_kind(matching, matching[0].kind) if matching else 0
             amount = int(inst["amount"])
             capped = min(fulfilled, amount)
-            status = "FULFILLED" if capped >= amount and amount > 0 else (
-                "PARTIAL" if capped > 0 else "ISSUED"
+            status = (
+                "FULFILLED"
+                if capped >= amount and amount > 0
+                else ("PARTIAL" if capped > 0 else "ISSUED")
             )
             cx.execute(
                 "UPDATE instructions SET fulfilled_amount = ?, status = ?, updated_at = ? "
@@ -2326,7 +2953,8 @@ class CaseWorkflow:
             s.outputs["state_S"] = result.projection.S.state
             s.outputs["issues"] = len(result.issues)
             s.outputs["allowed_effect"] = (
-                None if result.allowed_effect is None
+                None
+                if result.allowed_effect is None
                 else f"{result.allowed_effect.direction}:{result.allowed_effect.amount}"
             )
         with step("commit", metadata={"root_id": root_id}) as s:
@@ -2442,11 +3070,16 @@ class CaseWorkflow:
             conclusion_status = "BLOCKED"
         elif result.allowed_effect is not None:
             state = self._apply_instruction_coverage(cx, session, row, result, now)
-            conclusion_status = "OUTSTANDING" if state == "READY_TO_EXECUTE" else "BLOCKED"
+            conclusion_status = (
+                "OUTSTANDING" if state == "READY_TO_EXECUTE" else "BLOCKED"
+            )
         elif result.issues:
             state = "WAITING"
             conclusion_status = "BLOCKED"
-        elif result.projection.S.state == "KNOWN" and int(result.projection.S.value or 0) == 0:
+        elif (
+            result.projection.S.state == "KNOWN"
+            and int(result.projection.S.value or 0) == 0
+        ):
             # S=0 with every gate clean; only SETTLED if no execution is pending.
             pending = cx.execute(
                 "SELECT 1 FROM instructions WHERE root_id = ? AND status IN ('ISSUED','PARTIAL') "
@@ -2561,14 +3194,21 @@ class CaseWorkflow:
         # never overwritten by a later order on the same cost basis (§10.1 keeps
         # old instructions and their fulfillment). Idempotency is provided by the
         # retain path, which reuses the existing row without re-issuing.
-        basis_digest = hashlib.sha256((root_id + result.cost_basis).encode()).hexdigest()[:16]
+        basis_digest = hashlib.sha256(
+            (root_id + result.cost_basis).encode()
+        ).hexdigest()[:16]
         instruction_id = f"instruction:{basis_digest}:{uuid.uuid4().hex[:8]}"
         # The authority that lets this order be issued (contracts §2): the
         # covering system grant(s) for the action at this scope/amount. Recorded
         # so the instruction is grounded, not merely asserted.
         action = "ISSUE_PAYMENT" if effect.direction == "PAY" else "ISSUE_COLLECTION"
         authority_refs = self._covering_grant_ids(
-            cx, session.tenant, "system:referee", action, str(row["activity"]), effect.amount
+            cx,
+            session.tenant,
+            "system:referee",
+            action,
+            str(row["activity"]),
+            effect.amount,
         )
         cx.execute(
             "INSERT INTO instructions (id, tenant, root_id, direction, amount, "
@@ -2593,7 +3233,9 @@ class CaseWorkflow:
         # (§10.2). The first writer becomes the canonical owner. The keys come
         # from the CURRENT result (each the document bound to a cost), so the
         # LIVE evidence path keys on the same identity admission used.
-        for economic_key in (result.economic_keys or self._economic_keys_for(cx, root_id)):
+        for economic_key in result.economic_keys or self._economic_keys_for(
+            cx, root_id
+        ):
             existing = cx.execute(
                 "SELECT owner_root FROM usage_registry WHERE tenant = ? AND economic_key = ?",
                 (session.tenant, economic_key),
@@ -2628,7 +3270,9 @@ class CaseWorkflow:
                 return True
         return False
 
-    def _economic_keys_for(self, cx: sqlite3.Connection, root_id: str) -> tuple[str, ...]:
+    def _economic_keys_for(
+        self, cx: sqlite3.Connection, root_id: str
+    ) -> tuple[str, ...]:
         """The canonical economic identities this root claims (dedup/usage).
 
         The evidence (LIVE/REPLAY) path stores the admitted expenses — each with
@@ -2646,7 +3290,9 @@ class CaseWorkflow:
         ).fetchone()
         if conclusion is not None and conclusion["payload_json"]:
             try:
-                result = AssessmentResult.model_validate_json(conclusion["payload_json"])
+                result = AssessmentResult.model_validate_json(
+                    conclusion["payload_json"]
+                )
             except Exception:
                 result = None
             if result is not None:
@@ -2665,7 +3311,9 @@ class CaseWorkflow:
 
         transcription = Transcription.model_validate_json(row["transcription_json"])
         return tuple(
-            str(fact.value) for fact in transcription.facts if fact.field == "economic_key"
+            str(fact.value)
+            for fact in transcription.facts
+            if fact.field == "economic_key"
         )
 
     def _transcription_for(self, cx: sqlite3.Connection, root_id: str):
@@ -2706,7 +3354,10 @@ class CaseWorkflow:
             return "WAITING"
         if result.allowed_effect is not None:
             return "READY_TO_EXECUTE"
-        if result.projection.S.state == "KNOWN" and int(result.projection.S.value or 0) == 0:
+        if (
+            result.projection.S.state == "KNOWN"
+            and int(result.projection.S.value or 0) == 0
+        ):
             return "SETTLED"
         return "WAITING"
 
@@ -2779,7 +3430,9 @@ class CaseWorkflow:
 
     @staticmethod
     def _reload(cx: sqlite3.Connection, row: sqlite3.Row) -> sqlite3.Row:
-        return cx.execute("SELECT * FROM cases WHERE id = ?", (str(row["id"]),)).fetchone()
+        return cx.execute(
+            "SELECT * FROM cases WHERE id = ?", (str(row["id"]),)
+        ).fetchone()
 
     @staticmethod
     def _audit(
@@ -2808,7 +3461,9 @@ class CaseWorkflow:
             ),
         )
 
-    def _query_one(self, sql: str, params: tuple[object, ...] = ()) -> sqlite3.Row | None:
+    def _query_one(
+        self, sql: str, params: tuple[object, ...] = ()
+    ) -> sqlite3.Row | None:
         connection = self.db.connect()
         try:
             return connection.execute(sql, params).fetchone()
@@ -2845,7 +3500,9 @@ class CaseWorkflow:
             "ORDER BY id DESC LIMIT 10",
             (str(row["id"]),),
         ).fetchall()
-        activity_name = activity["name"] if activity is not None else row["activity_name"]
+        activity_name = (
+            activity["name"] if activity is not None else row["activity_name"]
+        )
         employee_name = person["name"] if person is not None else row["employee"]
 
         # Persisted issues, conclusion and instructions (contracts §10.3).
@@ -2857,8 +3514,11 @@ class CaseWorkflow:
                 (str(row["id"]),),
             )
         )
-        if not issues and (activity is None or activity["budget_amount"] is None) \
-                and row["state"] == "DRAFT":
+        if (
+            not issues
+            and (activity is None or activity["budget_amount"] is None)
+            and row["state"] == "DRAFT"
+        ):
             issues = (_context_issue(str(row["id"])),)
 
         conclusion_row = cx.execute(
@@ -2871,11 +3531,16 @@ class CaseWorkflow:
         if conclusion_row is not None:
             from invoice_referee.domain.case import SettlementConclusion
 
-            result = AssessmentResult.model_validate_json(conclusion_row["payload_json"])
+            result = AssessmentResult.model_validate_json(
+                conclusion_row["payload_json"]
+            )
             actual_money = result.projection
             if result.issues:
                 status = "BLOCKED"
-            elif result.projection.S.state == "KNOWN" and int(result.projection.S.value or 0) == 0:
+            elif (
+                result.projection.S.state == "KNOWN"
+                and int(result.projection.S.value or 0) == 0
+            ):
                 status = "BALANCED"
             else:
                 status = "OUTSTANDING"

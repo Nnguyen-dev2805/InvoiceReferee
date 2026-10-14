@@ -66,6 +66,13 @@ describe("Advance (record advance received)", () => {
     expect(money.instrument_method).toBe("TRANSFER");
     expect(money.instrument_status).toBe("COMPLETED");
     expect(money.amount).toBe(4_000_000);
+    // The transaction identity comes from the voucher — never a minted UUID —
+    // and the time/parties come from the source, not the confirm moment.
+    expect(money.external_key).toBe("transfer:FT-UC03-F01-0001");
+    expect(money.instrument_reference).toBe("FT-UC03-F01-0001");
+    expect(money.payer).toBe("Công ty InvoiceReferee");
+    expect(money.payee).toBe("Nguyễn An");
+    expect(money.event_at).toBe("2026-10-05");
     // The client never sets a received/verified state.
     expect(money).not.toHaveProperty("verification_state");
   });

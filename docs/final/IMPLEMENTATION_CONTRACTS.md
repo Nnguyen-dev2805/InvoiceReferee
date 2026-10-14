@@ -114,6 +114,18 @@ Luồng: upload → **Đọc chứng từ** → kiểm tra bản nháp → **Xá
   mục; khi nộp, server rebind hồ sơ nháp sang hoạt động AUTHORIZED đúng (hoặc từ
   chối nếu không có trong danh mục). Profile/ngân sách/quyền/lịch sử lấy theo scope
   hoạt động đã gắn; không mượn context hoạt động khác.
+- **Tự liên kết hồ sơ (chốt 14/10/2026, ADR0008).** Nhân viên không chọn hoạt động
+  thường trực trong luồng thông thường: backend tự liên kết quyết toán với hồ sơ
+  tạm ứng/công việc (`reconciliation/linking.py` + `settlement_link.py`, pure;
+  `Declaration.activity_id` optional, `confirmed_activity_id` cho xác nhận).
+  Bốn kết quả `LINKED`/`NEEDS_CONFIRMATION`/`NOT_FOUND`/`CONFLICT`; UI chỉ hỏi
+  ("Hồ sơ này quyết toán cho khoản tạm ứng nào?") khi mơ hồ, hiển thị ứng viên
+  kèm số hồ sơ/ngày/nhân viên/số tiền; chưa tìm thấy thì tiếp nhận độc lập, không
+  ép chọn hoạt động không tồn tại; không tạm ứng thì tiếp tục luồng đề nghị thanh
+  toán. Hai ô "Nội dung hoạt động"/"Mục đích" gộp thành một ô "Nội dung đề nghị
+  quyết toán"; địa điểm/ngày công tác giữ trường riêng, không gửi nội dung đề nghị
+  vào destination. Rebind trùng hồ sơ đã tồn tại là conflict (tiếp tục hồ sơ đó);
+  không ghi đè/xóa/chuyển sources/ledger ngầm; ngày chưa biết giữ chưa biết.
 - **Lưu bản nháp đã xác nhận.** `Declaration` mang giá trị nhân viên xác nhận +
   `original_declared_advance`; server lưu `case_declarations.draft_json` (confirmed +
   original + `corrected_fields` + actor + thời điểm). Sửa ứng kê khai (vd 4tr→4,5tr)
@@ -170,6 +182,17 @@ Cập nhật phạm vi 14/10/2026 (§14/§15, ADR006/ADR007):
   thành CONFIRMED**; upload chưa tự thành received. `external_key` chống trùng theo
   (giao dịch/số phiếu); scope/actor do server kiểm. Một hồ sơ bị chặn ghi vào hoạt
   động khác (`claimed_scope` phải khớp root).
+- **Định danh và kiểm bên giao dịch (chốt 14/10/2026, ADR0008,
+  `reconciliation/advance_identity.py` pure):** giữ `event_at` chứng từ,
+  `recorded_at` là giờ máy chủ; người nhận phải là nhân viên hồ sơ (id hoặc tên
+  hiển thị), bên chi phải là nguồn quỹ công ty đã cấu hình (tên tổ chức trong
+  context hoặc id `company:*`) — không hard-code, không tự thay người nhận rồi
+  coi đã khớp; tên/tài khoản chưa rõ giữ unresolved cho kế toán. `external_key`
+  phải có namespace (`<namespace>:<reference>`); thiếu thì giữ chưa giải quyết,
+  không bịa UUID. Cùng key tải lại là idempotent; cùng key khác payload trọng yếu
+  (kind/amount/payer/payee/scope) là conflict; khác namespace là giao dịch khác.
+  Voucher payee lệch nhân viên, payer lệch nguồn, hoặc thiếu định danh → giữ
+  OBSERVED/unresolved, không thành A đã xác minh.
 
 MoneyEvent kinds ADVANCE_RECEIVED/REIMBURSEMENT_RECEIVED/EMPLOYEE_RETURN/
 REVERSAL/OBSERVED_UNALLOCATED; external_key=(origin_namespace,transaction_ref)

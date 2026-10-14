@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { api, attachSources, errorMessage, settlementDraft, submitCase } from "../api";
+import { api, attachSources, errorMessage, getSettlementDraft, settlementDraft, submitCase } from "../api";
+import type { SettlementLink } from "../api";
 import { formatVnd } from "../format";
 import type { CaseView, SessionPayload } from "../types";
 import { DocumentViewer } from "./document_viewer";
@@ -18,6 +19,9 @@ export interface SettlementExpenseDraft {
 export interface IntakeDraftState {
   declared_name: string | null;
   activity_name: string | null;
+  destination: string | null;
+  trip_start: string | null;
+  trip_end: string | null;
   occurred_at: string | null;
   declared_purpose: string | null;
   incurred_total: number | null;
@@ -30,6 +34,9 @@ export interface IntakeDraftState {
 const EMPTY_DRAFT: IntakeDraftState = {
   declared_name: null,
   activity_name: null,
+  destination: null,
+  trip_start: null,
+  trip_end: null,
   occurred_at: null,
   declared_purpose: null,
   incurred_total: null,
@@ -40,27 +47,87 @@ const EMPTY_DRAFT: IntakeDraftState = {
 };
 
 export function Intake({
-  session,
   onCase,
   onBack,
+  existingCase,
 }: {
   session: SessionPayload;
   onCase: (view: CaseView) => void;
   onBack?: () => void;
+  existingCase?: CaseView | null;
 }) {
-  const [step, setStep] = useState<"upload" | "reading" | "review">("upload");
-  const [caseView, setCaseView] = useState<CaseView | null>(null);
+  const [step, setStep] = useState<"upload" | "reading" | "review">(
+    existingCase && existingCase.state === "DRAFT" ? "reading" : "upload",
+  );
+  const [caseView, setCaseView] = useState<CaseView | null>(existingCase ?? null);
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
-  // The activity the draft is bound to. The employee chooses by name (never a
-  // backend id). Empty until the draft is read and the employee picks one.
-  const [activityId, setActivityId] = useState<string>("");
-
-  // Draft state: null until a real read produces it. No demo defaults.
+  // Backend dossier link (14/10/2026): the server decides which advance/work
+  // dossier this settlement belongs to. The employee only confirms when the
+  // basis is weak (NEEDS_CONFIRMATION) — never by picking a standing code.
+  const [link, setLink] = useState<SettlementLink | null>(null);
+  const [confirmedActivityId, setConfirmedActivityId] = useState<string>("");
   const [draft, setDraft] = useState<IntakeDraftState>(EMPTY_DRAFT);
+
+  // Resume draft from server when an existing draft case is opened
+  useEffect(() => {
+    if (!existingCase || existingCase.state !== "DRAFT") return;
+    let cancelled = false;
+    setBusy(true);
+    setStep("reading");
+    setCaseView(existingCase);
+
+    void (async () => {
+      try {
+        const resp = await getSettlementDraft(existingCase.id);
+        if (cancelled) return;
+        setWarnings(resp.warnings ?? []);
+        setDraft({
+          declared_name: resp.declared_name,
+          activity_name: resp.activity_name,
+          destination: resp.destination,
+          trip_start: resp.trip_start,
+          trip_end: resp.trip_end,
+          occurred_at: resp.occurred_at,
+          // One merged proposal-content field (see handleReadDocuments).
+          declared_purpose: resp.declared_purpose ?? resp.activity_name,
+          incurred_total: resp.incurred_total,
+          declared_advance: resp.declared_advance,
+          expenses: (resp.expenses ?? []).map((e) => ({
+            description: e.description,
+            invoice_no: e.invoice_no,
+            amount: e.amount,
+            source_filename: e.source_filename,
+            status: e.status || "UNMATCHED",
+            matched_invoice: e.matched_invoice,
+            suggested_invoice: e.suggested_invoice,
+          })),
+          notes: "",
+          original_advance: resp.declared_advance,
+        });
+        // The backend link decides the dossier; the employee confirms only a
+        // weak link. No activity guessing on the client.
+        setLink(resp.link ?? null);
+        setConfirmedActivityId("");
+        setStep("review");
+      } catch (cause) {
+        if (cancelled) return;
+        setError(
+          `Không tải lại được bản nháp: ${errorMessage(cause)}. Bạn có thể chọn tệp để đọc lại.`,
+        );
+        setStep("upload");
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [existingCase?.id]);
 
   function removeFile(index: number) {
     setFiles((prev) => prev.filter((_, i) => i !== index));
@@ -105,8 +172,14 @@ export function Intake({
       setDraft({
         declared_name: resp.declared_name,
         activity_name: resp.activity_name,
+        destination: resp.destination,
+        trip_start: resp.trip_start,
+        trip_end: resp.trip_end,
         occurred_at: resp.occurred_at,
-        declared_purpose: resp.declared_purpose,
+        // One merged proposal-content field: prefer the read purpose, fall
+        // back to the read activity name. The trip destination is kept as its
+        // own travel field and is never fed the proposal content.
+        declared_purpose: resp.declared_purpose ?? resp.activity_name,
         incurred_total: resp.incurred_total,
         declared_advance: resp.declared_advance,
         expenses: (resp.expenses ?? []).map((e) => ({
@@ -121,15 +194,10 @@ export function Intake({
         notes: "",
         original_advance: resp.declared_advance,
       });
-      // Pre-select a matching catalog activity by purpose/name when one exists.
-      // If none matches, pre-select the dossier's own NEW activity so the employee
-      // is not stuck with an empty choice (it enters the authorization follow-up).
-      const guess = session.activity_catalog.find(
-        (a) =>
-          resp.declared_purpose !== null &&
-          (a.purpose === resp.declared_purpose || a.name === resp.activity_name),
-      );
-      setActivityId(guess?.id ?? currentCase.activity ?? "");
+      // The backend link decides the dossier; the employee confirms only a
+      // weak link. No activity guessing on the client.
+      setLink(resp.link ?? null);
+      setConfirmedActivityId("");
       setStep("review");
     } catch (cause) {
       setError(
@@ -142,11 +210,19 @@ export function Intake({
   }
 
   // Bước 4: “Xác nhận và nộp hồ sơ”. Sends the confirmed draft (edits + notes)
-  // so the server persists it; the async worker result is polled below.
+  // so the server persists it; the async worker result is polled below. The
+  // backend owns the dossier link: the client only forwards the employee's
+  // confirmation of a weak link, never a standing activity choice.
   async function handleConfirmAndSubmit() {
     if (!caseView) return;
-    if (!activityId) {
-      setError("Vui lòng chọn hoạt động cho hồ sơ trước khi nộp.");
+    if (link?.status === "CONFLICT") {
+      setError(
+        "Chứng từ mang căn cứ trái nhau về hồ sơ tạm ứng; kế toán xác minh trước khi nộp tiếp.",
+      );
+      return;
+    }
+    if (link?.status === "NEEDS_CONFIRMATION" && !confirmedActivityId) {
+      setError("Vui lòng chọn khoản tạm ứng mà hồ sơ này quyết toán.");
       return;
     }
     setBusy(true);
@@ -156,17 +232,18 @@ export function Intake({
     try {
       const result = await submitCase(
         caseView.id,
-        activityId,
+        null,
         draft.declared_purpose ?? "Quyết toán chi phí",
         caseView.version,
         [],
         {
           notes: draft.notes.trim() || null,
           declared_name: draft.declared_name,
-          destination: draft.activity_name,
+          destination: draft.destination ?? undefined,
           declared_advance: draft.declared_advance,
           incurred_total: draft.incurred_total,
           original_declared_advance: draft.original_advance,
+          confirmed_activity_id: confirmedActivityId || null,
         },
       );
       setCaseView(result.case_view);
@@ -268,7 +345,7 @@ export function Intake({
                 Kéo thả hoặc tải lên toàn bộ tài liệu hồ sơ (PDF, PNG, JPG)
               </span>
               <span className="text-[11px] text-slate-400 block mt-1">
-                Bao gồm: Giấy quyết toán / giấy thanh toán tạm ứng, hóa đơn điện tử, vé, biên nhận
+                Bao gồm: Giấy quyết toán / giấy thanh toán tạm ứng, hóa đơn điện tử, vé, biên nhận — kèm chứng từ ứng (ủy nhiệm chi / phiếu chi) nếu có
               </span>
               <label
                 htmlFor="source-files"
@@ -479,66 +556,85 @@ export function Intake({
             )}
           </div>
 
-          {/* 1. Người đề nghị & Hoạt động */}
+          {/* 1. Liên kết hồ sơ (backend tự quyết) & Nội dung đề nghị */}
           <div className="space-y-3">
             <h3 className="text-xs font-semibold text-slate-900">
-              Thông tin hoạt động &amp; người đề nghị
+              Liên kết hồ sơ &amp; nội dung đề nghị
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2">
-                <label htmlFor="draft-activity" className="text-slate-700 block font-semibold text-xs mb-1">
-                  Hoạt động của hồ sơ:
-                </label>
-                <select
-                  id="draft-activity"
-                  aria-label="Hoạt động của hồ sơ"
-                  value={activityId}
-                  onChange={(e) => setActivityId(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800"
-                >
-                  <option value="">— Chọn hoạt động —</option>
-                  {session.activity_catalog.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                      {a.occurred_at ? ` · ${a.occurred_at.slice(0, 10)}` : ""}
-                    </option>
+            {link?.status === "LINKED" && (
+              <p role="status" className="text-xs text-emerald-800 bg-emerald-50 p-2.5 rounded-md border border-emerald-200">
+                Đã liên kết với hồ sơ {link.candidates.find((c) => c.activity_id === link.activity_id)?.name ?? link.activity_id}
+                {link.activity_id ? ` (${link.activity_id})` : ""}.
+                {link.reasons.length > 0 ? ` Căn cứ: ${link.reasons.join(" ")}` : ""}
+              </p>
+            )}
+            {link?.status === "NEEDS_CONFIRMATION" && (
+              <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs font-semibold text-amber-900">
+                  Hồ sơ này quyết toán cho khoản tạm ứng nào?
+                </p>
+                <p className="text-[11px] text-amber-800">
+                  Chứng từ chỉ giống tên/nội dung/ngày/số tiền nên hệ thống không tự gắn.
+                  Bạn chọn đúng khoản trong phạm vi của mình.
+                </p>
+                <div role="radiogroup" aria-label="Khoản tạm ứng cần quyết toán" className="space-y-1.5">
+                  {link.candidates.map((c) => (
+                    <label key={c.activity_id} className="flex items-start gap-2 text-xs bg-white rounded border border-amber-200 px-2.5 py-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="link-confirm"
+                        value={c.activity_id}
+                        checked={confirmedActivityId === c.activity_id}
+                        onChange={(e) => setConfirmedActivityId(e.target.value)}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        <strong className="font-semibold text-slate-900">{c.name}</strong>
+                        <span className="text-slate-500 font-mono-nums block text-[11px]">
+                          {c.activity_id}
+                          {c.occurred_at ? ` · ${c.occurred_at.slice(0, 10)}` : ""}
+                          {c.amount !== null && c.amount !== undefined ? ` · ${formatVnd(c.amount)}` : ""}
+                        </span>
+                      </span>
+                    </label>
                   ))}
-                  {caseView?.activity ? (
-                    <option value={caseView.activity}>
-                      ＋ Hoạt động mới: {draft.activity_name ?? draft.declared_purpose ?? "theo chứng từ"}
-                    </option>
-                  ) : null}
-                </select>
-                <span className="text-[10px] text-slate-400 block mt-1">
-                  Danh mục do hệ thống cung cấp; không cần nhập mã nội bộ. Nếu hoạt động chưa có trong danh mục, chọn “Hoạt động mới” — hồ sơ sẽ vào luồng xin bổ sung ngân sách/quyền.
-                </span>
+                </div>
               </div>
+            )}
+            {link?.status === "NOT_FOUND" && (
+              <p role="status" className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-md border border-slate-200">
+                Đã tiếp nhận hồ sơ độc lập — không tìm thấy hồ sơ tạm ứng/công việc khớp.
+                Hồ sơ không cần khoản tạm ứng vẫn được xử lý như đề nghị thanh toán.
+                {link.reasons.length > 0 ? ` ${link.reasons.join(" ")}` : ""}
+              </p>
+            )}
+            {link?.status === "CONFLICT" && (
+              <p role="alert" className="text-xs text-rose-800 bg-rose-50 p-2.5 rounded-md border border-rose-200">
+                Chứng từ mang căn cứ trái nhau về hồ sơ tạm ứng; hệ thống giữ mâu thuẫn,
+                không tự chọn. Kế toán xác minh trước khi nộp tiếp.
+                {link.reasons.length > 0 ? ` ${link.reasons.join(" ")}` : ""}
+              </p>
+            )}
 
-              <div className="sm:col-span-2">
-                <label htmlFor="draft-activity-name" className="text-slate-700 block font-semibold text-xs mb-1">
-                  Nội dung hoạt động (đọc từ giấy):
-                </label>
-                <input
-                  id="draft-activity-name"
-                  value={draft.activity_name ?? ""}
-                  onChange={(e) => setDraft((prev) => ({ ...prev, activity_name: e.target.value }))}
-                  className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label htmlFor="draft-purpose" className="text-slate-700 block font-semibold text-xs mb-1">
-                  Mục đích:
-                </label>
-                <input
-                  id="draft-purpose"
-                  value={draft.declared_purpose ?? ""}
-                  onChange={(e) => setDraft((prev) => ({ ...prev, declared_purpose: e.target.value }))}
-                  className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800"
-                />
-              </div>
+            <div>
+              <label htmlFor="draft-purpose" className="text-slate-700 block font-semibold text-xs mb-1">
+                Nội dung đề nghị quyết toán:
+              </label>
+              <input
+                id="draft-purpose"
+                value={draft.declared_purpose ?? ""}
+                onChange={(e) => setDraft((prev) => ({ ...prev, declared_purpose: e.target.value }))}
+                className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800"
+              />
             </div>
+
+            {(draft.destination || draft.trip_start || draft.trip_end) && (
+              <p className="text-[11px] text-slate-500">
+                Địa điểm/ngày công tác theo chứng từ:
+                {[draft.destination, draft.trip_start, draft.trip_end].filter(Boolean).join(" · ")}
+              </p>
+            )}
           </div>
 
           {/* 2. Bảng kê các khoản chi phí đã trích xuất */}
@@ -637,7 +733,7 @@ export function Intake({
                     Sửa lại nếu AI đọc sai số trên giấy
                   </span>
                 </div>
-                <div className="w-40 shrink-0">
+                <div className="w-44 shrink-0">
                   <input
                     id="draft-advance"
                     type="number"
@@ -650,39 +746,32 @@ export function Intake({
                     }
                     className="w-full text-right bg-slate-50 hover:bg-white border border-slate-300 rounded px-2.5 py-1 text-xs font-mono-nums tabular-nums font-bold text-slate-900 focus:outline-none focus:border-slate-800 transition-colors"
                   />
+                  {draft.declared_advance !== null && (
+                    <span className="text-[11px] text-slate-500 font-mono-nums block text-right mt-0.5">
+                      = {formatVnd(draft.declared_advance)}
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Row 3: Chênh lệch kê khai dự kiến */}
               <div className="flex items-center justify-between px-1 py-2 text-xs bg-slate-50/30">
                 <span className="font-medium text-slate-600">
-                  Chênh lệch kê khai dự kiến (T - Ứng):
+                  Chênh lệch kê khai dự kiến:
                 </span>
                 <div className="text-right">
                   {netDifference === null ? (
                     <span className="text-xs text-slate-400 font-normal">Chưa xác định</span>
                   ) : (
                     <div className="flex items-center gap-1.5 justify-end">
-                      <span
-                        className={`text-xs font-bold font-mono-nums tabular-nums ${
-                          netDifference < 0
-                            ? "text-amber-700"
-                            : netDifference > 0
-                            ? "text-emerald-700"
-                            : "text-slate-900"
-                        }`}
-                      >
-                        {netDifference < 0
-                           ? `-${formatVnd(Math.abs(netDifference))}`
-                          : netDifference > 0
-                          ? `+${formatVnd(netDifference)}`
-                          : "0 ₫"}
+                      <span className="text-xs font-bold font-mono-nums tabular-nums text-slate-900">
+                        {formatVnd(Math.abs(netDifference))}
                       </span>
                       <span className="text-[11px] text-slate-500 font-normal font-sans">
                         {netDifference < 0
-                          ? "(Nhân viên có thể hoàn lại)"
+                          ? "(Nhân viên hoàn lại tiền thừa)"
                           : netDifference > 0
-                          ? "(Công ty có thể chi bổ sung)"
+                          ? "(Công ty chi thêm)"
                           : "(Cân bằng kê khai)"}
                       </span>
                     </div>
@@ -706,12 +795,12 @@ export function Intake({
           </div>
 
           {/* 5. Nút "Xác nhận và nộp hồ sơ" */}
-          <div className="pt-2">
+          <div className="pt-3 flex items-center justify-end">
             <button
               type="button"
               onClick={() => void handleConfirmAndSubmit()}
               disabled={busy}
-              className="w-full bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs py-2.5 px-4 rounded transition-colors disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
+              className="bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs py-2 px-5 rounded transition-colors disabled:opacity-40 flex items-center gap-2 cursor-pointer"
             >
               {busy ? "Đang xử lý nộp hồ sơ…" : "Xác nhận và nộp hồ sơ"}
             </button>

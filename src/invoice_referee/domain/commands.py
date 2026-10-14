@@ -32,7 +32,15 @@ class ActivityData(StrictModel):
 
 
 class Declaration(StrictModel):
-    activity_id: Id
+    # The activity the dossier is filed against. Optional since 14/10/2026:
+    # the backend links the settlement to its dossier (LINKED), and only asks
+    # the employee to confirm when the basis is weak/conflicting. An explicit
+    # id from an old client is treated as the employee's confirmation.
+    activity_id: Id | None = None
+    # The employee's confirmation/correction of the backend link: must be one
+    # of the link candidates (or a catalog activity in scope). Never a grant,
+    # budget or confirmed money.
+    confirmed_activity_id: Id | None = None
     declared_purpose: str
     notes: str | None = None
     # The employee-confirmed draft (W4). These are the values the employee saw

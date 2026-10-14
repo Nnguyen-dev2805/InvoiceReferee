@@ -142,7 +142,9 @@ def health(request: Request) -> dict[str, object]:
         "mode": request.app.state.mode,
         "python": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "platform": platform.system(),
-        "live_ready": bool(getattr(settings, "live_ready", False)) if settings else False,
+        "live_ready": bool(getattr(settings, "live_ready", False))
+        if settings
+        else False,
         "langsmith_ready": bool(getattr(settings, "langsmith_ready", False))
         if settings
         else False,
@@ -249,7 +251,9 @@ def get_source_content(request: Request, root_id: str, source_id: str) -> FileRe
                 file_path = candidate
                 break
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Tệp chứng từ không tồn tại trên máy chủ.")
+        raise HTTPException(
+            status_code=404, detail="Tệp chứng từ không tồn tại trên máy chủ."
+        )
 
     media_type = (
         "application/pdf"
@@ -262,7 +266,6 @@ def get_source_content(request: Request, root_id: str, source_id: str) -> FileRe
         filename=matching.filename or "document.pdf",
         content_disposition_type="inline",
     )
-
 
 
 @router.post("/cases/{root_id}/sources")
@@ -339,9 +342,15 @@ def _prune_empty_upload_dirs(uploads_dir: Path, tenant: str, root_id: str) -> No
 
 
 @router.post("/verify")
-async def run_verify(request: Request, payload: views.VerifyRequest) -> dict[str, object]:
+async def run_verify(
+    request: Request, payload: views.VerifyRequest
+) -> dict[str, object]:
     """Run a suite through the workflow and score with independent gold (§8)."""
-    from invoice_referee.evaluation.packets import load_gold, load_input, load_stub_readings
+    from invoice_referee.evaluation.packets import (
+        load_gold,
+        load_input,
+        load_stub_readings,
+    )
     from invoice_referee.evaluation.runner import EvaluationRunner
     from invoice_referee.evaluation.scorer import IndependentScorer
     from invoice_referee.evaluation.suites import select_suite
@@ -356,7 +365,9 @@ async def run_verify(request: Request, payload: views.VerifyRequest) -> dict[str
         packet_input = load_input(packet_dir, stage_id="ban-dau")
         if payload.mode == "STUB":
             packet_input = packet_input.model_copy(
-                update={"transcription": load_stub_readings(packet_dir, stage_id="ban-dau")}
+                update={
+                    "transcription": load_stub_readings(packet_dir, stage_id="ban-dau")
+                }
             )
         actual = await runner.run(packet_input, payload.mode)
         gold = load_gold(packet_dir, stage_id="ban-dau")
@@ -411,6 +422,7 @@ async def submit_case(
             root_id=root_id,
             declaration=Declaration(
                 activity_id=payload.activity_id,
+                confirmed_activity_id=payload.confirmed_activity_id,
                 declared_purpose=payload.declared_purpose,
                 notes=payload.notes,
                 declared_name=payload.declared_name,
@@ -534,17 +546,28 @@ async def advance_draft(
     return draft._asdict()
 
 
+@router.get("/cases/{root_id}/settlement/draft")
+async def get_settlement_draft(
+    request: Request,
+    root_id: str,
+) -> dict[str, object]:
+    """Return prefilled draft for an existing case (reusing persisted report)."""
+    session = _require_session(request)
+    workflow = _workflow(request)
+    return await workflow.get_settlement_draft(session, root_id)
+
+
 @router.post("/cases/{root_id}/settlement/draft")
 async def settlement_draft(
     request: Request,
     root_id: str,
-    files: list[UploadFile] = File(...),
+    files: list[UploadFile] = File(default=[]),
 ) -> dict[str, object]:
     """Read uploaded settlement documents and return a prefilled draft for review."""
     session = _require_session(request)
     workflow = _workflow(request)
     if not files:
-        raise HTTPException(status_code=400, detail="Chưa chọn chứng từ.")
+        return await workflow.get_settlement_draft(session, root_id)
     uploads: list[tuple[str, str, bytes]] = []
     for upload in files:
         data = await upload.read()
@@ -593,4 +616,3 @@ async def override_case(
             ),
         ),
     )
-

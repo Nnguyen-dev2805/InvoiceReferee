@@ -26,7 +26,9 @@ class DocumentProfile:
     @property
     def critical_fields(self) -> frozenset[str]:
         return frozenset(
-            name for name, importance in self.field_importance.items() if importance == "CRITICAL"
+            name
+            for name, importance in self.field_importance.items()
+            if importance == "CRITICAL"
         )
 
 
@@ -86,6 +88,10 @@ _SETTLEMENT_FORM = DocumentProfile(
         "printed_reimbursement": "CRITICAL",
         "amount_words": "CRITICAL",
         "case_no_evidence_reason": "NON_CRITICAL",
+        # An advance/dossier number printed on the form (14/10/2026): optional
+        # evidence for backend dossier linking (DOCUMENT_REFERENCE). The LLM
+        # extracts it with quote refs; code decides the link.
+        "advance_reference": "NON_CRITICAL",
     },
     allowed_fields=(
         "declared_name",
@@ -99,6 +105,7 @@ _SETTLEMENT_FORM = DocumentProfile(
         "printed_reimbursement",
         "amount_words",
         "case_no_evidence_reason",
+        "advance_reference",
     ),
     field_types={
         "declared_advance": "money",
@@ -109,7 +116,9 @@ _SETTLEMENT_FORM = DocumentProfile(
 )
 
 
-def required_fields_for(document_type: str, activity_profile: str | None) -> tuple[str, ...]:
+def required_fields_for(
+    document_type: str, activity_profile: str | None
+) -> tuple[str, ...]:
     """The required fields for a document type under an activity profile.
 
     Common settlement fields apply to every profile; the TRAVEL refinement adds
@@ -123,6 +132,7 @@ def required_fields_for(document_type: str, activity_profile: str | None) -> tup
     if document_type == "SETTLEMENT_FORM" and activity_profile == "TRAVEL":
         return _SETTLEMENT_FORM_COMMON + _SETTLEMENT_FORM_TRAVEL
     return profile.required_fields
+
 
 _E_INVOICE = DocumentProfile(
     required_fields=("issuer_name", "document_number", "document_date", "total_amount"),
@@ -148,6 +158,9 @@ _RECEIPT_LIKE = DocumentProfile(
         "payer_name",
         "collection_reason",
         "payment_confirmation_text",
+        # A printed advance/dossier code (14/10/2026, ADR0008): optional
+        # evidence for backend dossier linking, never required.
+        "advance_reference",
     ),
 )
 
@@ -203,6 +216,9 @@ _PAYMENT_PROOF = DocumentProfile(
         "event_at": "CRITICAL",
         "transaction_reference": "CRITICAL",
         "transaction_status": "CRITICAL",
+        # A printed advance/dossier code (14/10/2026, ADR0008): optional
+        # evidence for backend dossier linking, never required.
+        "advance_reference": "NON_CRITICAL",
     },
     allowed_fields=(
         "payment_provider",
@@ -216,6 +232,7 @@ _PAYMENT_PROOF = DocumentProfile(
         "account_suffix",
         "amount",
         "currency",
+        "advance_reference",
     ),
 )
 
@@ -227,6 +244,9 @@ _CARD_SLIP = DocumentProfile(
         "transaction_reference": "CRITICAL",
         "transaction_status": "CRITICAL",
         "card_suffix": "NON_CRITICAL",
+        # A printed advance/dossier code (14/10/2026, ADR0008): optional
+        # evidence for backend dossier linking, never required.
+        "advance_reference": "NON_CRITICAL",
     },
     allowed_fields=(
         "payment_provider",
@@ -235,6 +255,7 @@ _CARD_SLIP = DocumentProfile(
         "authorization_code",
         "transaction_status",
         "card_suffix",
+        "advance_reference",
     ),
 )
 

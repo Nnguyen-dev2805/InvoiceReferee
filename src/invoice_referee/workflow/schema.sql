@@ -90,6 +90,10 @@ CREATE TABLE IF NOT EXISTS context_activities (
     -- Server-owned business profile (T1): TRAVEL or WORK_EXPENSE. Drives the
     -- paper contract refinement; never a client-supplied value.
     profile            TEXT NOT NULL DEFAULT 'TRAVEL',
+    -- The namespaced advance/dossier reference(s) this activity is known by
+    -- (e.g. "TU-2026-001"). A settlement document that prints one of these can be
+    -- linked by DOCUMENT_REFERENCE (14/10/2026). A bare number is not a global id.
+    references_json    TEXT NOT NULL DEFAULT '[]',
     -- Activity context is per tenant: the same activity id in another tenant
     -- is a separate (proposed) record, never this tenant's catalog entry.
     PRIMARY KEY (tenant, activity_id)

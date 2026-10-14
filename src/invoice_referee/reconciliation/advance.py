@@ -93,7 +93,9 @@ def _status(document: DocumentAnalysis) -> AdvanceStatus:
     # A receipt-like cash voucher may state the handover in
     # `payment_confirmation_text` ("Số tiền đã giao … đã nhận …"); a stated
     # handover is COMPLETED, otherwise the status stays UNKNOWN.
-    confirmation = _found_value(document, "payment_confirmation_text", "collection_reason")
+    confirmation = _found_value(
+        document, "payment_confirmation_text", "collection_reason"
+    )
     if confirmation is not None:
         text = str(confirmation).casefold()
         if "đã nhận" in text or "đã giao" in text or "hoàn tất" in text:
@@ -101,7 +103,9 @@ def _status(document: DocumentAnalysis) -> AdvanceStatus:
     return "UNKNOWN"
 
 
-def _method(document: DocumentAnalysis, method_hint: str | None) -> AdvanceMethod | None:
+def _method(
+    document: DocumentAnalysis, method_hint: str | None
+) -> AdvanceMethod | None:
     if method_hint in ("TRANSFER", "CASH"):
         return method_hint  # type: ignore[return-value]
     # A payment proof that names a provider/account implies a transfer; a
@@ -109,7 +113,9 @@ def _method(document: DocumentAnalysis, method_hint: str | None) -> AdvanceMetho
     text = " ".join(
         str(c.value) for c in document.fields if c.state == "FOUND"
     ).casefold()
-    if any(token in text for token in ("chuyển khoản", "transfer", "ngân hàng", "bank")):
+    if any(
+        token in text for token in ("chuyển khoản", "transfer", "ngân hàng", "bank")
+    ):
         return "TRANSFER"
     if any(token in text for token in ("tiền mặt", "cash", "phiếu chi")):
         return "CASH"
@@ -126,11 +132,10 @@ def draft_advance_from_document(
     """Prefill an advance-received draft from one read document (pure)."""
     amount = parse_vnd(_found_value(document, "amount", "total_amount"))
     payer_name = _found_value(document, "payer_name", "issuer_name")
-    # The receiver is the dossier's employee: a cash voucher names the payee in
-    # `payee_name` or (receipt-like) leaves it implicit. When the document does
-    # not name a receiver, the scoped employee is the payee by construction — the
-    # accountant still confirms, so this is a prefill, not an assertion.
-    payee_name = _found_value(document, "payee_name", "buyer_person_name") or employee
+    # The receiver stays unresolved when the document does not name one: the
+    # server must NOT substitute the dossier employee and pretend it matched
+    # (14/10/2026). The accountant resolves the missing payee with evidence.
+    payee_name = _found_value(document, "payee_name", "buyer_person_name")
     reference = _found_value(document, "transaction_reference", "document_number")
     event_at = _found_value(document, "event_at", "document_date")
 

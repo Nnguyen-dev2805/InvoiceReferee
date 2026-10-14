@@ -62,7 +62,7 @@ export const api = {
 
 export async function submitCase(
   rootId: string,
-  activityId: string,
+  activityId: string | null,
   declaredPurpose: string,
   version: number,
   employeePaidClaims: Array<{
@@ -80,6 +80,7 @@ export async function submitCase(
     declared_advance?: number | null;
     incurred_total?: number | null;
     original_declared_advance?: number | null;
+    confirmed_activity_id?: string | null;
   } = {},
 ): Promise<CommandResultView> {
   return request<CommandResultView>(
@@ -173,6 +174,7 @@ export async function advanceDraft(
   event_at: string | null;
   missing_fields: string[];
   requires_confirmation: boolean;
+  refs?: Array<{ source_id: string; source_sha256: string; page: number | null; exact_quote: string }>;
 }> {
   const form = new FormData();
   for (const file of files) form.append("files", file);
@@ -204,6 +206,27 @@ export interface SettlementInvoiceItem {
   amount: number | null;
 }
 
+export interface SettlementLinkCandidate {
+  activity_id: string;
+  name: string;
+  basis: string | null;
+  amount: number | null;
+  occurred_at: string | null;
+  employee: string | null;
+}
+
+export interface SettlementLink {
+  status: "LINKED" | "NEEDS_CONFIRMATION" | "NOT_FOUND" | "CONFLICT";
+  activity_id: string | null;
+  basis: string | null;
+  candidates: SettlementLinkCandidate[];
+  reasons: string[];
+  conflicting_fields: string[];
+  owner: string | null;
+  requires_confirmation: boolean;
+  inherited: boolean;
+}
+
 export interface SettlementDraftResponse {
   declared_name: string | null;
   destination: string | null;
@@ -221,6 +244,7 @@ export interface SettlementDraftResponse {
   field_states?: Record<string, string>;
   provider_mode?: string | null;
   data_origin?: string | null;
+  link?: SettlementLink | null;
 }
 
 export interface SettlementArithmeticFinding {
@@ -240,6 +264,17 @@ export async function settlementDraft(
     method: "POST",
     headers: { "X-Command-Id": newCommandId() },
     body: form,
+    credentials: "same-origin",
+  });
+  return parse<SettlementDraftResponse>(response);
+}
+
+export async function getSettlementDraft(
+  rootId: string,
+): Promise<SettlementDraftResponse> {
+  const response = await fetch(`/api/cases/${rootId}/settlement/draft`, {
+    method: "GET",
+    headers: { "X-Command-Id": newCommandId() },
     credentials: "same-origin",
   });
   return parse<SettlementDraftResponse>(response);
