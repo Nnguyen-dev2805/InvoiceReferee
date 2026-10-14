@@ -135,7 +135,7 @@ Money/quantity normalization is code-owned and uses `Decimal` from literal numer
 - [x] Update contracts §9 so per-source `EvidenceReader.read` is async OCR-only, root `read_root` is async, all X-Kiro calls are async/budgeted, and pure validation/matching stay sync; pin the 12-attempt batch schedule and source-candidate-only consumer boundary.
 - [x] Add a case-to-taxonomy/role compatibility table and type-specific schema matrix for all accepted document types. Pin profile/critical-field tables to Hoangha `policy/document_validity.py` in revision `1ee33487e2770ebd9e5ae65b994bbd3f3a4dd7a8`; pin confidence transitions to `application/process_case.py`. Do not describe model output as fact or legal validity.
 - [x] Verify the canonical docs say Q32–Q34/finance policy decisions remain outside the scope and that `UNKNOWN`/missing confidence cannot produce a financial conclusion.
-- [ ] Check links, headings, enum spellings, and exact thresholds with `rtk proxy rg`; `rtk proxy git diff --check` must pass.
+- [x] Check links, headings, enum spellings, and exact thresholds with `rtk proxy rg`; `rtk proxy git diff --check` must pass.
 
 **Gate:** Canonical design/contracts and this plan agree on every enum, field state, threshold, type/role pair, and side-effect boundary.
 
