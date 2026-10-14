@@ -66,7 +66,12 @@ class StubClassifier:
                 {"source_id": source_id, "page_range": [1, 1],
                  "document_type": "SETTLEMENT_FORM", "roles": ["SETTLEMENT_DECLARATION"]}
             ]}
-        return {"fields": [], "lines": []}
+        # One FOUND field with a real quote from the fake OCR text, so the run is
+        # genuinely usable (a run with no FOUND field is a technical failure).
+        return {"fields": [
+            {"field": "printed_total", "state": "FOUND", "value": "100000",
+             "quote": "Tổng cộng: 100.000", "page": 1}
+        ], "lines": []}
 
 
 def _workflow(tmp_path: Path) -> CaseWorkflow:
@@ -286,3 +291,27 @@ async def test_source_change_before_publish_is_not_published(tmp_path: Path) -> 
     # report is attached and the case is not EVIDENCE_READY.
     assert view.evidence_report is None
     assert view.state != "EVIDENCE_READY"
+
+
+async def test_unreadable_evidence_is_not_a_false_success(tmp_path: Path) -> None:
+    # If classification/extraction yields nothing usable, the case must not be
+    # presented as EVIDENCE_READY with no explanation (never a false success).
+    wf = _workflow(tmp_path)
+    root = await _root_with_source(wf)
+
+    class EmptyClassifier:
+        async def complete_json(self, *, system: str, user: str, budget: RunBudget) -> dict:
+            if "classify" in system.lower():
+                return {"documents": []}
+            return {"fields": [], "lines": []}
+
+    wf.enable_evidence_read(
+        reader=FileOcrReader(provider=FakeEvidenceReader()), classifier=EmptyClassifier(),
+        artifacts_root=tmp_path / "artifacts", provider_mode="LIVE",
+    )
+    await _submit(wf, root, "activity:travel-a", "cmd:empty")
+    await wf.run_evidence_job_for(root)
+    view = wf.view(_ctx(wf, "re"), root)
+    # A visible problem, not a cheerful "ready".
+    assert view.problems
+    assert view.state == "TECHNICAL_ERROR"

@@ -27,6 +27,39 @@ from invoice_referee.evidence.xkiro import XkiroSchemaError
 _DIGITS = re.compile(r"\d")
 _NUMBER = re.compile(r"(\d{1,3}(?:[.\s]\d{3})+|\d+)")
 
+# Model synonyms → the profile vocabulary (plan §12). Code owns this map so a
+# correctly-read invoice is not reported as missing required fields.
+_FIELD_ALIASES: dict[str, str] = {
+    # Invoice-level synonyms only. Generic words (amount, number, date) are NOT
+    # aliased: a settlement row's `amount` means `line_amount`, not `total_amount`
+    # (plan §12), and aliasing it would corrupt row matching.
+    "invoice_number": "document_number",
+    "invoice_no": "document_number",
+    "seller_name": "issuer_name",
+    "seller": "issuer_name",
+    "seller_tax_code": "issuer_tax_code",
+    "seller_tax_id": "issuer_tax_code",
+    "issuer_tax_id": "issuer_tax_code",
+    "invoice_date": "document_date",
+    "issue_date": "document_date",
+    "symbol": "serial_number",
+    "symbol_code": "serial_number",
+    "serial": "serial_number",
+    "template": "template_number",
+    "payment_method": "payment_method_text",
+    "grand_total": "total_amount",
+    "vat": "tax",
+    "vat_amount": "tax",
+    "buyer_tax_id": "buyer_tax_code",
+    "currency_code": "currency",
+}
+
+
+def canonical_field_name(name: str) -> str:
+    """Map a model field synonym to the code-owned profile vocabulary."""
+    key = (name or "").strip()
+    return _FIELD_ALIASES.get(key, key)
+
 
 def _normalize_number(text: str) -> Decimal | None:
     match = _NUMBER.search(text or "")
@@ -51,11 +84,32 @@ def _quote_supported(quote: str, haystack: str) -> bool:
     return quote.strip() in haystack
 
 
+_ISO_DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
+
+
+def _date_supported(iso: str, quote: str) -> bool | None:
+    """An ISO date is supported when its y/m/d appear in the quote's own date.
+
+    Handles a source date written as prose ("Ngày 10 tháng 10 năm 2026").
+    Returns None when the value is not an ISO date.
+    """
+    match = _ISO_DATE.match(iso)
+    if match is None:
+        return None
+    year, month, day = (int(g) for g in match.groups())
+    nums = {int(n) for n in re.findall(r"\d+", quote)}
+    return {year, month, day} <= nums
+
+
 def _value_supported(value: object, quote: str) -> bool:
     """The normalized value must be derivable from the exact quote."""
     if value is None:
         return False
     text = str(value).strip()
+    # A normalized date (ISO) is supported when the quote carries the same date.
+    date_ok = _date_supported(text, quote)
+    if date_ok is not None:
+        return date_ok
     # Money/number: the digits must appear in the quote (formatting aside).
     if _DIGITS.search(text) and _DIGITS.search(quote):
         quote_num = _normalize_number(quote)
@@ -91,13 +145,19 @@ def _validate_field(
     if not isinstance(entry, dict):
         return FieldCandidate(field="", state="NOT_APPLICABLE")
     state = str(entry.get("state") or "NOT_APPLICABLE")
-    field_name = str(entry.get("field") or "")
+    # Accept the canonical `field` and the `name` alias a model may emit, then
+    # map model synonyms to the profile vocabulary (plan §12).
+    field_name = canonical_field_name(
+        str(entry.get("field") or entry.get("name") or entry.get("field_name") or "")
+    )
     if state != "FOUND":
         return FieldCandidate(field=field_name, state=state)  # type: ignore[arg-type]
-    quote = str(entry.get("quote") or "")
+    quote = str(entry.get("quote") or entry.get("exact_quote") or "")
     page = int(entry.get("page") or default_page)
     value = entry.get("value")
-    if not _quote_supported(quote, haystack) or not _value_supported(value, quote):
+    # A FOUND value needs an exact quote from the source AND a value derivable
+    # from it; without a quote it cannot be FOUND (plan E5).
+    if not quote or not _quote_supported(quote, haystack) or not _value_supported(value, quote):
         return FieldCandidate(field=field_name, state="UNREADABLE")
     return FieldCandidate(
         field=field_name,
@@ -117,11 +177,13 @@ async def extract_document(
     """Extract one document's fields/lines and verify provenance (plan E5)."""
     haystack = _source_pages_text(ocr, classification.page_range)
     system = (
-        "Extract the fields of this document from its OCR text. Return every "
-        "applicable field with an explicit state (FOUND/NOT_PRESENT/UNREADABLE/"
-        "AMBIGUOUS/NOT_APPLICABLE) and, for FOUND, an exact quote and the page. "
-        "Never invent a value; a missing value is NOT_PRESENT, not zero. Reply as "
-        "JSON {\"fields\": [...], \"lines\": [...]}."
+        "Extract the fields of this document from its OCR text. Reply as JSON "
+        "{\"fields\": [...], \"lines\": [...]}. Each field object uses EXACTLY "
+        "these keys: field (the field name), state (one of FOUND, NOT_PRESENT, "
+        "UNREADABLE, AMBIGUOUS, NOT_APPLICABLE), value (only when state=FOUND), "
+        "quote (the exact substring copied from the OCR text; required when "
+        "state=FOUND), page (1-based). Do not rename these keys (never use "
+        "'name'). Never invent a value; a missing value is NOT_PRESENT, not zero."
     )
     user = _serialize(ocr, classification)
     payload = await _call_with_one_repair(llm, system=system, user=user, budget=budget)

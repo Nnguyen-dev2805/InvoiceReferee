@@ -60,8 +60,24 @@ async def run_evidence_job(workflow, job_id: str) -> None:
         if job is not None and not workflow._evidence_basis_current(cx, job):
             workflow._mark_evidence_job(cx, job_id, phase="DONE", status="CANCELLED")
             return
+        # A run that produced nothing usable (no documents, or no FOUND field at
+        # all) is a technical failure, not a cheerful "ready" (never a false
+        # success). The report is still stored so the reason is inspectable.
+        if not _evidence_usable(report):
+            workflow._fail_evidence_job(
+                cx, job_id, "không đọc/trích xuất được dữ liệu dùng được từ chứng từ"
+            )
+            return
         workflow._publish_evidence_report(cx, tenant=tenant, root_id=root_id, report=report)
         workflow._mark_evidence_job(cx, job_id, phase="DONE", status="COMPLETED")
+
+
+def _evidence_usable(report) -> bool:
+    """True when the read produced at least one document with a FOUND field."""
+    for document in getattr(report, "documents", ()):
+        if any(field.state == "FOUND" for field in getattr(document, "fields", ())):
+            return True
+    return False
 
 
 async def drain_evidence_jobs(workflow, stop: asyncio.Event) -> None:

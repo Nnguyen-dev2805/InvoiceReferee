@@ -52,6 +52,40 @@ def compatible_roles(document_type: str) -> tuple[DocumentEvidenceRole, ...]:
     return DEFAULT_TYPE_ROLES.get(document_type, ("UNKNOWN",))
 
 
+def _first_str(entry: dict, *keys: str) -> str:
+    """The first non-empty string among `keys` (tolerant of model aliases)."""
+    for key in keys:
+        value = entry.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _role_list(entry: dict) -> tuple[str, ...]:
+    """Roles from `roles` or the `evidence_role` alias; a bare string is a list."""
+    raw = entry.get("roles")
+    if raw is None:
+        raw = entry.get("evidence_role")
+    if isinstance(raw, str):
+        return (raw.strip(),) if raw.strip() else ()
+    if isinstance(raw, (list, tuple)):
+        return tuple(str(item).strip() for item in raw if str(item).strip())
+    return ()
+
+
+def _as_page_range(raw: object, page_text: dict[int, str]) -> tuple[int, int]:
+    """A model may omit page_range; default to the whole source, clamped."""
+    pages = sorted(page_text) or [1]
+    if isinstance(raw, (list, tuple)) and len(raw) >= 2:
+        try:
+            start, end = int(raw[0]), int(raw[1])
+            if start >= 1 and end >= start:
+                return start, end
+        except (TypeError, ValueError):
+            pass
+    return pages[0], pages[-1]
+
+
 def _ref(source_id: str, digest: str, page: int, quote: str) -> EvidenceRef:
     return EvidenceRef(
         source_id=source_id,
@@ -83,8 +117,16 @@ async def classify_documents(
     system = (
         "You classify each document's type and evidence role from its OCR text "
         "only (never the filename). Reply as JSON {\"documents\": [...]}, one "
-        "entry per document unit, keyed by the submitted source_id. An unclear "
-        "document is UNKNOWN with alternatives; do not guess a schema."
+        "entry per document unit, with EXACTLY these keys: "
+        "source_id (echo the submitted id), page_range ([start, end], 1-based), "
+        "document_type (one of: "
+        + ", ".join(DEFAULT_TYPE_ROLES)
+        + "), roles (a JSON array drawn from: SETTLEMENT_DECLARATION, "
+        "ORIGINAL_EXPENSE_EVIDENCE, PAYMENT_EVIDENCE, SUPPORTING_DOCUMENT, "
+        "UNKNOWN), alternative_document_types (array, optional), "
+        "classification_confidence (0..1), signals (array). "
+        "Do not rename these keys and do not add a details object. An unclear "
+        "document is document_type UNKNOWN with alternatives; do not guess."
     )
     user = _serialize(ocr)
     try:
@@ -104,19 +146,19 @@ async def classify_documents(
         source_id = str(entry.get("source_id") or "")
         if source_id not in expected:
             raise XkiroError(f"classification named an unknown source: {source_id}")
-        raw_type = str(entry.get("document_type") or "UNKNOWN")
-        # A model may return a free-form label; anything outside the code-owned
-        # taxonomy maps to UNKNOWN (never a guessed schema, never a crash).
+        # Accept the canonical keys and the aliases a model may emit instead
+        # (type / evidence_role). A free-form label outside the taxonomy maps to
+        # UNKNOWN — never a guessed schema, never a crash.
+        raw_type = _first_str(entry, "document_type", "type", "documentType", "doc_type")
         document_type = raw_type if raw_type in DEFAULT_TYPE_ROLES else "UNKNOWN"
         allowed = compatible_roles(document_type)
-        # Keep only roles the code map allows for this type.
         roles = tuple(
-            role for role in entry.get("roles", []) if role in allowed
+            role for role in _role_list(entry) if role in allowed
         )
         if not roles:
             roles = allowed
-        page_range = entry.get("page_range") or [1, 1]
-        start, end = int(page_range[0]), int(page_range[1])
+        page_range = _as_page_range(entry.get("page_range"), page_text[source_id])
+        start, end = page_range
         # The model proposes a range; code validates it against the OCR pages
         # and rejects an out-of-range or overlapping incompatible unit (plan E4).
         page_numbers = set(page_text[source_id])
@@ -150,7 +192,13 @@ async def classify_documents(
                     alt for alt in (entry.get("alternative_document_types") or ())
                     if alt in DEFAULT_TYPE_ROLES
                 ),
-                classification_confidence=entry.get("classification_confidence"),
+                classification_confidence=(
+                    entry.get("classification_confidence")
+                    if isinstance(entry.get("classification_confidence"), (int, float))
+                    else entry.get("confidence")
+                    if isinstance(entry.get("confidence"), (int, float))
+                    else None
+                ),
                 signals=tuple(entry.get("signals") or ()),
                 refs=(_ref(source_id, digest, start, quote),),
             )

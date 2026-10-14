@@ -233,3 +233,43 @@ async def test_unknown_alternative_type_is_dropped() -> None:
     ]})
     result = await classify_documents(ocr, llm=llm, budget=RunBudget())
     assert result[0].alternative_document_types == ("PAPER_RECEIPT",)
+
+
+async def test_accepts_type_and_evidence_role_aliases() -> None:
+    # A real model returned {"type": ..., "evidence_role": ...} instead of the
+    # canonical document_type/roles; the parser must accept the aliases.
+    ocr = (_ocr("source:1", (_page(1, "HÓA ĐƠN GIÁ TRỊ GIA TĂNG ĐIỆN TỬ"),)),)
+    llm = FakeLlm({"documents": [
+        {"source_id": "source:1", "type": "E_INVOICE",
+         "evidence_role": "ORIGINAL_EXPENSE_EVIDENCE", "confidence": 0.98}
+    ]})
+    result = await classify_documents(ocr, llm=llm, budget=RunBudget())
+    assert result[0].document_type == "E_INVOICE"
+    assert result[0].roles == ("ORIGINAL_EXPENSE_EVIDENCE",)
+
+
+async def test_accepts_single_string_role() -> None:
+    ocr = (_ocr("source:1", (_page(1, "x"),)),)
+    llm = FakeLlm({"documents": [
+        {"source_id": "source:1", "document_type": "E_INVOICE",
+         "roles": "ORIGINAL_EXPENSE_EVIDENCE"}
+    ]})
+    result = await classify_documents(ocr, llm=llm, budget=RunBudget())
+    assert result[0].roles == ("ORIGINAL_EXPENSE_EVIDENCE",)
+
+
+async def test_classification_prompt_pins_the_schema_keys() -> None:
+    # The prompt must name the exact keys the parser reads, or the model invents
+    # its own (type/evidence_role) and everything degrades to UNKNOWN.
+    captured: dict[str, str] = {}
+
+    class RecLlm:
+        async def complete_json(self, *, system: str, user: str, budget: RunBudget) -> dict:
+            captured["system"] = system
+            return {"documents": []}
+
+    await classify_documents((_ocr("source:1", (_page(1, "x"),)),), llm=RecLlm(), budget=RunBudget())
+    for key in ("document_type", "roles", "page_range", "source_id"):
+        assert key in captured["system"]
+    # And it lists the accepted type values so the model picks from them.
+    assert "E_INVOICE" in captured["system"]

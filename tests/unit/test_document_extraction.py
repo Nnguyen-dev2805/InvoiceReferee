@@ -197,3 +197,78 @@ async def test_line_field_with_mismatching_value_is_demoted() -> None:
     analysis = await extract_document(_ocr(), _classification(), llm=llm, budget=RunBudget())
     amount = next(f for f in analysis.line_items[0].fields if f.field == "amount")
     assert amount.state != "FOUND"
+
+
+async def test_accepts_field_name_alias() -> None:
+    # A real model returned {"name": ..., "value": ...} instead of {"field": ...};
+    # the parser must accept the alias or every field becomes name ""/UNREADABLE.
+    llm = FakeLlm({
+        "fields": [
+            {"name": "total_amount", "state": "FOUND", "value": "450000",
+             "quote": "Tổng cộng: 450.000", "page": 1},
+        ],
+        "lines": [],
+    })
+    analysis = await extract_document(_ocr(), _classification(), llm=llm, budget=RunBudget())
+    assert any(f.field == "total_amount" for f in analysis.fields)
+    assert all(f.field != "" for f in analysis.fields)
+
+
+async def test_found_without_quote_is_not_found() -> None:
+    # The model gave a value but no supporting quote; it cannot be FOUND.
+    llm = FakeLlm({
+        "fields": [{"name": "total_amount", "state": "FOUND", "value": "450000", "page": 1}],
+        "lines": [],
+    })
+    analysis = await extract_document(_ocr(), _classification(), llm=llm, budget=RunBudget())
+    total = next(f for f in analysis.fields if f.field == "total_amount")
+    assert total.state != "FOUND"
+
+
+async def test_extraction_prompt_pins_the_schema_keys() -> None:
+    captured: dict[str, str] = {}
+
+    class RecLlm:
+        async def complete_json(self, *, system: str, user: str, budget: RunBudget) -> dict:
+            captured["system"] = system
+            return {"fields": [], "lines": []}
+
+    await extract_document(_ocr(), _classification(), llm=RecLlm(), budget=RunBudget())
+    for key in ("field", "state", "value", "quote", "page"):
+        assert key in captured["system"]
+
+
+async def test_field_name_aliases_are_canonicalized() -> None:
+    # Plan §12: model synonyms map to the profile vocabulary, so a correctly
+    # read invoice is not reported as missing required fields.
+    from invoice_referee.evidence.extraction import canonical_field_name
+
+    assert canonical_field_name("invoice_number") == "document_number"
+    assert canonical_field_name("seller_name") == "issuer_name"
+    assert canonical_field_name("seller_tax_code") == "issuer_tax_code"
+    assert canonical_field_name("invoice_date") == "document_date"
+    assert canonical_field_name("symbol_code") == "serial_number"
+    assert canonical_field_name("payment_method") == "payment_method_text"
+    assert canonical_field_name("total_amount") == "total_amount"  # already canonical
+    assert canonical_field_name("") == ""
+
+
+async def test_extraction_canonicalizes_field_names_end_to_end() -> None:
+    llm = FakeLlm({
+        "fields": [
+            {"name": "seller_name", "state": "FOUND", "value": "Công ty ABC",
+             "quote": "HÓA ĐƠN", "page": 1},
+        ],
+        "lines": [],
+    })
+    analysis = await extract_document(_ocr(), _classification(), llm=llm, budget=RunBudget())
+    assert any(f.field == "issuer_name" for f in analysis.fields)
+
+
+def test_iso_date_value_supported_by_vietnamese_quote() -> None:
+    from invoice_referee.evidence.extraction import _value_supported
+
+    # Model normalized a Vietnamese date to ISO; the quote holds the same date.
+    assert _value_supported("2026-10-10", "Ngày 10 tháng 10 năm 2026")
+    # A different date is not supported.
+    assert not _value_supported("2026-10-11", "Ngày 10 tháng 10 năm 2026")
