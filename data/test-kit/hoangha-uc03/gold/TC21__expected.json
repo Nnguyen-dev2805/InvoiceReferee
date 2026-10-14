@@ -1,0 +1,100 @@
+{
+  "schema_version": "2.0",
+  "case_id": "TC21",
+  "title": "Một hóa đơn được khai báo nhưng chưa đính kèm",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_thue_hoi_truong.pdf",
+      "hoa_don_in_an.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "uncertainty_type": "FACTUAL_UNKNOWN",
+    "primary_rule": "SET_EVIDENCE_MISSING_001",
+    "findings": [
+      "SET_EVIDENCE_MISSING_001"
+    ],
+    "followup": null
+  },
+  "implementation_status": "GAP_EXPECTED",
+  "accounting_facts": {
+    "report_lines": [
+      {
+        "line_id": "L01",
+        "description": "Thuê hội trường",
+        "invoice_ref": "00002101",
+        "amount": "10800000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L02",
+        "description": "In tài liệu",
+        "invoice_ref": "00002102",
+        "amount": "2160000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L03",
+        "description": "Nước uống hội nghị",
+        "invoice_ref": "00002103",
+        "amount": "1080000",
+        "note": "Đính kèm hóa đơn"
+      }
+    ],
+    "report_line_sum": "14040000",
+    "report_total": "14040000",
+    "advance_amount": "15000000",
+    "declared_difference": "960000",
+    "evidence": [
+      {
+        "evidence_id": "EV01",
+        "file": "hoa_don_thue_hoi_truong.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00002101",
+        "description": "Thuê hội trường",
+        "amount": "10800000"
+      },
+      {
+        "evidence_id": "EV02",
+        "file": "hoa_don_in_an.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00002102",
+        "description": "In tài liệu hội nghị",
+        "amount": "2160000"
+      }
+    ]
+  },
+  "line_support_expectations": [
+    {
+      "report_line_id": "L01",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_thue_hoi_truong.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn khớp."
+    },
+    {
+      "report_line_id": "L02",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_in_an.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn khớp."
+    },
+    {
+      "report_line_id": "L03",
+      "support_type": "E_INVOICE",
+      "document_files": [],
+      "match_status": "MISSING_DOCUMENT",
+      "reason": "Có số hóa đơn 00002103 nhưng thiếu file tương ứng."
+    }
+  ],
+  "rationale": "Report tham chiếu hóa đơn 00002103 nhưng hồ sơ không có file tương ứng."
+}

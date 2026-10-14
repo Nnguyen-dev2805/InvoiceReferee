@@ -1,0 +1,46 @@
+{
+  "schema_version": "2.0",
+  "case_id": "03_policy_khoan_chi-TC09",
+  "group_id": "03_policy_khoan_chi",
+  "title": "Không hợp lệ - chưa xác định ngày chi",
+  "data_classification": "SYNTHETIC",
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "employee": {
+      "name": "Donal Trump",
+      "department": "Phòng Kinh doanh",
+      "position": "Nhân viên"
+    },
+    "request_form": "request_form.pdf",
+    "evidence_files": [
+      "hoa_don_0001909.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "primary_rule_id": "SET_EXPENSE_DATE_001",
+    "implementation_status": "COVERED",
+    "expected_findings": [
+      "SET_EXPENSE_DATE_001"
+    ],
+    "workflow_status": "NEEDS_REVIEW"
+  },
+  "facts": {
+    "report_total_vnd": 1400000,
+    "advance_amount_vnd": 1500000,
+    "settlement_amount_vnd": 100000,
+    "settlement_direction": "Nhân viên hoàn trả công ty",
+    "line_count": 1
+  },
+  "line_support_expectations": [
+    {
+      "item_id": "L01",
+      "description": "Phí dịch vụ kỹ thuật",
+      "amount_vnd": 1400000,
+      "reference": "0001909",
+      "note": "Đính kèm hóa đơn"
+    }
+  ],
+  "generator_notes": []
+}

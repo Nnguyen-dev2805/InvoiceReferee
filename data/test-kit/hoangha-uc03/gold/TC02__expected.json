@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "case_id": "TC02",
+  "title": "Hợp lệ công ty thanh toán thêm",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_dien_tu.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "AUTO_PROCESS",
+    "uncertainty_type": "NONE",
+    "primary_rule": null,
+    "findings": [
+      "SET_PAPER_TOTAL_001",
+      "SET_ADV_AMOUNT_001",
+      "SET_SETTLEMENT_DIFF_001",
+      "SET_APPROVAL_001"
+    ],
+    "followup": "PENDING_APPROVAL"
+  },
+  "implementation_status": "COVERED",
+  "accounting_facts": {
+    "report_line_sum": "5400000",
+    "report_total": "5400000",
+    "advance_amount": "5000000",
+    "declared_difference": "400000",
+    "invoice_subtotal": "5000000",
+    "invoice_tax": "400000",
+    "invoice_total": "5400000",
+    "buyer_tax_code": "0319999996",
+    "expected_company_tax_code": "0319999996"
+  },
+  "rationale": "Tổng chi 5.400.000 VND; công ty thanh toán thêm 400.000 VND."
+}

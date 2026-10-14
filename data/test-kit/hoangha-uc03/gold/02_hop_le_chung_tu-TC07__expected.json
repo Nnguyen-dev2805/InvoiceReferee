@@ -1,0 +1,46 @@
+{
+  "schema_version": "2.0",
+  "case_id": "02_hop_le_chung_tu-TC07",
+  "group_id": "02_hop_le_chung_tu",
+  "title": "Không hợp lệ - bằng chứng chuyển khoản chưa hoàn tất",
+  "data_classification": "SYNTHETIC",
+  "submission": {
+    "settlement_type": "EMPLOYEE_REIMBURSEMENT",
+    "source_type": "PAPER_SCAN",
+    "employee": {
+      "name": "Donal Trump",
+      "department": "Phòng Kinh doanh",
+      "position": "Nhân viên"
+    },
+    "request_form": "request_form.pdf",
+    "evidence_files": [
+      "chung_tu_GD-1807.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "primary_rule_id": "SET_DOCUMENT_VALIDITY_001",
+    "implementation_status": "COVERED",
+    "expected_findings": [
+      "PAYMENT_NOT_CONFIRMED"
+    ],
+    "workflow_status": "NEEDS_REVIEW"
+  },
+  "facts": {
+    "report_total_vnd": 450000,
+    "advance_amount_vnd": 0,
+    "settlement_amount_vnd": null,
+    "settlement_direction": "",
+    "line_count": 1
+  },
+  "line_support_expectations": [
+    {
+      "item_id": "L01",
+      "description": "Phí gửi hồ sơ",
+      "amount_vnd": 450000,
+      "reference": "GD-1807",
+      "note": "Chứng từ chuyển khoản thay thế"
+    }
+  ],
+  "generator_notes": []
+}

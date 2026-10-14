@@ -1,0 +1,859 @@
+{
+  "dataset": "hoangha-uc03",
+  "source_revision": "1ee33487e2770ebd9e5ae65b994bbd3f3a4dd7a8",
+  "v1_count": 25,
+  "v2_count": 50,
+  "cases": [
+    {
+      "case_id": "TC01",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC01__hoa_don_dien_tu.pdf",
+        "inputs/TC01__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC01__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC02",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC02__hoa_don_dien_tu.pdf",
+        "inputs/TC02__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC02__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC03",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC03__hoa_don_dien_tu.pdf",
+        "inputs/TC03__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC03__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC04",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC04__hoa_don_dien_tu.pdf",
+        "inputs/TC04__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC04__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC05",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC05__hoa_don_dien_tu.pdf",
+        "inputs/TC05__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC05__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC06",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC06__hoa_don_dien_tu.pdf",
+        "inputs/TC06__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC06__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC07",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC07__hoa_don_dien_tu.pdf",
+        "inputs/TC07__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC07__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC08",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC08__hoa_don_dien_tu.pdf",
+        "inputs/TC08__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC08__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC09",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC09__hoa_don_dien_tu.pdf",
+        "inputs/TC09__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC09__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC10",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC10__hoa_don_dien_tu.pdf",
+        "inputs/TC10__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC10__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC11",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC11__hoa_don_dien_tu.pdf",
+        "inputs/TC11__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC11__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC12",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC12__hoa_don_dien_tu.pdf",
+        "inputs/TC12__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC12__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC13",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC13__hoa_don_dien_tu.pdf",
+        "inputs/TC13__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC13__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC14",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC14__hoa_don_dien_tu.pdf",
+        "inputs/TC14__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC14__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC15",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC15__hoa_don_dien_tu.pdf",
+        "inputs/TC15__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC15__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC16",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC16__hoa_don_khach_san.pdf",
+        "inputs/TC16__hoa_don_taxi.pdf",
+        "inputs/TC16__hoa_don_ve_may_bay.pdf",
+        "inputs/TC16__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC16__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC17",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC17__hoa_don_nha_hang.pdf",
+        "inputs/TC17__hoa_don_phong_hop.pdf",
+        "inputs/TC17__report_hoan_ung.pdf",
+        "inputs/TC17__ve_dien_tu_bai_do_xe.pdf"
+      ],
+      "gold": [
+        "gold/TC17__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC18",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC18__bien_ban_nghiem_thu.pdf",
+        "inputs/TC18__hoa_don_linh_kien.pdf",
+        "inputs/TC18__report_hoan_ung.pdf",
+        "inputs/TC18__xac_nhan_chuyen_khoan.pdf"
+      ],
+      "gold": [
+        "gold/TC18__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC19",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC19__hoa_don_khach_san.pdf",
+        "inputs/TC19__hoa_don_taxi.pdf",
+        "inputs/TC19__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC19__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC20",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC20__hoa_don_nhien_lieu.pdf",
+        "inputs/TC20__report_hoan_ung.pdf",
+        "inputs/TC20__ve_dien_tu_cao_toc.pdf"
+      ],
+      "gold": [
+        "gold/TC20__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC21",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC21__hoa_don_in_an.pdf",
+        "inputs/TC21__hoa_don_thue_hoi_truong.pdf",
+        "inputs/TC21__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC21__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC22",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC22__hoa_don_thiet_bi.pdf",
+        "inputs/TC22__hoa_don_van_chuyen.pdf",
+        "inputs/TC22__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC22__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC23",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC23__hoa_don_muc_in.pdf",
+        "inputs/TC23__hoa_don_van_phong_pham.pdf",
+        "inputs/TC23__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC23__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC24",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC24__hoa_don_khach_san.pdf",
+        "inputs/TC24__hoa_don_khong_khai_bao.pdf",
+        "inputs/TC24__hoa_don_taxi.pdf",
+        "inputs/TC24__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC24__expected.json"
+      ]
+    },
+    {
+      "case_id": "TC25",
+      "set": "v1",
+      "inputs": [
+        "inputs/TC25__hoa_don_khach_san.pdf",
+        "inputs/TC25__hoa_don_ve_tau.pdf",
+        "inputs/TC25__phieu_thu_di_chuyen.pdf",
+        "inputs/TC25__report_hoan_ung.pdf"
+      ],
+      "gold": [
+        "gold/TC25__expected.json"
+      ]
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC01",
+      "set": "v2",
+      "inputs": [
+        "inputs/01_quyet_toan_so_tien-TC01__hoa_don_0001701.pdf",
+        "inputs/01_quyet_toan_so_tien-TC01__request_form.pdf"
+      ],
+      "gold": [
+        "gold/01_quyet_toan_so_tien-TC01__expected.json"
+      ]
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC02",
+      "set": "v2",
+      "inputs": [
+        "inputs/01_quyet_toan_so_tien-TC02__hoa_don_0001702.pdf",
+        "inputs/01_quyet_toan_so_tien-TC02__request_form.pdf"
+      ],
+      "gold": [
+        "gold/01_quyet_toan_so_tien-TC02__expected.json"
+      ]
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC03",
+      "set": "v2",
+      "inputs": [
+        "inputs/01_quyet_toan_so_tien-TC03__hoa_don_0001703.pdf",
+        "inputs/01_quyet_toan_so_tien-TC03__request_form.pdf"
+      ],
+      "gold": [
+        "gold/01_quyet_toan_so_tien-TC03__expected.json"
+      ]
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC04",
+      "set": "v2",
+      "inputs": [
+        "inputs/01_quyet_toan_so_tien-TC04__hoa_don_0001704.pdf",
+        "inputs/01_quyet_toan_so_tien-TC04__hoa_don_0001705.pdf",
+        "inputs/01_quyet_toan_so_tien-TC04__hoa_don_0001706.pdf",
+        "inputs/01_quyet_toan_so_tien-TC04__request_form.pdf"
+      ],
+      "gold": [
+        "gold/01_quyet_toan_so_tien-TC04__expected.json"
+      ]
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC05",
+      "set": "v2",
+      "inputs": [
+        "inputs/01_quyet_toan_so_tien-TC05__hoa_don_0001707.pdf",
+        "inputs/01_quyet_toan_so_tien-TC05__hoa_don_0001708.pdf",
+        "inputs/01_quyet_toan_so_tien-TC05__request_form.pdf"
+      ],
+      "gold": [
+        "gold/01_quyet_toan_so_tien-TC05__expected.json"
+      ]
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC06",
+      "set": "v2",
+      "inputs": [
+        "inputs/01_quyet_toan_so_tien-TC06__hoa_don_0001709.pdf",
+        "inputs/01_quyet_toan_so_tien-TC06__request_form.pdf"
+      ],
+      "gold": [
+        "gold/01_quyet_toan_so_tien-TC06__expected.json"
+      ]
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC07",
+      "set": "v2",
+      "inputs": [
+        "inputs/01_quyet_toan_so_tien-TC07__hoa_don_0001710.pdf",
+        "inputs/01_quyet_toan_so_tien-TC07__request_form.pdf"
+      ],
+      "gold": [
+        "gold/01_quyet_toan_so_tien-TC07__expected.json"
+      ]
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC08",
+      "set": "v2",
+      "inputs": [
+        "inputs/01_quyet_toan_so_tien-TC08__hoa_don_0001711.pdf",
+        "inputs/01_quyet_toan_so_tien-TC08__request_form.pdf"
+      ],
+      "gold": [
+        "gold/01_quyet_toan_so_tien-TC08__expected.json"
+      ]
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC09",
+      "set": "v2",
+      "inputs": [
+        "inputs/01_quyet_toan_so_tien-TC09__hoa_don_0001712.pdf",
+        "inputs/01_quyet_toan_so_tien-TC09__request_form.pdf"
+      ],
+      "gold": [
+        "gold/01_quyet_toan_so_tien-TC09__expected.json"
+      ]
+    },
+    {
+      "case_id": "01_quyet_toan_so_tien-TC10",
+      "set": "v2",
+      "inputs": [
+        "inputs/01_quyet_toan_so_tien-TC10__hoa_don_0001713.pdf",
+        "inputs/01_quyet_toan_so_tien-TC10__request_form.pdf"
+      ],
+      "gold": [
+        "gold/01_quyet_toan_so_tien-TC10__expected.json"
+      ]
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC01",
+      "set": "v2",
+      "inputs": [
+        "inputs/02_hop_le_chung_tu-TC01__hoa_don_0001801.pdf",
+        "inputs/02_hop_le_chung_tu-TC01__request_form.pdf"
+      ],
+      "gold": [
+        "gold/02_hop_le_chung_tu-TC01__expected.json"
+      ]
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC02",
+      "set": "v2",
+      "inputs": [
+        "inputs/02_hop_le_chung_tu-TC02__hoa_don_0001802.pdf",
+        "inputs/02_hop_le_chung_tu-TC02__request_form.pdf"
+      ],
+      "gold": [
+        "gold/02_hop_le_chung_tu-TC02__expected.json"
+      ]
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC03",
+      "set": "v2",
+      "inputs": [
+        "inputs/02_hop_le_chung_tu-TC03__hoa_don_0001803.pdf",
+        "inputs/02_hop_le_chung_tu-TC03__request_form.pdf"
+      ],
+      "gold": [
+        "gold/02_hop_le_chung_tu-TC03__expected.json"
+      ]
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC04",
+      "set": "v2",
+      "inputs": [
+        "inputs/02_hop_le_chung_tu-TC04__hoa_don_thieu_so.pdf",
+        "inputs/02_hop_le_chung_tu-TC04__request_form.pdf"
+      ],
+      "gold": [
+        "gold/02_hop_le_chung_tu-TC04__expected.json"
+      ]
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC05",
+      "set": "v2",
+      "inputs": [
+        "inputs/02_hop_le_chung_tu-TC05__hoa_don_0001805.pdf",
+        "inputs/02_hop_le_chung_tu-TC05__request_form.pdf"
+      ],
+      "gold": [
+        "gold/02_hop_le_chung_tu-TC05__expected.json"
+      ]
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC06",
+      "set": "v2",
+      "inputs": [
+        "inputs/02_hop_le_chung_tu-TC06__chung_tu_VN-ABC123.pdf",
+        "inputs/02_hop_le_chung_tu-TC06__request_form.pdf"
+      ],
+      "gold": [
+        "gold/02_hop_le_chung_tu-TC06__expected.json"
+      ]
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC07",
+      "set": "v2",
+      "inputs": [
+        "inputs/02_hop_le_chung_tu-TC07__chung_tu_GD-1807.pdf",
+        "inputs/02_hop_le_chung_tu-TC07__request_form.pdf"
+      ],
+      "gold": [
+        "gold/02_hop_le_chung_tu-TC07__expected.json"
+      ]
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC08",
+      "set": "v2",
+      "inputs": [
+        "inputs/02_hop_le_chung_tu-TC08__chung_tu_DOC-1808.pdf",
+        "inputs/02_hop_le_chung_tu-TC08__request_form.pdf"
+      ],
+      "gold": [
+        "gold/02_hop_le_chung_tu-TC08__expected.json"
+      ]
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC09",
+      "set": "v2",
+      "inputs": [
+        "inputs/02_hop_le_chung_tu-TC09__hoa_don_0001809.pdf",
+        "inputs/02_hop_le_chung_tu-TC09__request_form.pdf"
+      ],
+      "gold": [
+        "gold/02_hop_le_chung_tu-TC09__expected.json"
+      ]
+    },
+    {
+      "case_id": "02_hop_le_chung_tu-TC10",
+      "set": "v2",
+      "inputs": [
+        "inputs/02_hop_le_chung_tu-TC10__hoa_don_0001810.pdf",
+        "inputs/02_hop_le_chung_tu-TC10__request_form.pdf"
+      ],
+      "gold": [
+        "gold/02_hop_le_chung_tu-TC10__expected.json"
+      ]
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC01",
+      "set": "v2",
+      "inputs": [
+        "inputs/03_policy_khoan_chi-TC01__hoa_don_0001901.pdf",
+        "inputs/03_policy_khoan_chi-TC01__request_form.pdf"
+      ],
+      "gold": [
+        "gold/03_policy_khoan_chi-TC01__expected.json"
+      ]
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC02",
+      "set": "v2",
+      "inputs": [
+        "inputs/03_policy_khoan_chi-TC02__hoa_don_0001902.pdf",
+        "inputs/03_policy_khoan_chi-TC02__request_form.pdf"
+      ],
+      "gold": [
+        "gold/03_policy_khoan_chi-TC02__expected.json"
+      ]
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC03",
+      "set": "v2",
+      "inputs": [
+        "inputs/03_policy_khoan_chi-TC03__hoa_don_0001903.pdf",
+        "inputs/03_policy_khoan_chi-TC03__request_form.pdf"
+      ],
+      "gold": [
+        "gold/03_policy_khoan_chi-TC03__expected.json"
+      ]
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC04",
+      "set": "v2",
+      "inputs": [
+        "inputs/03_policy_khoan_chi-TC04__hoa_don_0001904.pdf",
+        "inputs/03_policy_khoan_chi-TC04__request_form.pdf"
+      ],
+      "gold": [
+        "gold/03_policy_khoan_chi-TC04__expected.json"
+      ]
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC05",
+      "set": "v2",
+      "inputs": [
+        "inputs/03_policy_khoan_chi-TC05__hoa_don_0001905.pdf",
+        "inputs/03_policy_khoan_chi-TC05__request_form.pdf"
+      ],
+      "gold": [
+        "gold/03_policy_khoan_chi-TC05__expected.json"
+      ]
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC06",
+      "set": "v2",
+      "inputs": [
+        "inputs/03_policy_khoan_chi-TC06__hoa_don_0001906.pdf",
+        "inputs/03_policy_khoan_chi-TC06__request_form.pdf"
+      ],
+      "gold": [
+        "gold/03_policy_khoan_chi-TC06__expected.json"
+      ]
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC07",
+      "set": "v2",
+      "inputs": [
+        "inputs/03_policy_khoan_chi-TC07__hoa_don_0001907.pdf",
+        "inputs/03_policy_khoan_chi-TC07__request_form.pdf"
+      ],
+      "gold": [
+        "gold/03_policy_khoan_chi-TC07__expected.json"
+      ]
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC08",
+      "set": "v2",
+      "inputs": [
+        "inputs/03_policy_khoan_chi-TC08__hoa_don_0001908.pdf",
+        "inputs/03_policy_khoan_chi-TC08__request_form.pdf"
+      ],
+      "gold": [
+        "gold/03_policy_khoan_chi-TC08__expected.json"
+      ]
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC09",
+      "set": "v2",
+      "inputs": [
+        "inputs/03_policy_khoan_chi-TC09__hoa_don_0001909.pdf",
+        "inputs/03_policy_khoan_chi-TC09__request_form.pdf"
+      ],
+      "gold": [
+        "gold/03_policy_khoan_chi-TC09__expected.json"
+      ]
+    },
+    {
+      "case_id": "03_policy_khoan_chi-TC10",
+      "set": "v2",
+      "inputs": [
+        "inputs/03_policy_khoan_chi-TC10__hoa_don_0001910.pdf",
+        "inputs/03_policy_khoan_chi-TC10__request_form.pdf"
+      ],
+      "gold": [
+        "gold/03_policy_khoan_chi-TC10__expected.json"
+      ]
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC01",
+      "set": "v2",
+      "inputs": [
+        "inputs/04_bang_chung_va_matching-TC01__hoa_don_0002001.pdf",
+        "inputs/04_bang_chung_va_matching-TC01__request_form.pdf"
+      ],
+      "gold": [
+        "gold/04_bang_chung_va_matching-TC01__expected.json"
+      ]
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC02",
+      "set": "v2",
+      "inputs": [
+        "inputs/04_bang_chung_va_matching-TC02__hoa_don_0002002.pdf",
+        "inputs/04_bang_chung_va_matching-TC02__request_form.pdf"
+      ],
+      "gold": [
+        "gold/04_bang_chung_va_matching-TC02__expected.json"
+      ]
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC03",
+      "set": "v2",
+      "inputs": [
+        "inputs/04_bang_chung_va_matching-TC03__hoa_don_0002003.pdf",
+        "inputs/04_bang_chung_va_matching-TC03__request_form.pdf"
+      ],
+      "gold": [
+        "gold/04_bang_chung_va_matching-TC03__expected.json"
+      ]
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC04",
+      "set": "v2",
+      "inputs": [
+        "inputs/04_bang_chung_va_matching-TC04__request_form.pdf"
+      ],
+      "gold": [
+        "gold/04_bang_chung_va_matching-TC04__expected.json"
+      ]
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC05",
+      "set": "v2",
+      "inputs": [
+        "inputs/04_bang_chung_va_matching-TC05__request_form.pdf"
+      ],
+      "gold": [
+        "gold/04_bang_chung_va_matching-TC05__expected.json"
+      ]
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC06",
+      "set": "v2",
+      "inputs": [
+        "inputs/04_bang_chung_va_matching-TC06__chung_tu_GD-2006.pdf",
+        "inputs/04_bang_chung_va_matching-TC06__request_form.pdf"
+      ],
+      "gold": [
+        "gold/04_bang_chung_va_matching-TC06__expected.json"
+      ]
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC07",
+      "set": "v2",
+      "inputs": [
+        "inputs/04_bang_chung_va_matching-TC07__chung_tu_VDT-2007.pdf",
+        "inputs/04_bang_chung_va_matching-TC07__request_form.pdf"
+      ],
+      "gold": [
+        "gold/04_bang_chung_va_matching-TC07__expected.json"
+      ]
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC08",
+      "set": "v2",
+      "inputs": [
+        "inputs/04_bang_chung_va_matching-TC08__hoa_don_0002008.pdf",
+        "inputs/04_bang_chung_va_matching-TC08__hoa_don_0002099.pdf",
+        "inputs/04_bang_chung_va_matching-TC08__request_form.pdf"
+      ],
+      "gold": [
+        "gold/04_bang_chung_va_matching-TC08__expected.json"
+      ]
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC09",
+      "set": "v2",
+      "inputs": [
+        "inputs/04_bang_chung_va_matching-TC09__request_form.pdf"
+      ],
+      "gold": [
+        "gold/04_bang_chung_va_matching-TC09__expected.json"
+      ]
+    },
+    {
+      "case_id": "04_bang_chung_va_matching-TC10",
+      "set": "v2",
+      "inputs": [
+        "inputs/04_bang_chung_va_matching-TC10__hoa_don_0002010.pdf",
+        "inputs/04_bang_chung_va_matching-TC10__request_form.pdf"
+      ],
+      "gold": [
+        "gold/04_bang_chung_va_matching-TC10__expected.json"
+      ]
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC01",
+      "set": "v2",
+      "inputs": [
+        "inputs/05_ho_so_phuc_hop-TC01__chung_tu_VN-5001.pdf",
+        "inputs/05_ho_so_phuc_hop-TC01__hoa_don_0005002.pdf",
+        "inputs/05_ho_so_phuc_hop-TC01__hoa_don_0005003.pdf",
+        "inputs/05_ho_so_phuc_hop-TC01__request_form.pdf"
+      ],
+      "gold": [
+        "gold/05_ho_so_phuc_hop-TC01__expected.json"
+      ]
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC02",
+      "set": "v2",
+      "inputs": [
+        "inputs/05_ho_so_phuc_hop-TC02__hoa_don_0005004.pdf",
+        "inputs/05_ho_so_phuc_hop-TC02__request_form.pdf"
+      ],
+      "gold": [
+        "gold/05_ho_so_phuc_hop-TC02__expected.json"
+      ]
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC03",
+      "set": "v2",
+      "inputs": [
+        "inputs/05_ho_so_phuc_hop-TC03__hoa_don_0005005.pdf",
+        "inputs/05_ho_so_phuc_hop-TC03__request_form.pdf"
+      ],
+      "gold": [
+        "gold/05_ho_so_phuc_hop-TC03__expected.json"
+      ]
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC04",
+      "set": "v2",
+      "inputs": [
+        "inputs/05_ho_so_phuc_hop-TC04__hoa_don_0005006.pdf",
+        "inputs/05_ho_so_phuc_hop-TC04__hoa_don_0005007.pdf",
+        "inputs/05_ho_so_phuc_hop-TC04__request_form.pdf"
+      ],
+      "gold": [
+        "gold/05_ho_so_phuc_hop-TC04__expected.json"
+      ]
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC05",
+      "set": "v2",
+      "inputs": [
+        "inputs/05_ho_so_phuc_hop-TC05__chung_tu_GD-5008.pdf",
+        "inputs/05_ho_so_phuc_hop-TC05__hoa_don_0005008.pdf",
+        "inputs/05_ho_so_phuc_hop-TC05__request_form.pdf"
+      ],
+      "gold": [
+        "gold/05_ho_so_phuc_hop-TC05__expected.json"
+      ]
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC06",
+      "set": "v2",
+      "inputs": [
+        "inputs/05_ho_so_phuc_hop-TC06__hoa_don_0005009.pdf",
+        "inputs/05_ho_so_phuc_hop-TC06__request_form.pdf"
+      ],
+      "gold": [
+        "gold/05_ho_so_phuc_hop-TC06__expected.json"
+      ]
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC07",
+      "set": "v2",
+      "inputs": [
+        "inputs/05_ho_so_phuc_hop-TC07__ban_sao_hoa_don_0005010.pdf",
+        "inputs/05_ho_so_phuc_hop-TC07__request_form.pdf"
+      ],
+      "gold": [
+        "gold/05_ho_so_phuc_hop-TC07__expected.json"
+      ]
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC08",
+      "set": "v2",
+      "inputs": [
+        "inputs/05_ho_so_phuc_hop-TC08__chung_tu_VDT-5012.pdf",
+        "inputs/05_ho_so_phuc_hop-TC08__hoa_don_0005011.pdf",
+        "inputs/05_ho_so_phuc_hop-TC08__request_form.pdf"
+      ],
+      "gold": [
+        "gold/05_ho_so_phuc_hop-TC08__expected.json"
+      ]
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC09",
+      "set": "v2",
+      "inputs": [
+        "inputs/05_ho_so_phuc_hop-TC09__hoa_don_0005013.pdf",
+        "inputs/05_ho_so_phuc_hop-TC09__hoa_don_0005014.pdf",
+        "inputs/05_ho_so_phuc_hop-TC09__hoa_don_0005015.pdf",
+        "inputs/05_ho_so_phuc_hop-TC09__request_form.pdf"
+      ],
+      "gold": [
+        "gold/05_ho_so_phuc_hop-TC09__expected.json"
+      ]
+    },
+    {
+      "case_id": "05_ho_so_phuc_hop-TC10",
+      "set": "v2",
+      "inputs": [
+        "inputs/05_ho_so_phuc_hop-TC10__hoa_don_0005016.pdf",
+        "inputs/05_ho_so_phuc_hop-TC10__request_form.pdf"
+      ],
+      "gold": [
+        "gold/05_ho_so_phuc_hop-TC10__expected.json"
+      ]
+    }
+  ],
+  "runtime": {
+    "gold_visible": false
+  }
+}

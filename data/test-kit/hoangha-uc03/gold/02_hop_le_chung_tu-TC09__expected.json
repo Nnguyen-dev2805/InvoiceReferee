@@ -1,0 +1,46 @@
+{
+  "schema_version": "2.0",
+  "case_id": "02_hop_le_chung_tu-TC09",
+  "group_id": "02_hop_le_chung_tu",
+  "title": "Không hợp lệ - tiền hàng và tổng thanh toán không nhất quán",
+  "data_classification": "SYNTHETIC",
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "employee": {
+      "name": "Donal Trump",
+      "department": "Phòng Kinh doanh",
+      "position": "Nhân viên"
+    },
+    "request_form": "request_form.pdf",
+    "evidence_files": [
+      "hoa_don_0001809.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "primary_rule_id": "SET_DOCUMENT_CONSISTENCY_001",
+    "implementation_status": "PLANNED",
+    "expected_findings": [
+      "DOCUMENT_ARITHMETIC_MISMATCH"
+    ],
+    "workflow_status": "NEEDS_REVIEW"
+  },
+  "facts": {
+    "report_total_vnd": 1100000,
+    "advance_amount_vnd": 1500000,
+    "settlement_amount_vnd": 400000,
+    "settlement_direction": "Nhân viên hoàn trả công ty",
+    "line_count": 1
+  },
+  "line_support_expectations": [
+    {
+      "item_id": "L01",
+      "description": "Mua dây cáp",
+      "amount_vnd": 1100000,
+      "reference": "0001809",
+      "note": "Đính kèm hóa đơn"
+    }
+  ],
+  "generator_notes": []
+}

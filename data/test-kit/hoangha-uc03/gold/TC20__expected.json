@@ -1,0 +1,100 @@
+{
+  "schema_version": "2.0",
+  "case_id": "TC20",
+  "title": "Có lý do cho dòng không có chứng từ",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_nhien_lieu.pdf",
+      "ve_dien_tu_cao_toc.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "ACCOUNTANT_REVIEW",
+    "uncertainty_type": "OUTSIDE_POLICY",
+    "primary_rule": "SET_PAPER_EVIDENCE_EXCEPTION",
+    "findings": [
+      "SET_PAPER_EVIDENCE_EXCEPTION"
+    ],
+    "followup": null
+  },
+  "implementation_status": "COVERED",
+  "accounting_facts": {
+    "report_lines": [
+      {
+        "line_id": "L01",
+        "description": "Nhiên liệu",
+        "invoice_ref": "00002001",
+        "amount": "1080000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L02",
+        "description": "Phí cao tốc",
+        "invoice_ref": "ETC-201026-7742",
+        "amount": "300000",
+        "note": "Vé điện tử thay thế"
+      },
+      {
+        "line_id": "L03",
+        "description": "Phí gửi xe hiện trường",
+        "invoice_ref": "Không có",
+        "amount": "100000",
+        "note": "Bãi giữ xe tạm không phát hành chứng từ"
+      }
+    ],
+    "report_line_sum": "1480000",
+    "report_total": "1480000",
+    "advance_amount": "2000000",
+    "declared_difference": "520000",
+    "evidence": [
+      {
+        "evidence_id": "EV01",
+        "file": "hoa_don_nhien_lieu.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00002001",
+        "description": "Nhiên liệu đi khảo sát",
+        "amount": "1080000"
+      },
+      {
+        "evidence_id": "EV02",
+        "file": "ve_dien_tu_cao_toc.pdf",
+        "document_type": "E_TICKET",
+        "reference": "ETC-201026-7742",
+        "description": "Phí đường bộ chuyến khảo sát",
+        "amount": "300000"
+      }
+    ]
+  },
+  "line_support_expectations": [
+    {
+      "report_line_id": "L01",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_nhien_lieu.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn khớp."
+    },
+    {
+      "report_line_id": "L02",
+      "support_type": "ALTERNATIVE_DOCUMENT",
+      "document_files": [
+        "ve_dien_tu_cao_toc.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Vé điện tử khớp."
+    },
+    {
+      "report_line_id": "L03",
+      "support_type": "NO_DOCUMENT",
+      "document_files": [],
+      "match_status": "MANUAL_EXCEPTION",
+      "reason": "Có lý do cụ thể; kế toán quyết định chấp nhận ngoại lệ."
+    }
+  ],
+  "rationale": "Dòng không chứng từ đã có lý do nhưng vẫn cần kế toán duyệt ngoại lệ, không được tự động bác bỏ."
+}

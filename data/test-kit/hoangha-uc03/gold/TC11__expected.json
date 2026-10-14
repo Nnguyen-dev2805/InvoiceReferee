@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "case_id": "TC11",
+  "title": "Số học trên hóa đơn không nhất quán",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_dien_tu.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "uncertainty_type": "FACTUAL_UNKNOWN",
+    "primary_rule": "SET_ARITH_001",
+    "findings": [
+      "SET_ARITH_001"
+    ],
+    "followup": null
+  },
+  "implementation_status": "GAP_EXPECTED",
+  "accounting_facts": {
+    "report_line_sum": "5500000",
+    "report_total": "5500000",
+    "advance_amount": "6000000",
+    "declared_difference": "500000",
+    "invoice_subtotal": "5000000",
+    "invoice_tax": "400000",
+    "invoice_total": "5500000",
+    "buyer_tax_code": "0319999996",
+    "expected_company_tax_code": "0319999996"
+  },
+  "rationale": "Tiền hàng 5.000.000 + thuế 400.000 nhưng tổng hóa đơn ghi 5.500.000 VND."
+}

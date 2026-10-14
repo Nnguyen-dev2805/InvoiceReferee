@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "case_id": "TC01",
+  "title": "Hợp lệ nhân viên hoàn trả tiền thừa",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_dien_tu.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "AUTO_PROCESS",
+    "uncertainty_type": "NONE",
+    "primary_rule": null,
+    "findings": [
+      "SET_PAPER_TOTAL_001",
+      "SET_ADV_AMOUNT_001",
+      "SET_SETTLEMENT_DIFF_001",
+      "SET_APPROVAL_001"
+    ],
+    "followup": "PENDING_APPROVAL"
+  },
+  "implementation_status": "COVERED",
+  "accounting_facts": {
+    "report_line_sum": "3240000",
+    "report_total": "3240000",
+    "advance_amount": "4000000",
+    "declared_difference": "760000",
+    "invoice_subtotal": "3000000",
+    "invoice_tax": "240000",
+    "invoice_total": "3240000",
+    "buyer_tax_code": "0319999996",
+    "expected_company_tax_code": "0319999996"
+  },
+  "rationale": "Tổng chi 3.240.000 VND; nhân viên hoàn trả 760.000 VND."
+}

@@ -1,0 +1,111 @@
+{
+  "schema_version": "2.0",
+  "case_id": "TC25",
+  "title": "Tài liệu thay thế lệch số tiền với report",
+  "synthetic_test_data": true,
+  "submission": {
+    "settlement_type": "ADVANCE_SETTLEMENT",
+    "source_type": "PAPER_SCAN",
+    "request_document": "report_hoan_ung.pdf",
+    "evidence_documents": [
+      "hoa_don_ve_tau.pdf",
+      "hoa_don_khach_san.pdf",
+      "phieu_thu_di_chuyen.pdf"
+    ]
+  },
+  "expected": {
+    "automation_decision": "REQUEST_INFO",
+    "uncertainty_type": "FACTUAL_UNKNOWN",
+    "primary_rule": "SET_ALTERNATIVE_AMOUNT_001",
+    "findings": [
+      "SET_ALTERNATIVE_AMOUNT_001"
+    ],
+    "followup": null
+  },
+  "implementation_status": "GAP_EXPECTED",
+  "accounting_facts": {
+    "report_lines": [
+      {
+        "line_id": "L01",
+        "description": "Vé tàu",
+        "invoice_ref": "00002501",
+        "amount": "1080000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L02",
+        "description": "Phòng nghỉ",
+        "invoice_ref": "00002502",
+        "amount": "2160000",
+        "note": "Đính kèm hóa đơn"
+      },
+      {
+        "line_id": "L03",
+        "description": "Di chuyển nội thành",
+        "invoice_ref": "PT-251026-016",
+        "amount": "900000",
+        "note": "Phiếu thu thay thế hóa đơn"
+      }
+    ],
+    "report_line_sum": "4140000",
+    "report_total": "4140000",
+    "advance_amount": "5000000",
+    "declared_difference": "860000",
+    "evidence": [
+      {
+        "evidence_id": "EV01",
+        "file": "hoa_don_ve_tau.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00002501",
+        "description": "Vé tàu công tác",
+        "amount": "1080000"
+      },
+      {
+        "evidence_id": "EV02",
+        "file": "hoa_don_khach_san.pdf",
+        "document_type": "E_INVOICE",
+        "reference": "00002502",
+        "description": "Phòng nghỉ công tác",
+        "amount": "2160000"
+      },
+      {
+        "evidence_id": "EV03",
+        "file": "phieu_thu_di_chuyen.pdf",
+        "document_type": "RECEIPT",
+        "reference": "PT-251026-016",
+        "description": "Di chuyển nội thành",
+        "amount": "700000"
+      }
+    ]
+  },
+  "line_support_expectations": [
+    {
+      "report_line_id": "L01",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_ve_tau.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn khớp."
+    },
+    {
+      "report_line_id": "L02",
+      "support_type": "E_INVOICE",
+      "document_files": [
+        "hoa_don_khach_san.pdf"
+      ],
+      "match_status": "MATCHED",
+      "reason": "Hóa đơn khớp."
+    },
+    {
+      "report_line_id": "L03",
+      "support_type": "ALTERNATIVE_DOCUMENT",
+      "document_files": [
+        "phieu_thu_di_chuyen.pdf"
+      ],
+      "match_status": "AMOUNT_CONFLICT",
+      "reason": "Lệch 200.000 VND giữa report và phiếu thu."
+    }
+  ],
+  "rationale": "Report ghi 900.000 VND nhưng phiếu thu PT-251026-016 chỉ ghi 700.000 VND."
+}
