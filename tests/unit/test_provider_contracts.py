@@ -47,6 +47,49 @@ def test_provider_mode_values() -> None:
     assert modes == ("LIVE", "RECORDED_REPLAY", "STUB")
 
 
+def test_manifest_records_app_size_caps() -> None:
+    from invoice_referee.evidence.trace import DEFAULT_MAX_LLM_INPUT_CHARS
+
+    manifest = RunManifest(
+        mode="LIVE",
+        max_llm_input_chars=DEFAULT_MAX_LLM_INPUT_CHARS,
+        max_llm_output_chars=20_000,
+        limit_version="pilot-1",
+        limit_origin="LEAD_PILOT",
+    )
+    assert manifest.max_llm_input_chars == 120_000
+    assert manifest.limit_origin == "LEAD_PILOT"
+
+
+def test_unknown_cap_config_fails_closed() -> None:
+    # A manifest that does not declare its caps must not silently claim defaults.
+    with pytest.raises(Exception):
+        RunManifest(mode="LIVE", limit_origin="NOT_A_SOURCE")  # type: ignore[arg-type]
+
+
+async def test_oversized_messages_fail_before_http() -> None:
+    from invoice_referee.evidence.xkiro import XkiroClient, XkiroError
+
+    called = {"http": False}
+
+    def handler(request):  # pragma: no cover - must not be reached
+        called["http"] = True
+        raise AssertionError("HTTP must not be attempted for an oversized request")
+
+    import httpx
+
+    client = XkiroClient(
+        api_key="k",
+        model="m",
+        base_url="https://x.test/v1",
+        transport=httpx.MockTransport(handler),
+        max_input_chars=100,
+    )
+    with pytest.raises(XkiroError):
+        await client.complete_json(system="s", user="x" * 500, budget=RunBudget())
+    assert called["http"] is False
+
+
 # -- propose_step: routing is read-only, source-scoped and money-free ---------
 
 

@@ -23,6 +23,11 @@ DEFAULT_HTTP_TIMEOUT_S = 20
 DEFAULT_PROCESSING_DEADLINE_S = 90
 DEFAULT_THRESHOLD = 0.75
 
+# App-size character caps for X-Kiro (contracts §12.3, plan E3). These are
+# lead-chosen pilot limits, NOT a claim about the model context window.
+DEFAULT_MAX_LLM_INPUT_CHARS = 120_000
+DEFAULT_MAX_LLM_OUTPUT_CHARS = 20_000
+
 
 @dataclass
 class RunBudget:
@@ -68,6 +73,12 @@ class RunManifest(StrictModel):
     trace_refs: tuple[str, ...] = ()
     usage_unknown: bool = True
     notes: str | None = None
+    # App-size caps (contracts §12.3). limit_origin names the source so a
+    # missing/unknown cap config fails closed rather than claiming a default.
+    max_llm_input_chars: int = DEFAULT_MAX_LLM_INPUT_CHARS
+    max_llm_output_chars: int = DEFAULT_MAX_LLM_OUTPUT_CHARS
+    limit_version: str | None = None
+    limit_origin: Literal["LEAD_PILOT", "MEASURED_M0"] | None = None
 
 
 class TraceSpan(StrictModel):
