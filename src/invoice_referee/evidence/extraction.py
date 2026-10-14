@@ -1,0 +1,233 @@
+"""Typed document extraction with provenance (contracts §12.3; plan E5).
+
+One model call per document returns state-aware field candidates. Code then
+verifies each FOUND value against the OCR text: the quote must appear in this
+document's own pages, and the normalized value must be supported by the quote.
+A real quote with a mismatching value, a paraphrase, or a quote from another
+source is demoted (never FOUND). Code assigns line ids; model ids are dropped.
+"""
+
+from __future__ import annotations
+
+import re
+from decimal import Decimal, InvalidOperation
+
+from invoice_referee.domain.common import EvidenceRef
+from invoice_referee.domain.documents import (
+    DocumentAnalysis,
+    DocumentClassification,
+    DocumentLine,
+    DocumentProfileIssue,
+    FieldCandidate,
+    OcrSourceResult,
+)
+from invoice_referee.evidence.trace import RunBudget
+from invoice_referee.evidence.xkiro import XkiroSchemaError
+
+_DIGITS = re.compile(r"\d")
+_NUMBER = re.compile(r"(\d{1,3}(?:[.\s]\d{3})+|\d+)")
+
+
+def _normalize_number(text: str) -> Decimal | None:
+    match = _NUMBER.search(text or "")
+    if match is None:
+        return None
+    try:
+        return Decimal(match.group(1).replace(".", "").replace(" ", ""))
+    except InvalidOperation:
+        return None
+
+
+def _source_pages_text(ocr: OcrSourceResult, page_range: tuple[int, int]) -> str:
+    start, end = page_range
+    return "\n".join(
+        page.markdown for page in ocr.pages if start <= page.page <= end
+    )
+
+
+def _quote_supported(quote: str, haystack: str) -> bool:
+    if not quote.strip():
+        return False
+    return quote.strip() in haystack
+
+
+def _value_supported(value: object, quote: str) -> bool:
+    """The normalized value must be derivable from the exact quote."""
+    if value is None:
+        return False
+    text = str(value).strip()
+    # Money/number: the digits must appear in the quote (formatting aside).
+    if _DIGITS.search(text) and _DIGITS.search(quote):
+        quote_num = _normalize_number(quote)
+        value_num = _normalize_number(text)
+        if quote_num is not None and value_num is not None:
+            return quote_num == value_num
+        return text in quote
+    return text in quote or text.lower() in quote.lower()
+
+
+def _ref(ocr: OcrSourceResult, page: int, quote: str) -> EvidenceRef:
+    return EvidenceRef(
+        source_id=ocr.source_id,
+        source_sha256=ocr.source_digest,
+        page=page,
+        exact_quote=quote or "document",
+    )
+
+
+async def extract_document(
+    ocr: OcrSourceResult,
+    classification: DocumentClassification,
+    *,
+    llm: object,
+    budget: RunBudget,
+) -> DocumentAnalysis:
+    """Extract one document's fields/lines and verify provenance (plan E5)."""
+    haystack = _source_pages_text(ocr, classification.page_range)
+    system = (
+        "Extract the fields of this document from its OCR text. Return every "
+        "applicable field with an explicit state (FOUND/NOT_PRESENT/UNREADABLE/"
+        "AMBIGUOUS/NOT_APPLICABLE) and, for FOUND, an exact quote and the page. "
+        "Never invent a value; a missing value is NOT_PRESENT, not zero. Reply as "
+        "JSON {\"fields\": [...], \"lines\": [...]}."
+    )
+    user = _serialize(ocr, classification)
+    payload = await _call_with_one_repair(llm, system=system, user=user, budget=budget)
+    if payload is None:
+        return _unresolved(ocr, classification)
+
+    raw_fields = payload.get("fields")
+    raw_lines = payload.get("lines") or []
+    if not isinstance(raw_fields, list) or not isinstance(raw_lines, list):
+        return _unresolved(ocr, classification)
+
+    fields: list[FieldCandidate] = []
+    for entry in raw_fields:
+        if not isinstance(entry, dict):
+            continue
+        state = str(entry.get("state") or "NOT_APPLICABLE")
+        field_name = str(entry.get("field") or "")
+        if state != "FOUND":
+            fields.append(FieldCandidate(field=field_name, state=state))  # type: ignore[arg-type]
+            continue
+        quote = str(entry.get("quote") or "")
+        page = int(entry.get("page") or classification.page_range[0])
+        value = entry.get("value")
+        # Provenance: the quote must be in this document's own pages AND the
+        # normalized value must be supported by that quote.
+        if not _quote_supported(quote, haystack) or not _value_supported(value, quote):
+            fields.append(
+                FieldCandidate(
+                    field=field_name,
+                    state="UNREADABLE",
+                    refs=(),
+                )
+            )
+            continue
+        fields.append(
+            FieldCandidate(
+                field=field_name,
+                state="FOUND",
+                value=value if isinstance(value, (str, int, Decimal, bool)) else str(value),
+                refs=(_ref(ocr, page, quote),),
+            )
+        )
+
+    lines: list[DocumentLine] = []
+    for index, entry in enumerate(raw_lines, start=1):
+        if not isinstance(entry, dict):
+            continue
+        # Code owns the line id; the model's id is discarded.
+        line_fields = tuple(
+            FieldCandidate(
+                field=str(f.get("field") or ""),
+                state=str(f.get("state") or "NOT_APPLICABLE"),  # type: ignore[arg-type]
+                value=f.get("value"),
+                refs=(_ref(ocr, int(f.get("page") or 1), str(f.get("quote") or "line")),)
+                if f.get("state") == "FOUND"
+                else (),
+            )
+            for f in entry.get("fields", [])
+            if isinstance(f, dict)
+        )
+        lines.append(DocumentLine(id=f"{classification.document_id}:line:{index}", fields=line_fields))
+
+    return DocumentAnalysis(
+        source_id=ocr.source_id,
+        document_id=classification.document_id,
+        document_type=classification.document_type,
+        roles=classification.roles,
+        role_refs=classification.role_refs,
+        page_range=classification.page_range,
+        block_ids=classification.block_ids,
+        classification_confidence=classification.classification_confidence,
+        alternative_document_types=classification.alternative_document_types,
+        classification_refs=classification.refs,
+        fields=tuple(fields),
+        line_items=tuple(lines),
+        confidence_status="UNRESOLVED",
+        confidence_refs=(),
+        profile_status="UNKNOWN",
+        profile_findings=(),
+        refs=classification.refs,
+        warnings=(),
+    )
+
+
+async def _call_with_one_repair(
+    llm: object, *, system: str, user: str, budget: RunBudget
+) -> dict | None:
+    """One extraction call; on a schema error, at most one repair call."""
+    try:
+        return await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
+    except XkiroSchemaError:
+        try:
+            return await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
+        except XkiroSchemaError:
+            return None
+
+
+def _unresolved(
+    ocr: OcrSourceResult, classification: DocumentClassification
+) -> DocumentAnalysis:
+    return DocumentAnalysis(
+        source_id=ocr.source_id,
+        document_id=classification.document_id,
+        document_type=classification.document_type,
+        roles=classification.roles,
+        role_refs=classification.role_refs,
+        page_range=classification.page_range,
+        block_ids=classification.block_ids,
+        fields=(),
+        line_items=(),
+        confidence_status="UNRESOLVED",
+        profile_status="NEEDS_HUMAN",
+        profile_findings=(
+            DocumentProfileIssue(
+                code="EXTRACTION_FAILED",
+                field=None,
+                status="UNRESOLVED",
+                message="extraction schema invalid after one repair",
+                blocking=True,
+            ),
+        ),
+        refs=classification.refs,
+    )
+
+
+def _serialize(ocr: OcrSourceResult, classification: DocumentClassification) -> str:
+    import json
+
+    start, end = classification.page_range
+    return json.dumps(
+        {
+            "document_type": classification.document_type,
+            "roles": list(classification.roles),
+            "pages": [
+                {"page": page.page, "markdown": page.markdown}
+                for page in ocr.pages
+                if start <= page.page <= end
+            ],
+        },
+        ensure_ascii=False,
+    )
