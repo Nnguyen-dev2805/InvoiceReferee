@@ -11,6 +11,13 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from invoice_referee.domain.common import EvidenceRef, Id, StrictModel, UtcDatetime
+from invoice_referee.domain.documents import (
+    DocumentAnalysis,
+    DocumentRowMatch,
+    EvidenceLink,
+    EvidenceMatchFinding,
+    PageCoverage,
+)
 from invoice_referee.domain.issues import ProcessingProblem
 
 Media = Literal["PDF", "PNG", "JPEG"]
@@ -82,7 +89,14 @@ class Confirmation(StrictModel):
 
 
 class ReadResult(StrictModel):
-    """What one read pass produced. Proposals only: no financial effect."""
+    """What one read pass produced. Proposals only: no financial effect.
+
+    The typed evidence-report fields (documents/links/row_matches/findings and
+    detailed page coverage) were added for the §12 pipeline. Existing fields
+    keep their meaning; the older integer `page_coverage` is retained for the
+    current reader/job consumers, and the new `page_coverage_detail` carries the
+    typed `PageCoverage` entries (contracts §12.5).
+    """
 
     units: tuple[EvidenceUnit, ...] = ()
     observations: tuple[Observation, ...] = ()
@@ -90,3 +104,11 @@ class ReadResult(StrictModel):
     page_coverage: tuple[int, ...] = ()
     problems: tuple[ProcessingProblem, ...] = ()
     trace_refs: tuple[str, ...] = ()
+    # --- §12 typed evidence report (all optional; STUB leaves them empty) ---
+    provider_mode: str | None = None
+    data_origin: str | None = None
+    documents: tuple[DocumentAnalysis, ...] = ()
+    links: tuple[EvidenceLink, ...] = ()
+    row_matches: tuple[DocumentRowMatch, ...] = ()
+    match_findings: tuple[EvidenceMatchFinding, ...] = ()
+    page_coverage_detail: tuple[PageCoverage, ...] = ()
