@@ -1,9 +1,11 @@
 # InvoiceReferee final — Thiết kế và hợp đồng đánh giá
 
 Ngày 13/10/2026, Asia/Ho_Chi_Minh. **DESIGN_CONSOLIDATED — Q1–Q30 đã chốt; review thiết kế đã thực hiện, chưa có bằng chứng runtime.**
-**Cập nhật phạm vi mới:** §14 ghi quyết định thu hẹp employee-paid và cuộc grill
-đang mở. Phần company-direct trước đó là lịch sử thiết kế; không triển khai thay
-policy hoặc coi các gate cũ đã chứng minh phạm vi mới trước khi grill kết thúc.
+**Cập nhật phạm vi:** §14 đã chốt (ACCEPTED) — thu hẹp employee-paid, lời xác nhận
+có ngưỡng, ngoài phạm vi giữ nguồn, hoãn form giải trình. §15 chốt pipeline chứng cứ
+OCR/phân loại/trích xuất/matching. Phần company-direct trước đó là lịch sử thiết kế;
+code/contracts/gold **chưa** chuyển đổi theo phạm vi mới (do E0 và plan
+finance/admissibility kế tiếp sở hữu).
 Nguồn: [đề thi gốc](../Challenge_Brief_OrganizationAI_VN.docx.md), Q1–Q30 đã được người dùng chốt.
 Q5 là ưu tiên chất lượng, không phải bằng chứng BTC gia hạn hoặc bỏ yêu cầu thử nghiệm.
 Nhánh làm việc kiểm tra: final. Nhánh rebuild, code và quyết định của nhánh đó không là cơ sở thiết kế.
@@ -24,8 +26,10 @@ Phạm vi đã chốt:
 - Công tác nội địa trước; tiếp khách địa phương sau khi có policy/raw input/gold
   và kiểm đủ routine/FACT/POLICY/AUTHORITY, không làm hỏng invariants chung.
 - Có ứng thực nhận hoặc không ứng đã xác minh; nhân viên có thể chi thêm tiền riêng.
-- Giữ riêng employee-paid và company-direct. Nhân viên trả cho nhiều khách vẫn
-  là một claimant, không phải nhiều hồ sơ thanh toán cùng hóa đơn.
+- Bản đầu quyết toán **khoản nhân viên trực tiếp thanh toán** (xem §14, ADR006).
+  Company-direct giữ như dữ kiện để đối chiếu/báo ngoài phạm vi, **không** vào phép
+  tính hoàn trả nhân viên. Nhân viên trả cho nhiều khách vẫn là một claimant, không
+  phải nhiều hồ sơ thanh toán cùng hóa đơn.
 - Nhận nhiều lần ứng và chi/thu đã thực nhận đúng người/hoạt động/căn cứ.
   Ghi thực hiện nhiều lần một yêu cầu hợp lệ khác với phê duyệt từng phần hồ sơ còn unresolved.
 - Chưa nhận ngoại tệ, hóa đơn phân bổ cho nhiều claimant/hoạt động, chuyển tiền
@@ -85,7 +89,7 @@ Một lời “đồng ý” hoặc việc đổi B không tự giải quyết n
 | --- | --- |
 | T | Tổng chi công việc thực tế trong scope, chưa cắt theo ngân sách hay điều kiện hoàn trả |
 | E | Phần chi phí đủ điều kiện nhân viên thực tế đã trả |
-| C | Phần chi công việc công ty trả trực tiếp, không hoàn lại cho nhân viên |
+| C | Phần chi công việc công ty trả trực tiếp; giữ để đối chiếu/báo ngoài phạm vi, không hoàn lại cho nhân viên |
 | A | Tổng ứng công ty đã thực trả và nhân viên đã thực nhận |
 | P | Tổng tiền công ty đã thực hoàn trả cho nhân viên trong quyết toán |
 | R | Tổng tiền nhân viên đã hoàn và công ty đã thực nhận, thuộc ứng/quyết toán của scope này |
@@ -462,10 +466,10 @@ cần tra tranh luận, không là tập instructions phải nạp toàn bộ.
 
 ## 14. Thu hẹp hồ sơ và policy đầu vào — cuộc grill 13/10/2026
 
-Trạng thái: **IN_DISCUSSION**. [ADR006](../adr/0006-employee-paid-scope.md) ghi
-phần đã được người dùng chốt; chưa thay code/contracts/dataset/gold hoặc mở
-implementation. Những khẳng định về implementation ở §13 là snapshot lịch sử,
-không phải kết quả kiểm tra checkout hiện tại.
+Trạng thái: **ACCEPTED (14/10/2026)**. [ADR006](../adr/0006-employee-paid-scope.md)
+và [ADR007](../adr/0007-money-confirmation-basis.md) ghi phần đã chốt; code/contracts/
+dataset/gold vẫn **chưa** thay đổi. Những khẳng định về implementation ở §13 là
+snapshot lịch sử, không phải kết quả kiểm tra checkout hiện tại.
 
 Đã chốt trong trao đổi:
 - Bản đầu quyết toán khoản nhân viên trực tiếp thanh toán cho hoạt động; không
@@ -479,30 +483,103 @@ không phải kết quả kiểm tra checkout hiện tại.
 - Không yêu cầu giấy giải trình trong bộ nộp ban đầu. Người dùng yêu cầu hoãn
   phần giải trình để phát triển sau; chưa chốt bỏ cả câu hỏi/chuyển tiếp.
 
-Cần chốt vòng hiện tại (mỗi câu có đề xuất, chưa được coi là đáp án đã duyệt):
+Đã chốt vòng 14/10/2026 (thay cho danh sách "cần chốt" trước đó):
 - **Q32 — Policy lời xác nhận chi tiền:** chấp nhận lời xác nhận chịu trách nhiệm
   của nhân viên cùng chứng từ dịch vụ làm căn cứ xử lý routine khi các điều kiện
   khác đủ và không có mâu thuẫn trọng yếu; hiển thị đúng mức căn cứ, không gọi là
-  đã xác minh giao dịch ngân hàng. Đây là thay đổi so với yêu cầu căn cứ tiền của
-  §3/contracts §3, mang rủi ro không phát hiện được lời khai sai không có dấu hiệu.
-  Phạm vi/số tiền áp dụng và metric phải chốt ở vòng sau nếu chọn phương án này.
+  đã xác minh giao dịch ngân hàng. Ngưỡng: trong giới hạn tự xử lý hiện có
+  (`E<=8tr`, `abs(S)<=4tr`); vượt ngưỡng vẫn AUTHORITY. Chi tiết và rủi ro ở
+  [ADR007](../adr/0007-money-confirmation-basis.md).
 - **Q33 — Giới hạn hoãn giải trình:** hoãn form giải trình tự do; giữ khả năng nêu
   vấn đề/câu hỏi cụ thể, đúng người xử lý, cho sửa khai báo/bổ sung nguồn và kiểm
-  lại. Không tự kết luận đủ điều kiện cho nguồn thiếu/mâu thuẫn trọng yếu. Chưa
-  quyết định giữ/xóa UI/API trả lời hiện có. Đây là đề xuất tránh bỏ yêu cầu đề A.
+  lại. Không tự kết luận đủ điều kiện cho nguồn thiếu/mâu thuẫn trọng yếu. Đường
+  `AnswerIssue` hiện có vẫn giữ.
 - **Q34 — Nguồn ngoài phạm vi employee-paid:** khi tài liệu cho thấy công ty trả
   trực tiếp hoặc người trả thuộc bên khác, giữ nguồn và báo phần ngoài phạm vi;
   không ép thành khoản nhân viên đã trả, không bỏ phần vật chất để kết luận tiền.
+  `C` giữ như dữ kiện để đối chiếu/báo, không vào phép tính hoàn trả nhân viên.
 
-Hệ quả dữ liệu dự kiến, chưa triển khai:
+Hệ quả dữ liệu (chưa triển khai; plan finance/admissibility kế tiếp sở hữu):
 - D01 routine mới: nhân viên khai đã trả khách sạn4.320.000 + taxi680.000 =5 triệu;
   ứng thực nhận2, B8, lịch sử P/R đủ và bằng0; đề nghị chi3. Số tiền/kết luận gold
-  cuối phải theo Q32 đã chốt, không chỉ sao chép số đề nghị trên bảng kê.
+  cuối theo Q32 đã chốt, không chỉ sao chép số đề nghị trên bảng kê.
 - Nếu giữ chi8 và chuyển toàn bộ thành nhân viên trả, A2 =>S6; vượt quyền tự tạo
   yêu cầu4. Không giữ đáp án chi3 của dữ liệu cũ sau thay đổi đó.
 - D01/D06/D15 cùng các case có company-direct cần rà soát lại nguồn, T/E, budget,
-  route, gold và bộ chấm. Không xóa/ghi đè dữ liệu trong cuộc grill.
+  route, gold và bộ chấm. Không xóa/ghi đè dữ liệu trong lượt này.
 
-Bước tiếp theo: người dùng trả lời Q32–Q34, sau đó hỏi các quyết định phụ thuộc
-về form, ranh giới tiền, trường hợp thiếu nguồn và acceptance. Chỉ khi hết câu
-hỏi mở và người dùng xác nhận tổng hợp mới sửa contracts/lập plan triển khai.
+Bước tiếp theo: E0 promote các quyết định này vào contracts; pipeline chứng cứ ở §15
+triển khai trước, việc map chứng cứ → finance/admissibility thuộc plan kế tiếp.
+
+## 15. Pipeline chứng cứ OCR/phân loại/trích xuất/matching — chốt 14/10/2026
+
+Trạng thái: **ACCEPTED**. Nguồn: [biên bản OCR/matching](reviews/2026-10-13/ocr-input-policy-discussion.md),
+[disposition](../superpowers/plans/2026-10-13-hoangha-evidence-pipeline.md#review-trail).
+Plan: [Hoangha evidence pipeline](../superpowers/plans/2026-10-13-hoangha-evidence-pipeline.md).
+Contracts chi tiết: [§12](IMPLEMENTATION_CONTRACTS.md). Đây là **quyết định thiết kế**;
+chưa có bằng chứng runtime.
+
+### 15.1. Phạm vi và ranh giới
+
+Thay đường transcription cue-based ở LIVE của `final` bằng pipeline có thể kiểm:
+OCR **mọi trang** mọi file được nhận (PDF/PNG/JPEG, kể cả PDF có text layer — native
+text không bỏ qua OCR) → confidence gate → phân loại `document_type`/`evidence_role`
+→ trích xuất có trạng thái + provenance theo schema từng loại → validation profile →
+matching với **giấy quyết toán upload (`SETTLEMENT_FORM`)**. Không có `SETTLEMENT_FORM`
+⇒ bỏ qua matching và ghi finding `SETTLEMENT_FORM_MISSING` (evidence-only, không chặn
+nộp); khai báo in-app không phải `SETTLEMENT_FORM`. Đầu ra LIVE/RECORDED_REPLAY **chưa**
+đi vào Reconciler hay phát hành kết luận tiền: `assessment_ready=false`,
+`assessment_blocker=EVIDENCE_ADMISSION_NOT_CONNECTED`, và trạng thái case là
+**`EVIDENCE_READY`** (mới, tách khỏi `WAITING`). `final` vẫn là chủ workflow/DB/audit/
+tiền; không port repository/database/settlement lifecycle thứ hai của Hoangha.
+
+### 15.2. Quyết định đã chốt
+
+- **Nguồn:** chỉ PDF/JPG/JPEG; mọi trang qua OCR; không fallback native text.
+- **Provider:** dùng `XkiroClient` đã cấu hình của `final` cho phân loại/trích xuất/
+  review confidence/resolve suggestion; **không** thêm Kimi hay vendor thứ hai.
+- **Worker:** một worker nền đơn giản (asyncio lifespan), một active job/root, trần
+  hiện có 2 worker/job; enqueue bền vững sau khi validate command, HTTP trả
+  `PROCESSING`/job id; restart phục hồi cùng basis với budget còn lại.
+- **Confidence:** word score < `0.85` tạo candidate; thiếu confidence ở trường trọng
+  yếu ⇒ unresolved, không PASS. Profile/criticality matrix copy từ Hoangha revision
+  `1ee33487…` (`policy/document_validity.py`), thêm trường `SETTLEMENT_FORM`.
+- **Taxonomy:** giữ đủ 16 `ExpenseDocumentType` của Hoangha + `SETTLEMENT_FORM`;
+  `DocumentEvidenceRole` tách khỏi page-level `EvidenceRole`; code sở hữu map
+  type↔role; `UNKNOWN` không chọn schema đoán; `OTHER` chỉ schema chung.
+- **Trạng thái trường:** `FOUND`/`NOT_PRESENT`/`UNREADABLE`/`AMBIGUOUS`/`NOT_APPLICABLE`;
+  thiếu không phải số 0; `FOUND` cần quote + locator source/page/block.
+- **Matching:** port nguyên core Hoangha (exact invoice ref → 1.0 auto; ngược lại
+  amount .60 + semantic ≤.30 + party .12/.20 + non-original .10; `<.50` bỏ, `[.50,.75)`
+  suggestion, `>=.75` auto; LLM chỉ promote suggestion có sẵn ở `>=.90`). Giữ rủi ro
+  đã biết: mã trùng auto-link dù issuer/nội dung khác.
+- **Cardinality:** nhiều chứng từ một dòng; một chứng từ nhiều dòng chỉ khi có phân bổ
+  tường minh theo `invoice_refs`+amount từng dòng, tổng ≤ giá trị chứng từ; chứng từ
+  hỗ trợ không thay chứng từ gốc.
+- **Budget:** ≤8 file, 12 LLM attempts, 10 OCR attempts; batch classification 1/lần,
+  confidence 1/lần, extraction 1/tài liệu, ≤1 repair/root, suggestion 1/lần; cap ký tự
+  X-Kiro `120.000` in/`20.000` out (giới hạn pilot do lead chọn, không phải context window).
+- **Artifact:** OCR thô lưu private dưới `uploads_dir.parent/"artifacts"`, scoped
+  tenant/root/source digest, cùng vòng đời nguồn; trần 20 MiB/source, 40 MiB/root.
+- **Gold chứng cứ:** corpus UC-03 chỉ có `expected.json` tài chính (không độc lập).
+  Gold extraction/link cho §15 do **người viết tay trên một tập con** (ví dụ 10–15
+  case); phần còn lại chỉ là input + coverage, không đòi gold độc lập từng case.
+
+### 15.3. Loại trừ (ngoài §15)
+
+Không đổi T/E/A/P/R/S, budget, eligibility, policy, authority, owner issue, ghi tiền
+hay workflow vai trò. Không map chứng cứ → `AssessmentInput`/`Fact.KNOWN` trong §15.
+Không import policy/cap/authority/decision-gold của Hoangha thành policy `final`.
+Các quyết định tài chính/policy (Q32–Q34) thuộc plan kế tiếp.
+
+**Lỗ đã biết:** §15 **không** phát hiện/báo nguồn ngoài phạm vi employee-paid (Q34);
+report im lặng với case company-direct/other-payer. Plan finance kế tiếp sở hữu.
+
+### 15.4. Rủi ro và gate
+
+M0 phải đo lại pipeline mới (all-page OCR) trước khi freeze ceiling. Corpus chính
+thức là 75 case UC-03: 50 ở `data/testcase_uc3_v2/` (v2) + 25 ở `data/tham-khao/uc-03/`
+(TC01–TC25, bản v1; nguồn gốc trong `.worktrees/hoangha`) + bộ OCR smoke riêng.
+Release gate của §15 là bằng chứng extraction/role/link/source support trên tập con
+có gold, không phải kết luận tài chính. Guard: đường E7 offline **không** được phát
+sinh call provider thật (dev server mặc định LIVE kể từ `aee7fb38`).

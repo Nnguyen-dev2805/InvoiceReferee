@@ -68,3 +68,27 @@ _Avoid_: Suy cân bằng từ việc chưa tìm thấy chứng từ hoặc coi m
 **Chi phí công việc đã phát sinh**:
 Giá trị chi phí của hoạt động đã được xác lập và có căn cứ, bao gồm phần chưa thanh toán nếu nghĩa vụ đã được xác minh.
 _Avoid_: Đồng nhất với tiền đã chi, dự toán tương lai hoặc tổng ghi trên hóa đơn chưa được xác minh.
+
+**Chi phí nhân viên trực tiếp thanh toán**:
+Phạm vi bản đầu: khoản chi công việc mà nhân viên thực tế đã trả cho bên cung cấp, bằng tiền ứng hoặc tiền riêng; công ty trả trực tiếp nhà cung cấp nằm ngoài phạm vi.
+_Avoid_: Đồng nhất với khoản công ty trả trực tiếp hoặc khoản chưa ai trả.
+
+**Phần ngoài phạm vi**:
+Khoản chi mà nguồn cho thấy công ty trả trực tiếp hoặc người trả thuộc bên khác, được giữ làm dữ kiện để đối chiếu và báo, không đưa vào phép tính hoàn trả nhân viên.
+_Avoid_: Bỏ nguồn để kết luận tiền, hoặc ép thành khoản nhân viên đã trả.
+
+**Lời xác nhận chi tiền**:
+Lời nhân viên tự xác nhận có trách nhiệm rằng mình đã trả một khoản chi, dùng làm một phần căn cứ cho khoản nhân viên đã trả khi có chứng từ dịch vụ và không mâu thuẫn trọng yếu.
+_Avoid_: Đồng nhất với giao dịch ngân hàng đã được xác minh hoặc chứng từ thanh toán độc lập.
+
+**Loại tài liệu**:
+Nhãn phân loại nội dung một tài liệu (hóa đơn, biên nhận, vé, chứng từ thanh toán, giấy quyết toán, …), do model đề xuất và code kiểm.
+_Avoid_: Đồng nhất với vai trò chứng cứ của tài liệu đó trong hồ sơ.
+
+**Vai trò chứng cứ**:
+Vai trò của một tài liệu trong hồ sơ (khai báo quyết toán, chứng từ chi phí gốc, căn cứ thanh toán, tài liệu hỗ trợ, chưa xác định); một tài liệu có thể mang nhiều vai trò nếu mỗi vai trò có căn cứ riêng.
+_Avoid_: Đồng nhất với loại tài liệu, hoặc coi tài liệu hỗ trợ là chứng từ gốc.
+
+**Trạng thái trường**:
+Kết quả trích xuất một trường: có thấy (`FOUND`), không có trong nguồn (`NOT_PRESENT`), không đọc được (`UNREADABLE`), mơ hồ (`AMBIGUOUS`), hoặc không áp dụng (`NOT_APPLICABLE`).
+_Avoid_: Coi "không thấy" là số 0, hoặc suy đoán khi không đọc được.

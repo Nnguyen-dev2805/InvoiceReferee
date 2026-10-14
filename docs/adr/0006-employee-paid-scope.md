@@ -19,7 +19,22 @@ Người dùng yêu cầu ghi phần giải trình khi thiếu chứng từ đ�
 Phạm vi hoãn so với cơ chế câu hỏi/chuyển tiếp bắt buộc của đề thi đang được
 grill tại thiết kế §14. Chưa có yêu cầu xóa đường AnswerIssue đã tồn tại.
 
-Chỉ cập nhật quyết định thiết kế trong lượt này. Code, contracts, bộ dữ liệu,
-gold và kết quả kiểm thử trước đây chưa được chuyển đổi hoặc xác minh theo phạm
-vi mới. Các câu hỏi về policy, giới hạn đầu vào và xử lý vấn đề cần chốt trước
-plan triển khai.
+## Chốt vòng 14/10/2026
+
+Người dùng chốt tiếp ba câu còn mở của design §14:
+
+- **Q33 — Giải trình (hoãn form, giữ câu hỏi):** hoãn form giải trình tự do; giữ
+  khả năng nêu vấn đề/câu hỏi cụ thể, đúng người xử lý, cho sửa khai báo/bổ sung
+  nguồn và kiểm lại. Không tự kết luận đủ điều kiện cho nguồn thiếu/mâu thuẫn
+  trọng yếu. Đường `AnswerIssue` hiện có vẫn giữ.
+- **Q34 — Nguồn ngoài phạm vi employee-paid:** khi tài liệu cho thấy công ty trả
+  trực tiếp hoặc người trả thuộc bên khác, **giữ nguồn và báo phần ngoài phạm vi**;
+  không ép thành khoản nhân viên đã trả, không bỏ phần vật chất để kết luận tiền.
+  Hệ quả: giữ trường `C` (company-direct) như dữ kiện chi phí để đối chiếu và báo
+  ngoài phạm vi, nhưng **không** đưa vào phép tính hoàn trả cho nhân viên.
+- **Q32 — Căn cứ lời xác nhận:** xem [ADR0007](0007-money-confirmation-basis.md).
+
+Trạng thái: **ACCEPTED**. Các quyết định thiết kế đã chốt; code, contracts, bộ dữ
+liệu và gold vẫn **chưa** được chuyển đổi theo phạm vi mới. Việc chuyển đổi do plan
+Hoangha-evidence (E0) và plan finance/admissibility kế tiếp sở hữu; không coi các
+kết quả kiểm thử trước đây là đã chứng minh phạm vi mới.

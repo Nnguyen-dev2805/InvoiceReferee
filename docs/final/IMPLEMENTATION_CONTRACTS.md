@@ -47,7 +47,7 @@ DTO có thể có nested types nội bộ, không phải mỗi type/file/service
 | Claim | Căn cứ được nhận | Không đủ riêng lẻ |
 | --- | --- | --- |
 | Incurred expense/T | Final expense document và evidence service/activity incurred hoặc confirmation đúng trách nhiệm | Forecast/request/face value đang tranh chấp |
-| Employee-paid/E candidate | Payment proof ghi payer/amount/expense; hoặc confirmation tài chính hợp lệ | Guest/buyer trên invoice, lời khai chi tiền thông thường |
+| Employee-paid/E candidate | Payment proof ghi payer/amount/expense; hoặc confirmation tài chính hợp lệ; hoặc **lời xác nhận chịu trách nhiệm của nhân viên + chứng từ dịch vụ** khi các điều kiện khác đủ và không mâu thuẫn trọng yếu (Q32/ADR007; chỉ trong ngưỡng tự xử lý E<=8tr, abs(S)<=4tr) | Guest/buyer trên invoice, tên/chữ ký/`TM-CK` trên hóa đơn, lời khai chi tiền ngoài ngưỡng |
 | Company-direct/C | Company supplier payment có binding expense + actor/context đúng scope | Tên công ty trên hóa đơn |
 | A/P/R/received | Confirmed completed transfer/cash receipt/ledger có payer/payee/scope; reversal phải có event gốc | Requested/approved/debit-only/pending |
 | Activity purpose/link | Employee declaration được policy nhận + context compatible, không contradiction | Amount/date giống nhau hoặc opaque LLM confidence |
@@ -77,6 +77,16 @@ S=E-A-P+R, không float. B8/invoice-incurred10/paid employee5/company3/unpaid2:
 T10, E candidate5, C3, POLICY; không create vendor instruction.
 Nếu unpaid đã biết không đổi quyền lợi employee hoặc phép kiểm B, chỉ notice
 “ngoài việc thực hiện tiền của hồ sơ”, không giả toàn invoice đã thanh toán.
+
+Cập nhật phạm vi 14/10/2026 (§14/§15, ADR006/ADR007):
+- **C (Q34):** khi nguồn cho thấy công ty trả trực tiếp/người trả khác, giữ C như
+  dữ kiện để đối chiếu và báo phần ngoài phạm vi employee-paid; **không** đưa C vào
+  phép tính hoàn trả nhân viên và không bỏ phần vật chất để kết luận tiền. `S` cho
+  phạm vi employee-paid không cộng C.
+- **Lời xác nhận (Q32):** một khoản E có thể dựa trên lời xác nhận chịu trách nhiệm
+  của nhân viên + chứng từ dịch vụ, chỉ trong ngưỡng `E<=8tr`, `abs(S)<=4tr`, khi
+  không mâu thuẫn trọng yếu; provenance/`verified_by` phản ánh actor là nhân viên và
+  view ghi rõ mức căn cứ là "lời xác nhận", không phải giao dịch ngân hàng đã xác minh.
 
 MoneyEvent kinds ADVANCE_RECEIVED/REIMBURSEMENT_RECEIVED/EMPLOYEE_RETURN/
 REVERSAL/OBSERVED_UNALLOCATED; external_key=(origin_namespace,transaction_ref)
@@ -148,8 +158,9 @@ hứa xử lý trong app.
 
 ## 6. State/read-set/transaction
 
-Case derived states DRAFT/PROCESSING/WAITING/TECHNICAL_ERROR/READY_TO_EXECUTE/
-SETTLED/STOPPED; WAITING hiện issue set + dependencies, không một nhãn che issues.
+Case derived states DRAFT/PROCESSING/EVIDENCE_READY/WAITING/TECHNICAL_ERROR/
+READY_TO_EXECUTE/SETTLED/STOPPED; EVIDENCE_READY (mới, §12.5) nghĩa "đọc chứng cứ
+xong, chưa nối admission"; WAITING hiện issue set + dependencies, không một nhãn che issues.
 Job QUEUED/RUNNING/WAITING_HUMAN/COMPLETED/FAILED/CANCELLED; instruction ISSUED/
 PARTIAL/FULFILLED/SUSPENDED/SUPERSEDED/EXECUTION_UNKNOWN.
 Input revision tăng material changes; control_epoch tăng Stop/Resume; case_version
@@ -248,8 +259,12 @@ uncertainty if provider cannot resolve a snapshot, don't fake exact reproducibil
 
 ## 9. Interface names cho các tasks
 
-- EvidenceReader.read(source:SourceRef, requested_fields:tuple[str,...],
-  budget:RunBudget) -> ReadResult là async; proposals không có financial effect.
+- EvidenceReader.read(source:SourceRef, budget:RunBudget) -> OcrSourceResult là async
+  OCR-only (mọi trang, không native-text bypass; xem §12). `read_root(sources, reader,
+  llm, budget, provider_mode) -> ReadResult` là async, ghép OCR→confidence→classify→
+  extract→validate→match; mọi call X-Kiro là async/budgeted, validation/matching thuần
+  sync. Proposals không có financial effect; LIVE/RECORDED_REPLAY không vào Reconciler
+  cho tới khi có adapter admission riêng.
 - Reconciler.assess(input:AssessmentInput) -> AssessmentResult là pure sync;
   snapshot chứa observations/relations, không thêm positional parameters khác.
 - CaseWorkflow.execute(ctx:CommandContext, command:CaseCommand) -> CommandResult
@@ -365,8 +380,8 @@ SettlementConclusion lưu BALANCED/OUTSTANDING/BLOCKED cùng projection, refs/re
 và disposition từng khoản (ACCEPTED/EXCLUDED/UNRESOLVED, amount/rule/reason/refs).
 Không có instruction không chứng minh balanced. Priority CaseView: STOPPED >
 PROCESSING current job > TECHNICAL_ERROR material processing/unsupported/limit >
-WAITING business issue/unknown execution > READY_TO_EXECUTE actionable instruction >
-SETTLED. DRAFT áp dụng trước submit. SETTLED chỉ khi S known0, relations/coverage/
+EVIDENCE_READY (đọc xong, chưa nối admission) > WAITING business issue/unknown execution
+> READY_TO_EXECUTE actionable instruction > SETTLED. DRAFT áp dụng trước submit. SETTLED chỉ khi S known0, relations/coverage/
 rights đủ, không material problems/active issue/remaining/pending/unknown execution.
 No extra human approval để kết thúc routine. Facts unresolved không được lưu
 affirmative conclusion BALANCED; historical conclusion còn audit nhưng superseded.
@@ -457,3 +472,168 @@ Grouping axes được ghi trước selection: root/economic/source clone bắt 
 family/template/layout/issuer dùng khi ảnh hưởng độc lập, font/A4 chung không đủ
 để gộp. Nếu family overlap không tách được, root-heldout chỉ chứng minh trong các
 families đã khai báo, không claim unseen-family; gần trùng cùng nghĩa vụ vẫn fail.
+
+## 12. Pipeline chứng cứ — DTO và interface (chốt 14/10/2026)
+
+Nguồn: [design §15](ARCHITECTURE_AND_EVALUATION.md) và
+[plan Hoangha-evidence](../superpowers/plans/2026-10-13-hoangha-evidence-pipeline.md).
+§12 cụ thể hóa DTO/interface; khi shorthand ở §3/§9 chưa đủ, dùng §12. Đây là
+contract thiết kế, chưa phải code hay proof runtime. **Ranh giới:** mọi type dưới
+đây là proposal/evidence, không phải `Fact.KNOWN`; không đổi T/E/A/P/R/S, policy,
+authority hay ghi tiền.
+
+### 12.1. OCR types
+
+- `OcrWord(text:str, block_start:int|None, block_end:int|None, confidence:float|None)`;
+  offset block-local.
+- `OcrBlock(id:str, kind:str, content:str, bbox:BBox|None, words:tuple[OcrWord,...])`.
+- `OcrPage(page:int, markdown:str, blocks:tuple[OcrBlock,...])`.
+- `OcrSourceResult(source_id:Id, source_digest:str, provider:str, model:str,
+  pages:tuple[OcrPage,...], raw_artifact_ref:str)`.
+- `BBox` = bốn toạ độ `top_left_x/top_left_y/bottom_right_x/bottom_right_y` float hữu hạn.
+- `PageCoverage(source_id:Id, page:int, state:OCR_COMPLETE|NOT_READ|ERROR,
+  artifact_ref:str|None, problem:str|None)`.
+- `async MistralOcrClient.ocr_file(source:SourceRef, *, budget:RunBudget)
+  -> OcrSourceResult`: PDF dùng document payload, ảnh dùng image payload,
+  `include_blocks=true`, word confidence, không trả base64; thiếu page ⇒ problem,
+  không empty-success.
+
+### 12.2. Phân loại và vai trò
+
+- `DocumentType` = strict enum 17 giá trị: 16 `ExpenseDocumentType` của Hoangha
+  (`E_INVOICE, PAPER_RECEIPT, CARD_SLIP, PAYMENT_PROOF, TRANSPORT_TICKET,
+  HOTEL_RECEIPT, COLLECTION_RECEIPT, CONTRACT, QUOTATION, PURCHASE_ORDER,
+  ACCEPTANCE_RECORD, DELIVERY_NOTE, GOODS_RECEIPT, SUPPLIER_CONFIRMATION, OTHER,
+  UNKNOWN`) + `SETTLEMENT_FORM`.
+- `DocumentEvidenceRole` = strict enum `SETTLEMENT_DECLARATION,
+  ORIGINAL_EXPENSE_EVIDENCE, PAYMENT_EVIDENCE, SUPPORTING_DOCUMENT, UNKNOWN`; **tách**
+  khỏi page-level `EvidenceRole` của §2.
+- `DocumentClassification(document_id:Id, source_id:Id, page_range:tuple[int,int],
+  block_ids:tuple[str,...], document_type:DocumentType,
+  roles:tuple[DocumentEvidenceRole,...],
+  role_refs:Mapping[DocumentEvidenceRole,tuple[EvidenceRef,...]],
+  alternative_document_types:tuple[DocumentType,...], classification_confidence:float|None,
+  signals:tuple[str,...], refs:tuple[EvidenceRef,...])`. Model đề xuất range; code
+  validate bounds và tạo unit ID tất định. Unit trùng/chồng không tương thích ⇒ unresolved;
+  nhiều loại khác range trong một PDF không phải conflict.
+- Map mặc định do code sở hữu: original = `E_INVOICE, PAPER_RECEIPT,
+  TRANSPORT_TICKET, HOTEL_RECEIPT, COLLECTION_RECEIPT`; supporting = `CARD_SLIP,
+  PAYMENT_PROOF, CONTRACT, QUOTATION, PURCHASE_ORDER, ACCEPTANCE_RECORD, DELIVERY_NOTE,
+  GOODS_RECEIPT, SUPPLIER_CONFIRMATION`; `OTHER` supporting; `UNKNOWN` unknown;
+  `SETTLEMENT_FORM` declaration. `PAYMENT_EVIDENCE` chỉ thêm khi nguồn tự thể hiện
+  payer/payee/amount/identity/status với refs riêng.
+- `async classify_documents(ocr, *, llm, budget) -> tuple[DocumentClassification,...]`:
+  một batch/root; `UNKNOWN` không chọn schema đoán.
+- Bảng compatibility type↔role (code sở hữu; model không tự đổi):
+
+| `DocumentType` | Role mặc định | Ghi chú |
+| --- | --- | --- |
+| `SETTLEMENT_FORM` | `SETTLEMENT_DECLARATION` | nguồn của matching |
+| `E_INVOICE`, `PAPER_RECEIPT`, `TRANSPORT_TICKET`, `HOTEL_RECEIPT`, `COLLECTION_RECEIPT` | `ORIGINAL_EXPENSE_EVIDENCE` | có thể thêm `PAYMENT_EVIDENCE` nếu nguồn tự thể hiện payer/payee/amount/identity/status |
+| `CARD_SLIP`, `PAYMENT_PROOF` | `SUPPORTING_DOCUMENT` | thêm `PAYMENT_EVIDENCE` chỉ khi có đủ payer/payee/amount/identity/status với refs riêng |
+| `CONTRACT`, `QUOTATION`, `PURCHASE_ORDER`, `ACCEPTANCE_RECORD`, `DELIVERY_NOTE`, `GOODS_RECEIPT`, `SUPPLIER_CONFIRMATION`, `OTHER` | `SUPPORTING_DOCUMENT` | `OTHER` chỉ schema chung |
+| `UNKNOWN` | `UNKNOWN` | không extraction đoán |
+
+Schema trường theo từng loại (field chung, field riêng, line shape) do
+[plan Hoangha-evidence](../superpowers/plans/2026-10-13-hoangha-evidence-pipeline.md#schema-field-names-and-validation-ownership)
+giữ và E0 pin; profile/critical-field matrix pin tại Hoangha revision `1ee33487…`
+(`policy/document_validity.py`).
+
+### 12.3. Trích xuất và trạng thái trường
+
+- `FieldState = Literal["FOUND","NOT_PRESENT","UNREADABLE","AMBIGUOUS","NOT_APPLICABLE"]`.
+- `CandidateValue = str|int|Decimal|bool|tuple[str,...]` (list chỉ cho trường nguồn
+  nêu như `invoice_refs`, không cho amount).
+- `ValueAlternative(value:CandidateValue, refs:tuple[EvidenceRef,...])`.
+- `FieldCandidate(field:str, state:FieldState, value:CandidateValue|None,
+  alternatives:tuple[ValueAlternative,...], refs:tuple[EvidenceRef,...])`: `FOUND`
+  cần value+ref; `AMBIGUOUS` giữ ≥2 alternative có nguồn và không value tổng; các
+  state khác không value. Không thêm generic confidence.
+- `DocumentLine(id:Id, fields:tuple[FieldCandidate,...], refs:tuple[EvidenceRef,...])`;
+  code cấp id sau validate (bỏ id do model tạo).
+- `DocumentProfileIssue(code:str, field:str|None, status:UNRESOLVED|INVALID,
+  message:str, refs:tuple[EvidenceRef,...], blocking:bool)` — chỉ validity của
+  profile/extraction, không policy.
+- `DocumentAnalysis(source_id, document_type, roles, classification_confidence,
+  alternative_document_types, classification_refs, fields, line_items,
+  confidence_status:ASSESSED|SKIPPED_NO_NUMERIC_CANDIDATES|UNRESOLVED, confidence_refs,
+  profile_status:CLEAR|NEEDS_HUMAN|UNKNOWN, profile_findings, refs, warnings)` +
+  `document_id, page_range, block_ids, role_refs` từ classification đã validate.
+- `async extract_document(ocr, classification, *, llm, budget) -> DocumentAnalysis`:
+  một call/tài liệu.
+- `validate_document(analysis, ocr, quality) -> DocumentAnalysis` pure sync: validate
+  ownership source/page/block, quote chuẩn hoá khớp, schema, nhất quán state/value,
+  required field và compatibility type/role.
+- Confidence: `collect_low_confidence_blocks(ocr, threshold=0.85)` tạo candidate;
+  `async review_ocr_quality(candidates, *, llm, budget) -> ConfidenceReview` một batch;
+  `ConfidenceReview(status:ASSESSED|SKIPPED_NO_NUMERIC_CANDIDATES|TECHNICAL_ERROR,
+  block_assessments)` với `BlockAssessment` có `importance/quality_state/review_action/
+  canonical_fields/observed_text/reason/...`. `SKIPPED_NO_NUMERIC_CANDIDATES` **không**
+  phải PASS. Model chỉ đánh giá readability; không thay text/thay value.
+- Sửa schema: tối đa **một** repair call/root; sau đó giữ lỗi kỹ thuật + unresolved.
+- Cap X-Kiro: `MAX_LLM_INPUT_CHARS=120_000`, `MAX_OUTPUT_CHARS=20_000` (giới hạn
+  pilot, không phải context window); ghi vào `RunManifest` (`max_llm_input_chars`,
+  `max_llm_output_chars`, `limit_version`, `limit_origin`).
+- **Criticality matrix `SETTLEMENT_FORM`:** Hoangha không có loại này; E0 pin ma trận
+  critical/required cho `SETTLEMENT_FORM` trong `document_profiles.py` (field trọng yếu
+  tối thiểu: `declared_name`, `trip_*`, các `printed_*`, `amount_words`, và per-row
+  `amount`/`invoice_refs`). Đây là quyết định của lead, phải có test cho từng field
+  trọng yếu trước khi E3/E5 dùng. Field critical thiếu confidence ⇒ unresolved, không PASS.
+
+### 12.4. Matching
+
+- `EvidenceLink(item_id, source_id, document_id, status:AUTO_LINK|SUGGEST_LINK,
+  method:INVOICE_NUMBER_EXACT|AMOUNT_AND_CONTENT|LLM_RESOLVED, score:Decimal,
+  allocated_amount:Decimal|None, explanation:str, refs)`.
+- `DocumentRowMatch(item_id, paper_amount:Decimal|None, category_candidate,
+  evidence_status:ORIGINAL_EVIDENCE|ALTERNATIVE_EVIDENCE|NO_EVIDENCE,
+  alternative_evidence_type, matched_document_date, original_total:Decimal|None,
+  allocated_total:Decimal|None, no_evidence_reason:str|None, refs)`.
+- `EvidenceMatchFinding(code, status:PASS|UNRESOLVED, message, refs)`;
+  `EvidenceMatchingResult(links, rows, findings, unmatched_source_ids)`.
+- `match_paper_evidence(paper, documents) -> EvidenceMatchingResult` pure sync; yêu cầu
+  `paper.document_type == SETTLEMENT_FORM` (giấy quyết toán upload). Không có form ⇒
+  không gọi hàm này; report ghi finding `SETTLEMENT_FORM_MISSING`. Port core Hoangha revision `1ee33487…`
+  (`application/paper_evidence_matching.py`): exact invoice ref → `AUTO_LINK`/1.0;
+  ngược lại amount 0.60 (≤1 VND) + semantic ≤0.30 + party 0.12/0.20 + non-original
+  +0.10, cap 1.0; `<0.50` bỏ, `[0.50,0.75)` suggestion, `>=0.75` auto; tie theo thứ
+  tự gắn nguồn.
+- `async resolve_evidence_suggestions(result, documents, *, llm, budget)` một batch khi
+  có suggestion; model chỉ promote cặp có sẵn ở `>=0.90`, không tạo cặp mới.
+- Cardinality: một nguồn auto-link cho dòng khác mặc định chỉ suggestion; phân bổ
+  nhiều dòng chỉ khi mỗi dòng lặp `invoice_ref` chuẩn hoá + amount, tổng ≤ giá trị
+  chứng từ. Chứng từ hỗ trợ không tính là chứng từ gốc; `original_total` chỉ cộng
+  chứng từ gốc/phần phân bổ gốc; amount thiếu giữ `None`.
+
+### 12.5. ReadResult và consumer boundary
+
+- `async read_root(sources, *, reader, llm, budget, provider_mode) -> ReadResult`:
+  OCR mọi nguồn → confidence batch có điều kiện → classification batch → extraction
+  mỗi tài liệu → validate → match → suggestion batch tuỳ chọn; dừng trước reconciliation/
+  policy/tiền.
+- `ReadResult(provider_mode, data_origin:LIVE_READ|RECORDED_REPLAY|STUB_TRANSCRIPTION,
+  documents, links, row_matches, match_findings, page_coverage, problems, trace_refs)`
+  + giữ `units/observations/relations` cũ.
+- `CaseView` expose `ReadResult` như evidence report. Trong LIVE/RECORDED_REPLAY,
+  job đọc xong ⇒ **trạng thái riêng `EVIDENCE_READY`** (thêm vào `CaseState`; khác
+  `WAITING` vốn nghĩa "business issue/execution chưa rõ"), `conclusion=None`, không
+  instruction; `assessment_ready=false`,
+  `assessment_blocker=EVIDENCE_ADMISSION_NOT_CONNECTED`. Ưu tiên `CaseView` chèn
+  `EVIDENCE_READY` ngay dưới `TECHNICAL_ERROR`, trên `WAITING`; không tạo question
+  card. Guard trong `_assess_and_commit` (không chỉ `_submit`) để Answer/Resume/Decide
+  không rơi lại transcription STUB. STUB giữ nguyên đường assessment hiện có.
+- **`SETTLEMENT_FORM` là giấy quyết toán upload** (paper). Nếu root không có
+  `SETTLEMENT_FORM`, pipeline vẫn OCR/phân loại/trích xuất chứng từ nhưng **bỏ qua
+  matching** và ghi finding `SETTLEMENT_FORM_MISSING` (evidence-only, không chặn nộp,
+  không phải business issue). Khai báo in-app không phải `SETTLEMENT_FORM`.
+- **Q34 hoãn:** §12/report **không** phát hiện/báo nguồn ngoài phạm vi employee-paid
+  trong plan này; đây là **lỗ đã biết** (report im lặng với case company-direct/
+  other-payer) do plan finance kế tiếp sở hữu.
+- Cache/artifact identity: `(tenant, root_id, source_id, source_digest, reader_config)`;
+  `reader_config` gồm model/prompt/schema/profile/representation/requested-fields version.
+  Artifact private dưới `uploads_dir.parent/"artifacts"`, cùng vòng đời nguồn, trần
+  20 MiB/source, 40 MiB/root.
+- Worker: `async CaseWorkflow.run_evidence_job(job_id) -> None` →
+  `workflow/evidence_jobs.py::run_evidence_job`; `drain_evidence_jobs(workflow, stop)`
+  claim QUEUED transactionally, chạy một job một lúc; FastAPI lifespan sở hữu task.
+  Persist `jobs.input_basis_json` (additive migration) + `attempts_json`.
