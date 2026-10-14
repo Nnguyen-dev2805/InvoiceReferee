@@ -383,289 +383,344 @@ export function Intake({
           </div>
         </section>
       )}
+        </div>
+      </main>
+    );
+  }
 
-      {/* ------------------------------------------------------------- */}
-      {/* BƯỚC 3 & 4: KIỂM TRA BẢN NHÁP & XÁC NHẬN NỘP HỒ SƠ            */}
-      {/* ------------------------------------------------------------- */}
-      {step === "review" && (
-        <section aria-labelledby="review-title" className="space-y-4">
-          {/* Top Bar */}
-          <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 id="review-title" className="text-base font-bold text-slate-900 tracking-tight">
-                  Kiểm tra bản nháp hồ sơ
-                </h2>
-                <span
-                  className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
-                    warnings.length === 0
-                      ? "text-emerald-800 bg-emerald-50 border-emerald-200"
-                      : "text-amber-800 bg-amber-50 border-amber-200"
-                  }`}
-                >
-                  {warnings.length === 0 ? "● Đã trích xuất" : "● Cần kiểm tra"}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 font-normal mt-0.5">
-                Xem tài liệu gốc bên cạnh để đối chiếu. Trường đọc rõ được điền sẵn; bạn có thể chỉnh sửa nếu AI đọc sai.
-              </p>
-              {warnings.length > 0 && (
-                <ul className="mt-2 space-y-1">
-                  {warnings.map((w, i) => (
-                    <li key={i} className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                      ⚠ {w}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+  return (
+    <main className="h-[calc(100vh-48px)] flex flex-col md:flex-row overflow-hidden flex-1">
+      {/* LEFT PANE: Document & Evidence Inspector (50%) */}
+      <div className="w-full md:w-1/2 h-1/2 md:h-full overflow-hidden flex flex-col">
+        <DocumentViewer caseView={caseView} pendingFiles={files} />
+      </div>
 
+      {/* RIGHT PANE: Extracted Draft Workspace (50%) */}
+      <div className="w-full md:w-1/2 h-1/2 md:h-full overflow-hidden flex flex-col bg-white">
+        {/* Sleek Subheader Bar (h-11) */}
+        <div className="h-11 border-b border-slate-200 px-5 flex items-center justify-between shrink-0 bg-white z-10">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setStep("upload")}
-              className="text-xs font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-md border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer self-start sm:self-auto shrink-0"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
             >
-              ← Chọn lại tệp
+              <span className="font-mono">←</span>
+              <span>Chọn lại tệp</span>
             </button>
+            <span className="text-slate-300">/</span>
+            <span className="text-xs font-semibold text-slate-900">
+              Kiểm tra bản nháp hồ sơ
+            </span>
+            <span
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+                warnings.length === 0
+                  ? "text-emerald-800 bg-emerald-50 border-emerald-200"
+                  : "text-amber-800 bg-amber-50 border-amber-200"
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  warnings.length === 0 ? "bg-emerald-500" : "bg-amber-500"
+                }`}
+              />
+              <span>{warnings.length === 0 ? "Đã trích xuất" : "Cần kiểm tra"}</span>
+            </span>
           </div>
 
-          {/* Two-Column Side-by-Side: Left = Original Document, Right = Extracted Fields */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-            {/* CỘT TRÁI: TÀI LIỆU GỐC (5 / 12) */}
-            <div className="lg:col-span-5 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs flex flex-col h-[680px]">
-              <DocumentViewer caseView={caseView} pendingFiles={files} />
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+            >
+              Đóng
+            </button>
+          )}
+        </div>
+
+        {/* Scrollable Canvas */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6 text-xs">
+          {/* Global Error Banner */}
+          {error !== null && (
+            <div role="alert" className="p-3 rounded-lg bg-rose-50 text-rose-900 border border-rose-200 text-xs">
+              {error}
             </div>
+          )}
 
-            {/* CỘT PHẢI: THÔNG TIN ĐÃ TRÍCH XUẤT (7 / 12) */}
-            <div className="lg:col-span-7 bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-5 text-xs">
-              {/* 1. Người đề nghị & Hoạt động */}
-              <div className="space-y-3 pb-4 border-b border-slate-100">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Thông tin hoạt động &amp; Nhân viên
-                  </h3>
-                  <span className="text-[11px] text-slate-400">
-                    Người đề nghị: <strong className="text-slate-800">{draft.declared_name ?? "Chưa đọc được"}</strong>
-                  </span>
-                </div>
+          {/* Global Status Banner */}
+          {status !== null && (
+            <div role="status" className="p-3 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs">
+              {status}
+            </div>
+          )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="sm:col-span-2">
-                    <label htmlFor="draft-activity" className="text-slate-700 block font-semibold text-xs mb-1">
-                      Hoạt động của hồ sơ:
-                    </label>
-                    <select
-                      id="draft-activity"
-                      aria-label="Hoạt động của hồ sơ"
-                      value={activityId}
-                      onChange={(e) => setActivityId(e.target.value)}
-                      className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
-                    >
-                      <option value="">— Chọn hoạt động —</option>
-                      {session.activity_catalog.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name}
-                          {a.occurred_at ? ` · ${a.occurred_at.slice(0, 10)}` : ""}
-                        </option>
-                      ))}
-                      {caseView?.activity ? (
-                        <option value={caseView.activity}>
-                          ＋ Hoạt động mới: {draft.activity_name ?? draft.declared_purpose ?? "theo chứng từ"}
-                        </option>
-                      ) : null}
-                    </select>
-                    <span className="text-[10px] text-slate-400 block mt-1">
-                      Danh mục do hệ thống cung cấp; không cần nhập mã nội bộ. Nếu hoạt động chưa có
-                      trong danh mục, chọn “Hoạt động mới” — hồ sơ sẽ vào luồng xin bổ sung ngân sách/quyền.
-                    </span>
-                  </div>
+          {/* Header Info */}
+          <div className="pb-4 border-b border-slate-100 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <h2 id="review-title" className="text-base font-bold text-slate-900 tracking-tight">
+                Bản nháp hồ sơ quyết toán
+              </h2>
+              <span className="text-[11px] text-slate-500">
+                Người đề nghị: <strong className="text-slate-900 font-semibold">{draft.declared_name ?? "Chưa đọc được"}</strong>
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 font-normal">
+              Xem tài liệu gốc ở khung bên cạnh để đối chiếu. Các trường đọc rõ đã được điền sẵn; bạn có thể chỉnh sửa nếu AI đọc sai.
+            </p>
+            {warnings.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {warnings.map((w, i) => (
+                  <li key={i} className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5">
+                    ⚠ {w}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
-                  <div className="sm:col-span-2">
-                    <label htmlFor="draft-activity-name" className="text-slate-700 block font-semibold text-xs mb-1">
-                      Nội dung hoạt động (đọc từ giấy):
-                    </label>
-                    <input
-                      id="draft-activity-name"
-                      value={draft.activity_name ?? ""}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, activity_name: e.target.value }))}
-                      placeholder="Chưa đọc được"
-                      className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
-                    />
-                  </div>
+          {/* 1. Người đề nghị & Hoạt động */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-slate-900">
+              Thông tin hoạt động &amp; người đề nghị
+            </h3>
 
-                  <div className="sm:col-span-2">
-                    <label htmlFor="draft-purpose" className="text-slate-700 block font-semibold text-xs mb-1">
-                      Mục đích:
-                    </label>
-                    <input
-                      id="draft-purpose"
-                      value={draft.declared_purpose ?? ""}
-                      onChange={(e) => setDraft((prev) => ({ ...prev, declared_purpose: e.target.value }))}
-                      placeholder="Chưa đọc được"
-                      className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
-                    />
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label htmlFor="draft-activity" className="text-slate-700 block font-semibold text-xs mb-1">
+                  Hoạt động của hồ sơ:
+                </label>
+                <select
+                  id="draft-activity"
+                  aria-label="Hoạt động của hồ sơ"
+                  value={activityId}
+                  onChange={(e) => setActivityId(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+                >
+                  <option value="">— Chọn hoạt động —</option>
+                  {session.activity_catalog.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                      {a.occurred_at ? ` · ${a.occurred_at.slice(0, 10)}` : ""}
+                    </option>
+                  ))}
+                  {caseView?.activity ? (
+                    <option value={caseView.activity}>
+                      ＋ Hoạt động mới: {draft.activity_name ?? draft.declared_purpose ?? "theo chứng từ"}
+                    </option>
+                  ) : null}
+                </select>
+                <span className="text-[10px] text-slate-400 block mt-1">
+                  Danh mục do hệ thống cung cấp; không cần nhập mã nội bộ. Nếu hoạt động chưa có trong danh mục, chọn “Hoạt động mới” — hồ sơ sẽ vào luồng xin bổ sung ngân sách/quyền.
+                </span>
               </div>
 
-              {/* 2. Bảng kê các khoản chi phí đã trích xuất */}
-              <div className="space-y-2.5 pb-4 border-b border-slate-100">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Các khoản chi phí trích xuất ({draft.expenses.length})
-                  </h3>
-                  <span className="text-[11px] text-slate-400 font-mono-nums">
-                    Đơn vị: VNĐ
-                  </span>
-                </div>
-
-                <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs">
-                  {draft.expenses.length === 0 ? (
-                    <div className="p-4 text-center text-slate-400 text-xs">
-                      Chưa đọc được dòng chi tiết từ chứng từ. Kiểm tra lại tệp đã tải hoặc thử đọc lại.
-                    </div>
-                  ) : (
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
-                          <th className="py-2 px-3">Khoản chi</th>
-                          <th className="py-2 px-3">Hóa đơn</th>
-                          <th className="py-2 px-3 text-right">Số tiền (VNĐ)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {draft.expenses.map((item, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50/50">
-                            <td className="py-2.5 px-3">
-                              <span className="font-medium text-slate-900 block">{item.description}</span>
-                              {item.matched_invoice ? (
-                                <span className="text-[10px] text-emerald-700 font-mono-nums block mt-0.5">
-                                  ✓ Khớp tệp: {item.matched_invoice}
-                                </span>
-                              ) : item.suggested_invoice ? (
-                                <span className="text-[10px] text-slate-500 block mt-0.5">
-                                  ? Có thể liên quan: {item.suggested_invoice} (chưa xác nhận)
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-amber-700 block mt-0.5">
-                                  ⚠ Chưa liên kết được chứng từ cho khoản này
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-2.5 px-3 font-mono-nums text-slate-600">
-                              {item.invoice_no || "—"}
-                            </td>
-                            <td className="py-2.5 px-3 text-right font-mono-nums font-semibold text-slate-900">
-                              {formatVnd(item.amount)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-
-              {/* 3. Tổng chi & Ứng NHÂN VIÊN KÊ KHAI (không phải A đã xác minh) */}
-              <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200 space-y-3.5">
-                <div className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                  Tổng chi &amp; Ứng nhân viên kê khai
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  Đây là số nhân viên kê khai trên giấy, chưa phải số ứng công ty đã thực nhận.
-                  Ứng thực nhận và chênh lệch chính thức chỉ có sau khi hệ thống đối soát lịch sử.
-                </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {/* Tổng chi phí kê khai */}
-                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
-                    <span className="text-[11px] text-slate-500 block font-medium">
-                      Tổng chi phí kê khai:
-                    </span>
-                    <strong className="text-sm font-bold text-slate-900 font-mono-nums block mt-1">
-                      {draft.incurred_total !== null ? formatVnd(draft.incurred_total) : "Chưa đọc được"}
-                    </strong>
-                  </div>
-
-                  {/* Ứng nhân viên kê khai - Có thể chỉnh sửa */}
-                  <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
-                    <div className="flex items-center justify-between">
-                      <label htmlFor="draft-advance" className="text-[11px] text-slate-700 block font-semibold">
-                        Ứng nhân viên kê khai:
-                      </label>
-                      {draft.declared_advance !== draft.original_advance && (
-                        <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
-                          * Đã chỉnh sửa
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      id="draft-advance"
-                      type="number"
-                      value={draft.declared_advance ?? ""}
-                      onChange={(e) =>
-                        setDraft((prev) => ({
-                          ...prev,
-                          declared_advance: e.target.value === "" ? null : Number(e.target.value),
-                        }))
-                      }
-                      className="w-full mt-1 bg-slate-50/50 border border-slate-300 rounded text-xs px-2.5 py-1 font-mono-nums font-bold text-slate-900 focus:outline-none focus:border-slate-800"
-                    />
-                    <span className="text-[10px] text-slate-400 block mt-1">
-                      Số ứng nhân viên kê khai; sửa lại nếu AI đọc sai. Không thay đổi số ứng công ty đã ghi nhận.
-                    </span>
-                  </div>
-                </div>
-
-                {/* Chênh lệch kê khai dự kiến (chỉ khi biết cả hai số) */}
-                <div className="pt-1 flex items-center justify-between border-t border-slate-200/80 text-xs">
-                  <span className="font-medium text-slate-600">
-                    Chênh lệch kê khai dự kiến (T - Ứng kê khai):
-                  </span>
-                  <span className={`font-mono-nums font-bold text-sm ${
-                    netDifference === null ? "text-slate-400"
-                      : netDifference < 0 ? "text-amber-700" : netDifference > 0 ? "text-emerald-700" : "text-slate-900"
-                  }`}>
-                    {netDifference === null
-                      ? "Chưa xác định"
-                      : netDifference < 0
-                      ? `-${formatVnd(Math.abs(netDifference))} (Nhân viên có thể hoàn lại)`
-                      : netDifference > 0
-                      ? `+${formatVnd(netDifference)} (Công ty có thể chi bổ sung)`
-                      : "0 ₫ (Cân bằng kê khai)"}
-                  </span>
-                </div>
-              </div>
-
-              {/* 4. Ghi chú của nhân viên */}
-              <div>
-                <label htmlFor="draft-notes" className="text-slate-700 block font-semibold text-xs mb-1">
-                  Ghi chú của nhân viên (nếu có bổ sung hoặc sửa khác PDF gốc):
+              <div className="sm:col-span-2">
+                <label htmlFor="draft-activity-name" className="text-slate-700 block font-semibold text-xs mb-1">
+                  Nội dung hoạt động (đọc từ giấy):
                 </label>
                 <input
-                  id="draft-notes"
-                  value={draft.notes}
-                  onChange={(e) => setDraft((prev) => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Ví dụ: Đã kiểm tra hóa đơn và xác nhận số tiền ứng thực tế..."
+                  id="draft-activity-name"
+                  value={draft.activity_name ?? ""}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, activity_name: e.target.value }))}
+                  placeholder="Chưa đọc được"
                   className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
                 />
               </div>
 
-              {/* Bước 4: Nút "Xác nhận và nộp hồ sơ" */}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => void handleConfirmAndSubmit()}
-                  disabled={busy}
-                  className="w-full bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs py-3 px-4 rounded-lg shadow-sm transition-colors disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {busy ? "Đang xử lý nộp hồ sơ…" : "Xác nhận và nộp hồ sơ"}
-                </button>
+              <div className="sm:col-span-2">
+                <label htmlFor="draft-purpose" className="text-slate-700 block font-semibold text-xs mb-1">
+                  Mục đích:
+                </label>
+                <input
+                  id="draft-purpose"
+                  value={draft.declared_purpose ?? ""}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, declared_purpose: e.target.value }))}
+                  placeholder="Chưa đọc được"
+                  className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+                />
               </div>
             </div>
           </div>
-        </section>
-      )}
-    </div>
+
+          {/* 2. Bảng kê các khoản chi phí đã trích xuất */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-slate-900">
+              Các khoản chi phí trích xuất ({draft.expenses.length})
+            </h3>
+
+            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs">
+              {draft.expenses.length === 0 ? (
+                <div className="p-4 text-center text-slate-400 text-xs">
+                  Chưa đọc được dòng chi tiết từ chứng từ. Kiểm tra lại tệp đã tải hoặc thử đọc lại.
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
+                      <th className="py-2.5 px-3">Khoản chi</th>
+                      <th className="py-2.5 px-3">Hóa đơn</th>
+                      <th className="py-2.5 px-3 text-right">Số tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {draft.expenses.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-3">
+                          <span className="font-medium text-slate-900 block">{item.description}</span>
+                          {item.matched_invoice ? (
+                            <span className="text-[10px] text-emerald-700 font-mono-nums block mt-0.5">
+                              ✓ Khớp tệp: {item.matched_invoice}
+                            </span>
+                          ) : item.suggested_invoice ? (
+                            <span className="text-[10px] text-slate-500 block mt-0.5">
+                              ? Có thể liên quan: {item.suggested_invoice} (chưa xác nhận)
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-amber-700 block mt-0.5">
+                              ⚠ Chưa liên kết được chứng từ cho khoản này
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono-nums tabular-nums text-slate-600">
+                          {item.invoice_no || "—"}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono-nums tabular-nums font-semibold text-slate-900">
+                          {formatVnd(item.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* 3. Tổng chi & Ứng NHÂN VIÊN KÊ KHAI */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-slate-900">
+                Tổng chi &amp; ứng nhân viên kê khai
+              </h3>
+              <span className="text-[11px] text-slate-400">
+                Số liệu kê khai trên chứng từ
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Đây là số nhân viên kê khai trên giấy, chưa phải số ứng công ty đã thực nhận.
+              Ứng thực nhận và chênh lệch chính thức chỉ có sau khi hệ thống đối soát lịch sử.
+            </p>
+
+            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs divide-y divide-slate-100">
+              {/* Row 1: Tổng chi phí kê khai (T) */}
+              <div className="flex items-center justify-between px-4 py-2.5 text-xs bg-slate-50/50">
+                <span className="font-semibold text-slate-900">
+                  Tổng chi phí kê khai:
+                </span>
+                <strong className="text-xs font-bold text-slate-950 font-mono-nums tabular-nums">
+                  {draft.incurred_total !== null ? formatVnd(draft.incurred_total) : "Chưa đọc được"}
+                </strong>
+              </div>
+
+              {/* Row 2: Ứng nhân viên kê khai - Có thể chỉnh sửa */}
+              <div className="flex items-center justify-between px-4 py-2 text-xs">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="draft-advance" className="font-medium text-slate-700">
+                      Ứng nhân viên kê khai:
+                    </label>
+                    {draft.declared_advance !== draft.original_advance && (
+                      <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        * Đã chỉnh sửa
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-400 block">
+                    Sửa lại nếu AI đọc sai số trên giấy
+                  </span>
+                </div>
+                <div className="w-40 shrink-0">
+                  <input
+                    id="draft-advance"
+                    type="number"
+                    value={draft.declared_advance ?? ""}
+                    onChange={(e) =>
+                      setDraft((prev) => ({
+                        ...prev,
+                        declared_advance: e.target.value === "" ? null : Number(e.target.value),
+                      }))
+                    }
+                    className="w-full text-right bg-slate-50 hover:bg-white border border-slate-300 rounded px-2.5 py-1 text-xs font-mono-nums tabular-nums font-bold text-slate-900 focus:outline-none focus:border-slate-800 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: Chênh lệch kê khai dự kiến */}
+              <div className="flex items-center justify-between px-4 py-2.5 text-xs bg-slate-50/30">
+                <span className="font-medium text-slate-600">
+                  Chênh lệch kê khai dự kiến (T - Ứng):
+                </span>
+                <div className="text-right">
+                  {netDifference === null ? (
+                    <span className="text-xs text-slate-400 font-normal">Chưa xác định</span>
+                  ) : (
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <span
+                        className={`text-xs font-bold font-mono-nums tabular-nums ${
+                          netDifference < 0
+                            ? "text-amber-700"
+                            : netDifference > 0
+                            ? "text-emerald-700"
+                            : "text-slate-900"
+                        }`}
+                      >
+                        {netDifference < 0
+                          ? `-${formatVnd(Math.abs(netDifference))}`
+                          : netDifference > 0
+                          ? `+${formatVnd(netDifference)}`
+                          : "0 ₫"}
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-normal font-sans">
+                        {netDifference < 0
+                          ? "(Nhân viên có thể hoàn lại)"
+                          : netDifference > 0
+                          ? "(Công ty có thể chi bổ sung)"
+                          : "(Cân bằng kê khai)"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Ghi chú của nhân viên */}
+          <div className="space-y-1.5">
+            <label htmlFor="draft-notes" className="text-slate-700 block font-semibold text-xs">
+              Ghi chú của nhân viên (nếu có bổ sung hoặc sửa khác PDF gốc):
+            </label>
+            <input
+              id="draft-notes"
+              value={draft.notes}
+              onChange={(e) => setDraft((prev) => ({ ...prev, notes: e.target.value }))}
+              placeholder="Ví dụ: Đã kiểm tra hóa đơn và xác nhận số tiền ứng thực tế..."
+              className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+            />
+          </div>
+
+          {/* 5. Nút "Xác nhận và nộp hồ sơ" */}
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => void handleConfirmAndSubmit()}
+              disabled={busy}
+              className="w-full bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs py-3 px-4 rounded-lg shadow-sm transition-colors disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {busy ? "Đang xử lý nộp hồ sơ…" : "Xác nhận và nộp hồ sơ"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }
