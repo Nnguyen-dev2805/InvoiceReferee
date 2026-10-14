@@ -54,10 +54,49 @@ _FIELD_ALIASES: dict[str, str] = {
     "currency_code": "currency",
 }
 
+# SETTLEMENT_FORM synonyms, scoped by document_type so the invoice vocabulary is
+# untouched. The model reads a settlement form by its own natural labels
+# (`requester_name`, `work_location`, `total_expense`, …); without this map a
+# correctly-read form is reported as missing every required field (false
+# NEEDS_HUMAN). Mapping is by document type only — `total_amount_numeric` on a
+# form is the printed total, but `total_amount` on an invoice is not aliased.
+_SETTLEMENT_FORM_ALIASES: dict[str, str] = {
+    "requester_name": "declared_name",
+    "requester": "declared_name",
+    "employee_name": "declared_name",
+    "work_location": "trip_destination",
+    "destination": "trip_destination",
+    "start_date": "trip_start",
+    "trip_from": "trip_start",
+    "end_date": "trip_end",
+    "trip_to": "trip_end",
+    "subject": "purpose",
+    "reason": "purpose",
+    "total_expense": "printed_total",
+    "total_amount_numeric": "printed_total",
+    "total_expense_in_words": "amount_words",
+    "total_expense_words": "amount_words",
+    "total_amount_words": "amount_words",
+    "advance_amount": "declared_advance",
+    "advanced_amount": "declared_advance",
+    "refund_amount": "printed_return",
+    "return_amount": "printed_return",
+    "additional_payment_requested": "printed_reimbursement",
+    "reimbursement_amount": "printed_reimbursement",
+}
 
-def canonical_field_name(name: str) -> str:
-    """Map a model field synonym to the code-owned profile vocabulary."""
+
+def canonical_field_name(name: str, document_type: str | None = None) -> str:
+    """Map a model field synonym to the code-owned profile vocabulary.
+
+    The alias table is scoped by document type: a SETTLEMENT_FORM form is read by
+    its own labels (`requester_name`, `total_expense`, …), so those map only when
+    the caller states the document type. Without a type, only the invoice table
+    applies (kept for backward-compatible callers).
+    """
     key = (name or "").strip()
+    if document_type == "SETTLEMENT_FORM":
+        return _SETTLEMENT_FORM_ALIASES.get(key, _FIELD_ALIASES.get(key, key))
     return _FIELD_ALIASES.get(key, key)
 
 
@@ -85,18 +124,25 @@ def _quote_supported(quote: str, haystack: str) -> bool:
 
 
 _ISO_DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
+_SLASH_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
 
 
 def _date_supported(iso: str, quote: str) -> bool | None:
-    """An ISO date is supported when its y/m/d appear in the quote's own date.
+    """A date value is supported when its own y/m/d appear in the quote.
 
-    Handles a source date written as prose ("Ngày 10 tháng 10 năm 2026").
-    Returns None when the value is not an ISO date.
+    Handles a value normalized to ISO ("2026-10-10") or written DD/MM/YYYY
+    ("10/10/2026") against a source date written as prose ("Ngày 10 tháng 10 năm
+    2026") or a shared range line ("từ 06/10/2026 đến 10/10/2026"). Returns None
+    when the value is not a date.
     """
-    match = _ISO_DATE.match(iso)
-    if match is None:
-        return None
-    year, month, day = (int(g) for g in match.groups())
+    iso_match = _ISO_DATE.match(iso)
+    if iso_match is not None:
+        year, month, day = (int(g) for g in iso_match.groups())
+    else:
+        slash_match = _SLASH_DATE.match(iso)
+        if slash_match is None:
+            return None
+        day, month, year = (int(g) for g in slash_match.groups())
     nums = {int(n) for n in re.findall(r"\d+", quote)}
     return {year, month, day} <= nums
 
@@ -105,6 +151,11 @@ def _value_supported(value: object, quote: str) -> bool:
     """The normalized value must be derivable from the exact quote."""
     if value is None:
         return False
+    # A row's `invoice_refs` is a list; every element must appear in the quote.
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return False
+        return all(_value_supported(item, quote) for item in value)
     text = str(value).strip()
     # A normalized date (ISO) is supported when the quote carries the same date.
     date_ok = _date_supported(text, quote)
@@ -135,6 +186,7 @@ def _validate_field(
     ocr: OcrSourceResult,
     haystack: str,
     default_page: int,
+    document_type: str | None = None,
 ) -> FieldCandidate:
     """Build one FieldCandidate, verifying provenance for FOUND (plan E5).
 
@@ -148,7 +200,8 @@ def _validate_field(
     # Accept the canonical `field` and the `name` alias a model may emit, then
     # map model synonyms to the profile vocabulary (plan §12).
     field_name = canonical_field_name(
-        str(entry.get("field") or entry.get("name") or entry.get("field_name") or "")
+        str(entry.get("field") or entry.get("name") or entry.get("field_name") or ""),
+        document_type,
     )
     if state != "FOUND":
         return FieldCandidate(field=field_name, state=state)  # type: ignore[arg-type]
@@ -162,9 +215,23 @@ def _validate_field(
     return FieldCandidate(
         field=field_name,
         state="FOUND",
-        value=value if isinstance(value, (str, int, Decimal, bool)) else str(value),
+        value=_normalize_value(value),
         refs=(_ref(ocr, page, quote),),
     )
+
+
+def _normalize_value(value: object) -> str | int | Decimal | bool | tuple[str, ...]:
+    """Coerce a model value to the FieldCandidate value vocabulary.
+
+    A row's `invoice_refs` arrives as a JSON list of strings; the DTO stores a
+    tuple, so the code (not the model) normalizes it. Any other non-scalar is
+    stringified so provenance is still bound to the quote.
+    """
+    if isinstance(value, (list, tuple)):
+        return tuple(str(item) for item in value)
+    if isinstance(value, (str, int, Decimal, bool)):
+        return value
+    return str(value)
 
 
 async def extract_document(
@@ -177,13 +244,18 @@ async def extract_document(
     """Extract one document's fields/lines and verify provenance (plan E5)."""
     haystack = _source_pages_text(ocr, classification.page_range)
     system = (
-        "Extract the fields of this document from its OCR text. Reply as JSON "
-        "{\"fields\": [...], \"lines\": [...]}. Each field object uses EXACTLY "
-        "these keys: field (the field name), state (one of FOUND, NOT_PRESENT, "
-        "UNREADABLE, AMBIGUOUS, NOT_APPLICABLE), value (only when state=FOUND), "
-        "quote (the exact substring copied from the OCR text; required when "
-        "state=FOUND), page (1-based). Do not rename these keys (never use "
-        "'name'). Never invent a value; a missing value is NOT_PRESENT, not zero."
+        "Extract the fields and the TABLE ROWS of this document from its OCR text. "
+        "Reply as JSON {\"fields\": [...], \"line_items\": [...]}. Each field object "
+        "uses EXACTLY these keys: field (the field name), state (one of FOUND, "
+        "NOT_PRESENT, UNREADABLE, AMBIGUOUS, NOT_APPLICABLE), value (only when "
+        "state=FOUND), quote (the exact substring copied from the OCR text; "
+        "required when state=FOUND), page (1-based). Do not rename these keys "
+        "(never use 'name'). Each line_items entry is ONE COST ROW of a table and "
+        "uses EXACTLY one key: fields, an array of the same field objects for that "
+        "row, using row field names description, amount, invoice_refs (an array of "
+        "the document-number strings the row references) and no_evidence_reason. "
+        "Do NOT put plain OCR text lines in line_items; only table cost rows. "
+        "Never invent a value; a missing value is NOT_PRESENT, not zero."
     )
     user = _serialize(ocr, classification)
     payload = await _call_with_one_repair(llm, system=system, user=user, budget=budget)
@@ -191,27 +263,43 @@ async def extract_document(
         return _unresolved(ocr, classification)
 
     raw_fields = payload.get("fields")
-    raw_lines = payload.get("lines") or []
+    # The pinned prompt asks for `line_items`; a model may still answer with the
+    # older `lines` key, so accept either (plan E5).
+    raw_lines = payload.get("line_items")
+    if raw_lines is None:
+        raw_lines = payload.get("lines") or []
     if not isinstance(raw_fields, list) or not isinstance(raw_lines, list):
         return _unresolved(ocr, classification)
 
+    document_type = classification.document_type
     fields: list[FieldCandidate] = [
-        _validate_field(entry, ocr=ocr, haystack=haystack, default_page=classification.page_range[0])
+        _validate_field(
+            entry, ocr=ocr, haystack=haystack,
+            default_page=classification.page_range[0], document_type=document_type,
+        )
         for entry in raw_fields
         if isinstance(entry, dict)
     ]
 
     lines: list[DocumentLine] = []
-    for index, entry in enumerate(raw_lines, start=1):
+    for entry in raw_lines:
+        # Only a structured row ({fields: [...]}) is a line item. A raw OCR text
+        # string is not a row and must not be turned into a fabricated field.
         if not isinstance(entry, dict):
             continue
         # Code owns the line id; the model's id is discarded. Line fields get
         # the same provenance validation as top-level fields (plan E5).
         line_fields = tuple(
-            _validate_field(f, ocr=ocr, haystack=haystack, default_page=classification.page_range[0])
+            _validate_field(
+                f, ocr=ocr, haystack=haystack,
+                default_page=classification.page_range[0], document_type=document_type,
+            )
             for f in entry.get("fields", [])
             if isinstance(f, dict)
         )
+        if not line_fields:
+            continue
+        index = len(lines) + 1
         lines.append(DocumentLine(id=f"{classification.document_id}:line:{index}", fields=line_fields))
 
     return DocumentAnalysis(

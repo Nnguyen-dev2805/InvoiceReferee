@@ -272,3 +272,138 @@ def test_iso_date_value_supported_by_vietnamese_quote() -> None:
     assert _value_supported("2026-10-10", "Ngày 10 tháng 10 năm 2026")
     # A different date is not supported.
     assert not _value_supported("2026-10-11", "Ngày 10 tháng 10 năm 2026")
+
+
+# --- Bug A: SETTLEMENT_FORM field-name aliases (real provider output) --------
+
+
+def _settlement_ocr() -> OcrSourceResult:
+    md = (
+        "GIẤY ĐỀ NGHỊ QUYẾT TOÁN CÔNG TÁC\n"
+        "Người đề nghị: Nguyễn An\n"
+        "Nơi công tác: Hà Nội\n"
+        "Thời gian công tác: từ 06/10/2026 đến 10/10/2026\n"
+        "Mục đích: Làm việc với khách hàng tại Hà Nội\n"
+        "Tổng chi phí đề nghị quyết toán: 3.240.000 đ\n"
+        "Số tiền đã tạm ứng theo khai báo: 4.000.000 đ\n"
+        "Số tiền đề nghị nhân viên hoàn lại: 760.000 đ\n"
+        "Số tiền đề nghị công ty chi thêm: 0 đ"
+    )
+    block = OcrBlock(id="b1", kind="text", content=md, words=())
+    return OcrSourceResult(
+        source_id="source:1",
+        source_digest=SHA,
+        provider="mistral",
+        model="ocr-1",
+        pages=(OcrPage(page=1, markdown=md, blocks=(block,)),),
+    )
+
+
+def test_settlement_form_aliases_are_scoped_by_document_type() -> None:
+    from invoice_referee.evidence.extraction import canonical_field_name
+
+    # SETTLEMENT_FORM synonyms map to the profile vocabulary...
+    assert canonical_field_name("requester_name", "SETTLEMENT_FORM") == "declared_name"
+    assert canonical_field_name("work_location", "SETTLEMENT_FORM") == "trip_destination"
+    assert canonical_field_name("start_date", "SETTLEMENT_FORM") == "trip_start"
+    assert canonical_field_name("end_date", "SETTLEMENT_FORM") == "trip_end"
+    assert canonical_field_name("total_expense", "SETTLEMENT_FORM") == "printed_total"
+    assert canonical_field_name("total_amount_numeric", "SETTLEMENT_FORM") == "printed_total"
+    assert canonical_field_name("advance_amount", "SETTLEMENT_FORM") == "declared_advance"
+    assert canonical_field_name("refund_amount", "SETTLEMENT_FORM") == "printed_return"
+    # ...without leaking into the invoice vocabulary (total_amount stays canonical).
+    assert canonical_field_name("total_amount", "E_INVOICE") == "total_amount"
+    assert canonical_field_name("total_amount") == "total_amount"
+
+
+async def test_settlement_form_aliases_end_to_end() -> None:
+    # A real model returns natural names; without scoped aliases every required
+    # SETTLEMENT_FORM field is reported missing (false NEEDS_HUMAN).
+    llm = FakeLlm(
+        {
+            "fields": [
+                {"field": "requester_name", "state": "FOUND", "value": "Nguyễn An",
+                 "quote": "Người đề nghị: Nguyễn An", "page": 1},
+                {"field": "work_location", "state": "FOUND", "value": "Hà Nội",
+                 "quote": "Nơi công tác: Hà Nội", "page": 1},
+                {"field": "start_date", "state": "FOUND", "value": "06/10/2026",
+                 "quote": "Thời gian công tác: từ 06/10/2026 đến 10/10/2026", "page": 1},
+                {"field": "end_date", "state": "FOUND", "value": "10/10/2026",
+                 "quote": "Thời gian công tác: từ 06/10/2026 đến 10/10/2026", "page": 1},
+                {"field": "subject", "state": "FOUND", "value": "Làm việc với khách hàng tại Hà Nội",
+                 "quote": "Mục đích: Làm việc với khách hàng tại Hà Nội", "page": 1},
+                {"field": "total_expense", "state": "FOUND", "value": "3240000",
+                 "quote": "Tổng chi phí đề nghị quyết toán: 3.240.000 đ", "page": 1},
+                {"field": "advance_amount", "state": "FOUND", "value": "4000000",
+                 "quote": "Số tiền đã tạm ứng theo khai báo: 4.000.000 đ", "page": 1},
+                {"field": "refund_amount", "state": "FOUND", "value": "760000",
+                 "quote": "Số tiền đề nghị nhân viên hoàn lại: 760.000 đ", "page": 1},
+            ],
+            "lines": [],
+        }
+    )
+    analysis = await extract_document(
+        _settlement_ocr(), _classification("SETTLEMENT_FORM"), llm=llm, budget=RunBudget()
+    )
+    found = {f.field for f in analysis.fields if f.state == "FOUND"}
+    assert {
+        "declared_name", "trip_destination", "trip_start", "trip_end",
+        "purpose", "printed_total", "declared_advance", "printed_return",
+    } <= found
+
+
+# --- Bug B: the model returns line rows, sometimes as raw OCR strings --------
+
+
+async def test_line_items_key_is_accepted() -> None:
+    # The pinned prompt asks for `line_items`; the parser must read that key too.
+    llm = FakeLlm(
+        {
+            "fields": [],
+            "line_items": [
+                {"fields": [
+                    {"field": "description", "state": "FOUND", "value": "Khách sạn",
+                     "quote": "HÓA ĐƠN", "page": 1},
+                ]},
+            ],
+        }
+    )
+    analysis = await extract_document(_ocr(), _classification(), llm=llm, budget=RunBudget())
+    assert len(analysis.line_items) == 1
+
+
+async def test_raw_string_lines_do_not_crash_and_yield_no_rows() -> None:
+    # A real model dumped raw OCR lines as a list of strings. They are not
+    # structured rows, so code cannot fabricate fields; it must not crash and
+    # must not invent line items.
+    llm = FakeLlm(
+        {
+            "fields": [{"field": "total_amount", "state": "FOUND", "value": "450000",
+                        "quote": "Tổng cộng: 450.000", "page": 1}],
+            "lines": ["HÓA ĐƠN", "| STT | NỘI DUNG |", "Tổng cộng: 450.000"],
+        }
+    )
+    analysis = await extract_document(_ocr(), _classification(), llm=llm, budget=RunBudget())
+    assert analysis.line_items == ()
+    assert any(f.field == "total_amount" for f in analysis.fields)
+
+
+async def test_row_invoice_refs_list_value_is_stored_as_tuple() -> None:
+    llm = FakeLlm(
+        {
+            "fields": [],
+            "line_items": [
+                {"fields": [
+                    {"field": "amount", "state": "FOUND", "value": "450000",
+                     "quote": "Tổng cộng: 450.000", "page": 1},
+                    {"field": "invoice_refs", "state": "FOUND", "value": ["001"],
+                     "quote": "Số: 001", "page": 1},
+                ]},
+            ],
+        }
+    )
+    analysis = await extract_document(_ocr(), _classification(), llm=llm, budget=RunBudget())
+    row = analysis.line_items[0]
+    refs = next(f for f in row.fields if f.field == "invoice_refs")
+    assert refs.state == "FOUND"
+    assert refs.value == ("001",)
