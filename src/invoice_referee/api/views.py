@@ -101,6 +101,11 @@ class MoneyInput(ApiModel):
     completion_claim: str | None = None
     reverses_event_id: str | None = None
     reason: str
+    # The "record actual money" form's source metadata (plan D): the observed
+    # instrument method/status/reference. The server still decides verification.
+    instrument_method: Literal["TRANSFER", "CASH"] | None = None
+    instrument_status: Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"] | None = None
+    instrument_reference: str | None = None
 
 
 class RecordActualRequest(ApiModel):

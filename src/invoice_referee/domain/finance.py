@@ -35,13 +35,16 @@ MoneyKind = Literal[
 VerificationState = Literal["OBSERVED", "CONFIRMED", "REJECTED"]
 AllocationState = Literal["UNALLOCATED", "ALLOCATED", "UNKNOWN"]
 
-# How an employee-paid portion is established (ADR0007). A Q32 employee
-# declaration is NOT an independently verified bank fact; it is a scoped,
-# responsible confirmation bounded to E<=8m and abs(S)<=4m. LIVE admission must
-# never present UNSPECIFIED_LEGACY as a verified basis.
+# How an employee-paid portion is established (ADR0007 + 14/10/2026 chốt). In
+# the demo policy a valid invoice bound to the right employee and dossier is
+# accepted as the employee-paid basis (EMPLOYEE_PAID_INVOICE) with no separate
+# payer confirmation; a Q32 employee declaration (EMPLOYEE_DECLARATION_Q32) is a
+# bounded responsible confirmation. Neither is an independently verified bank
+# fact. LIVE admission must never present UNSPECIFIED_LEGACY as a verified basis.
 PaymentBasisKind = Literal[
     "INDEPENDENT_PAYMENT",
     "FINANCIAL_CONFIRMATION",
+    "EMPLOYEE_PAID_INVOICE",
     "EMPLOYEE_DECLARATION_Q32",
     "UNSPECIFIED_LEGACY",
 ]
@@ -112,6 +115,14 @@ class RecordMoneyInput(StrictModel):
     reverses_event_id: Id | None = None
     refs: tuple[EvidenceRef, ...] = ()
     reason: str
+    # Observed source metadata for the "record actual money" form (plan D). The
+    # client reports what the document says (a transfer/cash instrument's method
+    # and status); the SERVER still decides verification_state. A source status
+    # that is not COMPLETED (pending/failed/unclear) never becomes confirmed
+    # received money. Defaults None keep every existing caller unchanged.
+    instrument_method: Literal["TRANSFER", "CASH"] | None = None
+    instrument_status: Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"] | None = None
+    instrument_reference: str | None = None
 
 
 class MoneyEvent(StrictModel):
@@ -130,6 +141,11 @@ class MoneyEvent(StrictModel):
     allocation_state: AllocationState
     reverses_event_id: Id | None = None
     refs: tuple[EvidenceRef, ...] = ()
+    # Source-reported instrument metadata retained for audit (plan D). None for
+    # events recorded before the advance form existed.
+    instrument_method: Literal["TRANSFER", "CASH"] | None = None
+    instrument_status: Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"] | None = None
+    instrument_reference: str | None = None
 
 
 class CoverageRecord(StrictModel):

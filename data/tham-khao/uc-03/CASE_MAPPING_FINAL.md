@@ -1,5 +1,12 @@
 # Chuyển bộ UC03 Hoangha sang final — mapping đủ 25 case
 
+> **Lịch sử v2:** Bảng dưới đây ghi phương án lúc chỉ nhận công tác. Sau quyết
+> định mở rộng sang chi phí công việc, mapping mục tiêu cho PDF gốc là
+> [v3](final-case-mapping-v3.json) và
+> [đặc tả mới](../../../docs/superpowers/specs/2026-10-14-general-expense-policy-and-form.md).
+> Không yêu cầu sửa hồ sơ tiếp khách, mua thiết bị thành chuyến công tác để chạy
+> v3. Giữ bảng cũ để truy vết quyết định và đối chiếu các biến thể F01–F03.
+
 **Ngày:** 14/10/2026. **Trạng thái:** MAPPING_COMPLETE; chưa tạo biến thể PDF/context/gold final, chưa chạy OCR/LLM/workflow. Đây là bản thiết kế chuyển case, không phải oracle mà runtime được phép đọc.
 
 ## 1. Điều đã kiểm và điều giữ nguyên

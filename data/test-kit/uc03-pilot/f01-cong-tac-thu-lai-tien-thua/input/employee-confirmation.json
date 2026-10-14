@@ -3,12 +3,12 @@
   "value": 3240000,
   "actor": "employee:employee-a",
   "scope": "activity:uc03-f01",
-  "reason": "Tôi xác nhận đã trực tiếp thanh toán khoản chi này cho nhà cung cấp; phục vụ hoạt động được phép, chưa được hoàn trả.",
+  "reason": "Hóa đơn dịch vụ hợp lệ gắn đúng nhân viên và hồ sơ; được chấp nhận làm căn cứ khoản chi nhân viên đã thanh toán theo policy demo.",
   "observed_at": "2026-10-10T18:00:00+07:00",
   "refs": [
     {
       "source_id": "file:02-hoa-don-dich-vu.pdf",
-      "source_sha256": "0f9a66678a8df2e7ecef705934c01bcced9c8609105ff93dfb7b4bfd8ef2068a",
+      "source_sha256": "7a5db68dfdd919d6a4aaf327891625f1a6cc2130e6dca99439f0064c2bc97fbf",
       "page": 1,
       "exact_quote": "3.240.000 đ"
     }

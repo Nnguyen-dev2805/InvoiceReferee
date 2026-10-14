@@ -147,6 +147,34 @@ export async function recordActual(
   );
 }
 
+export async function advanceDraft(
+  rootId: string,
+  files: File[],
+  method: "TRANSFER" | "CASH" | null = null,
+): Promise<{
+  source_id: string;
+  amount: number | null;
+  payer_name: string | null;
+  payee_name: string | null;
+  transaction_reference: string | null;
+  instrument_method: "TRANSFER" | "CASH" | null;
+  instrument_status: "COMPLETED" | "PENDING" | "FAILED" | "UNKNOWN";
+  event_at: string | null;
+  missing_fields: string[];
+  requires_confirmation: boolean;
+}> {
+  const form = new FormData();
+  for (const file of files) form.append("files", file);
+  const query = method ? `?method=${method}` : "";
+  const response = await fetch(`/api/cases/${rootId}/advance/draft${query}`, {
+    method: "POST",
+    headers: { "X-Command-Id": newCommandId() },
+    body: form,
+    credentials: "same-origin",
+  });
+  return parse(response);
+}
+
 export async function attachSources(
   rootId: string,
   files: File[],

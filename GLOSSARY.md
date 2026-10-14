@@ -81,6 +81,10 @@ _Avoid_: Bỏ nguồn để kết luận tiền, hoặc ép thành khoản nhân
 Lời nhân viên tự xác nhận có trách nhiệm rằng mình đã trả một khoản chi, dùng làm một phần căn cứ cho khoản nhân viên đã trả khi có chứng từ dịch vụ và không mâu thuẫn trọng yếu.
 _Avoid_: Đồng nhất với giao dịch ngân hàng đã được xác minh hoặc chứng từ thanh toán độc lập.
 
+**Căn cứ hóa đơn (policy demo)**:
+Quy ước nghiệp vụ cho demo (chốt 14/10/2026): hóa đơn gốc hợp lệ, gắn đúng nhân viên và hồ sơ, được chấp nhận làm căn cứ khoản chi nhân viên đã thanh toán, không cần giấy xác nhận thanh toán riêng.
+_Avoid_: Gọi là xác minh ngân hàng hoặc tạo giao dịch ngân hàng/confirmation giả; coi bên mua là công ty trên hóa đơn là người trả.
+
 **Loại tài liệu**:
 Nhãn phân loại nội dung một tài liệu (hóa đơn, biên nhận, vé, chứng từ thanh toán, giấy quyết toán, …), do model đề xuất và code kiểm.
 _Avoid_: Đồng nhất với vai trò chứng cứ của tài liệu đó trong hồ sơ.

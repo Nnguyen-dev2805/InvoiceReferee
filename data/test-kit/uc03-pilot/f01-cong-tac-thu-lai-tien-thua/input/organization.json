@@ -45,7 +45,7 @@
       "effective_to": "2026-12-31T23:59:59+07:00",
       "profile": "TRAVEL",
       "rules": [
-        "EMPLOYEE_PAID_Q32_BOUNDED"
+        "EMPLOYEE_PAID_INVOICE_BOUNDED"
       ]
     }
   ],

@@ -58,6 +58,7 @@ export interface EvidenceReport {
 export type PaymentBasisKind =
   | "INDEPENDENT_PAYMENT"
   | "FINANCIAL_CONFIRMATION"
+  | "EMPLOYEE_PAID_INVOICE"
   | "EMPLOYEE_DECLARATION_Q32"
   | "UNSPECIFIED_LEGACY";
 
@@ -73,6 +74,8 @@ export interface CaseView {
   id: string;
   version: number;
   state: CaseState;
+  activity?: string | null;
+  employee?: string | null;
   summary: string;
   sources: SourceView[];
   issues: IssueView[];

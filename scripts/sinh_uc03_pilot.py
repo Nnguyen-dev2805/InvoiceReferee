@@ -29,8 +29,13 @@ TENANT = "tenant:uc03-pilot"
 EMPLOYEE = "employee:employee-a"
 ACCOUNTANT = "employee:accountant-demo"
 APPROVER = "employee:approver"
+CLAIMANT_NAME = "Nguyễn An"
+# The two advance-basis documents are alternative test choices for F01 only; both
+# describe the SAME 4.000.000 đ advance and must never be summed into 8.000.000.
+TRANSFER_DOC = "03-bien-nhan-chuyen-khoan.pdf"
+CASH_DOC = "04-phieu-chi-tien-mat.pdf"
 FILES = {"01-giay-quyet-toan.pdf", "02-hoa-don-dich-vu.pdf", "organization.json",
-         "submission.json", "employee-confirmation.json"}
+         "submission.json", "employee-confirmation.json", TRANSFER_DOC, CASH_DOC}
 # Source specifications, not expected outcomes. Hidden gold is authored separately.
 CASES = (
     ("UC03-F01", "f01-cong-tac-thu-lai-tien-thua", "IR26101001", "Bữa ăn phục vụ công việc trong chuyến công tác", "Suất", 10, 300_000, 3_240_000, 4_000_000, "Ba triệu hai trăm bốn mươi nghìn đồng"),
@@ -66,6 +71,19 @@ def table(rows, widths, *, header: bool = True):
     return result
 
 
+def signature_row(columns) -> Table:
+    """Signature blocks on ONE horizontal row, centered, with NO border/grid."""
+    data = [[paragraph("\n".join(lines), size=9, center=True) for lines in columns]]
+    result = Table(data, colWidths=[503 / len(columns)] * len(columns), hAlign="CENTER")
+    result.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    return result
+
+
 def write_pdf(path: Path, title: str, story) -> None:
     def canvas_factory(*args, **kwargs):
         kwargs["invariant"] = 1
@@ -76,14 +94,13 @@ def write_pdf(path: Path, title: str, story) -> None:
     doc.build(story, canvasmaker=canvas_factory)
 
 
-def render_sources(case, inp: Path) -> None:
+def render_settlement_form(case, inp: Path) -> None:
     cid, _, number, description, unit, qty, price, total, advance, words = case
-    activity = f"activity:{cid.lower()}"
     form = [paragraph("CÔNG TY INVOICEREFEREE", size=12),
             paragraph("GIẤY ĐỀ NGHỊ QUYẾT TOÁN CÔNG TÁC", size=17, center=True),
             paragraph(f"Số: QT-{number}   |   Hà Nội, ngày 10 tháng 10 năm 2026", center=True),
             Spacer(1, 8), paragraph("Kính gửi: Bộ phận kế toán Công ty InvoiceReferee"),
-            paragraph("Người đề nghị: Nguyễn An"),
+            paragraph(f"Người đề nghị: {CLAIMANT_NAME}"),
             paragraph("Nơi công tác: Hà Nội"),
             paragraph("Thời gian công tác: từ 06/10/2026 đến 10/10/2026"),
             paragraph("Mục đích: Làm việc với khách hàng tại Hà Nội"),
@@ -95,11 +112,13 @@ def render_sources(case, inp: Path) -> None:
             paragraph(f"Số tiền đã tạm ứng theo khai báo: {money(advance)}"),
             paragraph(f"Số tiền đề nghị công ty chi thêm: {money(max(total - advance, 0))}"),
             paragraph(f"Số tiền đề nghị nhân viên hoàn lại: {money(max(advance - total, 0))}"),
-            paragraph("Tài liệu kèm theo: 01 hóa đơn dịch vụ."),
-            paragraph("Tôi xác nhận đã trực tiếp thanh toán khoản chi trên cho nhà cung cấp, "
-                      "phục vụ chuyến công tác này và chưa nhận hoàn trả cho khoản chi này."),
-            Spacer(1, 12), paragraph("Người đề nghị\n(Ký, ghi rõ họ tên)\nNguyễn An", center=True)]
+            Spacer(1, 12),
+            signature_row([[f"Người đề nghị", "(Ký, ghi rõ họ tên)", CLAIMANT_NAME]])]
     write_pdf(inp / "01-giay-quyet-toan.pdf", "Giấy quyết toán công tác", form)
+
+
+def render_invoice(case, inp: Path) -> None:
+    cid, _, number, description, unit, qty, price, total, advance, words = case
     net = qty * price
     invoice = [paragraph("CÔNG TY TNHH DỊCH VỤ AN BÌNH", size=12),
                paragraph("HÓA ĐƠN GIÁ TRỊ GIA TĂNG", size=18, center=True),
@@ -111,22 +130,76 @@ def render_sources(case, inp: Path) -> None:
                paragraph("Đơn vị mua: Công ty InvoiceReferee"),
                paragraph("Mã số thuế bên mua: 0319999996"),
                paragraph("Địa chỉ bên mua: 128 Nguyễn Văn Linh, Thành phố Hồ Chí Minh"),
+               paragraph(f"Họ tên người mua: {CLAIMANT_NAME}"),
                paragraph("Hình thức thanh toán: Chuyển khoản"),
                paragraph("Loại tiền: VND"),
-               table([["Nội dung dịch vụ", "ĐVT", "SL", "Đơn giá", "Thành tiền"],
-                      [description, unit, str(qty), money(price), money(net)]],
-                     [214, 42, 30, 102, 115]),
+               table([["STT", "Nội dung dịch vụ", "ĐVT", "SL", "Đơn giá", "Thành tiền"],
+                      ["1", description, unit, str(qty), money(price), money(net)]],
+                     [40, 174, 42, 30, 102, 115]),
                Spacer(1, 14),
                table([["Cộng tiền hàng chưa thuế", money(net)],
                       ["Thuế suất GTGT", "8%"],
                       ["Tiền thuế GTGT", money(total - net)],
                       ["Tổng cộng thanh toán", money(total)]], [369, 134], header=False),
                Spacer(1, 12), paragraph(f"Số tiền bằng chữ: {words}."),
-               paragraph("Dịch vụ được cung cấp tại Hà Nội từ 06/10/2026 đến 10/10/2026."),
-               Spacer(1, 14), table([["Người mua hàng", "Người bán hàng"],
-                                    ["(Ký, ghi rõ họ tên)", "Công ty TNHH Dịch vụ An Bình"]],
-                                   [251, 252], header=False)]
+               Spacer(1, 14),
+               signature_row([
+                   ["NGƯỜI MUA HÀNG", f"Ký bởi: {CLAIMANT_NAME}", "Ký ngày: 10/10/2026"],
+                   ["NGƯỜI BÁN HÀNG", "Công ty TNHH Dịch vụ An Bình",
+                    "Người ký: Phạm Hoàng Nam", "Ký ngày: 10/10/2026"],
+               ])]
     write_pdf(inp / "02-hoa-don-dich-vu.pdf", "Hóa đơn dịch vụ", invoice)
+
+
+def render_advance_documents(case, inp: Path) -> None:
+    """F01-only: two alternative advance-basis documents for the SAME 4m advance.
+
+    One transfer receipt and one cash voucher; only one is used per test branch,
+    so the 4.000.000 đ advance is never counted twice.
+    """
+    cid, _, number, _, _, _, _, total, advance, _ = case
+    purpose = "Ứng tiền cho chuyến công tác Hà Nội từ 06/10/2026 đến 10/10/2026"
+    advance_words = "Bốn triệu đồng"
+    transfer = [paragraph("CÔNG TY INVOICEREFEREE", size=12),
+                paragraph("BIÊN NHẬN CHUYỂN KHOẢN", size=16, center=True),
+                paragraph("(Bản ghi mô phỏng — không phải giao dịch ngân hàng thật)", size=9, center=True),
+                Spacer(1, 8),
+                table([["Mã giao dịch", f"FT-{cid}-0001"],
+                       ["Ngày giao dịch", "05/10/2026"],
+                       ["Trạng thái", "Hoàn tất"],
+                       ["Bên chuyển", "Công ty InvoiceReferee"],
+                       ["Tài khoản chuyển", "Ngân hàng Demo — 0123456789"],
+                       ["Bên nhận", CLAIMANT_NAME],
+                       ["Tài khoản nhận", "Ngân hàng Demo — 9876543210"],
+                       ["Số tiền", money(advance)],
+                       ["Nội dung", purpose],
+                       ["Tham chiếu khoản ứng", f"ADV-{cid}"]], [150, 353], header=False),
+                Spacer(1, 14),
+                signature_row([["Người lập", "Ký bởi: Trần Bình", "Ký ngày: 05/10/2026"]])]
+    write_pdf(inp / TRANSFER_DOC, "Biên nhận chuyển khoản", transfer)
+
+    cash = [paragraph("CÔNG TY INVOICEREFEREE", size=12),
+            paragraph("PHIẾU CHI TIỀN MẶT", size=16, center=True),
+            paragraph("(Bản ghi mô phỏng — không phải giao dịch ngân hàng thật)", size=9, center=True),
+            Spacer(1, 8),
+            table([["Số phiếu", f"PC-{cid}-0001"],
+                   ["Ngày", "05/10/2026"],
+                   ["Công ty chi", "Công ty InvoiceReferee"],
+                   ["Người nhận", CLAIMANT_NAME],
+                   ["Lý do", purpose],
+                   ["Số tiền", money(advance)],
+                   ["Số tiền bằng chữ", advance_words],
+                   ["Số tiền đã giao", money(advance)],
+                   ["Số tiền đã nhận", money(advance)],
+                   ["Ngày giao nhận", "05/10/2026"],
+                   ["Tham chiếu khoản ứng", f"ADV-{cid}"]], [150, 353], header=False),
+            Spacer(1, 14),
+            signature_row([
+                ["Người phê duyệt", "Ký bởi: Lê Minh", "Ký ngày: 05/10/2026"],
+                ["Kế toán / người giao tiền", "Ký bởi: Trần Bình", "Ký ngày: 05/10/2026"],
+                ["Người nhận tiền", f"Ký bởi: {CLAIMANT_NAME}", "Ký ngày: 05/10/2026"],
+            ])]
+    write_pdf(inp / CASH_DOC, "Phiếu chi tiền mặt", cash)
 
 
 def json_write(path: Path, value) -> None:
@@ -146,7 +219,7 @@ def context_for(case):
                   ("approver", APPROVER, ["AUTHORIZE_ACTIVITY", "SET_BUDGET", "RECOGNIZE_COST",
                    "EXCEPT_POLICY", "ISSUE_PAYMENT", "ISSUE_COLLECTION"], 20_000_000),
                   ("accountant", ACCOUNTANT, ["CONFIRM_FINANCIAL_FACT", "RECORD_ACTUAL", "STOP", "RESUME"], 20_000_000))]
-    quote = f"Ứng đã hoàn tất cho Nguyễn An, hoạt động {activity}: {money(advance)}."
+    quote = f"Ứng đã hoàn tất cho {CLAIMANT_NAME}, hoạt động {activity}: {money(advance)}."
     organization = dict(
         organization_id=TENANT, tenant=TENANT, profile="TRAVEL", data_origin="SIMULATED",
         financial_as_of=DATE, records=[],
@@ -155,10 +228,10 @@ def context_for(case):
                       authorization=dict(id=f"auth:{cid}", actor=APPROVER,
                           grant_ref=f"grant:{cid}:approver", effect_range=interval,
                           reason="Cho phép chuyến công tác Hà Nội", record_key=f"auth:{cid}")),
-        people=[dict(id=EMPLOYEE, name="Nguyễn An"), dict(id=ACCOUNTANT, name="Trần Bình"),
+        people=[dict(id=EMPLOYEE, name=CLAIMANT_NAME), dict(id=ACCOUNTANT, name="Trần Bình"),
                 dict(id=APPROVER, name="Lê Minh")],
         policies=[dict(id="policy:pilot", version="q32-v1", effective_from=interval[0],
-                       effective_to=interval[1], profile="TRAVEL", rules=["EMPLOYEE_PAID_Q32_BOUNDED"])],
+                       effective_to=interval[1], profile="TRAVEL", rules=["EMPLOYEE_PAID_INVOICE_BOUNDED"])],
         grants=grants,
         budgets=[dict(id=f"budget:{cid}", activity=activity, amount=8_000_000,
                       effect_range=interval, actor=APPROVER, grant_ref=f"grant:{cid}:approver")],
@@ -205,16 +278,20 @@ def generate(output: Path) -> None:
         unknown = {p.name for p in inp.iterdir()} - FILES
         if unknown or any(p.is_symlink() for p in inp.iterdir()):
             raise ValueError(f"unexpected input files; refusing overwrite: {unknown}")
-        render_sources(case, inp)
+        render_settlement_form(case, inp)
+        render_invoice(case, inp)
+        if cid == "UC03-F01":
+            render_advance_documents(case, inp)
         json_write(inp / "organization.json", context_for(case))
         json_write(inp / "submission.json", dict(employee=EMPLOYEE,
                    activity=f"activity:{cid.lower()}", declared_purpose="Làm việc với khách hàng tại Hà Nội",
-                   notes="Nhân viên xác nhận trực tiếp thanh toán chi phí kê trong giấy quyết toán."))
+                   notes="Nhân viên nộp giấy quyết toán và hóa đơn dịch vụ; "
+                         "kế toán xác minh khoản ứng thực nhận."))
         invoice = inp / "02-hoa-don-dich-vu.pdf"
         json_write(inp / "employee-confirmation.json", dict(
             fact_key=f"expense:{number}:employee_paid", value=total, actor=EMPLOYEE,
-            scope=f"activity:{cid.lower()}", reason="Tôi xác nhận đã trực tiếp thanh toán "
-            "khoản chi này cho nhà cung cấp; phục vụ hoạt động được phép, chưa được hoàn trả.",
+            scope=f"activity:{cid.lower()}", reason="Hóa đơn dịch vụ hợp lệ gắn đúng nhân viên và hồ sơ; "
+            "được chấp nhận làm căn cứ khoản chi nhân viên đã thanh toán theo policy demo.",
             observed_at=DATE, refs=[dict(source_id="file:02-hoa-don-dich-vu.pdf",
               source_sha256=hashlib.sha256(invoice.read_bytes()).hexdigest(), page=1,
               exact_quote=money(total))]))

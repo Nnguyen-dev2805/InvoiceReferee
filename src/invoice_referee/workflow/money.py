@@ -34,7 +34,18 @@ def verify_money_claim(
     confirmation, checked evidence refs, or a linked reversal bound to a real
     original. A bare statement is OBSERVED — preserved for audit, never
     fulfilling or settling. This never reads a client-supplied verified flag.
+
+    Source instrument status (plan D): when the source states a transfer/cash
+    status that is not COMPLETED (PENDING/FAILED/UNKNOWN), the claim can never be
+    CONFIRMED — an unfinished or failed transfer is not received money. An
+    ABSENT status is not a negative signal (older callers omit it).
     """
+    if money.instrument_status is not None and money.instrument_status != "COMPLETED":
+        return MoneyVerification(
+            verification_state="OBSERVED",
+            allocation_state="UNALLOCATED",
+            reason=f"source status {money.instrument_status} is not a completed transfer/receipt",
+        )
     has_claim = bool((money.completion_claim or "").strip())
     has_refs = bool(money.refs) or bool(evidence)
     is_reversal = money.reverses_event_id is not None
@@ -47,7 +58,7 @@ def verify_money_claim(
     return MoneyVerification(
         verification_state="OBSERVED",
         allocation_state="UNALLOCATED",
-        reason="bare claim: no confirmation, evidence or linked original",
+        reason="bare claim: no confirmation, evidence or original",
     )
 
 

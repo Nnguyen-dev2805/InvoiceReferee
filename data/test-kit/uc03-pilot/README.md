@@ -10,33 +10,52 @@ LLM, finance E2E và UI **chưa chạy**. Runtime hiện vẫn dừng ở `EVIDE
 | `f02-cong-tac-cong-ty-chi-them` | 5.400.000 đ | 5.000.000 đ | Chi thêm 400.000 đ |
 | `f03-cong-tac-can-bang` | 4.320.000 đ | 4.320.000 đ | Cân bằng, không instruction số 0 |
 
+## Quy ước căn cứ chi phí nhân viên (chốt 14/10/2026)
+
+Trong policy demo, **hóa đơn hợp lệ, gắn đúng nhân viên và hồ sơ, được chấp nhận làm
+căn cứ khoản chi nhân viên đã thanh toán** — không cần giấy xác nhận thanh toán riêng
+và không cần câu xác nhận dài trên giấy quyết toán. Đây là giả định nghiệp vụ cho demo,
+**không** phải xác minh ngân hàng; hệ thống không tạo giao dịch ngân hàng giả. Mức căn
+cứ hiển thị là `EMPLOYEE_PAID_INVOICE` (policy demo), không gọi là “đã xác minh ngân
+hàng”. Hóa đơn ghi “Họ tên người mua” (natural person) là khóa gắn với nhân viên; bên
+mua là công ty **không** được coi là công ty trả trực tiếp. Khoản ứng thực nhận vẫn cần
+bản ghi riêng của công ty (đã duyệt ứng không tự thành đã nhận).
+
 ## File nào dùng để làm gì
 
 Mỗi folder có:
 
 - `input/01-giay-quyet-toan.pdf`: giấy kê chi phí, thời gian/nơi/mục đích công tác,
   khoản ứng theo khai báo và số đề nghị chi/thu. Số in trên giấy chưa là actual money.
-- `input/02-hoa-don-dich-vu.pdf`: dịch vụ/giá trị/thuế/định danh invoice. Dòng
-  “Chuyển khoản” không tự chứng minh payer hoặc giao dịch hoàn tất.
+  Bỏ dòng “Tài liệu kèm theo” và câu tự xác nhận đã thanh toán.
+- `input/02-hoa-don-dich-vu.pdf`: dịch vụ/giá trị/thuế/định danh invoice, **Họ tên
+  người mua**. Dòng “Chuyển khoản” không tự chứng minh payer hoặc giao dịch hoàn tất.
+- **F01 chỉ**: `input/03-bien-nhan-chuyen-khoan.pdf` và
+  `input/04-phieu-chi-tien-mat.pdf` là **hai lựa chọn thay thế** cho CÙNG khoản ứng
+  4.000.000 đ (chuyển khoản vs tiền mặt). Dùng đúng một tài liệu cho mỗi lần test;
+  không nạp cả hai (4 triệu + 4 triệu = 8 triệu là sai). Kế toán ghi nhận A=4.000.000
+  từ tài liệu đã kiểm tra; upload chưa tự thành received.
 - `input/organization.json`: context synthetic cho **server/test harness**: hoạt động
   được phép, B=8 triệu, grants 8/4/20, ledger một khoản ứng đã nhận, coverage đầu kỳ
   bằng 0 và P/R chưa phát sinh đến `financial_as_of`. Không upload JSON này như PDF;
   không cho frontend tùy ý ghi `CONFIRMED` vào actual money.
 - `input/submission.json`: khai báo nhân viên theo schema hiện có.
-- `input/employee-confirmation.json`: lời xác nhận Q32 có actor/scope/ref/digest.
-  Đây là input để adapter/command **kế hoạch mới** xử lý. Actor phải đối chiếu server
-  session; ref `file:...` phải được đổi sang SourceRef đã upload cùng digest. API
-  hiện tại chưa tự nạp file này, và model không có quyền xác nhận nó thay nhân viên.
+- `input/employee-confirmation.json`: lời xác nhận Q32 có actor/scope/ref/digest (giữ
+  để tương thích; đường mặc định của demo là căn cứ hóa đơn, không bắt buộc claim).
+  Actor phải đối chiếu server session; ref `file:...` phải được đổi sang SourceRef đã
+  upload cùng digest. API hiện tại chưa tự nạp file này, và model không có quyền xác
+  nhận nó thay nhân viên.
 - `gold/expected-evidence.json`: field/type/role/link/amount phải đọc được, viết riêng
   để chấm. Không bịa confidence hay OCR block id; cần capture thật cho replay.
 - `gold/expected-business.json`: oracle có điều kiện cho route/state/E/A/P/R/S,
   instruction và trạng thái sau thực hiện. **Chỉ bộ chấm đọc**, không runtime/model.
+  F01 có thêm `advance_basis_branches` mô tả hai nhánh thay thế.
 - `provenance.json`: nguồn Hoangha gốc, hash và những thay đổi story. F01 chuyển
   tiếp khách thành bữa ăn trong công tác; F02 thay máy in bằng lưu trú; F03 giữ lưu trú.
 
 Các trạng thái `CONFIRMED` trong organization chỉ là **trusted simulated organization
 fixture**, không là proof ngân hàng thật. `employee_paid_basis` phải được view hiển thị
-là lời xác nhận nhân viên, không “đã xác minh ngân hàng”.
+là căn cứ theo policy demo (hóa đơn gắn đúng nhân viên), không “đã xác minh ngân hàng”.
 
 **Mốc thời gian:** snapshot/gold ban đầu được chốt tại 10/10/2026 18:00 +07:00.
 Harness phải kiểm trên mốc này với clock đã kiểm soát. Nếu test UI ở ngày hiện tại,

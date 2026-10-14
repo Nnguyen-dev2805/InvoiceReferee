@@ -35,6 +35,10 @@ _COMMON_INVOICE = (
     "issuer_tax_code",
     "buyer_name",
     "buyer_tax_code",
+    # The natural-person buyer ("Họ tên người mua"). In the demo policy a valid
+    # invoice bound to the right employee is the employee-paid basis; the buyer
+    # person is the binding key (never the company buyer, which is not a payer).
+    "buyer_person_name",
     "document_number",
     "template_number",
     "serial_number",

@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
+from fastapi.responses import FileResponse
 
 from invoice_referee.api import views
 from invoice_referee.domain.case import CommandContext
@@ -216,6 +217,36 @@ def get_case(request: Request, root_id: str) -> dict[str, object]:
     session = _require_session(request)
     case = _workflow(request).view(_read_context(session), root_id)
     return case.model_dump(mode="json")
+
+
+@router.get("/cases/{root_id}/sources/{source_id}")
+def get_source_content(request: Request, root_id: str, source_id: str) -> FileResponse:
+    session = _require_session(request)
+    workflow = _workflow(request)
+    case = workflow.view(_read_context(session), root_id)
+    matching = next((s for s in case.sources if s.id == source_id), None)
+    if matching is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy chứng từ.")
+    file_path = workflow.uploads_dir / matching.storage_key
+    if not file_path.exists() and matching.filename:
+        for candidate in (PROJECT_ROOT / "data").glob(f"**/{matching.filename}"):
+            if candidate.is_file():
+                file_path = candidate
+                break
+    if not file_path.exists() and matching.filename:
+        for candidate in (PROJECT_ROOT / ".runtime").glob(f"**/{matching.filename}"):
+            if candidate.is_file():
+                file_path = candidate
+                break
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Tệp chứng từ không tồn tại trên máy chủ.")
+
+    media_type = (
+        "application/pdf"
+        if matching.media == "PDF"
+        else ("image/png" if matching.media == "PNG" else "image/jpeg")
+    )
+    return FileResponse(file_path, media_type=media_type, filename=matching.filename or "document.pdf")
 
 
 @router.post("/cases/{root_id}/sources")
@@ -440,9 +471,44 @@ async def record_actual(
                 completion_claim=money.completion_claim,
                 reverses_event_id=money.reverses_event_id,
                 reason=money.reason,
+                instrument_method=money.instrument_method,
+                instrument_status=money.instrument_status,
+                instrument_reference=money.instrument_reference,
             ),
         ),
     )
+
+
+@router.post("/cases/{root_id}/advance/draft")
+async def advance_draft(
+    request: Request,
+    root_id: str,
+    files: list[UploadFile] = File(...),
+    method: str | None = None,
+) -> dict[str, object]:
+    """Read an uploaded advance document and return a prefilled DRAFT (plan D).
+
+    This is a READ: it never records money. The accountant reviews/edits the
+    draft and then records it through the existing actuals endpoint. Provider
+    I/O runs outside any transaction.
+    """
+    session = _require_session(request)
+    workflow = _workflow(request)
+    if not files:
+        raise HTTPException(status_code=400, detail="Chưa chọn chứng từ ứng.")
+    uploads: list[tuple[str, str, bytes]] = []
+    for upload in files:
+        data = await upload.read()
+        media = _sniff_media(data)
+        if media is None:
+            raise HTTPException(status_code=415, detail="Chỉ nhận PDF, PNG hoặc JPEG.")
+        if len(data) > workflow.max_source_bytes:
+            raise HTTPException(status_code=413, detail="Tệp vượt giới hạn dung lượng.")
+        uploads.append((upload.filename or "tep", media, data))
+    draft = await workflow.read_advance_draft(
+        session, root_id, tuple(uploads), method_hint=method
+    )
+    return draft._asdict()
 
 
 @router.post("/cases/{root_id}/control")

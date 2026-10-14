@@ -199,6 +199,10 @@ class CaseView(StrictModel):
     id: Id
     version: int
     state: CaseState
+    # The dossier's activity/employee scope (server-owned). A client uses it to
+    # address the right scope; the server still re-checks it (§4, plan D).
+    activity: Id | None = None
+    employee: Id | None = None
     summary: str
     sources: tuple[SourceRef, ...] = ()
     issues: tuple[BusinessIssue, ...] = ()

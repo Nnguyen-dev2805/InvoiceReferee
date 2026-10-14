@@ -9,7 +9,7 @@
   "preconditions": [
     "Current input digests/profile/source refs valid",
     "Authorized activity and B=8000000/grants valid",
-    "Responsible employee Q32 confirmation accepted with service evidence, no conflict",
+    "A valid invoice bound to the right employee/dossier is the employee-paid basis (demo policy; no separate payer confirmation)",
     "Scoped completed advance+coverage including opening balances valid",
     "No duplicate obligation or open/unknown execution"
   ],
@@ -28,7 +28,7 @@
     "state": "SETTLED",
     "conclusion": "BALANCED",
     "instruction": null,
-    "employee_paid_basis": "EMPLOYEE_DECLARATION_Q32_NOT_BANK_VERIFIED"
+    "employee_paid_basis": "EMPLOYEE_PAID_INVOICE_DEMO_POLICY_NOT_BANK_VERIFIED"
   },
   "after_confirmed_execution": {
     "state": "SETTLED",

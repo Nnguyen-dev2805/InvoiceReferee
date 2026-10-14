@@ -174,8 +174,11 @@ def test_employee_paid_portion_carries_q32_basis_not_bank_fact() -> None:
 # --- money stays UNKNOWN without a basis ------------------------------------
 
 
-def test_invoice_alone_does_not_create_employee_paid_or_ap_r() -> None:
-    # An invoice (and its printed "Chuyển khoản") never proves who paid.
+def test_invoice_without_a_bound_buyer_person_is_not_employee_paid() -> None:
+    # Demo policy (chốt 14/10/2026): a valid invoice IS the employee-paid basis
+    # only when it binds to the right employee. This invoice has no buyer person
+    # (the binding key), so it is NOT auto-admitted as employee-paid, and no
+    # A/P/R is fabricated from it.
     inp = _admit(_report((_paper(), _invoice())), claims=())
     expense = inp.expense_facts[0]
     assert expense.payments == ()

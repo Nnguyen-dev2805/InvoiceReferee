@@ -47,7 +47,7 @@ DTO có thể có nested types nội bộ, không phải mỗi type/file/service
 | Claim | Căn cứ được nhận | Không đủ riêng lẻ |
 | --- | --- | --- |
 | Incurred expense/T | Final expense document và evidence service/activity incurred hoặc confirmation đúng trách nhiệm | Forecast/request/face value đang tranh chấp |
-| Employee-paid/E candidate | Payment proof ghi payer/amount/expense; hoặc confirmation tài chính hợp lệ; hoặc **lời xác nhận chịu trách nhiệm của nhân viên + chứng từ dịch vụ** khi các điều kiện khác đủ và không mâu thuẫn trọng yếu (Q32/ADR007; chỉ trong ngưỡng tự xử lý E<=8tr, abs(S)<=4tr) | Guest/buyer trên invoice, tên/chữ ký/`TM-CK` trên hóa đơn, lời khai chi tiền ngoài ngưỡng |
+| Employee-paid/E candidate | **Policy demo (chốt 14/10/2026): hóa đơn gốc hợp lệ, gắn đúng nhân viên và hồ sơ, là căn cứ khoản nhân viên đã trả** (`EMPLOYEE_PAID_INVOICE`), không cần giấy xác nhận thanh toán riêng; hoặc payment proof ghi payer/amount/expense; hoặc confirmation tài chính hợp lệ; hoặc **lời xác nhận chịu trách nhiệm của nhân viên + chứng từ dịch vụ** trong ngưỡng tự xử lý E<=8tr, abs(S)<=4tr (Q32/ADR007) | Guest/buyer công ty trên invoice không phải người trả; tên/chữ ký/`TM-CK` trên hóa đơn tự nó; lời khai chi tiền ngoài ngưỡng |
 | Company-direct/C | Company supplier payment có binding expense + actor/context đúng scope | Tên công ty trên hóa đơn |
 | A/P/R/received | Confirmed completed transfer/cash receipt/ledger có payer/payee/scope; reversal phải có event gốc | Requested/approved/debit-only/pending |
 | Activity purpose/link | Employee declaration được policy nhận + context compatible, không contradiction | Amount/date giống nhau hoặc opaque LLM confidence |
@@ -83,18 +83,37 @@ Cập nhật phạm vi 14/10/2026 (§14/§15, ADR006/ADR007):
   dữ kiện để đối chiếu và báo phần ngoài phạm vi employee-paid; **không** đưa C vào
   phép tính hoàn trả nhân viên và không bỏ phần vật chất để kết luận tiền. `S` cho
   phạm vi employee-paid không cộng C.
-- **Lời xác nhận (Q32):** một khoản E có thể dựa trên lời xác nhận chịu trách nhiệm
-  của nhân viên + chứng từ dịch vụ, chỉ trong ngưỡng `E<=8tr`, `abs(S)<=4tr`, khi
-  không mâu thuẫn trọng yếu; provenance/`verified_by` phản ánh actor là nhân viên và
-  view ghi rõ mức căn cứ là "lời xác nhận", không phải giao dịch ngân hàng đã xác minh.
+- **Căn cứ hóa đơn (chốt 14/10/2026, thay đường mặc định):** trong policy demo, một
+  hóa đơn gốc hợp lệ (`profile_status=CLEAR`, có `total_amount`) gắn đúng nhân viên
+  và hồ sơ là căn cứ khoản nhân viên đã trả (`EMPLOYEE_PAID_INVOICE`); **không** cần
+  giấy xác nhận thanh toán riêng và **không** cần câu xác nhận dài trên giấy quyết
+  toán. Đây là giả định nghiệp vụ cho demo, **không** là xác minh ngân hàng; hệ thống
+  không tạo giao dịch ngân hàng giả. Hóa đơn có `buyer_person_name` là khóa gắn với
+  nhân viên; **bên mua là công ty không phải người trả** (không tạo C). Lệch người,
+  sai hồ sơ, số tiền mâu thuẫn hoặc tài liệu chưa đọc rõ vẫn là FACT đúng chỗ. Khoản
+  ứng thực nhận vẫn cần bản ghi riêng của công ty (mục D dưới).
+- **Lời xác nhận (Q32, đường phụ):** một khoản E cũng có thể dựa trên lời xác nhận
+  chịu trách nhiệm của nhân viên + chứng từ dịch vụ, chỉ trong ngưỡng `E<=8tr`,
+  `abs(S)<=4tr`, khi không mâu thuẫn trọng yếu; provenance/`verified_by` phản ánh actor
+  là nhân viên và view ghi rõ mức căn cứ là "lời xác nhận", không phải giao dịch ngân
+  hàng đã xác minh.
   Mức căn cứ là enum đóng `PaymentBasisKind` = `INDEPENDENT_PAYMENT` /
-  `FINANCIAL_CONFIRMATION` / `EMPLOYEE_DECLARATION_Q32` / `UNSPECIFIED_LEGACY`
-  (A0). `ExpensePayment` mang `basis_kind` (mặc định `UNSPECIFIED_LEGACY` cho
-  constructor STUB/test) và `responsible_actor`; admission LIVE/REPLAY không nhận
-  `UNSPECIFIED_LEGACY`. `PaymentBasisView(expense_id, kind, actor, refs, rule_id)`
-  là view dẫn xuất, không tạo ledger event. Client khai báo khoản đã trả qua
-  `EmployeePaidClaim(invoice_reference, amount, refs, reason)` (amount là VND
-  integer; client **không** cấp actor/verifier/known); server suy actor/scope/time.
+  `FINANCIAL_CONFIRMATION` / `EMPLOYEE_PAID_INVOICE` / `EMPLOYEE_DECLARATION_Q32` /
+  `UNSPECIFIED_LEGACY` (A0 + chốt 14/10). `ExpensePayment` mang `basis_kind` (mặc
+  định `UNSPECIFIED_LEGACY` cho constructor STUB/test) và `responsible_actor`;
+  admission LIVE/REPLAY không nhận `UNSPECIFIED_LEGACY`. `PaymentBasisView(expense_id,
+  kind, actor, refs, rule_id)` là view dẫn xuất, không tạo ledger event. Client khai
+  báo khoản đã trả qua `EmployeePaidClaim(invoice_reference, amount, refs, reason)`
+  (amount là VND integer; client **không** cấp actor/verifier/known); server suy
+  actor/scope/time. Hóa đơn đủ điều kiện không bắt client nhập lại invoice/amount hoặc
+  xác nhận payer riêng.
+- **Ứng thực nhận (mục D):** kế toán ghi nhận `ADVANCE_RECEIVED` từ chứng từ ứng đã
+  đọc (chuyển khoản/tiền mặt) qua `RecordActual`; `RecordMoneyInput` mang
+  `instrument_method` (TRANSFER/CASH), `instrument_status` (COMPLETED/PENDING/FAILED/
+  UNKNOWN) và `instrument_reference`. **Trạng thái nguồn khác COMPLETED không bao giờ
+  thành CONFIRMED**; upload chưa tự thành received. `external_key` chống trùng theo
+  (giao dịch/số phiếu); scope/actor do server kiểm. Một hồ sơ bị chặn ghi vào hoạt
+  động khác (`claimed_scope` phải khớp root).
 
 MoneyEvent kinds ADVANCE_RECEIVED/REIMBURSEMENT_RECEIVED/EMPLOYEE_RETURN/
 REVERSAL/OBSERVED_UNALLOCATED; external_key=(origin_namespace,transaction_ref)

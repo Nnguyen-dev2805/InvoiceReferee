@@ -1051,6 +1051,81 @@ class CaseWorkflow:
                 (root_id, transcription.model_dump_json(), self._now_iso()),
             )
 
+    async def read_advance_draft(
+        self,
+        session: DemoSession,
+        root_id: str,
+        uploads: tuple[tuple[str, str, bytes], ...],
+        *,
+        method_hint: str | None = None,
+    ):
+        """Read an uploaded advance document into a prefilled draft (plan D).
+
+        The accountant uploads a transfer receipt or cash voucher; the evidence
+        pipeline reads every page and extracts fields, and this returns a DRAFT
+        (never a committed event). Provider I/O runs OUTSIDE any transaction. A
+        read that yields no usable document is a typed failure, not a fake draft.
+        """
+        import hashlib
+
+        from invoice_referee.domain.evidence import SourceRef
+        from invoice_referee.evidence.pipeline import read_root
+        from invoice_referee.evidence.trace import RunBudget
+        from invoice_referee.reconciliation.advance import draft_advance_from_document
+
+        # Scope/employee come from the stored case, never the client.
+        connection = self.db.connect()
+        try:
+            row = connection.execute(
+                "SELECT * FROM cases WHERE id = ? AND tenant = ?",
+                (root_id, session.tenant),
+            ).fetchone()
+        finally:
+            connection.close()
+        if row is None:
+            raise NotFoundError("Hồ sơ không tồn tại trong tenant này.")
+
+        reader, classifier, artifacts, provider_mode = self._evidence_wiring()
+        if reader is None:
+            raise UnsupportedCommandError(
+                "Chưa cấu hình đọc chứng từ (LIVE) cho môi trường này."
+            )
+        sources = []
+        source_bytes: dict[str, bytes] = {}
+        for index, (filename, media, payload) in enumerate(uploads, start=1):
+            source_id = f"source:{hashlib.sha256(payload).hexdigest()[:16]}:adv{index}"
+            sources.append(
+                SourceRef(
+                    id=source_id, digest=hashlib.sha256(payload).hexdigest(),
+                    tenant=session.tenant, media=media,  # type: ignore[arg-type]
+                    storage_key=f"{session.tenant}/{root_id}/{source_id}", filename=filename,
+                )
+            )
+            source_bytes[source_id] = payload
+        report = await read_root(
+            sources=tuple(sources), reader=reader, classifier=classifier,
+            artifacts=artifacts, source_bytes=source_bytes, budget=RunBudget(),
+            provider_mode=provider_mode, root_id=root_id,
+        )
+        # Pick the document that actually carries advance fields; a clear one is
+        # preferred over an unresolved one.
+        def _score(document) -> int:
+            fields = {f.field for f in document.fields if f.state == "FOUND"}
+            score = len(fields & {"amount", "payee_name", "transaction_reference", "transaction_status"})
+            if document.profile_status == "CLEAR":
+                score += 1
+            return score
+
+        candidates = sorted(report.documents, key=_score, reverse=True)
+        if not candidates or _score(candidates[0]) == 0:
+            raise UnsupportedCommandError(
+                "Không đọc được dữ liệu khoản ứng từ chứng từ đã tải lên."
+            )
+        return draft_advance_from_document(
+            candidates[0], scope=str(row["activity"]), employee=str(row["employee"]),
+            method_hint=method_hint,
+        )
+
     def _create_draft(
         self,
         cx: sqlite3.Connection,
@@ -1447,6 +1522,12 @@ class CaseWorkflow:
     ) -> CommandResult:
         row = self._require_root(cx, session, command.root_id)
         money = command.money
+        # The record binds to THIS dossier's scope: a client cannot record money
+        # into another activity through this root (§4, plan D).
+        if money.claimed_scope not in (str(row["activity"]), session.tenant):
+            raise UnsupportedCommandError(
+                "Phạm vi ghi nhận không khớp hoạt động của hồ sơ này."
+            )
         # The accountant (or a granted actor) records actual money (§5).
         if session.persona not in ("accountant", "approver") and not self._actor_has_grant(
             cx, session.tenant, context.actor_id, "RECORD_ACTUAL", money.claimed_scope
@@ -1489,6 +1570,9 @@ class CaseWorkflow:
             allocation_state=verification.allocation_state,  # type: ignore[arg-type]
             reverses_event_id=money.reverses_event_id,
             refs=money.refs,
+            instrument_method=money.instrument_method,
+            instrument_status=money.instrument_status,
+            instrument_reference=money.instrument_reference,
         )
         # A reversal must not exceed the unreversed original (§10.1).
         if money.reverses_event_id is not None:
@@ -2430,6 +2514,8 @@ class CaseWorkflow:
             id=row["id"],
             version=int(row["version"]),
             state=row["state"],
+            activity=row["activity"],
+            employee=row["employee"],
             summary=(
                 f"{activity_name} · {_vn_date(row['activity_occurred_at'])} · {employee_name}"
             ),

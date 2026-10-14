@@ -46,7 +46,8 @@
         "serial_number": "IR26E",
         "total_amount": 5400000,
         "currency": "VND",
-        "payment_method_text": "Chuyển khoản"
+        "payment_method_text": "Chuyển khoản",
+        "buyer_person_name": "Nguyễn An"
       },
       "forbidden_role_inference": [
         "PAYMENT_EVIDENCE from buyer/signature/payment method alone"

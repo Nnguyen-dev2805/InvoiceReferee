@@ -76,7 +76,7 @@ def test_ledger_amount_and_coverage_preserved(tmp_path: Path) -> None:
         assert coverage.opening_balance is not None
         assert coverage.opening_balance.value == 0
         policies = context_policies(loaded, digest="a" * 64, profile="TRAVEL")
-        assert policies and policies[0].rules == ("EMPLOYEE_PAID_Q32_BOUNDED",)
+        assert policies and policies[0].rules == ("EMPLOYEE_PAID_INVOICE_BOUNDED",)
         budgets = context_budgets(loaded, activity="activity:uc03-f01", digest="a" * 64)
         assert budgets and budgets[0].amount == 8_000_000
         assert budgets[0].actor == "employee:approver"

@@ -260,3 +260,26 @@ async def test_activity_proposed_through_api_gets_server_generated_id(app_fixtur
     assert case["state"] == "DRAFT"
     assert any(issue["kind"] == "FACT" for issue in case["issues"])
     assert app_fixture.case_count(TENANT_A) == 1
+
+
+async def test_get_source_content_serves_uploaded_file(app_fixture):
+    created = await app_fixture.create(employee=EMPLOYEE, activity="activity:travel-a")
+    root = created.case_view.id
+    uploaded = await app_fixture.client.post(
+        f"/api/cases/{root}/sources",
+        files={"files": ("hoadon.pdf", GOOD_PDF, "application/pdf")},
+        headers={"X-Command-Id": "cmd-source-get", "X-Expected-Version": "1"},
+    )
+    assert uploaded.status_code == 200
+    source_id = uploaded.json()["case_view"]["sources"][0]["id"]
+
+    # Valid retrieval
+    response = await app_fixture.client.get(f"/api/cases/{root}/sources/{source_id}")
+    assert response.status_code == 200
+    assert response.content == GOOD_PDF
+    assert response.headers["content-type"] == "application/pdf"
+
+    # Other tenant blocked
+    tenant_b = app_fixture.client_for(tenant=TENANT_B)
+    assert (await tenant_b.get(f"/api/cases/{root}/sources/{source_id}")).status_code == 404
+

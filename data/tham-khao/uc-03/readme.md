@@ -8,15 +8,21 @@ Toàn bộ tài liệu là dữ liệu giả lập, không có giá trị pháp 
 `expected.json` dưới đây giữ hợp đồng cũ, **không phải oracle nghiệp vụ của final**.
 `COVERED/GAP_EXPECTED` không có nghĩa đã chạy PASS trong final.
 
-Đọc [bảng chuyển đổi 25 case](CASE_MAPPING_FINAL.md) và
-[mapping có cấu trúc](final-case-mapping.json) trước khi chọn case. Mapping mô tả
-nguồn gốc, phần cần bổ sung và kết quả có điều kiện; chưa tạo biến thể PDF/context/gold
-final và không được runtime/model nạp làm facts.
+**Mapping mục tiêu hiện tại khi mở rộng ngoài công tác:**
+[v3 giữ PDF gốc](final-case-mapping-v3.json), cùng
+[đặc tả policy và mẫu giấy chung](../../../docs/superpowers/specs/2026-10-14-general-expense-policy-and-form.md).
+V3 là authoring metadata, chưa có 25 packet context/gold thực thi và không được
+runtime/model nạp làm facts. Các giá trị tiền là kỳ vọng có điều kiện, không phải
+facts đã đọc/xác minh trong một lượt chạy final.
 
-Một số giấy là tiếp khách/mua thiết bị, và form cũ thiếu ngày bắt đầu/kết thúc
-công tác. Giữ chúng cho kiểm thử chứng từ hoặc tạo biến thể có phiên bản; không chỉ
-gắn context công tác trái nội dung giấy. Pipeline evidence hiện kết thúc
-`EVIDENCE_READY`; bước nối admission/policy/tiền thuộc kế hoạch tiếp theo.
+[Bảng v2](CASE_MAPPING_FINAL.md) và
+[JSON v2](final-case-mapping.json) là phương án **trước đây** khi final chỉ nhận
+công tác; một số mục từng yêu cầu chuyển nội dung mua sắm/tiếp khách thành chuyến
+công tác. Không dùng các bước chuyển ấy cho PDF gốc trong mục tiêu v3.
+
+Một số giấy là tiếp khách/mua thiết bị, và form gốc không ghi chuyến công tác.
+Giữ nguyên nguồn; hồ sơ thuộc profile công việc tương ứng. Các rule mới và
+25 packet test chưa được tích hợp/chạy chỉ vì mapping v3 đã được viết.
 
 `manifest.json.folder` đã được chỉnh theo folder không dấu có thật. Nhãn/rule legacy
 được giữ, kể cả drift metadata TC19/TC20 đã ghi trong bảng chuyển đổi.

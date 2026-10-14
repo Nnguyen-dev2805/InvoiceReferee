@@ -9,7 +9,7 @@
   "preconditions": [
     "Current input digests/profile/source refs valid",
     "Authorized activity and B=8000000/grants valid",
-    "Responsible employee Q32 confirmation accepted with service evidence, no conflict",
+    "A valid invoice bound to the right employee/dossier is the employee-paid basis (demo policy; no separate payer confirmation)",
     "Scoped completed advance+coverage including opening balances valid",
     "No duplicate obligation or open/unknown execution"
   ],
@@ -34,7 +34,7 @@
       "remaining": 760000,
       "execution_state": "NOT_STARTED"
     },
-    "employee_paid_basis": "EMPLOYEE_DECLARATION_Q32_NOT_BANK_VERIFIED"
+    "employee_paid_basis": "EMPLOYEE_PAID_INVOICE_DEMO_POLICY_NOT_BANK_VERIFIED"
   },
   "after_confirmed_execution": {
     "state": "SETTLED",
@@ -49,5 +49,20 @@
     "assessment_ready": false,
     "conclusion": null,
     "instructions": []
+  },
+  "advance_basis_branches": {
+    "note": "03-bien-nhan-chuyen-khoan.pdf and 04-phieu-chi-tien-mat.pdf are ALTERNATIVE documents for the SAME 4.000.000 đ advance; use exactly one, never both (4m + 4m = 8m is wrong).",
+    "transfer": {
+      "document": "03-bien-nhan-chuyen-khoan.pdf",
+      "amount": 4000000,
+      "instrument_status": "COMPLETED",
+      "expected_A": 4000000
+    },
+    "cash": {
+      "document": "04-phieu-chi-tien-mat.pdf",
+      "amount": 4000000,
+      "instrument_status": "COMPLETED",
+      "expected_A": 4000000
+    }
   }
 }

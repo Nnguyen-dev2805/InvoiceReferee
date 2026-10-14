@@ -8,11 +8,13 @@
       "case_id": "UC03-F01",
       "folder": "f01-cong-tac-thu-lai-tien-thua",
       "inputs": {
-        "01-giay-quyet-toan.pdf": "bab4c0a6ed2b6c5968e7c5156977cbc7c49256451aaea02883c5e860aa8cdfad",
-        "02-hoa-don-dich-vu.pdf": "0f9a66678a8df2e7ecef705934c01bcced9c8609105ff93dfb7b4bfd8ef2068a",
-        "employee-confirmation.json": "bab4a1fdd1dbc219626feb40a5729d32a33af1e7db0292c4d0fd1cd4dad9b2fd",
-        "organization.json": "41a6c5fdb7da7ca1beaa4377e2394bde0665ea228dfade2227ace7a9abbaa498",
-        "submission.json": "97ba6f16a5bec0e1f17084fed1568d4ff7e61d355c7ed611829cd1d64174eb0d"
+        "01-giay-quyet-toan.pdf": "61937573085e29e4bbe28f3c054d3893c176ba4445494f3bad0f3078135b2433",
+        "02-hoa-don-dich-vu.pdf": "7a5db68dfdd919d6a4aaf327891625f1a6cc2130e6dca99439f0064c2bc97fbf",
+        "03-bien-nhan-chuyen-khoan.pdf": "27e54359f26eadd8c65fc6f90c23677fd0988c6b0910a039c2ed759714438357",
+        "04-phieu-chi-tien-mat.pdf": "c39b33d81ce3bcaf0eaffff386d4bbad76750483ef554a030b9a34f3b3fe10fc",
+        "employee-confirmation.json": "1176cceb391ae776fa6a38ae3196413201d993582b0df3c1faeab5259bc00675",
+        "organization.json": "b0424ef26cc9eb563247bfd6f393747be18c40e9c025c41cf5db26b2583aaf61",
+        "submission.json": "627cea29847ee00316f66e1f660872919d289619e94825f02683cf6c06ac19a2"
       },
       "source_origin": "Hoangha v1 TC01",
       "profile": "TRAVEL",
@@ -23,11 +25,11 @@
       "case_id": "UC03-F02",
       "folder": "f02-cong-tac-cong-ty-chi-them",
       "inputs": {
-        "01-giay-quyet-toan.pdf": "4016c52369f6b7157da8fa47e358c50603c2514f489d25ae8390443576385284",
-        "02-hoa-don-dich-vu.pdf": "3cf2cc650269c2e0ea00d23fdb93cc9ddb367c25bd4f528013ffe0afe323c418",
-        "employee-confirmation.json": "720fb1d2e20803c510e80145f8a163c799fab328e1c7e994c1c0556aceec7c80",
-        "organization.json": "2b6169b008130208fd10448ccb5ce8af019ff95242711a2cd990636bf216da09",
-        "submission.json": "c8f92606f9bff0a4d2594a7b1c65bebbdd3bd5c415c909d15674d640f5d0ef1d"
+        "01-giay-quyet-toan.pdf": "2c623e7d3671e79fc5e8dcbf04e8ecdf8e8e09628975575ceef6f1e4bae17e62",
+        "02-hoa-don-dich-vu.pdf": "02dffc0b5b290bea150994755d096b3bcb84c60a2320aee08c9c81a59af7dca3",
+        "employee-confirmation.json": "37b6328a952bc92b8e105dbb3b48b6df15f9245d955228911a8c421bbc3394f5",
+        "organization.json": "9ac2ec38685949a0345b06547bbd1b8dcb4eb1b1d12e0c9cedf045d7cf006a87",
+        "submission.json": "8834975e29c2f2f1d8c18f39b2475cee00be893d29ff2dd81ab114305eaac731"
       },
       "source_origin": "Hoangha v1 TC02",
       "profile": "TRAVEL",
@@ -38,11 +40,11 @@
       "case_id": "UC03-F03",
       "folder": "f03-cong-tac-can-bang",
       "inputs": {
-        "01-giay-quyet-toan.pdf": "4cccc7649dc51cf08749d07749fd9bb12585e7ec8eca8de269efd3dd61e5e81d",
-        "02-hoa-don-dich-vu.pdf": "19c8f2ab7b5326f41a285d43de912e7003c09739dab466985f46447b119a40aa",
-        "employee-confirmation.json": "eac5e1263cea8a10ffd218f874d7e23c8e068baf05cbf279cd5b6f7341b6ec99",
-        "organization.json": "691590ee8e8175e5efa367afd1e1d681327300614ec68134035d2fb65f8f593d",
-        "submission.json": "7b95b79d2508029c4b4f8d0e3a2bfa2e0e6737a762b666aad247d8017ffcaaf4"
+        "01-giay-quyet-toan.pdf": "e4df2cdc6ff667de49c3f8df1eb81aa3b3d0e0e162c812f38ba7726c7895297d",
+        "02-hoa-don-dich-vu.pdf": "1835b0d874a9df1a235a3853ef843d6e711e69e21625e99f4d4798329d590474",
+        "employee-confirmation.json": "5a158ffb8ab312f9efe5354c5f88056feb6f50e415dd8f9b89858eec4b45b4b7",
+        "organization.json": "f945b6a4aaefd1929144603a66ceb49e7041577d190a3f59461928595cb948a2",
+        "submission.json": "f7b6bc8edb42e00ae619c9f7d788f72bf96f1542edcd137ff06e9a0fbc201eda"
       },
       "source_origin": "Hoangha v1 TC03",
       "profile": "TRAVEL",

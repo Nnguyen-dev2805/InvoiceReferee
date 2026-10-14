@@ -12,12 +12,13 @@ export type Panel =
   | "questions"
   | "approval"
   | "execution"
+  | "advance"
   | "controls"
   | "dossier";
 
 const WORKSPACES: Record<Persona, Panel[]> = {
   employee: ["intake", "questions", "dossier"],
-  accountant: ["approval", "execution", "controls", "dossier"],
+  accountant: ["advance", "approval", "execution", "controls", "dossier"],
   approver: ["approval", "questions", "controls", "dossier"],
 };
 

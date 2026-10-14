@@ -2,8 +2,8 @@ import { formatVnd } from "../format";
 import type { CaseView, InstructionView } from "../types";
 
 const DIRECTION_LABELS: Record<string, string> = {
-  PAY: "Công ty chi cho nhân viên",
-  COLLECT: "Nhân viên hoàn lại công ty",
+  PAY: "Công ty chi trả cho nhân viên",
+  COLLECT: "Nhân viên hoàn nộp lại công ty",
 };
 
 const EXECUTION_LABELS: Record<string, string> = {
@@ -14,28 +14,40 @@ const EXECUTION_LABELS: Record<string, string> = {
 };
 
 function InstructionRow({ instruction }: { instruction: InstructionView }) {
+  const isPay = instruction.direction === "PAY";
   return (
     <li
       data-testid={`instruction-${instruction.direction}`}
-      className="p-3 bg-slate-50 border border-slate-200 rounded space-y-1 text-xs"
+      className={`p-4 rounded-xl border space-y-2.5 text-xs transition-all shadow-xs ${
+        isPay
+          ? "bg-emerald-50/60 border-emerald-200/90 text-emerald-950"
+          : "bg-amber-50/60 border-amber-200/90 text-amber-950"
+      }`}
     >
       <div className="flex items-center justify-between">
-        <span className="font-semibold text-slate-900">
-          <strong>{DIRECTION_LABELS[instruction.direction] ?? instruction.direction}</strong>:{" "}
-          <span className="font-['JetBrains_Mono']">{formatVnd(instruction.amount)}</span>
-        </span>
-        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 font-['JetBrains_Mono']">
+        <div className="flex items-center gap-2">
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isPay ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+            {isPay ? "CHI" : "THU"}
+          </span>
+          <span className="font-semibold text-slate-900 text-xs">
+            <strong>{DIRECTION_LABELS[instruction.direction] ?? instruction.direction}</strong>:{" "}
+            <span className="font-mono-nums text-sm font-bold">{formatVnd(instruction.amount)}</span>
+          </span>
+        </div>
+        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white border border-slate-200 font-mono-nums shadow-2xs text-slate-700">
           {instruction.status}
         </span>
       </div>
-      <p className="muted text-[11px] text-slate-500">
-        Còn lại: <span className="font-['JetBrains_Mono']">{formatVnd(instruction.remaining)}</span> · Trạng thái:{" "}
-        {instruction.status} · Thực hiện:{" "}
-        {EXECUTION_LABELS[instruction.execution_state] ?? instruction.execution_state}
-      </p>
-      <p className="muted text-[11px] text-slate-600 bg-white p-1.5 rounded border border-slate-100">
-        Căn cứ: {instruction.basis}
-      </p>
+
+      <div className="flex items-center gap-2 text-[11px] text-slate-600 font-medium">
+        <span>Còn lại: <strong className="font-mono-nums text-slate-900">{formatVnd(instruction.remaining)}</strong></span>
+        <span className="text-slate-300">·</span>
+        <span>Thực hiện: <strong>{EXECUTION_LABELS[instruction.execution_state] ?? instruction.execution_state}</strong></span>
+      </div>
+
+      <div className="text-[11px] text-slate-600 bg-white/90 p-2.5 rounded-lg border border-slate-200/80">
+        <span className="font-semibold text-slate-700">Căn cứ chỉ thị:</span> {instruction.basis}
+      </div>
     </li>
   );
 }
@@ -47,19 +59,24 @@ export function Approval({ caseView }: { caseView: CaseView | null }) {
     (i) => i.status === "ISSUED" || i.status === "PARTIAL",
   );
   return (
-    <section aria-labelledby="approval-title" className="bg-white border border-slate-200 rounded p-4 text-xs shadow-sm space-y-3">
-      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-        <h2 id="approval-title" className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-slate-700 text-sm" aria-hidden="true">assignment_turned_in</span>
-          <span>Yêu cầu cần thực hiện ({active.length})</span>
-        </h2>
+    <section aria-labelledby="approval-title" className="bg-white border border-slate-200 rounded-xl p-5 text-xs shadow-xs space-y-4">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h2 id="approval-title" className="text-sm font-bold text-slate-900 tracking-tight">
+            Lệnh chi / thu cần thực hiện ({active.length})
+          </h2>
+          <p className="text-xs text-slate-500 font-medium">
+            Chỉ thị thanh toán hoặc thu hồi tiền sau khi đối soát xong
+          </p>
+        </div>
       </div>
+
       {active.length === 0 ? (
-        <p className="muted text-slate-400 italic text-[11px] py-2 text-center">
-          Chưa có yêu cầu chi/thu nào cần thực hiện.
+        <p className="text-slate-400 italic text-xs py-4 text-center">
+          Chưa có yêu cầu chi/thu nào cần thực hiện trong hồ sơ này.
         </p>
       ) : (
-        <ul className="instructions space-y-2">
+        <ul className="instructions space-y-2.5">
           {active.map((instruction) => (
             <InstructionRow key={instruction.id} instruction={instruction} />
           ))}

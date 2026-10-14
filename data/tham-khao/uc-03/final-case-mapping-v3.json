@@ -1,0 +1,924 @@
+{
+  "schema_version": "uc03-final-general-expense-mapping/v3",
+  "status": "ORIGINAL_PDF_SCOPE_MAPPED_NOT_EXECUTABLE_GOLD",
+  "source_corpus_commit": "1ee33487e2770ebd9e5ae65b994bbd3f3a4dd7a8",
+  "source_case_count": 25,
+  "source_pdf_count": 65,
+  "authoring_only": true,
+  "runtime_must_not_read_this_file": true,
+  "user_decisions": {
+    "supported_business": "employee-paid business expense settlement with/without advance",
+    "hoangha_category_limits_vnd": {
+      "WORK_CLIENT_MEAL_PER_EXPENSE": 5000000,
+      "TAXI_PER_EXPENSE": 2000000
+    },
+    "hoangha_submission_window_days": 30,
+    "final_system_recognition_limit_vnd": 8000000,
+    "final_system_instruction_limit_vnd": 4000000,
+    "final_demo_approver_grant_ceiling_vnd_per_action": 20000000,
+    "missing_evidence_with_reason": "FACT then exact POLICY exception via current answer/decision flow",
+    "no_special_explanation_screen": true
+  },
+  "packet_preconditions": [
+    "Keep original PDF bytes; OCR all accepted pages; original Hoangha expected.json remains reference only.",
+    "Server-owned employee/activity/profile/company identity; no invented travel dates for nontravel cases.",
+    "Independent synthetic organization context per case: authorized activity, B, scoped grants, actual A and coverage P/R/opening/funds/as_of where needed.",
+    "Invoice demo basis is business-policy evidence, not a bank event; contradictory natural-person or payer evidence blocks affected E.",
+    "Actual completed money events/valid zero history remain independent of printed advance or invoice claims.",
+    "Explicit category/versioned rule;5m client/work meal,2m taxi,30-day date; final8/4/20 authority.",
+    "Controlled financial assessment clock in harness; use actual current time in interactive UI and disclose future/late historical sources.",
+    "Keep source-specific missing/conflicting/extra evidence material; no model or gold repair into facts."
+  ],
+  "cases": [
+    {
+      "case_id": "TC01",
+      "source_folder": "tc01-hop-le-nhan-vien-hoan-tra-tien-thua",
+      "source_scope": "Tiếp khách địa phương",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_pdf_refs": [
+        {
+          "path": "tc01-hop-le-nhan-vien-hoan-tra-tien-thua/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "6af4c063a3662ad568f30536c58213cb95fd7e48018892ab8f14df7a312d977c"
+        },
+        {
+          "path": "tc01-hop-le-nhan-vien-hoan-tra-tien-thua/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "d8dddd4e839e8fa89c059bee610b9a85457757d577e7ec9ce352c9ad158f3019"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ kết quả thu lại tiền ứng thừa",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "WORK_CLIENT_MEAL",
+      "target_after_supported_context": "COLLECT_760000",
+      "conditional_business_expectation": "Original local-client meal: after supported invoice/payment basis, B, A4000000, P/R0 and coverage, E3240000 -> COLLECT760000; no invented travel dates.",
+      "old_hoangha_result_reference_only": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "COVERED"
+      },
+      "v2_travel_variant_reference_only": {
+        "case_id": "UC03-F01",
+        "folder": "../../test-kit/uc03-pilot/f01-cong-tac-thu-lai-tien-thua",
+        "status": "INPUTS_AND_HIDDEN_GOLD_CREATED_NOT_E2E_READY",
+        "plan": "../../../docs/superpowers/plans/2026-10-14-evidence-finance-admission.md"
+      },
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC02",
+      "source_folder": "tc02-hop-le-cong-ty-thanh-toan-them",
+      "source_scope": "Mua thiết bị",
+      "source_purpose": "Mua thiết bị văn phòng phục vụ hoạt động công ty",
+      "source_pdf_refs": [
+        {
+          "path": "tc02-hop-le-cong-ty-thanh-toan-them/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "5361b509da576e842896bf9df302af98336a76dd4406019af1da50cf3d3fcfe2"
+        },
+        {
+          "path": "tc02-hop-le-cong-ty-thanh-toan-them/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "03e5473e19ce2c368cc1b696afd21f7e687c8170b094f9b19bbae4c6f4ce1d6d"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ kết quả công ty chi thêm",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "OFFICE_PURCHASE",
+      "target_after_supported_context": "PAY_400000",
+      "conditional_business_expectation": "Original office equipment: with admitted E5400000, A5000000 and P/R0, PAY400000. No asset/inventory lifecycle.",
+      "old_hoangha_result_reference_only": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "COVERED"
+      },
+      "v2_travel_variant_reference_only": {
+        "case_id": "UC03-F02",
+        "folder": "../../test-kit/uc03-pilot/f02-cong-tac-cong-ty-chi-them",
+        "status": "INPUTS_AND_HIDDEN_GOLD_CREATED_NOT_E2E_READY",
+        "plan": "../../../docs/superpowers/plans/2026-10-14-evidence-finance-admission.md"
+      },
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC03",
+      "source_folder": "tc03-hop-le-khong-phat-sinh-chenh-lech",
+      "source_scope": "Công tác",
+      "source_purpose": "Chi phí lưu trú trong chuyến công tác",
+      "source_pdf_refs": [
+        {
+          "path": "tc03-hop-le-khong-phat-sinh-chenh-lech/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "18f981f5fd6ecc541d316bdb4a0c8e51f44d5322e2cc69d88dbfebabc24d6b93"
+        },
+        {
+          "path": "tc03-hop-le-khong-phat-sinh-chenh-lech/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "7e21f2f2403196bec51dfa86c0f054671a1466a958a8187feeb1df40530a3011"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ cân bằng không tạo yêu cầu số 0",
+      "source_profile": "TRAVEL",
+      "category_focus": "LODGING",
+      "target_after_supported_context": "BALANCED",
+      "conditional_business_expectation": "E=A4320000 and P/R0 only after full travel/context/history basis -> no zero instruction.",
+      "old_hoangha_result_reference_only": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "COVERED"
+      },
+      "v2_travel_variant_reference_only": {
+        "case_id": "UC03-F03",
+        "folder": "../../test-kit/uc03-pilot/f03-cong-tac-can-bang",
+        "status": "INPUTS_AND_HIDDEN_GOLD_CREATED_NOT_E2E_READY",
+        "plan": "../../../docs/superpowers/plans/2026-10-14-evidence-finance-admission.md"
+      },
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC04",
+      "source_folder": "tc04-hop-le-nhieu-mat-hang-thiet-bi",
+      "source_scope": "Mua thiết bị",
+      "source_purpose": "Mua thiết bị máy tính cho nhân viên",
+      "source_pdf_refs": [
+        {
+          "path": "tc04-hop-le-nhieu-mat-hang-thiet-bi/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "c401a2cdd8dcc9e1d48348d1a40df832a2993a331a596538e89ecf020b394f6c"
+        },
+        {
+          "path": "tc04-hop-le-nhieu-mat-hang-thiet-bi/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "b8c5b4efa03083986be17496845179ddcb9c5a490dc9d8dd0a23b7c42ceccebf"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ nhiều mặt hàng và số lớn",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "OFFICE_PURCHASE",
+      "target_after_supported_context": "AUTHORITY_ABOVE_20M",
+      "conditional_business_expectation": "E83600000 and A85000000 are conditional; E exceeds system8m and demo actor20m even if S=-1400000.",
+      "old_hoangha_result_reference_only": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "COVERED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC05",
+      "source_folder": "tc05-tong-cac-dong-tren-bao-cao-khong-khop",
+      "source_scope": "Tiếp khách địa phương",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_pdf_refs": [
+        {
+          "path": "tc05-tong-cac-dong-tren-bao-cao-khong-khop/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "b86695951b340957cba2a39aafc474c77e50d209d9ad2430ff4fe94141378d67"
+        },
+        {
+          "path": "tc05-tong-cac-dong-tren-bao-cao-khong-khop/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "6216eae3e32cdf2394d97de0e90ccf0fce60f90596ff230fef1d2db28e96008c"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ lỗi tổng bảng kê",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "WORK_CLIENT_MEAL",
+      "target_after_supported_context": "FACT_PAPER_TOTAL",
+      "conditional_business_expectation": "Report row sum/printed total/source disagree; preserve all three numbers and no money instruction.",
+      "old_hoangha_result_reference_only": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_PAPER_TOTAL_001",
+        "implementation_status": "COVERED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC06",
+      "source_folder": "tc06-chenh-lech-quyet-toan-ghi-sai",
+      "source_scope": "Tiếp khách địa phương",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_pdf_refs": [
+        {
+          "path": "tc06-chenh-lech-quyet-toan-ghi-sai/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "8ff6df5d8a361ae2d00e2d767f858a6288a0168b227663cfbc11b50b00130c00"
+        },
+        {
+          "path": "tc06-chenh-lech-quyet-toan-ghi-sai/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "3625468be7503fa3b973b81fdc9740b98c5451acca96d2a073ba490437751890"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ chênh lệch trên giấy ghi sai",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "WORK_CLIENT_MEAL",
+      "target_after_supported_context": "FACT_PRINTED_DIFFERENCE",
+      "conditional_business_expectation": "Printed difference700000 differs from computed760000; it is not a completed return.",
+      "old_hoangha_result_reference_only": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_SETTLEMENT_DIFF_001",
+        "implementation_status": "COVERED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC07",
+      "source_folder": "tc07-so-tien-bang-chu-tren-bao-cao-khong-khop",
+      "source_scope": "Tiếp khách địa phương",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_pdf_refs": [
+        {
+          "path": "tc07-so-tien-bang-chu-tren-bao-cao-khong-khop/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "b86b3fb5efa4467bfad39bd3661134fb3d0f42acad6f0cbc0c93ca261bd7fa9c"
+        },
+        {
+          "path": "tc07-so-tien-bang-chu-tren-bao-cao-khong-khop/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "26b8605079ac11c75a874e9466abf4391285dcd94994178dd067a014565c47de"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ số bằng chữ khác số bằng số",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "WORK_CLIENT_MEAL",
+      "target_after_supported_context": "FACT_AMOUNT_WORDS",
+      "conditional_business_expectation": "Number and words materially conflict; critical field, do not silently normalize.",
+      "old_hoangha_result_reference_only": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_PAPER_CONSISTENCY_001",
+        "implementation_status": "COVERED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC08",
+      "source_folder": "tc08-bao-cao-va-hoa-don-lech-so-tien",
+      "source_scope": "Tiếp khách địa phương",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_pdf_refs": [
+        {
+          "path": "tc08-bao-cao-va-hoa-don-lech-so-tien/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "2e6cee3a5bfe2d6878ab2a6008845a33a1855152d50589553a2bc41926b3d940"
+        },
+        {
+          "path": "tc08-bao-cao-va-hoa-don-lech-so-tien/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "3211a01c1fa54983aeb5809936c1f68396b043ff8395016b937656cfdbf9b817"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ bảng kê và invoice lệch tiền",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "WORK_CLIENT_MEAL",
+      "target_after_supported_context": "FACT_SOURCE_AMOUNT",
+      "conditional_business_expectation": "Report/invoice mismatch persists despite exact invoice reference; no chosen amount by model confidence.",
+      "old_hoangha_result_reference_only": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_PAPER_AMOUNT_001",
+        "implementation_status": "COVERED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC09",
+      "source_folder": "tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac",
+      "source_scope": "Tiếp khách địa phương",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_pdf_refs": [
+        {
+          "path": "tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "7b49e2e0168200e6532513d13251a7910e9e58a3e59a3fd1656737fa56f32d5d"
+        },
+        {
+          "path": "tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "bcfa80a1a46117d9c8aa20db1644b74ac67c6193d954432a6184ffa3c5c313e2"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ buyer identity mâu thuẫn",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "WORK_CLIENT_MEAL",
+      "target_after_supported_context": "FACT_COMPANY_BUYER_BINDING",
+      "conditional_business_expectation": "Buyer tax identity points to a different company; preserve literal source and ask scoped correction/binding.",
+      "old_hoangha_result_reference_only": {
+        "decision": "ESCALATE",
+        "rule": "SET_BUYER_TAX_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC10",
+      "source_folder": "tc10-hoa-don-thieu-ma-so-thue-nguoi-mua",
+      "source_scope": "Tiếp khách địa phương",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_pdf_refs": [
+        {
+          "path": "tc10-hoa-don-thieu-ma-so-thue-nguoi-mua/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "082c2147228cd1d5f9ec938008fe0e9d118fc0af4ce931ff4dfd70b22c006cf2"
+        },
+        {
+          "path": "tc10-hoa-don-thieu-ma-so-thue-nguoi-mua/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "51579a3d6c2e467ff69fb21446ae75e3f8c25588d2066e2401cf194f0b778d8f"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ trường bắt buộc/thiếu dữ liệu",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "WORK_CLIENT_MEAL",
+      "target_after_supported_context": "FACT_REQUIRED_BUYER_FIELD",
+      "conditional_business_expectation": "Invoice buyer tax code absent; apply declared E_INVOICE profile and company-binding policy, never copy the value from request/context.",
+      "old_hoangha_result_reference_only": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_REQUIRED_FIELD_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC11",
+      "source_folder": "tc11-so-hoc-tren-hoa-don-khong-nhat-quan",
+      "source_scope": "Mua thiết bị",
+      "source_purpose": "Mua thiết bị văn phòng phục vụ hoạt động công ty",
+      "source_pdf_refs": [
+        {
+          "path": "tc11-so-hoc-tren-hoa-don-khong-nhat-quan/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "6ad1a550687c94c4b2fd08edeed79e52a9cdd5ee4efbd7c8532e23e41e36269f"
+        },
+        {
+          "path": "tc11-so-hoc-tren-hoa-don-khong-nhat-quan/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "1ae75778de46915cf9c3434605165fbeed5cced0a7000c566de940b3f0b720c4"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ số học nội bộ invoice sai",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "OFFICE_PURCHASE",
+      "target_after_supported_context": "FACT_INVOICE_ARITHMETIC",
+      "conditional_business_expectation": "Invoice internal sums disagree; preserve source values and block financial instruction.",
+      "old_hoangha_result_reference_only": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_ARITH_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC12",
+      "source_folder": "tc12-hoa-don-trung-dinh-danh-voi-ho-so-truoc",
+      "source_scope": "Tiếp khách địa phương",
+      "source_purpose": "Chi phí tiếp khách lần nộp thứ hai",
+      "source_pdf_refs": [
+        {
+          "path": "tc12-hoa-don-trung-dinh-danh-voi-ho-so-truoc/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "02248e2e6963fe3abe8f469762be6f33b255875dd71b768f78c957e169c4b803"
+        },
+        {
+          "path": "tc12-hoa-don-trung-dinh-danh-voi-ho-so-truoc/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "45a547bf6e9aba2147adbf431e1759309030087f3301a1906f5e321395cc6620"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ kiểm trùng economic obligation qua hai lần nộp",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "WORK_CLIENT_MEAL",
+      "target_after_supported_context": "NO_DUPLICATE_OBLIGATION",
+      "conditional_business_expectation": "Run a prior claim and later repeat with same economic invoice; no second instruction or invented fraud flag.",
+      "old_hoangha_result_reference_only": {
+        "decision": "ESCALATE",
+        "rule": "SET_DUP_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC13",
+      "source_folder": "tc13-khoan-chi-ruou-bia-can-chuyen-policy",
+      "source_scope": "Chi cá nhân rõ",
+      "source_purpose": "Mua đồ uống phục vụ cá nhân sau giờ làm",
+      "source_pdf_refs": [
+        {
+          "path": "tc13-khoan-chi-ruou-bia-can-chuyen-policy/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "9ab08caf796cd86b1535b8629ceb35846d5c4db157c59932ce206bd5391f8c03"
+        },
+        {
+          "path": "tc13-khoan-chi-ruou-bia-can-chuyen-policy/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "9acf672a2d723d60f16ccdb48eaf1bbf1356d59e6be76adc8bab8c5ad005a5b5"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ không hoàn trả chi cá nhân và vẫn thu lại ứng",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "PERSONAL",
+      "target_after_supported_context": "EXCLUDED_COLLECT_ADVANCE",
+      "conditional_business_expectation": "Clearly personal cost not eligible E; if A3000000/P/R0 verified, COLLECT3000000; no routine exception to recognize it.",
+      "old_hoangha_result_reference_only": {
+        "decision": "ESCALATE",
+        "rule": "SET_CATEGORY_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC14",
+      "source_folder": "tc14-tong-ho-so-vuot-tham-quyen-100-trieu",
+      "source_scope": "Mua thiết bị",
+      "source_purpose": "Mua máy chủ phục vụ hệ thống nội bộ",
+      "source_pdf_refs": [
+        {
+          "path": "tc14-tong-ho-so-vuot-tham-quyen-100-trieu/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "dedf0e0493e94b4a9443e25defebb78675ade1a7bee74c5948a02885309a9cd6"
+        },
+        {
+          "path": "tc14-tong-ho-so-vuot-tham-quyen-100-trieu/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "4c3abef57943fdb9ea48554df77a6a29b7173a5a54edf6348a3df28ba0feec95"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ vượt quyền lớn dù số phải chi nhỏ",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "OFFICE_PURCHASE",
+      "target_after_supported_context": "AUTHORITY_BEYOND_DEMO",
+      "conditional_business_expectation": "E121000000/A120000000 conditional; despite S+1000000, recognition exceeds8m and demo20m; no instruction.",
+      "old_hoangha_result_reference_only": {
+        "decision": "ESCALATE",
+        "rule": "SET_AUTH_001",
+        "implementation_status": "COVERED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC15",
+      "source_folder": "tc15-evidence-cung-so-tien-nhung-sai-noi-dung",
+      "source_scope": "Sửa chữa thiết bị",
+      "source_purpose": "Sửa chữa máy in văn phòng",
+      "source_pdf_refs": [
+        {
+          "path": "tc15-evidence-cung-so-tien-nhung-sai-noi-dung/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "40845e70cf423ddb1cf94a17642b0031072b5cbcfd09fadf52eba7d6ff4d8da5"
+        },
+        {
+          "path": "tc15-evidence-cung-so-tien-nhung-sai-noi-dung/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "7fb7ec1859d0e2c2d859491617a58dd34c90ab0dafc47add0e676f1ffdf0cedb"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ cùng số tiền nhưng khác nghiệp vụ/reference",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "OPERATIONS",
+      "target_after_supported_context": "FACT_WRONG_EVIDENCE_BINDING",
+      "conditional_business_expectation": "Repair work versus wrong-source document of equal amount; amount alone cannot establish match.",
+      "old_hoangha_result_reference_only": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_PAPER_MATCH_001",
+        "implementation_status": "COVERED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC16",
+      "source_folder": "tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac",
+      "source_scope": "Công tác",
+      "source_purpose": "Hoàn ứng chi phí chuyến công tác Đà Nẵng",
+      "source_pdf_refs": [
+        {
+          "path": "tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "2c5da32c468bfd26a816f11ae28307537324131ba2eb57153026f547f3094131"
+        },
+        {
+          "path": "tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/hoa_don_khach_san.pdf",
+          "pages": 1,
+          "sha256": "689b74e5fc165aaab7bcf3d2dd460cdccc81774459bd886bd9c8c3c83d175b51"
+        },
+        {
+          "path": "tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/hoa_don_ve_may_bay.pdf",
+          "pages": 1,
+          "sha256": "1b4a595cf05f36ab6b4e6d62d8003b66fdd6404ad020afedf7cbe8d8e7437e52"
+        },
+        {
+          "path": "tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/hoa_don_taxi.pdf",
+          "pages": 1,
+          "sha256": "3be0d44400459dfb29f7126a9231632249592d54ba3e01082fecd0f2c1e440b3"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ ba khoản/matching đúng nhưng finance vượt ngưỡng",
+      "source_profile": "TRAVEL",
+      "category_focus": "MIXED_TRAVEL",
+      "target_after_supported_context": "AUTHORITY_RECOGNIZE",
+      "conditional_business_expectation": "Three source rows E10260000/A12000000 -> S-1740000 if known; E>8m needs authority.",
+      "old_hoangha_result_reference_only": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC17",
+      "source_folder": "tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the",
+      "source_scope": "Tiếp khách/cuộc họp",
+      "source_purpose": "Hoàn ứng chi phí tiếp khách và tổ chức cuộc họp",
+      "source_pdf_refs": [
+        {
+          "path": "tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "7d5342dda35c90d215449d504295d322b51548f4e11efce5761c5b2a5094f838"
+        },
+        {
+          "path": "tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/hoa_don_nha_hang.pdf",
+          "pages": 1,
+          "sha256": "163a2b5e5bfd6ae2802220c467faa0d96b5260aedaed1140a9dfdc3853eb7a08"
+        },
+        {
+          "path": "tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/hoa_don_phong_hop.pdf",
+          "pages": 1,
+          "sha256": "642502d5821139383386c0550b2e19f02de2546037498fa96959bad5d8e6e01f"
+        },
+        {
+          "path": "tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/ve_dien_tu_bai_do_xe.pdf",
+          "pages": 1,
+          "sha256": "90a29084321eb05883e520a50676b02e81cf7b04f0b9a873eb005f39a3a4c9cd"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ nhiều loại chứng từ có thể đủ thay invoice VAT",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "MIXED_MEETING",
+      "target_after_supported_context": "COLLECT_AFTER_TICKET_ROLE_CLEAR",
+      "conditional_business_expectation": "Meeting meal3240000, room2160000 and parking ticket200000 are three distinct costs; if all accepted E5600000/A6000000 -> COLLECT400000.",
+      "old_hoangha_result_reference_only": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC18",
+      "source_folder": "tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the",
+      "source_scope": "Sửa chữa thiết bị",
+      "source_purpose": "Hoàn ứng sửa chữa máy in văn phòng",
+      "source_pdf_refs": [
+        {
+          "path": "tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "a591a6e2311e8baee6e7e467d9ac0a399a09c834ece658bc06895cdf0e9367c0"
+        },
+        {
+          "path": "tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/hoa_don_linh_kien.pdf",
+          "pages": 1,
+          "sha256": "10560d52458c84ae384c0f93c567f5afb1046487a03976d9e7c358024b581417"
+        },
+        {
+          "path": "tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/bien_ban_nghiem_thu.pdf",
+          "pages": 1,
+          "sha256": "72b46c3a1b9a08d40e6f80d1a85d9f97374b2074466bbed39c0c7f7b6135ea05"
+        },
+        {
+          "path": "tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/xac_nhan_chuyen_khoan.pdf",
+          "pages": 1,
+          "sha256": "3f4480a8b2ca5ebcf93767baf2421e38aeb129fa8fd6b885d4280cd748563796"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ một khoản có nhiều tài liệu bổ trợ không cộng trùng",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "OPERATIONS",
+      "target_after_supported_context": "FACT_PAYER_AND_ROLE",
+      "conditional_business_expectation": "Repair components2700000 + labor1500000 supported by acceptance/payment files; bank payer/payee must be read literally, supporting proofs are not extra expenses. Original is not automatically a happy path.",
+      "old_hoangha_result_reference_only": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC19",
+      "source_folder": "tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong",
+      "source_scope": "Công tác/khảo sát",
+      "source_purpose": "Hoàn ứng chuyến khảo sát khách hàng",
+      "source_pdf_refs": [
+        {
+          "path": "tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "490ceb2fd097860b445085f737a3a6976d5fabf25f91844d9dae3ab06f6fb0c2"
+        },
+        {
+          "path": "tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong/hoa_don_khach_san.pdf",
+          "pages": 1,
+          "sha256": "b66033f1719320d69930564653b5375ae247c4bc78dbe805131a517cb4e3aa8f"
+        },
+        {
+          "path": "tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong/hoa_don_taxi.pdf",
+          "pages": 1,
+          "sha256": "b0cf654f02e40eb12fdab9e51eff2d19759eaee196da816e581a7d2356770e5b"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ thiếu chứng từ một dòng không ép unknown thành 0",
+      "source_profile": "TRAVEL",
+      "category_focus": "MIXED_TRAVEL",
+      "target_after_supported_context": "FACT_MISSING_EVIDENCE",
+      "conditional_business_expectation": "Unproven800000 row remains unresolved, never zero; no partial money instruction.",
+      "old_hoangha_result_reference_only": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_PAPER_EVIDENCE_REQUIRED",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC20",
+      "source_folder": "tc20-co-ly-do-cho-dong-khong-co-chung-tu",
+      "source_scope": "Công tác/khảo sát",
+      "source_purpose": "Hoàn ứng chuyến khảo sát hiện trường",
+      "source_pdf_refs": [
+        {
+          "path": "tc20-co-ly-do-cho-dong-khong-co-chung-tu/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "341b7cb972560d139ddcef74e7845baa2c92a7b0af96fc06f75a0142088958d4"
+        },
+        {
+          "path": "tc20-co-ly-do-cho-dong-khong-co-chung-tu/hoa_don_nhien_lieu.pdf",
+          "pages": 1,
+          "sha256": "58038726ca102ef4b5da47be0c424b94dfb1f69fe7774104530e83ce515de96f"
+        },
+        {
+          "path": "tc20-co-ly-do-cho-dong-khong-co-chung-tu/ve_dien_tu_cao_toc.pdf",
+          "pages": 1,
+          "sha256": "e47c995dcaec75ee8d6566d08968d16d1a89914dbc982f0029b446ddf6fe7584"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ lý do thiếu chứng từ nhưng không biến lời giải thích thành tài chính",
+      "source_profile": "TRAVEL",
+      "category_focus": "MIXED_TRAVEL",
+      "target_after_supported_context": "FACT_THEN_POLICY_MISSING_EVIDENCE",
+      "conditional_business_expectation": "Parking100000 row with reason: establish service/value and responsible employee-paid basis first; then exact missing-evidence POLICY exception. If accepted and A2000000/P/R0, E1480000 -> COLLECT520000; if finally excluded, E1380000 -> COLLECT620000. Neither initially.",
+      "old_hoangha_result_reference_only": {
+        "decision": "ACCOUNTANT_REVIEW",
+        "rule": "SET_PAPER_EVIDENCE_EXCEPTION",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC21",
+      "source_folder": "tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem",
+      "source_scope": "Tổ chức hội nghị",
+      "source_purpose": "Hoàn ứng chi phí tổ chức hội nghị",
+      "source_pdf_refs": [
+        {
+          "path": "tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "480b0fce2c74713afd84fe2abd232b5eb406b1fbc378ad9f2e231a7f352275a0"
+        },
+        {
+          "path": "tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem/hoa_don_thue_hoi_truong.pdf",
+          "pages": 1,
+          "sha256": "6af3f4aeceffa8417bd42b3c53cb70cfedb470d7da9a8eff1e7ed8de9988bd12"
+        },
+        {
+          "path": "tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem/hoa_don_in_an.pdf",
+          "pages": 1,
+          "sha256": "f62132779909c611156edcd025b5b74a62bfbdd2a0a1fe9d6386754af0900c78"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ khai số hóa đơn nhưng thiếu đúng file",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "OPERATIONS",
+      "target_after_supported_context": "FACT_THEN_AUTHORITY",
+      "conditional_business_expectation": "Conference invoice00002103 missing: FACT first; if later supplied and E14040000 known, AUTHORITY>8m.",
+      "old_hoangha_result_reference_only": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_EVIDENCE_MISSING_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC22",
+      "source_folder": "tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong",
+      "source_scope": "Mua/lắp thiết bị",
+      "source_purpose": "Hoàn ứng mua và lắp đặt thiết bị mạng",
+      "source_pdf_refs": [
+        {
+          "path": "tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "cb6c3bdb3d6f3afce98a263cbfd3ac382181a6e84424ef2d8c21f806baf1e578"
+        },
+        {
+          "path": "tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong/hoa_don_thiet_bi.pdf",
+          "pages": 1,
+          "sha256": "dd1a28efe5dd0d4cfefb023527e62c857ec71bea04deaa5f7081f899559e5713"
+        },
+        {
+          "path": "tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong/hoa_don_van_chuyen.pdf",
+          "pages": 1,
+          "sha256": "bc42a55e74d8f7d2d1b76f74589f8d8aff008e7b3568bebf4e94432269649bcb"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ phân bổ vượt giá trị một invoice",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "OFFICE_PURCHASE",
+      "target_after_supported_context": "FACT_ALLOCATION_THEN_AUTHORITY",
+      "conditional_business_expectation": "Invoice00002201 total5400000 is overallocated to lines5400000+2160000; FACT first; recompute E after correction, then authority if >8m.",
+      "old_hoangha_result_reference_only": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_EVIDENCE_REUSE_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC23",
+      "source_folder": "tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong",
+      "source_scope": "Vật tư văn phòng",
+      "source_purpose": "Hoàn ứng mua vật tư văn phòng",
+      "source_pdf_refs": [
+        {
+          "path": "tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "0c7274b30aacae98a01a66dd9cfd362ca46133c1fc02538ea916b10c1013d0ee"
+        },
+        {
+          "path": "tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong/hoa_don_van_phong_pham.pdf",
+          "pages": 1,
+          "sha256": "294e59c200b0443829683d8c439009ffd240db2e4a5bb7c2f6c9527386c5a9c6"
+        },
+        {
+          "path": "tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong/hoa_don_muc_in.pdf",
+          "pages": 1,
+          "sha256": "0c94bce5a697c9d5249ad40596fbc74a136778c6941a34f97169402ef5649084"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ allocation đúng nhưng quyền finance khác",
+      "source_profile": "WORK_EXPENSE",
+      "category_focus": "OFFICE_PURCHASE",
+      "target_after_supported_context": "AUTHORITY_RECOGNIZE",
+      "conditional_business_expectation": "Invoice00002301 allocated2160000+1080000=3240000; invoice00002302=5400000; E8640000/A9000000, S-360000 conditional but AUTHORITY>8m.",
+      "old_hoangha_result_reference_only": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC24",
+      "source_folder": "tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report",
+      "source_scope": "Công tác",
+      "source_purpose": "Hoàn ứng chuyến công tác ngắn ngày",
+      "source_pdf_refs": [
+        {
+          "path": "tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "4c641814be9f141606657e2bda91222e47f1dda722e23440d9edc1e026fde154"
+        },
+        {
+          "path": "tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/hoa_don_khach_san.pdf",
+          "pages": 1,
+          "sha256": "dcdf79e819850526f3d9a16929c2e23e6001d0c456df62e5393184e469ad3031"
+        },
+        {
+          "path": "tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/hoa_don_taxi.pdf",
+          "pages": 1,
+          "sha256": "322544a0fc8a6aaddccfbbbbe3840f862c62b64c20c07de759c48b27a5bb6575"
+        },
+        {
+          "path": "tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/hoa_don_khong_khai_bao.pdf",
+          "pages": 1,
+          "sha256": "a2b479db87e131e5eb2e514c7fb8108136ea29ddb0842f864e4c6e977ebd2357"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ nguồn đính kèm dư không silently discard",
+      "source_profile": "TRAVEL",
+      "category_focus": "MIXED_TRAVEL",
+      "target_after_supported_context": "FACT_UNREFERENCED_SOURCE",
+      "conditional_business_expectation": "Extra personal/unlisted invoice1080000 retained; ask relevance; after supported unrelated exclusion E2700000/A3000000 -> COLLECT300000 only if all other gates pass.",
+      "old_hoangha_result_reference_only": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_UNREFERENCED_EVIDENCE_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    },
+    {
+      "case_id": "TC25",
+      "source_folder": "tc25-tai-lieu-thay-the-lech-so-tien-voi-report",
+      "source_scope": "Công tác",
+      "source_purpose": "Hoàn ứng chi phí công tác tỉnh",
+      "source_pdf_refs": [
+        {
+          "path": "tc25-tai-lieu-thay-the-lech-so-tien-voi-report/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "6dc3ba18fdc7d42ab40b9c56fa8d20a9d0c6fbc934cb6e59862d3d30b29b4872"
+        },
+        {
+          "path": "tc25-tai-lieu-thay-the-lech-so-tien-voi-report/hoa_don_ve_tau.pdf",
+          "pages": 1,
+          "sha256": "9b1ee2de2ed767f294ee53ae223aadef11753fa7579a82b98c1d6644ac925944"
+        },
+        {
+          "path": "tc25-tai-lieu-thay-the-lech-so-tien-voi-report/hoa_don_khach_san.pdf",
+          "pages": 1,
+          "sha256": "1f7ae1d7951ab4f4d4ba9494349cbbc9e83c8d8bcf1973cbc00d1dcecb578d60"
+        },
+        {
+          "path": "tc25-tai-lieu-thay-the-lech-so-tien-voi-report/phieu_thu_di_chuyen.pdf",
+          "pages": 1,
+          "sha256": "5ecb81997c968f5636ded712b09f80777e0bbce602df7d6eccf73146c12366de"
+        }
+      ],
+      "original_pdf_policy": "KEEP_EXACT_BYTES_AND_SHA256",
+      "business_invariant": "Giữ chứng từ dịch vụ khác invoice VAT và amount mismatch",
+      "source_profile": "TRAVEL",
+      "category_focus": "MIXED_TRAVEL",
+      "target_after_supported_context": "FACT_ALTERNATIVE_AMOUNT",
+      "conditional_business_expectation": "Expense row900000 versus collection receipt700000; retain200000 conflict; do not infer repaired S from printed return.",
+      "old_hoangha_result_reference_only": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_ALTERNATIVE_AMOUNT_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "v2_travel_variant_reference_only": null,
+      "financial_oracle_ready": false,
+      "runtime_executed": false
+    }
+  ]
+}

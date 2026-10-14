@@ -46,11 +46,44 @@
         "serial_number": "IR26E",
         "total_amount": 3240000,
         "currency": "VND",
-        "payment_method_text": "Chuyển khoản"
+        "payment_method_text": "Chuyển khoản",
+        "buyer_person_name": "Nguyễn An"
       },
       "forbidden_role_inference": [
         "PAYMENT_EVIDENCE from buyer/signature/payment method alone"
       ]
+    },
+    "03-bien-nhan-chuyen-khoan.pdf": {
+      "document_type": "OTHER",
+      "roles": [
+        "SUPPORTING_DOCUMENT"
+      ],
+      "page_count": 1,
+      "fields": {
+        "transaction_reference": "FT-UC03-F01-0001",
+        "transaction_status": "COMPLETED",
+        "payer_name": "Công ty InvoiceReferee",
+        "payee_name": "Nguyễn An",
+        "amount": 4000000,
+        "payment_description": "Ứng tiền cho chuyến công tác Hà Nội từ 06/10/2026 đến 10/10/2026"
+      },
+      "note": "Alternative advance-basis document; synthetic, not a real bank transaction"
+    },
+    "04-phieu-chi-tien-mat.pdf": {
+      "document_type": "OTHER",
+      "roles": [
+        "SUPPORTING_DOCUMENT"
+      ],
+      "page_count": 1,
+      "fields": {
+        "transaction_reference": "PC-UC03-F01-0001",
+        "transaction_status": "COMPLETED",
+        "payer_name": "Công ty InvoiceReferee",
+        "payee_name": "Nguyễn An",
+        "amount": 4000000,
+        "payment_description": "Ứng tiền cho chuyến công tác Hà Nội từ 06/10/2026 đến 10/10/2026"
+      },
+      "note": "Alternative advance-basis document; synthetic cash voucher"
     }
   },
   "match": {

@@ -108,6 +108,12 @@ Căn cứ:
 - Lời khai mục đích/liên hệ công việc có thể được policy nhận khi không mâu thuẫn.
 - Tiền/payer/received cần chứng từ hỗ trợ hoặc xác nhận có trách nhiệm, đúng phạm
   vi, có người/căn cứ/thời điểm. Hóa đơn không tự chứng minh người thực tế trả.
+- **Chốt 14/10/2026 (policy demo):** một hóa đơn gốc hợp lệ gắn đúng nhân viên và hồ
+  sơ được chấp nhận làm căn cứ khoản nhân viên đã trả (`EMPLOYEE_PAID_INVOICE`), không
+  cần giấy xác nhận thanh toán riêng. Đây là giả định nghiệp vụ cho demo, không phải
+  xác minh ngân hàng và không tạo giao dịch ngân hàng giả; view ghi rõ mức căn cứ.
+- Khoản ứng thực nhận vẫn cần bản ghi riêng của công ty; đã duyệt ứng không tự thành
+  đã nhận. Kế toán ghi nhận `ADVANCE_RECEIVED` từ chứng từ ứng đã đọc.
 - A/P/R=0 cần lịch sử đủ scope/mốc đối chiếu hoặc xác nhận coverage có trách nhiệm.
 - Facts đọc đúng không tự chứng minh relation người/hoạt động/hóa đơn/giao dịch đúng.
 - Nguồn và lời khai mâu thuẫn trọng yếu giữ unresolved; không chọn theo model confidence.
@@ -490,6 +496,10 @@ snapshot lịch sử, không phải kết quả kiểm tra checkout hiện tại
   đã xác minh giao dịch ngân hàng. Ngưỡng: trong giới hạn tự xử lý hiện có
   (`E<=8tr`, `abs(S)<=4tr`); vượt ngưỡng vẫn AUTHORITY. Chi tiết và rủi ro ở
   [ADR007](../adr/0007-money-confirmation-basis.md).
+  **Cập nhật 14/10/2026 (sau grill):** đường mặc định của hồ sơ routine nay là
+  **hóa đơn hợp lệ gắn đúng nhân viên/hồ sơ** (`EMPLOYEE_PAID_INVOICE`), không cần
+  lời xác nhận thanh toán riêng; Q32 trở thành đường phụ có ngưỡng. Xem §3 "Căn cứ"
+  và [ADR007](../adr/0007-money-confirmation-basis.md) "Chốt vòng 14/10/2026".
 - **Q33 — Giới hạn hoãn giải trình:** hoãn form giải trình tự do; giữ khả năng nêu
   vấn đề/câu hỏi cụ thể, đúng người xử lý, cho sửa khai báo/bổ sung nguồn và kiểm
   lại. Không tự kết luận đủ điều kiện cho nguồn thiếu/mâu thuẫn trọng yếu. Đường

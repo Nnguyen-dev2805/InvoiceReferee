@@ -9,8 +9,9 @@
   "changes": [
     "Company/person names become InvoiceReferee/Nguyễn An synthetic",
     "Trip place/date/purpose explicit",
-    "Employee statement retained as declaration, not bank confirmation",
-    "All amounts and positive/negative/zero net relation retained"
+    "Demo policy: a valid invoice bound to the right employee/dossier is the employee-paid basis; the printed payment-declaration sentence is removed",
+    "All amounts and positive/negative/zero net relation retained",
+    "F01 invoice adds the buyer person 'Nguyễn An'; two alternative advance-basis documents (transfer receipt + cash voucher) for the same 4m advance"
   ],
   "story_change": "local reception becomes work meal during trip"
 }

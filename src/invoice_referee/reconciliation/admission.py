@@ -23,9 +23,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from typing import NamedTuple
 
 from invoice_referee.domain.case import AssessmentInput, CaseScope, ReadSet
-from invoice_referee.domain.common import EvidenceRef, Fact
+from invoice_referee.domain.common import EvidenceRef, Fact, parse_vnd
 from invoice_referee.domain.documents import DocumentAnalysis, DocumentLine
 from invoice_referee.domain.evidence import Confirmation, ReadResult
 from invoice_referee.domain.finance import (
@@ -113,32 +114,34 @@ def _settlement_rows(
     return tuple(rows)
 
 
+class _MatchedExpense(NamedTuple):
+    """One admitted cost: its amount, refs and the matched original document."""
+
+    amount: Decimal
+    refs: tuple[EvidenceRef, ...]
+    document: DocumentAnalysis | None
+
+
 def _match_expense_documents(
     report: ReadResult, paper: DocumentAnalysis | None
-) -> list[tuple[Decimal, tuple[EvidenceRef, ...]]]:
-    """One (amount, refs) per matched original-expense document."""
-    links = {(link.item_id, link.document_id): link for link in report.links}
+) -> list[_MatchedExpense]:
+    """One matched original-expense document (with its amount + refs) per cost."""
     rows = _settlement_rows(paper)
-    out: list[tuple[Decimal, tuple[EvidenceRef, ...]]] = []
+    out: list[_MatchedExpense] = []
     original = [
         d for d in report.documents if d.document_type in _ORIGINAL_EXPENSE_TYPES
     ]
-    for index, document in enumerate(original, start=1):
+    for document in original:
         total = _as_decimal(_field(document, "total_amount"))
         if total is None:
             continue
-        item_id = f"ITEM-{index:03d}"
-        # A link (AUTO/SUGGEST) is not required to admit a cost, but a document
-        # matched to a paper row is preferred; unmatched documents still count as
-        # their own occurrence when the row count is unambiguous.
-        _ = links.get((item_id, document.document_id))
-        out.append((total, _document_refs(document)))
+        out.append(_MatchedExpense(total, _document_refs(document), document))
     # When the paper states rows but no document matched, fall back to the row's
     # own stated amount so an unresolved-but-present row is not silently zero.
     if not out:
         for description, amount, refs in rows:
             if amount is not None:
-                out.append((amount, ()))
+                out.append(_MatchedExpense(amount, (), None))
     return out
 
 
@@ -193,41 +196,117 @@ def _declared_name(paper: DocumentAnalysis | None) -> tuple[str, tuple[EvidenceR
     return None
 
 
+def _buyer_person_name(
+    document: DocumentAnalysis,
+) -> tuple[str, tuple[EvidenceRef, ...]] | None:
+    for candidate in document.fields:
+        if candidate.field == "buyer_person_name" and candidate.state == "FOUND":
+            return str(candidate.value), candidate.refs
+    return None
+
+
 def _claimant_binding_issue(
     paper: DocumentAnalysis | None,
     organization: OrganizationContext,
     employee: str,
+    *,
+    original_documents: tuple[DocumentAnalysis, ...] = (),
 ) -> BusinessIssue | None:
-    """A FACT when the document's declared claimant does not bind to the dossier.
+    """A FACT when a document's declared person does not bind to the dossier.
 
-    A different name is not automatically fraud, but it must not be ignored: the
-    code emits a specific issue to confirm/correct/record a valid alias. Only
-    format-normalized differences count as equal (no fuzzy match).
+    Two names can bind a document to the responsible employee: the settlement
+    form's `declared_name` and an invoice's `buyer_person_name` (the natural
+    person who bought). Any present name that does not bind to the dossier's
+    employee is a specific FACT to confirm/correct/alias. A different name is not
+    automatically fraud, but it must not be ignored. Only format-normalized
+    differences count as equal (no fuzzy match).
     """
-    declared = _declared_name(paper)
-    if declared is None:
-        return None
-    literal_name, refs = declared
     context_name = _claimant_name(organization, employee)
     if context_name is None:
         return None
-    if _normalize_name(literal_name) == _normalize_name(context_name):
+    declared = _declared_name(paper)
+    if declared is not None:
+        literal_name, refs = declared
+        if _normalize_name(literal_name) != _normalize_name(context_name):
+            return BusinessIssue(
+                id="issue:fact:claimant-binding",
+                kind="FACT",
+                field_or_rule="expense:claimant_binding",
+                owner="employee",
+                basis=(
+                    f"Hồ sơ gắn với '{context_name}', nhưng giấy quyết toán khai '{literal_name}'."
+                ),
+                refs=refs,
+                question=(
+                    f"Xác nhận/correct người đề nghị: hồ sơ đang gắn '{context_name}', "
+                    f"tài liệu khai '{literal_name}'. Xác nhận đây là cùng một người "
+                    f"(ghi nhận alias) hoặc sửa lại cho đúng."
+                ),
+            )
+    for document in original_documents:
+        buyer = _buyer_person_name(document)
+        if buyer is None:
+            continue
+        literal_name, refs = buyer
+        if _normalize_name(literal_name) != _normalize_name(context_name):
+            return BusinessIssue(
+                id="issue:fact:claimant-binding",
+                kind="FACT",
+                field_or_rule="expense:claimant_binding",
+                owner="employee",
+                basis=(
+                    f"Hồ sơ gắn với '{context_name}', nhưng người mua trên chứng từ là '{literal_name}'."
+                ),
+                refs=refs,
+                question=(
+                    f"Xác nhận/correct người mua trên chứng từ: hồ sơ đang gắn '{context_name}', "
+                    f"chứng từ ghi người mua '{literal_name}'. Xác nhận đây là cùng một người "
+                    f"(ghi nhận alias) hoặc sửa lại cho đúng."
+                ),
+            )
+    return None
+
+
+def _invoice_is_employee_paid_basis(
+    document: DocumentAnalysis | None,
+    organization: OrganizationContext,
+    employee: str,
+) -> bool:
+    """Whether a valid, bound, clear original invoice establishes the employee-paid cost.
+
+    Demo policy (user chốt 14/10/2026): a valid invoice bound to the right
+    employee and dossier is accepted as the basis for an employee-paid cost, with
+    no separate payer confirmation. It requires a CLEAR profile, a FOUND total,
+    and — when the invoice names a buyer person — that the buyer binds to the
+    dossier's employee. The company buyer is never a payer.
+    """
+    if document is None or document.profile_status != "CLEAR":
+        return False
+    if document.document_type not in _ORIGINAL_EXPENSE_TYPES:
+        return False
+    if _field(document, "total_amount") is None:
+        return False
+    buyer = _buyer_person_name(document)
+    if buyer is None:
+        return False
+    context_name = _claimant_name(organization, employee)
+    if context_name is None:
+        return False
+    return _normalize_name(buyer[0]) == _normalize_name(context_name)
+
+
+def _declared_advance(
+    paper: DocumentAnalysis | None,
+) -> tuple[int, tuple[EvidenceRef, ...]] | None:
+    if paper is None:
         return None
-    return BusinessIssue(
-        id="issue:fact:claimant-binding",
-        kind="FACT",
-        field_or_rule="expense:claimant_binding",
-        owner="employee",
-        basis=(
-            f"Hồ sơ gắn với '{context_name}', nhưng giấy quyết toán khai '{literal_name}'."
-        ),
-        refs=refs,
-        question=(
-            f"Xác nhận/correct người đề nghị: hồ sơ đang gắn '{context_name}', "
-            f"tài liệu khai '{literal_name}'. Xác nhận đây là cùng một người "
-            f"(ghi nhận alias) hoặc sửa lại cho đúng."
-        ),
-    )
+    for candidate in paper.fields:
+        if candidate.field == "declared_advance" and candidate.state == "FOUND":
+            parsed = parse_vnd(candidate.value)
+            if parsed is None:
+                return None
+            return parsed, candidate.refs
+    return None
 
 
 def _claim_index(confirmations: tuple[Confirmation, ...]) -> dict[str, Confirmation]:
@@ -305,6 +384,38 @@ def admit_evidence(
         effective_coverage: CoverageRecord | None = None
     else:
         effective_coverage = candidate_coverage
+
+    # A declared advance with no matching company record must NOT be read as A=0.
+    # Coverage establishes zero FLOWS in the scope, but the printed declared
+    # advance is a material signal that the advance exists: the accountant must
+    # verify/record it before S is settled. Dropping coverage keeps A/S UNKNOWN
+    # and hands advance verification to the accountant (flow "chưa có bản ghi").
+    declared = _declared_advance(paper)
+    if declared is not None and effective_coverage is not None:
+        declared_amount, declared_refs = declared
+        recorded_advance = sum(
+            int(e.amount) for e in merged_ledger if e.kind == "ADVANCE_RECEIVED"
+        )
+        if recorded_advance < declared_amount:
+            issues.append(
+                BusinessIssue(
+                    id="issue:fact:advance-unrecorded",
+                    kind="FACT",
+                    field_or_rule="ledger:advance",
+                    owner="accountant",
+                    basis=(
+                        f"Giấy quyết toán khai ứng {declared_amount} đ nhưng bản ghi ứng thực nhận "
+                        f"mới là {recorded_advance} đ."
+                    ),
+                    refs=declared_refs,
+                    question=(
+                        "Xác minh và ghi nhận khoản ứng thực nhận đúng scope trước khi đối soát "
+                        "(đã duyệt ứng không tự thành đã nhận)."
+                    ),
+                )
+            )
+            effective_coverage = None
+
     budgets = context_budgets(organization, activity=scope.activity, digest=org_digest)
     policies = context_policies(organization, digest=org_digest, profile=scope.profile)
     grants = context_grants(organization, digest=org_digest)
@@ -319,10 +430,16 @@ def admit_evidence(
     matched = _match_expense_documents(report, paper)
     claims = _claim_index(confirmations)
 
-    # Claimant binding: the document's declared claimant must bind to the
-    # dossier's responsible claimant. A mismatch is a FACT to resolve (never
-    # silently ignored, never auto-interpreted as fraud).
-    binding_issue = _claimant_binding_issue(paper, organization, scope.employee)
+    # Claimant binding: any declared person on the paper or on an original
+    # document (invoice buyer) must bind to the dossier's responsible employee.
+    # A mismatch is a FACT to resolve (never silently ignored, never
+    # auto-interpreted as fraud).
+    original_documents = tuple(
+        d for d in report.documents if d.document_type in _ORIGINAL_EXPENSE_TYPES
+    )
+    binding_issue = _claimant_binding_issue(
+        paper, organization, scope.employee, original_documents=original_documents
+    )
     if binding_issue is not None:
         issues.append(binding_issue)
 
@@ -335,10 +452,12 @@ def admit_evidence(
     # The Q32 bound is on the TOTAL declared E (<=8m) and abs(TOTAL S) (<=4m),
     # not per-row: two 5m claims must not both be accepted just because each row
     # is individually under the limit (ADR0007/Q32). The bound is checked once
-    # against the sum of the matched claims before any portion is admitted.
+    # against the sum of the matched claims before any portion is admitted. It
+    # bounds the Q32 DECLARATION path only; the invoice basis (demo policy) does
+    # not fabricate E=0 when the total is large — authority is gated by policy.
     matched_claims = [
-        _claim_for(claims, refs, report, index)
-        for index, (_amount, refs) in enumerate(matched, start=1)
+        _claim_for(claims, entry.refs, report, index)
+        for index, entry in enumerate(matched, start=1)
     ]
     total_claimed = sum(
         int(_as_decimal(c.value) or 0) for c in matched_claims if c is not None
@@ -355,7 +474,8 @@ def admit_evidence(
     )
 
     expenses: list[Expense] = []
-    for index, (amount, refs) in enumerate(matched, start=1):
+    for index, entry in enumerate(matched, start=1):
+        amount, refs = entry.amount, entry.refs
         expense_id = f"expense:{index}"
         # The service evidence must name the cost; the settlement row is the
         # canonical cost identity. Ref-less rows still carry the document refs.
@@ -363,10 +483,29 @@ def admit_evidence(
         eligibility = "UNKNOWN"
         # Payment status is its own axis: with no admitted payment the basis does
         # not establish the payment status, so it stays UNKNOWN (never a proven
-        # debt). An accepted Q32 portion verifies the paid amount -> PAID.
+        # debt). An accepted invoice/Q32 portion verifies the paid amount -> PAID.
         payment_state = "UNKNOWN"
         claim = matched_claims[index - 1]
-        if claim is not None and bound_ok:
+        # Demo policy: a valid invoice bound to the right employee/dossier is the
+        # employee-paid basis, with no separate payer confirmation (chốt
+        # 14/10/2026). It is a demo-policy basis, never a bank-verified fact.
+        if _invoice_is_employee_paid_basis(entry.document, organization, scope.employee):
+            payments.append(
+                ExpensePayment(
+                    external_key=f"invoice:{scope.activity}:{expense_id}",
+                    payer=scope.employee,
+                    payee="vendor:evidence",
+                    amount=int(amount),
+                    expense_id=expense_id,
+                    received_state="CLEAR",
+                    refs=refs,
+                    basis_kind="EMPLOYEE_PAID_INVOICE",
+                    responsible_actor=scope.employee,
+                )
+            )
+            eligibility = "ELIGIBLE"
+            payment_state = "PAID"
+        elif claim is not None and bound_ok:
             claim_amount = int(_as_decimal(claim.value) or 0)
             payments.append(
                 ExpensePayment(
