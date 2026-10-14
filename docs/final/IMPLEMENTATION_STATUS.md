@@ -7,33 +7,41 @@ The plan owns task acceptance; package/config files own executable commands.
 
 | Field | Current value |
 | --- | --- |
-| Base branch | `final` @ 68c5e2eb (after R0–R8 + the doc/data cleanup commit). |
-| Phase | T1..T10 + R0–R8 done. **Scope change 14/10/2026**: employee-paid narrowing + evidence pipeline promoted into canonical docs (plan E0 done, docs only). Code/contracts/gold **not yet migrated** to the new scope. |
-| Authorized scope now | Docs-only turn authorized 14/10/2026: update canonical docs for the accepted scope (Q32–Q34) and the Hoangha evidence pipeline (E0). No code change authorized this turn. |
-
-### Docs turn 14/10/2026 — scope + evidence pipeline (E0)
-
-Docs-only; no code/tests run. Files: new `docs/adr/0007-money-confirmation-basis.md`;
-`docs/adr/0006-employee-paid-scope.md` (Q33/Q34 → ACCEPTED);
-`docs/final/ARCHITECTURE_AND_EVALUATION.md` (§14 ACCEPTED, new §15, §1/§3 scope);
-`docs/final/IMPLEMENTATION_CONTRACTS.md` (§3 Q32, §4 Q32/Q34, §9 async reader, new §12,
-`EVIDENCE_READY` in §2/§10.3); `GLOSSARY.md` (6 new terms);
-`docs/superpowers/plans/2026-10-13-hoangha-evidence-pipeline.md` (E0 ticked, plus
-builder-check resolutions). A fresh builder-check subagent read the docs; its 7
-questions were resolved: (Q1) `SETTLEMENT_FORM` = uploaded paper, missing ⇒
-`SETTLEMENT_FORM_MISSING` finding, no matching; (Q2) evidence gold hand-authored on a
-subset (~10–15); (Q3) new `EVIDENCE_READY` state; (Q4) out-of-scope payer deferred as a
-documented known hole; plus corpus path fix (v1 = `data/tham-khao/uc-03/`) and an
-offline no-live-call guard note. Verification: `git diff --check` pass; headings/enums/
-thresholds present. **No commit** (not authorized).
+| Base branch | `final` @ 9a7f84cd (after R0–R8 + the doc/data cleanup + the evidence-pipeline E0–E8 branch). |
+| Phase | T1..T10 + R0–R8 done. **Evidence pipeline E0–E8 implemented** (2026-10-14): docs promoted; strict document/evidence DTOs; all-page OCR + raw artifacts; conditional OCR-confidence gate + X-Kiro caps; document type/role classification + per-type profiles; typed extraction with provenance + profile validation; ported Hoangha matcher + bounded suggestion resolution; the §12 pipeline wired into `final`'s durable job/worker with a typed `ReadResult` and `EVIDENCE_READY`; the 75-case UC-03 corpus imported. Employee-paid scope narrowing (Q32–Q34) is documented but **finance/admissibility code is NOT yet migrated** to it (a later plan). |
+| Authorized scope now | Implement the Hoangha-evidence plan E0–E8 (user-authorized 14/10/2026, inline). Committed on `final`; **not pushed**. |
 | Setup review | ACCEPTED; clean-clone proof passed. |
-| Execution method | Inline execution (executing-plans), single integrator; per-task TDD + full-suite after each. A whole-branch fresh review has not been run. |
+| Execution method | Inline execution (executing-plans), single integrator; per-task TDD + full-suite after each. A whole-branch fresh review (opus) was run over 68c5e2eb..6d62198b and its Critical/Important findings fixed in one pass. |
 | Workflow integrator | Inline executor — single writer for workflow/api/domain owned files |
-| Next application task | Hoangha-evidence plan E1–E8 (start E1: strict document/evidence DTOs). Finance/admissibility mapping (Q32/Q34) is a later plan. T11 still BLOCKED on practitioners. |
-| Last completed application task | R0–R8 (data/pipeline remediation). |
-| Product unit/integration/UI/LIVE evidence | Last recorded run: `uv run pytest` → **244 passed**; vitest 6; playwright 9; build exit 0. LIVE baseline (development) union=**1**; STUB core/escalation union=0. See [RELEASE_EVIDENCE](RELEASE_EVIDENCE.md). **Not re-run this turn** (docs-only); Docker build NOT_RUN. Public hosting + practitioner pilot BLOCKED. |
+| Next application task | Finance/admissibility mapping of the evidence report into `AssessmentInput` (the deferred `EVIDENCE_ADMISSION_NOT_CONNECTED` adapter, Q32/Q34). T11 still BLOCKED on practitioners. |
+| Last completed application task | Evidence pipeline E0–E8 + whole-branch review fix pass. |
+| Product unit/integration/UI/LIVE evidence | `uv run pytest` → **331 passed / 11 failed** (the 11 are pre-existing from 68c5e2eb removing `data/kiem-thu`, not this branch); frontend vitest 6, build exit 0 on pinned Node 24.19.0. **M0 LIVE NOT_RUN** (no live authorization); RECORDED_REPLAY captures NOT_RECORDED. Docker build NOT_RUN. Public hosting + practitioner pilot BLOCKED. |
 | CodeGraph | Re-check with `rtk proxy codegraph status` before relying on it; the index lags writes. |
-| Git handoff | R0–R8 commits + 68c5e2eb (doc/data cleanup) on `final`. This turn's doc edits are uncommitted (no commit authorization). |
+| Git handoff | Evidence branch commits (on `final`): b82a556c (E0 docs), 2d6438b9 (E1), 9a804daa (E2), c44015d4 (E3), 46cb676d (E4), 844d7aec (E5), 2fe17fc4 (E6), 741a5a9e (E7), 6d62198b (E8), 9a7f84cd (E0 tick), 83632655 (review fix pass). Unpushed (no push authorization). |
+
+### Evidence pipeline E0–E8 (2026-10-14)
+
+Implemented the Hoangha evidence pipeline on `final` (plan
+`docs/superpowers/plans/2026-10-13-hoangha-evidence-pipeline.md`). E0 promoted the
+accepted decisions into design §15 / contracts §12 / ADR0006-0007 / glossary. E1–E6
+added `domain/documents.py`, `evidence/{artifacts,ocr_quality,classification,
+document_profiles,extraction,document_validity,matching}.py` with strict DTOs,
+all-page OCR, the confidence gate, classification, provenance-checked extraction,
+profile validation and the ported Hoangha matcher. E7 wired `read_root` through
+`runtime.build_workflow` for LIVE/RECORDED_REPLAY into a durable, basis-checked
+evidence worker (`workflow/evidence_jobs.py`, lifespan-owned) that publishes a typed
+`ReadResult` and sets `EVIDENCE_READY` (`conclusion=None`, no instruction,
+`assessment_ready=false`); `_assess_and_commit` early-returns so LIVE/REPLAY never
+reaches the Reconciler, and STUB keeps its assessment path. E8 imported the 75-case
+UC-03 corpus into `data/test-kit/hoangha-uc03`. A fresh opus whole-branch review found
+4 Critical + 12 Important findings; all were fixed in one TDD pass (see the ledger
+`.superpowers/sdd/2026-10-13-hoangha-evidence-pipeline/progress.md`).
+
+Remaining gaps (NOT_RUN / deferred, not claims): M0 LIVE measurement; RECORDED_REPLAY
+captured recordings; the full per-stage counter/read-cache persistence on restart
+(the input-basis check is implemented); Q34 out-of-scope payer detection (documented
+known hole); the finance/admissibility adapter. Plan checkboxes E1–E8 ticked except
+those three (lines for restart-counter test anchors, recordings, M0 LIVE).
 
 ### Remediation pass (2026-10-13, reviewed commit 13a6eb09)
 
