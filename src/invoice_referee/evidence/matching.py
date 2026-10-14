@@ -369,7 +369,14 @@ async def resolve_evidence_suggestions(
     )
     user = _serialize_suggestions(suggestions)
     try:
-        payload = await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
+        from invoice_referee.evidence.telemetry import llm_trace_context
+
+        with llm_trace_context(
+            stage="resolve-evidence-suggestions",
+            prompt_version="evidence-suggestion-resolution-v1",
+            schema_version="evidence-promotions-json-v1",
+        ):
+            payload = await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
     except XkiroError:
         return result
 

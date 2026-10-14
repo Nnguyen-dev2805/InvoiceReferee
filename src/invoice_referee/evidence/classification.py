@@ -130,7 +130,14 @@ async def classify_documents(
     )
     user = _serialize(ocr)
     try:
-        payload = await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
+        from invoice_referee.evidence.telemetry import llm_trace_context
+
+        with llm_trace_context(
+            stage="classify",
+            prompt_version="document-classification-v1",
+            schema_version="document-classification-json-v1",
+        ):
+            payload = await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
     except XkiroError as error:
         raise XkiroError("classification failed") from error
 

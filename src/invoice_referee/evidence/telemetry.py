@@ -27,19 +27,41 @@ never writes business state.
 from __future__ import annotations
 
 import contextvars
+import hashlib
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Iterator
 
-from invoice_referee.evidence.trace import LangSmithTrace, TraceSpan
+from invoice_referee.evidence.trace import (
+    LangSmithTrace,
+    TraceSpan,
+    sanitize_trace_error,
+    stage_payload,
+)
 
 # The operation currently in scope, so nested helpers (admission, reconcile) can
 # attach steps without threading the object through every signature. Set by
 # `operation()`; async-safe because each task/request gets its own context.
 _current_operation: contextvars.ContextVar["Operation | None"] = contextvars.ContextVar(
     "invoice_referee_current_operation", default=None
+)
+_current_step: contextvars.ContextVar["Step | None"] = contextvars.ContextVar(
+    "invoice_referee_current_step", default=None
+)
+
+
+@dataclass(frozen=True)
+class LlmTraceContext:
+    stage: str
+    prompt_version: str
+    schema_version: str
+    attempt_kind: str = "provider_call"
+
+
+_current_llm_context: contextvars.ContextVar[LlmTraceContext | None] = contextvars.ContextVar(
+    "invoice_referee_llm_trace_context", default=None
 )
 
 
@@ -91,6 +113,8 @@ class Operation:
     inputs: dict[str, object] = field(default_factory=dict)
     outputs: dict[str, object] = field(default_factory=dict)
     error: str | None = None
+    output_state: str | None = None
+    llm_call_counts: dict[str, int] = field(default_factory=dict)
     spans: list[TraceSpan] = field(default_factory=list)
     # The recorder that owns this operation, so a nested helper reached via the
     # contextvar can attach steps without the owner being passed explicitly.
@@ -107,6 +131,7 @@ class Step:
     outputs: dict[str, object] = field(default_factory=dict)
     error: str | None = None
     skipped: str | None = None
+    output_state: str | None = None
 
 
 class TraceRecorder:
@@ -165,6 +190,14 @@ class TraceRecorder:
             # The sink reads span.metadata/inputs/outputs directly; no extra
             # payload is needed. `record` never raises (errors -> export_errors).
             self.sink.record(span)
+        flush_sink = getattr(self.sink, "flush", None)
+        if callable(flush_sink):
+            try:
+                flush_sink(timeout=5.0)
+            except Exception as error:
+                self.export_errors.append(
+                    sanitize_trace_error(f"{type(error).__name__}: {error}")
+                )
         if operation not in self.operations:
             self.operations.append(operation)
 
@@ -207,7 +240,12 @@ class _OperationContext:
         _current_operation.reset(self._token)
         ended_at = datetime.now(UTC)
         if exc is not None and self.op.error is None:
-            self.op.error = f"{exc_type.__name__ if exc_type else 'Error'}: {exc}"[:300]
+            self.op.error = sanitize_trace_error(
+                f"{exc_type.__name__ if exc_type else 'Error'}: {exc}"
+            )
+        output_state = self.op.output_state or (
+            "COLLECTED" if self.op.outputs else "NOT_COLLECTED"
+        )
         root = TraceSpan(
             name=self.name,
             run_id=self.op.run_id,
@@ -217,6 +255,7 @@ class _OperationContext:
             ended_at=ended_at,
             inputs=self.op.inputs,
             outputs=self.op.outputs,
+            output_state=output_state,
             error=self.op.error,
             metadata=self.op.metadata,
             tags=self.op.tags,
@@ -247,15 +286,22 @@ class _StepContext:
     def __enter__(self) -> Step:
         self.started_at = datetime.now(UTC)
         self.step = Step(run_id=self.run_id, name=self.name, inputs=self.inputs)
+        self._step_token = _current_step.set(self.step)
         return self.step
 
     def __exit__(self, exc_type, exc, tb) -> bool:
+        _current_step.reset(self._step_token)
         ended_at = datetime.now(UTC)
         if exc is not None and self.step.error is None:
-            self.step.error = f"{exc_type.__name__ if exc_type else 'Error'}: {exc}"[:300]
+            self.step.error = sanitize_trace_error(
+                f"{exc_type.__name__ if exc_type else 'Error'}: {exc}"
+            )
         outputs = dict(self.step.outputs)
         if self.step.skipped is not None:
             outputs.setdefault("skipped", self.step.skipped)
+        output_state = self.step.output_state or (
+            "COLLECTED" if outputs else "NOT_COLLECTED"
+        )
         span = TraceSpan(
             name=self.name,
             run_id=self.step.run_id,
@@ -265,6 +311,7 @@ class _StepContext:
             ended_at=ended_at,
             inputs=self.step.inputs,
             outputs=outputs,
+            output_state=output_state,
             error=self.step.error,
             metadata=self.metadata,
         )
@@ -292,3 +339,145 @@ def step(name: str, *, metadata: dict[str, object] | None = None, inputs: dict[s
         return
     with op.recorder.step(name, operation=op, metadata=metadata, inputs=inputs) as s:
         yield s
+
+
+@contextmanager
+def llm_trace_context(
+    *,
+    stage: str,
+    prompt_version: str,
+    schema_version: str,
+    attempt_kind: str = "provider_call",
+) -> Iterator[None]:
+    """Attach stable prompt/schema labels to real provider calls in this scope."""
+    token = _current_llm_context.set(
+        LlmTraceContext(
+            stage=stage,
+            prompt_version=prompt_version,
+            schema_version=schema_version,
+            attempt_kind=attempt_kind,
+        )
+    )
+    try:
+        yield
+    finally:
+        _current_llm_context.reset(token)
+
+
+def record_llm_call(
+    *,
+    started_at: datetime,
+    ended_at: datetime,
+    system: str,
+    user: str,
+    requested_model: str,
+    returned_model: str | None,
+    parsed_response: dict[str, object] | None,
+    usage: dict[str, object],
+    error: str | None,
+) -> None:
+    """Buffer one `run_type=llm` child for an actual provider request."""
+    operation = current_operation()
+    if operation is None or operation.recorder is None:
+        return
+
+    context = _current_llm_context.get()
+    current_step = _current_step.get()
+    stage_name = (
+        context.stage
+        if context is not None
+        else current_step.name if current_step is not None else "structured_output"
+    )
+    stage_instance = current_step.name if current_step is not None else stage_name
+    attempt_scope = current_step.run_id if current_step is not None else stage_name
+    attempt_key = f"{attempt_scope}:{stage_name}"
+    attempt_index = operation.llm_call_counts.get(attempt_key, 0) + 1
+    operation.llm_call_counts[attempt_key] = attempt_index
+    prompt_version = context.prompt_version if context is not None else "unversioned"
+    schema_version = context.schema_version if context is not None else "json-object-v1"
+    attempt_kind = context.attempt_kind if context is not None else "provider_call"
+
+    parsed_json_summary: dict[str, object] = {}
+    parsed_json_sha256: str | None = None
+    if parsed_response is not None:
+        import json
+
+        canonical_response = json.dumps(
+            parsed_response, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        )
+        parsed_json_sha256 = hashlib.sha256(canonical_response.encode("utf-8")).hexdigest()
+        known_lists = ("documents", "fields", "line_items", "assessments", "promotions")
+        parsed_json_summary = {
+            "top_level_keys": sorted(str(key) for key in parsed_response.keys()),
+            "list_counts": {
+                key: len(parsed_response[key])
+                for key in known_lists
+                if isinstance(parsed_response.get(key), list)
+            },
+        }
+
+    inputs = stage_payload(
+        "llm",
+        {
+            "requested_model": requested_model,
+            "prompt_version": prompt_version,
+            "schema_version": schema_version,
+            "attempt_index": attempt_index,
+            "attempt_kind": attempt_kind,
+            "stage_instance": stage_instance,
+            "system_chars": len(system),
+            "user_chars": len(user),
+            "system_sha256": hashlib.sha256(system.encode("utf-8")).hexdigest(),
+            "user_sha256": hashlib.sha256(user.encode("utf-8")).hexdigest(),
+        },
+    )
+    outputs = stage_payload(
+        "llm",
+        {
+            "status": "FAILED" if error is not None else "SUCCEEDED",
+            "response_format": "json_object",
+            "parsed_json_summary": parsed_json_summary,
+            "parsed_json_sha256": parsed_json_sha256,
+            "requested_model": requested_model,
+            "returned_model": returned_model,
+            "usage": usage,
+            "prompt_version": prompt_version,
+            "schema_version": schema_version,
+            "attempt_index": attempt_index,
+            "attempt_kind": attempt_kind,
+            "stage_instance": stage_instance,
+            "system_chars": len(system),
+            "user_chars": len(user),
+            "system_sha256": inputs["system_sha256"],
+            "user_sha256": inputs["user_sha256"],
+        },
+    )
+    operation.recorder.record_span(
+        operation,
+        TraceSpan(
+            name=f"llm:{stage_name}",
+            run_id=_new_run_id(f"llm:{stage_name}"),
+            parent_run_id=operation.run_id,
+            run_type="llm",
+            model=returned_model or requested_model,
+            started_at=started_at,
+            ended_at=ended_at,
+            inputs=inputs,
+            outputs=outputs,
+            output_state="COLLECTED",
+            error=sanitize_trace_error(error) if error is not None else None,
+            metadata={
+                "provider": "xkiro",
+                "stage": stage_name,
+                "requested_model": requested_model,
+                "returned_model": returned_model,
+                "usage": usage,
+                "prompt_version": prompt_version,
+                "schema_version": schema_version,
+                "attempt_index": attempt_index,
+                "attempt_kind": attempt_kind,
+                "stage_instance": stage_instance,
+            },
+            tags=("llm", stage_name),
+        ),
+    )

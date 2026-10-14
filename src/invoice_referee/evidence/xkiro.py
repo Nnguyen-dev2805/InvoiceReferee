@@ -8,6 +8,7 @@ Fact, a grant or a money effect.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import httpx
 
@@ -60,30 +61,83 @@ class XkiroClient:
                 f"LLM input {len(serialized)} chars exceeds cap {self.max_input_chars}"
             )
         budget.charge_llm()
-        async with httpx.AsyncClient(timeout=self.timeout_s, transport=self.transport) as client:
-            response = await client.post(
-                f"{self.base_url.rstrip('/')}/chat/completions",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                    "response_format": {"type": "json_object"},
-                },
-            )
-        if response.status_code >= 400:
-            raise XkiroTransportError(f"LLM HTTP {response.status_code}")
-        content = response.json()["choices"][0]["message"]["content"]
-        if len(content) > self.max_output_chars:
-            raise XkiroTransportError("LLM output exceeded the bounded size")
-        import json
-
+        started_at = datetime.now(UTC)
+        attempted = False
+        returned_model: str | None = None
+        usage: dict[str, object] = {}
+        parsed: dict[str, object] | None = None
+        trace_error: str | None = None
         try:
-            parsed = json.loads(content)
-        except json.JSONDecodeError as error:
-            raise XkiroSchemaError("LLM returned non-JSON output", raw=content) from error
-        if not isinstance(parsed, dict):
-            raise XkiroSchemaError("LLM JSON must be an object", raw=content)
-        return parsed
+            async with httpx.AsyncClient(timeout=self.timeout_s, transport=self.transport) as client:
+                attempted = True
+                response = await client.post(
+                    f"{self.base_url.rstrip('/')}/chat/completions",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    json={
+                        "model": self.model,
+                        "messages": [
+                            {"role": "system", "content": system},
+                            {"role": "user", "content": user},
+                        ],
+                        "response_format": {"type": "json_object"},
+                    },
+                )
+            if response.status_code >= 400:
+                raise XkiroTransportError(f"LLM HTTP {response.status_code}")
+            body = response.json()
+            model_value = body.get("model")
+            returned_model = model_value if isinstance(model_value, str) else None
+            usage = _trace_usage(body.get("usage"))
+            content = body["choices"][0]["message"]["content"]
+            if len(content) > self.max_output_chars:
+                raise XkiroTransportError("LLM output exceeded the bounded size")
+            import json
+
+            try:
+                parsed_value = json.loads(content)
+            except json.JSONDecodeError as error:
+                raise XkiroSchemaError("LLM returned non-JSON output", raw=content) from error
+            if not isinstance(parsed_value, dict):
+                raise XkiroSchemaError("LLM JSON must be an object", raw=content)
+            parsed = parsed_value
+            return parsed_value
+        except Exception as error:
+            trace_error = f"{type(error).__name__}: {error}"
+            raise
+        finally:
+            if attempted:
+                try:
+                    from invoice_referee.evidence.telemetry import record_llm_call
+
+                    record_llm_call(
+                        started_at=started_at,
+                        ended_at=datetime.now(UTC),
+                        system=system,
+                        user=user,
+                        requested_model=self.model,
+                        returned_model=returned_model,
+                        parsed_response=parsed,
+                        usage=usage,
+                        error=trace_error,
+                    )
+                except Exception:
+                    # Instrumentation never changes the provider result or failure.
+                    pass
+
+
+def _trace_usage(value: object) -> dict[str, object]:
+    """Keep only provider-reported token counters; do not infer missing usage."""
+    if not isinstance(value, dict):
+        return {}
+    keys = {
+        "prompt_tokens",
+        "completion_tokens",
+        "total_tokens",
+        "input_tokens",
+        "output_tokens",
+    }
+    return {
+        key: count
+        for key, count in value.items()
+        if key in keys and isinstance(count, int) and not isinstance(count, bool)
+    }

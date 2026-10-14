@@ -171,6 +171,48 @@ async def test_submit_and_evidence_job_emit_root_and_child_spans(tmp_path: Path)
     job_root = next(r for r in client.runs if r["name"] == "evidence-job")
     ocr = next(r for r in client.runs if str(r["name"]).startswith("ocr:"))
     assert ocr["parent_run_id"] == job_root["id"]
+    assert ocr["inputs"]["source_id"]
+    assert len(ocr["inputs"]["source_digest"]) == 64
+    assert ocr["inputs"]["media"] == "PDF"
+    assert ocr["outputs"]["pages_read"] == 1
+    assert ocr["outputs"]["provider"] == "fake"
+    assert "markdown" not in str(ocr["outputs"]).lower()
+
+    classified = next(r for r in client.runs if r["name"] == "classify")
+    assert classified["outputs"]["documents"][0]["document_type"] == "SETTLEMENT_FORM"
+    extracted = next(r for r in client.runs if str(r["name"]).startswith("extract:"))
+    assert extracted["outputs"]["fields"][0]["field"] == "printed_total"
+    assert extracted["outputs"]["fields"][0]["state"] == "FOUND"
+    validated = next(r for r in client.runs if str(r["name"]).startswith("validate:"))
+    assert isinstance(validated["outputs"]["findings"], list)
+    assert job_root["outputs"]["document_count"] == 1
+    assert job_root["outputs"]["status"] == "COMPLETED"
+    assert job_root["outputs"]["documents"][0]["fields"][0]["field"] == "printed_total"
+    assert job_root["outputs"]["state_after"]
+    assert job_root["outputs"]["version_after"] >= 1
+    admission = next(r for r in client.runs if r["name"] == "admission")
+    assert admission["outputs"]["status"] == "ASSEMBLED"
+    assert admission["outputs"]["employee_paid_state"] == "NOT_INDEPENDENTLY_BANK_VERIFIED"
+    assert set(admission["outputs"]["read_set"]) == {
+        "input_revision", "control_epoch", "context_version", "ledger_version", "usage_version"
+    }
+    reconcile = next(r for r in client.runs if r["name"] == "reconcile")
+    assert set(reconcile["outputs"]["axes"]) == {"T", "E", "C", "A", "P", "R", "unpaid", "S"}
+    assert all("state" in fact for fact in reconcile["outputs"]["axes"].values())
+    commit = next(r for r in client.runs if r["name"] == "commit")
+    assert commit["outputs"]["committed"] is True
+    assert "state_before" in commit["outputs"] and "state_after" in commit["outputs"]
+    command_root = next(r for r in client.runs if r["name"] == "command:submit")
+    assert command_root["outputs"]["command"] == "SUBMIT"
+    assert command_root["outputs"]["state"]
+    assert not [r for r in client.runs if r["run_type"] == "llm"]
+    handler = next(
+        run for run in client.runs
+        if run["name"] == "handler" and run.get("parent_run_id") == command_root["id"]
+    )
+    assert handler["outputs"]["command"] == "SUBMIT"
+    assert handler["outputs"]["status"] == "HANDLED"
+    assert handler["outputs"]["job_id"]
 
 
 async def test_sink_failure_does_not_change_the_business_result(tmp_path: Path) -> None:
@@ -182,6 +224,95 @@ async def test_sink_failure_does_not_change_the_business_result(tmp_path: Path) 
     view = _view(wf, root)
     assert view.conclusion is not None, "a tracing failure must not lose the conclusion"
     assert wf.trace.export_errors, "the export failure must be visible"
+
+
+async def test_settlement_draft_root_contains_the_returned_draft(tmp_path: Path) -> None:
+    client = FakeClient()
+    wf = _workflow(tmp_path)
+    _wire(wf, client)
+    root = await _seed(wf, tmp_path)
+    session_id = str(wf._query_one("SELECT session_id FROM demo_sessions LIMIT 1")["session_id"])
+    draft = await wf.read_settlement_draft(wf.session(session_id), root, uploads=())
+
+    trace = next(run for run in client.runs if run["name"] == "settlement-draft-read")
+    assert trace["outputs"]["status"] == "COMPLETED"
+    assert trace["outputs"]["document_count"] == 1
+    assert trace["outputs"]["draft"]["declared_advance"] == draft["declared_advance"]
+    assert trace["outputs"]["draft"]["warnings"] == draft["warnings"]
+    assert trace["extra"]["metadata"]["trace_output_state"] == "COLLECTED"
+
+
+async def test_validation_trace_surfaces_shared_arithmetic_findings(tmp_path: Path) -> None:
+    import json
+
+    from invoice_referee.domain.documents import OcrBlock, OcrPage, OcrSourceResult
+    from invoice_referee.domain.evidence import SourceRef
+    from invoice_referee.evidence.artifacts import ArtifactStore
+    from invoice_referee.evidence.pipeline import read_root
+    from invoice_referee.evidence.trace import RunBudget
+
+    markdown = (
+        "GIẤY QUYẾT TOÁN\nSố tiền đã tạm ứng: 4.000.000\n"
+        "Tổng cộng: 3.240.000\nSố tiền nhân viên hoàn trả công ty: 700.000"
+    )
+
+    class ArithmeticOcr:
+        async def ocr_file(self, source, *, budget, artifacts, source_bytes, expected_pages=None, root_id=""):
+            return OcrSourceResult(
+                source_id=source.id,
+                source_digest=source.digest,
+                provider="fake",
+                model="fake-ocr",
+                pages=(OcrPage(page=1, markdown=markdown, blocks=(OcrBlock(
+                    id="b1", kind="text", content=markdown, words=()
+                ),)),),
+            )
+
+    class ArithmeticLlm:
+        async def complete_json(self, *, system: str, user: str, budget):
+            if "classify" in system.lower():
+                source_id = json.loads(user)["documents"][0]["source_id"]
+                return {"documents": [{
+                    "source_id": source_id,
+                    "page_range": [1, 1],
+                    "document_type": "SETTLEMENT_FORM",
+                    "roles": ["SETTLEMENT_DECLARATION"],
+                }]}
+            return {"fields": [
+                {"field": "declared_advance", "state": "FOUND", "value": "4000000", "quote": "4.000.000", "page": 1},
+                {"field": "printed_total", "state": "FOUND", "value": "3240000", "quote": "3.240.000", "page": 1},
+                {"field": "printed_return", "state": "FOUND", "value": "700000", "quote": "700.000", "page": 1},
+            ], "line_items": []}
+
+    client = FakeClient()
+    recorder = TraceRecorder(LangSmithTrace(api_key="k", client=client))
+    source = SourceRef(
+        id="source:arithmetic",
+        digest="a" * 64,
+        tenant="tenant:demo",
+        media="PDF",
+        storage_key="tenant:demo/case:arithmetic/source.pdf",
+        filename="source.pdf",
+    )
+    with recorder.operation("settlement-draft-read"):
+        await read_root(
+            sources=(source,),
+            reader=FileOcrReader(provider=ArithmeticOcr()),
+            classifier=ArithmeticLlm(),
+            artifacts=ArtifactStore(root=tmp_path / "artifacts"),
+            source_bytes={source.id: b"synthetic pdf"},
+            budget=RunBudget(),
+            provider_mode="LIVE",
+            root_id="case:arithmetic",
+        )
+
+    validation = next(run for run in client.runs if run["name"] == "validate:SETTLEMENT_FORM")
+    arithmetic = validation["outputs"]["arithmetic_checks"]
+    assert arithmetic["state"] == "CHECKED_BY_SHARED_RULE"
+    assert arithmetic["findings"][0]["code"] == "settlement-return"
+    assert "760000" in arithmetic["findings"][0]["basis"]
+    assert "700000" in arithmetic["findings"][0]["basis"]
+    assert "60000" in arithmetic["findings"][0]["basis"]
 
 
 async def test_each_command_gets_its_own_operation_root(tmp_path: Path) -> None:

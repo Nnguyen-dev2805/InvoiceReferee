@@ -15,12 +15,16 @@ class FakeClient:
     def __init__(self) -> None:
         self.runs: list[dict[str, object]] = []
         self.updates: list[dict[str, object]] = []
+        self.flush_calls = 0
 
     def create_run(self, **kwargs: object) -> None:
         self.runs.append(kwargs)
 
     def update_run(self, run_id: str, **kwargs: object) -> None:
         self.updates.append({"run_id": run_id, **kwargs})
+
+    def flush(self, timeout: float | None = None) -> None:
+        self.flush_calls += 1
 
 
 def _span() -> TraceSpan:
@@ -96,9 +100,8 @@ def test_completed_span_is_closed_with_its_own_end_time() -> None:
     assert client.runs[0]["start_time"] == start
     assert client.runs[0]["end_time"] == end
     assert client.runs[0]["start_time"] != client.runs[0]["end_time"]
-    update = next(u for u in client.updates if "end_time" in u)
-    assert update["end_time"] == end
-    assert update["run_id"] == client.runs[0]["id"]
+    assert client.updates == []
+    assert client.runs[0]["extra"]["metadata"]["trace_output_state"] == "NOT_COLLECTED"
 
 
 def test_open_span_is_not_faked_closed() -> None:
@@ -129,6 +132,119 @@ def test_record_keeps_local_span_when_client_raises() -> None:
     trace = LangSmithTrace(api_key="k", client=Boom())
     trace.record(_span(), payload={"x": 1})  # must not raise
     assert len(trace.local.spans) == 1
+
+
+def test_completed_run_sends_inputs_outputs_error_and_real_times_at_create() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    client = FakeClient()
+    trace = LangSmithTrace(api_key="k", project="p", client=client)
+    start = datetime(2026, 10, 14, 9, 0, tzinfo=UTC)
+    end = start + timedelta(seconds=3)
+    trace.record(
+        TraceSpan(
+            name="extract:E_INVOICE",
+            run_id="run:extract",
+            started_at=start,
+            ended_at=end,
+            inputs={"document_type": "E_INVOICE"},
+            outputs={"field_count": 2},
+            error="ValueError: provider response invalid",
+            metadata={"safe": "ok", "nested": {"authorization": "Bearer private"}},
+        )
+    )
+
+    run = client.runs[0]
+    assert run["inputs"] == {"document_type": "E_INVOICE"}
+    assert run["outputs"] == {"field_count": 2}
+    assert run["error"] == "ValueError: provider response invalid"
+    assert run["start_time"] == start and run["end_time"] == end
+    assert run["extra"]["metadata"] == {
+        "safe": "ok",
+        "nested": {},
+        "trace_output_state": "COLLECTED",
+    }
+    assert client.updates == []
+
+
+def test_empty_outputs_are_distinct_from_not_collected_outputs() -> None:
+    client = FakeClient()
+    trace = LangSmithTrace(api_key="k", project="p", client=client)
+    trace.record(
+        TraceSpan(
+            name="empty-result",
+            run_id="run:empty",
+            outputs={},
+            output_state="EMPTY",
+        )
+    )
+    trace.record(
+        TraceSpan(
+            name="missing-result",
+            run_id="run:missing",
+            outputs={},
+            output_state="NOT_COLLECTED",
+        )
+    )
+
+    empty, missing = client.runs
+    assert empty["outputs"] == {}
+    assert empty["extra"]["metadata"]["trace_output_state"] == "EMPTY"
+    assert "outputs" not in missing
+    assert missing["extra"]["metadata"]["trace_output_state"] == "NOT_COLLECTED"
+
+
+def test_filter_payload_recursively_removes_secrets_and_keeps_metrics() -> None:
+    from invoice_referee.evidence.trace import filter_payload
+
+    filtered = filter_payload(
+        {
+            "stage": {
+                "api_key": "sk-private",
+                "token_count": 17,
+                "content": "private document text",
+                "details": {"authorization": "Bearer private", "status": "ok"},
+            },
+            "rows": [{"cookie": "session-private", "amount": 2500}],
+        }
+    )
+
+    assert filtered == {
+        "stage": {
+            "token_count": 17,
+            "details": {"status": "ok"},
+        },
+        "rows": [{"amount": 2500}],
+    }
+
+
+def test_stage_payload_uses_stage_allowlist_and_reports_truncation() -> None:
+    from invoice_referee.evidence.trace import filter_payload, stage_payload
+
+    stage = stage_payload(
+        "extraction",
+        {
+            "document_id": "doc:1",
+            "fields": [{"field": "employee_name", "state": "FOUND", "value": "PRIVATE_PERSON"}],
+            "raw_prompt": "PRIVATE_PROMPT",
+            "unknown_field": "must be dropped",
+        },
+    )
+    assert "raw_prompt" not in stage and "unknown_field" not in stage
+    assert stage["fields"][0]["value"] == "[REDACTED]"
+
+    bounded = filter_payload({"rows": [{"item_id": f"row:{i}"} for i in range(45)]})
+    assert len(bounded["rows"]) == 40
+    assert bounded["truncated"] is True
+    assert bounded["truncated_counts"]["items"] == 5
+
+
+def test_record_flushes_buffered_client_once_after_create() -> None:
+    client = FakeClient()
+    trace = LangSmithTrace(api_key="k", project="p", client=client)
+    trace.record(_span())
+    trace.flush()
+    assert client.flush_calls == 1
 
 
 def test_disabled_trace_never_calls_client() -> None:

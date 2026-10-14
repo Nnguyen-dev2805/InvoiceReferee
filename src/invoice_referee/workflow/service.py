@@ -1152,6 +1152,83 @@ class CaseWorkflow:
         op_name = f"command:{command.kind.lower()}"
         command_root = getattr(command, "root_id", None)
         from invoice_referee.evidence.telemetry import code_revision
+        from invoice_referee.evidence.trace import stage_payload
+
+        def _command_trace_payload(
+            result: CommandResult,
+            *,
+            status: str,
+            duplicate: bool,
+            before,
+            after,
+        ) -> dict[str, object]:
+            view = result.case_view
+            axes = {}
+            for axis in ("T", "E", "C", "A", "P", "R", "unpaid", "S"):
+                fact = getattr(view.actual_money, axis)
+                axes[axis] = {
+                    "state": fact.state,
+                    "value": fact.value if fact.state == "KNOWN" else None,
+                }
+            issues = []
+            for issue in view.issues:
+                field_or_rule = issue.field_or_rule
+                issue_owner = (
+                    issue.owner
+                    if issue.owner in {"employee", "accountant", "approver", "org-data"}
+                    else "REDACTED_OWNER"
+                )
+                item = {
+                    "kind": issue.kind,
+                    "field_or_rule": field_or_rule,
+                    "owner": issue_owner,
+                    "status": issue.status,
+                }
+                if "arithmetic" in field_or_rule.lower():
+                    item["basis"] = issue.basis
+                issues.append(item)
+            return stage_payload(
+                "command",
+                {
+                    "command": command.kind,
+                    "status": status,
+                    "duplicate_command": duplicate,
+                    "state": view.state,
+                    "case_version": view.version,
+                    "state_before": str(before["state"])
+                    if before is not None
+                    else None,
+                    "state_after": view.state,
+                    "version_before": int(before["version"])
+                    if before is not None
+                    else None,
+                    "version_after": int(after["version"])
+                    if after is not None
+                    else view.version,
+                    "input_revision": int(after["input_revision"])
+                    if after is not None
+                    else None,
+                    "job_id": result.job_id,
+                    "instructions": [
+                        {
+                            "id": instruction.id,
+                            "direction": instruction.direction,
+                            "amount": instruction.amount,
+                            "status": instruction.status,
+                            "execution_state": instruction.execution_state,
+                            "fulfilled_amount": instruction.fulfilled_amount,
+                            "remaining": instruction.remaining,
+                        }
+                        for instruction in view.instructions
+                    ],
+                    "axes": axes,
+                    "issues": issues,
+                    "issue_count": len(issues),
+                    "conclusion_status": (
+                        view.conclusion.status if view.conclusion is not None else None
+                    ),
+                },
+            )
 
         with self._trace_operation(
             op_name,
@@ -1166,6 +1243,32 @@ class CaseWorkflow:
             tags=("operation", command.kind.lower()),
         ) as operation:
             with self.db.transaction() as cx:
+                before = (
+                    cx.execute(
+                        "SELECT state, version, input_revision FROM cases "
+                        "WHERE id = ? AND tenant = ?",
+                        (command_root, session.tenant),
+                    ).fetchone()
+                    if command_root is not None
+                    else None
+                )
+                operation.inputs.update(
+                    stage_payload(
+                        "command",
+                        {
+                            "command": command.kind,
+                            "state_before": str(before["state"])
+                            if before is not None
+                            else None,
+                            "version_before": int(before["version"])
+                            if before is not None
+                            else None,
+                            "input_revision": int(before["input_revision"])
+                            if before is not None
+                            else None,
+                        },
+                    )
+                )
                 stored = cx.execute(
                     "SELECT fingerprint, result_json FROM command_log WHERE tenant = ? "
                     "AND actor_id = ? AND command_id = ?",
@@ -1177,12 +1280,32 @@ class CaseWorkflow:
                             "command_id đã được dùng cho một nội dung khác."
                         )
                     previous = CommandResult.model_validate_json(stored["result_json"])
-                    operation.outputs["duplicate_command"] = True
+                    after = cx.execute(
+                        "SELECT state, version, input_revision FROM cases WHERE id = ? AND tenant = ?",
+                        (previous.case_view.id, session.tenant),
+                    ).fetchone()
+                    operation.outputs.update(
+                        _command_trace_payload(
+                            previous,
+                            status="DUPLICATE",
+                            duplicate=True,
+                            before=before,
+                            after=after,
+                        )
+                    )
                     return previous.model_copy(update={"duplicate_command": True})
 
                 with self._trace.step("handler", operation=operation) as step:
                     result = handler(cx, session, context, command)
-                    step.outputs["state"] = result.case_view.state
+                    step.outputs.update(
+                        _command_trace_payload(
+                            result,
+                            status="HANDLED",
+                            duplicate=False,
+                            before=before,
+                            after=None,
+                        )
+                    )
                 cx.execute(
                     "INSERT INTO command_log (tenant, actor_id, command_id, fingerprint, "
                     "result_json, recorded_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1195,6 +1318,19 @@ class CaseWorkflow:
                         self._now_iso(),
                     ),
                 )
+                after = cx.execute(
+                    "SELECT state, version, input_revision FROM cases "
+                    "WHERE id = ? AND tenant = ?",
+                    (result.case_view.id, session.tenant),
+                ).fetchone()
+                result_trace = _command_trace_payload(
+                    result,
+                    status="COMPLETED",
+                    duplicate=False,
+                    before=before,
+                    after=after,
+                )
+                operation.outputs.update(result_trace)
                 self._record_trace_ref(command_root, operation)
                 return result
 
@@ -1270,7 +1406,7 @@ class CaseWorkflow:
         import hashlib
 
         from invoice_referee.domain.evidence import SourceRef
-        from invoice_referee.evidence.pipeline import read_root
+        from invoice_referee.evidence.pipeline import read_root, trace_read_report
         from invoice_referee.evidence.trace import RunBudget
         from invoice_referee.reconciliation.advance import draft_advance_from_document
 
@@ -1325,36 +1461,79 @@ class CaseWorkflow:
                 provider_mode=provider_mode,
                 root_id=root_id,
             )
-            operation.outputs["documents"] = len(report.documents)
 
-        # Pick the document that actually carries advance fields; a clear one is
-        # preferred over an unresolved one.
-        def _score(document) -> int:
-            fields = {f.field for f in document.fields if f.state == "FOUND"}
-            score = len(
-                fields
-                & {
-                    "amount",
-                    "payee_name",
-                    "transaction_reference",
-                    "transaction_status",
-                }
-            )
-            if document.profile_status == "CLEAR":
-                score += 1
-            return score
+            # Pick the document that actually carries advance fields; a clear one
+            # is preferred over an unresolved one. Keep this result in the root
+            # so it records the draft users actually received.
+            def _score(document) -> int:
+                fields = {f.field for f in document.fields if f.state == "FOUND"}
+                score = len(
+                    fields
+                    & {
+                        "amount",
+                        "payee_name",
+                        "transaction_reference",
+                        "transaction_status",
+                    }
+                )
+                if document.profile_status == "CLEAR":
+                    score += 1
+                return score
 
-        candidates = sorted(report.documents, key=_score, reverse=True)
-        if not candidates or _score(candidates[0]) == 0:
-            raise UnsupportedCommandError(
-                "Không đọc được dữ liệu khoản ứng từ chứng từ đã tải lên."
+            candidates = sorted(report.documents, key=_score, reverse=True)
+            if not candidates or _score(candidates[0]) == 0:
+                raise UnsupportedCommandError(
+                    "Không đọc được dữ liệu khoản ứng từ chứng từ đã tải lên."
+                )
+            draft = draft_advance_from_document(
+                candidates[0],
+                scope=str(row["activity"]),
+                employee=str(row["employee"]),
+                method_hint=method_hint,
             )
-        return draft_advance_from_document(
-            candidates[0],
-            scope=str(row["activity"]),
-            employee=str(row["employee"]),
-            method_hint=method_hint,
-        )
+            # Already-recorded hint (14/10/2026): when this exact transaction
+            # identity is already in company history, reloading it is
+            # idempotent — say so upfront instead of letting A look doubled.
+            # Read-only checks on a short-lived connection (no transaction).
+            if draft.transaction_reference and draft.instrument_method:
+                from invoice_referee.reconciliation.advance_identity import (
+                    build_external_key,
+                )
+
+                key = build_external_key(
+                    draft.instrument_method.lower(), draft.transaction_reference
+                )
+                known = False
+                if key is not None:
+                    connection = self.db.connect()
+                    try:
+                        known = (
+                            connection.execute(
+                                "SELECT 1 FROM money_events WHERE tenant = ? "
+                                "AND external_key = ? LIMIT 1",
+                                (session.tenant, key),
+                            ).fetchone()
+                            is not None
+                        )
+                    finally:
+                        connection.close()
+                    if not known:
+                        with self.db.transaction() as cx:
+                            known = (
+                                self._snapshot_ledger_entry(cx, session.tenant, key)
+                                is not None
+                            )
+                if known:
+                    draft = draft._replace(already_recorded=True)
+            draft_summary = (
+                draft.model_dump(mode="json")
+                if hasattr(draft, "model_dump")
+                else draft
+                if isinstance(draft, dict)
+                else {"status": "DRAFT_CREATED"}
+            )
+            operation.outputs.update(trace_read_report(report, draft=draft_summary))
+        return draft
 
     async def read_settlement_draft(
         self,
@@ -1373,7 +1552,7 @@ class CaseWorkflow:
         import hashlib
 
         from invoice_referee.domain.evidence import SourceRef
-        from invoice_referee.evidence.pipeline import read_root
+        from invoice_referee.evidence.pipeline import read_root, trace_read_report
         from invoice_referee.evidence.trace import RunBudget
         from invoice_referee.reconciliation.settlement_draft import (
             build_settlement_draft,
@@ -1512,7 +1691,8 @@ class CaseWorkflow:
                     report=report,
                 )
                 draft["link"] = link_to_payload(link)
-                operation.outputs["link"] = link.status
+                operation.outputs.clear()
+                operation.outputs.update(trace_read_report(report, draft=draft))
                 # Persist the operation trace ref alongside the report (debug ref).
                 self._last_trace_ref[root_id] = operation.run_id
 
@@ -2437,6 +2617,29 @@ class CaseWorkflow:
             raise UnsupportedCommandError("Bạn không có quyền ghi nhận tiền thực tế.")
         now = self._now_iso()
         root_id = str(row["id"])
+        # Source refs are checked against uploaded bytes: a ref that names a
+        # source attached to ANOTHER dossier, or a digest that contradicts the
+        # attached bytes, is rejected before any write (14/10/2026). Refs from
+        # a transient advance-draft read (never attached) carry the read proof
+        # itself; the accountant's permission and responsible confirmation
+        # cover them.
+        for ref in money.refs:
+            source_id = str(ref.source_id)
+            if source_id.startswith("file:"):
+                source_id = source_id[len("file:") :]
+            stored_source = cx.execute(
+                "SELECT root_id, digest FROM case_sources WHERE source_id = ? "
+                "AND tenant = ?",
+                (source_id, session.tenant),
+            ).fetchone()
+            if stored_source is None:
+                continue
+            if str(stored_source["root_id"]) != root_id or str(
+                stored_source["digest"]
+            ) != str(ref.source_sha256):
+                raise UnsupportedCommandError(
+                    "Chứng từ đối chiếu không khớp tệp đã tải lên hồ sơ này."
+                )
         # External identity is namespaced (14/10/2026): "<namespace>:<reference>".
         # A missing/blank identity stays an unresolved draft — the server never
         # mints a UUID in place of the missing transaction code and then claims
@@ -2923,6 +3126,47 @@ class CaseWorkflow:
     ) -> None:
         """Assess the current snapshot and commit issues/conclusion/instruction atomically."""
         from invoice_referee.reconciliation.service import Reconciler
+        from invoice_referee.evidence.trace import stage_payload
+
+        def _fact_summary(fact) -> dict[str, object]:
+            state = getattr(fact, "state", "UNKNOWN")
+            result: dict[str, object] = {"state": state}
+            if state == "KNOWN":
+                result["value"] = getattr(fact, "value", None)
+            refs = getattr(fact, "refs", ())
+            if refs:
+                result["refs"] = [
+                    {
+                        "source_id": getattr(ref, "source_id", None),
+                        "source_sha256": getattr(ref, "source_sha256", None),
+                        "page": getattr(ref, "page", None),
+                    }
+                    for ref in refs
+                ]
+            return result
+
+        def _business_issue_summary(issue) -> dict[str, object]:
+            issue_owner = getattr(issue, "owner", "UNKNOWN")
+            if issue_owner not in {"employee", "accountant", "approver", "org-data"}:
+                issue_owner = "REDACTED_OWNER"
+            field_or_rule = getattr(issue, "field_or_rule", "")
+            arithmetic = "arithmetic" in field_or_rule.lower()
+            return {
+                "kind": getattr(issue, "kind", "UNKNOWN"),
+                "field_or_rule": field_or_rule,
+                "owner": issue_owner,
+                "status": getattr(issue, "status", "UNKNOWN"),
+                "depends_on": list(getattr(issue, "depends_on", ())),
+                **({"basis": getattr(issue, "basis", "")} if arithmetic else {}),
+                "refs": [
+                    {
+                        "source_id": getattr(ref, "source_id", None),
+                        "source_sha256": getattr(ref, "source_sha256", None),
+                        "page": getattr(ref, "page", None),
+                    }
+                    for ref in getattr(issue, "refs", ())
+                ],
+            }
 
         root_id = str(row["id"])
         # Stop is atomic with the commit: a worker whose snapshot predates a
@@ -2931,35 +3175,314 @@ class CaseWorkflow:
             return
         from invoice_referee.evidence.telemetry import step
 
-        with step("admission", metadata={"root_id": root_id}) as s:
+        with step("admission", metadata={"trace_stage": "admission"}) as s:
             assessment_input = self._build_assessment_input(cx, session, row, now)
             if assessment_input is not None:
                 rs = assessment_input.read_set
-                s.outputs["expenses"] = len(assessment_input.expense_facts)
-                s.outputs["admission_issues"] = len(assessment_input.admission_issues)
-                s.outputs["input_revision"] = rs.input_revision
-                s.outputs["control_epoch"] = rs.control_epoch
-                s.outputs["context_version"] = rs.context_version
-                s.outputs["ledger_version"] = rs.ledger_version
-                s.outputs["usage_version"] = rs.usage_version
-                s.outputs["provider_mode"] = assessment_input.scope.profile
+                expenses = [
+                    {
+                        "expense_id": expense.id,
+                        "economic_key": expense.economic_key,
+                        "fact": "T",
+                        "incurred": _fact_summary(expense.incurred),
+                        "eligibility_state": expense.eligibility,
+                        "payment_state": expense.payment_state,
+                        "payment_basis_kinds": sorted(
+                            {payment.basis_kind for payment in expense.payments}
+                        ),
+                        "category": expense.category,
+                        "refs": [
+                            {
+                                "source_id": ref.source_id,
+                                "source_sha256": ref.source_sha256,
+                                "page": ref.page,
+                            }
+                            for ref in expense.refs
+                        ],
+                    }
+                    for expense in assessment_input.expense_facts
+                ]
+                unverified = [
+                    {
+                        "field": observation.field,
+                        "read_state": observation.read_state,
+                        "normalized": observation.normalized,
+                        "refs": [
+                            {
+                                "source_id": observation.ref.source_id,
+                                "source_sha256": observation.ref.source_sha256,
+                                "page": observation.ref.page,
+                            }
+                        ],
+                    }
+                    for observation in assessment_input.observations
+                ]
+                blocked = [
+                    _business_issue_summary(issue)
+                    for issue in assessment_input.admission_issues
+                ]
+                arithmetic_findings = [
+                    {
+                        "field_or_rule": issue.field_or_rule,
+                        "reason": issue.basis,
+                        "refs": [
+                            {
+                                "source_id": ref.source_id,
+                                "source_sha256": ref.source_sha256,
+                                "page": ref.page,
+                            }
+                            for ref in issue.refs
+                        ],
+                    }
+                    for issue in assessment_input.admission_issues
+                    if "arithmetic" in issue.field_or_rule.lower()
+                ]
+                history = [
+                    {
+                        "kind": event.kind,
+                        "amount": event.amount,
+                        "verification_state": event.verification_state,
+                        "allocation_state": event.allocation_state,
+                        "refs": [
+                            {
+                                "source_id": ref.source_id,
+                                "source_sha256": ref.source_sha256,
+                                "page": ref.page,
+                            }
+                            for ref in event.refs
+                        ],
+                    }
+                    for event in assessment_input.ledger
+                ]
+                relations = [
+                    {
+                        "kind": relation.kind,
+                        "from_id": relation.from_id,
+                        "to_id": relation.to_id,
+                        "state": relation.state,
+                        "refs": [
+                            {
+                                "source_id": ref.source_id,
+                                "source_sha256": ref.source_sha256,
+                                "page": ref.page,
+                            }
+                            for ref in relation.refs
+                        ],
+                    }
+                    for relation in assessment_input.relations
+                ]
+                confirmations = [
+                    {
+                        "field": item.fact_key,
+                        "value": item.value,
+                        "scope": item.scope,
+                        "actor": "REDACTED",
+                        "refs": [
+                            {
+                                "source_id": ref.source_id,
+                                "source_sha256": ref.source_sha256,
+                                "page": ref.page,
+                            }
+                            for ref in item.refs
+                        ],
+                    }
+                    for item in assessment_input.confirmations
+                ]
+                processing_problems = [
+                    {
+                        "kind": problem.kind,
+                        "affected_fields": list(problem.affected_fields),
+                        "relevance": problem.relevance,
+                        "blocking": problem.blocking,
+                        "next_action": problem.next_action,
+                    }
+                    for problem in assessment_input.admission_problems
+                ]
+                read_set = {
+                    "input_revision": rs.input_revision,
+                    "control_epoch": rs.control_epoch,
+                    "context_version": rs.context_version,
+                    "ledger_version": rs.ledger_version,
+                    "usage_version": rs.usage_version,
+                }
+                admission_payload = stage_payload(
+                    "admission",
+                    {
+                        "status": "ASSEMBLED",
+                        "accepted_facts": expenses,
+                        "unverified_facts": unverified,
+                        "blocked_facts": blocked,
+                        "fact_count": len(expenses),
+                        "issue_count": len(blocked),
+                        "issues": blocked,
+                        "read_set": read_set,
+                        "money_basis": "NOT_COMPUTED_BEFORE_RECONCILIATION",
+                        "employee_paid_state": "NOT_INDEPENDENTLY_BANK_VERIFIED",
+                        "binding": {
+                            "activity": assessment_input.scope.activity,
+                            "profile": assessment_input.scope.profile,
+                            "employee_identity": "REDACTED",
+                            "tenant_identity": "REDACTED",
+                            "scope_source": "SERVER_CONTEXT",
+                        },
+                        "money_history": history,
+                        "relations": relations,
+                        "confirmations": confirmations,
+                        "problems": processing_problems,
+                        "arithmetic_findings": arithmetic_findings,
+                    },
+                )
+                s.inputs.update(admission_payload)
+                s.outputs.update(admission_payload)
+            else:
+                s.skipped = "no_published_evidence_report"
+                s.outputs.update(
+                    stage_payload("admission", {"status": "PENDING_EVIDENCE"})
+                )
         if assessment_input is None:
             # Evidence mode with no published report yet: stay EVIDENCE_READY.
             # A LIVE/REPLAY root must never fall back to a seeded STUB
             # transcription (contracts §12.5, plan E7/A5).
             return
-        with step("reconcile", metadata={"root_id": root_id}) as s:
+        with step(
+            "reconcile",
+            metadata={"trace_stage": "reconcile"},
+            inputs=stage_payload(
+                "reconcile",
+                {
+                    "cost_basis": assessment_input.previous_eligibility.cost_basis
+                    if assessment_input.previous_eligibility is not None
+                    else None,
+                },
+            ),
+        ) as s:
             result = Reconciler().assess(assessment_input)
-            s.outputs["state_S"] = result.projection.S.state
-            s.outputs["issues"] = len(result.issues)
-            s.outputs["allowed_effect"] = (
-                None
-                if result.allowed_effect is None
-                else f"{result.allowed_effect.direction}:{result.allowed_effect.amount}"
+            axes = {
+                name: _fact_summary(getattr(result.projection, name))
+                for name in ("T", "E", "C", "A", "P", "R", "unpaid", "S")
+            }
+            issue_summaries = [
+                _business_issue_summary(issue) for issue in result.issues
+            ]
+            technical_problems = [
+                {
+                    "kind": problem.kind,
+                    "field_or_rule": ",".join(problem.affected_fields) or problem.kind,
+                    "owner": "system",
+                    "status": "BLOCKING" if problem.blocking else "OBSERVED",
+                }
+                for problem in result.problems
+            ]
+            issue_summaries.extend(technical_problems)
+            effect = (
+                {
+                    "state": "PERMITTED",
+                    "direction": result.allowed_effect.direction,
+                    "amount": result.allowed_effect.amount,
+                    "basis": result.allowed_effect.basis,
+                }
+                if result.allowed_effect is not None
+                else {"state": "NONE"}
             )
-        with step("commit", metadata={"root_id": root_id}) as s:
+            blockers = [
+                {"kind": issue["kind"], "field_or_rule": issue["field_or_rule"]}
+                for issue in issue_summaries
+            ]
+            if result.allowed_effect is None and not blockers:
+                if result.projection.S.state != "KNOWN":
+                    blockers.append({"kind": "FACT", "field_or_rule": "S_UNKNOWN"})
+                else:
+                    blockers.append(
+                        {"kind": "POLICY", "field_or_rule": "NO_EFFECT_REQUIRED"}
+                    )
+            decision_state = (
+                "PERMITTED"
+                if result.allowed_effect is not None
+                else "BLOCKED"
+                if result.issues
+                or result.problems
+                or result.projection.S.state != "KNOWN"
+                else "NO_EFFECT_REQUIRED"
+            )
+            s.outputs.update(
+                stage_payload(
+                    "reconcile",
+                    {
+                        "axes": axes,
+                        "issues": issue_summaries,
+                        "authorizations": [
+                            str(item) for item in result.required_authorizations
+                        ],
+                        "allowed_effect": effect,
+                        "effect_blockers": blockers,
+                        "decision_state": decision_state,
+                        "state": "KNOWN"
+                        if result.projection.S.state == "KNOWN"
+                        else "UNKNOWN",
+                        "cost_basis": result.cost_basis,
+                        "money_basis": result.money_basis,
+                    },
+                )
+            )
+        with step("commit", metadata={"trace_stage": "commit"}) as s:
+            version_before = int(row["version"])
+            state_before = str(row["state"])
             self._commit_assessment(cx, session, row, result, now)
-            s.outputs["committed"] = True
+            after = cx.execute(
+                "SELECT state, version, input_revision FROM cases WHERE id = ?",
+                (root_id,),
+            ).fetchone()
+            instruction_row = cx.execute(
+                "SELECT id, direction, amount, status, execution_state, fulfilled_amount "
+                "FROM instructions WHERE root_id = ? ORDER BY rowid DESC LIMIT 1",
+                (root_id,),
+            ).fetchone()
+            conclusion_row = cx.execute(
+                "SELECT status FROM case_conclusions WHERE root_id = ? "
+                "ORDER BY revision DESC LIMIT 1",
+                (root_id,),
+            ).fetchone()
+            s.outputs.update(
+                stage_payload(
+                    "commit",
+                    {
+                        "state_before": state_before,
+                        "state_after": str(after["state"])
+                        if after is not None
+                        else None,
+                        "version_before": version_before,
+                        "version_after": int(after["version"])
+                        if after is not None
+                        else None,
+                        "input_revision": int(after["input_revision"])
+                        if after is not None
+                        else None,
+                        "instruction": (
+                            {
+                                "id": str(instruction_row["id"]),
+                                "direction": str(instruction_row["direction"]),
+                                "amount": int(instruction_row["amount"]),
+                                "status": str(instruction_row["status"]),
+                                "execution_state": str(
+                                    instruction_row["execution_state"]
+                                ),
+                                "fulfilled_amount": int(
+                                    instruction_row["fulfilled_amount"]
+                                ),
+                                "semantics": "instruction_is_not_payment_confirmation",
+                            }
+                            if instruction_row is not None
+                            else None
+                        ),
+                        "conclusion_status": (
+                            str(conclusion_row["status"])
+                            if conclusion_row is not None
+                            else None
+                        ),
+                        "committed": True,
+                    },
+                )
+            )
 
     def _build_assessment_input(
         self, cx: sqlite3.Connection, session: DemoSession, row: sqlite3.Row, now: str

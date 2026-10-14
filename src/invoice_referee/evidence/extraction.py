@@ -350,7 +350,14 @@ async def extract_document(
         "Never invent a value; a missing value is NOT_PRESENT, not zero."
     )
     user = _serialize(ocr, classification)
-    payload = await _call_with_one_repair(llm, system=system, user=user, budget=budget)
+    from invoice_referee.evidence.telemetry import llm_trace_context
+
+    with llm_trace_context(
+        stage="extract",
+        prompt_version="document-extraction-v1",
+        schema_version="document-fields-and-line-items-json-v1",
+    ):
+        payload = await _call_with_one_repair(llm, system=system, user=user, budget=budget)
     if payload is None:
         return _unresolved(ocr, classification)
 
@@ -430,11 +437,25 @@ async def _call_with_one_repair(
     llm: object, *, system: str, user: str, budget: RunBudget
 ) -> dict | None:
     """One extraction call; on a schema error, at most one repair call."""
+    from invoice_referee.evidence.telemetry import llm_trace_context
+
     try:
-        return await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
+        with llm_trace_context(
+            stage="extract",
+            prompt_version="document-extraction-v1",
+            schema_version="document-fields-and-line-items-json-v1",
+            attempt_kind="primary",
+        ):
+            return await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
     except XkiroSchemaError:
         try:
-            return await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
+            with llm_trace_context(
+                stage="extract",
+                prompt_version="document-extraction-v1",
+                schema_version="document-fields-and-line-items-json-v1",
+                attempt_kind="repair",
+            ):
+                return await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
         except XkiroSchemaError:
             return None
 

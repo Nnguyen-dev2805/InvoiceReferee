@@ -19,12 +19,16 @@ class FakeClient:
     def __init__(self) -> None:
         self.runs: list[dict[str, object]] = []
         self.updates: list[dict[str, object]] = []
+        self.flush_calls = 0
 
     def create_run(self, **kwargs: object) -> None:
         self.runs.append(kwargs)
 
     def update_run(self, run_id: str, **kwargs: object) -> None:
         self.updates.append({"run_id": run_id, **kwargs})
+
+    def flush(self, timeout: float | None = None) -> None:
+        self.flush_calls += 1
 
 
 class BoomClient:
@@ -88,10 +92,9 @@ def test_skipped_step_is_recorded_as_skipped_not_success() -> None:
         with recorder.step("ocr:file1", operation=op) as s:
             s.skipped = "cache_reuse"
     step = next(r for r in client.runs if r["name"] == "ocr:file1")
-    assert step["inputs"].get("metadata") is None or True  # smoke
     # the skip is an explicit output, not a provider success
-    update = next(u for u in client.updates if u.get("outputs"))
-    assert update["outputs"].get("skipped") == "cache_reuse"
+    assert step["outputs"].get("skipped") == "cache_reuse"
+    assert step["extra"]["metadata"]["trace_output_state"] == "COLLECTED"
 
 
 def test_sink_failure_never_raises_and_is_diagnosed() -> None:
@@ -124,6 +127,25 @@ def test_disabled_recorder_buffers_locally_without_network() -> None:
     assert len(recorder.operations) == 1
 
 
+def test_step_inputs_outputs_and_parent_are_sent_together() -> None:
+    client = FakeClient()
+    recorder = TraceRecorder(LangSmithTrace(api_key="k", client=client))
+    with recorder.operation("evidence-job") as operation:
+        with recorder.step(
+            "validate:E_INVOICE",
+            operation=operation,
+            inputs={"document_id": "doc:1", "field_count": 2},
+        ) as step:
+            step.outputs.update({"profile_status": "NEEDS_HUMAN", "finding_count": 1})
+
+    child = next(run for run in client.runs if run["name"] == "validate:E_INVOICE")
+    assert child["inputs"] == {"document_id": "doc:1", "field_count": 2}
+    assert child["outputs"] == {"profile_status": "NEEDS_HUMAN", "finding_count": 1}
+    assert child["parent_run_id"] == client.runs[0]["id"]
+    assert child["extra"]["metadata"]["trace_output_state"] == "COLLECTED"
+    assert client.flush_calls == 1
+
+
 def test_redaction_keeps_numeric_token_metrics() -> None:
     # A numeric metric whose name contains "token" must NOT be dropped.
     filtered = filter_payload(
@@ -145,5 +167,5 @@ def test_span_carries_metadata_and_error() -> None:
             s.error = "timeout"
     step = next(r for r in client.runs if r["name"] == "ocr")
     assert step["extra"]["metadata"]["file"] == "a.pdf"
-    update = next(u for u in client.updates if u.get("error"))
-    assert update["error"] == "timeout"
+    assert step["error"] == "timeout"
+    assert client.updates == []

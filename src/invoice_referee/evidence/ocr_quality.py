@@ -120,7 +120,14 @@ async def review_ocr_quality(
     )
     user = _serialize_candidates(candidates)
     try:
-        payload = await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
+        from invoice_referee.evidence.telemetry import llm_trace_context
+
+        with llm_trace_context(
+            stage="confidence-review",
+            prompt_version="ocr-confidence-review-v1",
+            schema_version="ocr-block-assessment-json-v1",
+        ):
+            payload = await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
     except XkiroError:
         return ConfidenceReview(status="TECHNICAL_ERROR", block_assessments=())
 

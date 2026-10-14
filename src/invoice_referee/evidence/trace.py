@@ -102,6 +102,7 @@ class TraceSpan(StrictModel):
     run_type: str = "chain"
     inputs: dict[str, object] = {}
     outputs: dict[str, object] = {}
+    output_state: Literal["COLLECTED", "EMPTY", "NOT_COLLECTED", "REDACTED"] | None = None
     error: str | None = None
     metadata: dict[str, object] = {}
     tags: tuple[str, ...] = ()
@@ -114,9 +115,37 @@ class TraceSpan(StrictModel):
 _SENSITIVE_SUBSTRINGS = (
     "raw", "content", "payload", "pdf", "image", "api_key", "apikey",
     "secret", "authorization", "password", "credential", "bearer",
+    "cookie", "header", "base64",
 )
 # Exact secret key names that contain a sensitive word but are not metrics.
-_SECRET_EXACT = frozenset({"token", "access_token", "auth_token", "id_token", "refresh_token"})
+_SECRET_EXACT = frozenset({
+    "token", "access_token", "auth_token", "id_token", "refresh_token",
+    "tenant", "actor", "actor_id", "employee", "employee_id", "person",
+})
+_PRIVATE_VALUE_KEYS = (
+    "name", "account", "identity", "citizen", "passport", "phone", "email",
+    "address", "tax_code", "personal_id", "person_id", "employee_id", "actor_id",
+)
+_ALWAYS_DROP_KEYS = frozenset({"quote", "exact_quote", "raw_quote", "ocr_text", "markdown"})
+_TRACE_MAX_DEPTH = 7
+_TRACE_MAX_ITEMS = 40
+_TRACE_MAX_STRING_CHARS = 1200
+_TRACE_MAX_TOTAL_CHARS = 20000
+
+
+class _PayloadLimits:
+    def __init__(self) -> None:
+        self.omitted_items = 0
+        self.omitted_chars = 0
+        self.omitted_depth = 0
+        self.remaining_chars = _TRACE_MAX_TOTAL_CHARS
+
+    @property
+    def truncated(self) -> bool:
+        return bool(self.omitted_items or self.omitted_chars or self.omitted_depth)
+
+
+_DROP = object()
 
 
 def _is_sensitive_key(key: str) -> bool:
@@ -131,13 +160,185 @@ def _is_sensitive_key(key: str) -> bool:
 
 
 def filter_payload(payload: dict[str, object]) -> dict[str, object]:
-    """Drop sensitive keys before anything leaves the process (§9).
+    """Recursively redact and bound trace data before it leaves the process.
 
-    Local audit does not depend on telemetry; this only guards the opt-in path.
-    Numeric metrics (``token_count`` …) are preserved; only secrets and private
-    content are removed.
+    This is an observability-only copy; caller payloads are never mutated.
+    Numeric metrics (``token_count`` …) are preserved. Source quotes and raw OCR
+    are removed; personal values in structured fields are replaced with a marker.
     """
-    return {key: value for key, value in payload.items() if not _is_sensitive_key(key)}
+    limits = _PayloadLimits()
+    result = _sanitize_value(payload, key="", field_name=None, depth=0, limits=limits)
+    if not isinstance(result, dict):
+        return {}
+    if limits.truncated:
+        result["truncated"] = True
+        result["truncated_counts"] = {
+            "items": limits.omitted_items,
+            "chars": limits.omitted_chars,
+            "depth": limits.omitted_depth,
+        }
+    return result
+
+
+def _is_private_field(field_name: str | None) -> bool:
+    lowered = (field_name or "").lower()
+    return any(marker in lowered for marker in _PRIVATE_VALUE_KEYS)
+
+
+def _sanitize_value(
+    value: object,
+    *,
+    key: str,
+    field_name: str | None,
+    depth: int,
+    limits: _PayloadLimits,
+) -> object:
+    if key and (_is_sensitive_key(key) or key.lower() in _ALWAYS_DROP_KEYS):
+        return _DROP
+    if depth > _TRACE_MAX_DEPTH:
+        limits.omitted_depth += 1
+        return _DROP
+    if isinstance(value, dict):
+        item_field = value.get("field")
+        child_field = item_field if isinstance(item_field, str) else field_name
+        result: dict[str, object] = {}
+        for index, (child_key, child_value) in enumerate(value.items()):
+            if index >= _TRACE_MAX_ITEMS or limits.remaining_chars <= 0:
+                limits.omitted_items += len(value) - index
+                break
+            lowered = str(child_key).lower()
+            if _is_private_field(lowered):
+                result[str(child_key)] = "[REDACTED]"
+                continue
+            if _is_private_field(child_field) and lowered in {
+                "value", "normalized", "description", "party", "quote", "observed_text",
+            }:
+                result[str(child_key)] = "[REDACTED]"
+                continue
+            safe = _sanitize_value(
+                child_value,
+                key=str(child_key),
+                field_name=child_field,
+                depth=depth + 1,
+                limits=limits,
+            )
+            if safe is not _DROP:
+                safe_key = _bounded_trace_text(str(child_key), limits)
+                if safe_key:
+                    result[safe_key] = safe
+        return result
+    if isinstance(value, (list, tuple)):
+        result_list: list[object] = []
+        for index, item in enumerate(value):
+            if index >= _TRACE_MAX_ITEMS or limits.remaining_chars <= 0:
+                limits.omitted_items += len(value) - index
+                break
+            safe = _sanitize_value(
+                item,
+                key="",
+                field_name=field_name,
+                depth=depth + 1,
+                limits=limits,
+            )
+            if safe is not _DROP:
+                result_list.append(safe)
+        return result_list
+    if isinstance(value, str):
+        return _bounded_trace_text(value, limits)
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return str(value)[:_TRACE_MAX_STRING_CHARS]
+
+
+def _bounded_trace_text(value: str, limits: _PayloadLimits) -> str:
+    allowed = min(_TRACE_MAX_STRING_CHARS, limits.remaining_chars)
+    if len(value) > allowed:
+        limits.omitted_chars += len(value) - allowed
+    result = value[:allowed]
+    limits.remaining_chars -= len(result)
+    return result
+
+
+_TRACE_STAGE_KEYS: dict[str, frozenset[str]] = {
+    "ocr": frozenset({
+        "source_id", "source_digest", "media", "expected_pages", "provider", "model",
+        "pages_read", "coverage", "read_state", "review_regions", "artifact_ref", "complete",
+    }),
+    "confidence": frozenset({"candidate_count", "candidates", "status", "decisions", "findings", "skipped"}),
+    "classification": frozenset({
+        "status", "skipped", "source_count", "sources", "count", "documents",
+    }),
+    "extraction": frozenset({
+        "document_id", "document_type", "source_id", "source_digest", "page_range",
+        "confidence_status", "ocr_page_count", "classification_confidence", "parse_status",
+        "field_count", "line_item_count", "fields", "line_items", "source_refs",
+        "provenance_findings", "repair_attempts", "llm_attempts",
+    }),
+    "validation": frozenset({
+        "document_id", "document_type", "source_id", "profile_status", "confidence_status",
+        "input_fields", "findings", "fields", "blocking_count", "arithmetic_checks",
+    }),
+    "matching": frozenset({
+        "method", "paper_document_id", "document_count", "row_count", "links", "rows",
+        "findings", "suggestions", "llm_called", "resolved_suggestions",
+    }),
+    "admission": frozenset({
+        "status", "accepted_facts", "unverified_facts", "blocked_facts", "fact_count",
+        "issue_count", "issues", "read_set", "money_basis", "employee_paid_state",
+        "binding", "money_history", "relations", "confirmations", "problems",
+        "arithmetic_findings",
+    }),
+    "reconcile": frozenset({
+        "axes", "issues", "authorizations", "allowed_effect", "effect_blockers",
+        "decision_state", "state", "cost_basis", "money_basis",
+    }),
+    "commit": frozenset({
+        "state_before", "state_after", "version_before", "version_after", "input_revision",
+        "instruction", "conclusion_status", "committed",
+    }),
+    "command": frozenset({
+        "command", "status", "duplicate_command", "state", "case_version", "job_id",
+        "input_revision", "state_before", "state_after", "version_before", "version_after",
+        "instructions", "conclusion_status", "axes", "issues", "issue_count",
+    }),
+    "read_root": frozenset({
+        "status", "outcome", "provider_mode", "document_count", "link_count",
+        "row_match_count", "problem_count", "documents", "findings", "draft",
+        "state_after", "version_after",
+    }),
+    "llm": frozenset({
+        "status", "response_format", "parsed_json_summary", "parsed_json_sha256",
+        "requested_model", "returned_model", "usage",
+        "prompt_version", "schema_version", "attempt_index", "attempt_kind",
+        "stage_instance", "system_chars", "user_chars", "system_sha256", "user_sha256",
+    }),
+}
+
+
+def stage_payload(stage: str, payload: dict[str, object]) -> dict[str, object]:
+    """Apply a stage-specific top-level allowlist and attach its schema version."""
+    allowed = _TRACE_STAGE_KEYS.get(stage)
+    if allowed is None:
+        raise ValueError(f"Unknown trace stage: {stage}")
+    selected = {key: value for key, value in payload.items() if key in allowed}
+    return filter_payload({"schema_version": f"invoice_referee.trace.{stage}.v1", **selected})
+
+
+def sanitize_trace_error(error: object, *, max_chars: int = 300) -> str:
+    """Remove common credentials from exception text and keep diagnostics bounded."""
+    import re
+
+    value = str(error)
+    value = re.sub(r"(?i)\bBearer\s+[^\s,;]+", "Bearer [REDACTED]", value)
+    value = re.sub(
+        r"(?i)(api[_-]?key|access[_-]?token|refresh[_-]?token|password|cookie)\s*[:=]\s*[^\s,;]+",
+        r"\1=[REDACTED]",
+        value,
+    )
+    value = re.sub(r"(?i)(authorization\s*[:=]\s*)[^\r\n]+", r"\1[REDACTED]", value)
+    value = re.sub(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", "[REDACTED_EMAIL]", value, flags=re.I)
+    value = re.sub(r"(?<!\w)(?:\+?\d[\d .()-]{7,}\d)(?!\w)", "[REDACTED_NUMBER]", value)
+    return value[:max_chars]
 
 
 
@@ -204,7 +405,21 @@ class LangSmithTrace:
         except Exception as error:
             # Telemetry failure is not a business failure; the local span stands
             # and the failure is recorded for diagnostics (never silently lost).
-            self.export_errors.append(f"{type(error).__name__}: {error}"[:300])
+            self.export_errors.append(sanitize_trace_error(f"{type(error).__name__}: {error}"))
+
+    def flush(self, *, timeout: float = 5.0) -> None:
+        """Wait briefly for the SDK's buffered creates to reach its transport."""
+        if not self.enabled:
+            return
+        try:
+            client = self._ensure_client()
+            flush = getattr(client, "flush", None) if client is not None else None
+            if callable(flush):
+                flush(timeout=timeout)
+        except Exception as error:
+            self.export_errors.append(
+                sanitize_trace_error(f"{type(error).__name__}: {error}")
+            )
 
     def _run_uuid(self, run_id: str) -> str:
         """A deterministic LangSmith UUID for a logical span id."""
@@ -222,6 +437,16 @@ class LangSmithTrace:
         # Real timings only: an open run is closed at the observed end; a span
         # with no explicit end is left open (LangSmith accepts a null end). We do
         # NOT set start==end==now by default, which would fabricate latency 0.
+        span_outputs = dict(span.outputs)
+        if span.detail is not None:
+            span_outputs["detail"] = sanitize_trace_error(span.detail)
+        output_state = span.output_state or (
+            "COLLECTED" if span_outputs else "NOT_COLLECTED"
+        )
+        metadata = filter_payload({
+            **span.metadata,
+            "trace_output_state": output_state,
+        })
         extra = {
             "logical_run_id": span.run_id,
             "basis": span.basis,
@@ -229,9 +454,9 @@ class LangSmithTrace:
             "model": span.model,
             "agent_id": self.agent_id,
             "agent_environment": self.agent_environment,
-            "metadata": dict(span.metadata),
+            "metadata": metadata,
         }
-        inputs = {**filter_payload(span.inputs), **filter_payload(payload)}
+        inputs = filter_payload({**span.inputs, **payload})
         create_kwargs: dict[str, object] = {
             "id": run_uuid,
             "name": span.name,
@@ -240,6 +465,13 @@ class LangSmithTrace:
             "inputs": inputs,
             "extra": extra,
         }
+        if output_state != "NOT_COLLECTED":
+            filtered_outputs = filter_payload(span_outputs)
+            if output_state == "COLLECTED" and not filtered_outputs:
+                metadata["trace_output_state"] = "REDACTED"
+            create_kwargs["outputs"] = filtered_outputs
+        if span.error is not None:
+            create_kwargs["error"] = sanitize_trace_error(span.error)
         if start is not None:
             create_kwargs["start_time"] = start
         if end is not None:
@@ -249,17 +481,6 @@ class LangSmithTrace:
         if span.tags:
             create_kwargs["tags"] = list(span.tags)
         client.create_run(**create_kwargs)  # type: ignore[attr-defined]
-        # Close the run with outputs/error when we have them (update_run is the
-        # SDK's way to attach an end/error/outputs after create).
-        update_kwargs: dict[str, object] = {}
-        if span.outputs or span.detail:
-            update_kwargs["outputs"] = {**span.outputs, **({"detail": span.detail} if span.detail else {})}
-        if span.error is not None:
-            update_kwargs["error"] = span.error
-        if end is not None:
-            update_kwargs["end_time"] = end
-        if update_kwargs:
-            client.update_run(run_uuid, **update_kwargs)  # type: ignore[attr-defined]
 
 
 

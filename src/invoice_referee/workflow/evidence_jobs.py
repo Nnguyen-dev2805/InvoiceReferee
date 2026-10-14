@@ -23,7 +23,8 @@ async def run_evidence_job(workflow, job_id: str) -> None:
     Delegates to the workflow's wired evidence reader/classifier. Provider I/O
     runs outside any SQLite transaction.
     """
-    from invoice_referee.evidence.pipeline import read_root
+    from invoice_referee.evidence.pipeline import read_root, trace_read_report
+    from invoice_referee.evidence.trace import stage_payload
 
     context = workflow._evidence_context(job_id)
     if context is None:
@@ -55,6 +56,12 @@ async def run_evidence_job(workflow, job_id: str) -> None:
             )
         except Exception as error:  # provider failure -> technical, never a fake success
             operation.error = f"{type(error).__name__}: {error}"[:300]
+            operation.outputs.update(
+                stage_payload(
+                    "read_root",
+                    {"status": "FAILED", "outcome": "PROVIDER_ERROR", "provider_mode": provider_mode},
+                )
+            )
             with workflow.db.transaction() as cx:
                 workflow._fail_evidence_job(cx, job_id, error)
             return
@@ -62,13 +69,29 @@ async def run_evidence_job(workflow, job_id: str) -> None:
         with workflow.db.transaction() as cx:
             # A Stop or changed input basis invalidates publication (contracts §6,
             # §12.5): a stale result must not be presented as current.
-            row = cx.execute("SELECT state FROM cases WHERE id = ?", (root_id,)).fetchone()
+            row = cx.execute("SELECT state, version FROM cases WHERE id = ?", (root_id,)).fetchone()
             if row is not None and str(row["state"]) == "STOPPED":
+                operation.outputs.update(
+                    trace_read_report(
+                        report,
+                        status="CANCELLED",
+                        state_after=str(row["state"]),
+                        version_after=int(row["version"]),
+                    )
+                )
                 operation.outputs["outcome"] = "CANCELLED_STOPPED"
                 workflow._mark_evidence_job(cx, job_id, phase="DONE", status="CANCELLED")
                 return
             job = cx.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
             if job is not None and not workflow._evidence_basis_current(cx, job):
+                operation.outputs.update(
+                    trace_read_report(
+                        report,
+                        status="CANCELLED",
+                        state_after=str(row["state"]) if row is not None else None,
+                        version_after=int(row["version"]) if row is not None else None,
+                    )
+                )
                 operation.outputs["outcome"] = "CANCELLED_STALE_BASIS"
                 workflow._mark_evidence_job(cx, job_id, phase="DONE", status="CANCELLED")
                 return
@@ -77,11 +100,13 @@ async def run_evidence_job(workflow, job_id: str) -> None:
             # success). The report is still stored so the reason is inspectable.
             if not _evidence_usable(report):
                 operation.error = "no usable evidence read"
+                operation.outputs.update(
+                    trace_read_report(report, status="FAILED_NO_USABLE_EVIDENCE")
+                )
                 workflow._fail_evidence_job(
                     cx, job_id, "không đọc/trích xuất được dữ liệu dùng được từ chứng từ"
                 )
                 return
-            operation.outputs["documents"] = len(report.documents)
             workflow._publish_evidence_report(cx, tenant=tenant, root_id=root_id, report=report)
             # After publishing, the typed finance consumer assesses the admission
             # input built from the CURRENT stored state (plan A5). A Stop or a
@@ -93,6 +118,17 @@ async def run_evidence_job(workflow, job_id: str) -> None:
                 workflow._now_iso(),
             )
             workflow._mark_evidence_job(cx, job_id, phase="DONE", status="COMPLETED")
+            result_row = cx.execute(
+                "SELECT state, version FROM cases WHERE id = ?", (root_id,)
+            ).fetchone()
+            operation.outputs.update(
+                trace_read_report(
+                    report,
+                    status="COMPLETED",
+                    state_after=str(result_row["state"]) if result_row is not None else None,
+                    version_after=int(result_row["version"]) if result_row is not None else None,
+                )
+            )
         workflow._record_trace_ref(root_id, operation)
 
 
