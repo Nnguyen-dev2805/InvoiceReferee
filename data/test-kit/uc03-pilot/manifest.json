@@ -1,0 +1,53 @@
+{
+  "schema_version": "uc03-pilot-input/v1",
+  "data_origin": "SYNTHETIC",
+  "runtime_status": "EVIDENCE_READY_FINANCE_NOT_CONNECTED",
+  "corpus_status": "INPUTS_GENERATED_NOT_RUNTIME_PASS",
+  "entries": [
+    {
+      "case_id": "UC03-F01",
+      "folder": "f01-cong-tac-thu-lai-tien-thua",
+      "inputs": {
+        "01-giay-quyet-toan.pdf": "bab4c0a6ed2b6c5968e7c5156977cbc7c49256451aaea02883c5e860aa8cdfad",
+        "02-hoa-don-dich-vu.pdf": "0f9a66678a8df2e7ecef705934c01bcced9c8609105ff93dfb7b4bfd8ef2068a",
+        "employee-confirmation.json": "bab4a1fdd1dbc219626feb40a5729d32a33af1e7db0292c4d0fd1cd4dad9b2fd",
+        "organization.json": "41a6c5fdb7da7ca1beaa4377e2394bde0665ea228dfade2227ace7a9abbaa498",
+        "submission.json": "97ba6f16a5bec0e1f17084fed1568d4ff7e61d355c7ed611829cd1d64174eb0d"
+      },
+      "source_origin": "Hoangha v1 TC01",
+      "profile": "TRAVEL",
+      "split": "development",
+      "family": "uc03-pilot-v1"
+    },
+    {
+      "case_id": "UC03-F02",
+      "folder": "f02-cong-tac-cong-ty-chi-them",
+      "inputs": {
+        "01-giay-quyet-toan.pdf": "4016c52369f6b7157da8fa47e358c50603c2514f489d25ae8390443576385284",
+        "02-hoa-don-dich-vu.pdf": "3cf2cc650269c2e0ea00d23fdb93cc9ddb367c25bd4f528013ffe0afe323c418",
+        "employee-confirmation.json": "720fb1d2e20803c510e80145f8a163c799fab328e1c7e994c1c0556aceec7c80",
+        "organization.json": "2b6169b008130208fd10448ccb5ce8af019ff95242711a2cd990636bf216da09",
+        "submission.json": "c8f92606f9bff0a4d2594a7b1c65bebbdd3bd5c415c909d15674d640f5d0ef1d"
+      },
+      "source_origin": "Hoangha v1 TC02",
+      "profile": "TRAVEL",
+      "split": "development",
+      "family": "uc03-pilot-v1"
+    },
+    {
+      "case_id": "UC03-F03",
+      "folder": "f03-cong-tac-can-bang",
+      "inputs": {
+        "01-giay-quyet-toan.pdf": "4cccc7649dc51cf08749d07749fd9bb12585e7ec8eca8de269efd3dd61e5e81d",
+        "02-hoa-don-dich-vu.pdf": "19c8f2ab7b5326f41a285d43de912e7003c09739dab466985f46447b119a40aa",
+        "employee-confirmation.json": "eac5e1263cea8a10ffd218f874d7e23c8e068baf05cbf279cd5b6f7341b6ec99",
+        "organization.json": "691590ee8e8175e5efa367afd1e1d681327300614ec68134035d2fb65f8f593d",
+        "submission.json": "7b95b79d2508029c4b4f8d0e3a2bfa2e0e6737a762b666aad247d8017ffcaaf4"
+      },
+      "source_origin": "Hoangha v1 TC03",
+      "profile": "TRAVEL",
+      "split": "development",
+      "family": "uc03-pilot-v1"
+    }
+  ]
+}

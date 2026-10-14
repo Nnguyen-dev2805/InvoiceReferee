@@ -2,7 +2,29 @@
 
 Toàn bộ tài liệu là dữ liệu giả lập, không có giá trị pháp lý hoặc kế toán.
 
-## Cách nộp một case
+## Dùng bộ này trên nhánh final
+
+Đây là corpus **tham khảo Hoangha v1**, gồm 25 case/65 PDF. Các nhãn và
+`expected.json` dưới đây giữ hợp đồng cũ, **không phải oracle nghiệp vụ của final**.
+`COVERED/GAP_EXPECTED` không có nghĩa đã chạy PASS trong final.
+
+Đọc [bảng chuyển đổi 25 case](CASE_MAPPING_FINAL.md) và
+[mapping có cấu trúc](final-case-mapping.json) trước khi chọn case. Mapping mô tả
+nguồn gốc, phần cần bổ sung và kết quả có điều kiện; chưa tạo biến thể PDF/context/gold
+final và không được runtime/model nạp làm facts.
+
+Một số giấy là tiếp khách/mua thiết bị, và form cũ thiếu ngày bắt đầu/kết thúc
+công tác. Giữ chúng cho kiểm thử chứng từ hoặc tạo biến thể có phiên bản; không chỉ
+gắn context công tác trái nội dung giấy. Pipeline evidence hiện kết thúc
+`EVIDENCE_READY`; bước nối admission/policy/tiền thuộc kế hoạch tiếp theo.
+
+`manifest.json.folder` đã được chỉnh theo folder không dấu có thật. Nhãn/rule legacy
+được giữ, kể cả drift metadata TC19/TC20 đã ghi trong bảng chuyển đổi.
+
+## Cách nộp theo giao diện Hoangha cũ
+
+Phần này giữ hướng dẫn lịch sử. Với `final`, dùng luồng intake hiện tại và bảng
+mapping ở trên; không coi tên menu/trạng thái dưới đây là hợp đồng UI final.
 
 - Chọn `Quyết toán tạm ứng` và `Đơn giấy`.
 - Tải `report_hoan_ung.pdf` làm đơn/báo cáo chính.

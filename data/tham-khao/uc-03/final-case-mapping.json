@@ -1,0 +1,2272 @@
+{
+  "schema_version": "uc03-final-mapping-proposal/v2",
+  "status": "MAPPING_COMPLETE_NOT_IMPLEMENTED_NOT_RUNTIME_GOLD",
+  "created_at": "2026-10-14",
+  "source_corpus": "Hoangha testcase_uc3 v1",
+  "source_corpus_commit": "1ee33487e2770ebd9e5ae65b994bbd3f3a4dd7a8",
+  "final_head_at_start": "51444fec845239b0394d2fa52d48b02de729f384",
+  "case_count": 25,
+  "pdf_count": 65,
+  "authoring_only": true,
+  "runtime_must_not_read_this_file": true,
+  "common_preconditions": [
+    "Hồ sơ/employee/activity server-scoped, cùng một người và một hoạt động",
+    "Nguồn SETTLEMENT_FORM ghi trip destination/start/end/purpose; không suy trip từ ngày lập",
+    "Activity authorized, budget riêng có thời hạn/version, grant công nhận E<=8 triệu và phát instruction abs(S)<=4 triệu, cấp demo<=20 triệu đúng action/scope/time",
+    "Employee-paid basis: responsible employee confirmation+service evidence trong ngưỡng Q32; trên ngưỡng cần căn cứ tiền/xác nhận tài chính riêng",
+    "A là completed employee advance được kế toán xác minh/binding; printed advance không là actual",
+    "P/R zero cần coverage đủ, opening balances và fund scope; không lấy absence file làm zero",
+    "Không expense usage/reservation khác, trừ case duplicate12",
+    "Current LIVE/REPLAY boundary EVIDENCE_READY/conclusionNone/no instruction trước plan finance/admissibility"
+  ],
+  "cases": [
+    {
+      "case_id": "TC01",
+      "folder": "tc01-hop-le-nhan-vien-hoan-tra-tien-thua",
+      "legacy_title": "Hợp lệ nhân viên hoàn trả tiền thừa",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_scope": "Tiếp khách địa phương",
+      "business_invariant_to_preserve": "Giữ kết quả thu lại tiền ứng thừa",
+      "legacy_expected": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "COVERED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc01-hop-le-nhan-vien-hoan-tra-tien-thua/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "6af4c063a3662ad568f30536c58213cb95fd7e48018892ab8f14df7a312d977c"
+        },
+        {
+          "path": "tc01-hop-le-nhan-vien-hoan-tra-tien-thua/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "d8dddd4e839e8fa89c059bee610b9a85457757d577e7ec9ce352c9ad158f3019"
+        }
+      ],
+      "evidence_expectation": "Đọc tổng 3.240.000, ứng khai 4.000.000, số hoàn in 760.000; ref 00000101. Invoice chỉ nêu phương thức chuyển khoản, không chứng minh employee đã trả.",
+      "required_source_adaptation": "Tạo biến thể bữa ăn phục vụ chuyến công tác; giữ 10 suất, đơn giá 300.000, VAT 240.000, tổng 3.240.000. Bổ sung trip trên giấy.",
+      "planned_variant_id": "UC03-F01",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "Nếu E=3.240.000/A=4.000.000/P=R=0 đã đủ căn cứ: READY_TO_EXECUTE, COLLECT 760.000; nhận tiền hoàn rồi mới SETTLED.",
+        "requires_common_context": true,
+        "scenario_goal": "COLLECT",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": 3240000,
+            "A": 4000000,
+            "P": 0,
+            "R": 0,
+            "S": -760000
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "READY_TO_EXECUTE",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "COLLECT",
+          "amount_vnd": 760000,
+          "instruction_count": 1,
+          "condition": "COMMON_GATES_SATISFIED_NO_BUSINESS_ISSUES"
+        },
+        "execution_actor": "ACCOUNTANT_WITH_RECORD_EXECUTION_GRANT",
+        "post_execution_state": {
+          "state": "SETTLED",
+          "condition": "E/A/P/R đầy đủ, S=0 sau actual completed/bound event; không open/unknown execution. TC03 không cần money event mới."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN",
+      "generated_variant": {
+        "case_id": "UC03-F01",
+        "folder": "../../test-kit/uc03-pilot/f01-cong-tac-thu-lai-tien-thua",
+        "status": "INPUTS_AND_HIDDEN_GOLD_CREATED_NOT_E2E_READY",
+        "plan": "../../../docs/superpowers/plans/2026-10-14-evidence-finance-admission.md"
+      }
+    },
+    {
+      "case_id": "TC02",
+      "folder": "tc02-hop-le-cong-ty-thanh-toan-them",
+      "legacy_title": "Hợp lệ công ty thanh toán thêm",
+      "source_purpose": "Mua thiết bị văn phòng phục vụ hoạt động công ty",
+      "source_scope": "Mua thiết bị",
+      "business_invariant_to_preserve": "Giữ kết quả công ty chi thêm",
+      "legacy_expected": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "COVERED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc02-hop-le-cong-ty-thanh-toan-them/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "5361b509da576e842896bf9df302af98336a76dd4406019af1da50cf3d3fcfe2"
+        },
+        {
+          "path": "tc02-hop-le-cong-ty-thanh-toan-them/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "03e5473e19ce2c368cc1b696afd21f7e687c8170b094f9b19bbae4c6f4ce1d6d"
+        }
+      ],
+      "evidence_expectation": "Đọc máy in văn phòng, tổng 5.400.000, ứng khai 5.000.000, phần chi thêm in 400.000; ref 00000201.",
+      "required_source_adaptation": "Bản gốc dùng evidence-only. Tạo biến thể chi phí lưu trú công tác tổng 5.400.000, giữ số tiền/cấu trúc VAT, thay cả bảng kê và invoice; không chỉ đổi context.",
+      "planned_variant_id": "UC03-F02",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "Nếu biến thể E=5.400.000/A=5.000.000/P=R=0 đủ căn cứ: READY_TO_EXECUTE, PAY 400.000. Bản máy in gốc không được coi là routine công tác.",
+        "requires_common_context": true,
+        "scenario_goal": "PAY",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": 5400000,
+            "A": 5000000,
+            "P": 0,
+            "R": 0,
+            "S": 400000
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "READY_TO_EXECUTE",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "PAY",
+          "amount_vnd": 400000,
+          "instruction_count": 1,
+          "condition": "COMMON_GATES_SATISFIED_NO_BUSINESS_ISSUES"
+        },
+        "execution_actor": "ACCOUNTANT_WITH_RECORD_EXECUTION_GRANT",
+        "post_execution_state": {
+          "state": "SETTLED",
+          "condition": "E/A/P/R đầy đủ, S=0 sau actual completed/bound event; không open/unknown execution. TC03 không cần money event mới."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN",
+      "generated_variant": {
+        "case_id": "UC03-F02",
+        "folder": "../../test-kit/uc03-pilot/f02-cong-tac-cong-ty-chi-them",
+        "status": "INPUTS_AND_HIDDEN_GOLD_CREATED_NOT_E2E_READY",
+        "plan": "../../../docs/superpowers/plans/2026-10-14-evidence-finance-admission.md"
+      }
+    },
+    {
+      "case_id": "TC03",
+      "folder": "tc03-hop-le-khong-phat-sinh-chenh-lech",
+      "legacy_title": "Hợp lệ không phát sinh chênh lệch",
+      "source_purpose": "Chi phí lưu trú trong chuyến công tác",
+      "source_scope": "Công tác",
+      "business_invariant_to_preserve": "Giữ cân bằng không tạo yêu cầu số 0",
+      "legacy_expected": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "COVERED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc03-hop-le-khong-phat-sinh-chenh-lech/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "18f981f5fd6ecc541d316bdb4a0c8e51f44d5322e2cc69d88dbfebabc24d6b93"
+        },
+        {
+          "path": "tc03-hop-le-khong-phat-sinh-chenh-lech/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "7e21f2f2403196bec51dfa86c0f054671a1466a958a8187feeb1df40530a3011"
+        }
+      ],
+      "evidence_expectation": "Đọc phòng nghỉ 4 đêm, trước thuế 4.000.000/VAT 320.000/tổng 4.320.000; ứng khai 4.320.000, số chênh in 0.",
+      "required_source_adaptation": "Giữ chi phí lưu trú; bổ sung nơi đến/ngày đi-về, xác nhận nhân viên trả, A thực nhận và coverage P/R. Không suy trip từ ngày lập đơn.",
+      "planned_variant_id": "UC03-F03",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "Nếu E=A=4.320.000 và P=R=0 verified: S=0, BALANCED/SETTLED, không instruction, không execution OPEN/UNKNOWN.",
+        "requires_common_context": true,
+        "scenario_goal": "BALANCED",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": 4320000,
+            "A": 4320000,
+            "P": 0,
+            "R": 0,
+            "S": 0
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "SETTLED",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": 0,
+          "instruction_count": 0,
+          "condition": "BALANCED_NO_OPEN_OR_UNKNOWN_EXECUTION"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": "SETTLED",
+          "condition": "E/A/P/R đầy đủ, S=0 sau actual completed/bound event; không open/unknown execution. TC03 không cần money event mới."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN",
+      "generated_variant": {
+        "case_id": "UC03-F03",
+        "folder": "../../test-kit/uc03-pilot/f03-cong-tac-can-bang",
+        "status": "INPUTS_AND_HIDDEN_GOLD_CREATED_NOT_E2E_READY",
+        "plan": "../../../docs/superpowers/plans/2026-10-14-evidence-finance-admission.md"
+      }
+    },
+    {
+      "case_id": "TC04",
+      "folder": "tc04-hop-le-nhieu-mat-hang-thiet-bi",
+      "legacy_title": "Hợp lệ nhiều mặt hàng thiết bị",
+      "source_purpose": "Mua thiết bị máy tính cho nhân viên",
+      "source_scope": "Mua thiết bị",
+      "business_invariant_to_preserve": "Giữ nhiều mặt hàng và số lớn",
+      "legacy_expected": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "COVERED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc04-hop-le-nhieu-mat-hang-thiet-bi/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "c401a2cdd8dcc9e1d48348d1a40df832a2993a331a596538e89ecf020b394f6c"
+        },
+        {
+          "path": "tc04-hop-le-nhieu-mat-hang-thiet-bi/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "b8c5b4efa03083986be17496845179ddcb9c5a490dc9d8dd0a23b7c42ceccebf"
+        }
+      ],
+      "evidence_expectation": "Đọc tổng 83.600.000/ứng 85.000.000, chênh khai 1.400.000; nhiều item không tự thành nhiều lần chi.",
+      "required_source_adaptation": "Bản thiết bị giữ evidence-only. Muốn test finance tạo biến thể chi công tác nhiều khoản giữ tổng; phải có confirmation tài chính/paid basis độc lập vì E>8 triệu.",
+      "planned_variant_id": "UC03-F04",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "Sau khi scope/facts đủ: E=83.600.000 vượt 8 triệu, cũng vượt cấp demo 20 triệu; không routine, không instruction, cần cấp có quyền ngoài demo.",
+        "requires_common_context": true,
+        "scenario_goal": "AUTHORITY",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC04:paid_basis",
+            "kind": "FACT",
+            "owner": "ACCOUNTANT",
+            "field_or_rule": "expense:employee_paid_basis",
+            "condition": "candidate_E_above_8000000_and_admissible_paid_basis_missing",
+            "depends_on": [],
+            "required_answer": "Cung cấp payment proof hoặc financial confirmation đúng trách nhiệm, refs/người/thời điểm/scope. Employee-only Q32 không đủ ngoài ngưỡng."
+          },
+          {
+            "id": "TC04:recognize_cost",
+            "kind": "AUTHORITY",
+            "owner": "HIGHER_AUTHORITY",
+            "field_or_rule": "authority:RECOGNIZE_COST",
+            "condition": "E_known_above_8000000_and_required_recognition_grant_missing",
+            "depends_on": [
+              "TC04:paid_basis"
+            ],
+            "required_answer": "Công nhận E đúng người/hoạt động/profile/time/amount; không chỉ kiểm abs(S). Trên 20 triệu cần cấp ngoài demo."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": 83600000,
+            "A": 85000000,
+            "P": 0,
+            "R": 0,
+            "S": -1400000
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": "ACCOUNTANT_WITH_RECORD_EXECUTION_GRANT",
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        },
+        "possible_effect_after_issue_resolution": {
+          "direction": "COLLECT",
+          "amount_vnd": 1400000,
+          "condition": "Chỉ nếu resolved source xác nhận đúng các con số và mọi grant/policy đủ; nếu facts đổi thì recompute."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC05",
+      "folder": "tc05-tong-cac-dong-tren-bao-cao-khong-khop",
+      "legacy_title": "Tổng các dòng trên báo cáo không khớp",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_scope": "Tiếp khách địa phương",
+      "business_invariant_to_preserve": "Giữ lỗi tổng bảng kê",
+      "legacy_expected": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_PAPER_TOTAL_001",
+        "implementation_status": "COVERED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc05-tong-cac-dong-tren-bao-cao-khong-khop/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "b86695951b340957cba2a39aafc474c77e50d209d9ad2430ff4fe94141378d67"
+        },
+        {
+          "path": "tc05-tong-cac-dong-tren-bao-cao-khong-khop/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "6216eae3e32cdf2394d97de0e90ccf0fce60f90596ff230fef1d2db28e96008c"
+        }
+      ],
+      "evidence_expectation": "Giữ 2 dòng 2.000.000 + 1.000.000 = 3.000.000; printed_total 3.500.000; invoice gross 3.240.000. Model đọc literal, không sửa số nguồn.",
+      "required_source_adaptation": "Tạo biến thể hai khoản công tác nhưng giữ đồng thời ba số và invoice_refs; cung cấp các căn cứ chung để lỗi totals được kiểm riêng.",
+      "planned_variant_id": "UC03-F05",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "S chưa được khẳng định; WAITING/FACT về totals, không instruction. Không chọn 3.000.000/3.240.000/3.500.000 chỉ theo model confidence.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC05:totals",
+            "kind": "FACT",
+            "owner": "EMPLOYEE",
+            "field_or_rule": "settlement_totals",
+            "condition": "literal_totals_conflict",
+            "depends_on": [],
+            "required_answer": "Bảng kê cộng 3.000.000, tổng ghi 3.500.000, hóa đơn ghi 3.240.000: hãy sửa bảng kê/nguồn tương ứng và xác định số nào đúng, gồm hay chưa gồm thuế."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC06",
+      "folder": "tc06-chenh-lech-quyet-toan-ghi-sai",
+      "legacy_title": "Chênh lệch quyết toán ghi sai",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_scope": "Tiếp khách địa phương",
+      "business_invariant_to_preserve": "Giữ chênh lệch trên giấy ghi sai",
+      "legacy_expected": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_SETTLEMENT_DIFF_001",
+        "implementation_status": "COVERED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc06-chenh-lech-quyet-toan-ghi-sai/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "8ff6df5d8a361ae2d00e2d767f858a6288a0168b227663cfbc11b50b00130c00"
+        },
+        {
+          "path": "tc06-chenh-lech-quyet-toan-ghi-sai/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "3625468be7503fa3b973b81fdc9740b98c5451acca96d2a073ba490437751890"
+        }
+      ],
+      "evidence_expectation": "Đọc 3.240.000/4.000.000/printed_return 700.000 và chữ 700.000; arithmetic reference là 760.000, không ghi đè printed_return.",
+      "required_source_adaptation": "Chuyển dịch vụ sang chi phí chuyến công tác, giữ sai lệch 700.000 so với 760.000. Đảm bảo ledger chưa có return 700.000.",
+      "planned_variant_id": "UC03-F06",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "FACT về printed settlement; 760.000 là phép tính tham chiếu khi E/A verified, chưa khẳng định balance trước giải quyết conflict. Printed_return không phải R đã nhận.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC06:printed_difference",
+            "kind": "FACT",
+            "owner": "EMPLOYEE",
+            "field_or_rule": "printed_return_vs_verified_balances",
+            "condition": "printed_settlement_conflict",
+            "depends_on": [],
+            "required_answer": "Ứng 4.000.000 và chi 3.240.000 chênh 760.000, đơn ghi 700.000: đây là lỗi khai số phải hoàn hay đã có giao dịch hoàn một phần? Bổ sung/sửa đúng loại căn cứ."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC07",
+      "folder": "tc07-so-tien-bang-chu-tren-bao-cao-khong-khop",
+      "legacy_title": "Số tiền bằng chữ trên báo cáo không khớp",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_scope": "Tiếp khách địa phương",
+      "business_invariant_to_preserve": "Giữ số bằng chữ khác số bằng số",
+      "legacy_expected": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_PAPER_CONSISTENCY_001",
+        "implementation_status": "COVERED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc07-so-tien-bang-chu-tren-bao-cao-khong-khop/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "b86b3fb5efa4467bfad39bd3661134fb3d0f42acad6f0cbc0c93ca261bd7fa9c"
+        },
+        {
+          "path": "tc07-so-tien-bang-chu-tren-bao-cao-khong-khop/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "26b8605079ac11c75a874e9466abf4391285dcd94994178dd067a014565c47de"
+        }
+      ],
+      "evidence_expectation": "Giữ printed_total 3.240.000 và amount_words chỉ 3.500.000; không chuẩn hóa thành cùng giá trị.",
+      "required_source_adaptation": "Tạo biến thể công tác giữ nguyên mâu thuẫn chữ-số; test admission semantic consistency riêng, không gọi đây là lỗi OCR.",
+      "planned_variant_id": "UC03-F07",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "FACT blocking inconsistency theo contract đã chốt: printed_total 3.240.000 và amount_words 3.500.000; không instruction. Sửa implementation drift, không mở lại quyết định criticality.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC07:amount_words",
+            "kind": "FACT",
+            "owner": "EMPLOYEE",
+            "field_or_rule": "amount_words_vs_printed_total",
+            "condition": "critical_words_digits_conflict",
+            "depends_on": [],
+            "required_answer": "Tổng bằng số 3.240.000 nhưng bằng chữ 3.500.000: hãy sửa đơn và xác nhận tổng đúng với chứng từ."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN",
+      "implementation_dependency": {
+        "contract": "IMPLEMENTATION_CONTRACTS §12.3: amount_words thuộc criticality tối thiểu SETTLEMENT_FORM",
+        "observed_code_drift": "document_profiles.py hiện gán amount_words NON_CRITICAL",
+        "required_action": "Implementer đưa profile trở lại contract trước khi case này dùng làm oracle runtime; không thay contract/gold để khớp source đang drift."
+      }
+    },
+    {
+      "case_id": "TC08",
+      "folder": "tc08-bao-cao-va-hoa-don-lech-so-tien",
+      "legacy_title": "Báo cáo và hóa đơn lệch số tiền",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_scope": "Tiếp khách địa phương",
+      "business_invariant_to_preserve": "Giữ bảng kê và invoice lệch tiền",
+      "legacy_expected": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_PAPER_AMOUNT_001",
+        "implementation_status": "COVERED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc08-bao-cao-va-hoa-don-lech-so-tien/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "2e6cee3a5bfe2d6878ab2a6008845a33a1855152d50589553a2bc41926b3d940"
+        },
+        {
+          "path": "tc08-bao-cao-va-hoa-don-lech-so-tien/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "3211a01c1fa54983aeb5809936c1f68396b043ff8395016b937656cfdbf9b817"
+        }
+      ],
+      "evidence_expectation": "Giữ claim 3.500.000, invoice 3.240.000, printed_return 500.000; ref exact vẫn có thể AUTO_LINK nhưng không chứng minh amounts khớp.",
+      "required_source_adaptation": "Biến thể công tác; giữ exact reference và lệch 260.000 để kiểm tách matching khỏi admission.",
+      "planned_variant_id": "UC03-F08",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "FACT về cost value/binding, không invoice-match PASS rồi tự dùng E=3.500.000 hoặc E=3.240.000.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC08:expense_amount",
+            "kind": "FACT",
+            "owner": "EMPLOYEE",
+            "field_or_rule": "expense:amount_and_document_binding",
+            "condition": "claim_invoice_amount_conflict",
+            "depends_on": [],
+            "required_answer": "Khoản kê 3.500.000 và hóa đơn 3.240.000 lệch 260.000: có chi phí bổ sung nào có căn cứ hay bảng kê sai?"
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC09",
+      "folder": "tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac",
+      "legacy_title": "Mã số thuế người mua thuộc công ty khác",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_scope": "Tiếp khách địa phương",
+      "business_invariant_to_preserve": "Giữ buyer identity mâu thuẫn",
+      "legacy_expected": {
+        "decision": "ESCALATE",
+        "rule": "SET_BUYER_TAX_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "7b49e2e0168200e6532513d13251a7910e9e58a3e59a3fd1656737fa56f32d5d"
+        },
+        {
+          "path": "tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "bcfa80a1a46117d9c8aa20db1644b74ac67c6193d954432a6184ffa3c5c313e2"
+        }
+      ],
+      "evidence_expectation": "Giữ buyer name công ty An Thịnh nhưng MST 7777777777, context công ty 0319999996; không thay MST từ context vào OCR fact.",
+      "required_source_adaptation": "Biến thể công tác giữ buyer mismatch; freeze predicate identity/activity trước gold business, không tự thêm quy định thuế.",
+      "planned_variant_id": "UC03-F09",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "FACT về identity/binding trước. POLICY chỉ nếu rulebook đã có điều kiện buyer bắt buộc và facts rõ; không map ESCALATE cũ thành POLICY mặc định.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC09:buyer_binding",
+            "kind": "FACT",
+            "owner": "EMPLOYEE",
+            "field_or_rule": "expense:buyer_identity_activity_binding",
+            "condition": "buyer_identity_contradiction",
+            "depends_on": [],
+            "required_answer": "MST trên hóa đơn 7777777777 khác công ty 0319999996 dù tên giống: tài liệu thuộc đúng hoạt động không và cần nhà cung cấp sửa gì?"
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC10",
+      "folder": "tc10-hoa-don-thieu-ma-so-thue-nguoi-mua",
+      "legacy_title": "Hóa đơn thiếu mã số thuế người mua",
+      "source_purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "source_scope": "Tiếp khách địa phương",
+      "business_invariant_to_preserve": "Giữ trường bắt buộc/thiếu dữ liệu",
+      "legacy_expected": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_REQUIRED_FIELD_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc10-hoa-don-thieu-ma-so-thue-nguoi-mua/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "082c2147228cd1d5f9ec938008fe0e9d118fc0af4ce931ff4dfd70b22c006cf2"
+        },
+        {
+          "path": "tc10-hoa-don-thieu-ma-so-thue-nguoi-mua/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "51579a3d6c2e467ff69fb21446ae75e3f8c25588d2066e2401cf194f0b778d8f"
+        }
+      ],
+      "evidence_expectation": "buyer_tax_code=NOT_PRESENT trên invoice; không lấy từ request/context để điền. Giữ các trường khác đọc được.",
+      "required_source_adaptation": "Biến thể công tác; xác định field importance/requiredness của E_INVOICE trước golden business. Không biến thiếu informational field thành FACT bắt buộc.",
+      "planned_variant_id": "UC03-F10",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "Chỉ khóa FACT nếu profile/admissibility thực sự yêu cầu MST này; nếu optional thì notice và đánh giá binding bằng nguồn khác. Hiện chưa freeze financial oracle.",
+        "requires_common_context": true,
+        "oracle_hold_reason": "Chưa có operative buyer-tax requiredness/admissibility rule để khóa business gold; không lấy legacy REQUEST_INFO thay quy định.",
+        "scenario_goal": "PROFILE_RULE_REQUIRED",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC10:buyer_requiredness",
+            "kind": "FACT",
+            "owner": "ACCOUNTANT",
+            "field_or_rule": "invoice:buyer_tax_code",
+            "condition": "operative_profile_requires_missing_buyer_tax_code",
+            "depends_on": [],
+            "required_answer": "Nếu MST cần cho binding: hóa đơn thiếu MST bên mua, hãy bổ sung bản sửa hoặc xác nhận identity bằng căn cứ được profile nhận."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC11",
+      "folder": "tc11-so-hoc-tren-hoa-don-khong-nhat-quan",
+      "legacy_title": "Số học trên hóa đơn không nhất quán",
+      "source_purpose": "Mua thiết bị văn phòng phục vụ hoạt động công ty",
+      "source_scope": "Mua thiết bị",
+      "business_invariant_to_preserve": "Giữ số học nội bộ invoice sai",
+      "legacy_expected": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_ARITH_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc11-so-hoc-tren-hoa-don-khong-nhat-quan/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "6ad1a550687c94c4b2fd08edeed79e52a9cdd5ee4efbd7c8532e23e41e36269f"
+        },
+        {
+          "path": "tc11-so-hoc-tren-hoa-don-khong-nhat-quan/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "1ae75778de46915cf9c3434605165fbeed5cced0a7000c566de940b3f0b720c4"
+        }
+      ],
+      "evidence_expectation": "Giữ subtotal 5.000.000 + tax 400.000 nhưng total 5.500.000; printed/request 5.500.000 không làm invoice tự nhất quán.",
+      "required_source_adaptation": "Gốc máy in evidence-only; biến thể dịch vụ công tác giữ subtotal/tax/printed_total sai.",
+      "planned_variant_id": "UC03-F11",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "FACT nội bộ invoice; không tự sửa total thành 5.400.000, không issue instruction theo 5.500.000.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC11:invoice_arithmetic",
+            "kind": "FACT",
+            "owner": "EMPLOYEE",
+            "field_or_rule": "invoice:subtotal_tax_total",
+            "condition": "invoice_arithmetic_conflict",
+            "depends_on": [],
+            "required_answer": "Tiền hàng 5.000.000 + thuế 400.000 = 5.400.000, hóa đơn ghi 5.500.000: bổ sung invoice sửa đúng từ nhà cung cấp."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC12",
+      "folder": "tc12-hoa-don-trung-dinh-danh-voi-ho-so-truoc",
+      "legacy_title": "Hóa đơn trùng định danh với hồ sơ trước",
+      "source_purpose": "Chi phí tiếp khách lần nộp thứ hai",
+      "source_scope": "Tiếp khách địa phương",
+      "business_invariant_to_preserve": "Giữ kiểm trùng economic obligation qua hai lần nộp",
+      "legacy_expected": {
+        "decision": "ESCALATE",
+        "rule": "SET_DUP_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc12-hoa-don-trung-dinh-danh-voi-ho-so-truoc/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "02248e2e6963fe3abe8f469762be6f33b255875dd71b768f78c957e169c4b803"
+        },
+        {
+          "path": "tc12-hoa-don-trung-dinh-danh-voi-ho-so-truoc/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "45a547bf6e9aba2147adbf431e1759309030087f3301a1906f5e321395cc6620"
+        }
+      ],
+      "evidence_expectation": "Invoice trùng số/issuer/date/amount TC01; phải đọc đúng cả hai submission. Byte hash chỉ là signal, không phải economic identity tự đủ.",
+      "required_source_adaptation": "Dùng hai lần nộp của cùng UC03-F01, cùng người/hoạt động; dựng usage/reservation hoặc instruction trước trong runtime context, không chỉ tải file đơn lẻ.",
+      "planned_variant_id": "UC03-F12",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "Lần hai không phát hành obligation/instruction mới; giữ owner canonical và audit reuse/block. Không mặc định gian lận hoặc POLICY chỉ vì trùng byte.",
+        "requires_common_context": true,
+        "scenario_goal": "REUSE_NO_SECOND_INSTRUCTION",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC12:prior_usage",
+            "kind": "FACT",
+            "owner": "ACCOUNTANT",
+            "field_or_rule": "usage:economic_obligation_owner",
+            "condition": "prior_usage_or_scope_not_verified",
+            "depends_on": [],
+            "required_answer": "Chỉ hỏi nếu scope/usage chưa rõ: hóa đơn này đã dùng ở hồ sơ trước nào, cùng hoạt động và phần chi đã được xử lý chưa?"
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC13",
+      "folder": "tc13-khoan-chi-ruou-bia-can-chuyen-policy",
+      "legacy_title": "Khoản chi rượu bia cần chuyển policy",
+      "source_purpose": "Mua đồ uống phục vụ cá nhân sau giờ làm",
+      "source_scope": "Chi cá nhân rõ",
+      "business_invariant_to_preserve": "Giữ không hoàn trả chi cá nhân và vẫn thu lại ứng",
+      "legacy_expected": {
+        "decision": "ESCALATE",
+        "rule": "SET_CATEGORY_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc13-khoan-chi-ruou-bia-can-chuyen-policy/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "9ab08caf796cd86b1535b8629ceb35846d5c4db157c59932ce206bd5391f8c03"
+        },
+        {
+          "path": "tc13-khoan-chi-ruou-bia-can-chuyen-policy/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "9acf672a2d723d60f16ccdb48eaf1bbf1356d59e6be76adc8bab8c5ad005a5b5"
+        }
+      ],
+      "evidence_expectation": "Request ghi phục vụ cá nhân sau giờ làm; invoice rượu 2.160.000; giữ A khai 3.000.000 và chênh khai 840.000 nhưng không coi chúng là actual.",
+      "required_source_adaptation": "Đặt nguồn chi cá nhân vào root công tác có activity/A/coverage hợp lệ; không đổi nguồn thành chi công việc. Không thêm blanket ban rượu ngoài rulebook.",
+      "planned_variant_id": "UC03-F13",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "Nếu toàn bộ khoản rõ là cá nhân: disposition EXCLUDED, E=0; A=3.000.000/P=R=0 verified thì COLLECT 3.000.000, không 840.000. Không buộc POLICY để phê duyệt khoản bị loại rõ.",
+        "requires_common_context": true,
+        "scenario_goal": "EXCLUDED_COLLECT_ADVANCE",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": 0,
+            "A": 3000000,
+            "P": 0,
+            "R": 0,
+            "S": -3000000
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "READY_TO_EXECUTE",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "COLLECT",
+          "amount_vnd": 3000000,
+          "instruction_count": 1,
+          "condition": "COMMON_GATES_SATISFIED_NO_BUSINESS_ISSUES"
+        },
+        "execution_actor": "ACCOUNTANT_WITH_RECORD_EXECUTION_GRANT",
+        "post_execution_state": {
+          "state": "SETTLED",
+          "condition": "E/A/P/R đầy đủ, S=0 sau actual completed/bound event; không open/unknown execution. TC03 không cần money event mới."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC14",
+      "folder": "tc14-tong-ho-so-vuot-tham-quyen-100-trieu",
+      "legacy_title": "Tổng hồ sơ vượt thẩm quyền 100 triệu",
+      "source_purpose": "Mua máy chủ phục vụ hệ thống nội bộ",
+      "source_scope": "Mua thiết bị",
+      "business_invariant_to_preserve": "Giữ vượt quyền lớn dù số phải chi nhỏ",
+      "legacy_expected": {
+        "decision": "ESCALATE",
+        "rule": "SET_AUTH_001",
+        "implementation_status": "COVERED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc14-tong-ho-so-vuot-tham-quyen-100-trieu/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "dedf0e0493e94b4a9443e25defebb78675ade1a7bee74c5948a02885309a9cd6"
+        },
+        {
+          "path": "tc14-tong-ho-so-vuot-tham-quyen-100-trieu/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "4c3abef57943fdb9ea48554df77a6a29b7173a5a54edf6348a3df28ba0feec95"
+        }
+      ],
+      "evidence_expectation": "Đọc máy chủ, invoice 121.000.000/ứng khai 120.000.000/chênh khai 1.000.000.",
+      "required_source_adaptation": "Giữ gốc evidence-only; biến thể chi công tác lớn nếu cần test authority, bổ sung independent financial basis vì E>8 triệu. Không mang cap 100 triệu của Hoangha.",
+      "planned_variant_id": "UC03-F14",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "E=121.000.000 verified vượt quyền công nhận 8 triệu và cấp demo 20 triệu dù S=1 triệu; không instruction, cấp ngoài demo.",
+        "requires_common_context": true,
+        "scenario_goal": "AUTHORITY",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC14:paid_basis",
+            "kind": "FACT",
+            "owner": "ACCOUNTANT",
+            "field_or_rule": "expense:employee_paid_basis",
+            "condition": "candidate_E_above_8000000_and_admissible_paid_basis_missing",
+            "depends_on": [],
+            "required_answer": "Cung cấp payment proof hoặc financial confirmation đúng trách nhiệm, refs/người/thời điểm/scope. Employee-only Q32 không đủ ngoài ngưỡng."
+          },
+          {
+            "id": "TC14:recognize_cost",
+            "kind": "AUTHORITY",
+            "owner": "HIGHER_AUTHORITY",
+            "field_or_rule": "authority:RECOGNIZE_COST",
+            "condition": "E_known_above_8000000_and_required_recognition_grant_missing",
+            "depends_on": [
+              "TC14:paid_basis"
+            ],
+            "required_answer": "Công nhận E đúng người/hoạt động/profile/time/amount; không chỉ kiểm abs(S). Trên 20 triệu cần cấp ngoài demo."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": 121000000,
+            "A": 120000000,
+            "P": 0,
+            "R": 0,
+            "S": 1000000
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": "ACCOUNTANT_WITH_RECORD_EXECUTION_GRANT",
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        },
+        "possible_effect_after_issue_resolution": {
+          "direction": "PAY",
+          "amount_vnd": 1000000,
+          "condition": "Chỉ nếu resolved source xác nhận đúng các con số và mọi grant/policy đủ; nếu facts đổi thì recompute."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC15",
+      "folder": "tc15-evidence-cung-so-tien-nhung-sai-noi-dung",
+      "legacy_title": "Evidence cùng số tiền nhưng sai nội dung",
+      "source_purpose": "Sửa chữa máy in văn phòng",
+      "source_scope": "Sửa chữa thiết bị",
+      "business_invariant_to_preserve": "Giữ cùng số tiền nhưng khác nghiệp vụ/reference",
+      "legacy_expected": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_PAPER_MATCH_001",
+        "implementation_status": "COVERED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc15-evidence-cung-so-tien-nhung-sai-noi-dung/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "40845e70cf423ddb1cf94a17642b0031072b5cbcfd09fadf52eba7d6ff4d8da5"
+        },
+        {
+          "path": "tc15-evidence-cung-so-tien-nhung-sai-noi-dung/hoa_don_dien_tu.pdf",
+          "pages": 1,
+          "sha256": "7fb7ec1859d0e2c2d859491617a58dd34c90ab0dafc47add0e676f1ffdf0cedb"
+        }
+      ],
+      "evidence_expectation": "Request sửa máy in/ref SC-2026-15, invoice vé máy bay/ref 00001501 đều 2.700.000; giữ hai descriptions/refs riêng.",
+      "required_source_adaptation": "Gốc repair evidence-only; biến thể claim khách sạn nhưng attachment vé máy bay giữ amount 2.700.000 để test sai liên kết trong scope công tác.",
+      "planned_variant_id": "UC03-F15",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "FACT binding; equal amount hoặc LLM promote suggestion không đủ activity/expense admission. Không chọn document theo filename.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC15:expense_binding",
+            "kind": "FACT",
+            "owner": "EMPLOYEE",
+            "field_or_rule": "expense:document_activity_binding",
+            "condition": "different_content_reference_unresolved",
+            "depends_on": [],
+            "required_answer": "Khoản kê và chứng từ đều 2.700.000 nhưng nội dung/reference khác: hãy gắn đúng chứng từ cho từng khoản hoặc sửa khai báo."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC16",
+      "folder": "tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac",
+      "legacy_title": "Hợp lệ ba hóa đơn trong một báo cáo công tác",
+      "source_purpose": "Hoàn ứng chi phí chuyến công tác Đà Nẵng",
+      "source_scope": "Công tác",
+      "business_invariant_to_preserve": "Giữ ba khoản/matching đúng nhưng finance vượt ngưỡng",
+      "legacy_expected": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "2c5da32c468bfd26a816f11ae28307537324131ba2eb57153026f547f3094131"
+        },
+        {
+          "path": "tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/hoa_don_khach_san.pdf",
+          "pages": 1,
+          "sha256": "689b74e5fc165aaab7bcf3d2dd460cdccc81774459bd886bd9c8c3c83d175b51"
+        },
+        {
+          "path": "tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/hoa_don_ve_may_bay.pdf",
+          "pages": 1,
+          "sha256": "1b4a595cf05f36ab6b4e6d62d8003b66fdd6404ad020afedf7cbe8d8e7437e52"
+        },
+        {
+          "path": "tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/hoa_don_taxi.pdf",
+          "pages": 1,
+          "sha256": "3be0d44400459dfb29f7126a9231632249592d54ba3e01082fecd0f2c1e440b3"
+        }
+      ],
+      "evidence_expectation": "Ba dòng 4.320.000 + 5.400.000 + 540.000 = 10.260.000, refs 00001601/2/3; một-một, không đếm tổng invoice lần hai.",
+      "required_source_adaptation": "Giữ nội dung Đà Nẵng, thêm trip dates vào nguồn; finance actor xác nhận paid E, A=12.000.000/coverage; không dùng employee-only Q32 cho E>8 triệu.",
+      "planned_variant_id": "UC03-F16",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "Với E=10.260.000/A=12.000.000: S=-1.740.000 là arithmetic khi verified, nhưng cần quyền công nhận E>8 triệu. Cấp demo <=20 triệu có thể quyết đúng grant; sau đó mới COLLECT.",
+        "requires_common_context": true,
+        "scenario_goal": "AUTHORITY",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC16:paid_basis",
+            "kind": "FACT",
+            "owner": "ACCOUNTANT",
+            "field_or_rule": "expense:employee_paid_basis",
+            "condition": "candidate_E_above_8000000_and_admissible_paid_basis_missing",
+            "depends_on": [],
+            "required_answer": "Cung cấp payment proof hoặc financial confirmation đúng trách nhiệm, refs/người/thời điểm/scope. Employee-only Q32 không đủ ngoài ngưỡng."
+          },
+          {
+            "id": "TC16:recognize_cost",
+            "kind": "AUTHORITY",
+            "owner": "AUTHORIZED_APPROVER",
+            "field_or_rule": "authority:RECOGNIZE_COST",
+            "condition": "E_known_above_8000000_and_required_recognition_grant_missing",
+            "depends_on": [
+              "TC16:paid_basis"
+            ],
+            "required_answer": "Người có grant đúng action/scope/profile/time/max_amount công nhận E; kiểm quyền phát yêu cầu chi/thu riêng."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": 10260000,
+            "A": 12000000,
+            "P": 0,
+            "R": 0,
+            "S": -1740000
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": "ACCOUNTANT_WITH_RECORD_EXECUTION_GRANT",
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        },
+        "possible_effect_after_issue_resolution": {
+          "direction": "COLLECT",
+          "amount_vnd": 1740000,
+          "condition": "Chỉ nếu resolved source xác nhận đúng các con số và mọi grant/policy đủ; nếu facts đổi thì recompute."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC17",
+      "folder": "tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the",
+      "legacy_title": "Hợp lệ hóa đơn kèm vé điện tử thay thế",
+      "source_purpose": "Hoàn ứng chi phí tiếp khách và tổ chức cuộc họp",
+      "source_scope": "Tiếp khách/cuộc họp",
+      "business_invariant_to_preserve": "Giữ nhiều loại chứng từ có thể đủ thay invoice VAT",
+      "legacy_expected": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "7d5342dda35c90d215449d504295d322b51548f4e11efce5761c5b2a5094f838"
+        },
+        {
+          "path": "tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/hoa_don_nha_hang.pdf",
+          "pages": 1,
+          "sha256": "163a2b5e5bfd6ae2802220c467faa0d96b5260aedaed1140a9dfdc3853eb7a08"
+        },
+        {
+          "path": "tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/hoa_don_phong_hop.pdf",
+          "pages": 1,
+          "sha256": "642502d5821139383386c0550b2e19f02de2546037498fa96959bad5d8e6e01f"
+        },
+        {
+          "path": "tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/ve_dien_tu_bai_do_xe.pdf",
+          "pages": 1,
+          "sha256": "90a29084321eb05883e520a50676b02e81cf7b04f0b9a873eb005f39a3a4c9cd"
+        }
+      ],
+      "evidence_expectation": "Giữ hai invoice 3.240.000/2.160.000 và vé bãi xe 200.000. Loại legacy E_TICKET không tự là TRANSPORT_TICKET; đọc nội dung và vai trò.",
+      "required_source_adaptation": "Chuyển thành tiếp khách trong chuyến công tác, giữ số và parking voucher; thêm binding service/activity. Freeze loại/role dựa nguồn (không chỉ alias E_TICKET).",
+      "planned_variant_id": "UC03-F17",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "Nếu cả 3 khoản có service evidence/payer đủ theo profile: E=5.600.000/A=6.000.000 => COLLECT 400.000. Không tự POLICY vì tài liệu không có chữ hóa đơn VAT.",
+        "requires_common_context": true,
+        "scenario_goal": "ROLE_ADMISSION_REQUIRED",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": 5600000,
+            "A": 6000000,
+            "P": 0,
+            "R": 0,
+            "S": -400000
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": "ACCOUNTANT_WITH_RECORD_EXECUTION_GRANT",
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        },
+        "possible_effect_after_issue_resolution": {
+          "direction": "COLLECT",
+          "amount_vnd": 400000,
+          "condition": "Chỉ nếu resolved source xác nhận đúng các con số và mọi grant/policy đủ; nếu facts đổi thì recompute."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC18",
+      "folder": "tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the",
+      "legacy_title": "Hợp lệ một dòng dùng hai tài liệu thay thế",
+      "source_purpose": "Hoàn ứng sửa chữa máy in văn phòng",
+      "source_scope": "Sửa chữa thiết bị",
+      "business_invariant_to_preserve": "Giữ một khoản có nhiều tài liệu bổ trợ không cộng trùng",
+      "legacy_expected": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "a591a6e2311e8baee6e7e467d9ac0a399a09c834ece658bc06895cdf0e9367c0"
+        },
+        {
+          "path": "tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/hoa_don_linh_kien.pdf",
+          "pages": 1,
+          "sha256": "10560d52458c84ae384c0f93c567f5afb1046487a03976d9e7c358024b581417"
+        },
+        {
+          "path": "tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/bien_ban_nghiem_thu.pdf",
+          "pages": 1,
+          "sha256": "72b46c3a1b9a08d40e6f80d1a85d9f97374b2074466bbed39c0c7f7b6135ea05"
+        },
+        {
+          "path": "tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/xac_nhan_chuyen_khoan.pdf",
+          "pages": 1,
+          "sha256": "3f4480a8b2ca5ebcf93767baf2421e38aeb129fa8fd6b885d4280cd748563796"
+        }
+      ],
+      "evidence_expectation": "Invoice 2.700.000; acceptance và bank cùng mô tả nhân công 1.500.000. Hai supporting docs không tạo 3.000.000 chi phí. Bank ghi recipient company An Thịnh, thiếu binding rõ tới trung tâm Phúc An.",
+      "required_source_adaptation": "Gốc repair evidence-only; biến thể dịch vụ công tác giữ one-row/two-support pattern, làm rõ payee trong nguồn nếu muốn happy path. Biến thể giữ ambiguous payee là negative FACT riêng.",
+      "planned_variant_id": "UC03-F18",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "Chưa tự AUTO theo old gold. Giữ bank payer và recipient literal; FACT payee/binding nếu chưa rõ. Sau happy-variant đủ service/payer: E=4.200.000/A=5.000.000 => COLLECT 800.000, không 5.700.000 hay chỉ 2.700.000.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT_PAYEE_AND_ROLE",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC18:payee_binding",
+            "kind": "FACT",
+            "owner": "ACCOUNTANT",
+            "field_or_rule": "expense:payment_payee_binding",
+            "condition": "literal_payee_binding_unresolved",
+            "depends_on": [],
+            "required_answer": "Giao dịch 1.500.000 thực tế vào tài khoản nhà cung cấp dịch vụ nào? Vì sao source ghi người nhận công ty An Thịnh?"
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": 4200000,
+            "A": 5000000,
+            "P": 0,
+            "R": 0,
+            "S": -800000
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": "ACCOUNTANT_WITH_RECORD_EXECUTION_GRANT",
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        },
+        "possible_effect_after_issue_resolution": {
+          "direction": "COLLECT",
+          "amount_vnd": 800000,
+          "condition": "Chỉ nếu resolved source xác nhận đúng các con số và mọi grant/policy đủ; nếu facts đổi thì recompute."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC19",
+      "folder": "tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong",
+      "legacy_title": "Thiếu chứng từ và không có lý do cho một dòng",
+      "source_purpose": "Hoàn ứng chuyến khảo sát khách hàng",
+      "source_scope": "Công tác/khảo sát",
+      "business_invariant_to_preserve": "Giữ thiếu chứng từ một dòng không ép unknown thành 0",
+      "legacy_expected": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_PAPER_EVIDENCE_REQUIRED",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {
+        "rule": {
+          "manifest": "SET_EVIDENCE_REASON_001",
+          "case_expected": "SET_PAPER_EVIDENCE_REQUIRED"
+        }
+      },
+      "inputs": [
+        {
+          "path": "tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "490ceb2fd097860b445085f737a3a6976d5fabf25f91844d9dae3ab06f6fb0c2"
+        },
+        {
+          "path": "tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong/hoa_don_khach_san.pdf",
+          "pages": 1,
+          "sha256": "b66033f1719320d69930564653b5375ae247c4bc78dbe805131a517cb4e3aa8f"
+        },
+        {
+          "path": "tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong/hoa_don_taxi.pdf",
+          "pages": 1,
+          "sha256": "b0cf654f02e40eb12fdab9e51eff2d19759eaee196da816e581a7d2356770e5b"
+        }
+      ],
+      "evidence_expectation": "Hai invoice 2.160.000/540.000; dòng ăn trưa 800.000 không file/lý do. Row NO_EVIDENCE không nghĩa cost=0 hay EXCLUDED.",
+      "required_source_adaptation": "Giữ bản gốc, bổ sung activity dates/finance context cho các phần đã rõ để cô lập thiếu service evidence 800.000.",
+      "planned_variant_id": "UC03-F19",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "FACT service/expense căn cứ dòng 800.000; không instruction cho tổng bị ảnh hưởng, không tự thu 1.300.000 từ E chỉ 2.700.000, không tự công nhận E=3.500.000.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC19:service_evidence",
+            "kind": "FACT",
+            "owner": "EMPLOYEE",
+            "field_or_rule": "expense:L03:service_and_amount",
+            "condition": "service_evidence_missing",
+            "depends_on": [],
+            "required_answer": "Khoản ăn trưa 800.000 chưa có chứng từ dịch vụ: hãy bổ sung tài liệu phù hợp hoặc nguồn xác minh được policy chấp nhận."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC20",
+      "folder": "tc20-co-ly-do-cho-dong-khong-co-chung-tu",
+      "legacy_title": "Có lý do cho dòng không có chứng từ",
+      "source_purpose": "Hoàn ứng chuyến khảo sát hiện trường",
+      "source_scope": "Công tác/khảo sát",
+      "business_invariant_to_preserve": "Giữ lý do thiếu chứng từ nhưng không biến lời giải thích thành tài chính",
+      "legacy_expected": {
+        "decision": "ACCOUNTANT_REVIEW",
+        "rule": "SET_PAPER_EVIDENCE_EXCEPTION",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {
+        "decision": {
+          "manifest": "ESCALATE",
+          "case_expected": "ACCOUNTANT_REVIEW"
+        },
+        "rule": {
+          "manifest": "SET_NO_INVOICE_EXCEPTION_001",
+          "case_expected": "SET_PAPER_EVIDENCE_EXCEPTION"
+        }
+      },
+      "inputs": [
+        {
+          "path": "tc20-co-ly-do-cho-dong-khong-co-chung-tu/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "341b7cb972560d139ddcef74e7845baa2c92a7b0af96fc06f75a0142088958d4"
+        },
+        {
+          "path": "tc20-co-ly-do-cho-dong-khong-co-chung-tu/hoa_don_nhien_lieu.pdf",
+          "pages": 1,
+          "sha256": "58038726ca102ef4b5da47be0c424b94dfb1f69fe7774104530e83ce515de96f"
+        },
+        {
+          "path": "tc20-co-ly-do-cho-dong-khong-co-chung-tu/ve_dien_tu_cao_toc.pdf",
+          "pages": 1,
+          "sha256": "e47c995dcaec75ee8d6566d08968d16d1a89914dbc982f0029b446ddf6fe7584"
+        }
+      ],
+      "evidence_expectation": "Giữ nhiên liệu 1.080.000 + vé phí đường bộ 300.000 + gửi xe thiếu nguồn 100.000 có lý do. Note là declaration, không receipt.",
+      "required_source_adaptation": "Giữ gốc và bổ sung trip/ledger. Không tạo giấy/form giải trình mới; dùng câu hỏi typed đã giữ theo Q33.",
+      "planned_variant_id": "UC03-F20",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "FACT về service/value dòng 100.000 trước; POLICY chỉ khi đã đủ facts và có rule/exception path nhận thiếu chứng từ. Không tự E=1.380.000 hoặc E=1.480.000; lời lý do không tự tạo exemption.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT_THEN_POLICY_IF_RULE",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC20:service_evidence",
+            "kind": "FACT",
+            "owner": "EMPLOYEE",
+            "field_or_rule": "expense:L03:service_and_amount",
+            "condition": "no_receipt_reason_only",
+            "depends_on": [],
+            "required_answer": "Bãi xe không phát hành chứng từ cho khoản 100.000: có nguồn xác minh dịch vụ/số tiền nào được policy nhận? Sau đủ facts mới hỏi người có quyền ngoại lệ nếu cần."
+          },
+          {
+            "id": "TC20:document_exception",
+            "kind": "POLICY",
+            "owner": "AUTHORIZED_APPROVER",
+            "field_or_rule": "policy:missing_original_document_exception",
+            "condition": "facts_verified_and_effective_rule_requires_document_exception",
+            "depends_on": [
+              "TC20:service_evidence"
+            ],
+            "required_answer": "Quyết định ngoại lệ đúng rule/khoản/scope/max_effect với grant hợp lệ; không waive dữ kiện chưa rõ."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC21",
+      "folder": "tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem",
+      "legacy_title": "Một hóa đơn được khai báo nhưng chưa đính kèm",
+      "source_purpose": "Hoàn ứng chi phí tổ chức hội nghị",
+      "source_scope": "Tổ chức hội nghị",
+      "business_invariant_to_preserve": "Giữ khai số hóa đơn nhưng thiếu đúng file",
+      "legacy_expected": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_EVIDENCE_MISSING_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "480b0fce2c74713afd84fe2abd232b5eb406b1fbc378ad9f2e231a7f352275a0"
+        },
+        {
+          "path": "tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem/hoa_don_thue_hoi_truong.pdf",
+          "pages": 1,
+          "sha256": "6af3f4aeceffa8417bd42b3c53cb70cfedb470d7da9a8eff1e7ed8de9988bd12"
+        },
+        {
+          "path": "tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem/hoa_don_in_an.pdf",
+          "pages": 1,
+          "sha256": "f62132779909c611156edcd025b5b74a62bfbdd2a0a1fe9d6386754af0900c78"
+        }
+      ],
+      "evidence_expectation": "Giữ refs 00002101/2/3; invoice nước uống 1.080.000 chưa nộp, total14.040.000/ứng15.000.000. Không điền từ gold vào nguồn.",
+      "required_source_adaptation": "Gốc hội nghị giữ evidence-only; biến thể hội nghị gắn chuyến công tác cần scope rõ, hoặc profile riêng chưa bật.",
+      "planned_variant_id": "UC03-F21",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "FACT thiếu invoice00002103. Sau đủ source/finance E=14.040.000 verified cần AUTHORITY>8 triệu; câu hỏi thuộc dữ kiện có thể làm trước decision phụ thuộc.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT_THEN_AUTHORITY",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC21:missing_invoice",
+            "kind": "FACT",
+            "owner": "EMPLOYEE",
+            "field_or_rule": "expense:L03:source_00002103",
+            "condition": "declared_invoice_not_attached",
+            "depends_on": [],
+            "required_answer": "Bảng kê ghi invoice00002103 nước uống 1.080.000 nhưng thiếu file: hãy nộp đúng source. Sau đó kiểm lại grant công nhận E."
+          },
+          {
+            "id": "TC21:paid_basis",
+            "kind": "FACT",
+            "owner": "ACCOUNTANT",
+            "field_or_rule": "expense:employee_paid_basis",
+            "condition": "candidate_E_above_8000000_and_admissible_paid_basis_missing",
+            "depends_on": [
+              "TC21:missing_invoice"
+            ],
+            "required_answer": "Cung cấp payment proof hoặc financial confirmation đúng trách nhiệm, refs/người/thời điểm/scope. Employee-only Q32 không đủ ngoài ngưỡng."
+          },
+          {
+            "id": "TC21:recognize_cost",
+            "kind": "AUTHORITY",
+            "owner": "AUTHORIZED_APPROVER",
+            "field_or_rule": "authority:RECOGNIZE_COST",
+            "condition": "E_known_above_8000000_and_required_recognition_grant_missing",
+            "depends_on": [
+              "TC21:paid_basis"
+            ],
+            "required_answer": "Người có grant đúng action/scope/profile/time/max_amount công nhận E; kiểm quyền phát yêu cầu chi/thu riêng."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC22",
+      "folder": "tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong",
+      "legacy_title": "Một hóa đơn bị dùng vượt giá trị cho hai dòng",
+      "source_purpose": "Hoàn ứng mua và lắp đặt thiết bị mạng",
+      "source_scope": "Mua/lắp thiết bị",
+      "business_invariant_to_preserve": "Giữ phân bổ vượt giá trị một invoice",
+      "legacy_expected": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_EVIDENCE_REUSE_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "cb6c3bdb3d6f3afce98a263cbfd3ac382181a6e84424ef2d8c21f806baf1e578"
+        },
+        {
+          "path": "tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong/hoa_don_thiet_bi.pdf",
+          "pages": 1,
+          "sha256": "dd1a28efe5dd0d4cfefb023527e62c857ec71bea04deaa5f7081f899559e5713"
+        },
+        {
+          "path": "tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong/hoa_don_van_chuyen.pdf",
+          "pages": 1,
+          "sha256": "bc42a55e74d8f7d2d1b76f74589f8d8aff008e7b3568bebf4e94432269649bcb"
+        }
+      ],
+      "evidence_expectation": "Invoice00002201=5.400.000 bị dùng cho L01 5.400.000 + L02 2.160.000 =7.560.000; vận chuyển540.000 riêng.",
+      "required_source_adaptation": "Gốc giữ evidence-only; biến thể công tác giữ split+over-allocation 2.160.000 và total8.100.000, không đổi lỗi thành hai invoices khác.",
+      "planned_variant_id": "UC03-F22",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "FACT allocation bound; không 2 lần source total. Nếu sửa nguồn và E cuối8.100.000 verified thì AUTHORITY>8 triệu; nếu total giảm theo nguồn khác, recompute không pin nhãn cũ.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT_THEN_AUTHORITY",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC22:allocation",
+            "kind": "FACT",
+            "owner": "EMPLOYEE",
+            "field_or_rule": "expense:allocation_00002201",
+            "condition": "allocated_sum_exceeds_source",
+            "depends_on": [],
+            "required_answer": "Hai dòng cùng invoice5.400.000 nhưng phân bổ7.560.000: dòng2 có chứng từ riêng hay bị khai trùng?"
+          },
+          {
+            "id": "TC22:paid_basis",
+            "kind": "FACT",
+            "owner": "ACCOUNTANT",
+            "field_or_rule": "expense:employee_paid_basis",
+            "condition": "candidate_E_above_8000000_and_admissible_paid_basis_missing",
+            "depends_on": [
+              "TC22:allocation"
+            ],
+            "required_answer": "Cung cấp payment proof hoặc financial confirmation đúng trách nhiệm, refs/người/thời điểm/scope. Employee-only Q32 không đủ ngoài ngưỡng."
+          },
+          {
+            "id": "TC22:recognize_cost",
+            "kind": "AUTHORITY",
+            "owner": "AUTHORIZED_APPROVER",
+            "field_or_rule": "authority:RECOGNIZE_COST",
+            "condition": "E_known_above_8000000_and_required_recognition_grant_missing",
+            "depends_on": [
+              "TC22:paid_basis"
+            ],
+            "required_answer": "Người có grant đúng action/scope/profile/time/max_amount công nhận E; kiểm quyền phát yêu cầu chi/thu riêng."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC23",
+      "folder": "tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong",
+      "legacy_title": "Hợp lệ một hóa đơn phân bổ cho nhiều dòng",
+      "source_purpose": "Hoàn ứng mua vật tư văn phòng",
+      "source_scope": "Vật tư văn phòng",
+      "business_invariant_to_preserve": "Giữ allocation đúng nhưng quyền finance khác",
+      "legacy_expected": {
+        "decision": "AUTO_PROCESS",
+        "rule": null,
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "0c7274b30aacae98a01a66dd9cfd362ca46133c1fc02538ea916b10c1013d0ee"
+        },
+        {
+          "path": "tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong/hoa_don_van_phong_pham.pdf",
+          "pages": 1,
+          "sha256": "294e59c200b0443829683d8c439009ffd240db2e4a5bb7c2f6c9527386c5a9c6"
+        },
+        {
+          "path": "tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong/hoa_don_muc_in.pdf",
+          "pages": 1,
+          "sha256": "0c94bce5a697c9d5249ad40596fbc74a136778c6941a34f97169402ef5649084"
+        }
+      ],
+      "evidence_expectation": "Invoice00002301=3.240.000 phân L01 2.160.000 + L02 1.080.000; invoice00002302=5.400.000; tổng8.640.000.",
+      "required_source_adaptation": "Gốc office vật tư giữ evidence-only; biến thể công tác cùng activity/claimant, giữ tỷ lệ allocation và số tiền; cần independent financial confirmation vì E>8 triệu.",
+      "planned_variant_id": "UC03-F23",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "Matching/allocation đúng nhưng E=8.640.000 vượt8 triệu; S=-360.000 verified không đủ làm routine. Cấp đúng grant<=20 triệu quyết sau.",
+        "requires_common_context": true,
+        "scenario_goal": "AUTHORITY",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC23:paid_basis",
+            "kind": "FACT",
+            "owner": "ACCOUNTANT",
+            "field_or_rule": "expense:employee_paid_basis",
+            "condition": "candidate_E_above_8000000_and_admissible_paid_basis_missing",
+            "depends_on": [],
+            "required_answer": "Cung cấp payment proof hoặc financial confirmation đúng trách nhiệm, refs/người/thời điểm/scope. Employee-only Q32 không đủ ngoài ngưỡng."
+          },
+          {
+            "id": "TC23:recognize_cost",
+            "kind": "AUTHORITY",
+            "owner": "AUTHORIZED_APPROVER",
+            "field_or_rule": "authority:RECOGNIZE_COST",
+            "condition": "E_known_above_8000000_and_required_recognition_grant_missing",
+            "depends_on": [
+              "TC23:paid_basis"
+            ],
+            "required_answer": "Người có grant đúng action/scope/profile/time/max_amount công nhận E; kiểm quyền phát yêu cầu chi/thu riêng."
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": 8640000,
+            "A": 9000000,
+            "P": 0,
+            "R": 0,
+            "S": -360000
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": "ACCOUNTANT_WITH_RECORD_EXECUTION_GRANT",
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        },
+        "possible_effect_after_issue_resolution": {
+          "direction": "COLLECT",
+          "amount_vnd": 360000,
+          "condition": "Chỉ nếu resolved source xác nhận đúng các con số và mọi grant/policy đủ; nếu facts đổi thì recompute."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC24",
+      "folder": "tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report",
+      "legacy_title": "Có hóa đơn đính kèm nhưng không xuất hiện trên report",
+      "source_purpose": "Hoàn ứng chuyến công tác ngắn ngày",
+      "source_scope": "Công tác",
+      "business_invariant_to_preserve": "Giữ nguồn đính kèm dư không silently discard",
+      "legacy_expected": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_UNREFERENCED_EVIDENCE_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "4c641814be9f141606657e2bda91222e47f1dda722e23440d9edc1e026fde154"
+        },
+        {
+          "path": "tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/hoa_don_khach_san.pdf",
+          "pages": 1,
+          "sha256": "dcdf79e819850526f3d9a16929c2e23e6001d0c456df62e5393184e469ad3031"
+        },
+        {
+          "path": "tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/hoa_don_taxi.pdf",
+          "pages": 1,
+          "sha256": "322544a0fc8a6aaddccfbbbbe3840f862c62b64c20c07de759c48b27a5bb6575"
+        },
+        {
+          "path": "tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/hoa_don_khong_khai_bao.pdf",
+          "pages": 1,
+          "sha256": "a2b479db87e131e5eb2e514c7fb8108136ea29ddb0842f864e4c6e977ebd2357"
+        }
+      ],
+      "evidence_expectation": "Hai row tổng2.700.000; thêm invoice00002409 ăn uống cá nhân1.080.000 không có row. Giữ unmatched_source và nội dung.",
+      "required_source_adaptation": "Giữ gốc, bổ sung dates/ctx. Test hai phản hồi có căn cứ: đính nhầm/không liên quan vs bỏ sót khoản của hoạt động.",
+      "planned_variant_id": "UC03-F24",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "FACT relevance ban đầu; không cộng thêm1.080.000 và không xóa source. Nếu xác minh unrelated/personal: quarantine/exclude có reason, E=2.700.000/A3.000.000 => COLLECT300.000. Nếu liên quan, revise rồi assess lại.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT_UNTIL_RELEVANCE_CLEAR",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC24:source_relevance",
+            "kind": "FACT",
+            "owner": "EMPLOYEE",
+            "field_or_rule": "source:00002409:activity_relevance",
+            "condition": "unmatched_material_source_relevance_unknown",
+            "depends_on": [],
+            "required_answer": "Invoice00002409 trị giá1.080.000 không có trong bảng kê: đính nhầm, khoản cá nhân hay khoản công tác bỏ sót?"
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": 2700000,
+            "A": 3000000,
+            "P": 0,
+            "R": 0,
+            "S": -300000
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": "ACCOUNTANT_WITH_RECORD_EXECUTION_GRANT",
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        },
+        "possible_effect_after_issue_resolution": {
+          "direction": "COLLECT",
+          "amount_vnd": 300000,
+          "condition": "Chỉ nếu resolved source xác nhận đúng các con số và mọi grant/policy đủ; nếu facts đổi thì recompute."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    },
+    {
+      "case_id": "TC25",
+      "folder": "tc25-tai-lieu-thay-the-lech-so-tien-voi-report",
+      "legacy_title": "Tài liệu thay thế lệch số tiền với report",
+      "source_purpose": "Hoàn ứng chi phí công tác tỉnh",
+      "source_scope": "Công tác",
+      "business_invariant_to_preserve": "Giữ chứng từ dịch vụ khác invoice VAT và amount mismatch",
+      "legacy_expected": {
+        "decision": "REQUEST_INFO",
+        "rule": "SET_ALTERNATIVE_AMOUNT_001",
+        "implementation_status": "GAP_EXPECTED"
+      },
+      "legacy_metadata_disagreement": {},
+      "inputs": [
+        {
+          "path": "tc25-tai-lieu-thay-the-lech-so-tien-voi-report/report_hoan_ung.pdf",
+          "pages": 1,
+          "sha256": "6dc3ba18fdc7d42ab40b9c56fa8d20a9d0c6fbc934cb6e59862d3d30b29b4872"
+        },
+        {
+          "path": "tc25-tai-lieu-thay-the-lech-so-tien-voi-report/hoa_don_ve_tau.pdf",
+          "pages": 1,
+          "sha256": "9b1ee2de2ed767f294ee53ae223aadef11753fa7579a82b98c1d6644ac925944"
+        },
+        {
+          "path": "tc25-tai-lieu-thay-the-lech-so-tien-voi-report/hoa_don_khach_san.pdf",
+          "pages": 1,
+          "sha256": "1f7ae1d7951ab4f4d4ba9494349cbbc9e83c8d8bcf1973cbc00d1dcecb578d60"
+        },
+        {
+          "path": "tc25-tai-lieu-thay-the-lech-so-tien-voi-report/phieu_thu_di_chuyen.pdf",
+          "pages": 1,
+          "sha256": "5ecb81997c968f5636ded712b09f80777e0bbce602df7d6eccf73146c12366de"
+        }
+      ],
+      "evidence_expectation": "Rows1.080.000/2.160.000/900.000; collection receipt row3 ghi700.000, payer Nguyễn Minh An; giữ900 vs700 và identityPT-251026-016.",
+      "required_source_adaptation": "Giữ gốc, thêm dates/ctx. Phân loại phiếu thu theo nội dung, không hard-code legacy RECEIPT; conflict200.000 là lỗi chính.",
+      "planned_variant_id": "UC03-F25",
+      "finance_target": {
+        "status": "CONDITIONAL_DESIGN_NOT_EXECUTABLE_GOLD",
+        "expectation": "FACT amount dòng3; không áp POLICY chỉ vì là phiếu thu. Không tự dùng printed_return860.000 hay repaired balance1.060.000 trước recheck nguồn/correction.",
+        "requires_common_context": true,
+        "scenario_goal": "FACT",
+        "preconditions": {
+          "common_context": "top-level common_preconditions",
+          "scope_variant_created": true,
+          "finance_admission_implemented": true,
+          "material_facts_resolved": true,
+          "financial_issue_templates_materialized_only_when_condition_holds": true
+        },
+        "issue_sequence": [
+          {
+            "id": "TC25:amount_conflict",
+            "kind": "FACT",
+            "owner": "EMPLOYEE",
+            "field_or_rule": "expense:L03:amount",
+            "condition": "claim_900000_receipt_700000_conflict",
+            "depends_on": [],
+            "required_answer": "Dòng di chuyển kê900.000 nhưng phiếu thu700.000: có thêm200.000 được chứng minh hay bạn cần sửa bảng kê?"
+          }
+        ],
+        "projection_if_known": {
+          "condition": "Chỉ sau common context, source variant và mọi fact/admissibility liên quan đủ. Số dưới đây không là known facts của PDF gốc. TC18 cần happy-variant sửa payee; TC24 cần confirmed quarantine/exclusion.",
+          "currency": "VND",
+          "values": {
+            "E": null,
+            "A": null,
+            "P": null,
+            "R": null,
+            "S": null
+          }
+        },
+        "expected_state_before_resolution": {
+          "current_evidence_stage": "EVIDENCE_READY_IF_READ_JOB_COMPLETES_WITH_REPORT",
+          "future_focus_scenario": "WAITING",
+          "condition": "Routine TC01/02/03/13 sau common gates đủ; các ca có focus issue active giữ WAITING. EVIDENCE_READY là boundary hiện tại, không financial conclusion."
+        },
+        "allowed_effect_after_gates": {
+          "direction": "NONE",
+          "amount_vnd": null,
+          "instruction_count": 0,
+          "condition": "NO_INSTRUCTION_WHILE_MATERIAL_FACT_OR_POLICY_OR_AUTHORITY_UNRESOLVED"
+        },
+        "execution_actor": null,
+        "post_execution_state": {
+          "state": null,
+          "condition": "Chưa khóa post-state trước khi focus issue được giải quyết và oracle nghiệp vụ được viết."
+        }
+      },
+      "ready_for_financial_oracle": false,
+      "execution_status": "NOT_RUN"
+    }
+  ],
+  "issue_dependency_semantics": "issue_sequence là template có điều kiện. Fact precondition đã đủ không tạo issue/câu hỏi; materializer loại dependency đã đáp ứng thay vì tạo phantom issue. Nhiều issue độc lập có thể cùng active; thứ tự không cưỡng ép serial ngoài depends_on."
+}

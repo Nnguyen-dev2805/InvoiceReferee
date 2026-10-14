@@ -1,0 +1,16 @@
+{
+  "fact_key": "expense:IR26101001:employee_paid",
+  "value": 3240000,
+  "actor": "employee:employee-a",
+  "scope": "activity:uc03-f01",
+  "reason": "Tôi xác nhận đã trực tiếp thanh toán khoản chi này cho nhà cung cấp; phục vụ hoạt động được phép, chưa được hoàn trả.",
+  "observed_at": "2026-10-10T18:00:00+07:00",
+  "refs": [
+    {
+      "source_id": "file:02-hoa-don-dich-vu.pdf",
+      "source_sha256": "0f9a66678a8df2e7ecef705934c01bcced9c8609105ff93dfb7b4bfd8ef2068a",
+      "page": 1,
+      "exact_quote": "3.240.000 đ"
+    }
+  ]
+}

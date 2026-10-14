@@ -1,7 +1,7 @@
 [
   {
     "case_id": "TC01",
-    "folder": "TC01_hợp_lệ_nhân_viên_hoàn_trả_tiền_thừa",
+    "folder": "tc01-hop-le-nhan-vien-hoan-tra-tien-thua",
     "title": "Hợp lệ nhân viên hoàn trả tiền thừa",
     "expected_decision": "AUTO_PROCESS",
     "expected_primary_rule": null,
@@ -9,7 +9,7 @@
   },
   {
     "case_id": "TC02",
-    "folder": "TC02_hợp_lệ_công_ty_thanh_toán_thêm",
+    "folder": "tc02-hop-le-cong-ty-thanh-toan-them",
     "title": "Hợp lệ công ty thanh toán thêm",
     "expected_decision": "AUTO_PROCESS",
     "expected_primary_rule": null,
@@ -17,7 +17,7 @@
   },
   {
     "case_id": "TC03",
-    "folder": "TC03_hợp_lệ_không_phát_sinh_chênh_lệch",
+    "folder": "tc03-hop-le-khong-phat-sinh-chenh-lech",
     "title": "Hợp lệ không phát sinh chênh lệch",
     "expected_decision": "AUTO_PROCESS",
     "expected_primary_rule": null,
@@ -25,7 +25,7 @@
   },
   {
     "case_id": "TC04",
-    "folder": "TC04_hợp_lệ_nhiều_mặt_hàng_thiết_bị",
+    "folder": "tc04-hop-le-nhieu-mat-hang-thiet-bi",
     "title": "Hợp lệ nhiều mặt hàng thiết bị",
     "expected_decision": "AUTO_PROCESS",
     "expected_primary_rule": null,
@@ -33,7 +33,7 @@
   },
   {
     "case_id": "TC05",
-    "folder": "TC05_tổng_các_dòng_trên_báo_cáo_không_khớp",
+    "folder": "tc05-tong-cac-dong-tren-bao-cao-khong-khop",
     "title": "Tổng các dòng trên báo cáo không khớp",
     "expected_decision": "REQUEST_INFO",
     "expected_primary_rule": "SET_PAPER_TOTAL_001",
@@ -41,7 +41,7 @@
   },
   {
     "case_id": "TC06",
-    "folder": "TC06_chênh_lệch_quyết_toán_ghi_sai",
+    "folder": "tc06-chenh-lech-quyet-toan-ghi-sai",
     "title": "Chênh lệch quyết toán ghi sai",
     "expected_decision": "REQUEST_INFO",
     "expected_primary_rule": "SET_SETTLEMENT_DIFF_001",
@@ -49,7 +49,7 @@
   },
   {
     "case_id": "TC07",
-    "folder": "TC07_số_tiền_bằng_chữ_trên_báo_cáo_không_khớp",
+    "folder": "tc07-so-tien-bang-chu-tren-bao-cao-khong-khop",
     "title": "Số tiền bằng chữ trên báo cáo không khớp",
     "expected_decision": "REQUEST_INFO",
     "expected_primary_rule": "SET_PAPER_CONSISTENCY_001",
@@ -57,7 +57,7 @@
   },
   {
     "case_id": "TC08",
-    "folder": "TC08_báo_cáo_và_hóa_đơn_lệch_số_tiền",
+    "folder": "tc08-bao-cao-va-hoa-don-lech-so-tien",
     "title": "Báo cáo và hóa đơn lệch số tiền",
     "expected_decision": "REQUEST_INFO",
     "expected_primary_rule": "SET_PAPER_AMOUNT_001",
@@ -65,7 +65,7 @@
   },
   {
     "case_id": "TC09",
-    "folder": "TC09_mã_số_thuế_người_mua_thuộc_công_ty_khác",
+    "folder": "tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac",
     "title": "Mã số thuế người mua thuộc công ty khác",
     "expected_decision": "ESCALATE",
     "expected_primary_rule": "SET_BUYER_TAX_001",
@@ -73,7 +73,7 @@
   },
   {
     "case_id": "TC10",
-    "folder": "TC10_hóa_đơn_thiếu_mã_số_thuế_người_mua",
+    "folder": "tc10-hoa-don-thieu-ma-so-thue-nguoi-mua",
     "title": "Hóa đơn thiếu mã số thuế người mua",
     "expected_decision": "REQUEST_INFO",
     "expected_primary_rule": "SET_REQUIRED_FIELD_001",
@@ -81,7 +81,7 @@
   },
   {
     "case_id": "TC11",
-    "folder": "TC11_số_học_trên_hóa_đơn_không_nhất_quán",
+    "folder": "tc11-so-hoc-tren-hoa-don-khong-nhat-quan",
     "title": "Số học trên hóa đơn không nhất quán",
     "expected_decision": "REQUEST_INFO",
     "expected_primary_rule": "SET_ARITH_001",
@@ -89,7 +89,7 @@
   },
   {
     "case_id": "TC12",
-    "folder": "TC12_hóa_đơn_trùng_định_danh_với_hồ_sơ_trước",
+    "folder": "tc12-hoa-don-trung-dinh-danh-voi-ho-so-truoc",
     "title": "Hóa đơn trùng định danh với hồ sơ trước",
     "expected_decision": "ESCALATE",
     "expected_primary_rule": "SET_DUP_001",
@@ -97,7 +97,7 @@
   },
   {
     "case_id": "TC13",
-    "folder": "TC13_khoản_chi_rượu_bia_cần_chuyển_policy",
+    "folder": "tc13-khoan-chi-ruou-bia-can-chuyen-policy",
     "title": "Khoản chi rượu bia cần chuyển policy",
     "expected_decision": "ESCALATE",
     "expected_primary_rule": "SET_CATEGORY_001",
@@ -105,7 +105,7 @@
   },
   {
     "case_id": "TC14",
-    "folder": "TC14_tổng_hồ_sơ_vượt_thẩm_quyền_100_triệu",
+    "folder": "tc14-tong-ho-so-vuot-tham-quyen-100-trieu",
     "title": "Tổng hồ sơ vượt thẩm quyền 100 triệu",
     "expected_decision": "ESCALATE",
     "expected_primary_rule": "SET_AUTH_001",
@@ -113,7 +113,7 @@
   },
   {
     "case_id": "TC15",
-    "folder": "TC15_evidence_cùng_số_tiền_nhưng_sai_nội_dung",
+    "folder": "tc15-evidence-cung-so-tien-nhung-sai-noi-dung",
     "title": "Evidence cùng số tiền nhưng sai nội dung",
     "expected_decision": "REQUEST_INFO",
     "expected_primary_rule": "SET_PAPER_MATCH_001",
@@ -121,7 +121,7 @@
   },
   {
     "case_id": "TC16",
-    "folder": "TC16_hợp_lệ_ba_hóa_đơn_trong_một_báo_cáo_công_tác",
+    "folder": "tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac",
     "title": "Hợp lệ ba hóa đơn trong một báo cáo công tác",
     "expected_decision": "AUTO_PROCESS",
     "expected_primary_rule": null,
@@ -130,7 +130,7 @@
   },
   {
     "case_id": "TC17",
-    "folder": "TC17_hợp_lệ_hóa_đơn_kèm_vé_điện_tử_thay_thế",
+    "folder": "tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the",
     "title": "Hợp lệ hóa đơn kèm vé điện tử thay thế",
     "expected_decision": "AUTO_PROCESS",
     "expected_primary_rule": null,
@@ -139,7 +139,7 @@
   },
   {
     "case_id": "TC18",
-    "folder": "TC18_hợp_lệ_một_dòng_dùng_hai_tài_liệu_thay_thế",
+    "folder": "tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the",
     "title": "Hợp lệ một dòng dùng hai tài liệu thay thế",
     "expected_decision": "AUTO_PROCESS",
     "expected_primary_rule": null,
@@ -148,7 +148,7 @@
   },
   {
     "case_id": "TC19",
-    "folder": "TC19_thiếu_chứng_từ_và_không_có_lý_do_cho_một_dòng",
+    "folder": "tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong",
     "title": "Thiếu chứng từ và không có lý do cho một dòng",
     "expected_decision": "REQUEST_INFO",
     "expected_primary_rule": "SET_EVIDENCE_REASON_001",
@@ -157,7 +157,7 @@
   },
   {
     "case_id": "TC20",
-    "folder": "TC20_có_lý_do_cho_dòng_không_có_chứng_từ",
+    "folder": "tc20-co-ly-do-cho-dong-khong-co-chung-tu",
     "title": "Có lý do cho dòng không có chứng từ",
     "expected_decision": "ESCALATE",
     "expected_primary_rule": "SET_NO_INVOICE_EXCEPTION_001",
@@ -166,7 +166,7 @@
   },
   {
     "case_id": "TC21",
-    "folder": "TC21_một_hóa_đơn_được_khai_báo_nhưng_chưa_đính_kèm",
+    "folder": "tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem",
     "title": "Một hóa đơn được khai báo nhưng chưa đính kèm",
     "expected_decision": "REQUEST_INFO",
     "expected_primary_rule": "SET_EVIDENCE_MISSING_001",
@@ -175,7 +175,7 @@
   },
   {
     "case_id": "TC22",
-    "folder": "TC22_một_hóa_đơn_bị_dùng_vượt_giá_trị_cho_hai_dòng",
+    "folder": "tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong",
     "title": "Một hóa đơn bị dùng vượt giá trị cho hai dòng",
     "expected_decision": "REQUEST_INFO",
     "expected_primary_rule": "SET_EVIDENCE_REUSE_001",
@@ -184,7 +184,7 @@
   },
   {
     "case_id": "TC23",
-    "folder": "TC23_hợp_lệ_một_hóa_đơn_phân_bổ_cho_nhiều_dòng",
+    "folder": "tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong",
     "title": "Hợp lệ một hóa đơn phân bổ cho nhiều dòng",
     "expected_decision": "AUTO_PROCESS",
     "expected_primary_rule": null,
@@ -193,7 +193,7 @@
   },
   {
     "case_id": "TC24",
-    "folder": "TC24_có_hóa_đơn_đính_kèm_nhưng_không_xuất_hiện_trên_report",
+    "folder": "tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report",
     "title": "Có hóa đơn đính kèm nhưng không xuất hiện trên report",
     "expected_decision": "REQUEST_INFO",
     "expected_primary_rule": "SET_UNREFERENCED_EVIDENCE_001",
@@ -202,7 +202,7 @@
   },
   {
     "case_id": "TC25",
-    "folder": "TC25_tài_liệu_thay_thế_lệch_số_tiền_với_report",
+    "folder": "tc25-tai-lieu-thay-the-lech-so-tien-voi-report",
     "title": "Tài liệu thay thế lệch số tiền với report",
     "expected_decision": "REQUEST_INFO",
     "expected_primary_rule": "SET_ALTERNATIVE_AMOUNT_001",

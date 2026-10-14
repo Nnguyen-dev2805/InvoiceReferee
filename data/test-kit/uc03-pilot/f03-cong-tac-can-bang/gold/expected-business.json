@@ -1,0 +1,47 @@
+{
+  "schema_version": "uc03-pilot-business/v1",
+  "case_id": "UC03-F03",
+  "data_origin": "SYNTHETIC",
+  "oracle_origin": "HAND_AUTHORED_NOT_RECONCILER_OUTPUT",
+  "runtime_must_not_read": true,
+  "execution_status": "NOT_RUN",
+  "admission_gate": "NOT_IMPLEMENTED",
+  "preconditions": [
+    "Current input digests/profile/source refs valid",
+    "Authorized activity and B=8000000/grants valid",
+    "Responsible employee Q32 confirmation accepted with service evidence, no conflict",
+    "Scoped completed advance+coverage including opening balances valid",
+    "No duplicate obligation or open/unknown execution"
+  ],
+  "before_execution": {
+    "projection": {
+      "T": 4320000,
+      "E": 4320000,
+      "C": 0,
+      "A": 4320000,
+      "P": 0,
+      "R": 0,
+      "S": 0
+    },
+    "route": "AUTO",
+    "issues": [],
+    "state": "SETTLED",
+    "conclusion": "BALANCED",
+    "instruction": null,
+    "employee_paid_basis": "EMPLOYEE_DECLARATION_Q32_NOT_BANK_VERIFIED"
+  },
+  "after_confirmed_execution": {
+    "state": "SETTLED",
+    "S": 0,
+    "P": 0,
+    "R": 0,
+    "new_zero_instruction": false,
+    "action": "NONE"
+  },
+  "current_evidence_only": {
+    "state": "EVIDENCE_READY",
+    "assessment_ready": false,
+    "conclusion": null,
+    "instructions": []
+  }
+}

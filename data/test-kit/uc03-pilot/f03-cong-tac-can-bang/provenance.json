@@ -1,0 +1,16 @@
+{
+  "legacy_case": "TC03",
+  "legacy_corpus": "data/tham-khao/uc-03",
+  "legacy_source_hashes": {
+    "tc03-hop-le-khong-phat-sinh-chenh-lech/hoa_don_dien_tu.pdf": "7e21f2f2403196bec51dfa86c0f054671a1466a958a8187feeb1df40530a3011",
+    "tc03-hop-le-khong-phat-sinh-chenh-lech/report_hoan_ung.pdf": "18f981f5fd6ecc541d316bdb4a0c8e51f44d5322e2cc69d88dbfebabc24d6b93"
+  },
+  "intent_preserved": "verified balance zero, no instruction",
+  "changes": [
+    "Company/person names become InvoiceReferee/Nguyễn An synthetic",
+    "Trip place/date/purpose explicit",
+    "Employee statement retained as declaration, not bank confirmation",
+    "All amounts and positive/negative/zero net relation retained"
+  ],
+  "story_change": "lodging retained; trip/date/context expanded"
+}

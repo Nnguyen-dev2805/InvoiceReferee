@@ -1,0 +1,194 @@
+{
+  "organization_id": "tenant:uc03-pilot",
+  "tenant": "tenant:uc03-pilot",
+  "profile": "TRAVEL",
+  "data_origin": "SIMULATED",
+  "financial_as_of": "2026-10-10T18:00:00+07:00",
+  "records": [],
+  "activity": {
+    "activity_id": "activity:uc03-f02",
+    "name": "Công tác Hà Nội",
+    "occurred_at": "2026-10-06T09:00:00+07:00",
+    "purpose": "Làm việc với khách hàng tại Hà Nội",
+    "profile": "TRAVEL",
+    "authorization": {
+      "id": "auth:UC03-F02",
+      "actor": "employee:approver",
+      "grant_ref": "grant:UC03-F02:approver",
+      "effect_range": [
+        "2026-10-01T00:00:00+07:00",
+        "2026-12-31T23:59:59+07:00"
+      ],
+      "reason": "Cho phép chuyến công tác Hà Nội",
+      "record_key": "auth:UC03-F02"
+    }
+  },
+  "people": [
+    {
+      "id": "employee:employee-a",
+      "name": "Nguyễn An"
+    },
+    {
+      "id": "employee:accountant-demo",
+      "name": "Trần Bình"
+    },
+    {
+      "id": "employee:approver",
+      "name": "Lê Minh"
+    }
+  ],
+  "policies": [
+    {
+      "id": "policy:pilot",
+      "version": "q32-v1",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "profile": "TRAVEL",
+      "rules": [
+        "EMPLOYEE_PAID_Q32_BOUNDED"
+      ]
+    }
+  ],
+  "grants": [
+    {
+      "id": "grant:UC03-F02:recognize",
+      "version": "v1",
+      "actor": "system:referee",
+      "actions": [
+        "RECOGNIZE_COST"
+      ],
+      "scope": "activity:uc03-f02",
+      "max_amount": 8000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL"
+      ]
+    },
+    {
+      "id": "grant:UC03-F02:issue",
+      "version": "v1",
+      "actor": "system:referee",
+      "actions": [
+        "ISSUE_PAYMENT",
+        "ISSUE_COLLECTION"
+      ],
+      "scope": "activity:uc03-f02",
+      "max_amount": 4000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL"
+      ]
+    },
+    {
+      "id": "grant:UC03-F02:approver",
+      "version": "v1",
+      "actor": "employee:approver",
+      "actions": [
+        "AUTHORIZE_ACTIVITY",
+        "SET_BUDGET",
+        "RECOGNIZE_COST",
+        "EXCEPT_POLICY",
+        "ISSUE_PAYMENT",
+        "ISSUE_COLLECTION"
+      ],
+      "scope": "activity:uc03-f02",
+      "max_amount": 20000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL"
+      ]
+    },
+    {
+      "id": "grant:UC03-F02:accountant",
+      "version": "v1",
+      "actor": "employee:accountant-demo",
+      "actions": [
+        "CONFIRM_FINANCIAL_FACT",
+        "RECORD_ACTUAL",
+        "STOP",
+        "RESUME"
+      ],
+      "scope": "activity:uc03-f02",
+      "max_amount": 20000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL"
+      ]
+    }
+  ],
+  "budgets": [
+    {
+      "id": "budget:UC03-F02",
+      "activity": "activity:uc03-f02",
+      "amount": 8000000,
+      "effect_range": [
+        "2026-10-01T00:00:00+07:00",
+        "2026-12-31T23:59:59+07:00"
+      ],
+      "actor": "employee:approver",
+      "grant_ref": "grant:UC03-F02:approver"
+    }
+  ],
+  "ledger": [
+    {
+      "id": "advance:UC03-F02",
+      "external_key": "company:bank-demo:ADV-UC03-F02",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:uc03-f02",
+      "payer": "company:demo",
+      "payee": "employee:employee-a",
+      "amount": 5000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null,
+      "witness_keys": [
+        "advance:UC03-F02"
+      ]
+    }
+  ],
+  "coverage": {
+    "employee": "employee:employee-a",
+    "activity": "activity:uc03-f02",
+    "start": "2026-09-01T00:00:00+07:00",
+    "as_of": "2026-10-10T18:00:00+07:00",
+    "fund_ids": [
+      "company:bank-demo"
+    ],
+    "flow_kinds": [
+      "ADVANCE_RECEIVED",
+      "REIMBURSEMENT_RECEIVED",
+      "EMPLOYEE_RETURN",
+      "REVERSAL",
+      "OBSERVED_UNALLOCATED"
+    ],
+    "opening_by_fund": {
+      "company:bank-demo": 0
+    },
+    "ledger_version": "ledger:v1",
+    "witness_keys": [
+      "coverage:UC03-F02"
+    ]
+  },
+  "witnesses": [
+    {
+      "record_key": "advance:UC03-F02",
+      "quote": "Ứng đã hoàn tất cho Nguyễn An, hoạt động activity:uc03-f02: 5.000.000 đ.",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:uc03-f02",
+      "observed_at": "2026-10-05T10:00:00+07:00"
+    },
+    {
+      "record_key": "coverage:UC03-F02",
+      "quote": "Đã đối chiếu đủ sổ ứng/hoàn, số dư đầu kỳ 0; chưa có hoàn trả hoặc thu lại trong scope đến 10/10/2026 18:00.",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:uc03-f02",
+      "observed_at": "2026-10-10T18:00:00+07:00"
+    }
+  ]
+}

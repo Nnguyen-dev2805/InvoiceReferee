@@ -1,0 +1,16 @@
+{
+  "legacy_case": "TC01",
+  "legacy_corpus": "data/tham-khao/uc-03",
+  "legacy_source_hashes": {
+    "tc01-hop-le-nhan-vien-hoan-tra-tien-thua/hoa_don_dien_tu.pdf": "d8dddd4e839e8fa89c059bee610b9a85457757d577e7ec9ce352c9ad158f3019",
+    "tc01-hop-le-nhan-vien-hoan-tra-tien-thua/report_hoan_ung.pdf": "6af4c063a3662ad568f30536c58213cb95fd7e48018892ab8f14df7a312d977c"
+  },
+  "intent_preserved": "employee returns surplus advance",
+  "changes": [
+    "Company/person names become InvoiceReferee/Nguyễn An synthetic",
+    "Trip place/date/purpose explicit",
+    "Employee statement retained as declaration, not bank confirmation",
+    "All amounts and positive/negative/zero net relation retained"
+  ],
+  "story_change": "local reception becomes work meal during trip"
+}

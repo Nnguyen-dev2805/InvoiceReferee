@@ -1,0 +1,16 @@
+{
+  "legacy_case": "TC02",
+  "legacy_corpus": "data/tham-khao/uc-03",
+  "legacy_source_hashes": {
+    "tc02-hop-le-cong-ty-thanh-toan-them/hoa_don_dien_tu.pdf": "03e5473e19ce2c368cc1b696afd21f7e687c8170b094f9b19bbae4c6f4ce1d6d",
+    "tc02-hop-le-cong-ty-thanh-toan-them/report_hoan_ung.pdf": "5361b509da576e842896bf9df302af98336a76dd4406019af1da50cf3d3fcfe2"
+  },
+  "intent_preserved": "company reimburses shortfall",
+  "changes": [
+    "Company/person names become InvoiceReferee/Nguyễn An synthetic",
+    "Trip place/date/purpose explicit",
+    "Employee statement retained as declaration, not bank confirmation",
+    "All amounts and positive/negative/zero net relation retained"
+  ],
+  "story_change": "office printer becomes lodging service; both request and invoice changed"
+}

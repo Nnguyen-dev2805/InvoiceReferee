@@ -110,3 +110,58 @@ Replace current values with observed state. Record:
 Mark completed only when the task's gate passed; distinguish BLOCKED, FAILED and
 NOT_RUN. A task skipped by request stays explicitly unverified. A design/contract
 change updates its existing source and invalidates affected checks until rerun.
+
+## UC03 mapping task — 14/10/2026
+
+User-authorized next step: map all 25 Hoangha v1 cases under
+`data/tham-khao/uc-03` to the accepted final contract, and repair manifest paths.
+Write set: corpus `manifest.json` (folder fields only), `readme.md`, new
+[CASE_MAPPING_FINAL](../../data/tham-khao/uc-03/CASE_MAPPING_FINAL.md), new
+`final-case-mapping.json`, this scoped checkpoint and the independent review ledger.
+No application source/finance/policy change, data regeneration, product tests,
+browser/provider LIVE, commit or push belongs to this task.
+
+Mapping v2 covers 25 IDs and 65 immutable PDF refs. All legacy PDF/DOCX/gold
+artifacts are preserved; 25 broken `manifest.folder` values now resolve. Context,
+source variants and executable financial oracle are **NOT_IMPLEMENTED**. All
+`ready_for_financial_oracle` flags remain false. The mapping is authoring-only and
+must never enter runtime/model input as facts. Its conditional issue sequences
+separate FACT/POLICY/AUTHORITY owners from projection/effects/execution actors.
+
+Initial independent review was NEEDS_REVISION; owner/issue sequencing and TC07
+criticality drift were corrected in the mapping only. Closure verdict and evidence:
+[review ledger](reviews/2026-10-14-uc03-mapping-review.md). Mapping verification
+checks 25 IDs, 65 hashes, unchanged legacy artifacts, folder-only manifest diff,
+issue dependencies/owners, arithmetic, no zero instruction and local links; exit 0.
+`rtk proxy git diff --check` exit 0. These are document/data checks, not product
+acceptance results.
+
+Next task: create the planned UC03-F01/F02/F03 travel-source/context/gold variants
+and write the evidence-to-finance/admissibility plan; retain the current
+EVIDENCE_READY guard until that consumer's contract and gate are implemented.
+Source originals TC01/TC02 are reception/equipment, not automatic travel routines.
+
+## UC03 pilot + admission plan — 14/10/2026
+
+User authorized creation of F01–F03 data and the finance/admissibility plan;
+explicitly requested **no subagent review**. Native self-review only. Created
+[pilot3](../../data/test-kit/uc03-pilot/README.md), 6 PDFs, runtime context/submission/
+employee-confirmation inputs, separately authored hidden evidence/business gold,
+provenance, `scripts/sinh_uc03_pilot.py`, 3 artifact-tool tests and
+[A0–A8 admission plan](../superpowers/plans/2026-10-14-evidence-finance-admission.md).
+Mapping points to the created variants; original156 reference/gold/DOCX artifacts
+stay byte-identical. No application finance/admission/matcher implementation changed.
+
+Evidence: [self-review ledger](reviews/2026-10-14-uc03-pilot-evidence.md). PDF text,
+one-page bounds and final render/layout checked; input DTOs parse; invoice/gold math
+and hashes agree. Generator tests observed RED then **3passed**. Full final pytest:
+**353passed /11failed**; failures still depend on deleted `data/kiem-thu`, named in
+ledger. No claim suite GREEN. Provider LIVE/captures/UI/finance pilot E2E NOT_RUN.
+Data/gold initial clock10/10/2026 18:00+07; interactive current-date execution needs
+fresh responsible coverage. No bank verification or actual payment is inferred from
+the synthetic employee declaration, printed balance or passing artifact tests.
+
+Plan self-reviewed, **A0–A8 NOT_IMPLEMENTED**. Next: user reviews the concrete plan,
+then one native integrator implements it with the stated gates. Keep EVIDENCE_READY
+guard until its typed admission consumer gate passes. No commit/push in this task;
+unrelated working-tree activity was preserved.
