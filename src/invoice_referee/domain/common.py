@@ -56,6 +56,45 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
 
+def parse_vnd(text: object) -> int | None:
+    """Parse a VND amount from a model/source string, or None.
+
+    A real provider returns VN-formatted money ("3.240.000 đ", "4.000.000"),
+    where '.' is a thousands separator and a trailing currency marker ("đ",
+    "VND") may follow. A bare integer ("3240000") and a real int/Decimal are
+    accepted too. Returns None when no integer amount can be recovered — never a
+    fabricated zero (a missing value is UNKNOWN, not 0).
+    """
+    import re
+    from decimal import Decimal, InvalidOperation
+
+    if text is None or isinstance(text, bool):
+        return None
+    if isinstance(text, int):
+        return text
+    if isinstance(text, Decimal):
+        return int(text) if text == text.to_integral_value() else None
+    s = str(text).strip()
+    if not s:
+        return None
+    # Drop a trailing currency marker and any spaces.
+    s = re.sub(r"(?i)\b(vnd|đ|dong|đồng)\b", "", s).strip()
+    # A number written with '.'/' ' thousands separators and/or ',' decimals.
+    match = re.search(r"-?\d[\d.,\s]*", s)
+    if match is None:
+        return None
+    raw = match.group(0).strip()
+    # VN convention: '.' or ' ' group thousands; ',' is the decimal separator.
+    normalized = raw.replace(".", "").replace(" ", "").replace(",", ".")
+    try:
+        value = Decimal(normalized)
+    except InvalidOperation:
+        return None
+    if value != value.to_integral_value():
+        return int(value)  # a fractional amount rounds down to whole VND
+    return int(value)
+
+
 class KnownAmount(StrictModel):
     """A verified, known VND amount. Booleans and floats are not money."""
 

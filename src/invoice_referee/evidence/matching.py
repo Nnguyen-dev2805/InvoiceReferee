@@ -111,16 +111,14 @@ def _line_description(line: DocumentLine) -> str:
 
 
 def _as_decimal(value: object) -> Decimal | None:
-    if value is None:
-        return None
-    if isinstance(value, Decimal):
-        return value
-    if isinstance(value, bool):
-        return None
-    try:
-        return Decimal(str(value))
-    except Exception:
-        return None
+    """Parse a model/source money value to Decimal (VN formatting included).
+
+    A real provider returns "3.240.000 đ"; the shared parser handles it.
+    """
+    from invoice_referee.domain.common import parse_vnd
+
+    parsed = parse_vnd(value)
+    return None if parsed is None else Decimal(parsed)
 
 
 def _refs(document: DocumentAnalysis) -> tuple[EvidenceRef, ...]:

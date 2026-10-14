@@ -56,12 +56,15 @@ _ORIGINAL_EXPENSE_TYPES = frozenset(
 
 
 def _as_decimal(value: object) -> Decimal | None:
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, ValueError):
-        return None
+    """Parse a model/source money value to Decimal, VN formatting included.
+
+    A real provider returns "3.240.000 đ"; the shared parser handles it (and a
+    bare int/Decimal). None when no amount is recoverable — never a fake zero.
+    """
+    from invoice_referee.domain.common import parse_vnd
+
+    parsed = parse_vnd(value)
+    return None if parsed is None else Decimal(parsed)
 
 
 def _field(document: DocumentAnalysis, name: str) -> object | None:

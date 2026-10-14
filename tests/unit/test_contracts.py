@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from invoice_referee.domain.common import EvidenceRef, Fact, KnownAmount
+from invoice_referee.domain.common import EvidenceRef, Fact, KnownAmount, parse_vnd
 
 AS_OF = datetime(2026, 10, 13, 3, 0, tzinfo=UTC)
 
@@ -402,3 +402,18 @@ def test_package_declares_console_entry_point() -> None:
     root = Path(__file__).resolve().parents[2]
     data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     assert data["project"]["scripts"]["invoice-referee"] == "invoice_referee.cli:main"
+
+
+def test_parse_vnd_handles_real_provider_formatting() -> None:
+    # A real provider returns VN-formatted money; the shared parser recovers the
+    # integer and never fabricates a zero from an unparseable value.
+    assert parse_vnd("3.240.000 đ") == 3_240_000
+    assert parse_vnd("4.000.000") == 4_000_000
+    assert parse_vnd("3240000") == 3_240_000
+    assert parse_vnd(3_240_000) == 3_240_000
+    assert parse_vnd("760.000 VND") == 760_000
+    assert parse_vnd("0 đ") == 0
+    assert parse_vnd("không có") is None
+    assert parse_vnd("") is None
+    assert parse_vnd(None) is None
+    assert parse_vnd(True) is None  # bool is never money

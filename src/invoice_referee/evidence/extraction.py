@@ -234,6 +234,20 @@ def _normalize_value(value: object) -> str | int | Decimal | bool | tuple[str, .
     return str(value)
 
 
+def _field_vocabulary(document_type: str) -> str:
+    """The profile's field names for a document type, as a prompt fragment.
+
+    Code-owned: the profile decides the vocabulary; the prompt only advertises
+    it so the model does not invent its own labels.
+    """
+    from invoice_referee.evidence.document_profiles import DOCUMENT_PROFILES
+
+    profile = DOCUMENT_PROFILES.get(document_type)
+    if profile is None or not profile.allowed_fields:
+        return ""
+    return ", ".join(profile.allowed_fields)
+
+
 async def extract_document(
     ocr: OcrSourceResult,
     classification: DocumentClassification,
@@ -243,6 +257,17 @@ async def extract_document(
 ) -> DocumentAnalysis:
     """Extract one document's fields/lines and verify provenance (plan E5)."""
     haystack = _source_pages_text(ocr, classification.page_range)
+    # Name the target field vocabulary for this document type, or the model
+    # invents its own labels (e.g. `department` for the trip destination) and a
+    # correctly-read form is reported as missing required fields. The profile is
+    # code-owned; the prompt only advertises it.
+    vocabulary = _field_vocabulary(classification.document_type)
+    vocabulary_clause = (
+        f" For this document_type, use EXACTLY these field names where they apply: "
+        f"{vocabulary}."
+        if vocabulary
+        else ""
+    )
     system = (
         "Extract the fields and the TABLE ROWS of this document from its OCR text. "
         "Reply as JSON {\"fields\": [...], \"line_items\": [...]}. Each field object "
@@ -250,7 +275,8 @@ async def extract_document(
         "NOT_PRESENT, UNREADABLE, AMBIGUOUS, NOT_APPLICABLE), value (only when "
         "state=FOUND), quote (the exact substring copied from the OCR text; "
         "required when state=FOUND), page (1-based). Do not rename these keys "
-        "(never use 'name'). Each line_items entry is ONE COST ROW of a table and "
+        "(never use 'name')." + vocabulary_clause +
+        " Each line_items entry is ONE COST ROW of a table and "
         "uses EXACTLY one key: fields, an array of the same field objects for that "
         "row, using row field names description, amount, invoice_refs (an array of "
         "the document-number strings the row references) and no_evidence_reason. "

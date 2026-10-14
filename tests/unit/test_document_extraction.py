@@ -238,6 +238,24 @@ async def test_extraction_prompt_pins_the_schema_keys() -> None:
         assert key in captured["system"]
 
 
+async def test_extraction_prompt_names_the_profile_field_vocabulary() -> None:
+    # The prompt must name the target field vocabulary for the document type, or
+    # the model invents its own labels (e.g. `department` for the trip
+    # destination) and a correctly-read form is reported NEEDS_HUMAN.
+    captured: dict[str, str] = {}
+
+    class RecLlm:
+        async def complete_json(self, *, system: str, user: str, budget: RunBudget) -> dict:
+            captured["system"] = system
+            return {"fields": [], "lines": []}
+
+    await extract_document(
+        _settlement_ocr(), _classification("SETTLEMENT_FORM"), llm=RecLlm(), budget=RunBudget()
+    )
+    for field in ("declared_name", "trip_destination", "printed_total", "declared_advance"):
+        assert field in captured["system"]
+
+
 async def test_field_name_aliases_are_canonicalized() -> None:
     # Plan §12: model synonyms map to the profile vocabulary, so a correctly
     # read invoice is not reported as missing required fields.

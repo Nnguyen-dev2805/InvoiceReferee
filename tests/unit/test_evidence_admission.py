@@ -228,6 +228,19 @@ def test_q32_unknown_s_cannot_be_treated_as_within_bound() -> None:
     assert expense.payments == ()
 
 
+def test_vn_formatted_money_is_parsed() -> None:
+    # A real model returns VN-formatted money ("3.240.000 đ"); admission must
+    # parse it, or a correctly-read form yields zero expenses.
+    from invoice_referee.reconciliation.admission import _as_decimal as admit_decimal
+    from invoice_referee.evidence.matching import _as_decimal as match_decimal
+
+    for parser in (admit_decimal, match_decimal):
+        assert parser("3.240.000 đ") == 3_240_000
+        assert parser("4.000.000") == 4_000_000
+        assert parser("3240000") == 3_240_000
+        assert parser(3_240_000) == 3_240_000
+
+
 def test_q32_total_bound_is_enforced_across_rows() -> None:
     # Two rows, each individually <= 8m, but the TOTAL claimed E (2 x 5m = 10m)
     # exceeds the 8m recognition limit: the bounded Q32 path must not accept the
