@@ -17,7 +17,6 @@ test("execution: record actual money updates the projection", async ({ page }) =
     mimeType: "application/pdf",
     buffer: GOOD_PDF,
   });
-  await page.getByRole("button", { name: "Đính kèm" }).click();
   await page.getByRole("button", { name: "Nộp hồ sơ" }).click();
 
   // Switch to the accountant persona, who sees the order and records money.

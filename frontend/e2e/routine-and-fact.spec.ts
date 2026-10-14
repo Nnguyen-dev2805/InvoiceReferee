@@ -16,7 +16,6 @@ async function openAndSubmit(page, activityId: string, persona?: string) {
     mimeType: "application/pdf",
     buffer: GOOD_PDF,
   });
-  await page.getByRole("button", { name: "Đính kèm" }).click();
   await expect(page.getByRole("heading", { name: "Chứng từ (1)" })).toBeVisible();
   await page.getByRole("button", { name: "Nộp hồ sơ" }).click();
   // Role workspaces (plan R6 UX01): switch to the persona that sees the panel.

@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-// T2 browser checkpoint as a spec (first executed at T6, when Playwright
-// browsers are installed): select/create twice, attach and list a source.
+// T2 browser checkpoint: select/create twice (same activity reuses one root),
+// then one primary action uploads the selected file and submits.
 
 const GOOD_PDF = Buffer.from("%PDF-1.4\nchung tu demo\n%%EOF\n");
 
-test("intake: create twice reuses one root, attach and list a source", async ({
+test("intake: create twice reuses one root, then submit uploads the source", async ({
   page,
 }) => {
   await page.goto("/");
@@ -29,17 +29,12 @@ test("intake: create twice reuses one root, attach and list a source", async ({
     buffer: GOOD_PDF,
   });
 
-  // Keyboard path: with a file selected the primary action is enabled and can
-  // receive keyboard focus. (After attaching, the button is disabled by design,
-  // so this check belongs here, not after the click.)
-  const attachButton = page.getByRole("button", { name: "Đính kèm" });
-  await expect(attachButton).toBeEnabled();
-  await attachButton.focus();
-  await expect(attachButton).toBeFocused();
+  // One primary action: the submit button uploads the pending file and submits.
+  const submitButton = page.getByRole("button", { name: "Nộp hồ sơ" });
+  await expect(submitButton).toBeEnabled();
+  await submitButton.click();
 
-  await page.getByRole("button", { name: "Đính kèm" }).click();
-
-  await expect(page.getByText(/Đã đính kèm 1 chứng từ/)).toBeVisible();
+  await expect(page.getByText(/Đã nộp hồ sơ/)).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Chứng từ (1)" }),
   ).toBeVisible();

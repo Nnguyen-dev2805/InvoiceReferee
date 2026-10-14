@@ -16,7 +16,6 @@ test("controls: stop and resume are audited", async ({ page }) => {
     mimeType: "application/pdf",
     buffer: GOOD_PDF,
   });
-  await page.getByRole("button", { name: "Đính kèm" }).click();
   await page.getByRole("button", { name: "Nộp hồ sơ" }).click();
 
   // The accountant controls the root (controls workspace).

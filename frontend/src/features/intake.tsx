@@ -49,40 +49,30 @@ export function Intake({
     }
   }
 
+  // One primary action: upload any pending files, then submit. Uploading and
+  // submitting separately let a user submit with files still only in the picker
+  // (the case reached the server with zero evidence), so they are merged.
   async function submit() {
     if (caseView === null) return;
     setBusy(true);
     setError(null);
     setStatus(null);
     try {
+      let current = caseView;
+      if (files.length > 0) {
+        const attached = await attachSources(current.id, files, current.version);
+        current = attached.case_view;
+        setFiles([]);
+      }
       const result = await submitCase(
-        caseView.id,
+        current.id,
         activityId,
         "Công tác",
-        caseView.version,
+        current.version,
       );
       setCaseView(result.case_view);
       onCase(result.case_view);
       setStatus("Đã nộp hồ sơ và đối chiếu.");
-    } catch (cause) {
-      setError(errorMessage(cause));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function attach() {
-    if (caseView === null || files.length === 0) return;
-    setBusy(true);
-    setError(null);
-    setStatus(null);
-    const count = files.length;
-    try {
-      const result = await attachSources(caseView.id, files, caseView.version);
-      setCaseView(result.case_view);
-      onCase(result.case_view);
-      setFiles([]);
-      setStatus(`Đã đính kèm ${count} chứng từ vào hồ sơ.`);
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -199,13 +189,6 @@ export function Intake({
         </label>
       </p>
       <p>
-        <button
-          type="button"
-          onClick={() => void attach()}
-          disabled={busy || caseView === null || files.length === 0}
-        >
-          Đính kèm
-        </button>
         <button
           type="button"
           onClick={() => void submit()}
