@@ -9,6 +9,7 @@ export interface MoneyFact {
 export type CaseState =
   | "DRAFT"
   | "PROCESSING"
+  | "EVIDENCE_READY"
   | "WAITING"
   | "TECHNICAL_ERROR"
   | "READY_TO_EXECUTE"
@@ -44,6 +45,15 @@ export interface InstructionView {
   execution_state: string;
 }
 
+export interface EvidenceReport {
+  provider_mode: string | null;
+  data_origin: string | null;
+  documents: unknown[];
+  links: unknown[];
+  row_matches: unknown[];
+  match_findings: unknown[];
+}
+
 export interface CaseView {
   id: string;
   version: number;
@@ -56,6 +66,9 @@ export interface CaseView {
   instructions: InstructionView[];
   actual_money: Record<string, MoneyFact>;
   audit: string[];
+  evidence_report: EvidenceReport | null;
+  assessment_ready: boolean;
+  assessment_blocker: string | null;
 }
 
 export interface CommandResultView {

@@ -361,6 +361,12 @@ class CaseWorkflow:
         # a seeded transcription. When set, submit reads the uploaded sources.
         self._transcriber: Callable[..., object] | None = None
         self._provider_mode: str = "STUB"
+        # The §12 evidence pipeline seam (E7). Unset => the STUB/finance path.
+        self._evidence_reader: object | None = None
+        self._evidence_classifier: object | None = None
+        self._evidence_artifacts: object | None = None
+        self._evidence_source_bytes: dict[str, bytes] = {}
+        self._evidence_provider_mode: str = "STUB"
 
     def enable_live_read(self, transcriber: Callable[..., object], *, provider_mode: str) -> None:
         """Wire a read->transcription callable so submit reads real sources.
@@ -370,6 +376,132 @@ class CaseWorkflow:
         """
         self._transcriber = transcriber
         self._provider_mode = provider_mode
+
+    def enable_evidence_read(
+        self,
+        *,
+        reader: object,
+        classifier: object,
+        artifacts_root: str | Path,
+        source_bytes: dict[str, bytes] | None = None,
+        provider_mode: str = "LIVE",
+    ) -> None:
+        """Wire the §12 evidence pipeline (OCR -> classify -> extract -> match).
+
+        The pipeline is evidence-only: it produces a typed `ReadResult` and never
+        reaches the finance consumer. Provider I/O runs outside the transaction.
+        """
+        from invoice_referee.evidence.artifacts import ArtifactStore
+
+        self._evidence_reader = reader
+        self._evidence_classifier = classifier
+        self._evidence_artifacts = ArtifactStore(root=artifacts_root)
+        self._evidence_source_bytes = source_bytes or {}
+        self._evidence_provider_mode = provider_mode
+        self._provider_mode = provider_mode
+
+    def _evidence_wiring(self):
+        return (
+            self._evidence_reader,
+            self._evidence_classifier,
+            self._evidence_artifacts,
+            self._evidence_provider_mode,
+        )
+
+    def _evidence_context(self, job_id: str):
+        """Return (tenant, root_id, sources, source_bytes) for a job, or None."""
+        from invoice_referee.domain.evidence import SourceRef
+
+        connection = self.db.connect()
+        try:
+            job = connection.execute(
+                "SELECT tenant, root_id FROM jobs WHERE id = ?", (job_id,)
+            ).fetchone()
+            if job is None:
+                return None
+            tenant = str(job["tenant"])
+            root_id = str(job["root_id"])
+            sources = tuple(
+                SourceRef(
+                    id=row["source_id"],
+                    digest=row["digest"],
+                    tenant=row["tenant"],
+                    media=row["media"],
+                    storage_key=row["storage_key"],
+                )
+                for row in connection.execute(
+                    "SELECT * FROM case_sources WHERE root_id = ? ORDER BY attached_at, source_id",
+                    (root_id,),
+                )
+            )
+        finally:
+            connection.close()
+        source_bytes: dict[str, bytes] = {}
+        for source in sources:
+            payload = self._evidence_source_bytes.get(source.id)
+            if payload is None:
+                path = self.uploads_dir / source.storage_key
+                if path.is_file():
+                    payload = path.read_bytes()
+            if payload is not None:
+                source_bytes[source.id] = payload
+        return tenant, root_id, sources, source_bytes
+
+    def _mark_evidence_job(
+        self, cx: sqlite3.Connection, job_id: str, *, phase: str, status: str
+    ) -> None:
+        cx.execute(
+            "UPDATE jobs SET phase = ?, status = ?, updated_at = ? WHERE id = ?",
+            (phase, status, self._now_iso(), job_id),
+        )
+
+    def _fail_evidence_job(self, cx: sqlite3.Connection, job_id: str, message: str) -> None:
+        cx.execute(
+            "UPDATE jobs SET phase = 'DONE', status = 'FAILED', updated_at = ? WHERE id = ?",
+            (self._now_iso(), job_id),
+        )
+
+    def _publish_evidence_report(self, cx, *, tenant: str, root_id: str, report) -> None:
+        cx.execute(
+            "INSERT OR REPLACE INTO case_evidence_reports (root_id, tenant, report_json, "
+            "created_at) VALUES (?, ?, ?, ?)",
+            (root_id, tenant, report.model_dump_json(), self._now_iso()),
+        )
+        # The evidence pipeline does not assess finance: the case is
+        # EVIDENCE_READY with no conclusion/instruction (contracts §12.5).
+        cx.execute(
+            "UPDATE cases SET state = 'EVIDENCE_READY', updated_at = ? WHERE id = ?",
+            (self._now_iso(), root_id),
+        )
+
+    def _claim_next_evidence_job(self) -> str | None:
+        with self.db.transaction() as cx:
+            row = cx.execute(
+                "SELECT id FROM jobs WHERE status = 'QUEUED' AND kind = 'SUBMIT' "
+                "ORDER BY created_at LIMIT 1"
+            ).fetchone()
+            if row is None:
+                return None
+            job_id = str(row["id"])
+            cx.execute(
+                "UPDATE jobs SET status = 'RUNNING', updated_at = ? WHERE id = ?",
+                (self._now_iso(), job_id),
+            )
+            return job_id
+
+    async def run_evidence_job_for(self, root_id: str) -> None:
+        """Test/CLI helper: run the newest QUEUED evidence job for a root."""
+        from invoice_referee.workflow.evidence_jobs import run_evidence_job
+
+        with self.db.transaction() as cx:
+            row = cx.execute(
+                "SELECT id FROM jobs WHERE root_id = ? AND status = 'QUEUED' "
+                "ORDER BY created_at DESC LIMIT 1",
+                (root_id,),
+            ).fetchone()
+        if row is None:
+            return
+        await run_evidence_job(self, str(row["id"]))
 
     @property
     def provider_mode(self) -> str:
@@ -981,6 +1113,23 @@ class CaseWorkflow:
             if existing is not None
             else store.enqueue(cx, tenant=session.tenant, root_id=root_id, kind="SUBMIT", now=now)
         )
+        # In evidence mode (LIVE/RECORDED_REPLAY) the submit enqueues a durable
+        # evidence job and returns immediately; the worker produces the typed
+        # report. It never runs the finance assessment (contracts §12.5, plan E7).
+        if self._evidence_reader is not None:
+            cx.execute(
+                "UPDATE jobs SET submit_requested = 1, status = 'QUEUED', updated_at = ? "
+                "WHERE id = ?",
+                (now, job_id),
+            )
+            cx.execute(
+                "UPDATE cases SET state = 'PROCESSING', version = version + 1, "
+                "input_revision = input_revision + 1, updated_at = ? WHERE id = ?",
+                (now, root_id),
+            )
+            return CommandResult(
+                case_view=self._case_view(cx, self._reload(cx, row)), job_id=job_id
+            )
         store.mark(cx, job_id, phase="ASSESSING", status="RUNNING", now=now)
         self._assess_and_commit(cx, session, row, now)
         store.mark(cx, job_id, phase="DONE", status="COMPLETED", now=now)
@@ -1510,6 +1659,12 @@ class CaseWorkflow:
         # Stop must not create a new instruction (contracts §6).
         if str(row["state"]) == "STOPPED":
             return
+        # Evidence-only guard (contracts §12.5, plan E7): when the §12 pipeline
+        # is wired, a LIVE/REPLAY read is authoritative and must NOT be assessed
+        # by the finance consumer. This also covers Answer/Resume/Decide so they
+        # cannot fall back to a seeded STUB transcription.
+        if self._evidence_reader is not None:
+            return
         transcription = self._transcription_for(cx, root_id)
         assessment_input = build_assessment_input(
             cx,
@@ -2014,6 +2169,21 @@ class CaseWorkflow:
                 (str(row["id"]),),
             )
         )
+        # The typed evidence report (contracts §12.5): present after a LIVE/
+        # RECORDED_REPLAY read; it is pipeline completion only, never finance.
+        evidence_report = None
+        assessment_ready = True
+        assessment_blocker = None
+        report_row = cx.execute(
+            "SELECT report_json FROM case_evidence_reports WHERE root_id = ?",
+            (str(row["id"]),),
+        ).fetchone()
+        if report_row is not None and report_row["report_json"]:
+            from invoice_referee.domain.evidence import ReadResult
+
+            evidence_report = ReadResult.model_validate_json(report_row["report_json"])
+            assessment_ready = False
+            assessment_blocker = "EVIDENCE_ADMISSION_NOT_CONNECTED"
         return CaseView(
             id=row["id"],
             version=int(row["version"]),
@@ -2031,4 +2201,7 @@ class CaseWorkflow:
                 f"{entry['occurred_at']} · {entry['actor']} · {entry['action']}"
                 for entry in audit_rows
             ),
+            evidence_report=evidence_report,
+            assessment_ready=assessment_ready,
+            assessment_blocker=assessment_blocker,
         )

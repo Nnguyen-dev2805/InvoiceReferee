@@ -21,6 +21,7 @@ from invoice_referee.domain.common import (
 from invoice_referee.domain.evidence import (
     Confirmation,
     Observation,
+    ReadResult,
     Relation,
     SourceRef,
 )
@@ -41,6 +42,7 @@ from invoice_referee.domain.policy import (
 CaseState = Literal[
     "DRAFT",
     "PROCESSING",
+    "EVIDENCE_READY",
     "WAITING",
     "TECHNICAL_ERROR",
     "READY_TO_EXECUTE",
@@ -190,3 +192,8 @@ class CaseView(StrictModel):
     instructions: tuple[Instruction, ...] = ()
     actual_money: Projection
     audit: tuple[str, ...] = ()
+    # Typed evidence report (contracts §12.5). Present after a LIVE/REPLAY read;
+    # it is pipeline completion only, never a financial conclusion.
+    evidence_report: "ReadResult | None" = None
+    assessment_ready: bool = True
+    assessment_blocker: str | None = None

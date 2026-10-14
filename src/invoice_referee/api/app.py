@@ -7,6 +7,8 @@ workflow.
 
 from __future__ import annotations
 
+import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -30,8 +32,28 @@ def create_app(
     mode: str = "STUB",
     settings: object | None = None,
     frontend_dir: str | Path | None = None,
+    evidence_worker: bool = False,
 ) -> FastAPI:
-    app = FastAPI(title="InvoiceReferee", docs_url=None, redoc_url=None)
+    @asynccontextmanager
+    async def _lifespan(app: FastAPI):
+        stop = asyncio.Event()
+        task: asyncio.Task | None = None
+        if evidence_worker and getattr(workflow, "_evidence_reader", None) is not None:
+            from invoice_referee.workflow.evidence_jobs import drain_evidence_jobs
+
+            task = asyncio.create_task(drain_evidence_jobs(workflow, stop))
+        try:
+            yield
+        finally:
+            stop.set()
+            if task is not None:
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+    app = FastAPI(title="InvoiceReferee", docs_url=None, redoc_url=None, lifespan=_lifespan)
     app.state.workflow = workflow
     app.state.mode = mode
     app.state.settings = settings

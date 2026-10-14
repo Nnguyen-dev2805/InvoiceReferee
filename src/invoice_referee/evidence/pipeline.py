@@ -185,3 +185,92 @@ async def transcribe_root(
         unread_pages=unread_pages,
         provider_mode=provider_mode,
     )
+
+
+async def read_root(
+    *,
+    sources: tuple[SourceRef, ...],
+    reader,
+    classifier,
+    artifacts,
+    source_bytes: dict[str, bytes],
+    budget: RunBudget,
+    provider_mode: ProviderMode,
+) -> "ReadResult":
+    """Run the evidence pipeline: OCR -> confidence -> classify -> extract ->
+    validate -> match. Stops before reconciliation/policy/finance (plan E7).
+
+    The returned ReadResult is a typed evidence report only; nothing here has a
+    financial effect.
+    """
+    from invoice_referee.domain.documents import EvidenceMatchingResult
+    from invoice_referee.domain.evidence import ReadResult
+    from invoice_referee.evidence.classification import classify_documents
+    from invoice_referee.evidence.extraction import extract_document
+    from invoice_referee.evidence.matching import match_paper_evidence
+    from invoice_referee.evidence.ocr_quality import collect_low_confidence_blocks, review_ocr_quality
+    from invoice_referee.evidence.document_validity import validate_document
+
+    ocr_results = []
+    for source in sources:
+        payload = source_bytes.get(source.id)
+        if payload is None:
+            continue
+        ocr_results.append(
+            await reader.read_source(
+                source, budget=budget, artifacts=artifacts, source_bytes=payload
+            )
+        )
+    ocr = tuple(ocr_results)
+
+    # Confidence gate (one conditional batch).
+    candidates = tuple(c for result in ocr for c in collect_low_confidence_blocks(result))
+    review = await review_ocr_quality(candidates, llm=classifier, budget=budget)
+
+    classifications = await classify_documents(ocr, llm=classifier, budget=budget)
+
+    documents = []
+    for classification in classifications:
+        source = next((r for r in ocr if r.source_id == classification.source_id), None)
+        if source is None:
+            continue
+        analysis = await extract_document(source, classification, llm=classifier, budget=budget)
+        analysis = validate_document(analysis, source, review)
+        documents.append(analysis)
+
+    paper = next((d for d in documents if d.document_type == "SETTLEMENT_FORM"), None)
+    if paper is not None:
+        matching = match_paper_evidence(paper, tuple(documents))
+    else:
+        matching = EvidenceMatchingResult(
+            findings=(
+                __import__("invoice_referee.domain.documents", fromlist=["EvidenceMatchFinding"]).EvidenceMatchFinding(
+                    code="SETTLEMENT_FORM_MISSING",
+                    status="UNRESOLVED",
+                    message="Không có giấy quyết toán (SETTLEMENT_FORM) để ghép chứng từ.",
+                    refs=(),
+                ),
+            )
+        )
+
+    origin = {"LIVE": "LIVE_READ", "RECORDED_REPLAY": "RECORDED_REPLAY"}.get(
+        provider_mode, "STUB_TRANSCRIPTION"
+    )
+    problems = tuple(p for result in ocr for p in result.problems)
+    return ReadResult(
+        provider_mode=provider_mode,
+        data_origin=origin,
+        documents=tuple(documents),
+        links=matching.links,
+        row_matches=matching.rows,
+        match_findings=matching.findings,
+        page_coverage_detail=tuple(
+            __import__("invoice_referee.domain.documents", fromlist=["PageCoverage"]).PageCoverage(
+                source_id=result.source_id, page=page.page, state="OCR_COMPLETE",
+                artifact_ref=result.raw_artifact_ref,
+            )
+            for result in ocr
+            for page in result.pages
+        ),
+        problems=problems,
+    )

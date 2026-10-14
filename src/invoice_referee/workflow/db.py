@@ -16,7 +16,7 @@ SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 # The schema version this code expects. Bump when schema.sql gains a change that
 # must be applied to an existing DB (contracts §6: versioned migration, no
 # Alembic; a failed migration rolls back and keeps the old version).
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # Additive column migrations applied to an existing DB, keyed by version. Each
 # entry is (table, column, ddl) applied only when the column is missing; the
@@ -27,6 +27,13 @@ _COLUMN_MIGRATIONS: dict[int, tuple[tuple[str, str, str], ...]] = {
             "context_grants",
             "allowed_profiles_json",
             "ALTER TABLE context_grants ADD COLUMN allowed_profiles_json TEXT NOT NULL DEFAULT '[]'",
+        ),
+    ),
+    2: (
+        (
+            "jobs",
+            "input_basis_json",
+            "ALTER TABLE jobs ADD COLUMN input_basis_json TEXT NOT NULL DEFAULT '{}'",
         ),
     ),
 }

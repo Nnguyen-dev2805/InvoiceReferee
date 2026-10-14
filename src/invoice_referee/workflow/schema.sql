@@ -145,6 +145,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     status        TEXT NOT NULL,
     submit_requested INTEGER NOT NULL DEFAULT 0,
     attempts_json TEXT NOT NULL DEFAULT '{}',
+    input_basis_json TEXT NOT NULL DEFAULT '{}',
     result_json   TEXT,
     created_at    TEXT NOT NULL,
     updated_at    TEXT NOT NULL
@@ -229,6 +230,16 @@ CREATE TABLE IF NOT EXISTS case_transcriptions (
     root_id            TEXT PRIMARY KEY REFERENCES cases(id),
     transcription_json TEXT NOT NULL,
     created_at         TEXT NOT NULL
+);
+
+-- The typed evidence report for a root (contracts §12.5). Written by the
+-- evidence worker after a LIVE/RECORDED_REPLAY read; it is pipeline completion
+-- only and is never fed into the finance snapshot.
+CREATE TABLE IF NOT EXISTS case_evidence_reports (
+    root_id       TEXT PRIMARY KEY REFERENCES cases(id),
+    tenant        TEXT NOT NULL,
+    report_json   TEXT NOT NULL,
+    created_at    TEXT NOT NULL
 );
 
 -- Responsible confirmations from an owner's answer (contracts §3, §5). A
