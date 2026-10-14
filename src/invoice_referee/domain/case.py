@@ -117,6 +117,11 @@ class AssessmentInput(StrictModel):
     admission_issues: tuple[BusinessIssue, ...] = ()
     admission_problems: tuple[ProcessingProblem, ...] = ()
     expense_set_complete: bool = False
+    # Costs whose amount is in dispute (a source over-allocation, TC08). These
+    # carry a specific admission FACT that names both numbers and the difference,
+    # so the policy engine does not also raise the generic T/payer facts for
+    # them (the payer basis is known; only the amount is unresolved).
+    disputed_expense_ids: tuple[Id, ...] = ()
 
 
 class FinancialEffect(StrictModel):
@@ -141,6 +146,11 @@ class AssessmentResult(StrictModel):
     # from the admitted expenses; the persisted conclusion carries it and the
     # view exposes it. Default empty keeps STUB/legacy snapshots compatible.
     payment_basis: tuple[PaymentBasisView, ...] = ()
+    # The distinct canonical economic identities of the admitted costs (the
+    # document bound to each expense). Persisted with the conclusion so the
+    # usage/anti-duplicate consumer sees the SAME identity the evidence path
+    # admitted (§10.2). Default empty keeps STUB/legacy snapshots compatible.
+    economic_keys: tuple[str, ...] = ()
 
 
 class CommandContext(StrictModel):

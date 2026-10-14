@@ -2332,7 +2332,7 @@ class CaseWorkflow:
             state = "WAITING"
             conclusion_status = "BLOCKED"
         elif result.allowed_effect is not None and self._obligation_owned_elsewhere(
-            cx, session.tenant, root_id
+            cx, session.tenant, root_id, result
         ):
             # The economic obligation already belongs to another root in this
             # tenant: do not issue a second instruction (§10.2). The canonical
@@ -2489,8 +2489,10 @@ class CaseWorkflow:
             ),
         )
         # Record economic usage so a second root cannot claim the same obligation
-        # (§10.2). The first writer becomes the canonical owner.
-        for economic_key in self._economic_keys_for(cx, root_id):
+        # (§10.2). The first writer becomes the canonical owner. The keys come
+        # from the CURRENT result (each the document bound to a cost), so the
+        # LIVE evidence path keys on the same identity admission used.
+        for economic_key in (result.economic_keys or self._economic_keys_for(cx, root_id)):
             existing = cx.execute(
                 "SELECT owner_root FROM usage_registry WHERE tenant = ? AND economic_key = ?",
                 (session.tenant, economic_key),
@@ -2503,10 +2505,20 @@ class CaseWorkflow:
                 )
 
     def _obligation_owned_elsewhere(
-        self, cx: sqlite3.Connection, tenant: str, root_id: str
+        self, cx: sqlite3.Connection, tenant: str, root_id: str, result=None
     ) -> bool:
-        """True if any of this root's economic keys is owned by another root."""
-        for economic_key in self._economic_keys_for(cx, root_id):
+        """True if any of this root's economic keys is owned by another root.
+
+        The keys come from the CURRENT assessment result when available (each the
+        document bound to a cost), so the LIVE evidence path checks the same
+        identity admission produced rather than a stale STUB transcription.
+        """
+        keys = (
+            tuple(str(k) for k in result.economic_keys if str(k))
+            if result is not None and getattr(result, "economic_keys", ())
+            else self._economic_keys_for(cx, root_id)
+        )
+        for economic_key in keys:
             row = cx.execute(
                 "SELECT owner_root FROM usage_registry WHERE tenant = ? AND economic_key = ?",
                 (tenant, economic_key),
@@ -2516,6 +2528,32 @@ class CaseWorkflow:
         return False
 
     def _economic_keys_for(self, cx: sqlite3.Connection, root_id: str) -> tuple[str, ...]:
+        """The canonical economic identities this root claims (dedup/usage).
+
+        The evidence (LIVE/REPLAY) path stores the admitted expenses — each with
+        the identity of the document BOUND to it — in the latest conclusion, so
+        the usage/anti-duplicate consumer sees the same identity admission used.
+        The STUB hand-transcription path keeps its `case_transcriptions` keys.
+        A root with neither basis yields no keys (never a fabricated identity).
+        """
+        from invoice_referee.domain.case import AssessmentResult
+
+        conclusion = cx.execute(
+            "SELECT payload_json FROM case_conclusions WHERE root_id = ? "
+            "ORDER BY revision DESC LIMIT 1",
+            (root_id,),
+        ).fetchone()
+        if conclusion is not None and conclusion["payload_json"]:
+            try:
+                result = AssessmentResult.model_validate_json(conclusion["payload_json"])
+            except Exception:
+                result = None
+            if result is not None:
+                # The conclusion carries the distinct identities of the admitted
+                # costs (each the document bound to that cost).
+                keys = tuple(str(k) for k in result.economic_keys if str(k))
+                if keys:
+                    return keys
         row = cx.execute(
             "SELECT transcription_json FROM case_transcriptions WHERE root_id = ?",
             (root_id,),

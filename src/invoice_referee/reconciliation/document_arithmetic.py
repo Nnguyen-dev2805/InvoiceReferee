@@ -100,7 +100,12 @@ def _check_settlement_form(document: DocumentAnalysis) -> list[ArithmeticFinding
         # established; the missing-evidence/advance FACT path already covers it.
         return []
     findings: list[ArithmeticFinding] = []
-    expected_refund = advance - total
+    # Only one direction applies: when the advance exceeds the cost the paper
+    # returns money (refund); when the cost exceeds the advance the company pays
+    # extra (reimbursement). The inapplicable side is a verified zero, not a
+    # negative — so F02 (advance 5m < cost 5.4m, refund 0, reimburse 400k) is not
+    # a false contradiction.
+    expected_refund = max(advance - total, 0)
     refund = _found(document, "printed_return")
     if refund is not None and refund != expected_refund:
         diff = abs(refund - expected_refund)
@@ -118,7 +123,7 @@ def _check_settlement_form(document: DocumentAnalysis) -> list[ArithmeticFinding
             refs=_refs(document, "declared_advance", "printed_total", "printed_return"),
         ))
     reimburse = _found(document, "printed_reimbursement")
-    expected_reimburse = total - advance
+    expected_reimburse = max(total - advance, 0)
     if reimburse is not None and reimburse != expected_reimburse:
         diff = abs(reimburse - expected_reimburse)
         findings.append(ArithmeticFinding(

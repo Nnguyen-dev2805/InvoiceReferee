@@ -74,18 +74,18 @@ export function Execution({
         <h3 className="text-xs font-semibold text-slate-700">
           Dòng tiền thực tế đã ghi nhận trong sổ cái
         </h3>
-        <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs divide-y sm:divide-y-0 sm:divide-x divide-slate-100 grid grid-cols-1 sm:grid-cols-3">
+        <div className="border-t border-b border-slate-200 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 grid grid-cols-1 sm:grid-cols-3">
           {Object.entries(caseView.actual_money)
             .filter(([key]) => key in MONEY_LABELS)
             .map(([key, fact]) => (
               <div
                 key={key}
                 data-testid={`actual-${key}`}
-                className="p-3 bg-white text-xs flex flex-col justify-between hover:bg-slate-50/50 transition-colors"
+                className="py-2.5 px-2 bg-white text-xs flex flex-col justify-between hover:bg-slate-50/50 transition-colors"
               >
                 <span className="text-[11px] text-slate-500 font-medium">{MONEY_LABELS[key]}:</span>
                 <strong
-                  className={`font-mono-nums tabular-nums text-xs mt-1.5 ${
+                  className={`font-mono-nums tabular-nums text-xs mt-1 ${
                     fact.state === "KNOWN" && fact.value !== null
                       ? "text-slate-900 font-semibold"
                       : "text-slate-400 font-normal select-none"
@@ -118,7 +118,7 @@ export function Execution({
             id="received-amount"
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
-            className="w-full bg-white border border-slate-300 rounded-md text-xs px-3 py-2 text-slate-900 font-mono-nums tabular-nums font-semibold focus:outline-none focus:border-slate-800 shadow-2xs"
+            className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 font-mono-nums tabular-nums font-semibold focus:outline-none focus:border-slate-800"
           />
         </div>
 
@@ -137,7 +137,7 @@ export function Execution({
             id="received-payee"
             value={payee}
             onChange={(event) => setPayee(event.target.value)}
-            className="w-full bg-white border border-slate-300 rounded-md text-xs px-3 py-2 text-slate-900 font-mono-nums focus:outline-none focus:border-slate-800 shadow-2xs"
+            className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 font-mono-nums focus:outline-none focus:border-slate-800"
           />
         </div>
 
@@ -149,7 +149,7 @@ export function Execution({
             id="completion-claim"
             value={completionClaim}
             onChange={(event) => setCompletionClaim(event.target.value)}
-            className="w-full bg-white border border-slate-300 rounded-md text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+            className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800"
           />
         </div>
       </div>
@@ -159,7 +159,7 @@ export function Execution({
           type="button"
           onClick={() => void record()}
           disabled={busy || amount === ""}
-          className="bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs py-2.5 px-5 rounded-lg shadow-sm transition-colors disabled:opacity-40 cursor-pointer"
+          className="bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs py-2.5 px-4 rounded transition-colors disabled:opacity-40 cursor-pointer"
         >
           {busy ? "Đang ghi nhận…" : "Ghi nhận vào sổ cái"}
         </button>

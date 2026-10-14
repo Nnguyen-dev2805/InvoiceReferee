@@ -161,7 +161,7 @@ export function Dashboard({
             }`}
           >
             <span>Tất cả</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[11px] font-mono-nums bg-slate-100 text-slate-600">
+            <span className="px-1.5 py-0.5 rounded text-[11px] font-mono-nums bg-slate-100 text-slate-600">
               {counts.total}
             </span>
           </button>
@@ -178,7 +178,7 @@ export function Dashboard({
                 }`}
               >
                 <span>Cần bạn giải trình</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[11px] font-mono-nums ${
+                <span className={`px-1.5 py-0.5 rounded text-[11px] font-mono-nums ${
                   counts.employeeIssuesCount > 0 ? "bg-amber-100 text-amber-900 font-semibold" : "bg-slate-100 text-slate-600"
                 }`}>
                   {counts.employeeIssuesCount}
@@ -195,7 +195,7 @@ export function Dashboard({
                 }`}
               >
                 <span>Chờ phê duyệt</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[11px] font-mono-nums bg-slate-100 text-slate-600">
+                <span className="px-1.5 py-0.5 rounded text-[11px] font-mono-nums bg-slate-100 text-slate-600">
                   {counts.readyToExecuteCount}
                 </span>
               </button>
@@ -214,7 +214,7 @@ export function Dashboard({
                 }`}
               >
                 <span>Chờ phê duyệt</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[11px] font-mono-nums bg-slate-100 text-slate-600">
+                <span className="px-1.5 py-0.5 rounded text-[11px] font-mono-nums bg-slate-100 text-slate-600">
                   {counts.readyToExecuteCount}
                 </span>
               </button>
@@ -229,7 +229,7 @@ export function Dashboard({
                 }`}
               >
                 <span>Vướng mắc chính sách</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[11px] font-mono-nums ${
+                <span className={`px-1.5 py-0.5 rounded text-[11px] font-mono-nums ${
                   counts.policyIssuesCount > 0 ? "bg-amber-100 text-amber-900 font-semibold" : "bg-slate-100 text-slate-600"
                 }`}>
                   {counts.policyIssuesCount}
@@ -250,7 +250,7 @@ export function Dashboard({
                 }`}
               >
                 <span>Chờ tạm ứng</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[11px] font-mono-nums ${
+                <span className={`px-1.5 py-0.5 rounded text-[11px] font-mono-nums ${
                   counts.advancePendingCount > 0 ? "bg-amber-100 text-amber-900 font-semibold" : "bg-slate-100 text-slate-600"
                 }`}>
                   {counts.advancePendingCount}
@@ -267,7 +267,7 @@ export function Dashboard({
                 }`}
               >
                 <span>Cần chi trả</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[11px] font-mono-nums bg-slate-100 text-slate-600">
+                <span className="px-1.5 py-0.5 rounded text-[11px] font-mono-nums bg-slate-100 text-slate-600">
                   {counts.payPendingCount}
                 </span>
               </button>
@@ -282,7 +282,7 @@ export function Dashboard({
                 }`}
               >
                 <span>Cần thu hồi</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[11px] font-mono-nums bg-slate-100 text-slate-600">
+                <span className="px-1.5 py-0.5 rounded text-[11px] font-mono-nums bg-slate-100 text-slate-600">
                   {counts.collectPendingCount}
                 </span>
               </button>
@@ -299,7 +299,7 @@ export function Dashboard({
             }`}
           >
             <span>Đã quyết toán</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[11px] font-mono-nums bg-slate-100 text-slate-600">
+            <span className="px-1.5 py-0.5 rounded text-[11px] font-mono-nums bg-slate-100 text-slate-600">
               {counts.settledCount}
             </span>
           </button>
@@ -321,7 +321,7 @@ export function Dashboard({
       </div>
 
       {/* 3. Bespoke Clean Enterprise Table */}
-      <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs">
+      <div className="border border-slate-200 rounded overflow-hidden bg-white">
         {filteredCases.length === 0 ? (
           <div className="py-12 px-4 text-center space-y-2">
             <h3 className="text-sm font-semibold text-slate-800">

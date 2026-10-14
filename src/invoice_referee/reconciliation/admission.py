@@ -622,27 +622,42 @@ def admit_evidence(
             continue
         key = entry.document.document_id
         allocation_totals[key] = allocation_totals.get(key, 0) + int(entry.amount)
+    # A source whose rows over-allocate it is in DISPUTE (TC08): the declared
+    # amount and the document amount disagree. The disputed cost must stay
+    # unresolved (never elevated to verified eligible money) until a correction
+    # resolves it. The FACT keeps both source numbers and their difference.
+    disputed_documents: dict[str, tuple[int, int, int]] = {}
+    disputed_entry_by_doc: dict[str, _MatchedExpense] = {}
     for entry in matched:
         if entry.document is None:
             continue
         doc_total = _as_decimal(_field(entry.document, "total_amount"))
         if doc_total is None:
             continue
-        if allocation_totals[entry.document.document_id] > int(doc_total):
-            issues.append(
-                BusinessIssue(
-                    id=f"issue:fact:allocation:{entry.document.document_id}",
-                    kind="FACT",
-                    field_or_rule=f"expense:allocation:{entry.document.document_id}",
-                    owner="employee",
-                    basis=(
-                        f"Tổng phân bổ {allocation_totals[entry.document.document_id]} vượt "
-                        f"tổng chứng từ {int(doc_total)}."
-                    ),
-                    refs=entry.document.refs,
-                    question="Xác nhận phân bổ các dòng trên chứng từ không vượt tổng chứng từ.",
-                )
+        allocated = allocation_totals[entry.document.document_id]
+        if allocated > int(doc_total):
+            disputed_documents[entry.document.document_id] = (allocated, int(doc_total), allocated - int(doc_total))
+            disputed_entry_by_doc.setdefault(entry.document.document_id, entry)
+    for document_id, (allocated, doc_total, difference) in disputed_documents.items():
+        entry = disputed_entry_by_doc[document_id]
+        issues.append(
+            BusinessIssue(
+                id=f"issue:fact:allocation:{document_id}",
+                kind="FACT",
+                field_or_rule=f"expense:allocation:{document_id}",
+                owner="employee",
+                basis=(
+                    f"Kê khai {allocated} nhưng chứng từ chỉ chứng minh {doc_total} "
+                    f"(lệch {difference}); số tiền đang tranh chấp."
+                ),
+                refs=_document_refs(entry.document) if entry.document is not None else (),
+                question=(
+                    f"Xác nhận/sửa số tiền: kê khai {allocated} nhưng chứng từ "
+                    f"{doc_total} (lệch {difference}); cung cấp chứng từ "
+                    "đúng hoặc điều chỉnh số kê khai."
+                ),
             )
+        )
     # An extra source the paper does not reference is a relevance FACT (TC24),
     # never silently added as a cost or dropped.
     for document in unreferenced_documents:
@@ -721,9 +736,16 @@ def admit_evidence(
     )
 
     expenses: list[Expense] = []
+    disputed_expense_ids: list[str] = []
     for index, entry in enumerate(matched, start=1):
         amount, refs = entry.amount, entry.refs
         expense_id = f"expense:{index}"
+        # A cost whose source over-allocates is in dispute (TC08): its amount is
+        # not a verified fact and must not become eligible/employee-paid money.
+        disputed = (
+            entry.document is not None
+            and entry.document.document_id in disputed_documents
+        )
         # The service evidence must name the cost; the settlement row is the
         # canonical cost identity. Ref-less rows still carry the document refs.
         payments: list[ExpensePayment] = []
@@ -737,10 +759,14 @@ def admit_evidence(
         # employee-paid basis, with no separate payer confirmation (chốt
         # 14/10/2026). Composite binding allows a company-buyer-only invoice when
         # the paper claimant + company identity + row link agree (T2). It is a
-        # demo-policy basis, never a bank-verified fact.
-        invoice_bound, binding_fact = _invoice_binding(
-            entry.document, paper, organization, scope.employee
-        )
+        # demo-policy basis, never a bank-verified fact. A DISPUTED cost does not
+        # take this basis: the amount itself is unresolved.
+        if disputed:
+            invoice_bound, binding_fact = False, None
+        else:
+            invoice_bound, binding_fact = _invoice_binding(
+                entry.document, paper, organization, scope.employee
+            )
         if binding_fact is not None:
             issues.append(binding_fact)
         # A paper row with no matched original evidence is not silently dropped:
@@ -817,14 +843,22 @@ def admit_evidence(
         else:
             eligibility = "UNKNOWN"
 
+        # A disputed cost has no verified amount: T is UNKNOWN for it (never the
+        # declared 3.5m, never a silent cut to 3.24m). The source refs are kept so
+        # the two numbers can be compared.
+        incurred = (
+            Fact[int](key=f"{expense_id}:incurred", state="UNKNOWN", refs=refs)
+            if disputed
+            else Fact[int](key=f"{expense_id}:incurred", value=int(amount), state="KNOWN", refs=refs)
+        )
+        if disputed:
+            disputed_expense_ids.append(expense_id)
         expenses.append(
             Expense(
                 id=expense_id,
-                economic_key=_economic_key(report, refs, index),
+                economic_key=_economic_key(entry.document, index),
                 activity=scope.activity,
-                incurred=Fact[int](
-                    key=f"{expense_id}:incurred", value=int(amount), state="KNOWN", refs=refs
-                ),
+                incurred=incurred,
                 incurred_at=as_of,
                 payments=tuple(payments),
                 eligibility=eligibility,  # type: ignore[arg-type]
@@ -860,6 +894,7 @@ def admit_evidence(
         admission_issues=tuple(issues),
         admission_problems=tuple(problems),
         expense_set_complete=expense_set_complete,
+        disputed_expense_ids=tuple(disputed_expense_ids),
     )
 
 
@@ -890,13 +925,16 @@ def _claim_for(
     return None
 
 
-def _economic_key(
-    report: ReadResult, refs: tuple[EvidenceRef, ...], index: int
-) -> str:
-    """Canonical cost identity: issuer + document number, else the row id."""
-    for document in report.documents:
-        if document.document_type not in _ORIGINAL_EXPENSE_TYPES:
-            continue
+def _economic_key(document: DocumentAnalysis | None, index: int) -> str:
+    """Canonical cost identity from the document BOUND to this cost.
+
+    The identity is the document actually matched to the row (issuer + document
+    number), never the first invoice of the report and never the file/row order.
+    Two rows that share one invoice share its identity; a different invoice gets
+    its own. A row with no bound document has no invoice identity to claim, so it
+    falls back to a per-row marker.
+    """
+    if document is not None:
         number = _field(document, "document_number")
         issuer = _field(document, "issuer_name")
         if number is not None:

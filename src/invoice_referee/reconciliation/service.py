@@ -53,6 +53,23 @@ def _money_basis(input: AssessmentInput) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _economic_keys(input: AssessmentInput) -> tuple[str, ...]:
+    """The distinct canonical identities of the admitted costs (§10.2).
+
+    Each expense carries the identity of the document bound to it; the distinct
+    set is persisted with the conclusion so the usage/anti-duplicate consumer
+    keys on the same identity the evidence path admitted. A disputed/ref-less
+    cost's `expense:<n>` marker is kept too (it is a real per-row identity), but
+    an empty set stays empty (never a fabricated key).
+    """
+    seen: list[str] = []
+    for expense in input.expense_facts:
+        key = expense.economic_key
+        if key and key not in seen:
+            seen.append(key)
+    return tuple(seen)
+
+
 def _payment_basis(input: AssessmentInput) -> tuple[PaymentBasisView, ...]:
     """Per-expense paid basis from the admitted payments (plan A0/A4).
 
@@ -148,4 +165,5 @@ class Reconciler:
             cost_basis=_cost_basis(input),
             money_basis=_money_basis(input),
             payment_basis=_payment_basis(input),
+            economic_keys=_economic_keys(input),
         )

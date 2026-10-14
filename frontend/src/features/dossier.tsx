@@ -68,10 +68,10 @@ export function MoneyLine({
   return (
     <li
       data-testid={`money-${label}`}
-      className={`flex items-center justify-between px-4 py-2 text-xs transition-colors ${
+      className={`flex items-center justify-between px-1 py-2 text-xs transition-colors ${
         highlight
-          ? "bg-slate-50 font-semibold text-slate-900"
-          : "hover:bg-slate-50/50 text-slate-700"
+          ? "bg-slate-50/70 font-semibold text-slate-950"
+          : "hover:bg-slate-50/40 text-slate-700"
       }`}
     >
       <span className={highlight ? "font-semibold text-slate-900 text-xs" : "text-slate-600 font-medium"}>
@@ -148,7 +148,7 @@ export function Dossier({
             v{caseView.version}
           </span>
           <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border ${
               caseView.state === "READY_TO_EXECUTE"
                 ? "bg-emerald-50 text-emerald-900 border-emerald-200/90"
                 : caseView.state === "WAITING"
@@ -181,14 +181,13 @@ export function Dossier({
         </p>
       </div>
 
-      {/* Structured Reconciliation Ledger Table */}
-      <div className="space-y-2">
+      {/* Structured Reconciliation Ledger Table - Flat & Clean */}
+      <div className="space-y-1.5">
         <h3 className="text-xs font-semibold text-slate-900">
           Chi tiết dòng tiền đối soát
         </h3>
 
-        <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs">
-
+        <div className="border-t border-b border-slate-200">
           <ul className="money divide-y divide-slate-100">
             {Object.entries(caseView.actual_money)
               .filter(([key]) => key in MONEY_LABELS)
@@ -206,19 +205,19 @@ export function Dossier({
 
       {/* Payment Basis (Căn cứ pháp lý & nhân viên xác nhận) */}
       {caseView.payment_basis.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+        <div className="space-y-1.5">
+          <h3 className="text-xs font-semibold text-slate-900">
             Căn cứ xác nhận chi trả
           </h3>
           <div
-            className="border border-slate-200 rounded-lg overflow-hidden bg-white divide-y divide-slate-100 shadow-2xs"
+            className="border-t border-b border-slate-200 divide-y divide-slate-100"
             data-testid="payment-basis"
           >
             {caseView.payment_basis.map((basis) => (
               <div
                 key={basis.expense_id}
                 data-testid={`basis-${basis.expense_id}`}
-                className="px-4 py-3 text-xs flex items-center justify-between hover:bg-slate-50/50 transition-colors"
+                className="px-1 py-2.5 text-xs flex items-center justify-between hover:bg-slate-50/50 transition-colors"
               >
                 <div className="space-y-0.5">
                   <span className="font-semibold text-slate-900 block">
@@ -231,7 +230,7 @@ export function Dossier({
                   )}
                 </div>
                 {basis.rule_id && (
-                  <span className="text-[11px] font-mono-nums font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                  <span className="text-[11px] font-mono-nums font-medium text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
                     Điều khoản: {basis.rule_id}
                   </span>
                 )}
@@ -248,19 +247,19 @@ export function Dossier({
             <h3 className="text-xs font-semibold text-slate-900">
               Vấn đề cần xử lý ({caseView.issues.length})
             </h3>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-900 border border-amber-200">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-900 border border-amber-200">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
               <span>Chờ giải quyết</span>
             </span>
           </div>
 
-          <div className="border border-slate-200 rounded-lg overflow-hidden bg-white divide-y divide-slate-100 shadow-2xs">
+          <div className="border-t border-b border-slate-200 divide-y divide-slate-100">
             {caseView.issues.map((issue) => {
               const kindLabel = ISSUE_LABELS[issue.kind] ?? issue.kind;
               return (
                 <div
                   key={issue.id}
-                  className="p-3.5 hover:bg-slate-50/50 transition-colors text-xs space-y-2"
+                  className="px-1 py-3 hover:bg-slate-50/50 transition-colors text-xs space-y-1.5"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

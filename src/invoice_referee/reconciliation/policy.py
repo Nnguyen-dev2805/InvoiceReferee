@@ -166,7 +166,14 @@ def evaluate_policy(
                 _evidence_refs(input, fields=("coverage", "advance", "reimbursed", "returned")),
             )
         )
-    if projection.E.state == "UNKNOWN":
+    # When EVERY admitted cost is in dispute (TC08), the payer basis is already
+    # known — only the amount is unresolved, and the specific dispute FACT owns
+    # that question. Asking "who paid?" would be a false/duplicate question, so
+    # the generic payer FACT is suppressed for that case.
+    all_disputed = bool(input.expense_facts) and all(
+        expense.id in input.disputed_expense_ids for expense in input.expense_facts
+    )
+    if projection.E.state == "UNKNOWN" and not all_disputed:
         # An incurred cost with no established payer is a FACT owned by the
         # verifier; it must not become an E=0 money conclusion (§3, §10.2).
         issues.append(

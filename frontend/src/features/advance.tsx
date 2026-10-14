@@ -106,14 +106,14 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
         </h2>
       </div>
 
-      <div className="bg-slate-50/60 border border-slate-200 rounded-lg p-3.5 space-y-3">
+      <div className="space-y-3 py-1">
         <div className="flex items-center justify-between">
           <label className="text-slate-700 font-medium text-xs">Phương thức ứng:</label>
           <select
             aria-label="Phương thức ứng"
             value={method}
             onChange={(event) => setMethod(event.target.value as "TRANSFER" | "CASH")}
-            className="bg-white border border-slate-300 rounded-md px-2.5 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:border-slate-800 shadow-2xs cursor-pointer"
+            className="bg-white border border-slate-300 rounded px-2.5 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:border-slate-800 cursor-pointer"
           >
             <option value="TRANSFER">Chuyển khoản ngân hàng</option>
             <option value="CASH">Tiền mặt</option>
@@ -124,10 +124,10 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
           <label className="block text-slate-700 font-medium text-xs mb-1.5">
             Chứng từ tạm ứng (Ủy nhiệm chi / Phiếu chi):
           </label>
-          <div className="border border-dashed border-slate-300 hover:border-slate-400 bg-white rounded-lg p-3.5 text-center transition-colors">
+          <div className="border border-dashed border-slate-300 hover:border-slate-400 bg-slate-50/40 rounded p-3 text-center transition-colors">
             <label
               htmlFor="advance-file-input"
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-md border border-slate-200 cursor-pointer transition-colors"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded border border-slate-200 cursor-pointer transition-colors"
             >
               <span>{selectedFileName ? "Đổi tệp chứng từ" : "Chọn tệp chứng từ ứng"}</span>
               <input
@@ -156,7 +156,7 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
       </div>
 
       {draft !== null && (
-        <div className="space-y-3 bg-white p-4 rounded-lg border border-slate-200 shadow-2xs" data-testid="advance-draft">
+        <div className="space-y-3 pt-3 border-t border-slate-200" data-testid="advance-draft">
           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -236,7 +236,7 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
                 aria-label="Xác nhận của kế toán"
                 value={completionClaim}
                 onChange={(event) => setCompletionClaim(event.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-800"
               />
             </div>
           </div>
@@ -246,7 +246,7 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
               type="button"
               onClick={() => void confirm()}
               disabled={busy || amount === ""}
-              className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors disabled:opacity-40 cursor-pointer"
+              className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded transition-colors disabled:opacity-40 cursor-pointer"
             >
               {busy ? "Đang xử lý…" : "Xác nhận ghi nhận"}
             </button>
@@ -255,10 +255,10 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
       )}
 
       {notice !== null && (
-        <p role="status" className="p-2.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs">{notice}</p>
+        <p role="status" className="p-2.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs">{notice}</p>
       )}
       {error !== null && (
-        <p role="alert" className="error p-2.5 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-xs">{error}</p>
+        <p role="alert" className="error p-2.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-xs">{error}</p>
       )}
     </section>
   );

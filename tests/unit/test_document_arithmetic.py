@@ -75,6 +75,31 @@ def test_tc06_correct_refund_has_no_finding() -> None:
     assert findings == ()
 
 
+def test_f02_company_pays_extra_is_not_a_false_refund_finding() -> None:
+    # F02: advance 5m < cost 5.4m, so the refund is a verified zero and the
+    # company pays 400k extra. The inapplicable side is 0, not a negative.
+    assert check_document_arithmetic(
+        _paper(declared_advance="5000000", printed_total="5400000",
+               printed_return="0", printed_reimbursement="400000")
+    ) == ()
+
+
+def test_f03_balanced_paper_has_no_finding() -> None:
+    assert check_document_arithmetic(
+        _paper(declared_advance="4320000", printed_total="4320000",
+               printed_return="0", printed_reimbursement="0")
+    ) == ()
+
+
+def test_wrong_reimbursement_amount_is_a_finding() -> None:
+    findings = check_document_arithmetic(
+        _paper(declared_advance="5000000", printed_total="5400000",
+               printed_return="0", printed_reimbursement="100000")
+    )
+    assert _codes(findings) == ["settlement-reimburse"]
+    assert "400000" in findings[0].basis and "300000" in findings[0].basis
+
+
 def test_tc11_invoice_total_does_not_equal_subtotal_plus_tax() -> None:
     findings = check_document_arithmetic(
         _invoice(subtotal="5000000", tax="400000", total_amount="5500000")

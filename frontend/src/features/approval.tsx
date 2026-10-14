@@ -18,15 +18,15 @@ function InstructionRow({ instruction }: { instruction: InstructionView }) {
   return (
     <li
       data-testid={`instruction-${instruction.direction}`}
-      className={`p-3.5 rounded-lg border space-y-2.5 text-xs transition-colors shadow-2xs ${
+      className={`p-3 rounded border space-y-2 text-xs transition-colors ${
         isPay
-          ? "bg-emerald-50/50 border-emerald-200/90 text-emerald-950"
-          : "bg-amber-50/50 border-amber-200/90 text-amber-950"
+          ? "bg-emerald-50/40 border-emerald-200/80 text-emerald-950"
+          : "bg-amber-50/40 border-amber-200/80 text-amber-950"
       }`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isPay ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${isPay ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
             {isPay ? "CHI" : "THU"}
           </span>
           <span className="font-semibold text-slate-900 text-xs">
@@ -34,7 +34,7 @@ function InstructionRow({ instruction }: { instruction: InstructionView }) {
             <span className="font-mono-nums text-sm font-bold">{formatVnd(instruction.amount)}</span>
           </span>
         </div>
-        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-white border border-slate-200 font-mono-nums text-slate-700">
+        <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-white border border-slate-200 font-mono-nums text-slate-700">
           {instruction.status}
         </span>
       </div>
@@ -45,8 +45,8 @@ function InstructionRow({ instruction }: { instruction: InstructionView }) {
         <span>Thực hiện: <strong>{EXECUTION_LABELS[instruction.execution_state] ?? instruction.execution_state}</strong></span>
       </div>
 
-      <div className="text-[11px] text-slate-600 bg-white/90 p-2.5 rounded border border-slate-200/80">
-        <span className="font-semibold text-slate-700">Căn cứ chỉ thị:</span> {instruction.basis}
+      <div className="text-[11px] text-slate-600 pl-2.5 border-l-2 border-slate-300 py-0.5">
+        <span className="font-medium text-slate-700">Căn cứ chỉ thị:</span> {instruction.basis}
       </div>
     </li>
   );

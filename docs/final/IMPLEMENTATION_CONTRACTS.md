@@ -439,6 +439,23 @@ dedup bytes. Cash/no-number expense dùng binding/financial confirmation có tr�
 nhiệm để xác lập key; không tạo identity từ amount/date/name giống nhau. Candidate
 match chưa đủ định danh hoặc relation chưa rõ ⇒ FACT, không false duplicate.
 
+Identity của một khoản chi lấy từ **document thực sự bound vào khoản đó** (issuer +
+document_number), không lấy invoice đầu tiên của report và không dùng thứ tự
+file/row (TC23): hai dòng cùng một hóa đơn dùng chung canonical identity, hóa đơn
+khác có identity riêng. Khoản không có chứng từ bound dùng marker theo dòng. Identity
+này được persist trong `AssessmentResult.economic_keys` (trong
+`case_conclusions.payload_json`) để consumer usage/anti-duplicate đọc đúng identity
+mà admission đã dùng — cả đường LIVE/REPLAY lẫn STUB.
+
+Một khoản chi có nguồn bị phân bổ vượt (over-allocation) là **đang tranh chấp**
+(TC08): `incurred`/`eligibility` UNKNOWN, không có payment portion, FACT giữ cả số
+kê khai, số chứng từ và sai lệch (owner employee). Không nâng khoản tranh chấp thành
+verified/ELIGIBLE money; không âm thầm cắt về số chứng từ hoặc lấy số kê khai. Lịch
+sử đã xác minh (A/P/R) vẫn giữ. Approval/EXCEPT_POLICY chung không waive FACT; chỉ
+correction/nguồn mới hợp lệ ở revision mới mới giải quyết. Khi mọi khoản đều đang
+tranh chấp, không thêm câu hỏi `expense:payer` giả (căn cứ người trả đã rõ, chỉ số
+tiền chưa rõ).
+
 Tenant usage registry trong workflow/schema.sql: economic_key, owner_root,
 expense_id, verified payment_portion keys, evidence refs, version. Một expense
 scope chỉ có một owner root; payment portions mới cùng owner thêm một lần. Hai
@@ -731,9 +748,11 @@ giữ và E0 pin; profile/critical-field matrix pin tại Hoangha revision `1ee3
   (`reconciliation/document_arithmetic.py`). `ArithmeticFinding(code, field_or_rule,
   basis, question, refs)`.
 - Kiểm theo **loại tài liệu** và các field đã có căn cứ:
-  - `SETTLEMENT_FORM`: `declared_advance − printed_total` phải bằng `printed_return`
-    (`code=settlement-return`) hoặc `printed_total − declared_advance` phải bằng
-    `printed_reimbursement` (`code=settlement-reimburse`).
+  - `SETTLEMENT_FORM`: `max(declared_advance − printed_total, 0)` phải bằng
+    `printed_return` (`code=settlement-return`); `max(printed_total − declared_advance, 0)`
+    phải bằng `printed_reimbursement` (`code=settlement-reimburse`). Chỉ một chiều áp
+    dụng; chiều không áp dụng là zero có căn cứ (F02 ứng 5m < chi 5.4m ⇒ hoàn lại 0,
+    đề nghị chi thêm 400k — không phải mâu thuẫn).
   - `E_INVOICE`: `subtotal + tax + service_charge − discount` phải bằng `total_amount`
     (`code=invoice-total`). Ticket/receipt không bị bắt có VAT fields.
 - Thành phần trọng yếu (`tax`/`discount`/`service_charge`) ở trạng thái `UNREADABLE`/

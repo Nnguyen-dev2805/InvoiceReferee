@@ -1,128 +1,113 @@
-# Bốn case LIVE — F02/F03 công tác và Hoangha TC08/TC23
+# TC08/TC23 core fixes + F02/F03 reruns — implementation and evidence
 
-Ngày14/10/2026. **Hai case công tác đạt kết quả tiền mong đợi. Hai case Hoangha
-chuyển người/chặn instruction đúng ở bước đầu, nhưng còn lỗi dữ kiện tài chính
-TC08 và định danh khoản chi TC23. Không kết luận4case hoàn toàn PASS.**
+14/10/2026. Implementer report. Branch `final`, base HEAD `a98b7f2f`. No commit or
+push (no Git authorization); no database reset; no checkout; no subagent. A
+concurrent agent is editing `frontend/src/features/{approval,dossier,questions}.tsx`
+and added `docs/final/reviews/2026-10-14-langsmith-wiring.md`; those are preserved
+and untouched.
 
-## Phạm vi và danh tính test
+Fixes the two data failures of
+[`.runtime/fourcase-live-20261014-155735`](../../../.runtime/fourcase-live-20261014-155735)
+(branch/route checks passed; financial-data + economic-identity checks failed).
 
-- Đóng băng package từ working tree `final` lúc bắt đầu; HEAD `0b205420bfd3b4ce41e8739a1a701798a805bca1`. Snapshot bao gồm thay đổi backend agent đang làm và nằm dưới `.runtime/fourcase-live-20261014-155735/snapshot/src`.
-- Source bytes/hash và snapshot hashes được ghi vào identity.json, kiểm lại cuối run không đổi. Không sửa PDF, input org corpus hoặc application source.
-- LIVE Mistral OCR + configured X-Kiro `qwen/qwen3.7-flash:free`, không native-PDF text bypass, không dùng gold/expected.json/mapping trong ứng dụng/model.
-- Context tài chính SIMULATED; clock harness công khai10/10/2026 18:00+07. Actual advance là fixture riêng, không suy từ paper.
-- F02/F03 dùng nguyên `input/organization.json`; employee-confirmation.json không được gửi, invoice demo basis phải tự bind đúng nhân viên.
-- TC08/TC23 dùng context độc lập theo cùng rulebook: company/person/activity đúng; advance4m/9m, coverage đủ; TC08 B8m, TC23 B12m. System recognize8m/issue4m; grant approver TC23≤20m, không cấp system8.64m để ép AUTO.
--4case trong4database riêng. Chạy hai lượt song song một lần để hạn chế concurrency provider. Không reset/write user DB, không thực hiện tiền, không commit/push/subagent.
-- Đã render và nhìn đủ9PDF trước run. Mong đợi từ nguồn/số học/policy được viết trước run trong independent-expectations.json.
-- CodeGraph up-to-date với cảnh báo engine cũ; tool coverage Codebase Memory không expose, coverage UNKNOWN. Source liên quan đã đọc; không audit toàn repo.
-- Browser/UI, vòng phản hồi/approval/actual-payment sau trạng thái ban đầu, full25-case suite: NOT_RUN trong lượt này. Không kết luận luồng UI agent chưa bàn giao đã đúng.
+## Write set, consumers, completion
 
-## Kết quả đầu tiên
+| Fix | Files | Consumers | Gate |
+| --- | --- | --- | --- |
+| TC08 disputed amount | `reconciliation/admission.py`, `reconciliation/policy.py`, `domain/case.py` (`disputed_expense_ids`) | Reconciler → `_commit_assessment` | disputed cost `incurred` UNKNOWN + `eligibility` UNKNOWN + no payment; `expense:allocation` FACT (both numbers + 260k); no generic `expense:payer` |
+| TC23 economic identity | `reconciliation/admission.py::_economic_key` | `Expense.economic_key` | identity from the bound document, not the first invoice |
+| Identity reaches dedup | `reconciliation/service.py` (`economic_keys`), `domain/case.py` (`AssessmentResult.economic_keys`), `workflow/service.py` (`_obligation_owned_elsewhere`, `_issue_instruction`, `_economic_keys_for`) | usage registry / anti-duplicate | LIVE path records/checks the identity admission produced |
+| F02/F03 non-negative return | `reconciliation/document_arithmetic.py` | arithmetic gate | refund/reimburse compared to `max(...,0)` |
 
-| Case | T/E | A | S | Route/effect thực tế | Gate ban đầu | Giây |
-|---|---:|---:|---:|---|---|---:|
-| F02 — công tác chi thêm |5.400.000|5.000.000|+400.000|READY_TO_EXECUTE; PAY400000, no issues|PASS|68.117|
-| F03 — công tác cân bằng |4.320.000|4.320.000|0|SETTLED; no instruction, no issues|PASS|56.739|
-| TC08 — giấy/hóa đơn lệch |3.500.000 được đánh KNOWN, xem finding|4.000.000|−500.000 được đánh KNOWN|WAITING; FACT employee về allocation; no instruction|PASS riêng chặn/chuyển người|76.376|
-| TC23 — split một hóa đơn |8.640.000|9.000.000|−360.000|WAITING; AUTHORITY approver/RECOGNIZE_COST; no instruction|PASS riêng số tiền/quyền|105.718|
+No schema change (the new `economic_keys` rides inside the existing
+`case_conclusions.payload_json`; `disputed_expense_ids` inside `AssessmentInput`).
+Shared files (`admission.py`, `service.py`, `domain/case.py`) were the only ones
+touched; the concurrent agent's frontend files were not modified.
 
-F02 chỉ tạo yêu cầu chi, chưa chứng minh công ty đã chi400k. F03 không có nghĩa vụ
-tiền mới theo history fixture, nên được SETTLED trực tiếp mà không tạo request0.
+## RED → GREEN (backend)
 
-## Đầu vào và logic từng case
+All commands: `rtk proxy uv run --no-sync pytest <path> -p no:cacheprovider`.
 
-### F02
+| Behaviour | Test file | RED observed | GREEN |
+| --- | --- | --- | --- |
+| disputed amount not verified money | `tests/unit/test_disputed_amount_admission.py` | E=KNOWN 3.5m, eligibility ELIGIBLE, payment present | 5 passed |
+| per-cost economic identity | `tests/unit/test_economic_identity.py` | all three rows keyed to 00002301 | 3 passed |
+| LIVE dedup/usage on the bound identity | `tests/integration/test_economic_usage_dedup.py` | `usage_registry` empty on the LIVE path | 2 passed |
+| TC23 AUTHORITY + 3 keys | `tests/integration/test_tc23_authority_and_correction.py` | — | 2 passed |
+| correction/revision + no waiver | `tests/integration/test_dispute_correction.py` | — | 3 passed |
+| F02/F03 non-negative return | `tests/unit/test_document_arithmetic.py` | F02 false `settlement-return` FACT (live-observed) | 13 passed |
 
-`data/test-kit/uc03-pilot/f02-cong-tac-cong-ty-chi-them/input/`:
-giấy công tác06–10Oct, invoiceIR26101002 lodging5.4m, claim Nguyễn An. Company
-ledger fixture advance5m. Pipeline giữ TRAVEL, đọc đủ destination/start/end,
-buyer-person đúng Nguyễn An, total5.4m và tax400k. S=400k, trong quyền.
+Backend suite: `rtk proxy uv run --no-sync pytest -p no:cacheprovider` → **571
+passed / 0 failed**. Frontend (Node 24.19.0): `npm test` → **27 passed / 2
+skipped**; `npm run build` → exit 0.
 
-### F03
+## LIVE reruns (original PDFs, current source)
 
-`data/test-kit/uc03-pilot/f03-cong-tac-can-bang/input/`:
-giấy công tác06–10Oct, invoiceIR26101003 lodging4.32m, advance fixture4.32m.
-Pipeline đọc đúng trip/name/amount; S0, không có issue/execution còn mở.
+Harness `.runtime/fourcase-fix-20261014/` (git-ignored; copy of the observed
+harness, pointing at the current source). Real Mistral OCR + X-Kiro
+`qwen/qwen3.7-flash:free`, SIMULATED independent context, clock
+`2026-10-10T18:00:00+07:00`. Full `CaseWorkflow → evidence worker → admission →
+Reconciler → commit`. Source hashes unchanged from `identity.json` (TC08 report
+`2e6cee3a…`, invoice `3211a01c…`; TC23 report `0c7274b3…`, invoices `294e59c2…`,
+`0c94bce5…`).
 
-**Giới hạn context:** các organization.json pilot hiện không có category_policies
-versioned; category_policy count trong AssessmentInput là0. Hai lượt này chứng minh
-trip/source/payment arithmetic/B/grants/history ở fixture đã dùng, không chứng minh
-gate category/deadline30days của policy mở rộng. Cần bổ sung fixture/gate riêng nếu
-muốn gọi toàn bộ rulebook mới được test; không tự sửa corpus trong lượt điều tra.
+| Case | State | Instructions | Result |
+| --- | --- | --- | --- |
+| **F02** | READY_TO_EXECUTE | **PAY 400000** | T=E=5.4m, A=5m, S=400k; no issues |
+| **F03** | SETTLED | **none** | T=E=A=4.32m, S=0; no issues |
+| **TC08** | WAITING | **none** | T/E/S **UNKNOWN**, A=4m KNOWN; FACT `expense:allocation` (3.5m vs 3.24m, lệch 260k, owner employee, 15 refs) + `expense:T`; **no** `expense:payer` |
+| **TC23** | WAITING | **none** | T=E=8.64m, A=9m, S=−360k KNOWN; **AUTHORITY** `RECOGNIZE_COST` → approver |
 
-### TC08
+TC23 admission identities: `expense:1` = `expense:2` =
+`invoice:…HÒA BÌNH:00002301`; `expense:3` = `invoice:…MỰC IN VIỆT:00002302` —
+three rows, sum 8.64m, no double count.
 
-`data/tham-khao/uc-03/tc08-bao-cao-va-hoa-don-lech-so-tien/`:
-paper row/total3.5m, invoice00000801 total3.24m, lệch260k. Paper printed return500k
-khớp chính số3.5m nhưng chưa giải quyết invoice. Hệ thống có gọi suggestion LLM
-bổ sung một lần; admission vẫn phát hiện allocation3.5m>source3.24m.
+### Numeric-provenance / arithmetic cross-check
 
-Câu hỏi thực tế owner employee, basis "Tổng phân bổ3500000 vượt tổng chứng từ3240000".
-Không có issue thiếu B/payer/coverage che lỗi và không instruction.
+The disputed 260k and the F02 zero-refund both pass without a false positive:
+F02's paper (advance 5m < cost 5.4m) has a verified-zero refund and a 400k
+reimbursement, and its arithmetic gate is clean.
 
-**Finding P1 — tiền tranh chấp vẫn thành tiền đủ điều kiện đã xác minh:**
+## PASS/FAIL per dimension (independent)
 
-- Expense.incurred=KNOWN3.5m, eligibility=ELIGIBLE, ExpensePayment.amount3.5m.
-- Projection T=E=KNOWN3.5m, S=KNOWN−500k, dù source invoice chỉ3.24m và issue đang OPEN.
-- `admit_evidence` thêm allocation issue (615–641 tại snapshot) nhưng vẫn tạo
-  employee-paid portion bằng row amount (749–764) và KNOWN incurred (800–817).
-- Reconciler suppress effect vì issue, nhưng projection/consumer UI vẫn có thể
-  gọi3.5m là chi phí đủ điều kiện đã xác minh. Chặn chi/thu đúng chưa đóng lỗi false-known.
+- **Xử lý / branch routing**: F02 PAY 400k, F03 SETTLED no instruction, TC08
+  WAITING no instruction, TC23 AUTHORITY no instruction — **PASS**.
+- **Dữ kiện tài chính (financial facts)**: TC08 T/E/S UNKNOWN with A=4m KNOWN and
+  no issued money — **PASS** (was FAIL_FALSE_KNOWN). F02/F03 figures exact —
+  PASS.
+- **Economic identity**: TC23 three rows, first two share 00002301, third has
+  00002302 — **PASS** (was FAIL_ECONOMIC_KEY).
+- A job that exits 0, or a correct final state, is not by itself a full PASS;
+  each dimension above is reported separately.
 
-Fix theo contract: giữ declared/proposed amount riêng; portion/eligibility/incurred
-đang tranh chấp không được nâng KNOWN/ELIGIBLE. Không cắt âm thầm xuống3.24m hoặc
-chọn3.5m. FACT giữ source refs/values/difference; sau correction có căn cứ mới
-đánh giá lại. Test UNKNOWN E/S và no effect, cùng positive partial-allocation cases.
+## Constraints honoured
 
-### TC23
+- No policy relaxed and no PDF/gold edited; no native-text bypass and no sample
+  data added — the existing OCR pipeline is unchanged.
+- The disputed cost keeps BOTH source numbers (3.5m declared, 3.24m evidenced)
+  and the 260k difference; nothing is silently cut to 3.24m or taken as 3.5m.
+- The verified advance history (A=4m) is retained; only the disputed cost's
+  amount is UNKNOWN, not every figure.
+- A generic approval/EXCEPT_POLICY decision does not waive the dispute FACT
+  (proven in `test_dispute_correction.py`); a new valid basis at the next
+  revision is consumed.
+- The identity is not derived from file/row order; no valid row is lost and no
+  invoice is counted twice.
+- AUTHORITY (TC23) does not turn established figures UNKNOWN.
 
-`data/tham-khao/uc-03/tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong/`:
+## NOT_RUN / remaining
 
-- Invoice00002301 backs rows2.16m+1.08m=3.24m.
-- Invoice00002302 backs separate row5.4m.
-- Total E8.64m, advance fixture9m, S−360k. B12m đủ, nhưng E vượt system recognize8m.
--3expense rows giữ đúng amounts, không nhân total3.24m cho mỗi row; no FACT;
-  AUTHORITY RECOGNIZE_COST tới approver, no COLLECT360k trước quyết định.
+- The full 25-case Hoangha rerun, Docker, public hosting and the practitioner
+  pilot remain NOT_RUN (out of scope).
+- Verify Core4/Escalation5 remains NOT_RUN (`data/kiem-thu` absent).
+- The browser check was run for **TC08 only** (see below); F02/F03/TC23 browser
+  were NOT_RUN.
 
-**Finding P1 — identity của invoice thứ hai bị gán thành invoice thứ nhất:**
+## Browser evidence (TC08)
 
-Admission gán cả3expenses `economic_key=invoice:CÔNG TY TNHH VĂN PHÒNG PHẨM HÒA BÌNH:00002301`.
-Hai row đầu chung key là hợp lý, nhưng row mực in5.4m thuộc invoice00002302 phải có
-key riêng. `_economic_key(report, refs, index)` (873–884) bỏ qua refs/document của
-expense và trả invoice đầu tiên của report cho mọi row.
-
-Fix: derive canonical issuer/number identity từ document thực sự bound vào
-expense; retain allocation identity và source refs. Test2rows/1invoice chungkey,
-invoice thứ hai kháckey, source order independence và economic-usage boundary.
-Lượt này chưa chạy second root/TC12; không khẳng định đã tái hiện cross-root double
-payment, nhưng identity collision trong chính input TC23 đã được xác nhận.
-
-## Assertions và giới hạn verdict
-
-Private `test_observed_results.py` chấm saved artifacts mới, không gọi provider lần
-hai, không thay cho full product regression:
-
--4business-gate assertions PASS: expected money/effect/state hoặc exact owner/route/no instruction.
--2post-run deeper integrity checks FAIL: TC08 E không UNKNOWN, TC23 invoice key collision.
--Command exit1, **4passed/2failed**. Không gọi4gate ban đầu là4case fully PASS.
-- Source/snapshot hashes kiểm cuối run đều nguyên.
-
-Mong đợi routing/amounts viết trước run; hai integrity checks là findings phát hiện
-sau khi đọc evidence, không giả thành một frozen suite đã có từ trước.
-
-## Bằng chứng và lệnh
-
-Thư mục `.runtime/fourcase-live-20261014-155735/`:
-
-- `identity.json`, `independent-expectations.json`, `score.json`, frozen snapshot và run_case.py.
-- Mỗicase: ảnh render, context.json, report.json, view.json, result.json,
-  admission-input.json, audit.json, stages.jsonl, raw OCR artifacts và DB riêng.
-- Result chứa provider/model/origin/clock/seconds/module path; không chứa credential.
-- Lệnh cho mỗicase:
-  `rtk proxy env PYTHONPATH=<evidence>/snapshot/src uv run --no-sync python <evidence>/run_case.py F02` (F03/TC08/TC23 tương tự): cả4exit0, job ran; exit0 không là toàn bộ safety PASS.
-- Assertions:
-  `rtk proxy uv run --no-sync pytest <evidence>/test_observed_results.py -q -p no:cacheprovider` → exit1,4passed/2failed.
-
-Không sửa code/DB người dùng. Next: integrator xử lý false-known projection và
-source-bound economic identity cùng regression; giữ F02/F03 và TC23 authority
-gate. Rerun trên revision đã bàn giao, sau đó mới kiểm browser/vòng phản hồi.
+Dedicated pinned-clock LIVE server + built frontend + real socket
+(`.runtime/fourcase-fix-20261014/server.py`, `browser.mjs`):
+`POST /settlement/draft` 200, `POST /submit` 200. The dossier (`TC08-after.png`)
+shows T / E / C / unpaid / S as "—" (chưa xác minh), A = 4.000.000 đ, state
+"Chờ xử lý ngoại lệ", the dispute + T issues, and **no** collect instruction.
+Conclusion BLOCKED, `allowed_effect=None`, 0 instructions.

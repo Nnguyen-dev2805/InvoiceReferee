@@ -413,7 +413,7 @@ export function Intake({
               Kiểm tra bản nháp hồ sơ
             </span>
             <span
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium border ${
                 warnings.length === 0
                   ? "text-emerald-800 bg-emerald-50 border-emerald-200"
                   : "text-amber-800 bg-amber-50 border-amber-200"
@@ -443,14 +443,14 @@ export function Intake({
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6 text-xs">
           {/* Global Error Banner */}
           {error !== null && (
-            <div role="alert" className="p-3 rounded-lg bg-rose-50 text-rose-900 border border-rose-200 text-xs">
+            <div role="alert" className="p-3 rounded bg-rose-50 text-rose-900 border border-rose-200 text-xs">
               {error}
             </div>
           )}
 
           {/* Global Status Banner */}
           {status !== null && (
-            <div role="status" className="p-3 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs">
+            <div role="status" className="p-3 rounded bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs">
               {status}
             </div>
           )}
@@ -495,7 +495,7 @@ export function Intake({
                   aria-label="Hoạt động của hồ sơ"
                   value={activityId}
                   onChange={(e) => setActivityId(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+                  className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800"
                 >
                   <option value="">— Chọn hoạt động —</option>
                   {session.activity_catalog.map((a) => (
@@ -523,7 +523,7 @@ export function Intake({
                   id="draft-activity-name"
                   value={draft.activity_name ?? ""}
                   onChange={(e) => setDraft((prev) => ({ ...prev, activity_name: e.target.value }))}
-                  className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+                  className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800"
                 />
               </div>
 
@@ -535,7 +535,7 @@ export function Intake({
                   id="draft-purpose"
                   value={draft.declared_purpose ?? ""}
                   onChange={(e) => setDraft((prev) => ({ ...prev, declared_purpose: e.target.value }))}
-                  className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+                  className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800"
                 />
               </div>
             </div>
@@ -547,7 +547,7 @@ export function Intake({
               Các khoản chi phí trích xuất ({draft.expenses.length})
             </h3>
 
-            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs">
+            <div className="border-t border-b border-slate-200">
               {draft.expenses.length === 0 ? (
                 <div className="p-4 text-center text-slate-400 text-xs">
                   Chưa đọc được dòng chi tiết từ chứng từ. Kiểm tra lại tệp đã tải hoặc thử đọc lại.
@@ -609,9 +609,9 @@ export function Intake({
               Ứng thực nhận và chênh lệch chính thức chỉ có sau khi hệ thống đối soát lịch sử.
             </p>
 
-            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-2xs divide-y divide-slate-100">
+            <div className="border-t border-b border-slate-200 divide-y divide-slate-100">
               {/* Row 1: Tổng chi phí kê khai (T) */}
-              <div className="flex items-center justify-between px-4 py-2.5 text-xs bg-slate-50/50">
+              <div className="flex items-center justify-between px-1 py-2 text-xs bg-slate-50/50">
                 <span className="font-semibold text-slate-900">
                   Tổng chi phí kê khai:
                 </span>
@@ -621,7 +621,7 @@ export function Intake({
               </div>
 
               {/* Row 2: Ứng nhân viên kê khai - Có thể chỉnh sửa */}
-              <div className="flex items-center justify-between px-4 py-2 text-xs">
+              <div className="flex items-center justify-between px-1 py-2 text-xs">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
                     <label htmlFor="draft-advance" className="font-medium text-slate-700">
@@ -654,7 +654,7 @@ export function Intake({
               </div>
 
               {/* Row 3: Chênh lệch kê khai dự kiến */}
-              <div className="flex items-center justify-between px-4 py-2.5 text-xs bg-slate-50/30">
+              <div className="flex items-center justify-between px-1 py-2 text-xs bg-slate-50/30">
                 <span className="font-medium text-slate-600">
                   Chênh lệch kê khai dự kiến (T - Ứng):
                 </span>
@@ -673,7 +673,7 @@ export function Intake({
                         }`}
                       >
                         {netDifference < 0
-                          ? `-${formatVnd(Math.abs(netDifference))}`
+                           ? `-${formatVnd(Math.abs(netDifference))}`
                           : netDifference > 0
                           ? `+${formatVnd(netDifference)}`
                           : "0 ₫"}
@@ -701,7 +701,7 @@ export function Intake({
               id="draft-notes"
               value={draft.notes}
               onChange={(e) => setDraft((prev) => ({ ...prev, notes: e.target.value }))}
-              className="w-full bg-white border border-slate-300 rounded-lg text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+              className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800"
             />
           </div>
 
@@ -711,7 +711,7 @@ export function Intake({
               type="button"
               onClick={() => void handleConfirmAndSubmit()}
               disabled={busy}
-              className="w-full bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs py-3 px-4 rounded-lg shadow-sm transition-colors disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs py-2.5 px-4 rounded transition-colors disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
             >
               {busy ? "Đang xử lý nộp hồ sơ…" : "Xác nhận và nộp hồ sơ"}
             </button>
