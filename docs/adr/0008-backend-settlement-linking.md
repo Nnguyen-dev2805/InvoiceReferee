@@ -20,7 +20,11 @@ trong luồng thông thường; UI chỉ hỏi khi liên kết chưa đủ chắ
   kể cả khi chỉ có một ứng viên. Hai khoản ứng cùng người/cùng số tiền vẫn
   phân biệt được; ngày/số tiền chỉ đối chiếu, không phải định danh.
 - `exact equality` của purpose/name không phải cơ chế tự gắn.
-- Activity identity vẫn tồn tại ở backend (ngân sách/quyền/lịch sử); root giữ
+- Quy tắc trên áp dụng cho **liên kết bản quyết toán với hồ sơ tạm ứng đã có**.
+  Việc kế toán bổ sung một biên nhận ứng sau đó có quyết định riêng
+  `MULTI_FIELD_MATCH` theo [ADR0011](0011-multifield-advance-link.md); không mở
+  rộng liên kết quyết toán yếu thành tự động.
+- Activity identity vẫn tồn tại ở backend (scope quyền/chính sách/lịch sử); root giữ
   invariant `(organization, employee, activity)`. Rebind vào hồ sơ đã tồn tại
   là conflict (tiếp tục hồ sơ đó), không ghi đè/xóa ngầm, không chuyển
   sources/ledger ngầm. Ngày chưa biết giữ chưa biết.
@@ -39,3 +43,8 @@ trong luồng thông thường; UI chỉ hỏi khi liên kết chưa đủ chắ
 - Upload/OCR thành công chưa phải confirmed money; `PENDING`/`FAILED`/`UNKNOWN`
   không thành ứng thực nhận; chứng từ do nhân viên tải lên chưa tự confirmed —
   kế toán xác nhận có trách nhiệm theo quyền/scope.
+
+The accountant's upload-to-root binding, source retention, and separate work
+acceptance and history-coverage facts are specified in
+[ADR0010](0010-accountant-advance-and-coverage.md). Opening a root alone does not
+prove that a later advance voucher belongs to it.

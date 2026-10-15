@@ -43,6 +43,7 @@ GOLD: dict[str, dict[str, object]] = {
         "owner": "accountant",
         "observable": {"incurred": 3_000_000, "paid_employee": 3_000_000},
     },
+    # Kept unchanged for FUTURE_SCOPE_CASES: current-only T>B policy case.
     "D06": {
         "route": "POLICY",
         "owner": "approver",

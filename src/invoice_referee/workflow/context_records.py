@@ -39,6 +39,31 @@ def _context_ref(digest: str, record_key: str, quote: str) -> EvidenceRef:
     )
 
 
+def validate_activity_references(value: object) -> tuple[str, ...]:
+    """Validate optional, server-owned dossier references declared by context.
+
+    Both context import formats use this boundary. Missing/null means no known
+    reference; malformed values fail the import rather than silently weakening
+    or inventing a link.
+    """
+    if value is None:
+        return ()
+    if not isinstance(value, (list, tuple)):
+        raise ValueError("activity.references must be a list of non-empty strings")
+
+    references: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError("activity.references must contain non-empty strings")
+        reference = item.strip()
+        if reference in seen:
+            raise ValueError("activity.references must not contain duplicates")
+        seen.add(reference)
+        references.append(reference)
+    return tuple(references)
+
+
 def store_snapshot(
     cx: sqlite3.Connection,
     context: OrganizationContext,
@@ -109,15 +134,16 @@ def _project_relational(
         authorization = activity.get("authorization")
         budget = _budget_for(context.budgets, activity_id)
         status = str(activity.get("status") or ("AUTHORIZED" if authorization is not None else "PROPOSED"))
+        references = validate_activity_references(activity.get("references"))
         cx.execute(
             "INSERT INTO context_activities (activity_id, tenant, name, occurred_at, "
-            "purpose, budget_amount, budget_effect_from, status, profile) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "purpose, budget_amount, budget_effect_from, status, profile, references_json) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(tenant, activity_id) DO UPDATE SET name=excluded.name, "
             "occurred_at=excluded.occurred_at, purpose=excluded.purpose, "
             "budget_amount=excluded.budget_amount, "
             "budget_effect_from=excluded.budget_effect_from, status=excluded.status, "
-            "profile=excluded.profile",
+            "profile=excluded.profile, references_json=excluded.references_json",
             (
                 activity_id,
                 tenant,
@@ -128,6 +154,7 @@ def _project_relational(
                 (budget["effect_range"][0] if budget else None),
                 status,
                 str(activity.get("profile") or context.profile or "TRAVEL"),
+                json.dumps(list(references), ensure_ascii=False),
             ),
         )
     for person in context.people:
@@ -190,23 +217,114 @@ def _snapshot_contains_activity(context: OrganizationContext, activity: str) -> 
 def load_context(
     cx: sqlite3.Connection, tenant: str, activity: str, as_of: datetime
 ) -> OrganizationContext | None:
-    """Load the newest stored context snapshot for a tenant, scoped to `activity`.
+    """Compose tenant-wide identity with evidence scoped to exactly one activity.
 
-    The snapshot is loaded whole (policies/budgets/ledger/coverage survive a
-    restart), but only the newest snapshot that actually CONTAINS `activity` is
-    returned: a snapshot for another activity must not be used as this
-    activity's context (plan A5/D). Returns None when no snapshot names it.
+    New proposed activities are stored in the relational catalog before evidence
+    admission. They still need the tenant's company, people, policy and grants,
+    but must never inherit another activity's ledger, coverage or references.
     """
     rows = cx.execute(
         "SELECT payload_json FROM context_snapshots WHERE tenant = ? "
         "ORDER BY version DESC",
         (tenant,),
     ).fetchall()
-    for row in rows:
-        context = OrganizationContext.model_validate_json(row["payload_json"])
-        if _snapshot_contains_activity(context, activity):
-            return context
-    return None
+    if not rows:
+        return None
+
+    snapshots = [
+        OrganizationContext.model_validate_json(row["payload_json"])
+        for row in rows
+    ]
+    tenant_context = snapshots[0]
+    activity_context = next(
+        (item for item in snapshots if _snapshot_contains_activity(item, activity)),
+        None,
+    )
+    activity_row = cx.execute(
+        "SELECT activity_id, name, occurred_at, purpose, status, profile, "
+        "references_json FROM context_activities WHERE tenant = ? AND activity_id = ?",
+        (tenant, activity),
+    ).fetchone()
+    if activity_row is None and activity_context is None:
+        return None
+
+    # Company identity and people are organization-wide and may be absent from a
+    # newer compatibility snapshot. Keep the newest non-empty declaration while
+    # leaving effective policies/grants under the newest snapshot's authority.
+    company_name = next((item.company_name for item in snapshots if item.company_name), None)
+    people = tenant_context.people or next(
+        (item.people for item in snapshots if item.people), ()
+    )
+
+    activity_payload: dict[str, object] | None = None
+    if activity_row is not None:
+        activity_payload = {
+            "activity_id": str(activity_row["activity_id"]),
+            "name": str(activity_row["name"]),
+            "occurred_at": activity_row["occurred_at"],
+            "purpose": str(activity_row["purpose"] or ""),
+            "status": str(activity_row["status"] or "PROPOSED"),
+            "profile": str(activity_row["profile"] or "WORK_EXPENSE"),
+        }
+        raw_references = activity_row["references_json"]
+        if raw_references:
+            try:
+                references = json.loads(raw_references)
+            except (TypeError, ValueError):
+                references = []
+            if isinstance(references, list):
+                activity_payload["references"] = references
+    elif activity_context is not None:
+        activity_payload = dict(activity_context.activity or {})
+        if not activity_payload:
+            activity_payload = next(
+                (
+                    dict(item)
+                    for item in activity_context.activities
+                    if str(item.get("id") or item.get("activity_id") or "") == activity
+                ),
+                None,
+            )
+
+    scoped = activity_context or tenant_context
+    scoped_ledger = tuple(
+        event
+        for event in scoped.ledger
+        if str(event.get("scope") or event.get("activity") or "") == activity
+    )
+    coverage = scoped.coverage
+    if coverage is not None and str(coverage.get("activity") or "") != activity:
+        coverage = None
+    activity_entries = tuple(
+        item
+        for item in scoped.activities
+        if str(item.get("id") or item.get("activity_id") or "") == activity
+    )
+    budgets = tuple(
+        item for item in scoped.budgets if str(item.get("activity") or "") == activity
+    )
+    witnesses = tuple(
+        item
+        for item in scoped.witnesses
+        if not item.get("scope") or str(item.get("scope")) == activity
+    )
+    return tenant_context.model_copy(
+        update={
+            "organization_id": tenant_context.organization_id or tenant,
+            "tenant": tenant,
+            "company_name": company_name,
+            "people": people,
+            "activity": activity_payload,
+            "activities": activity_entries,
+            "ledger": scoped_ledger,
+            "coverage": coverage,
+            "budgets": budgets,
+            "witnesses": witnesses,
+            "financial_as_of": (
+                scoped.financial_as_of if activity_context is not None else None
+            ),
+        }
+    )
 
 
 def context_policies(

@@ -12,7 +12,7 @@ from invoice_referee.domain.case import AssessmentInput, AssessmentResult, Finan
 from invoice_referee.domain.common import EvidenceRef
 from invoice_referee.domain.finance import Projection
 from invoice_referee.domain.issues import BusinessIssue
-from invoice_referee.domain.policy import BudgetDecision, Grant
+from invoice_referee.domain.policy import Grant
 
 RECOGNIZE_LIMIT = 8_000_000
 ISSUE_LIMIT = 4_000_000
@@ -69,18 +69,6 @@ def _issue(
         question=question,
         refs=refs,
     )
-
-
-def _active_budget(input: AssessmentInput) -> BudgetDecision | None:
-    if not input.budget:
-        return None
-    # The budget whose effect range covers the activity time.
-    for decision in input.budget:
-        start, end = decision.effect_range
-        when = input.as_of
-        if start <= when and (end is None or when <= end):
-            return decision
-    return None
 
 
 def _scope_covers(input: AssessmentInput, grant_scope: str) -> bool:
@@ -203,32 +191,6 @@ def evaluate_policy(
                 "Chưa xác minh ai thực tế đã trả khoản chi này.",
                 "Xác minh người trả (chứng từ thanh toán hoặc xác nhận có trách nhiệm).",
                 _evidence_refs(input, fields=("incurred", "paid_employee", "paid_company"), expense=True),
-            )
-        )
-
-    budget = _active_budget(input)
-    if budget is None:
-        # No B record: an org-data FACT issue, never a fabricated zero budget.
-        issues.append(
-            _issue(
-                "issue:fact:budget",
-                "FACT",
-                "budget:B",
-                "org-data",
-                "Chưa có bản ghi ngân sách cho hoạt động.",
-                "Tìm/cấp bản ghi ngân sách hoặc quyết định hoạt động.",
-            )
-        )
-    elif projection.T.state == "KNOWN" and int(projection.T.value or 0) > budget.amount:
-        issues.append(
-            _issue(
-                "issue:policy:budget",
-                "POLICY",
-                "budget:B",
-                "approver",
-                f"Tổng chi {int(projection.T.value or 0)} vượt ngân sách {budget.amount}.",
-                "Quyết định ngoại lệ vượt ngân sách (giữ nguyên số thực chi).",
-                _evidence_refs(input, fields=("incurred", "amount"), budget=True, expense=True),
             )
         )
 

@@ -76,8 +76,8 @@ CREATE TABLE IF NOT EXISTS audit_events (
     occurred_at TEXT NOT NULL
 );
 
--- Validated synthetic demo context (contracts §10.4). budget_amount NULL means
--- no budget record exists yet; it is never a fabricated zero.
+-- Validated synthetic demo context (contracts §10.4). budget_amount is retained
+-- as legacy metadata; it does not gate current settlement decisions.
 CREATE TABLE IF NOT EXISTS context_activities (
     activity_id        TEXT NOT NULL,
     tenant             TEXT NOT NULL,
@@ -269,6 +269,75 @@ CREATE TABLE IF NOT EXISTS case_evidence_reports (
     -- can reuse a still-valid read instead of re-running OCR (report P1-1/W3).
     input_basis_json TEXT NOT NULL DEFAULT '{}',
     created_at    TEXT NOT NULL
+);
+
+-- A durable, source-bound accountant preview for a received-advance voucher.
+-- The PDF itself is in case_sources/uploads; this retains the read and the exact
+-- draft later consumed by RecordActual, including source locators across restart.
+CREATE TABLE IF NOT EXISTS case_advance_drafts (
+    draft_id    TEXT PRIMARY KEY,
+    tenant      TEXT NOT NULL,
+    root_id     TEXT NOT NULL REFERENCES cases(id),
+    source_id   TEXT NOT NULL REFERENCES case_sources(source_id),
+    actor       TEXT NOT NULL,
+    draft_json  TEXT NOT NULL,
+    report_json TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
+
+-- Employee-return proof is stored as a pending, source-bound draft. Reading it
+-- uses the existing OCR pipeline; no money event is created until accounting
+-- confirms the receipt.
+CREATE TABLE IF NOT EXISTS case_money_drafts (
+    draft_id       TEXT PRIMARY KEY,
+    tenant         TEXT NOT NULL,
+    root_id        TEXT NOT NULL REFERENCES cases(id),
+    instruction_id TEXT NOT NULL,
+    source_id      TEXT NOT NULL REFERENCES case_sources(source_id),
+    status         TEXT NOT NULL,
+    draft_json     TEXT NOT NULL,
+    report_json    TEXT NOT NULL,
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL,
+    confirmed_event_id TEXT,
+    confirmed_at   TEXT,
+    confirmed_by   TEXT,
+    UNIQUE (tenant, root_id, source_id, instruction_id)
+);
+CREATE INDEX IF NOT EXISTS case_money_drafts_pending
+    ON case_money_drafts (tenant, root_id, status, created_at);
+
+-- A completed, accountant-bound advance can ground acceptance of exactly this
+-- proposed work. It does not change activity status or create an action grant.
+CREATE TABLE IF NOT EXISTS case_activity_acceptances (
+    acceptance_id       TEXT PRIMARY KEY,
+    tenant              TEXT NOT NULL,
+    root_id             TEXT NOT NULL REFERENCES cases(id),
+    employee            TEXT NOT NULL,
+    activity            TEXT NOT NULL,
+    advance_external_key TEXT NOT NULL,
+    advance_draft_id    TEXT NOT NULL REFERENCES case_advance_drafts(draft_id),
+    actor               TEXT NOT NULL,
+    accepted_at         TEXT NOT NULL,
+    link_basis          TEXT NOT NULL,
+    reason              TEXT NOT NULL,
+    refs_json           TEXT NOT NULL,
+    link_signals_json   TEXT NOT NULL DEFAULT '[]',
+    UNIQUE (tenant, root_id, advance_external_key)
+);
+
+-- Append-only, accountant-confirmed history coverage. Each record is bound to
+-- the root ledger version present at confirmation; a later/backdated event makes
+-- it stale without rewriting the record or affecting another dossier.
+CREATE TABLE IF NOT EXISTS case_coverage_records (
+    coverage_id  TEXT PRIMARY KEY,
+    tenant       TEXT NOT NULL,
+    root_id      TEXT NOT NULL REFERENCES cases(id),
+    ledger_version TEXT NOT NULL,
+    coverage_json TEXT NOT NULL,
+    actor        TEXT NOT NULL,
+    recorded_at  TEXT NOT NULL,
+    reason       TEXT NOT NULL
 );
 
 -- Responsible confirmations from an owner's answer (contracts §3, §5). A

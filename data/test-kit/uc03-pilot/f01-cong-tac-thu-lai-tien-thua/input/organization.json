@@ -3,6 +3,7 @@
   "tenant": "tenant:uc03-pilot",
   "profile": "TRAVEL",
   "data_origin": "SIMULATED",
+  "company_name": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
   "financial_as_of": "2026-10-10T18:00:00+07:00",
   "records": [],
   "activity": {
@@ -26,7 +27,7 @@
   "people": [
     {
       "id": "employee:employee-a",
-      "name": "Nguyễn An"
+      "name": "NGUYỄN MINH AN"
     },
     {
       "id": "employee:accountant-demo",
@@ -87,7 +88,6 @@
       "actor": "employee:approver",
       "actions": [
         "AUTHORIZE_ACTIVITY",
-        "SET_BUDGET",
         "RECOGNIZE_COST",
         "EXCEPT_POLICY",
         "ISSUE_PAYMENT",
@@ -120,26 +120,13 @@
       ]
     }
   ],
-  "budgets": [
-    {
-      "id": "budget:UC03-F01",
-      "activity": "activity:uc03-f01",
-      "amount": 8000000,
-      "effect_range": [
-        "2026-10-01T00:00:00+07:00",
-        "2026-12-31T23:59:59+07:00"
-      ],
-      "actor": "employee:approver",
-      "grant_ref": "grant:UC03-F01:approver"
-    }
-  ],
   "ledger": [
     {
       "id": "advance:UC03-F01",
-      "external_key": "company:bank-demo:ADV-UC03-F01",
+      "external_key": "transfer:FT-UC03-F01-0001",
       "kind": "ADVANCE_RECEIVED",
       "scope": "activity:uc03-f01",
-      "payer": "company:demo",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
       "payee": "employee:employee-a",
       "amount": 4000000,
       "event_at": "2026-10-05T09:00:00+07:00",
@@ -178,7 +165,7 @@
   "witnesses": [
     {
       "record_key": "advance:UC03-F01",
-      "quote": "Ứng đã hoàn tất cho Nguyễn An, hoạt động activity:uc03-f01: 4.000.000 đ.",
+      "quote": "Ứng đã hoàn tất cho NGUYỄN MINH AN, hoạt động activity:uc03-f01: 4.000.000 đ.",
       "actor": "employee:accountant-demo",
       "scope": "activity:uc03-f01",
       "observed_at": "2026-10-05T10:00:00+07:00"

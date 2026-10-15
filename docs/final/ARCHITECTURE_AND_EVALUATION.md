@@ -1,6 +1,6 @@
 # InvoiceReferee final — Thiết kế và hợp đồng đánh giá
 
-Ngày 13/10/2026, Asia/Ho_Chi_Minh. **DESIGN_CONSOLIDATED — Q1–Q30 đã chốt; review thiết kế đã thực hiện, chưa có bằng chứng runtime.**
+Ngày 15/10/2026, Asia/Ho_Chi_Minh. **DESIGN_CONSOLIDATED — Q1–Q31 và quyết định §16 đã chốt; phần triển khai phải được chứng minh riêng bằng runtime.**
 **Cập nhật phạm vi:** §14 đã chốt (ACCEPTED) — thu hẹp employee-paid, lời xác nhận
 có ngưỡng, ngoài phạm vi giữ nguồn, hoãn form giải trình. §15 chốt pipeline chứng cứ
 OCR/phân loại/trích xuất/matching. Phần company-direct trước đó là lịch sử thiết kế;
@@ -52,25 +52,25 @@ Rulebook áp dụng theo profile, scope, thời hạn/version; tên case/file kh
 | --- | --- |
 | Hoạt động | Được tổ chức cho phép, theo quyết định riêng hoặc quy định đã ủy quyền |
 | Chi phí | Phục vụ đúng hoạt động; đủ căn cứ số/người/payer/liên kết; không tính trùng |
-| B | Ngân sách hợp lệ riêng cho hoạt động; dự toán nhân viên không tự thành B |
-| Tổng chi công việc | Trong B; vượt B giữ số thật và chuyển POLICY theo đường ngoại lệ |
+| Ngân sách B | Ngoài phạm vi quyết định quyết toán hiện tại; B thiếu/thấp/cao không tạo gate |
+| Tổng chi công việc | Giữ số chi phí đã xác minh; eligibility theo policy và quyền độc lập |
 | Chi cá nhân rõ | Loại khỏi E; vẫn xử lý nghĩa vụ ứng thực nhận |
 | Dữ kiện nghi vấn | FACT; không khẳng định tiền khi căn cứ trọng yếu chưa giải quyết |
 | Quyền tự công nhận E | E <= 8.000.000 đ |
 | Quyền tự tạo yêu cầu chi/thu | abs(S) <= 4.000.000 đ |
-| Người quyết định demo | Cấp B/công nhận chi phí/yêu cầu chi thu <= 20.000.000 đ, đúng scope/profile/thời hạn |
+| Người quyết định demo | Công nhận chi phí/yêu cầu chi thu <= 20.000.000 đ theo đúng action/scope/profile/thời hạn |
 | Trên quyền demo | Nêu cần cấp có quyền ngoài demo; không giả có người đủ quyền trong app |
 
 8/4/20 triệu là tham số demo được người dùng chọn để kiểm ba ranh giới, không
-benchmark hay mức được nghiên cứu là tối ưu. B không mặc định bằng 8 triệu.
-Boundary gồm dưới/bằng/trên mỗi hạn mức; grant còn cần actor, hành động, người/
+benchmark hay mức được nghiên cứu là tối ưu. 8 triệu là quyền tự công nhận E,
+không phải ngân sách. Boundary gồm dưới/bằng/trên mỗi hạn mức; grant còn cần actor, hành động, người/
 hoạt động/profile và thời hạn. Policy phù hợp nhưng grant thiếu/hết hạn/sai scope
 là AUTHORITY; một hồ sơ có thể đồng thời FACT/POLICY/AUTHORITY.
 
-Ví dụ: B14/E12/A11 triệu, các dữ kiện khác đủ, T trong B: S=1 triệu nhưng vượt
-quyền công nhận E8, phải AUTHORITY. Người đủ quyền quyết định ngoại lệ đúng hồ sơ,
+Ví dụ: E12/A11 triệu, các dữ kiện khác đủ: S=1 triệu nhưng E vượt quyền tự công
+nhận 8 triệu, phải AUTHORITY dù không có B. Người đủ quyền quyết định đúng hồ sơ,
 không tự đổi rulebook cho mọi hồ sơ. Xác nhận sau khi chi giữ đúng thời điểm,
-không giả thành cho phép trước. Thiếu bản ghi quyết định khác thực sự chưa có quyết định.
+không giả thành cho phép trước.
 
 Ngữ cảnh profile:
 - Công tác: mục đích, nơi đến, thời gian và liên hệ khoản chi với hoạt động.
@@ -81,13 +81,13 @@ Ngữ cảnh profile:
 
 Acceptance cho quyết định ngoại lệ: ghi rõ policy/rule được ngoại lệ, hoạt động,
 khoản/số tiền và thời điểm/người có grant phù hợp; kiểm các điều kiện khác còn lại.
-Một lời “đồng ý” hoặc việc đổi B không tự giải quyết nguồn tiền/quan hệ còn nghi vấn.
+Một lời “đồng ý” không tự giải quyết nguồn tiền/quan hệ còn nghi vấn.
 
 ## 3. Tiền và căn cứ
 
 | Ký hiệu | Nghĩa |
 | --- | --- |
-| T | Tổng chi công việc thực tế trong scope, chưa cắt theo ngân sách hay điều kiện hoàn trả |
+| T | Tổng chi công việc thực tế đã xác minh trong scope, không đồng nhất với eligibility E |
 | E | Phần chi phí đủ điều kiện nhân viên thực tế đã trả |
 | C | Phần chi công việc công ty trả trực tiếp; giữ để đối chiếu/báo ngoài phạm vi, không hoàn lại cho nhân viên |
 | A | Tổng ứng công ty đã thực trả và nhân viên đã thực nhận |
@@ -98,7 +98,7 @@ Một lời “đồng ý” hoặc việc đổi B không tự giải quyết n
 Đây là biểu diễn gross events trong scope Q28; mỗi R giữ loại/lý do và giao dịch
 liên quan, không gộp mất provenance. Refund từ nhà cung cấp nằm ngoài R/scope này.
 T không mặc định E+C: khoản chi công việc có thể cần ngoại lệ hoặc không được
-hoàn trả; không cắt T về E để che vượt B. Không trừ C lần nữa khỏi E.
+hoàn trả; không cắt T về E. Không trừ C lần nữa khỏi E.
 
 Integer VND cho quyết định; tiền nguồn có đơn vị/currency và quy tắc chuẩn hóa.
 Nếu nguồn cần phép nhân/làm tròn, dùng Decimal có giới hạn, không float.
@@ -123,6 +123,11 @@ Acceptance history coverage: scope người/hoạt động, mốc đối chiếu
 và số dư đầu kỳ/tồn trước nếu có phải được phủ. Có giao dịch trong tháng không
 chứng minh không có ứng trước tháng đó; thiếu coverage vẫn FACT. Xác nhận coverage
 có actor/căn cứ/phạm vi/thời điểm, khác câu trả lời “không thấy giao dịch”.
+
+Với hoạt động `PROPOSED`, một `ActivityAcceptance` riêng có thể ghi nhận kế toán
+đã xác minh công việc được công ty chấp nhận qua chứng từ ứng hoàn tất, đúng người
+và đúng hoạt động. Nó không đổi trạng thái hoạt động, không cấp grant và không
+thay policy/coverage.
 
 ## 4. Người dùng và luồng nghiệp vụ
 
@@ -152,7 +157,13 @@ tính thật đã xác thực; role client/tên/chữ ký scan không tự cấp
 8. Kế toán nhận danh sách yêu cầu còn hiệu lực: người, chiều/số tiền, lý do/căn cứ.
    Thực hiện tiền ngoài app, rồi ghi nhận kết quả/chứng từ; không sửa instruction
    trực tiếp để né recheck.
-9. Hoàn thành đối soát khác hoàn tất nghĩa vụ tiền. Hoàn tất cần history đủ, S=0,
+9. Kế toán bổ sung chứng từ ứng vào hồ sơ hiện có. Backend giữ tệp và bản đọc;
+   mã hồ sơ rõ có thể liên kết tự động, còn trường hợp không đủ phân biệt thì kế
+   toán xác nhận đúng hồ sơ và nêu căn cứ. Mâu thuẫn tham chiếu giữ nguyên conflict.
+10. Kế toán xác nhận riêng lịch sử tiền theo hồ sơ: kỳ, quỹ, loại dòng tiền, số dư
+    đầu kỳ, chứng từ căn cứ, lý do và mốc hệ thống ghi. Chứng từ ứng không tự tạo
+    coverage; giao dịch mới hoặc backdated làm coverage của hồ sơ stale.
+11. Hoàn thành đối soát khác hoàn tất nghĩa vụ tiền. Hoàn tất cần history đủ, S=0,
    không issue/pending/yêu cầu chưa thực hiện/execution chưa rõ/Stop chưa giải quyết.
    Không thêm lần duyệt eligibility chỉ để kết thúc routine đã đủ điều kiện.
 
@@ -250,7 +261,7 @@ sau một decision phải vẫn tra được căn cứ lịch sử đúng của 
 | Nhóm | Vấn đề | Người/hành vi |
 | --- | --- | --- |
 | FACT | Số/người/payer/history/relation thiếu, chưa rõ hoặc conflict | Người xác minh được fact đó; giữ căn cứ và phần bị chặn |
-| POLICY | Ngoài quy định/chưa bao phủ/vượt B | Người được phép quyết định ngoại lệ nếu policy cho đường đó |
+| POLICY | Ngoài quy định/chưa bao phủ/vượt hạn mức loại chi | Người được phép quyết định ngoại lệ nếu policy cho đường đó |
 | AUTHORITY | Policy phù hợp nhưng grant thiếu/sai/hết hạn/vượt mức | Người có quyền đúng scope/cost/action |
 | TECHNICAL | Provider/config/timeout/schema lỗi | Báo lỗi xử lý riêng, không tính là business escalation đúng |
 
@@ -259,7 +270,7 @@ không có ngoại lệ có thể tự loại khi đủ căn cứ; không erase 
 
 Chỉ học ngưỡng chọn thử recovery được Q17 cho phép hoặc hỏi người ngay. Features
 quan sát được như representation/text presence/issue/nguồn thay thế/budget còn.
-Ước lượng bước phục hồi hữu ích không thay evidence quality; không học B/grant/
+Ước lượng bước phục hồi hữu ích không thay evidence quality; không học grant/
 điều kiện chứng cứ hoặc bỏ conflict. Phải chứng minh routing thay đổi và recovery
 đúng, không chỉ đổi số calls. POLICY/AUTHORITY vẫn theo policy/grant.
 
@@ -306,13 +317,13 @@ việc đầy đủ và nguồn khác nhau có ý nghĩa, không chỉ đổi d�
 Inventory development ban đầu (chưa tạo packets):
 | ID | Scenario | Kỳ vọng |
 | --- | --- | --- |
-| D01 | Company-direct3/E5/A2 triệu, T8 trong B, nguồn/quyền đủ | CHI3, một instruction, không hoàn C |
+| D01 | Company-direct3/E5/A2 triệu, nguồn/quyền đủ | CHI3, một instruction, không hoàn C |
 | D02 | Số rõ nhưng relation người/hoạt động chưa đủ | FACT, không ghép chỉ vì tên/amount |
-| D03 | Tổng thực chi vượt B, có đường ngoại lệ | POLICY, giữ số thật |
-| D04 | B14/E12/A11, đủ nguồn nhưng E vượt grant8 | AUTHORITY dù S1 |
+| D03 | E=A=2 triệu, đủ history | BALANCED, không instruction số 0 |
+| D04 | E12/A11, đủ nguồn nhưng E vượt grant8 | AUTHORITY dù S1 |
 | D05 | Tiếp khách địa phương E0,7/A0 xác minh | CHI0,7, không đòi itinerary |
-| D06 | Thiếu mục đích/liên hệ công việc | FACT đúng người |
-| D07 | Tiếp khách vượt B/ngoài quy định có đường ngoại lệ | POLICY, không clip/cap đầu người |
+| D06 | T10>B8 là căn cứ duy nhất | FUTURE SCOPE; giữ nguyên oracle, loại khỏi mẫu hiện tại |
+| D07 | E9/A6, vượt quyền tự công nhận E8 | AUTHORITY |
 | D08 | Grant travel-only/hết hạn cho tiếp khách | AUTHORITY |
 | D09 | Procurement/nghiệm thu hoặc refund nhà cung cấp ngoài scope | Báo phần ngoài phạm vi, không khẳng định nghĩa vụ |
 | D10 | History coverage thiếu | FACT kế toán, không A/P/R=0 |
@@ -442,7 +453,10 @@ Nguồn kỹ thuật đã đọc (không thay M0):
 [custom evaluation](https://docs.langchain.com/langsmith/evaluate-llm-application),
 [mask trace data](https://docs.langchain.com/langsmith/mask-inputs-outputs).
 
-## 12. Quyết định sau review độc lập mở rộng — Q31
+## 12. Quyết định lịch sử sau review độc lập mở rộng — Q31
+
+Phần diễn giải B dưới đây phản ánh quyết định ngày 13/10/2026. Người dùng đã
+thay đổi phạm vi ngân sách vào 15/10/2026; §16 và ADR0009 là quyết định hiện hành.
 
 Ngày13/10 người dùng chốt B giới hạn **chi phí công việc đã phát sinh và được xác
 minh**, không chỉ phần tiền đã thanh toán. Đây là nghĩa của T ở mục3. T không tự
@@ -450,9 +464,8 @@ minh**, không chỉ phần tiền đã thanh toán. Đây là nghĩa của T �
 được xác lập. E vẫn là phần nhân viên thực trả đủ điều kiện; C là công ty thực
 trả trực tiếp; unpaid không tự vào E/C. S=E−A−P+R không đổi.
 
-Ví dụ dịch vụ10 đã cung cấp/nghĩa vụ xác minh, employee paid5/company paid3/unpaid2,
-B8: T10 -> POLICY vượt B2; không phát hành instruction công nợ cho nhà cung cấp.
-Khoản chưa trả chỉ là dữ kiện chi phí/budget, không mở vendor-payable workflow.
+Ví dụ dịch vụ10 đã cung cấp/nghĩa vụ xác minh, employee paid5/company paid3/unpaid2:
+T10 vẫn là tổng chi thực tế; khoản chưa trả không mở vendor-payable workflow.
 
 [Review mở rộng/disposition](reviews/2026-10-13/SYNTHESIS.md) chỉ ra các contract
 và acceptance cần khóa trước giao coding agent; verdict ready ở vòng trước không
@@ -509,10 +522,10 @@ snapshot lịch sử, không phải kết quả kiểm tra checkout hiện tại
   không ép thành khoản nhân viên đã trả, không bỏ phần vật chất để kết luận tiền.
   `C` giữ như dữ kiện để đối chiếu/báo, không vào phép tính hoàn trả nhân viên.
 
-Hệ quả dữ liệu (chưa triển khai; plan finance/admissibility kế tiếp sở hữu):
-- D01 routine mới: nhân viên khai đã trả khách sạn4.320.000 + taxi680.000 =5 triệu;
-  ứng thực nhận2, B8, lịch sử P/R đủ và bằng0; đề nghị chi3. Số tiền/kết luận gold
-  cuối theo Q32 đã chốt, không chỉ sao chép số đề nghị trên bảng kê.
+Hệ quả dữ liệu (kịch bản lịch sử; điều kiện B superseded bởi §16):
+- D01 routine: nhân viên khai đã trả khách sạn4.320.000 + taxi680.000 =5 triệu;
+  ứng thực nhận2, history P/R đủ và bằng0; đề nghị chi3 khi policy/quyền/căn cứ đủ.
+  B8 từng là dữ liệu fixture cũ, không còn là precondition; kết quả tài chính không đổi.
 - Nếu giữ chi8 và chuyển toàn bộ thành nhân viên trả, A2 =>S6; vượt quyền tự tạo
   yêu cầu4. Không giữ đáp án chi3 của dữ liệu cũ sau thay đổi đó.
 - D01/D06/D15 cùng các case có company-direct cần rà soát lại nguồn, T/E, budget,
@@ -579,8 +592,8 @@ tiền; không port repository/database/settlement lifecycle thứ hai của Hoa
 
 ### 15.3. Loại trừ (ngoài §15)
 
-Không đổi T/E/A/P/R/S, budget, eligibility, policy, authority, owner issue, ghi tiền
-hay workflow vai trò. Không map chứng cứ → `AssessmentInput`/`Fact.KNOWN` trong §15.
+Không đổi T/E/A/P/R/S, quyền eligibility/policy, owner issue, ghi tiền, workflow
+vai trò hoặc RunBudget của lượt đọc. Không map chứng cứ → `AssessmentInput`/`Fact.KNOWN` trong §15.
 Không import policy/cap/authority/decision-gold của Hoangha thành policy `final`.
 Các quyết định tài chính/policy (Q32–Q34) thuộc plan kế tiếp.
 
@@ -595,3 +608,44 @@ thức là 75 case UC-03: 50 ở `data/testcase_uc3_v2/` (v2) + 25 ở `data/tha
 Release gate của §15 là bằng chứng extraction/role/link/source support trên tập con
 có gold, không phải kết luận tài chính. Guard: đường E7 offline **không** được phát
 sinh call provider thật (dev server mặc định LIVE kể từ `aee7fb38`).
+
+## 16. Bỏ ngân sách hoạt động khỏi quyết định quyết toán — chốt 15/10/2026
+
+**Trạng thái: ACCEPTED; quyết định này supersede các quy tắc B trong §2–§4, §7,
+§8, §12 và phần precondition B ở §14. Xem [ADR0009](../adr/0009-activity-budget-out-of-scope.md).**
+
+- Không yêu cầu B; thiếu B không tạo FACT hoặc AUTHORITY; `T>B` không tạo POLICY.
+- B không được mặc định bằng 0/vô hạn/tiền ứng, không thay bằng hồ sơ xin ứng,
+  và không dùng để chặn `T`, `E` hay yêu cầu tiền.
+- Activity identity vẫn là scope để nối chứng từ, lịch sử, policy và grants. Quyền
+  8/4/20, policy theo loại chi, identity, coverage, payer, provenance, số học,
+  Stop/Resume và chống trùng giữ nguyên.
+- Dữ liệu B cũ có thể còn trong context để tương thích, nhưng không làm đổi outcome
+  hoặc basis của kết luận. `SET_BUDGET` không là action/workflow hiện hành.
+- Từ 15 case authoring cũ, D06 chỉ kiểm `T>B` nên được giữ cùng source/oracle ở
+  `FUTURE_SCOPE_CASES`, ngoài mẫu hiện tại. Current generator có 14 case; denominator
+  giảm 15→14 vì D06 bị loại theo quyết định, không đổi các oracle còn lại. Gate
+  development >=15 raw dossier chưa đạt cho đến khi có case thay thế trong scope.
+
+## 17. Kế toán bổ sung chứng từ ứng và xác nhận lịch sử — chốt 15/10/2026
+
+Xem [ADR0010](../adr/0010-accountant-advance-and-coverage.md). Tenant snapshots
+provide company/employee/policy/grant identity for a new proposed root; event
+history, activity references, work acceptance and coverage are restricted to the
+selected activity/root. An advance PDF is attached and its read is persisted before
+confirmation. A unique, consistent printed reference remains the strongest link.
+An unregistered voucher-only reference can use `MULTI_FIELD_MATCH` when a unique
+employee identity, configured payer, specific matching purpose, exact declared
+advance, source chronology, transaction identity and tenant-wide uniqueness all
+agree. Missing/ambiguous evidence requires accountant confirmation; wrong identity
+or organization, reference-to-other-activity and cross-root transaction ownership
+are conflicts. The UI shows the basis and opens the voucher used by the draft.
+Linking itself records no money, coverage or authority; the accountant separately
+confirms the actual advance.
+
+A clear, completed, party-matched advance can create a separately auditable work
+acceptance fact without promoting the activity or expanding authority. Money
+coverage is a distinct structured accountant command consumed by admission; free
+text and voucher upload do not establish it. Coverage uses server as-of and the
+root ledger version; same-root new/backdated events invalidate it. This records an
+accountable bookkeeping assertion and is not independent bank verification.

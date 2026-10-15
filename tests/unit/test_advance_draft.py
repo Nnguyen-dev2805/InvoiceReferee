@@ -65,6 +65,21 @@ def test_transfer_receipt_prefills_the_draft() -> None:
     assert draft.refs, "the draft must carry the source ref of the read fields"
 
 
+def test_transfer_receipt_preserves_explicit_activity_reference() -> None:
+    doc = _doc(
+        _found("transaction_reference", "FT-TC01-0001"),
+        _found("advance_reference", "TU-TC01"),
+        _found("transaction_status", "COMPLETED"),
+        _found("amount", "4.000.000 đ"),
+    )
+
+    draft = draft_advance_from_document(
+        doc, scope="activity:proposed:case", employee="employee:employee-a"
+    )
+
+    assert draft.activity_reference == "TU-TC01"
+
+
 def test_cash_voucher_infers_cash_method() -> None:
     doc = _doc(
         _found("transaction_reference", "PC-UC03-F01-0001"),

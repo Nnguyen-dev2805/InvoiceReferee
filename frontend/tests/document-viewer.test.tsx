@@ -1,4 +1,6 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { DocumentViewer } from "../src/features/document_viewer";
@@ -55,5 +57,25 @@ describe("DocumentViewer", () => {
     render(<DocumentViewer caseView={{ ...MOCK_CASE, sources: [] }} />);
     expect(screen.getByText(/Chưa có chứng từ được tải lên/)).toBeInTheDocument();
     expect(screen.getByText(/Chưa chọn chứng từ để xem/)).toBeInTheDocument();
+  });
+
+  it("opens the source selected by the advance draft and lets the user switch documents", async () => {
+    function Harness() {
+      const [selectedSourceId, setSelectedSourceId] = useState("source:2");
+      return (
+        <DocumentViewer
+          caseView={MOCK_CASE}
+          selectedSourceId={selectedSourceId}
+          onSourceSelected={setSelectedSourceId}
+        />
+      );
+    }
+
+    render(<Harness />);
+    expect(screen.getByRole("img", { name: "hoa_don_vat.png" })).toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByRole("button", { name: /giay_quyet_toan\.pdf/ }));
+
+    expect(screen.getByTitle("giay_quyet_toan.pdf")).toBeInTheDocument();
   });
 });

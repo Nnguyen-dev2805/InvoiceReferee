@@ -3,21 +3,246 @@
 This file records observed progress, not product policy or runtime configuration.
 The plan owns task acceptance; package/config files own executable commands.
 
+## Instruction-bound money movement and return review — 15/10/2026
+
+New P/R events are bound to the active same-root PAY/COLLECT instruction and
+source refs. Employee return upload/read is durable and leaves R/coverage
+unchanged; an accountant confirmation revalidates the stored read and writes R
+idempotently. Partial returns keep the COLLECT remainder; overpayment and
+party/status mismatches remain blocking. The employee workspace now exposes the
+proof upload only when a COLLECT is active. The accountant sees a return draft
+awaiting review, a supplementary-payment form only for an active PAY, clear P/R
+labels, and the coverage form only when missing, stale or blocked (with prior
+values prefilled for review).
+
+Verification: `rtk proxy uv run pytest -q` → exit 0 after updating the v8→v10
+migration assertion; after adding workflow-restart persistence coverage,
+`rtk proxy uv run pytest tests/integration/test_employee_return_draft_api.py -q`
+→ exit 0 (9 tests). Frontend `npm test -- --run` → 41 passed / 2 skipped;
+Node 24.19.0 / npm 11.12.1 `npm run build` → exit 0. API/unit tests use
+isolated temporary databases and stub OCR. Playwright LIVE TC01 was NOT_RUN:
+the available port 8000 reports LIVE but is the user's persistent server/DB,
+and there is not yet a feature-specific isolated LIVE runner. No request was
+sent to that server; no user DB was modified. Changes remain uncommitted.
+
+## Accountant receipt confirmation by button — 15/10/2026
+
+Routine source-clear, complete, auto-linked advance drafts now require only the
+accountant's **Xác nhận ghi nhận** action. The backend revalidates the saved read
+and derives its responsible statement; actor/time/source/draft are recorded.
+Missing-field corrections retain an explanation; manual links use their existing
+reason instead of a duplicate declaration. Conflicts remain blocked and pending
+sources remain observed. Coverage is unchanged. Added TRANSACTION_IDENTITY to the
+acceptance DTO/frontend union after a browser retry exposed the missing literal.
+
+Proof: **727 Python passed**, **38 frontend passed / 2 skipped**, Node24 build and
+diff check pass. Playwright on copied real TC01 reads the saved OCR, has no routine
+declaration/link textboxes, records one confirmed 4m event and one acceptance,
+then reloads/retries without duplication. No provider/coverage/instruction is
+created. Backend8000 restarted and LIVE health checked; nine user business-table
+fingerprints are unchanged. Original database was not used for monetary commands.
+[Evidence](reviews/2026-10-15-advance-button-confirmation.md). No commit/push/reset.
+
+## Vietnamese source dates and stored TC01 draft — 15/10/2026
+
+Shared calendar normalization now accepts Vietnamese prose dates alongside numeric
+dates, rejects impossible days and day/month swaps, and binds trip-range endpoints
+to their field roles. Extraction prompt v2 requests ISO dates in its existing call;
+source quotes and multiline-company-name handling are preserved. Missing dates
+and present-but-invalid formats now have different linker explanations.
+
+The accountant can use **Kiểm tra lại bản nháp đã lưu** to re-evaluate a stored
+read, including after restart. GET checks ownership/source digests and current
+link candidates; it does not call a provider, bump the case, record money or create
+coverage. Unmapped codes on a successful match are in optional reference details.
+
+Verification: **726 Python passed**, **37 frontend passed / 2 skipped** (existing
+React act warnings), Node24 production build and diff check passed. Playwright on
+a copied TC01 DB proves LINKED/MULTI_FIELD_MATCH, hidden manual link fields and
+reload. This reuses actual stored LIVE OCR; fresh provider extraction NOT_RUN.
+Backend port8000 restarted with its existing command; a read-only authenticated
+GET on the user's case also returns LINKED/MULTI_FIELD_MATCH. All nine business
+table fingerprints before/after restart/readback match. No monetary confirmation,
+coverage, reset, commit or push. [Evidence](reviews/2026-10-15-source-date-fix.md).
+
+## TC01 multi-field advance link — 15/10/2026
+
+An unregistered reference on an accountant-uploaded voucher no longer blocks a
+separate, conservative `MULTI_FIELD_MATCH` decision. The backend requires a
+unique employee match, configured company payer, specific matching project
+purpose, exact declared-advance amount, source-backed chronology, a transaction
+identity not owned by another root, and one compatible tenant root. Missing or
+ambiguous facts require accountant confirmation; wrong identity/company,
+reference-to-other-activity and cross-root event ownership are conflicts. Each
+decision signal keeps its source references. The exact-reference path remains
+stronger.
+
+The accountant UI displays the auto-link basis and selects the voucher that was
+read. It hides the second link checkbox/reason only for a server-linked result;
+the accountant still checks and confirms the money event. This adds no coverage,
+grant, authority or instruction.
+
+**Verification:**
+
+- `rtk proxy uv run pytest -q` — PASS, exit 0; focused linker/extraction/advance
+  API and guard tests also pass. Added concurrent-upload coverage proves a
+  transaction cannot be auto-linked to two roots; tenant isolation, mapped-code
+  conflicts, duplicate recording and pending vouchers remain covered.
+- Frontend Vitest — PASS, 36 passed / 2 skipped. Build — PASS with Node
+  24.19.0 / npm 11.12.1. `git diff --check` — PASS.
+- Isolated LIVE Playwright — PASS, one test using the original three PDFs and a
+  new proposed root. It linked by `MULTI_FIELD_MATCH` with `TU-TC01` unmapped,
+  displayed no link checkbox/reason, and recorded one 4,000,000 VND confirmed
+  advance after accountant action. DB/audit retained one acceptance with 13
+  refs and eight decision signals; coverage/instruction counts are zero. The
+  case remains `WAITING`; full settlement is not claimed. Details and hashes:
+  [LIVE evidence](reviews/2026-10-15-multifield-advance-link-live.md).
+
+The clean LIVE context contained only company and employee identities (no
+activity references, ledger, grants or coverage). Runtime DB/uploads and browser
+evidence are under `.runtime/tc01-multifield-live-20261015-1145/`. The user's
+default database/server was not read, restarted or modified. No commit, push,
+reset or subagent was used.
+
+## Accountant advance and money-history coverage — 15/10/2026
+
+The accountant can now attach and durably read a transfer/cash voucher on an
+existing dossier, verify or complete missing required fields from that saved
+source, establish an explicit activity link when no unique reference link exists,
+and record the received amount as an actual money event. Activity acceptance is
+persisted as its own fact and leaves the new activity `PROPOSED`; it does not add
+authority. Money-history coverage is a separate accountant confirmation with
+fund/window/opening balance/flow set/witness/reason/server time and the covered
+root's ledger version. An upload or absent event history alone never means zero.
+
+**Verification:** full Python suite passed (`rtk proxy uv run pytest -q`); frontend
+Vitest passed 34 tests with 2 skipped (existing React `act(...)` warnings); frontend
+production build passed with the pinned Node 24 runtime. Final isolated LIVE
+Playwright passed in 1.4m using the two original TC01 settlement PDFs and one 4m
+advance voucher. The tested UI exposed the paper-declared 760k return, and the
+accountant recorded why no company receipt was established in the checked money
+history. The final DB contains one confirmed advance, one activity acceptance with
+11 refs spanning the voucher and settlement report, one versioned coverage
+confirmation and one `COLLECT 760.000` instruction. Reload retained it.
+
+Final admission is `READY_TO_EXECUTE` with `T=E=3.240.000`, `A=4.000.000`,
+`P=R=0` by the accountant's scoped history confirmation, and `S=-760.000`.
+`execution_state=NOT_STARTED`: no money was collected and the case remains open.
+Coverage is a responsible human assertion, not independent bank verification.
+The employee-return scenario was verified in deterministic
+`test_f01_completed_return_closes_the_loop`; it was not part of the LIVE browser
+run. Intermediate isolated failures and the superseded run are preserved in the
+[evidence report](reviews/2026-10-15-accountant-advance-coverage-live.md).
+
+The first run exposed missing-payer correction; the accepted correction only
+allows an accountant to fill missing required fields from the saved source, and
+does not allow overriding populated conflicting OCR. Further regressions fixed
+the missing overview-tab transition, the UTC/local date-only check and settlement
+source refs on explicit acceptance.
+
+**Evidence and limits:** [isolated LIVE report](reviews/2026-10-15-accountant-advance-coverage-live.md),
+[accountant runbook](ACCOUNTANT_ADVANCE_COVERAGE_RUNBOOK.md), and final local evidence
+under `.runtime/accountant-flow-live-20261015-confirmed/`. The running user's DB
+was not read or changed. No commit, push, reset, or subagent was used.
+
+### Multiline payer provenance and Vietnamese name display — 15/10/2026
+
+The transfer receipt's sender name is split across OCR lines. Text provenance
+validation now collapses whitespace only when comparing normalized text values
+to a source quote, while preserving the quote exactly in `EvidenceRef`. Wrong or
+truncated names remain unresolved. The accountant payer field stays blank unless
+the source supports a value; organization context is not used as a substitute.
+The payer/payee inputs use larger text so stacked Vietnamese marks remain legible.
+
+**Proof:** positive and negative multiline-name extraction regressions passed;
+full Python suite passed. Frontend Vitest passed 34 tests / 2 skipped and build
+passed. Isolated LIVE Playwright against the same synthetic source bytes found the
+full payer `CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH` with no manual correction,
+retained the line-break quote, and showed the payee `NGUYỄN MINH AN` unchanged.
+See [LIVE evidence](reviews/2026-10-15-multiline-payer-name-live.md). Provider
+mode was LIVE on an isolated DB; the user's DB was not read or changed. Collection
+remains `ISSUED` / `NOT_STARTED`, not executed. The currently running server was
+left alone; its Python process must be restarted before it can use the backend
+validator change.
+
+## Activity budget B removed from current settlement gates — 15/10/2026
+
+User-approved decision in attachment `97a6fa9f-21dd-4ed2-b164-6178f78c0b0c`;
+canonical contract/design/ADR0009 updated. Missing B no longer creates FACT in
+Reconciler or DRAFT views; `T>B` no longer creates POLICY; B no longer changes
+`cost_basis`. The existing B DTO/import/storage remains compatible with old
+contexts. No migration or user DB change.
+
+**Regression proof:** TDD RED observed for B-missing/over-B outcomes, legacy
+cost-basis sensitivity, DRAFT API issue, generated TC01/pilot contexts and the
+D06 denominator. Current tests cover no-B collect 760k, pay 1m, balanced S=0,
+low/high/missing-B invariance, retained missing-coverage FACT, retained >8m
+RECOGNIZE_COST AUTHORITY and action/scope grants, plus a real answer/reassessment
+that closes a seeded legacy `budget:B` issue while keeping coverage, sources,
+money-event history and prior audit.
+
+- `rtk proxy uv run pytest -q` → exit 0, all tests reached 100%.
+- Targeted unit/integration/generator suite → exit 0.
+- Frontend Vitest → 30 passed, 2 skipped; existing React `act(...)` warnings.
+- Frontend build → exit 0 with Node 24.19.0 / npm 11.12.1.
+- Playwright UI DRAFT/API readback → 1 passed on isolated STUB DB
+  `.runtime/budget-retirement-ui-20261015-2/`; no B issue or replacement AUTHORITY.
+  OCR draft read itself returned the expected STUB limitation (no LIVE reader),
+  so extraction/settlement UI remains NOT_RUN. No provider call was made.
+- UC03-F01/F02/F03 remain in their 3-case denominator with financial oracle
+  values unchanged; B was removed from their contexts/preconditions. B-only D06
+  keeps its original source/oracle in `FUTURE_SCOPE_CASES`; current authored set
+  is 14, so the planned 15-development-root gate is **NOT_MET** pending an
+  in-scope replacement. No gold outcome was silently rewritten.
+
+No shared web DB, LIVE server, original Hoangha PDF, or external provider was
+changed/called. No subagents, commit, push, or reset. Existing unrelated dirty
+worktree changes were preserved.
+
+## PDF identity cleanup — 15/10/2026
+
+User-authorized generator/data cleanup: eight pilot PDFs regenerated for Nguyễn
+Minh An / Công ty An Thịnh; one obsolete Nguyễn An expansion PDF deleted. Added
+two TC01 reception advance forms and paired transfer/cash contexts via the shared
+generator's `--tc01-output`. Monetary oracle unchanged; evidence names, provenance,
+source manifests and refs updated. [Evidence](reviews/2026-10-15-pdf-identity-cleanup.md):
+five generator tests and 32 related tests GREEN, full Python suite exit 0, all ten
+PDFs one-page/render-reviewed, hash/name inventory checked. Fresh LIVE/browser for
+new PDF bytes NOT_RUN. DB/server/original Hoangha sources untouched; no commit/push.
+
+## TC01 portable demo context — 14/10/2026
+
+User selected a SIMULATED confirmed advance of 4m. Legacy demo now names
+NGUYỄN MINH AN / Công ty An Thịnh; a separate typed TC01 fixture provides scoped
+B/grants/category policy/ledger/coverage. Runtime accepts the typed JSON through
+the existing validated importer; legacy import preserves company name. Dev CLI
+adds an explicit timezone-aware `--demo-as-of` for repeatable fictional-history
+assessment, while default real-time behavior and trace timestamps stay unchanged.
+
+[Runbook](../../data/demo/README.md) starts a separate database on port 8012.
+[Evidence](reviews/2026-10-14-tc01-portable-demo-context.md): 3 meaningful REDs,
+21 targeted tests GREEN, full Python suite exit 0, diff check exit 0. Actual stored
+LIVE TC01 OCR + new context in isolated admission yields COLLECT 760k with no
+issues. Original sources still require confirmation of the one weak link
+candidate; no fabricated strong reference/automatic name match was added.
+Fresh LIVE/browser NOT_RUN. User's default DB/server and unrelated frontend work
+are untouched. Base `38d8da3a`; this task has no commit/push authorization.
+
 ## Current handoff
 
 | Field | Current value |
 | --- | --- |
-| Base branch | `final` @ 91d444fa (working tree has unrelated concurrent edits; no commit made by this task). |
-| Phase | T1..T10 + R0–R8 done; evidence pipeline + admission + invoice basis + advance recording + general-expense T1–T5 + TC08/TC23 fixes committed. LangSmith root/step wiring is followed by this **input/output tracing completion** (2026-10-14, uncommitted): stage summaries, actual provider `llm` spans, recursive redaction, atomic create payloads and bounded flush are read back from cloud. |
-| Authorized scope now | LangSmith input/output tracing; complete. Isolated LIVE evidence `.runtime/langsmith-io-tracing-20261014-153951/`, report `report.md`. **Uncommitted — no Git authorization given.** |
+| Base branch | `final` @ `38d8da3a8b50d7b117a313a2498916302071e55b` (working tree includes prior concurrent edits; no commit made by this task). |
+| Phase | Prior T1..T10 + R0–R8/evidence work remains historical. Latest user-authorized scope: accountant advance and full-history coverage workflow; implementation and gates recorded above. |
+| Authorized scope now | Accountant advance/coverage workflow, isolated TC01 verification and handoff docs complete. No commit/push/reset. |
 | Setup review | ACCEPTED; clean-clone proof passed. |
 | Execution method | Inline execution, single integrator; per-behaviour TDD (RED observed → GREEN) + full-suite after. No subagent review (user-directed). |
 | Workflow integrator | Inline executor — single writer for workflow/api/domain/frontend shared files |
-| Next application task | User reviews the tracing report and direct LangSmith traces. No commit/push is authorized by this task. |
-| Last completed application task | LangSmith input/output tracing completed with offline RED→GREEN, full Python suite, LIVE browser TC01/TC06 and final cloud read-back. |
-| Product unit/integration/LIVE evidence | `rtk proxy uv run pytest -q` → **646 passed / 0 failed**. Frontend build passed with Node **24.19.0** / npm **11.12.1**. Playwright LIVE (built frontend + LIVE backend, simulated context, controlled clock `2026-10-10T18:00+07`) → **TC01 READY_TO_EXECUTE / COLLECT 760000; TC06 WAITING / FACT `expense:arithmetic:return`, no instruction**. Read back from LangSmith `invoice-referee`: **21 runs per case, 0 `outputs=null`**, observed start/end times, no errors, correct per-document LLM attempt indices, arithmetic finding visible in `validate`/`reconcile`, parent links intact; privacy scan **0 violations**. `health`: `langsmith_ready/enabled=true`, `export_errors=0`. **RECORDED_REPLAY / Docker / hosting / practitioner pilot NOT_RUN.** |
+| Next application task | Continue from the latest product request; if investigating TC01 further, preserve the distinction between human coverage confirmation and independent bank evidence. |
+| Last completed application task | Accountant advance receipt, activity acceptance, structured coverage, Vietnamese UI, live runbook and isolated LIVE TC01 verification. |
+| Product unit/integration/UI evidence | Full Python suite exit 0. Frontend tests 34 passed/2 skipped and production build passed (Node 24.19.0/npm 11.12.1). Final isolated LIVE Playwright passed with a new proposed activity, durable 4m advance, explicit activity link, settlement and voucher refs, coverage warning for paper-declared return and COLLECT 760k; earlier failed/superseded attempts remain documented. Employee-return closes the 760k collection in deterministic integration coverage. |
 | CodeGraph | 220 files / 3,897 nodes / 11,998 edges; index up to date, older-engine warning. `check_index_coverage` unavailable; coverage remains unknown. |
-| Git handoff | `final` @ 91d444fa, **ahead 1** of `origin/final`; tracing changes are uncommitted. Other concurrent working-tree changes were preserved. No commit/push/reset. |
+| Git handoff | `final` @ `38d8da3a8b50d7b117a313a2498916302071e55b`; this and prior concurrent changes remain uncommitted. No commit/push/reset. |
 
 ### Evidence pipeline E0–E8 (2026-10-14)
 
@@ -270,3 +495,67 @@ was not changed.
 
 Current Git state: `final` at `cea29405`, ahead 2 of `origin/final`. This correction
 and other concurrent working-tree changes are unstaged/uncommitted; no push.
+
+## TC01 activity-reference import and LIVE verification — 15/10/2026
+
+User-authorized fix and verification; no subagents, commit, push, reset, or edits
+to the user's shared database. The typed and legacy import paths now validate,
+persist, and expose `activity.references` through the existing v6
+`context_activities.references_json` column. New versions replace removed
+references; missing references remain empty. The backend linker was not changed.
+
+**Backend gate PASS:** composition-root integration tests prove typed/legacy import,
+catalog read, restart, same-payload idempotency, reference replacement/removal,
+invalid declaration rejection, unique `DOCUMENT_REFERENCE`, duplicate-reference
+conflict, tenant isolation, contradictory strong basis, weak-only confirmation,
+and transaction identity. `rtk proxy uv run pytest -q` exited 0 at 100%.
+Frontend tests/build and `git diff --check` also pass.
+
+**LIVE gate FAIL:** transfer and cash ran on separate local databases with the
+fixed demo clock `2026-10-14T23:00:00+07:00`, real OCR/LLM providers, and the built
+frontend. Each settlement upload linked to `activity:tc01` by
+`DOCUMENT_REFERENCE` from the page-1 `TU-TC01` quote. The full expected financial
+result was not produced: both cases remain `WAITING`, `A=4.000.000`,
+`P=R=0`, `T/E/S=UNKNOWN`, with open FACTs `expense:T` and `expense:payer`; no
+collection instruction was created. No future coverage was introduced and no
+money/policy/grant formula was changed.
+
+Re-upload idempotency subcheck PASS in each branch after the accountant UI was
+corrected with party names read from the same source PDF. The API view kept
+`A=4.000.000`; isolated SQLite showed zero `money_events` and zero instructions,
+while the imported snapshot still contained exactly one method-specific advance
+key. Extraction accuracy remains FAIL: transfer `payer_name=null`; cash
+`payee_name=null`. These values were recorded as manual corrections, not as OCR
+success. The independent trace, OCR, UI, API and database artifacts are under
+`.runtime/tc01-reference-live/20261015-005259-ICT/`; the review record contains
+expected-versus-actual values, provider state and LangSmith links. The next gate
+is to investigate the unresolved cost basis and missing OCR party field before
+claiming TC01 financial acceptance.
+
+Read-only reassembly of the stored LIVE reports confirmed the admission mapper
+can construct one expense with `incurred=3.240.000 KNOWN`, `ELIGIBLE`, and
+`EMPLOYEE_PAID_INVOICE`, but `expense_set_complete=false`: the included payment
+proof has `profile_status=NEEDS_HUMAN`. The separate paper/invoice matcher also
+reports `SET_PAPER_EVIDENCE_REQUIRED` / `SET_PAPER_UNMATCHED_001` because the paper
+references `00000101` and invoice extraction includes series `IR26E`. No rule was
+weakened to turn this incomplete evidence set into an instruction.
+
+Current Git work remains uncommitted; unrelated shared working-tree changes were
+preserved.
+
+### Transfer receipt receiver field across classification variants — 15/10/2026
+
+The latest default-DB draft classified the uploaded transfer voucher as
+`COLLECTION_RECEIPT`. That profile reused the generic receipt field vocabulary,
+which omitted `payee_name`; the OCR report still contained the printed receiver.
+`COLLECTION_RECEIPT` now has a dedicated profile that retains the generic receipt
+fields and also asks extraction for `payee_name`. `PAPER_RECEIPT` stays unchanged.
+
+Regression covers the same two-party transfer layout under both
+`COLLECTION_RECEIPT` and `PAYMENT_PROOF`, checking the prompt vocabulary, both
+source-bound names, and their quotes. RED was observed for
+`COLLECTION_RECEIPT`; `rtk proxy uv run pytest -q` then passed and
+`rtk proxy git diff --check` exited 0. No provider/browser rerun was made. The
+default server process predates this change and remains running; its startup
+imports context into the default DB, so it was not restarted. Restart the server
+and reread the saved PDF before expecting the receiver to appear in that draft.

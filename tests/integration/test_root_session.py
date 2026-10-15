@@ -80,10 +80,34 @@ async def test_client_role_or_budget_cannot_become_authority(app_fixture):
     )
     view = created.case_view
     assert view.state == "DRAFT"
-    assert any(issue.kind == "FACT" for issue in view.issues)
-    # Missing context is not a fabricated zero: no B row at all.
+    assert not any(issue.field_or_rule == "budget:B" for issue in view.issues)
+    # Missing B is outside this release's policy; keep activity identity intact.
     assert app_fixture.budget_amount("activity:unknown-z") is None
     assert app_fixture.budget_amount("activity:travel-b") is None
+
+
+async def test_api_draft_without_budget_has_no_budget_issue(app_fixture):
+    response = await app_fixture.client.post(
+        "/api/cases",
+        json={
+            "activity": {
+                "mode": "new",
+                "name": "Tiếp khách địa phương",
+                "occurred_at": "2026-10-06T09:00:00+07:00",
+                "declared_purpose": "Làm việc với đối tác",
+            }
+        },
+        headers={"X-Command-Id": "cmd:no-budget-draft"},
+    )
+    assert response.status_code == 200
+    case = response.json()["case_view"]
+    assert case["activity"].startswith("activity:proposed:")
+    assert not any(issue["field_or_rule"] == "budget:B" for issue in case["issues"])
+    reloaded = await app_fixture.client.get(f"/api/cases/{case['id']}")
+    assert reloaded.status_code == 200
+    assert not any(
+        issue["field_or_rule"] == "budget:B" for issue in reloaded.json()["issues"]
+    )
 
 
 async def test_tenant_b_cannot_view_or_reset_tenant_a(app_fixture):
@@ -208,7 +232,7 @@ async def test_tenant_b_activity_context_is_not_shared(app_fixture):
     view = created.case_view
     assert view.state == "DRAFT"
     assert "Công tác Hà Nội" not in view.summary
-    assert any(issue.kind == "FACT" for issue in view.issues)
+    assert not any(issue.field_or_rule == "budget:B" for issue in view.issues)
     # Tenant demo's committed seed is untouched, and no cross-tenant row exists.
     assert app_fixture.budget_amount("activity:travel-a") == 8_000_000
     row = app_fixture.query_one(
@@ -236,10 +260,11 @@ async def test_session_cookie_is_httponly_and_persona_switch_is_audited(app_fixt
     assert "PERSONA_SWITCH" in app_fixture.audit_actions()
 
 
-async def test_catalog_activity_reports_seeded_budget(app_fixture):
+async def test_catalog_preserves_legacy_budget_metadata_without_a_gate(app_fixture):
     created = await app_fixture.create(employee=EMPLOYEE, activity="activity:travel-a")
+    # Old contexts remain readable, but the stored B is not a settlement issue.
     assert app_fixture.budget_amount("activity:travel-a") == 8_000_000
-    assert not any(issue.kind == "FACT" for issue in created.case_view.issues)
+    assert not any(issue.field_or_rule == "budget:B" for issue in created.case_view.issues)
 
 
 async def test_activity_proposed_through_api_gets_server_generated_id(app_fixture):
@@ -258,7 +283,7 @@ async def test_activity_proposed_through_api_gets_server_generated_id(app_fixtur
     assert response.status_code == 200
     case = response.json()["case_view"]
     assert case["state"] == "DRAFT"
-    assert any(issue["kind"] == "FACT" for issue in case["issues"])
+    assert not any(issue["field_or_rule"] == "budget:B" for issue in case["issues"])
     assert app_fixture.case_count(TENANT_A) == 1
 
 
@@ -283,4 +308,3 @@ async def test_get_source_content_serves_uploaded_file(app_fixture):
     # Other tenant blocked
     tenant_b = app_fixture.client_for(tenant=TENANT_B)
     assert (await tenant_b.get(f"/api/cases/{root}/sources/{source_id}")).status_code == 404
-

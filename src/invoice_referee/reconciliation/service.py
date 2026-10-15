@@ -34,9 +34,14 @@ def _cost_basis(input: AssessmentInput) -> str:
         ],
         "activity": input.scope.activity,
         "profile": input.scope.profile,
-        "budget": [
-            (b.id, b.amount, b.effect_range[0].isoformat()) for b in input.budget
-        ],
+        "activity_acceptances": sorted(
+            (
+                acceptance.advance_external_key,
+                acceptance.actor,
+                tuple((ref.source_id, ref.source_sha256, ref.page) for ref in acceptance.refs),
+            )
+            for acceptance in input.activity_acceptances
+        ),
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()

@@ -14,8 +14,14 @@ import sqlite3
 from datetime import UTC, datetime
 
 from invoice_referee.domain.case import AssessmentInput, CaseScope, ReadSet
+from invoice_referee.domain.common import EvidenceRef
 from invoice_referee.domain.evidence import Confirmation, ReadResult
-from invoice_referee.domain.finance import CoverageRecord, MoneyEvent
+from invoice_referee.domain.finance import (
+    ActivityAcceptance,
+    ActivityLinkSignal,
+    CoverageRecord,
+    MoneyEvent,
+)
 from invoice_referee.domain.organization import OrganizationContext
 from invoice_referee.reconciliation.admission import admit_evidence
 from invoice_referee.workflow.context_records import load_context
@@ -55,6 +61,55 @@ def _load_recorded_money(cx: sqlite3.Connection, tenant: str, root_id: str) -> t
             (tenant, root_id),
         ).fetchall()
     )
+
+
+def _load_activity_acceptances(
+    cx: sqlite3.Connection, tenant: str, root_id: str
+) -> tuple[ActivityAcceptance, ...]:
+    import json
+
+    return tuple(
+        ActivityAcceptance(
+            root_id=str(row["root_id"]),
+            employee=str(row["employee"]),
+            activity=str(row["activity"]),
+            advance_external_key=str(row["advance_external_key"]),
+            advance_draft_id=str(row["advance_draft_id"]),
+            actor=str(row["actor"]),
+            accepted_at=datetime.fromisoformat(str(row["accepted_at"])),
+            link_basis=str(row["link_basis"]),
+            reason=str(row["reason"]),
+            refs=tuple(json.loads(row["refs_json"] or "[]")),
+            link_signals=tuple(
+                ActivityLinkSignal.model_validate({
+                    **signal,
+                    "refs": tuple(
+                        EvidenceRef.model_validate(ref)
+                        for ref in signal.get("refs", [])
+                    ),
+                })
+                for signal in json.loads(row["link_signals_json"] or "[]")
+            ),
+        )
+        for row in cx.execute(
+            "SELECT * FROM case_activity_acceptances WHERE tenant = ? AND root_id = ? "
+            "ORDER BY accepted_at, acceptance_id",
+            (tenant, root_id),
+        ).fetchall()
+    )
+
+
+def _load_coverage_record(
+    cx: sqlite3.Connection, tenant: str, root_id: str
+) -> CoverageRecord | None:
+    row = cx.execute(
+        "SELECT coverage_json FROM case_coverage_records WHERE tenant = ? AND root_id = ? "
+        "ORDER BY recorded_at DESC, coverage_id DESC LIMIT 1",
+        (tenant, root_id),
+    ).fetchone()
+    if row is None:
+        return None
+    return CoverageRecord.model_validate_json(row["coverage_json"])
 
 
 def _context_version(cx: sqlite3.Connection, tenant: str) -> int:
@@ -122,7 +177,8 @@ def build_evidence_assessment_input(
         organization=organization,
         confirmations=_load_confirmations(cx, tenant, root_id),
         ledger=_load_recorded_money(cx, tenant, root_id),
-        coverage=None,
+        coverage=_load_coverage_record(cx, tenant, root_id),
         read_set=read_set,
         as_of=as_of,
+        activity_acceptances=_load_activity_acceptances(cx, tenant, root_id),
     )

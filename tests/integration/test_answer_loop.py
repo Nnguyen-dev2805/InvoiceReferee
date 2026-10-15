@@ -84,3 +84,58 @@ async def test_wrong_owner_answer_is_not_applied(app_fixture):
         )["n"]
         == 0
     )
+
+
+async def test_reassessment_closes_legacy_budget_issue_without_losing_case_history(app_fixture):
+    # Seed one persisted issue as an older release would have stored it. The
+    # behavior under test still runs through the real employee answer command.
+    v = await app_fixture.submit_packet(
+        "missing-payer-no-history", mode="STUB", activity="activity:unknown-z"
+    )
+    payer_issue = next(i for i in v.issues if i.field_or_rule == "expense:payer")
+    assert any(i.field_or_rule == "ledger:coverage" for i in v.issues)
+    source_ids_before = [source.id for source in v.sources]
+    audit_before = app_fixture.audit_actions()
+    with app_fixture.db.transaction() as cx:
+        cx.execute(
+            "INSERT INTO case_issues (id, tenant, root_id, kind, field_or_rule, owner, "
+            "status, recovery_key, payload_json, created_at, updated_at) "
+            "VALUES (?, ?, ?, 'FACT', 'budget:B', 'org-data', 'OPEN', 'FACT:budget:B', ?, ?, ?)",
+            (
+                "issue:legacy-budget",
+                v.sources[0].tenant if v.sources else "tenant:demo",
+                v.id,
+                '{"id":"issue:legacy-budget","kind":"FACT","field_or_rule":"budget:B",'
+                '"owner":"org-data","status":"OPEN","basis":"Legacy B issue",'
+                '"question":"Legacy B question","refs":[]}',
+                "2026-10-05T09:00:00+00:00",
+                "2026-10-05T09:00:00+00:00",
+            ),
+        )
+
+    events_before = app_fixture.query_one(
+        "SELECT COUNT(*) AS n FROM money_events WHERE root_id = ?", (v.id,)
+    )["n"]
+    after = await app_fixture.answer(
+        v.id,
+        Answer(
+            issue_id=payer_issue.id,
+            basis_id="basis:payer",
+            answer_kind="FACT",
+            value="employee:employee-a",
+            reason="Tôi đã thanh toán khoản chi này.",
+        ),
+        actor="employee:employee-a",
+    )
+
+    assert not any(i.field_or_rule == "budget:B" for i in after.issues)
+    assert not any(i.field_or_rule == "expense:payer" for i in after.issues)
+    assert any(i.field_or_rule == "ledger:coverage" for i in after.issues)
+    assert [source.id for source in after.sources] == source_ids_before
+    assert app_fixture.query_one(
+        "SELECT COUNT(*) AS n FROM money_events WHERE root_id = ?", (v.id,)
+    )["n"] == events_before
+    audit_after = app_fixture.audit_actions()
+    for action in ("CREATE_DRAFT", "ATTACH_SOURCES", "ASSESS"):
+        assert action in audit_before and action in audit_after
+    assert audit_after.count("ANSWER_ISSUE") == audit_before.count("ANSWER_ISSUE") + 1

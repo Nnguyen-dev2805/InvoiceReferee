@@ -70,6 +70,89 @@ export interface PaymentBasisView {
   rule_id: string | null;
 }
 
+export interface ActivityAcceptanceView {
+  root_id: string;
+  employee: string;
+  activity: string;
+  advance_external_key: string;
+  advance_draft_id: string;
+  actor: string;
+  accepted_at: string;
+  link_basis: "DOCUMENT_REFERENCE" | "ACCOUNTANT_CONFIRMATION" | "MULTI_FIELD_MATCH" | "TRANSACTION_IDENTITY";
+  reason: string;
+  refs: unknown[];
+  link_signals: ActivityLinkSignalView[];
+}
+
+export interface ActivityLinkSignalView {
+  field: string;
+  state: string;
+  summary: string;
+  refs: unknown[];
+}
+
+export interface MoneyHistoryView {
+  id: string;
+  external_key: string;
+  kind: string;
+  scope: string;
+  payer: string;
+  payee: string;
+  amount: number;
+  event_at: string;
+  recorded_at: string;
+  verification_state: string;
+  allocation_state: string;
+  refs: unknown[];
+}
+
+export interface CoverageRecordView {
+  scope: string;
+  employee: string | null;
+  start: string;
+  as_of: string;
+  funds: string[];
+  flow_kinds: string[];
+  opening_balance: MoneyFact | null;
+  ledger_version: string | null;
+  witness_refs: unknown[];
+  source: string;
+  actor: string | null;
+  recorded_at: string | null;
+  reason: string | null;
+  unallocated_event_ids: string[];
+}
+
+export interface EmployeeReturnDraftView {
+  draft_id: string;
+  root_id: string;
+  employee: string;
+  activity: string;
+  instruction_id: string;
+  source_id: string;
+  source_sha256: string;
+  source_filename: string;
+  status: "WAITING_ACCOUNTANT" | "CONFIRMED";
+  match_status: "MATCHED" | "OVERPAY" | "NEEDS_REVIEW" | "CONFLICT" | "NOT_COMPLETED" | "STALE" | "ALREADY_RECORDED";
+  amount: number | null;
+  payer_name: string | null;
+  payee_name: string | null;
+  transaction_reference: string | null;
+  external_key: string | null;
+  instrument_method: "TRANSFER" | "CASH" | null;
+  instrument_status: "COMPLETED" | "PENDING" | "FAILED" | "UNKNOWN";
+  event_at: string | null;
+  instruction_amount: number;
+  instruction_remaining: number;
+  refs: Array<{ source_id: string; source_sha256: string; page: number | null; exact_quote: string }>;
+  missing_fields: string[];
+  signals: Array<{ field: string; state: string; summary: string; refs: unknown[] }>;
+  uploaded_at: string;
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  money_event_id: string | null;
+}
+
 export interface CaseView {
   id: string;
   version: number;
@@ -88,6 +171,11 @@ export interface CaseView {
   assessment_ready: boolean;
   assessment_blocker: string | null;
   payment_basis: PaymentBasisView[];
+  activity_acceptances?: ActivityAcceptanceView[];
+  coverage_record?: CoverageRecordView | null;
+  coverage_current?: boolean;
+  money_history?: MoneyHistoryView[];
+  employee_return_drafts?: EmployeeReturnDraftView[];
   // Technical/debug trace references (§9); shown only in the debug area.
   trace_refs?: string[];
 }

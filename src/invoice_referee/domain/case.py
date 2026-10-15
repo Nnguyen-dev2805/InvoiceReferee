@@ -26,8 +26,10 @@ from invoice_referee.domain.evidence import (
     SourceRef,
 )
 from invoice_referee.domain.finance import (
+    ActivityAcceptance,
     CoverageRecord,
     Expense,
+    EmployeeReturnDraft,
     MoneyEvent,
     PaymentBasisView,
     Projection,
@@ -100,8 +102,10 @@ class AssessmentInput(StrictModel):
     confirmations: tuple[Confirmation, ...] = ()
     ledger: tuple[MoneyEvent, ...] = ()
     coverage: CoverageRecord | None = None
+    activity_acceptances: tuple[ActivityAcceptance, ...] = ()
     policy: tuple[PolicyVersion, ...] = ()
     grants: tuple[Grant, ...] = ()
+    # Legacy context input: parsed for compatibility, ignored by current decisions.
     budget: tuple[BudgetDecision, ...] = ()
     # Versioned per-item category caps + submission window (T3). Empty means no
     # category policy is in force for this scope.
@@ -233,6 +237,11 @@ class CaseView(StrictModel):
     # Per-expense paid basis/actor/refs (plan A0/A8); empty until a typed
     # admission has produced a conclusion.
     payment_basis: tuple[PaymentBasisView, ...] = ()
+    activity_acceptances: tuple[ActivityAcceptance, ...] = ()
+    coverage_record: CoverageRecord | None = None
+    coverage_current: bool = False
+    money_history: tuple[MoneyEvent, ...] = ()
+    employee_return_drafts: tuple[EmployeeReturnDraft, ...] = ()
     # Technical/debug references to the operation traces for this root (§9;
     # LangSmith wiring). Never a business field; a UI shows these only in a
     # technical/debug area, not in the employee flow.

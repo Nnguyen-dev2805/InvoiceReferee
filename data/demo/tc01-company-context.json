@@ -1,0 +1,204 @@
+{
+  "tenant": "tenant:demo",
+  "profile": "WORK_EXPENSE",
+  "records": [],
+  "organization_id": "tenant:demo",
+  "company_name": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+  "activity": {
+    "activity_id": "activity:tc01",
+    "name": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+    "occurred_at": "2026-10-10T09:00:00+07:00",
+    "purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+    "profile": "WORK_EXPENSE",
+    "status": "AUTHORIZED",
+    "authorization": {
+      "id": "auth:tc01",
+      "actor": "employee:approver",
+      "grant_ref": "grant:tc01:approver",
+      "effect_range": [
+        "2026-10-01T00:00:00+07:00",
+        "2026-12-31T23:59:59+07:00"
+      ],
+      "reason": "Cho phép tiếp khách phục vụ dự án Nâng cấp văn phòng 2026 (quyết định demo).",
+      "record_key": "auth:tc01"
+    },
+    "references": [
+      "TU-TC01"
+    ]
+  },
+  "people": [
+    {
+      "id": "employee:employee-a",
+      "name": "NGUYỄN MINH AN"
+    },
+    {
+      "id": "employee:accountant-demo",
+      "name": "Trần Thị B (kế toán)"
+    },
+    {
+      "id": "employee:approver",
+      "name": "Lê Văn C (người quyết định)"
+    }
+  ],
+  "policies": [
+    {
+      "id": "policy:tc01",
+      "version": "q32-v1",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "profile": "WORK_EXPENSE",
+      "rules": [
+        "EMPLOYEE_PAID_INVOICE_BOUNDED"
+      ]
+    }
+  ],
+  "category_policies": [
+    {
+      "id": "category:tc01",
+      "version": "v1",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "profile": "WORK_EXPENSE",
+      "per_item_caps": {
+        "CLIENT_MEAL": 5000000,
+        "WORK_CLIENT_MEAL": 5000000,
+        "TAXI": 2000000
+      },
+      "submission_window_days": 30,
+      "excluded_categories": [
+        "PERSONAL"
+      ]
+    }
+  ],
+  "grants": [
+    {
+      "id": "grant:tc01:recognize",
+      "version": "v1",
+      "actor": "system:referee",
+      "actions": [
+        "RECOGNIZE_COST"
+      ],
+      "scope": "activity:tc01",
+      "max_amount": 8000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "WORK_EXPENSE"
+      ]
+    },
+    {
+      "id": "grant:tc01:issue",
+      "version": "v1",
+      "actor": "system:referee",
+      "actions": [
+        "ISSUE_PAYMENT",
+        "ISSUE_COLLECTION"
+      ],
+      "scope": "activity:tc01",
+      "max_amount": 4000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "WORK_EXPENSE"
+      ]
+    },
+    {
+      "id": "grant:tc01:approver",
+      "version": "v1",
+      "actor": "employee:approver",
+      "actions": [
+        "AUTHORIZE_ACTIVITY",
+        "RECOGNIZE_COST",
+        "EXCEPT_POLICY",
+        "ISSUE_PAYMENT",
+        "ISSUE_COLLECTION"
+      ],
+      "scope": "activity:tc01",
+      "max_amount": 20000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "WORK_EXPENSE"
+      ]
+    },
+    {
+      "id": "grant:tc01:accountant",
+      "version": "v1",
+      "actor": "employee:accountant-demo",
+      "actions": [
+        "CONFIRM_FINANCIAL_FACT",
+        "RECORD_ACTUAL",
+        "STOP",
+        "RESUME"
+      ],
+      "scope": "activity:tc01",
+      "max_amount": 20000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "WORK_EXPENSE"
+      ]
+    }
+  ],
+  "ledger": [
+    {
+      "id": "advance:tc01",
+      "external_key": "transfer:FT-TC01-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc01",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 4000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null,
+      "witness_keys": [
+        "advance:tc01"
+      ]
+    }
+  ],
+  "coverage": {
+    "employee": "employee:employee-a",
+    "activity": "activity:tc01",
+    "start": "2026-09-01T00:00:00+07:00",
+    "as_of": "2026-10-14T23:00:00+07:00",
+    "fund_ids": [
+      "company:bank-demo"
+    ],
+    "flow_kinds": [
+      "ADVANCE_RECEIVED",
+      "REIMBURSEMENT_RECEIVED",
+      "EMPLOYEE_RETURN",
+      "REVERSAL",
+      "OBSERVED_UNALLOCATED"
+    ],
+    "opening_by_fund": {
+      "company:bank-demo": 0
+    },
+    "ledger_version": "ledger:tc01:20261014-2300",
+    "witness_keys": [
+      "coverage:tc01"
+    ]
+  },
+  "witnesses": [
+    {
+      "record_key": "advance:tc01",
+      "quote": "Bản ghi ứng thực nhận mô phỏng: công ty đã chi 4.000.000 đ cho NGUYỄN MINH AN, hoạt động activity:tc01 ngày 05/10/2026.",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc01",
+      "observed_at": "2026-10-05T10:00:00+07:00"
+    },
+    {
+      "record_key": "coverage:tc01",
+      "quote": "Lịch sử mô phỏng đã đối chiếu đến 14/10/2026 23:00 +07:00: số dư đầu kỳ 0, ứng thực nhận 4.000.000 đ; chưa có chi thêm, hoàn trả, đảo giao dịch hoặc khoản chưa phân bổ trong scope TC01.",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc01",
+      "observed_at": "2026-10-14T23:00:00+07:00"
+    }
+  ],
+  "activities": [],
+  "financial_as_of": "2026-10-14T23:00:00+07:00",
+  "data_origin": "SIMULATED"
+}

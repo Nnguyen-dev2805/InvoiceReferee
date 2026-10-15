@@ -19,6 +19,7 @@ from invoice_referee.domain.case import CommandContext
 from invoice_referee.domain.commands import (
     ActivityData,
     AttachSources,
+    ConfirmCoverage,
     CreateDraft,
     Declaration,
     RecordActual,
@@ -28,7 +29,7 @@ from invoice_referee.domain.commands import (
 from invoice_referee.domain.common import EvidenceRef
 from invoice_referee.domain.documents import DocumentAnalysis, DocumentLine, FieldCandidate
 from invoice_referee.domain.evidence import ReadResult
-from invoice_referee.domain.finance import RecordMoneyInput
+from invoice_referee.domain.finance import COVERAGE_REQUIRED_FLOW_KINDS, RecordMoneyInput
 from invoice_referee.workflow.db import Database
 from invoice_referee.workflow.service import CaseWorkflow
 
@@ -163,6 +164,34 @@ async def _record(wf: CaseWorkflow, root: str, *, method: str, status: str) -> N
     )
 
 
+async def _confirm_history_coverage(wf: CaseWorkflow, root: str) -> None:
+    row = wf._query_one("SELECT version FROM cases WHERE id = ?", (root,))
+    source = wf._query_one("SELECT source_id, digest FROM case_sources WHERE root_id = ?", (root,))
+    session = wf.start_session(tenant=TENANT, persona="accountant", actor_id=ACCOUNTANT)
+    await wf.execute(
+        CommandContext(
+            session_id=session.session_id,
+            actor_id=ACCOUNTANT,
+            command_id=f"cmd:coverage:{root}",
+            expected_case_version=int(row["version"]),
+        ),
+        ConfirmCoverage(
+            root_id=root,
+            start=datetime(2026, 10, 1, tzinfo=timezone(timedelta(hours=7))),
+            funds=("Tài khoản ngân hàng công ty",),
+            flow_kinds=COVERAGE_REQUIRED_FLOW_KINDS,
+            opening_balance=0,
+            witness_refs=(EvidenceRef(
+                source_id=source["source_id"],
+                source_sha256=source["digest"],
+                page=1,
+                exact_quote="Sổ giao dịch đối chiếu đầy đủ",
+            ),),
+            reason="Đã đối chiếu toàn bộ lịch sử tiền của đúng hoạt động.",
+        ),
+    )
+
+
 async def test_tc01_without_advance_record_is_unknown_and_asks_accountant(tmp_path: Path) -> None:
     wf, root = await _seed(tmp_path, advance=0)
     state = _money(wf, root)
@@ -176,6 +205,7 @@ async def test_tc01_without_advance_record_is_unknown_and_asks_accountant(tmp_pa
 async def test_tc01_recording_the_advance_then_collects(tmp_path: Path) -> None:
     wf, root = await _seed(tmp_path, advance=0)
     await _record(wf, root, method="TRANSFER", status="COMPLETED")
+    await _confirm_history_coverage(wf, root)
     done = _money(wf, root)
     assert done["instructions"] == [("COLLECT", 760_000)]
     assert done["A"].value == 4_000_000

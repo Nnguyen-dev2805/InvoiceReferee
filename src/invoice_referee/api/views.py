@@ -117,6 +117,11 @@ class MoneyInput(ApiModel):
         None
     )
     instrument_reference: str | None = None
+    advance_draft_id: str | None = None
+    instruction_id: str | None = None
+    money_movement_draft_id: str | None = None
+    activity_link_confirmed: bool = False
+    activity_link_reason: str | None = None
     # Source refs from the read voucher (page/quote locators). The server
     # verifies them; a foreign digest is rejected before any write (14/10/2026).
     refs: list[EvidenceRef] = Field(default_factory=list)
@@ -124,6 +129,22 @@ class MoneyInput(ApiModel):
 
 class RecordActualRequest(ApiModel):
     money: MoneyInput
+
+
+class EmployeeReturnDraftRequest(ApiModel):
+    source_id: str
+    instruction_id: str
+    instrument_method: Literal["TRANSFER", "CASH"] = "TRANSFER"
+
+
+class ConfirmCoverageRequest(ApiModel):
+    start: UtcDatetime
+    funds: list[str]
+    flow_kinds: list[str]
+    opening_balance: int
+    unallocated_event_ids: list[str] = Field(default_factory=list)
+    witness_refs: list[EvidenceRef] = Field(default_factory=list)
+    reason: str = Field(min_length=12)
 
 
 class ControlRequest(ApiModel):

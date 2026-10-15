@@ -84,12 +84,11 @@ advance và coverage. Đáp án AUTO không được chứng minh từ hồ sơ 
 
 ### E3 — Context và gold chưa khớp rulebook
 
-- Tất cả organization.json trong development đặt B8m.
-- dev-cost-authority: T=E12m > B8m và E>8m; không phải chỉ một AUTHORITY cô lập.
-- dev-over-budget: T=E10m, A0 theo coverage; còn vượt quyền E8m và yêu cầu S4m.
-  FACT/POLICY/AUTHORITY có thể đồng thời tồn tại; một route đơn không chấm đủ issue set.
-- dev-supplementary: T10m > B8m nhưng allowed=AUTO/PAY4m; cần B>=10m hoặc ngoại lệ
-  hợp lệ có căn cứ để đáp án routine này đúng.
+- Một số organization.json cũ có B8m; đây là metadata legacy, không còn là gate.
+- dev-cost-authority: T=E12m; AUTHORITY do E>8m, độc lập với B.
+- dev-over-budget cũ chỉ dùng T>B để tạo POLICY; chuyển sang future scope, không
+  tính vào denominator hiện tại và không đổi gold của case.
+- dev-supplementary: T10m, allowed=AUTO/PAY4m; giữ oracle tiền sau khi bỏ điều kiện B.
 - organization ghi opening0/coverage đủ ngay cả trong các case cố ý thiếu history;
   transcription lại bỏ coverage. Cần xác định record đó thật sự chứng minh scope/
   thời hạn/loại tiền nào, tránh hai tầng đầu vào phát biểu mâu thuẫn.
@@ -171,30 +170,35 @@ viết lại trước khi đánh dấu DATA_READY. Đây là48 kiểm tra hành 
 roots độc lập. Những mục tiền/control/UX dùng lại hoặc biến đổi hồ sơ D01–D15;
 không cộng chúng vào mẫu benchmark như các hồ sơ mới.
 
+Scope amendment 15/10/2026: D06 là B-only và được giữ ngoài suite hiện tại; source
+và gold cũ không bị đổi. Current authored list có14 case và chưa đạt floor >=15;
+thêm một case in-scope trước khi claim development DATA_READY.
+
 Đơn vị tiền trong bảng: triệu VND. P/R ban đầu=0 chỉ khi coverage đã xác minh.
-Mỗi hồ sơ tạo activity/root riêng trừ case trùng cố ý. Để test quyền/ngân sách
-cô lập, cung cấp đủ những căn cứ không phải lỗi đích. Context ngoài UI phải được
+Mỗi hồ sơ tạo activity/root riêng trừ case trùng cố ý. Để test policy/quyền
+cô lập, cung cấp đủ những căn cứ không phải lỗi đích. B legacy không là gate.
+Context ngoài UI phải được
 seed/import có audit, không giả quyền bằng chọn persona.
 
 ### 6.1. 15 tình huống development cần có nguồn thật
 
 | Chạy | ID / map thư mục | Đầu vào cần thể hiện bằng nguồn/context | Kết quả và điểm phải xem trên UI |
 | --- | --- | --- | --- |
-| [ ] | D01 dev-clean-chi | T8, employee paid5, company direct3, A2, B8, coverage đủ | E5/C3/S3; một yêu cầu chi3; company-direct không hoàn cho nhân viên; chưa ghi P |
-| [ ] | D02 dev-clean-thu | T=E1.5, A2, B8, coverage đủ | Một yêu cầu thu0.5; không hiển thị chiều chi |
+| [ ] | D01 dev-clean-chi | T8, employee paid5, company direct3, A2, coverage đủ | E5/C3/S3; một yêu cầu chi3; company-direct không hoàn cho nhân viên; chưa ghi P |
+| [ ] | D02 dev-clean-thu | T=E1.5, A2, coverage đủ | Một yêu cầu thu0.5; không hiển thị chiều chi |
 | [ ] | D03 dev-balanced | T=E2, A2, coverage đủ, không pending/execution/issue | BALANCED/SETTLED; không lệnh số0; có căn cứ cho0 |
 | [ ] | D04 dev-payer-unknown | T5, chưa biết payer; A/P/R được xác lập riêng | FACT đúng owner, E/S chưa khẳng định. Sau chứng minh employee paid5 và A0, chuyển AUTHORITY cho S5; không coi một fact answer là đã đủ mọi gate |
 | [ ] | D05 dev-relation-conflict | Hai nguồn cho hai activity/beneficiary khác nhau, cùng khoản3; nguồn không tự chọn một | FACT binding đúng owner, giữ hai refs; bổ sung xác nhận binding rồi recheck phần phụ thuộc |
-| [ ] | D06 dev-over-budget | T10, E5, C3, unpaid2, A2, B8 | POLICY vì incurred T10>B8 dù mới trả8; không che vượt B bằng unpaid; quyết định ngoại lệ có quyền/scope mới tiếp tục |
-| [ ] | D07 dev-cost-authority | T=E9, A6, B12 => S3 | AUTHORITY RECOGNIZE_COST vì E9>8 dù S3<=4; đúng cấp quyết định/không tự chia nhỏ |
-| [ ] | D08 dev-action-authority | T=E8, A2, B8 => S6 | AUTHORITY ISSUE_PAYMENT vì6>4; không chia thành hai yêu cầu3 |
+| FUTURE | D06 dev-over-budget | T10, E5, C3, unpaid2, A2, B8 | B-only POLICY; source/gold giữ nguyên, loại khỏi denominator hiện tại |
+| [ ] | D07 dev-cost-authority | T=E9, A6 => S3 | AUTHORITY RECOGNIZE_COST vì E9>8 dù S3<=4; đúng cấp quyết định/không tự chia nhỏ |
+| [ ] | D08 dev-action-authority | T=E8, A2 => S6 | AUTHORITY ISSUE_PAYMENT vì6>4; không chia thành hai yêu cầu3 |
 | [ ] | D09 dev-missing-history | E3 có proof, lịch sử trước kỳ/coverage A/P/R thiếu | FACT kế toán; A/S không suy0; record coverage hợp lệ mới tính tiếp |
 | [ ] | D10 dev-duplicate | Cùng invoice identity/paid portion: scan và PDF ở cùng root; sau đó cùng invoice ở root khác | Same root tính một lần; khác root không phát hành hai lần, nêu canonical owner/FACT binding. ID/hash file khác không tạo khoản mới |
 | [ ] | D11 dev-personal | Khoản cá nhân0.5 được chứng minh; A=P=R0 có coverage | EXCLUDED có amount/rule/reason/refs; E0/S0. Không dùng riêng BALANCED để chứng minh loại chi. Biến thể A2 => vẫn thu2 |
 | [ ] | D12 dev-material-unsupported | Nguồn có khoản FX/refund vendor ảnh hưởng tiền, chưa có quy tắc trong scope | UNSUPPORTED/processing problem có ảnh hưởng/next action; không tự đổi sangVND hoặc kết luận tiền cuối |
 | [ ] | D13 dev-pending-bank | Biên nhận ghi đang xử lý, chưa confirmed received; history thể hiện event chưa rõ | Không xác nhận thực nhận chỉ vì có file; pending/unknown chặn action phụ thuộc/hoàn tất |
 | [ ] | D14 dev-mixed-pdf | PDF>=3 trang: invoice3, payment employee3, advance2; history/context đủ | Role theo page/unit; refs đúng trang, T/E3/A2/S1; một chi1. Không conflict chỉ vì invoice và payment khác role |
-| [ ] | D15 dev-supplementary | Cùng invoice incurred10; đợt1 E5/C3/unpaid2/A3, B12 => I2 NOT_STARTED. Đợt2 employee paid thêm2 có portion key riêng | T vẫn10, E7/C3/unpaid0/S4; supersede remainder2, một I4 actionable; giữ lịch sử, không tính invoice hai lần |
+| [ ] | D15 dev-supplementary | Cùng invoice incurred10; đợt1 E5/C3/unpaid2/A3, I2 NOT_STARTED. Đợt2 employee paid thêm2 có portion key riêng | T vẫn10, E7/C3/unpaid0/S4; supersede remainder2, một I4 actionable; giữ lịch sử, không tính invoice hai lần |
 
 **Cách chạy D01–D15:** chọn Nhân viên và hoạt động đúng context; đính kèm nguồn
 → kiểm preview/page/ref/unknown → xác nhận nộp → xem kết luận/câu hỏi → chuyển
@@ -275,9 +279,10 @@ DATA_BLOCKED về đầu vào, không quy hết failure cho model.
 2. Sửa generator để từng PDF thực sự chứa dữ kiện của case; tạo các source
    invoice/payment/advance/history đúng vai trò. Company context có căn cứ được
    cấp sẵn, không thêm gánh nặng nhập/upload không cần cho nhân viên.
-3. Hiện thực đủ15 development roots bằng raw sources độc lập; scenario âm cố ý
+3. Hiện thực đủ15 in-scope development roots bằng raw sources độc lập; D06 B-only
+   không tính và cần một case thay thế. Scenario âm cố ý
    chỉ thiếu/mâu thuẫn dữ kiện mục tiêu và có gold đủ tầng/issue set.
-4. Chạy thử D01/D02/D03/D04/D06/D07 qua pipeline đã sửa; phân biệt data defect,
+4. Chạy thử D01/D02/D03/D04/D07 qua pipeline đã sửa; phân biệt data defect,
    read/extraction defect, workflow defect và scoring defect.
 5. Sau development ổn định mới làm calibration/validation/holdout thay thế hợp
    lệ. Không dùng54 nguồn giống nhau để claim khả năng tổng quát.

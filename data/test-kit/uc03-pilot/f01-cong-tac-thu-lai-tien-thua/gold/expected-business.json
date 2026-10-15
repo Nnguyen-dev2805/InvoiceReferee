@@ -8,7 +8,7 @@
   "admission_gate": "NOT_IMPLEMENTED",
   "preconditions": [
     "Current input digests/profile/source refs valid",
-    "Authorized activity and B=8000000/grants valid",
+    "Authorized activity and action grants valid",
     "A valid invoice bound to the right employee/dossier is the employee-paid basis (demo policy; no separate payer confirmation)",
     "Scoped completed advance+coverage including opening balances valid",
     "No duplicate obligation or open/unknown execution"

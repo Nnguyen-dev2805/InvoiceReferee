@@ -58,9 +58,11 @@ class FakeLlm:
     def __init__(self, payload: dict) -> None:
         self.payload = payload
         self.calls = 0
+        self.last_system = ""
 
     async def complete_json(self, *, system: str, user: str, budget: RunBudget) -> dict:
         self.calls += 1
+        self.last_system = system
         return self.payload
 
 
@@ -252,7 +254,13 @@ async def test_extraction_prompt_names_the_profile_field_vocabulary() -> None:
     await extract_document(
         _settlement_ocr(), _classification("SETTLEMENT_FORM"), llm=RecLlm(), budget=RunBudget()
     )
-    for field in ("declared_name", "trip_destination", "printed_total", "declared_advance"):
+    for field in (
+        "declared_name",
+        "trip_destination",
+        "printed_total",
+        "declared_advance",
+        "document_date",
+    ):
         assert field in captured["system"]
 
 
@@ -290,6 +298,109 @@ def test_iso_date_value_supported_by_vietnamese_quote() -> None:
     assert _value_supported("2026-10-10", "Ngày 10 tháng 10 năm 2026")
     # A different date is not supported.
     assert not _value_supported("2026-10-11", "Ngày 10 tháng 10 năm 2026")
+
+
+async def test_vietnamese_date_is_normalized_without_changing_its_quote() -> None:
+    quote = "Thành phố Hồ Chí Minh, ngày 11 tháng 10 năm 2026"
+    llm = FakeLlm({"fields": [{"field": "document_date", "state": "FOUND",
+                              "value": "11 tháng 10 năm 2026", "quote": quote, "page": 1}],
+                   "line_items": []})
+    result = await extract_document(_ocr(quote), _classification(), llm=llm, budget=RunBudget())
+    field = next(field for field in result.fields if field.field == "document_date")
+    assert field.state == "FOUND"
+    assert field.value == "2026-10-11"
+    assert field.refs[0].exact_quote == quote
+    assert llm.calls == 1
+
+
+async def test_normalized_trip_dates_cannot_swap_range_endpoints() -> None:
+    quote = "Thời gian công tác: từ 06/10/2026 đến 10/10/2026"
+    llm = FakeLlm({"fields": [
+        {"field": "trip_start", "state": "FOUND", "value": "2026-10-10", "quote": quote, "page": 1},
+        {"field": "trip_end", "state": "FOUND", "value": "2026-10-06", "quote": quote, "page": 1},
+    ], "line_items": []})
+    result = await extract_document(_ocr(quote), _classification("SETTLEMENT_FORM"), llm=llm, budget=RunBudget())
+    assert all(field.state == "UNREADABLE" for field in result.fields)
+
+
+async def test_multiline_company_name_is_supported_with_original_quote_preserved() -> None:
+    company = "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH"
+    quote = "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ\nAN THỊNH"
+    ocr = _ocr(f"THÔNG TIN BÊN CHUYỂN\nBên chuyển\n{quote}\nTài khoản chuyển")
+    llm = FakeLlm({
+        "fields": [{"field": "payer_name", "state": "FOUND", "value": company,
+                    "quote": quote, "page": 1}],
+        "lines": [],
+    })
+
+    analysis = await extract_document(
+        ocr, _classification("PAYMENT_PROOF"), llm=llm, budget=RunBudget()
+    )
+    payer = next(field for field in analysis.fields if field.field == "payer_name")
+
+    assert payer.state == "FOUND"
+    assert payer.value == company
+    assert payer.refs[0].exact_quote == quote
+    assert "preserve the exact line breaks in quote" in llm.last_system
+
+
+@pytest.mark.parametrize("document_type", ["COLLECTION_RECEIPT", "PAYMENT_PROOF"])
+async def test_transfer_receipt_extracts_both_parties_for_either_document_type(
+    document_type: str,
+) -> None:
+    payer = "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH"
+    payee = "NGUYỄN MINH AN"
+    payer_quote = "Bên chuyển\nCÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ\nAN THỊNH"
+    payee_quote = "Bên nhận\nNGUYỄN MINH AN"
+    ocr = _ocr(f"{payer_quote}\n{payee_quote}")
+    llm = FakeLlm(
+        {
+            "fields": [
+                {"field": "payer_name", "state": "FOUND", "value": payer,
+                 "quote": payer_quote, "page": 1},
+                {"field": "payee_name", "state": "FOUND", "value": payee,
+                 "quote": payee_quote, "page": 1},
+            ],
+            "lines": [],
+        }
+    )
+
+    analysis = await extract_document(
+        ocr, _classification(document_type), llm=llm, budget=RunBudget()
+    )
+    by_field = {field.field: field for field in analysis.fields}
+
+    assert "payer_name" in llm.last_system
+    assert "payee_name" in llm.last_system
+    assert by_field["payer_name"].state == "FOUND"
+    assert by_field["payer_name"].value == payer
+    assert by_field["payer_name"].refs[0].exact_quote == payer_quote
+    assert by_field["payee_name"].state == "FOUND"
+    assert by_field["payee_name"].value == payee
+    assert by_field["payee_name"].refs[0].exact_quote == payee_quote
+
+
+async def test_multiline_company_name_does_not_accept_truncated_quote_or_wrong_value() -> None:
+    company = "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH"
+    first_line = "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ"
+    quote = f"{first_line}\nAN THỊNH"
+    ocr = _ocr(f"THÔNG TIN BÊN CHUYỂN\nBên chuyển\n{quote}\nTài khoản chuyển")
+
+    for value, field_quote in (
+        (company, first_line),
+        ("CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ MINH PHÁT", quote),
+    ):
+        llm = FakeLlm({
+            "fields": [{"field": "payer_name", "state": "FOUND", "value": value,
+                        "quote": field_quote, "page": 1}],
+            "lines": [],
+        })
+        analysis = await extract_document(
+            ocr, _classification("PAYMENT_PROOF"), llm=llm, budget=RunBudget()
+        )
+        payer = next(field for field in analysis.fields if field.field == "payer_name")
+        assert payer.state == "UNREADABLE"
+        assert payer.refs == ()
 
 
 # --- Bug A: SETTLEMENT_FORM field-name aliases (real provider output) --------

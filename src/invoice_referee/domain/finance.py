@@ -32,8 +32,24 @@ MoneyKind = Literal[
     "REVERSAL",
     "OBSERVED_UNALLOCATED",
 ]
+COVERAGE_REQUIRED_FLOW_KINDS: tuple[MoneyKind, ...] = (
+    "ADVANCE_RECEIVED",
+    "REIMBURSEMENT_RECEIVED",
+    "EMPLOYEE_RETURN",
+    "REVERSAL",
+    "OBSERVED_UNALLOCATED",
+)
 VerificationState = Literal["OBSERVED", "CONFIRMED", "REJECTED"]
 AllocationState = Literal["UNALLOCATED", "ALLOCATED", "UNKNOWN"]
+
+ActivityLinkSignalField = Literal[
+    "employee", "company", "purpose", "advance_amount", "time",
+    "reference", "transaction", "candidates",
+]
+ActivityLinkSignalState = Literal[
+    "MATCHED", "MISSING", "MISMATCH", "CONFLICT", "AMBIGUOUS",
+    "UNMAPPED", "NOT_CHECKED",
+]
 
 # How an employee-paid portion is established (ADR0007 + 14/10/2026 chốt). In
 # the demo policy a valid invoice bound to the right employee and dossier is
@@ -131,6 +147,14 @@ class RecordMoneyInput(StrictModel):
     instrument_method: Literal["TRANSFER", "CASH"] | None = None
     instrument_status: Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"] | None = None
     instrument_reference: str | None = None
+    # Source-bound workflow metadata for an accountant-reviewed advance voucher.
+    advance_draft_id: Id | None = None
+    activity_link_confirmed: bool = False
+    activity_link_reason: str | None = None
+    # A newly recorded payout/return must point at the issued instruction it
+    # fulfills. Optional for historical/imported callers and non-P/R movements.
+    instruction_id: Id | None = None
+    money_movement_draft_id: Id | None = None
 
 
 class MoneyEvent(StrictModel):
@@ -154,6 +178,97 @@ class MoneyEvent(StrictModel):
     instrument_method: Literal["TRANSFER", "CASH"] | None = None
     instrument_status: Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"] | None = None
     instrument_reference: str | None = None
+    recorded_by: Id | None = None
+    record_reason: str | None = None
+    advance_draft_id: Id | None = None
+    # New PAY/COLLECT receipts are bound to the exact issued instruction. Old
+    # ledger events remain readable with None and keep their historical meaning.
+    instruction_id: Id | None = None
+    money_movement_draft_id: Id | None = None
+
+
+class ActivityLinkSignal(StrictModel):
+    """A field-level, source-bound explanation for one advance/work link."""
+
+    field: ActivityLinkSignalField
+    state: ActivityLinkSignalState
+    summary: str
+    refs: tuple[EvidenceRef, ...] = ()
+
+
+MoneyMovementSignalField = Literal[
+    "instruction", "payer", "payee", "amount", "event_at", "transaction", "source_status"
+]
+MoneyMovementSignalState = Literal[
+    "MATCHED", "MISSING", "MISMATCH", "CONFLICT", "AMBIGUOUS", "OVERPAY",
+    "NOT_COMPLETED", "STALE",
+]
+
+
+class MoneyMovementSignal(StrictModel):
+    """A source-bound comparison between one receipt and its issued instruction."""
+
+    field: MoneyMovementSignalField
+    state: MoneyMovementSignalState
+    summary: str
+    refs: tuple[EvidenceRef, ...] = ()
+
+
+class EmployeeReturnDraft(StrictModel):
+    """An employee's uploaded return proof, pending accountant confirmation."""
+
+    draft_id: Id
+    root_id: Id
+    employee: Id
+    activity: Id
+    instruction_id: Id
+    source_id: Id
+    source_sha256: str
+    source_filename: str
+    status: Literal["WAITING_ACCOUNTANT", "CONFIRMED"] = "WAITING_ACCOUNTANT"
+    match_status: Literal[
+        "MATCHED", "OVERPAY", "NEEDS_REVIEW", "CONFLICT", "NOT_COMPLETED",
+        "STALE", "ALREADY_RECORDED",
+    ]
+    amount: Vnd | None = None
+    payer_name: str | None = None
+    payee_name: str | None = None
+    transaction_reference: str | None = None
+    external_key: str | None = None
+    instrument_method: Literal["TRANSFER", "CASH"] | None = None
+    instrument_status: Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"] = "UNKNOWN"
+    event_at: UtcDatetime | None = None
+    instruction_amount: Vnd
+    instruction_remaining: Vnd
+    refs: tuple[EvidenceRef, ...] = ()
+    missing_fields: tuple[str, ...] = ()
+    signals: tuple[MoneyMovementSignal, ...] = ()
+    uploaded_at: UtcDatetime
+    confirmed_at: UtcDatetime | None = None
+    confirmed_by: Id | None = None
+    money_event_id: Id | None = None
+
+
+class ActivityAcceptance(StrictModel):
+    """A work-acceptance fact grounded in one verified company advance voucher.
+
+    This records that the company accepted the scoped work through that voucher;
+    it is not activity authorization, a grant, or a financial decision.
+    """
+
+    root_id: Id
+    employee: Id
+    activity: Id
+    advance_external_key: str
+    advance_draft_id: Id
+    actor: Id
+    accepted_at: UtcDatetime
+    link_basis: Literal[
+        "DOCUMENT_REFERENCE", "ACCOUNTANT_CONFIRMATION", "MULTI_FIELD_MATCH", "TRANSACTION_IDENTITY"
+    ]
+    reason: str
+    refs: tuple[EvidenceRef, ...]
+    link_signals: tuple[ActivityLinkSignal, ...] = ()
 
 
 class CoverageRecord(StrictModel):
@@ -171,6 +286,14 @@ class CoverageRecord(StrictModel):
     opening_balance: Fact[Vnd] | None = None
     ledger_version: str | None = None
     witness_refs: tuple[EvidenceRef, ...] = ()
+    # Metadata exists for an accountable, case-specific confirmation. Imported
+    # compatibility coverage keeps source="CONTEXT" and the defaults below.
+    source: Literal["CONTEXT", "ACCOUNTANT_CONFIRMATION"] = "CONTEXT"
+    employee: Id | None = None
+    actor: Id | None = None
+    recorded_at: UtcDatetime | None = None
+    reason: str | None = None
+    unallocated_event_ids: tuple[Id, ...] = ()
 
 
 class Projection(StrictModel):

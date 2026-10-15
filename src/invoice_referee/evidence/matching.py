@@ -49,6 +49,26 @@ def _normalize_identifier(value: str | None) -> str:
     return re.sub(r"[^A-Z0-9]", "", (value or "").upper())
 
 
+def _invoice_ref_matches_number(reference: str, document_number: str) -> bool:
+    """Match a full invoice number to its standalone serial reference.
+
+    A shorter suffix is accepted only when it starts after a non-digit (for
+    example ``IR26E00000101`` vs ``00000101``). This avoids treating a tail
+    such as ``001`` as the same identifier as the larger numeric value ``2001``.
+    """
+    ref = _normalize_identifier(reference)
+    number = _normalize_identifier(document_number)
+    if not ref or not number:
+        return False
+    if ref == number:
+        return True
+    shorter, longer = (ref, number) if len(ref) < len(number) else (number, ref)
+    if not longer.endswith(shorter):
+        return False
+    preceding = longer[len(longer) - len(shorter) - 1]
+    return not preceding.isdigit()
+
+
 def _normalize_text(value: str | None) -> str:
     text = unicodedata.normalize("NFD", value or "")
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
@@ -150,13 +170,37 @@ def match_paper_evidence(
             _normalize_identifier(r) for r in (refs_value or ()) if _normalize_identifier(r)
         }
 
+        # A numeric serial is an exact identifier only if it resolves to one
+        # document in this candidate set. Duplicate serials stay suggestions.
+        ref_candidates: dict[str, list[str]] = {}
+        for ref in normalized_refs:
+            ref_candidates[ref] = [
+                document.document_id
+                for document in matchable
+                if (number := document_field(document, "document_number")) is not None
+                and _invoice_ref_matches_number(ref, str(number))
+            ]
+        unique_exact_documents = {
+            candidate_ids[0]
+            for candidate_ids in ref_candidates.values()
+            if len(candidate_ids) == 1
+        }
+        ambiguous_exact_documents = {
+            document_id
+            for candidate_ids in ref_candidates.values()
+            if len(candidate_ids) > 1
+            for document_id in candidate_ids
+        }
+
         row_links: list[EvidenceLink] = []
         for document in matchable:
             number = document_field(document, "document_number")
             total = _as_decimal(document_field(document, "total_amount"))
             issuer = document_field(document, "issuer_name")
-            invoice_number = _normalize_identifier(str(number) if number is not None else None)
-            invoice_exact = bool(invoice_number and invoice_number in normalized_refs)
+            invoice_exact = (
+                document.document_id in unique_exact_documents
+                and document.document_id not in ambiguous_exact_documents
+            )
             amount_exact = bool(
                 amount is not None and total is not None and abs(amount - total) <= Decimal("1")
             )
@@ -187,10 +231,14 @@ def match_paper_evidence(
                 if party >= 0.50:
                     signals.append("đơn vị phát hành")
                 explanation = "Khớp " + " và ".join(signals) if signals else "Không đủ dữ kiện để ghép."
+                if document.document_id in ambiguous_exact_documents:
+                    explanation += " Số hóa đơn trùng với nhiều chứng từ; cần chọn đúng hóa đơn."
 
             if score < Decimal("0.50"):
                 continue
             status = "AUTO_LINK" if score >= Decimal("0.75") else "SUGGEST_LINK"
+            if document.document_id in ambiguous_exact_documents:
+                status = "SUGGEST_LINK"
             allocated_amount = total if status == "AUTO_LINK" else None
             if status == "AUTO_LINK":
                 # An explicit-ref match consumes the row's stated amount; any

@@ -13,6 +13,7 @@ và không có kết quả runtime đã chạy. Nội dung synthetic, thuộc ti
 Đặc tả policy/form:
 [general-expense-policy-and-form](../../../docs/superpowers/specs/2026-10-14-general-expense-policy-and-form.md).
 
-Script authoring của lượt này ở `.runtime/uc03-expansion-prototype/render.py`;
-việc tích hợp renderer vào generator portable hiện có thuộc task triển khai sau,
-không sửa `scripts/sinh_uc03_pilot.py` khi agent khác đang sở hữu file đó.
+PDF minh họa cũ mang tên Nguyễn An đã được xóa ngày 15/10/2026. Không dùng
+prototype đó làm input kiểm thử. Chứng từ ứng TC01 hiện dùng bộ sinh portable
+và hướng dẫn tại [demo TC01](../../demo/README.md); đây không phải một packet
+mới cho mẫu quyết toán chung.

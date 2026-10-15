@@ -21,6 +21,7 @@ from invoice_referee.domain.commands import (
     AnswerIssue,
     AttachSources,
     CommandResult,
+    ConfirmCoverage,
     Control,
     CreateDraft,
     Decide,
@@ -489,8 +490,21 @@ async def record_actual(
 ) -> CommandResult:
     session = _require_session(request)
     workflow = _workflow(request)
-    context = _command_context(request, session, require_version=False)
     money = payload.money
+    if money.claimed_kind in ("REIMBURSEMENT_RECEIVED", "EMPLOYEE_RETURN"):
+        if session.persona != "accountant":
+            raise HTTPException(status_code=403, detail="Chỉ kế toán được xác nhận giao dịch theo lệnh chi/thu.")
+        if money.claimed_kind == "EMPLOYEE_RETURN" and not money.money_movement_draft_id:
+            raise HTTPException(status_code=422, detail="Cần xác nhận từ chứng từ hoàn trả đã lưu.")
+    if money.claimed_kind == "ADVANCE_RECEIVED":
+        if session.persona != "accountant":
+            raise HTTPException(status_code=403, detail="Chỉ kế toán được xác nhận chứng từ ứng.")
+        if not money.advance_draft_id:
+            raise HTTPException(
+                status_code=422,
+                detail="Cần xác nhận từ bản nháp chứng từ đã lưu trong hồ sơ.",
+            )
+    context = _command_context(request, session, require_version=True)
     return await workflow.execute(
         context,
         RecordActual(
@@ -509,10 +523,49 @@ async def record_actual(
                 instrument_method=money.instrument_method,
                 instrument_status=money.instrument_status,
                 instrument_reference=money.instrument_reference,
+                advance_draft_id=money.advance_draft_id,
+                instruction_id=money.instruction_id,
+                money_movement_draft_id=money.money_movement_draft_id,
+                activity_link_confirmed=money.activity_link_confirmed,
+                activity_link_reason=money.activity_link_reason,
                 refs=tuple(money.refs),
             ),
         ),
     )
+
+
+@router.post("/cases/{root_id}/coverage")
+async def confirm_coverage(
+    request: Request, root_id: str, payload: views.ConfirmCoverageRequest
+) -> CommandResult:
+    session = _require_session(request)
+    if session.persona != "accountant":
+        raise HTTPException(
+            status_code=403,
+            detail="Chỉ kế toán được xác nhận đã đối chiếu lịch sử tiền.",
+        )
+    context = _command_context(request, session, require_version=True)
+    return await _workflow(request).execute(
+        context,
+        ConfirmCoverage(
+            root_id=root_id,
+            start=payload.start,
+            funds=tuple(payload.funds),
+            flow_kinds=tuple(payload.flow_kinds),
+            opening_balance=payload.opening_balance,
+            unallocated_event_ids=tuple(payload.unallocated_event_ids),
+            witness_refs=tuple(payload.witness_refs),
+            reason=payload.reason,
+        ),
+    )
+
+
+@router.get("/cases/{root_id}/advance/draft")
+async def get_advance_draft(request: Request, root_id: str, draft_id: str | None = None):
+    session = _require_session(request)
+    if session.persona != "accountant":
+        raise HTTPException(status_code=403, detail="Chỉ kế toán được mở bản nháp chứng từ ứng.")
+    return _workflow(request).get_advance_draft(session, root_id, draft_id)
 
 
 @router.post("/cases/{root_id}/advance/draft")
@@ -522,14 +575,16 @@ async def advance_draft(
     files: list[UploadFile] = File(...),
     method: str | None = None,
 ) -> dict[str, object]:
-    """Read an uploaded advance document and return a prefilled DRAFT (plan D).
+    """Persist the voucher on this root, then return its source-bound draft.
 
-    This is a READ: it never records money. The accountant reviews/edits the
-    draft and then records it through the existing actuals endpoint. Provider
-    I/O runs outside any transaction.
+    Uploading/reading never records money. The accountant reviews and confirms
+    through the actuals endpoint. File persistence and source attachment finish
+    before provider I/O; a failed read still leaves the uploaded source retrievable.
     """
     session = _require_session(request)
     workflow = _workflow(request)
+    if session.persona != "accountant":
+        raise HTTPException(status_code=403, detail="Chỉ kế toán được bổ sung chứng từ ứng.")
     if not files:
         raise HTTPException(status_code=400, detail="Chưa chọn chứng từ ứng.")
     uploads: list[tuple[str, str, bytes]] = []
@@ -541,10 +596,83 @@ async def advance_draft(
         if len(data) > workflow.max_source_bytes:
             raise HTTPException(status_code=413, detail="Tệp vượt giới hạn dung lượng.")
         uploads.append((upload.filename or "tep", media, data))
+
+    attach_uploads: list[SourceUpload] = []
+    written: list[str] = []
+    for filename, media, data in uploads:
+        digest = hashlib.sha256(data).hexdigest()
+        connection = workflow.db.connect()
+        try:
+            stored = connection.execute(
+                "SELECT 1 FROM case_sources WHERE tenant = ? AND root_id = ? "
+                "AND digest = ? LIMIT 1",
+                (session.tenant, root_id, digest),
+            ).fetchone()
+        finally:
+            connection.close()
+        if stored is not None:
+            continue
+        source_id = f"source:{uuid.uuid4().hex}"
+        storage_key = f"{session.tenant}/{root_id}/{source_id}"
+        destination = workflow.uploads_dir / storage_key
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(data)
+        written.append(storage_key)
+        attach_uploads.append(
+            SourceUpload(
+                filename=filename,
+                media=media,
+                digest=digest,
+                storage_key=storage_key,
+            )
+        )
+
+    case_view = None
+    if attach_uploads:
+        command_context = _command_context(request, session, require_version=True)
+        command_context = command_context.model_copy(
+            update={"command_id": f"{command_context.command_id}:advance-source"}
+        )
+        try:
+            attached = await workflow.execute(
+                command_context,
+                AttachSources(root_id=root_id, uploads=tuple(attach_uploads)),
+            )
+            case_view = attached.case_view
+        except Exception:
+            for storage_key in written:
+                (workflow.uploads_dir / storage_key).unlink(missing_ok=True)
+            _prune_empty_upload_dirs(workflow.uploads_dir, session.tenant, root_id)
+            raise
+
     draft = await workflow.read_advance_draft(
         session, root_id, tuple(uploads), method_hint=method
     )
-    return draft._asdict()
+    if case_view is None:
+        case_view = workflow.view(_read_context(session), root_id)
+    return {
+        "draft": draft._asdict(),
+        "case_view": case_view.model_dump(mode="json"),
+    }
+
+
+@router.post("/cases/{root_id}/return-draft")
+async def employee_return_draft(
+    request: Request, root_id: str, payload: views.EmployeeReturnDraftRequest
+) -> dict[str, object]:
+    """Read an employee's return proof; money awaits accountant confirmation."""
+    session = _require_session(request)
+    if session.persona != "employee":
+        raise HTTPException(status_code=403, detail="Chỉ nhân viên của hồ sơ được tải chứng từ hoàn trả.")
+    context = _command_context(request, session, require_version=True)
+    return await _workflow(request).read_employee_return_draft(
+        session,
+        root_id,
+        payload.source_id,
+        payload.instruction_id,
+        method_hint=payload.instrument_method,
+        expected_case_version=context.expected_case_version,
+    )
 
 
 @router.get("/cases/{root_id}/settlement/draft")

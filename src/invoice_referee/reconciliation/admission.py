@@ -30,6 +30,8 @@ from invoice_referee.domain.common import EvidenceRef, Fact, parse_vnd
 from invoice_referee.domain.documents import DocumentAnalysis, DocumentLine
 from invoice_referee.domain.evidence import Confirmation, ReadResult
 from invoice_referee.domain.finance import (
+    ActivityAcceptance,
+    COVERAGE_REQUIRED_FLOW_KINDS,
     CoverageRecord,
     Expense,
     ExpensePayment,
@@ -268,7 +270,12 @@ def _match_expense_documents(
 
 
 def coverage_is_valid(
-    coverage: CoverageRecord | None, *, scope: CaseScope, as_of: datetime
+    coverage: CoverageRecord | None,
+    *,
+    scope: CaseScope,
+    as_of: datetime,
+    current_ledger_version: int | None = None,
+    has_uncovered_local_events: bool = False,
 ) -> bool:
     """Whether a coverage record is a VALID basis for a zero A/P/R (contracts §3).
 
@@ -283,13 +290,36 @@ def coverage_is_valid(
         return False
     if coverage.scope not in (scope.activity, scope.tenant):
         return False
-    if not (coverage.start <= as_of <= coverage.as_of):
+    if coverage.start > as_of:
+        return False
+    if coverage.source == "ACCOUNTANT_CONFIRMATION":
+        # A human confirmation remains usable for the same accounting date while
+        # its root ledger version is unchanged; the server never invents a future
+        # "as of" horizon. A new/backdated root event invalidates it by version.
+        if coverage.as_of > as_of or coverage.as_of.date() != as_of.date():
+            return False
+    elif as_of > coverage.as_of:
         return False
     if not coverage.funds or not coverage.flow_kinds:
         return False
     if coverage.opening_balance is None:
         return False
     if not coverage.witness_refs:
+        return False
+    if coverage.source == "ACCOUNTANT_CONFIRMATION":
+        if coverage.employee != scope.employee or coverage.actor is None:
+            return False
+        if coverage.recorded_at is None or not (coverage.reason or "").strip():
+            return False
+        if not set(COVERAGE_REQUIRED_FLOW_KINDS) <= set(coverage.flow_kinds):
+            return False
+        if coverage.unallocated_event_ids:
+            return False
+        if current_ledger_version is None or coverage.ledger_version != str(current_ledger_version):
+            return False
+    elif has_uncovered_local_events:
+        # A snapshot's complete company history predates a newly recorded root
+        # event. The old zero basis cannot cover that later or backdated movement.
         return False
     return True
 
@@ -533,6 +563,7 @@ def admit_evidence(
     coverage: CoverageRecord | None,
     read_set: ReadSet,
     as_of,
+    activity_acceptances: tuple[ActivityAcceptance, ...] = (),
 ) -> AssessmentInput:
     """Map a typed evidence report into an immutable AssessmentInput (pure)."""
     import hashlib
@@ -558,8 +589,9 @@ def admit_evidence(
             )
         )
 
-    # Context ledger/coverage/policy/budget come from the stored snapshot. The
-    # recorded actual-money events are MERGED with the context ledger (deduped by
+    # Context ledger/coverage/policy and legacy budget records come from the
+    # stored snapshot. B stays in the typed input for compatibility, not as a gate.
+    # Recorded actual-money events are MERGED with the context ledger (deduped by
     # external key), not substituted for it: dropping the context advance once a
     # receipt is recorded would miscompute S and the Q32 bound (plan A1/A3).
     ctx_ledger = context_ledger(organization, digest=org_digest)
@@ -571,8 +603,16 @@ def admit_evidence(
     # time and name scope/funds/kinds/opening/witnesses (contracts §3). An
     # invalid (stale/incomplete/wrong-scope) coverage is not a zero basis, so it
     # is dropped here (A/P/R stay UNKNOWN) and raised as a scoped FACT issue.
+    context_keys = {event.external_key for event in ctx_ledger}
+    has_uncovered_local_events = any(
+        event.external_key not in context_keys for event in ledger
+    )
     if candidate_coverage is not None and not coverage_is_valid(
-        candidate_coverage, scope=scope, as_of=as_of
+        candidate_coverage,
+        scope=scope,
+        as_of=as_of,
+        current_ledger_version=read_set.ledger_version,
+        has_uncovered_local_events=has_uncovered_local_events,
     ):
         issues.append(
             BusinessIssue(
@@ -588,6 +628,30 @@ def admit_evidence(
         effective_coverage: CoverageRecord | None = None
     else:
         effective_coverage = candidate_coverage
+
+    valid_activity_acceptances = tuple(
+        acceptance
+        for acceptance in activity_acceptances
+        if acceptance.employee == scope.employee
+        and acceptance.activity == scope.activity
+        and acceptance.reason.strip()
+        and acceptance.refs
+    )
+    activity_status = str((organization.activity or {}).get("status") or "")
+    if activity_status == "PROPOSED" and not valid_activity_acceptances:
+        issues.append(
+            BusinessIssue(
+                id="issue:fact:activity-acceptance",
+                kind="FACT",
+                field_or_rule="activity:acceptance",
+                owner="accountant",
+                basis="Hoạt động mới chưa có căn cứ đã được công ty chấp nhận theo chứng từ ứng.",
+                question=(
+                    "Kế toán: kiểm tra chứng từ ứng đã hoàn tất, xác nhận đúng nhân viên "
+                    "và công việc, hoặc bổ sung căn cứ liên kết còn thiếu."
+                ),
+            )
+        )
 
     # A declared advance with no matching company record must NOT be read as A=0.
     # Coverage establishes zero FLOWS in the scope, but the printed declared
@@ -950,6 +1014,7 @@ def admit_evidence(
         confirmations=confirmations,
         ledger=tuple(merged_ledger),
         coverage=effective_coverage,
+        activity_acceptances=valid_activity_acceptances,
         policy=policies,
         grants=grants,
         budget=budgets,

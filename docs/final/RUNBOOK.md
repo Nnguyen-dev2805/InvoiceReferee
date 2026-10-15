@@ -63,6 +63,10 @@ uv run python scripts/dev.py --port 8000
 Thiếu key ⇒ lệnh **dừng (exit 2) và in tên biến thiếu**, không tự hạ cấp. Không có
 chế độ giả lập ngầm. Chạy offline để demo/test: thêm `--mode stub`.
 
+Luồng kế toán ghi nhận khoản ứng, xác nhận đã đối chiếu lịch sử tiền và kiểm tra
+lệnh thu/chi nằm trong [runbook kế toán](ACCOUNTANT_ADVANCE_COVERAGE_RUNBOOK.md).
+Không dùng coverage mẫu để khẳng định đã kiểm tra sổ ngân hàng thực tế.
+
 ## 4. Container (single process, volume bền)
 
 ```bash

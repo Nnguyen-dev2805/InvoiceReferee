@@ -31,8 +31,8 @@ export const MONEY_LABELS: Record<string, string> = {
   E: "Chi phí đủ điều kiện",
   C: "Công ty trả trực tiếp",
   A: "Ứng thực nhận",
-  P: "Đã hoàn",
-  R: "Đã thu hồi",
+  P: "Chi bổ sung đã nhận",
+  R: "Nhân viên đã hoàn trả",
   unpaid: "Chưa thanh toán",
   S: "Chênh lệch (S)",
 };
@@ -96,6 +96,10 @@ export function MoneyLine({
 }
 
 export function formatIssueTarget(fieldOrRule: string): string {
+  if (fieldOrRule === "ledger:coverage" || fieldOrRule === "coverage") {
+    return "Lịch sử đối chiếu tiền";
+  }
+  if (fieldOrRule === "activity:acceptance") return "Công việc theo chứng từ ứng";
   const match = fieldOrRule.match(/expense(?::expense)?:(\d+)/);
   if (match) {
     const expenseNum = match[1];
@@ -106,7 +110,6 @@ export function formatIssueTarget(fieldOrRule: string): string {
   if (fieldOrRule.includes("paid_basis")) return "Căn cứ thanh toán khoản chi";
   if (fieldOrRule.includes("payer")) return "Người chi trả thực tế";
   if (fieldOrRule === "budget:B") return "Ngân sách hoạt động (B)";
-  if (fieldOrRule === "coverage") return "Lịch sử đối chiếu ứng/hoàn";
   return `#${fieldOrRule.split(":").pop()}`;
 }
 
@@ -180,6 +183,23 @@ export function Dossier({
           {formatSummary(caseView.summary)}
         </p>
       </div>
+
+      {(caseView.activity_acceptances ?? []).length > 0 && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3" data-testid="activity-acceptance">
+          <h3 className="text-xs font-semibold text-emerald-950">
+            Căn cứ công việc được công ty chấp nhận
+          </h3>
+          {(caseView.activity_acceptances ?? []).map((acceptance) => (
+            <div key={acceptance.advance_external_key} className="mt-1 text-[11px] text-emerald-900">
+              <p>
+                Kế toán xác nhận theo chứng từ ứng {acceptance.advance_external_key.split(":").slice(1).join(":")}
+                {" · "}{new Date(acceptance.accepted_at).toLocaleString("vi-VN")}
+              </p>
+              <p className="mt-0.5 text-emerald-800">{acceptance.reason}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Structured Reconciliation Ledger Table - Flat & Clean */}
       <div className="space-y-1.5">

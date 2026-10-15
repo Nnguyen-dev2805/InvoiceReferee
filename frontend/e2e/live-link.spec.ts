@@ -1,3 +1,4 @@
+import { explainAdvanceIfNeeded } from "./advance_helpers";
 import { expect, test } from "@playwright/test";
 import path from "path";
 import { fileURLToPath } from "node:url";
@@ -202,9 +203,7 @@ test("2. no advance record: accountant records the voucher via UI", async ({
   });
   // A second voucher code: the printed ADV-UC03-F01 already belongs to adv-A.
   await page.getByLabel("Mã giao dịch hoặc số phiếu").fill("ADV-UC03-F02");
-  await page
-    .getByLabel("Xác nhận của kế toán")
-    .fill("Đã kiểm tra chứng từ ứng và xác nhận đã giao.");
+  await explainAdvanceIfNeeded(page, "Đã kiểm tra chứng từ ứng và xác nhận đã giao.");
   await page.getByRole("button", { name: "Xác nhận ghi nhận" }).click();
   await expect(page.getByText(/Đã ghi nhận tiền ứng thực nhận/)).toBeVisible({
     timeout: 60_000,
@@ -237,9 +236,7 @@ test("5. reloading the same advance transaction stays idempotent", async ({
         page.getByText(/đã có trong lịch sử công ty/),
       ).toBeVisible({ timeout: 30_000 });
     }
-    await page
-      .getByLabel("Xác nhận của kế toán")
-      .fill(`Ghi nhận lại cùng giao dịch lần ${round + 1}.`);
+    await explainAdvanceIfNeeded(page, `Ghi nhận lại cùng giao dịch lần ${round + 1}.`);
     await page.getByRole("button", { name: "Xác nhận ghi nhận" }).click();
     await expect(page.getByText(/Đã ghi nhận tiền ứng thực nhận/)).toBeVisible({
       timeout: 60_000,
@@ -270,9 +267,7 @@ test("4. voucher naming another payee never becomes confirmed A", async ({
     timeout: 240_000,
   });
   await page.getByLabel("Người nhận theo chứng từ").fill("Nguyễn Văn B");
-  await page
-    .getByLabel("Xác nhận của kế toán")
-    .fill("Kiểm tra chứng từ ghi người nhận khác nhân viên hồ sơ.");
+  await explainAdvanceIfNeeded(page, "Kiểm tra chứng từ ghi người nhận khác nhân viên hồ sơ.");
   await page.getByRole("button", { name: "Xác nhận ghi nhận" }).click();
   // Either notice is a successful record: the wrong-payee voucher lands as
   // an OBSERVED (unconfirmed) event, never a CONFIRMED advance.

@@ -35,37 +35,49 @@ export function Controls({
   const isStopped = caseView.state === "STOPPED";
 
   return (
-    <section aria-labelledby="controls-title" className="space-y-3 select-none text-xs">
-      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-        <h2 id="controls-title" className="text-xs font-semibold text-slate-900">
-          Kiểm soát quy trình hồ sơ
-        </h2>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void control("STOP")}
-          disabled={busy || isStopped}
-          className="border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 px-3.5 py-1.5 text-xs font-semibold rounded transition-colors disabled:opacity-40 cursor-pointer"
-        >
-          Dừng hồ sơ
-        </button>
-        <button
-          type="button"
-          onClick={() => void control("RESUME")}
-          disabled={busy || !isStopped}
-          className="border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 px-3.5 py-1.5 text-xs font-semibold rounded shadow-2xs transition-colors disabled:opacity-40 cursor-pointer"
-        >
-          Tiếp tục
-        </button>
-      </div>
-
+    <div className="flex items-center gap-2 select-none text-xs">
       {error !== null && (
-        <p role="alert" className="error p-2.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-xs">
+        <span role="alert" className="text-[11px] text-rose-600 font-medium">
           {error}
-        </p>
+        </span>
       )}
-    </section>
+
+      {isStopped && (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-rose-50 text-rose-700 border border-rose-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+          <span>Hồ sơ đang tạm dừng</span>
+        </span>
+      )}
+
+      <button
+        type="button"
+        onClick={() => void control("STOP")}
+        disabled={busy || isStopped}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer border ${
+          isStopped
+            ? "opacity-30 border-slate-200 text-slate-400 cursor-not-allowed bg-slate-50"
+            : "border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-800"
+        }`}
+        title="Tạm dừng quy trình đối soát hồ sơ"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+        <span>Dừng hồ sơ</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => void control("RESUME")}
+        disabled={busy || !isStopped}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer border ${
+          !isStopped
+            ? "opacity-30 border-slate-200 text-slate-400 cursor-not-allowed bg-slate-50"
+            : "border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-semibold shadow-xs"
+        }`}
+        title="Tiếp tục xử lý hồ sơ"
+      >
+        <span className={`w-1.5 h-1.5 rounded-full ${isStopped ? "bg-emerald-600 animate-pulse" : "bg-slate-400"}`} />
+        <span>Tiếp tục</span>
+      </button>
+    </div>
   );
 }

@@ -8,6 +8,7 @@ import { Dashboard } from "./features/dashboard";
 import { DocumentViewer } from "./features/document_viewer";
 import { Dossier } from "./features/dossier";
 import { Execution } from "./features/execution";
+import { EmployeeReturn } from "./features/employee_return";
 import { Intake } from "./features/intake";
 import { Questions } from "./features/questions";
 import { Verify } from "./features/verify";
@@ -30,12 +31,14 @@ const ROLE_LABELS: Record<string, string> = {
 export default function App() {
   const [session, setSession] = useState<SessionPayload | null>(null);
   const [caseView, setCaseView] = useState<CaseView | null>(null);
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [caseList, setCaseList] = useState<CaseView[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
   const [isDebugOpen, setIsDebugOpen] = useState(false);
   const [isPersonaOpen, setIsPersonaOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
+  const [accountantTab, setAccountantTab] = useState<"dossier" | "cashflow">("dossier");
   const personaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -284,7 +287,11 @@ export default function App() {
           <main className="h-[calc(100vh-48px)] flex flex-col md:flex-row overflow-hidden flex-1">
             {/* LEFT PANE: Document & Evidence Inspector (50%) */}
             <div className="w-full md:w-1/2 h-1/2 md:h-full overflow-hidden flex flex-col">
-              <DocumentViewer caseView={caseView} />
+              <DocumentViewer
+                caseView={caseView}
+                selectedSourceId={selectedSourceId}
+                onSourceSelected={setSelectedSourceId}
+              />
             </div>
 
             {/* RIGHT PANE: Role-Based Action & Audit Workspace (50%) */}
@@ -336,7 +343,51 @@ export default function App() {
                     )
                   )}
                 </div>
+
+                {/* Subheader Action Controls (Dừng hồ sơ / Tiếp tục) */}
+                {activePanels.includes("controls") && (
+                  <Controls
+                    caseView={caseView}
+                    onCase={(newCase) => {
+                      setCaseView(newCase);
+                      void restoreLatestCase();
+                    }}
+                    currentRole={currentRole}
+                  />
+                )}
               </div>
+
+              {/* Role Workspace Tabs (Accountant: 2 clean tabs) */}
+              {currentRole === "accountant" && (
+                <div className="border-b border-slate-200 bg-white px-5 flex items-center gap-6 text-xs shrink-0 select-none">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={accountantTab === "dossier"}
+                    onClick={() => setAccountantTab("dossier")}
+                    className={`py-2.5 font-medium border-b-2 text-xs transition-colors cursor-pointer flex items-center gap-2 ${
+                      accountantTab === "dossier"
+                        ? "border-slate-900 text-slate-950 font-semibold"
+                        : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+                    }`}
+                  >
+                    <span>Đối soát chi phí</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={accountantTab === "cashflow"}
+                    onClick={() => setAccountantTab("cashflow")}
+                    className={`py-2.5 font-medium border-b-2 text-xs transition-colors cursor-pointer flex items-center gap-2 ${
+                      accountantTab === "cashflow"
+                        ? "border-slate-900 text-slate-950 font-semibold"
+                        : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+                    }`}
+                  >
+                    <span>Sổ cái & Dòng tiền</span>
+                  </button>
+                </div>
+              )}
 
               {/* Scrollable Canvas for Workspaces */}
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
@@ -365,63 +416,110 @@ export default function App() {
                     )}
                   </div>
                 )}
-                {/* 1. Dossier (Bảng đối soát tài chính & Lịch sử) */}
-                {activePanels.includes("dossier") && (
-                  <Dossier
-                    caseView={caseView}
-                    hideIssues={activePanels.includes("questions") && (caseView?.issues.length ?? 0) > 0}
-                  />
-                )}
 
-                {/* 2. Questions Workspace */}
-                {activePanels.includes("questions") && (
-                  <Questions
-                    caseView={caseView}
-                    onCase={(newCase) => {
-                      setCaseView(newCase);
-                      void restoreLatestCase();
-                    }}
-                    currentRole={currentRole}
-                  />
-                )}
+                {/* ACCOUNTANT WORKSPACE: Tab 1 (Đối soát chi phí) vs Tab 2 (Sổ cái & Dòng tiền) */}
+                {currentRole === "accountant" ? (
+                  accountantTab === "dossier" ? (
+                    <>
+                      {/* 1. Dossier (Bảng đối soát tài chính, chứng từ hợp lệ, chênh lệch S) */}
+                      <Dossier
+                        caseView={caseView}
+                        hideIssues={activePanels.includes("questions") && (caseView?.issues.length ?? 0) > 0}
+                      />
 
-                {/* 3. Approval Workspace */}
-                {activePanels.includes("approval") && (
-                  <Approval caseView={caseView} />
-                )}
+                      {/* 2. Questions Workspace */}
+                      {activePanels.includes("questions") && (
+                        <Questions
+                          caseView={caseView}
+                          onCase={(newCase) => {
+                            setCaseView(newCase);
+                            void restoreLatestCase();
+                          }}
+                          currentRole={currentRole}
+                        />
+                      )}
 
-                {/* 4. Advance Workspace */}
-                {activePanels.includes("advance") && (
-                  <Advance
-                    caseView={caseView}
-                    onCase={(newCase) => {
-                      setCaseView(newCase);
-                      void restoreLatestCase();
-                    }}
-                  />
-                )}
+                      {/* 3. Approval Workspace (Lệnh chi / thu phát sinh từ chênh lệch S) */}
+                      <Approval caseView={caseView} />
+                    </>
+                  ) : (
+                    <>
+                      {/* 4. Advance Workspace (Ghi nhận tạm ứng từ chứng từ) */}
+                      <Advance
+                        caseView={caseView}
+                        onCase={(newCase) => {
+                          setCaseView(newCase);
+                          void restoreLatestCase();
+                        }}
+                        onSourceSelected={setSelectedSourceId}
+                      />
 
-                {/* 5. Execution Workspace */}
-                {activePanels.includes("execution") && (
-                  <Execution
-                    caseView={caseView}
-                    onCase={(newCase) => {
-                      setCaseView(newCase);
-                      void restoreLatestCase();
-                    }}
-                  />
-                )}
+                      {/* 5. Execution Workspace (Ghi nhận dòng tiền thực tế vào sổ cái) */}
+                      <Execution
+                        caseView={caseView}
+                        onCase={(newCase) => {
+                          setCaseView(newCase);
+                          void restoreLatestCase();
+                        }}
+                      />
+                    </>
+                  )
+                ) : (
+                  <>
+                    {/* OTHER ROLES (Employee / Approver) */}
+                    {activePanels.includes("dossier") && (
+                      <Dossier
+                        caseView={caseView}
+                        hideIssues={activePanels.includes("questions") && (caseView?.issues.length ?? 0) > 0}
+                      />
+                    )}
 
-                {/* 6. Controls Workspace */}
-                {activePanels.includes("controls") && (
-                  <Controls
-                    caseView={caseView}
-                    onCase={(newCase) => {
-                      setCaseView(newCase);
-                      void restoreLatestCase();
-                    }}
-                    currentRole={currentRole}
-                  />
+                    {currentRole === "employee" && activePanels.includes("dossier") && (
+                      <EmployeeReturn
+                        caseView={caseView}
+                        onCase={(newCase) => {
+                          setCaseView(newCase);
+                          void restoreLatestCase();
+                        }}
+                      />
+                    )}
+
+                    {activePanels.includes("questions") && (
+                      <Questions
+                        caseView={caseView}
+                        onCase={(newCase) => {
+                          setCaseView(newCase);
+                          void restoreLatestCase();
+                        }}
+                        currentRole={currentRole}
+                      />
+                    )}
+
+                    {activePanels.includes("approval") && (
+                      <Approval caseView={caseView} />
+                    )}
+
+                    {activePanels.includes("advance") && (
+                      <Advance
+                        caseView={caseView}
+                        onCase={(newCase) => {
+                          setCaseView(newCase);
+                          void restoreLatestCase();
+                        }}
+                        onSourceSelected={setSelectedSourceId}
+                      />
+                    )}
+
+                    {activePanels.includes("execution") && (
+                      <Execution
+                        caseView={caseView}
+                        onCase={(newCase) => {
+                          setCaseView(newCase);
+                          void restoreLatestCase();
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </div>
             </div>

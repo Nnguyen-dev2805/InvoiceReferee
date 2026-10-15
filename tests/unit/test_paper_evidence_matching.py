@@ -95,6 +95,32 @@ def test_exact_number_preserves_hoangha_method() -> None:
     assert result.links[0].status == "AUTO_LINK"
 
 
+def test_numeric_invoice_reference_matches_unique_series_prefixed_number() -> None:
+    paper = _paper(rows=(("Chi phí tiếp khách", "3240000", ("00000101",), None),))
+    docs = (_invoice("DOC-1", number="IR26E00000101", issuer="Nhà hàng", total="3240000"),)
+
+    result = match_paper_evidence(paper, docs)
+
+    assert len(result.links) == 1
+    assert result.links[0].status == "AUTO_LINK"
+    assert result.links[0].method == "INVOICE_NUMBER_EXACT"
+    assert result.links[0].allocated_amount == Decimal("3240000")
+
+
+def test_numeric_invoice_reference_does_not_choose_between_duplicate_serials() -> None:
+    paper = _paper(rows=(("Chi phí tiếp khách", "3240000", ("00000101",), None),))
+    docs = (
+        _invoice("DOC-1", number="IR26E00000101", issuer="Nhà hàng", total="3240000"),
+        _invoice("DOC-2", number="AB00000101", issuer="Nhà hàng", total="3240000"),
+    )
+
+    result = match_paper_evidence(paper, docs)
+
+    assert len(result.links) == 2
+    assert all(link.status == "SUGGEST_LINK" for link in result.links)
+    assert all(link.method != "INVOICE_NUMBER_EXACT" for link in result.links)
+
+
 def test_amount_and_content_auto_match_clear_invoice() -> None:
     paper = _paper(
         rows=(("Mua vật phẩm từ công ty Thiên Ưng", "83600000", (), None),)

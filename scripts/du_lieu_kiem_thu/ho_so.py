@@ -1,4 +1,4 @@
-"""R1 case specifications: the 15 development roots (plan B).
+"""R1 case specifications: 14 current-scope development roots.
 
 Each case is a literal, typed spec: the activity/people/budget/grants/coverage
 context, the staged documents whose *visible text* carries the facts, and the
@@ -118,7 +118,6 @@ def _grants() -> tuple[dict[str, object], ...]:
             "actor": "employee:approver",
             "actions": [
                 "AUTHORIZE_ACTIVITY",
-                "SET_BUDGET",
                 "RECOGNIZE_COST",
                 "EXCEPT_POLICY",
                 "ISSUE_PAYMENT",
@@ -190,7 +189,7 @@ def _stub(
     return tuple(out)
 
 
-# -- the 15 cases (plan B) ---------------------------------------------------
+# -- authored cases; D06 is held for the future budget policy suite ---------
 
 def _case_01() -> CaseSpec:
     return CaseSpec(
@@ -461,9 +460,14 @@ def _case_15() -> CaseSpec:
     )
 
 
+FUTURE_SCOPE_CASES: tuple[CaseSpec, ...] = (_case_06(),)
+FUTURE_SCOPE_REASONS: dict[str, str] = {
+    "D06": "Its only POLICY basis is T>B, which is outside the current product scope.",
+}
+
 CASES: tuple[CaseSpec, ...] = (
     _case_01(), _case_02(), _case_03(), _case_04(), _case_05(),
-    _case_06(), _case_07(), _case_08(), _case_09(), _case_10(),
+    _case_07(), _case_08(), _case_09(), _case_10(),
     _case_11(), _case_12(), _case_13(), _case_14(), _case_15(),
 )
 

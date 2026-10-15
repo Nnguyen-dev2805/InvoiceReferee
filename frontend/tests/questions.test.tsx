@@ -51,6 +51,9 @@ describe("invoice-scoped employee-paid answer", () => {
 
     render(<Questions caseView={caseView} onCase={onCase} currentRole="employee" />);
 
+    expect(screen.getByText(/Bạn trực tiếp thanh toán bao nhiêu/)).toBeInTheDocument();
+    expect(screen.queryByText(/ngân sách hoạt động|vượt ngân sách/i)).not.toBeInTheDocument();
+
     const amount = screen.getByLabelText(
       "Số tiền VND nhân viên trực tiếp thanh toán cho hóa đơn IR26101001",
     );
@@ -78,5 +81,24 @@ describe("invoice-scoped employee-paid answer", () => {
       );
     });
     expect(onCase).toHaveBeenCalledWith(caseView);
+  });
+
+  it("routes history coverage to the structured accountant form instead of free text", () => {
+    const coverageIssue = {
+      id: "issue:fact:history",
+      kind: "FACT" as const,
+      field_or_rule: "ledger:coverage",
+      owner: "accountant",
+      status: "OPEN",
+      basis: "Thiếu lịch sử đối chiếu ứng/hoàn cho scope này.",
+      question: "Xác minh coverage lịch sử (scope/thời gian/loại dòng tiền).",
+    };
+    const view = { ...caseView, issues: [coverageIssue] };
+    render(<Questions caseView={view} onCase={() => {}} currentRole="accountant" />);
+
+    expect(screen.getByText(/Dùng biểu mẫu xác nhận đã đối chiếu lịch sử tiền/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Tới xác nhận lịch sử tiền" })).toHaveAttribute("href", "#history-coverage");
+    expect(screen.queryByLabelText("Nội dung giải trình / xác nhận:")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Gửi giải trình" })).toBeNull();
   });
 });

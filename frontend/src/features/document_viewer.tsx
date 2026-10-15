@@ -6,12 +6,16 @@ export interface DocumentViewerProps {
   caseView: CaseView | null;
   pendingFiles?: File[];
   onFilesSelected?: (files: File[]) => void;
+  selectedSourceId?: string | null;
+  onSourceSelected?: (sourceId: string) => void;
 }
 
 export function DocumentViewer({
   caseView,
   pendingFiles = [],
   onFilesSelected,
+  selectedSourceId = null,
+  onSourceSelected,
 }: DocumentViewerProps) {
   const sources = caseView?.sources ?? [];
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
@@ -50,7 +54,7 @@ export function DocumentViewer({
     return [...remote, ...local];
   }, [sources, pendingFiles]);
 
-  const activeTab = allTabs.find((t) => t.id === selectedTabId) ?? allTabs[0] ?? null;
+  const activeTab = allTabs.find((t) => t.id === (selectedSourceId ?? selectedTabId)) ?? allTabs[0] ?? null;
 
   // Generate URL for active document
   const documentUrl = useMemo(() => {
@@ -97,7 +101,11 @@ export function DocumentViewer({
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setSelectedTabId(tab.id)}
+                  aria-pressed={isSelected}
+                  onClick={() => {
+                    setSelectedTabId(tab.id);
+                    if (tab.source) onSourceSelected?.(tab.source.id);
+                  }}
                   className={`h-9 px-3 rounded-t-md text-xs flex items-center gap-2 transition-colors shrink-0 cursor-pointer border-t border-x ${
                     isSelected
                       ? "bg-white text-slate-900 font-semibold border-slate-200 shadow-2xs"
@@ -120,15 +128,30 @@ export function DocumentViewer({
         </div>
 
         {documentUrl && (
-          <div className="shrink-0 pr-1">
+          <div className="shrink-0 flex items-center pl-2 pr-1 border-l border-slate-200">
             <a
               href={documentUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 px-2.5 py-1 rounded border border-slate-200 shadow-2xs transition-colors cursor-pointer"
+              className="group inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-200/70 transition-colors cursor-pointer"
               title="Mở tài liệu trong tab mới"
+              aria-label="Mở tab mới"
             >
-              Mở tab mới ↗
+              <span>Mở tab mới</span>
+              <svg
+                className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
             </a>
           </div>
         )}

@@ -1,9 +1,9 @@
 """A1 organization-context import/load tests (plan A1).
 
-The importer must persist the FULL validated payload (policies, budgets, ledger,
-coverage, witnesses), so a restart loads the exact context an assessment rested
-on — not just activity/people/grants. A context without coverage must not imply
-A/P/R=0, and a new version must not overwrite the older snapshot.
+The importer must persist the FULL validated payload (policies, optional legacy
+budgets, ledger, coverage, witnesses), so a restart loads the exact context an
+assessment rested on — not just activity/people/grants. A context without coverage
+must not imply A/P/R=0, and a new version must not overwrite the older snapshot.
 """
 
 from __future__ import annotations
@@ -52,8 +52,8 @@ def test_pilot_context_survives_restart(tmp_path: Path) -> None:
         cx.close()
     assert loaded is not None
     assert loaded.organization_id == "tenant:uc03-pilot"
-    # The fields the old importer dropped are all present after reload.
-    assert loaded.policies and loaded.budgets and loaded.ledger and loaded.coverage
+    # Current pilot omits B; the rest of its operative context survives restart.
+    assert loaded.policies and not loaded.budgets and loaded.ledger and loaded.coverage
     assert loaded.financial_as_of == "2026-10-10T18:00:00+07:00"
     assert digest
 
@@ -68,7 +68,7 @@ def test_ledger_amount_and_coverage_preserved(tmp_path: Path) -> None:
         ledger = context_ledger(loaded, digest="a" * 64)
         assert [e.kind for e in ledger] == ["ADVANCE_RECEIVED"]
         assert ledger[0].amount == 4_000_000
-        assert ledger[0].external_key == "company:bank-demo:ADV-UC03-F01"
+        assert ledger[0].external_key == "transfer:FT-UC03-F01-0001"
         coverage = context_coverage(loaded, digest="a" * 64)
         assert coverage is not None
         assert coverage.as_of.isoformat().startswith("2026-10-10T11:00:00")
@@ -78,11 +78,39 @@ def test_ledger_amount_and_coverage_preserved(tmp_path: Path) -> None:
         policies = context_policies(loaded, digest="a" * 64, profile="TRAVEL")
         assert policies and policies[0].rules == ("EMPLOYEE_PAID_INVOICE_BOUNDED",)
         budgets = context_budgets(loaded, activity="activity:uc03-f01", digest="a" * 64)
-        assert budgets and budgets[0].amount == 8_000_000
-        assert budgets[0].actor == "employee:approver"
-        assert budgets[0].grant_ref == "grant:UC03-F01:approver"
+        assert budgets == ()
     finally:
         cx.close()
+
+
+def test_legacy_budget_record_remains_readable(tmp_path: Path) -> None:
+    workflow = _workflow(tmp_path)
+    legacy = _pilot().model_copy(
+        update={
+            "budget_amount": 8_000_000,
+            "budgets": ({
+                "id": "budget:legacy",
+                "activity": "activity:uc03-f01",
+                "amount": 8_000_000,
+                "effect_range": [
+                    "2026-10-01T00:00:00+07:00",
+                    "2026-12-31T23:59:59+07:00",
+                ],
+                "actor": "employee:approver",
+            },),
+        }
+    )
+    workflow.import_company_context(legacy, origin="SIMULATED")
+    cx = workflow.db.connect()
+    try:
+        loaded = load_context(
+            cx, "tenant:uc03-pilot", "activity:uc03-f01", datetime.now(UTC)
+        )
+    finally:
+        cx.close()
+    assert loaded is not None and loaded.budget_amount == 8_000_000
+    decisions = context_budgets(loaded, activity="activity:uc03-f01", digest="a" * 64)
+    assert len(decisions) == 1 and decisions[0].amount == 8_000_000
 
 
 def test_context_without_coverage_does_not_imply_zero(tmp_path: Path) -> None:
@@ -97,6 +125,46 @@ def test_context_without_coverage_does_not_imply_zero(tmp_path: Path) -> None:
         assert context_ledger(loaded, digest="a" * 64) == ()
     finally:
         cx.close()
+
+
+def test_new_activity_keeps_tenant_identity_without_borrowing_other_activity_history(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    context = _pilot()
+    workflow.import_company_context(context, origin="SIMULATED")
+    proposed_id = "activity:proposed:test-accounting-case"
+    with workflow.db.transaction() as cx:
+        cx.execute(
+            "INSERT INTO context_activities (activity_id, tenant, name, occurred_at, "
+            "purpose, budget_amount, budget_effect_from, status, profile, references_json) "
+            "VALUES (?, ?, ?, ?, ?, NULL, NULL, 'PROPOSED', 'WORK_EXPENSE', '[]')",
+            (
+                proposed_id,
+                "tenant:uc03-pilot",
+                "Tiếp khách với đối tác",
+                "2026-10-10T10:00:00+07:00",
+                "Làm việc với đối tác tại Hà Nội",
+            ),
+        )
+
+    with workflow.db.connect() as cx:
+        loaded = load_context(cx, "tenant:uc03-pilot", proposed_id, datetime.now(UTC))
+
+    assert loaded is not None
+    assert loaded.organization_id == context.organization_id
+    assert loaded.company_name == context.company_name
+    assert loaded.people == context.people
+    assert loaded.policies == context.policies
+    assert loaded.grants == context.grants
+    assert loaded.activity is not None
+    assert loaded.activity["activity_id"] == proposed_id
+    assert loaded.activity["status"] == "PROPOSED"
+    assert "authorization" not in loaded.activity
+    assert loaded.activities == ()
+    assert loaded.ledger == ()
+    assert loaded.coverage is None
+    assert loaded.financial_as_of is None
 
 
 def test_new_version_does_not_overwrite_older_snapshot(tmp_path: Path) -> None:
@@ -162,5 +230,5 @@ def test_relational_projection_still_authorizes(tmp_path: Path) -> None:
     finally:
         cx.close()
     assert activity["status"] == "AUTHORIZED"
-    assert int(activity["budget_amount"]) == 8_000_000
+    assert activity["budget_amount"] is None
     assert int(grants["n"]) == 4

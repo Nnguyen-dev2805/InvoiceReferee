@@ -14,6 +14,7 @@ from typing import Literal, NamedTuple
 
 from invoice_referee.domain.common import EvidenceRef, parse_vnd
 from invoice_referee.domain.documents import DocumentAnalysis, FieldCandidate
+from invoice_referee.domain.finance import ActivityLinkSignal
 
 AdvanceMethod = Literal["TRANSFER", "CASH"]
 AdvanceStatus = Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"]
@@ -49,11 +50,20 @@ class AdvanceDraft(NamedTuple):
     event_at: str | None
     refs: tuple[EvidenceRef, ...]
     missing_fields: tuple[str, ...]
+    activity_reference: str | None = None
+    draft_id: str | None = None
+    activity_link_status: Literal[
+        "LINKED", "NEEDS_CONFIRMATION", "NOT_FOUND", "CONFLICT"
+    ] = "NOT_FOUND"
+    matched_activity_id: str | None = None
     requires_confirmation: bool = True
     # True when this exact transaction identity is already in company history
     # (14/10/2026): reloading it must not raise A again — the accountant can
     # still confirm (idempotent), but the UI says so upfront.
     already_recorded: bool = False
+    activity_link_basis: str | None = None
+    activity_link_signals: tuple[ActivityLinkSignal, ...] = ()
+    activity_link_candidate_count: int = 0
 
 
 def _field(document: DocumentAnalysis, name: str) -> FieldCandidate | None:
@@ -141,15 +151,20 @@ def draft_advance_from_document(
     # (14/10/2026). The accountant resolves the missing payee with evidence.
     payee_name = _found_value(document, "payee_name", "buyer_person_name")
     reference = _found_value(document, "transaction_reference", "document_number")
+    activity_reference = _found_value(document, "advance_reference")
     event_at = _found_value(document, "event_at", "document_date")
 
     missing: list[str] = []
     if amount is None:
         missing.append("amount")
+    if payer_name is None:
+        missing.append("payer_name")
     if payee_name is None:
         missing.append("payee_name")
     if reference is None:
         missing.append("transaction_reference")
+    if event_at is None:
+        missing.append("event_at")
     if _status(document) == "UNKNOWN":
         missing.append("instrument_status")
 
@@ -166,4 +181,7 @@ def draft_advance_from_document(
         event_at=str(event_at) if event_at is not None else None,
         refs=_refs(document),
         missing_fields=tuple(missing),
+        activity_reference=(
+            str(activity_reference).strip() if activity_reference is not None else None
+        ),
     )

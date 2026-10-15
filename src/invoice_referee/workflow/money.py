@@ -9,6 +9,7 @@ is never clipped by the instruction's amount.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from invoice_referee.domain.finance import MoneyEvent, RecordMoneyInput
 
@@ -92,17 +93,41 @@ def can_reverse(events: tuple[MoneyEvent, ...], target_id: str, amount: int) -> 
 
 
 def fulfillment_for(
-    events: tuple[MoneyEvent, ...], *, payee: str, direction: str
+    events: tuple[MoneyEvent, ...],
+    *,
+    payee: str,
+    direction: str,
+    instruction_id: str | None = None,
+    legacy_after: datetime | None = None,
 ) -> int:
     """Net fulfillment granted to an instruction by matching receipts.
 
     A payment fulfills a PAY instruction only when it is received by the
     instruction's payee; a wrong payee records money but fulfills nothing.
     """
-    if direction == "PAY":
-        received = net_by_kind(events, "REIMBURSEMENT_RECEIVED")
+    kind = "REIMBURSEMENT_RECEIVED" if direction == "PAY" else "EMPLOYEE_RETURN"
+    candidates = tuple(
+        event for event in events
+        if event.kind == kind and event.payee == payee
+    )
+    if instruction_id is None:
+        selected = events
     else:
-        received = net_by_kind(events, "EMPLOYEE_RETURN")
+        linked_ids = {
+            event.id
+            for event in candidates
+            if event.instruction_id == instruction_id
+            or (
+                event.instruction_id is None
+                and legacy_after is not None
+                and event.recorded_at >= legacy_after
+            )
+        }
+        selected = tuple(
+            event
+            for event in events
+            if event.id in linked_ids or event.reverses_event_id in linked_ids
+        )
     # Only receipts paid to the expected payee count (checked at record time);
     # here the caller passes the already-scoped events.
-    return received
+    return net_by_kind(selected, kind)

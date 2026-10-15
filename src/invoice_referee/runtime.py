@@ -9,9 +9,11 @@ matching recording. Provider I/O never runs inside a mutation transaction.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from invoice_referee.config import Settings
+from invoice_referee.domain.organization import OrganizationContext
 from invoice_referee.evidence.trace import ProviderMode
 from invoice_referee.workflow.db import Database
 from invoice_referee.workflow.service import CaseWorkflow
@@ -56,7 +58,14 @@ def build_workflow(
     """
     db.migrate()
     workflow = CaseWorkflow(db, uploads_dir=uploads_dir, clock=clock)
-    workflow.import_demo_context(context_path, origin="SIMULATED")
+    raw_context = Path(context_path).read_bytes()
+    payload = json.loads(raw_context)
+    if isinstance(payload, dict) and "organization_id" in payload:
+        workflow.import_company_context(
+            OrganizationContext.model_validate_json(raw_context), origin="SIMULATED"
+        )
+    else:
+        workflow.import_demo_context(context_path, origin="SIMULATED")
     workflow.provider_mode = mode
     # Compose the trace sink here (the single entry point) and pass it to the
     # real consumers. Tracing is opt-in from Settings; when off the recorder is a

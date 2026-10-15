@@ -45,7 +45,7 @@ def _report() -> ReadResult:
     paper = DocumentAnalysis(
         source_id="source:1", document_id="source:1:1-1:SETTLEMENT_FORM",
         document_type="SETTLEMENT_FORM", roles=("SETTLEMENT_DECLARATION",), page_range=(1, 1),
-        fields=(_found("declared_name", "Nguyễn An"), _found("printed_total", "3240000")),
+        fields=(_found("declared_name", "NGUYỄN MINH AN"), _found("printed_total", "3240000")),
         line_items=(DocumentLine(id="row:1", fields=(
             _found("description", "Bữa ăn"), _found("amount", "3240000"), _found("invoice_refs", ("IR26101001",)),
         )),),
@@ -86,7 +86,7 @@ def _two_invoice_report() -> ReadResult:
     paper = DocumentAnalysis(
         source_id="source:paper", document_id="source:paper:1-1:SETTLEMENT_FORM",
         document_type="SETTLEMENT_FORM", roles=("SETTLEMENT_DECLARATION",), page_range=(1, 1),
-        fields=(FieldCandidate(field="declared_name", state="FOUND", value="Nguyễn An", refs=(paper_ref,)),),
+        fields=(FieldCandidate(field="declared_name", state="FOUND", value="NGUYỄN MINH AN", refs=(paper_ref,)),),
         line_items=(
             DocumentLine(id="row:a", fields=(
                 FieldCandidate(field="description", state="FOUND", value="Khoản A", refs=(paper_ref,)),

@@ -23,8 +23,10 @@ Người dùng chốt lại căn cứ cho khoản nhân viên đã trả trong *
    không tự thành đã nhận. Kế toán ghi nhận `ADVANCE_RECEIVED` từ chứng từ ứng.
 6. Chữ ký demo dùng văn bản "Ký bởi: …" và ngày ký; chưa kiểm tra chứng thư số, ảnh
    chữ ký hoặc mật mã.
-7. Giữ nguyên các quy tắc khác về ngân sách, thẩm quyền, scope, lịch sử tiền, số học,
-   Stop/Resume và chống trùng. Không mở rộng policy ngoài các điểm đã chốt.
+7. Giữ nguyên các quy tắc khác về thẩm quyền, scope, lịch sử tiền, số học,
+   Stop/Resume và chống trùng. Ngân sách B được đưa ra ngoài phạm vi bởi
+   [ADR0009](0009-activity-budget-out-of-scope.md); căn cứ nhân viên đã trả ở đây
+   không thay đổi. Không mở rộng policy ngoài các điểm đã chốt.
 
 **Hệ quả code:** `PaymentBasisKind` thêm `EMPLOYEE_PAID_INVOICE`. `admit_evidence`
 tạo phần nhân viên đã trả từ một hóa đơn gốc có `profile_status=CLEAR`, có

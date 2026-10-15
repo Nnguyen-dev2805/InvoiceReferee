@@ -279,7 +279,6 @@ def default_grants() -> tuple[Grant, ...]:
             actor=APPROVER,
             actions=(
                 "AUTHORIZE_ACTIVITY",
-                "SET_BUDGET",
                 "RECOGNIZE_COST",
                 "EXCEPT_POLICY",
                 "ISSUE_PAYMENT",

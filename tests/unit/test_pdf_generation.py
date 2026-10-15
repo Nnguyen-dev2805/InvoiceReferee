@@ -1,10 +1,10 @@
-"""R1: the generated 15-case corpus carries real facts in the sources (plan R1).
+"""Current-scope generated cases carry real facts in the sources (plan R1).
 
 The review (PDF_DATA_REVIEW) found the old evaluation PDFs shared one body and
 carried none of the facts their gold demanded. This suite pins the replacement:
-15 named cases whose sources actually contain the fields, staged so a future
-proof is absent from the initial input, with literal gold that never leaks into
-input.
+14 current-scope named cases whose sources actually contain the fields, staged so
+a future proof is absent from the initial input. D06 remains authored for a
+future budget-policy suite and is excluded from this current-scope denominator.
 """
 
 from __future__ import annotations
@@ -21,8 +21,11 @@ from du_lieu_kiem_thu.ho_so import (  # noqa: E402
     CASES,
     CASE_IDS,
     CASE_SLUGS,
+    FUTURE_SCOPE_CASES,
+    FUTURE_SCOPE_REASONS,
     build_case,
 )
+from du_lieu_kiem_thu.dap_an import GOLD as HISTORICAL_GOLD  # noqa: E402
 from invoice_referee.evaluation.packets import load_gold, load_input  # noqa: E402
 
 
@@ -42,9 +45,19 @@ def generated_d04(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return out / spec.slug
 
 
-def test_exactly_15_named_cases() -> None:
-    assert len(CASES) == 15
-    assert CASE_IDS == [f"D{i:02d}" for i in range(1, 16)]
+def test_current_scope_excludes_budget_only_d06_without_renumbering() -> None:
+    assert len(CASES) == 14
+    assert CASE_IDS == [f"D{i:02d}" for i in range(1, 6)] + [
+        f"D{i:02d}" for i in range(7, 16)
+    ]
+    assert "D06" not in CASE_IDS
+    assert [case.case_id for case in FUTURE_SCOPE_CASES] == ["D06"]
+    assert "T>B" in FUTURE_SCOPE_REASONS["D06"]
+    assert HISTORICAL_GOLD["D06"]["route"] == "POLICY"
+    assert HISTORICAL_GOLD["D06"]["observable"] == {
+        "incurred": 10_000_000,
+        "budget": 8_000_000,
+    }
 
 
 def test_slugs_are_vietnamese_free_lowercase_hyphen() -> None:
@@ -109,10 +122,10 @@ def test_native_date_is_not_read_as_amount(generated: Path) -> None:
     assert "20.260" not in text and "2.026" not in text
 
 
-def test_partial_build_is_not_claimed_as_15(tmp_path: Path) -> None:
+def test_partial_build_is_not_claimed_as_current_scope_corpus(tmp_path: Path) -> None:
     from du_lieu_kiem_thu.ho_so import build_case
 
-    # Building a single case produces one case dir, not a claimed-15 manifest.
+    # Building one case produces one directory, not the complete current set.
     spec = CASES[0]
     build_case(spec, tmp_path)
     dirs = [p for p in tmp_path.iterdir() if p.is_dir()]
@@ -246,4 +259,3 @@ def test_future_source_edit_keeps_initial_basis(generated_d04: Path) -> None:
     proof.write_bytes(proof.read_bytes() + b"% edited\n")
     after = digest_packet_input(generated_d04, stage_id="ban-dau")
     assert before == after, "editing a later-stage proof must not change the initial basis"
-

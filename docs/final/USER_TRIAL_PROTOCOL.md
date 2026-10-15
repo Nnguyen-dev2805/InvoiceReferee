@@ -46,7 +46,7 @@ người 1–2 và người 3–4.
 | --- | -------- | ------------------ |
 | A   | Hồ sơ công tác routine, chứng từ rõ, có ứng và khoản nhân viên đã trả | Có tự kết luận đúng và ra việc cần làm không |
 | B   | Hồ sơ thiếu payer/nguồn chưa rõ | Có dừng đúng chỗ và hỏi đúng người thay vì đoán không |
-| C   | Hồ sơ vượt ngân sách/cần quyền | Có chuyển đúng người và giữ đúng số thật không |
+| C   | Hồ sơ vi phạm policy hoặc vượt quyền action | Có chuyển đúng người và giữ đúng số thật không |
 
 ## 5. Phiếu đo trong buổi (mỗi người × mỗi chế độ)
 

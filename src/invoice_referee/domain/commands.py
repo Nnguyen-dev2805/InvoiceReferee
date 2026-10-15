@@ -124,6 +124,20 @@ class RecordActual(StrictModel):
     money: RecordMoneyInput
 
 
+class ConfirmCoverage(StrictModel):
+    """Accountant's structured reconciliation of one dossier's money history."""
+
+    kind: Literal["CONFIRM_COVERAGE"] = "CONFIRM_COVERAGE"
+    root_id: Id
+    start: UtcDatetime
+    funds: tuple[Id, ...]
+    flow_kinds: tuple[str, ...]
+    opening_balance: Vnd
+    unallocated_event_ids: tuple[Id, ...] = ()
+    witness_refs: tuple[EvidenceRef, ...]
+    reason: str = Field(min_length=12)
+
+
 class Control(StrictModel):
     kind: Literal["CONTROL"] = "CONTROL"
     root_id: Id
@@ -156,6 +170,7 @@ CaseCommand = Annotated[
         AnswerIssue,
         Decide,
         RecordActual,
+        ConfirmCoverage,
         Control,
         Override,
         MarkExecution,

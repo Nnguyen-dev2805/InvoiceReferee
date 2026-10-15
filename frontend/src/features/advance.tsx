@@ -1,8 +1,9 @@
 import { useState } from "react";
 
-import { advanceDraft, errorMessage, recordActual } from "../api";
+import { advanceDraft, api, errorMessage, getAdvanceDraft, recordActual } from "../api";
 import { formatVnd } from "../format";
-import type { CaseView } from "../types";
+import { Coverage } from "./coverage";
+import type { ActivityLinkSignalView, CaseView } from "../types";
 
 type DraftRef = {
   source_id: string;
@@ -13,10 +14,17 @@ type DraftRef = {
 
 type Draft = {
   source_id: string;
+  draft_id: string;
   amount: number | null;
   payer_name: string | null;
   payee_name: string | null;
   transaction_reference: string | null;
+  activity_reference: string | null;
+  activity_link_status: "LINKED" | "NEEDS_CONFIRMATION" | "NOT_FOUND" | "CONFLICT";
+  matched_activity_id: string | null;
+  activity_link_basis: string | null;
+  activity_link_signals: ActivityLinkSignalView[];
+  activity_link_candidate_count: number;
   instrument_method: "TRANSFER" | "CASH" | null;
   instrument_status: "COMPLETED" | "PENDING" | "FAILED" | "UNKNOWN";
   event_at: string | null;
@@ -33,8 +41,25 @@ const STATUS_LABELS: Record<string, string> = {
   UNKNOWN: "Chưa rõ",
 };
 
+const FIELD_LABELS: Record<string, string> = {
+  amount: "số tiền",
+  payer_name: "bên chi",
+  payee_name: "người nhận",
+  transaction_reference: "mã giao dịch/số phiếu",
+  instrument_status: "trạng thái giao dịch",
+  event_at: "ngày giao dịch",
+};
+
 /** Accountant records the advance the employee actually received (plan D). */
-export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCase: (view: CaseView) => void }) {
+export function Advance({
+  caseView,
+  onCase,
+  onSourceSelected,
+}: {
+  caseView: CaseView | null;
+  onCase: (view: CaseView) => void;
+  onSourceSelected?: (sourceId: string) => void;
+}) {
   const [method, setMethod] = useState<"TRANSFER" | "CASH">("TRANSFER");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [amount, setAmount] = useState("");
@@ -44,6 +69,9 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
   const [eventAt, setEventAt] = useState("");
   const [status, setStatus] = useState<string>("COMPLETED");
   const [completionClaim, setCompletionClaim] = useState("");
+  const [activityLinkConfirmed, setActivityLinkConfirmed] = useState(false);
+  const [activityLinkReason, setActivityLinkReason] = useState("");
+  const [rechecking, setRechecking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -52,6 +80,46 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
 
   if (caseView === null) return null;
 
+  function showDraft(result: Awaited<ReturnType<typeof advanceDraft>>) {
+    onCase(result.case_view);
+    onSourceSelected?.(result.draft.source_id);
+    setDraft({
+      ...result.draft,
+      refs: result.draft.refs ?? [],
+      activity_link_signals: result.draft.activity_link_signals ?? [],
+      activity_link_candidate_count: result.draft.activity_link_candidate_count ?? 0,
+      already_recorded: result.draft.already_recorded ?? false,
+    });
+    setAmount(result.draft.amount !== null ? String(result.draft.amount) : "");
+    setReference(result.draft.transaction_reference ?? "");
+    setPayer(result.draft.payer_name ?? "");
+    setPayee(result.draft.payee_name ?? "");
+    setEventAt(result.draft.event_at ?? "");
+    setStatus(result.draft.instrument_status);
+    setMethod(result.draft.instrument_method ?? method);
+    setSelectedFileName(result.case_view.sources.find((source) => source.id === result.draft.source_id)?.filename ?? "Chứng từ đã lưu");
+    setActivityLinkConfirmed(false);
+    setActivityLinkReason("");
+    setCompletionClaim("");
+  }
+
+  async function recheck() {
+    if (caseView === null) return;
+    setRechecking(true);
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      showDraft(await getAdvanceDraft(caseView.id, draft?.draft_id));
+      setNotice("Đã kiểm tra lại liên kết từ bản đọc đã lưu.");
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+      setRechecking(false);
+    }
+  }
+
   async function read(file: File) {
     if (caseView === null) return;
     setBusy(true);
@@ -59,20 +127,17 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
     setNotice(null);
     setSelectedFileName(file.name);
     try {
-      const result = await advanceDraft(caseView.id, [file], method);
-      setDraft({
-        ...result,
-        refs: result.refs ?? [],
-        already_recorded: result.already_recorded ?? false,
-      });
-      setAmount(result.amount !== null ? String(result.amount) : "");
-      setReference(result.transaction_reference ?? "");
-      setPayer(result.payer_name ?? "");
-      setPayee(result.payee_name ?? "");
-      setEventAt(result.event_at ?? "");
-      setStatus(result.instrument_status);
+      const result = await advanceDraft(caseView.id, [file], caseView.version, method);
+      showDraft(result);
       setNotice("Đã đọc chứng từ và điền bản nháp. Kiểm tra/sửa rồi xác nhận.");
     } catch (cause) {
+      // Source attachment commits before provider I/O. Refresh the case version
+      // even when OCR fails so a retry does not use a stale expected version.
+      try {
+        onCase(await api.getCase(caseView.id));
+      } catch {
+        // Preserve the original read error; the source remains attached.
+      }
       setError(errorMessage(cause));
     } finally {
       setBusy(false);
@@ -81,10 +146,6 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
 
   async function confirm() {
     if (caseView === null || draft === null) return;
-    if (completionClaim.trim() === "") {
-      setError("Kế toán cần xác nhận có trách nhiệm đã kiểm tra và giao/nhận tiền.");
-      return;
-    }
     // No fabricated identity: a missing transaction code stays an unresolved
     // draft — the server rejects a UUID minted in place of the real reference.
     if (reference.trim() === "") {
@@ -101,6 +162,28 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
       setError("Thiếu ngày giao dịch trên chứng từ: bổ sung ngày thực tế, không dùng thời điểm xác nhận.");
       return;
     }
+    const referenceLinkedToThisCase =
+      draft.activity_link_status === "LINKED" &&
+      draft.matched_activity_id === caseView.activity;
+    const referenceConflicts =
+      draft.activity_link_status === "CONFLICT" ||
+      (draft.activity_link_status === "LINKED" && !referenceLinkedToThisCase);
+    if (referenceConflicts) {
+      setError("Mã công việc trên chứng từ trỏ tới hồ sơ khác; giữ giao dịch để kế toán xác minh.");
+      return;
+    }
+    if (
+      !referenceLinkedToThisCase &&
+      (!activityLinkConfirmed || activityLinkReason.trim().length < 12)
+    ) {
+      setError("Kế toán cần xác nhận chứng từ thuộc đúng công việc và nêu căn cứ đối chiếu.");
+      return;
+    }
+    const explanation = completionClaim.trim() || activityLinkReason.trim();
+    if (draft.missing_fields.length > 0 && explanation.length < 12) {
+      setError("Ghi rõ căn cứ bổ sung thông tin OCR còn thiếu trước khi ghi nhận.");
+      return;
+    }
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -113,13 +196,16 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
         payee: payee.trim(),
         amount: Number(amount),
         event_at: eventAt.trim(),
-        completion_claim: completionClaim,
+        completion_claim: null,
         refs: draft.refs ?? [],
-        reason: "Ghi nhận tiền ứng thực nhận",
+        reason: explanation,
         instrument_method: method,
         instrument_status: status,
         instrument_reference: reference.trim() || null,
-      });
+        advance_draft_id: draft.draft_id,
+        activity_link_confirmed: referenceLinkedToThisCase || activityLinkConfirmed,
+        activity_link_reason: activityLinkReason.trim() || null,
+      }, caseView.version);
       onCase(result.case_view);
       setNotice(
         status === "COMPLETED"
@@ -163,14 +249,37 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
         <div>
           <label
             htmlFor="advance-file-input"
-            className="border border-dashed border-slate-300 hover:border-slate-500 bg-slate-50/50 hover:bg-slate-50 rounded p-6 text-center flex flex-col items-center justify-center cursor-pointer transition-colors block group"
+            className={`border border-dashed rounded p-6 text-center flex flex-col items-center justify-center transition-colors block group ${
+              busy
+                ? "border-slate-400 bg-slate-50/80 cursor-wait pointer-events-none"
+                : "border-slate-300 hover:border-slate-500 bg-slate-50/50 hover:bg-slate-50 cursor-pointer"
+            }`}
           >
-            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-slate-900 group-hover:bg-slate-200 mb-3 transition-colors">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 transition-colors ${
+              busy ? "bg-slate-200 text-slate-800" : "bg-slate-100 text-slate-500 group-hover:text-slate-900 group-hover:bg-slate-200"
+            }`}>
+              {busy ? (
+                <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              )}
             </div>
-            {selectedFileName ? (
+
+            {busy ? (
+              <>
+                <span className="font-semibold text-slate-900 block text-xs">
+                  {rechecking ? "Đang kiểm tra bản nháp đã lưu…" : "Đang nhận diện chứng từ tạm ứng…"}
+                </span>
+                <span className="text-[11px] text-slate-500 block mt-1 animate-pulse">
+                  {rechecking ? "Đối chiếu lại thông tin từ bản đọc đã lưu." : `Tệp ${selectedFileName ?? "chứng từ"} · OCR đang bóc tách số tiền, mã UNC và người nhận`}
+                </span>
+              </>
+            ) : selectedFileName ? (
               <>
                 <span className="font-semibold text-slate-800 block text-xs">
                   {selectedFileName}
@@ -194,6 +303,7 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
               type="file"
               aria-label="Chứng từ ứng"
               accept=".pdf,.png,.jpg,.jpeg"
+              disabled={busy}
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (file) void read(file);
@@ -203,6 +313,92 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
           </label>
         </div>
       </div>
+
+      <div className="flex justify-end">
+        <button type="button" disabled={busy} onClick={() => void recheck()}
+          className="rounded border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 disabled:opacity-40">
+          Kiểm tra lại bản nháp đã lưu
+        </button>
+      </div>
+
+      {/* Connected Micro-Stepper & Skeleton Preview during Active Processing */}
+      {busy && !rechecking && draft === null && (
+        <div className="space-y-4 pt-3 border-t border-slate-200">
+          {/* Connected Micro-Stepper */}
+          <div className="pl-6 space-y-3.5 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-px before:bg-slate-200">
+            {/* Step 1: Upload Complete */}
+            <div className="relative flex items-start gap-3">
+              <span className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[9px] font-bold">
+                ✓
+              </span>
+              <div>
+                <p className="text-xs font-medium text-slate-900">
+                  Đã tiếp nhận tệp: <span className="font-mono text-slate-700">{selectedFileName}</span>
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Tệp nguồn đã sẵn sàng đưa vào luồng trích xuất
+                </p>
+              </div>
+            </div>
+
+            {/* Step 2: OCR Running */}
+            <div className="relative flex items-start gap-3">
+              <span className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-slate-900 text-white flex items-center justify-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+              </span>
+              <div>
+                <p className="text-xs font-semibold text-slate-900">
+                  Đang nhận diện &amp; bóc tách thông tin giao dịch
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5 animate-pulse">
+                  OCR đọc số tiền thực nhận, mã UNC/số phiếu, người thụ hưởng và ngày giao dịch…
+                </p>
+              </div>
+            </div>
+
+            {/* Step 3: Pending Draft Fill */}
+            <div className="relative flex items-start gap-3 opacity-50">
+              <span className="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-slate-100 border border-slate-300" />
+              <div>
+                <p className="text-xs font-medium text-slate-700">
+                  Điền tự động vào bản nháp tạm ứng
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Kế toán kiểm tra, đối chiếu chứng từ và xác nhận ghi nhận
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Skeleton Shimmer Draft Preview */}
+          <div className="pt-2 space-y-3 opacity-60 pointer-events-none">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-300 animate-pulse" />
+                <span className="text-xs font-medium text-slate-400">Đang chuẩn bị bản nháp…</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-1 space-y-2">
+                <div className="h-3 w-24 bg-slate-200 rounded animate-pulse" />
+                <div className="h-6 w-full border-b border-slate-200 animate-pulse bg-slate-50" />
+              </div>
+              <div className="sm:col-span-1 space-y-2">
+                <div className="h-3 w-28 bg-slate-200 rounded animate-pulse" />
+                <div className="h-6 w-full border-b border-slate-200 animate-pulse bg-slate-50" />
+              </div>
+              <div className="sm:col-span-1 space-y-2">
+                <div className="h-3 w-32 bg-slate-200 rounded animate-pulse" />
+                <div className="h-6 w-full border-b border-slate-200 animate-pulse bg-slate-50" />
+              </div>
+              <div className="sm:col-span-1 space-y-2">
+                <div className="h-3 w-32 bg-slate-200 rounded animate-pulse" />
+                <div className="h-6 w-full border-b border-slate-200 animate-pulse bg-slate-50" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {draft !== null && (
         <div className="space-y-3 pt-3 border-t border-slate-200" data-testid="advance-draft">
@@ -221,7 +417,7 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
 
           {draft.missing_fields.length > 0 && (
             <p className="text-xs text-amber-800 bg-amber-50 p-2.5 rounded-md border border-amber-200">
-              ⚠ Thiếu hoặc mờ trường: {draft.missing_fields.join(", ")} — vui lòng bổ sung thông tin bên dưới.
+              ⚠ Chưa đọc rõ: {draft.missing_fields.map((field) => FIELD_LABELS[field] ?? "thông tin giao dịch").join(", ")} — kiểm tra trên chứng từ và bổ sung bên dưới.
             </p>
           )}
 
@@ -231,14 +427,90 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
             </p>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="sm:col-span-1">
-              <div className="flex items-center justify-between mb-1">
-                <label htmlFor="advance-amount" className="block text-slate-700 font-medium text-xs">
+          {draft.activity_reference && (
+            <p className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-md border border-slate-200">
+              Tham chiếu khoản ứng trên chứng từ: <strong>{draft.activity_reference}</strong>
+            </p>
+          )}
+          {draft.activity_link_status === "CONFLICT" ||
+          (draft.activity_link_status === "LINKED" && draft.matched_activity_id !== caseView.activity) ? (
+            <div role="alert" className="space-y-1 rounded-md border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-900">
+              <p className="font-medium">Có mâu thuẫn; chưa thể liên kết chứng từ với hồ sơ này.</p>
+              {draft.activity_link_signals.filter((signal) => signal.state === "CONFLICT").map((signal, index) => (
+                <p key={`${signal.field}:${index}`}>{signal.summary}</p>
+              ))}
+            </div>
+          ) : draft.activity_link_status === "LINKED" ? (
+            <div role="status" className="space-y-1 rounded-md border border-emerald-200 bg-emerald-50 p-2.5 text-xs text-emerald-900">
+              <p className="font-medium">
+                {draft.activity_link_basis === "MULTI_FIELD_MATCH"
+                  ? "Đã tự liên kết với hồ sơ này"
+                  : "Mã hồ sơ trên chứng từ khớp duy nhất với công việc trong hồ sơ này."}
+              </p>
+              {draft.activity_link_basis === "MULTI_FIELD_MATCH" && (
+                <ul className="list-disc space-y-0.5 pl-4 text-emerald-800">
+                  {draft.activity_link_signals
+                    .filter((signal) => signal.state === "MATCHED")
+                    .map((signal, index) => <li key={`${signal.field}:${index}`}>{signal.summary}</li>)}
+                </ul>
+              )}
+              {draft.activity_link_signals.some((signal) => signal.state === "UNMAPPED") && (
+                <details className="text-slate-600">
+                  <summary className="cursor-pointer">Chi tiết tham chiếu khoản ứng</summary>
+                  {draft.activity_link_signals.filter((signal) => signal.state === "UNMAPPED")
+                    .map((signal, index) => <p key={index}>{signal.summary}</p>)}
+                </details>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-2.5">
+              <p className="text-xs font-medium text-amber-900">
+                {draft.activity_link_candidate_count > 1
+                  ? `Có ${draft.activity_link_candidate_count} hồ sơ cùng phù hợp; kế toán cần xác nhận đúng công việc.`
+                  : "Chưa đủ căn cứ tự liên kết. Hãy kiểm tra các thông tin còn thiếu với công việc đang mở."}
+              </p>
+              {draft.activity_link_signals.some((signal) => ["MISSING", "MISMATCH", "AMBIGUOUS", "UNMAPPED"].includes(signal.state)) && (
+                <ul className="list-disc space-y-0.5 pl-4 text-xs text-amber-800">
+                  {draft.activity_link_signals
+                    .filter((signal) => ["MISSING", "MISMATCH", "AMBIGUOUS", "UNMAPPED"].includes(signal.state))
+                    .map((signal, index) => <li key={`${signal.field}:${index}`}>{signal.summary}</li>)}
+                </ul>
+              )}
+              <label className="flex items-start gap-2 text-xs text-slate-800">
+                <input
+                  type="checkbox"
+                  aria-label="Tôi xác nhận chứng từ ứng thuộc công việc trong hồ sơ này"
+                  checked={activityLinkConfirmed}
+                  onChange={(event) => setActivityLinkConfirmed(event.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>Tôi xác nhận chứng từ ứng thuộc công việc trong hồ sơ này: {caseView.summary}</span>
+              </label>
+              <label htmlFor="advance-activity-link-reason" className="block text-slate-700 font-medium text-xs">
+                Căn cứ đối chiếu với công việc
+              </label>
+              {draft.missing_fields.length > 0 && (
+                <p className="text-xs text-amber-800">Nêu cả căn cứ bổ sung các thông tin OCR chưa đọc rõ.</p>
+              )}
+              <textarea
+                id="advance-activity-link-reason"
+                aria-label="Căn cứ đối chiếu với công việc"
+                value={activityLinkReason}
+                onChange={(event) => setActivityLinkReason(event.target.value)}
+                rows={2}
+                className="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-800"
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-1 space-y-1">
+              <div className="flex items-center justify-between">
+                <label htmlFor="advance-amount" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
                   Số tiền thực nhận:
                 </label>
                 {formattedPreview && (
-                  <span className="text-[11px] font-mono-nums tabular-nums text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                  <span className="text-[11px] font-mono tabular-nums text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
                     {formattedPreview}
                   </span>
                 )}
@@ -248,12 +520,12 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
                 aria-label="Số tiền thực nhận"
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 font-mono-nums tabular-nums font-semibold text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 font-mono tabular-nums font-semibold text-xs text-slate-900 transition-colors"
               />
             </div>
 
-            <div className="sm:col-span-1">
-              <label htmlFor="advance-ref" className="block text-slate-700 font-medium text-xs mb-1">
+            <div className="sm:col-span-1 space-y-1">
+              <label htmlFor="advance-ref" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
                 Mã giao dịch / Số phiếu:
               </label>
               <input
@@ -261,12 +533,12 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
                 aria-label="Mã giao dịch hoặc số phiếu"
                 value={reference}
                 onChange={(event) => setReference(event.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 font-mono-nums text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 font-mono text-xs text-slate-900 transition-colors"
               />
             </div>
 
-            <div className="sm:col-span-1">
-              <label htmlFor="advance-payer" className="block text-slate-700 font-medium text-xs mb-1">
+            <div className="sm:col-span-1 space-y-1">
+              <label htmlFor="advance-payer" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
                 Bên chi (theo chứng từ):
               </label>
               <input
@@ -274,12 +546,12 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
                 aria-label="Bên chi theo chứng từ"
                 value={payer}
                 onChange={(event) => setPayer(event.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 text-sm font-medium text-slate-900 transition-colors"
               />
             </div>
 
-            <div className="sm:col-span-1">
-              <label htmlFor="advance-payee" className="block text-slate-700 font-medium text-xs mb-1">
+            <div className="sm:col-span-1 space-y-1">
+              <label htmlFor="advance-payee" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
                 Người nhận (theo chứng từ):
               </label>
               <input
@@ -287,12 +559,12 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
                 aria-label="Người nhận theo chứng từ"
                 value={payee}
                 onChange={(event) => setPayee(event.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 text-sm font-medium text-slate-900 transition-colors"
               />
             </div>
 
-            <div className="sm:col-span-2">
-              <label htmlFor="advance-event-at" className="block text-slate-700 font-medium text-xs mb-1">
+            <div className="sm:col-span-2 space-y-1">
+              <label htmlFor="advance-event-at" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
                 Ngày giao dịch (theo chứng từ, giữ nguyên):
               </label>
               <input
@@ -300,16 +572,15 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
                 aria-label="Ngày giao dịch theo chứng từ"
                 value={eventAt}
                 onChange={(event) => setEventAt(event.target.value)}
-                placeholder="2026-10-05"
-                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs"
+                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 text-xs text-slate-900 transition-colors"
               />
-              <span className="text-[11px] text-slate-400 block mt-1">
+              <span className="text-[11px] text-slate-400 block pt-0.5">
                 Giữ ngày trên chứng từ; thời điểm kế toán xác nhận do máy chủ ghi riêng.
               </span>
             </div>
 
-            <div className="sm:col-span-2">
-              <label htmlFor="advance-status" className="block text-slate-700 font-medium text-xs mb-1">
+            <div className="sm:col-span-2 space-y-1">
+              <label htmlFor="advance-status" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
                 Trạng thái theo nguồn:
               </label>
               <select
@@ -317,39 +588,50 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
                 aria-label="Trạng thái theo nguồn"
                 value={status}
                 onChange={(event) => setStatus(event.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-md px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-800 shadow-2xs cursor-pointer"
+                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 text-xs text-slate-900 transition-colors cursor-pointer"
               >
                 {Object.entries(STATUS_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
               {status !== "COMPLETED" && (
-                <span className="text-[11px] text-amber-800 block mt-1">
+                <span className="text-[11px] text-amber-800 block pt-0.5">
                   Trạng thái chưa hoàn tất: chứng từ được lưu để đối chiếu, chưa thành ứng thực nhận đã xác minh.
                 </span>
               )}
             </div>
 
-            <div className="sm:col-span-2">
-              <label htmlFor="advance-claim" className="block text-slate-700 font-medium text-xs mb-1">
-                Xác nhận có trách nhiệm của kế toán:
+            {draft.missing_fields.length > 0 && draft.activity_link_status === "LINKED" && (
+            <div className="sm:col-span-2 space-y-1">
+              <label htmlFor="advance-claim" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
+                Căn cứ bổ sung thông tin:
               </label>
               <input
                 id="advance-claim"
-                aria-label="Xác nhận của kế toán"
+                aria-label="Căn cứ bổ sung thông tin"
                 value={completionClaim}
                 onChange={(event) => setCompletionClaim(event.target.value)}
-                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-800"
+                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 text-xs text-slate-900 transition-colors"
               />
             </div>
+            )}
           </div>
 
-          <div className="pt-2">
+          <p className="text-xs text-slate-600">
+            {status === "COMPLETED"
+              ? "Khi xác nhận, bạn ghi nhận nhân viên đã thực nhận khoản ứng theo chứng từ này."
+              : "Chứng từ chưa hoàn tất chỉ được lưu để đối chiếu, chưa ghi nhận tiền thực nhận."}
+          </p>
+          <div className="pt-2 flex items-center justify-end">
             <button
               type="button"
               onClick={() => void confirm()}
-              disabled={busy || amount === ""}
-              className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded transition-colors disabled:opacity-40 cursor-pointer"
+              disabled={
+                busy || amount === "" ||
+                draft.activity_link_status === "CONFLICT" ||
+                (draft.activity_link_status === "LINKED" && draft.matched_activity_id !== caseView.activity)
+              }
+              className="bg-slate-950 hover:bg-slate-800 text-white text-xs font-medium px-5 py-2 rounded transition-colors disabled:opacity-40 cursor-pointer shadow-xs"
             >
               {busy ? "Đang xử lý…" : "Xác nhận ghi nhận"}
             </button>
@@ -363,6 +645,15 @@ export function Advance({ caseView, onCase }: { caseView: CaseView | null; onCas
       {error !== null && (
         <p role="alert" className="error p-2.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-xs">{error}</p>
       )}
+      <Coverage
+        caseView={caseView}
+        onCase={onCase}
+        showConfirmation={
+          !caseView.coverage_record
+          || !caseView.coverage_current
+          || caseView.issues.some((issue) => issue.field_or_rule.toLowerCase().includes("coverage"))
+        }
+      />
     </section>
   );
 }

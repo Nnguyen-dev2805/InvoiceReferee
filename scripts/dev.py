@@ -12,6 +12,7 @@ instead of silently degrading (design §10).
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 from pathlib import Path
 
 import uvicorn
@@ -29,7 +30,8 @@ FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
 
 
 def build_workflow(
-    db_path: str, uploads_dir: str, context_path: str, *, mode: str = "STUB", settings: Settings | None = None
+    db_path: str, uploads_dir: str, context_path: str, *, mode: str = "STUB",
+    settings: Settings | None = None, demo_as_of: datetime | None = None,
 ) -> tuple[CaseWorkflow, str]:
     from invoice_referee.runtime import build_workflow as compose_workflow
 
@@ -40,6 +42,7 @@ def build_workflow(
         db=database,
         uploads_dir=uploads_dir,
         context_path=context_path,
+        clock=(lambda: demo_as_of) if demo_as_of is not None else None,
     )
     digest = workflow.last_context_import("tenant:demo")["digest"]
     return workflow, digest
@@ -79,6 +82,16 @@ def format_diagnostics(
     )
 
 
+def _demo_time(value: str) -> datetime:
+    try:
+        moment = datetime.fromisoformat(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("Mốc demo cần ngày giờ ISO 8601.") from error
+    if moment.utcoffset() is None:
+        raise argparse.ArgumentTypeError("Mốc demo phải có múi giờ, ví dụ +07:00.")
+    return moment
+
+
 def build_parser() -> argparse.ArgumentParser:
     """The dev-server CLI. Default mode is LIVE (the app reads real uploads)."""
     parser = argparse.ArgumentParser(description="InvoiceReferee demo server")
@@ -88,6 +101,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--db", default=str(DEFAULT_DB))
     parser.add_argument("--uploads", default=str(DEFAULT_UPLOADS))
     parser.add_argument("--context", default=str(DEFAULT_CONTEXT))
+    parser.add_argument("--demo-as-of", type=_demo_time, default=None,
+                        help="Mốc đối soát cố định cho fixture SIMULATED; mặc định dùng giờ thực.")
     return parser
 
 
@@ -111,7 +126,8 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     workflow, digest = build_workflow(
-        args.db, args.uploads, args.context, mode=mode, settings=settings
+        args.db, args.uploads, args.context, mode=mode, settings=settings,
+        demo_as_of=args.demo_as_of,
     )
     app = create_app(
         workflow,
@@ -132,6 +148,8 @@ def main(argv: list[str] | None = None) -> int:
             port=args.port,
         )
     )
+    if args.demo_as_of is not None:
+        print(f"  assessment: {args.demo_as_of.isoformat()} (mốc demo cố định; trace dùng giờ thực)")
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
     return 0
 

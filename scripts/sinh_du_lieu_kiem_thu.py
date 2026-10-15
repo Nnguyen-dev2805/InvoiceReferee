@@ -1,4 +1,4 @@
-"""R1 entry: generate the 15-case test corpus (plan R1/D).
+"""R1 entry: generate current-scope test cases (plan R1/D).
 
 Usage:
     uv run python scripts/sinh_du_lieu_kiem_thu.py --output data/kiem-thu --cases all --replace-generated

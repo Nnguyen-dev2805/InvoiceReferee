@@ -1,14 +1,21 @@
 # Pilot UC03 — ba kết quả tiền
 
 Toàn bộ thông tin/tài liệu là synthetic. Đây là bộ development, không phải holdout
-độc lập hoặc phản hồi người dùng thực tế. Case/schema đã được kiểm tra tĩnh; OCR,
-LLM, finance E2E và UI **chưa chạy**. Runtime hiện vẫn dừng ở `EVIDENCE_READY`.
+độc lập hoặc phản hồi người dùng thực tế. PDF/context đã sinh lại ngày 15/10/2026
+cho **NGUYỄN MINH AN / Công ty An Thịnh**. Kết quả runtime trước khi đổi nguồn
+không tự chứng minh chất lượng OCR của PDF mới; cần chạy lại LIVE để nghiệm thu.
 
 | Case / folder | Chi phí | Ứng thực nhận trong context | Mục tiêu sau khi admission được triển khai |
 | --- | ---: | ---: | --- |
 | `f01-cong-tac-thu-lai-tien-thua` | 3.240.000 đ | 4.000.000 đ | Thu lại 760.000 đ |
 | `f02-cong-tac-cong-ty-chi-them` | 5.400.000 đ | 5.000.000 đ | Chi thêm 400.000 đ |
 | `f03-cong-tac-can-bang` | 4.320.000 đ | 4.320.000 đ | Cân bằng, không instruction số 0 |
+
+**Scope update 15/10/2026:** F01–F03 đều được giữ trong mẫu (denominator vẫn 3)
+vì chúng kiểm các kết quả thu 760.000 đ, chi 400.000 đ và cân bằng, không chỉ
+kiểm ngân sách. B đã bỏ khỏi organization contexts và preconditions; các giá trị
+T/E/A/P/R/S, route và instructions trong business gold không đổi. Đây là cập nhật
+precondition theo quyết định ADR0009, không phải đổi oracle để làm test xanh.
 
 ## Quy ước căn cứ chi phí nhân viên (chốt 14/10/2026)
 
@@ -36,9 +43,12 @@ Mỗi folder có:
   không nạp cả hai (4 triệu + 4 triệu = 8 triệu là sai). Kế toán ghi nhận A=4.000.000
   từ tài liệu đã kiểm tra; upload chưa tự thành received.
 - `input/organization.json`: context synthetic cho **server/test harness**: hoạt động
-  được phép, B=8 triệu, grants 8/4/20, ledger một khoản ứng đã nhận, coverage đầu kỳ
+  được phép, grants 8/4/20, ledger một khoản ứng đã nhận, coverage đầu kỳ
   bằng 0 và P/R chưa phát sinh đến `financial_as_of`. Không upload JSON này như PDF;
   không cho frontend tùy ý ghi `CONFIRMED` vào actual money.
+- F01 có `input/organization-cash.json` cho nhánh tiền mặt; `organization.json`
+  là nhánh chuyển khoản. Chọn đúng một context và chứng từ tương ứng; mỗi context
+  có đúng một khoản ứng 4 triệu. Namespace/mã giao dịch và bên chi khớp tài liệu.
 - `input/submission.json`: khai báo nhân viên theo schema hiện có.
 - `input/employee-confirmation.json`: lời xác nhận Q32 có actor/scope/ref/digest (giữ
   để tương thích; đường mặc định của demo là căn cứ hóa đơn, không bắt buộc claim).
@@ -76,7 +86,9 @@ rtk proxy uv run --no-sync pytest tests/unit/test_uc03_pilot_data.py
 Clone sạch thì chạy `rtk proxy uv sync` trước lệnh `--no-sync`. Script không tải model,
 không dùng font Windows, không đọc/ghi gold. Nó từ chối thư mục non-empty không có
 managed marker; không xóa directory tree, không follow symlink manifest/input.
-Chỉ 5 file input định danh và manifest được sinh lại, gold/provenance/hướng dẫn giữ nguyên.
+Generator sinh lại 8 PDF và các JSON input/manifest; không đọc/ghi gold. Các số tiền
+trong business gold không đổi. Evidence gold và provenance đã cập nhật danh tính
+theo nguồn mới trong lượt đổi tên, ngoài generator.
 
 ## Checklist test
 

@@ -29,13 +29,14 @@ TENANT = "tenant:uc03-pilot"
 EMPLOYEE = "employee:employee-a"
 ACCOUNTANT = "employee:accountant-demo"
 APPROVER = "employee:approver"
-CLAIMANT_NAME = "Nguyễn An"
+CLAIMANT_NAME = "NGUYỄN MINH AN"
+COMPANY_NAME = "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH"
 # The two advance-basis documents are alternative test choices for F01 only; both
 # describe the SAME 4.000.000 đ advance and must never be summed into 8.000.000.
 TRANSFER_DOC = "03-bien-nhan-chuyen-khoan.pdf"
 CASH_DOC = "04-phieu-chi-tien-mat.pdf"
 FILES = {"01-giay-quyet-toan.pdf", "02-hoa-don-dich-vu.pdf", "organization.json",
-         "submission.json", "employee-confirmation.json", TRANSFER_DOC, CASH_DOC}
+         "organization-cash.json", "submission.json", "employee-confirmation.json", TRANSFER_DOC, CASH_DOC}
 # Source specifications, not expected outcomes. Hidden gold is authored separately.
 CASES = (
     ("UC03-F01", "f01-cong-tac-thu-lai-tien-thua", "IR26101001", "Bữa ăn phục vụ công việc trong chuyến công tác", "Suất", 10, 300_000, 3_240_000, 4_000_000, "Ba triệu hai trăm bốn mươi nghìn đồng"),
@@ -97,10 +98,10 @@ def write_pdf(path: Path, title: str, story, *, left_margin: float = 46, right_m
 
 def render_settlement_form(case, inp: Path) -> None:
     cid, _, number, description, unit, qty, price, total, advance, words = case
-    form = [paragraph("CÔNG TY INVOICEREFEREE", size=12),
+    form = [paragraph(COMPANY_NAME, size=10),
             paragraph("GIẤY ĐỀ NGHỊ QUYẾT TOÁN CÔNG TÁC", size=17, center=True),
             paragraph(f"Số: QT-{number}   |   Hà Nội, ngày 10 tháng 10 năm 2026", center=True),
-            Spacer(1, 8), paragraph("Kính gửi: Bộ phận kế toán Công ty InvoiceReferee"),
+            Spacer(1, 8), paragraph(f"Kính gửi: Bộ phận kế toán {COMPANY_NAME}"),
             paragraph(f"Người đề nghị: {CLAIMANT_NAME}"),
             paragraph("Nơi công tác: Hà Nội"),
             paragraph("Thời gian công tác: từ 06/10/2026 đến 10/10/2026"),
@@ -128,7 +129,7 @@ def render_invoice(case, inp: Path) -> None:
                Spacer(1, 8), paragraph("Đơn vị bán: Công ty TNHH Dịch vụ An Bình"),
                paragraph("Mã số thuế bên bán: 0101234565"),
                paragraph("Địa chỉ bên bán: 86 Trần Thái Tông, Cầu Giấy, Hà Nội"),
-               paragraph("Đơn vị mua: Công ty InvoiceReferee"),
+               paragraph(f"Đơn vị mua: {COMPANY_NAME}"),
                paragraph("Mã số thuế bên mua: 0319999996"),
                paragraph("Địa chỉ bên mua: 128 Nguyễn Văn Linh, Thành phố Hồ Chí Minh"),
                paragraph(f"Họ tên người mua: {CLAIMANT_NAME}"),
@@ -167,15 +168,20 @@ def _advance_paragraph(text: str, *, size: float = 10, center: bool = False, rig
     return Paragraph(escape(str(text)).replace("\n", "<br/>"), style)
 
 
-def render_advance_documents(case, inp: Path, *, status: str = "Hoàn tất") -> None:
-    """F01-only: two alternative advance-basis documents for the SAME 4m advance.
+def render_advance_documents(
+    case, inp: Path, *, status: str = "Hoàn tất", purpose: str | None = None,
+    claimant: str = CLAIMANT_NAME, company: str = COMPANY_NAME,
+    accountant: str = "Trần Bình", approver: str = "Lê Minh",
+    advance_reference: str | None = None,
+) -> None:
+    """Two alternative advance-basis documents for the SAME 4m advance.
 
     One transfer receipt and one cash voucher; only one is used per test branch,
     so the 4.000.000 đ advance is never counted twice.
     """
     cid, _, number, _, _, _, _, total, advance, _ = case
-    claimant = CLAIMANT_NAME
-    purpose = "Ứng tiền cho chuyến công tác Hà Nội từ 06/10/2026 đến 10/10/2026"
+    purpose = purpose or "Ứng tiền cho chuyến công tác Hà Nội từ 06/10/2026 đến 10/10/2026"
+    advance_reference = advance_reference or f"ADV-{cid}"
     advance_words = "Bốn triệu đồng"
 
     adv_margin = 52.0  # 18.3 mm
@@ -195,19 +201,15 @@ def render_advance_documents(case, inp: Path, *, status: str = "Hoàn tất") ->
 
     # A. Header công ty; metadata mã giao dịch/ngày đặt gọn
     t_header = Table([
-        [
-            Table([
-                [_advance_paragraph("CÔNG TY INVOICEREFEREE", size=11, color=c_text)],
-                [_advance_paragraph("Địa chỉ: 128 Nguyễn Văn Linh, Quận 7, TP. Hồ Chí Minh", size=9, color=c_muted)],
-            ], colWidths=[300], style=[("VALIGN", (0, 0), (-1, -1), "TOP"), ("PADDING", (0, 0), (-1, -1), 0)]),
-            Table([
-                [_advance_paragraph(f"Mã giao dịch: FT-{cid}-0001", size=9.5, right=True, color=c_text)],
-                [_advance_paragraph("Ngày giao dịch: 05/10/2026", size=9, right=True, color=c_text_sec)],
-            ], colWidths=[usable_w - 300], style=[("VALIGN", (0, 0), (-1, -1), "TOP"), ("PADDING", (0, 0), (-1, -1), 0)]),
-        ]
-    ], colWidths=[300, usable_w - 300])
+        [_advance_paragraph(company, size=9, color=c_text),
+         _advance_paragraph(f"Mã giao dịch: FT-{cid}-0001", size=9, right=True, color=c_text)],
+        [_advance_paragraph("Địa chỉ: 128 Nguyễn Văn Linh, TP. Hồ Chí Minh", size=8, color=c_muted),
+         _advance_paragraph("Ngày giao dịch: 05/10/2026", size=9, right=True, color=c_text_sec)],
+    ], colWidths=[usable_w * 0.56, usable_w * 0.44], hAlign="LEFT")
     t_header.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
         ("LINEBELOW", (0, 0), (-1, -1), 0.75, c_border),
     ]))
@@ -239,7 +241,7 @@ def render_advance_documents(case, inp: Path, *, status: str = "Hoàn tất") ->
     half_w = (usable_w - 12) / 2
     left_inner = Table([
         [_advance_paragraph("Bên chuyển", size=8.5, color=c_muted)],
-        [_advance_paragraph("Công ty InvoiceReferee", size=10.5, color=c_text, leading=14)],
+        [_advance_paragraph(company, size=10.5, color=c_text, leading=14)],
         [Spacer(1, 6)],
         [_advance_paragraph("Tài khoản chuyển", size=8.5, color=c_muted)],
         [_advance_paragraph("Ngân hàng Demo — 0123456789", size=10, color=c_text_sec, leading=14)],
@@ -301,7 +303,7 @@ def render_advance_documents(case, inp: Path, *, status: str = "Hoàn tất") ->
         [_advance_paragraph("Nội dung chuyển tiền", size=9.5, color=c_muted),
          _advance_paragraph(purpose, size=10, color=c_text, leading=14)],
         [_advance_paragraph("Tham chiếu khoản ứng", size=9.5, color=c_muted),
-         _advance_paragraph(f"ADV-{cid}", size=10, color=c_text, leading=14)],
+         _advance_paragraph(advance_reference, size=10, color=c_text, leading=14)],
     ], colWidths=[145, usable_w - 145])
     t_details.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -318,7 +320,7 @@ def render_advance_documents(case, inp: Path, *, status: str = "Hoàn tất") ->
         [_advance_paragraph("Người lập biên nhận", size=10, center=True, color=c_text)],
         [_advance_paragraph("(Ký, ghi rõ họ tên)", size=8.5, center=True, color=c_muted)],
         [Spacer(1, 46)],
-        [_advance_paragraph("Ký bởi: Trần Bình", size=9.5, center=True, color=c_text)],
+        [_advance_paragraph(f"Ký bởi: {accountant}", size=9.5, center=True, color=c_text)],
         [_advance_paragraph("Ký ngày: 05/10/2026", size=8.5, center=True, color=c_muted)],
     ], colWidths=[sig_w], style=[
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
@@ -343,19 +345,15 @@ def render_advance_documents(case, inp: Path, *, status: str = "Hoàn tất") ->
 
     # A. Header công ty; số phiếu/ngày
     t_cash_header = Table([
-        [
-            Table([
-                [_advance_paragraph("CÔNG TY INVOICEREFEREE", size=11, color=c_text)],
-                [_advance_paragraph("Địa chỉ: 128 Nguyễn Văn Linh, Quận 7, TP. Hồ Chí Minh", size=9, color=c_muted)],
-            ], colWidths=[300], style=[("VALIGN", (0, 0), (-1, -1), "TOP"), ("PADDING", (0, 0), (-1, -1), 0)]),
-            Table([
-                [_advance_paragraph(f"Số phiếu: PC-{cid}-0001", size=9.5, right=True, color=c_text)],
-                [_advance_paragraph("Ngày: 05/10/2026", size=9, right=True, color=c_text_sec)],
-            ], colWidths=[usable_w - 300], style=[("VALIGN", (0, 0), (-1, -1), "TOP"), ("PADDING", (0, 0), (-1, -1), 0)]),
-        ]
-    ], colWidths=[300, usable_w - 300])
+        [_advance_paragraph(company, size=9, color=c_text),
+         _advance_paragraph(f"Số phiếu: PC-{cid}-0001", size=9, right=True, color=c_text)],
+        [_advance_paragraph("Địa chỉ: 128 Nguyễn Văn Linh, TP. Hồ Chí Minh", size=8, color=c_muted),
+         _advance_paragraph("Ngày: 05/10/2026", size=9, right=True, color=c_text_sec)],
+    ], colWidths=[usable_w * 0.56, usable_w * 0.44], hAlign="LEFT")
     t_cash_header.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
         ("LINEBELOW", (0, 0), (-1, -1), 0.75, c_border),
     ]))
@@ -385,13 +383,13 @@ def render_advance_documents(case, inp: Path, *, status: str = "Hoàn tất") ->
     # D. Người nhận, lý do chi, tham chiếu khoản ứng
     t_cash_details = Table([
         [_advance_paragraph("Công ty chi", size=9.5, color=c_muted),
-         _advance_paragraph("Công ty InvoiceReferee", size=10, color=c_text, leading=14)],
+         _advance_paragraph(company, size=10, color=c_text, leading=14)],
         [_advance_paragraph("Người nhận tiền", size=9.5, color=c_muted),
          _advance_paragraph(claimant, size=10, color=c_text, leading=14)],
         [_advance_paragraph("Lý do chi", size=9.5, color=c_muted),
          _advance_paragraph(purpose, size=10, color=c_text, leading=14)],
         [_advance_paragraph("Tham chiếu khoản ứng", size=9.5, color=c_muted),
-         _advance_paragraph(f"ADV-{cid}", size=10, color=c_text, leading=14)],
+         _advance_paragraph(advance_reference, size=10, color=c_text, leading=14)],
     ], colWidths=[145, usable_w - 145])
     t_cash_details.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -436,14 +434,14 @@ def render_advance_documents(case, inp: Path, *, status: str = "Hoàn tất") ->
             _advance_paragraph("Người phê duyệt", size=9.5, center=True, color=c_text),
             _advance_paragraph("(Ký, ghi rõ họ tên)", size=8.5, center=True, color=c_muted),
             Spacer(1, 46),
-            _advance_paragraph("Ký bởi: Lê Minh", size=9.5, center=True, color=c_text),
+            _advance_paragraph(f"Ký bởi: {approver}", size=9.5, center=True, color=c_text),
             _advance_paragraph("Ký ngày: 05/10/2026", size=8.5, center=True, color=c_muted),
         ],
         [
             _advance_paragraph("Kế toán / người giao tiền", size=9.5, center=True, color=c_text),
             _advance_paragraph("(Ký, ghi rõ họ tên)", size=8.5, center=True, color=c_muted),
             Spacer(1, 46),
-            _advance_paragraph("Ký bởi: Trần Bình", size=9.5, center=True, color=c_text),
+            _advance_paragraph(f"Ký bởi: {accountant}", size=9.5, center=True, color=c_text),
             _advance_paragraph("Ký ngày: 05/10/2026", size=8.5, center=True, color=c_muted),
         ],
         [
@@ -480,7 +478,7 @@ def json_write(path: Path, value) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def context_for(case):
+def context_for(case, *, method: str = "TRANSFER"):
     cid, _, number, _, _, _, _, total, advance, _ = case
     activity = f"activity:{cid.lower()}"
     interval = ["2026-10-01T00:00:00+07:00", "2026-12-31T23:59:59+07:00"]
@@ -490,12 +488,17 @@ def context_for(case):
               for name, actor, actions, maximum in (
                   ("recognize", "system:referee", ["RECOGNIZE_COST"], 8_000_000),
                   ("issue", "system:referee", ["ISSUE_PAYMENT", "ISSUE_COLLECTION"], 4_000_000),
-                  ("approver", APPROVER, ["AUTHORIZE_ACTIVITY", "SET_BUDGET", "RECOGNIZE_COST",
+                  ("approver", APPROVER, ["AUTHORIZE_ACTIVITY", "RECOGNIZE_COST",
                    "EXCEPT_POLICY", "ISSUE_PAYMENT", "ISSUE_COLLECTION"], 20_000_000),
                   ("accountant", ACCOUNTANT, ["CONFIRM_FINANCIAL_FACT", "RECORD_ACTUAL", "STOP", "RESUME"], 20_000_000))]
     quote = f"Ứng đã hoàn tất cho {CLAIMANT_NAME}, hoạt động {activity}: {money(advance)}."
+    fund = "company:cash-demo" if method == "CASH" else "company:bank-demo"
+    transaction = f"company:bank-demo:ADV-{cid}"
+    if cid == "UC03-F01":
+        transaction = f"cash:PC-{cid}-0001" if method == "CASH" else f"transfer:FT-{cid}-0001"
     organization = dict(
         organization_id=TENANT, tenant=TENANT, profile="TRAVEL", data_origin="SIMULATED",
+        company_name=COMPANY_NAME,
         financial_as_of=DATE, records=[],
         activity=dict(activity_id=activity, name="Công tác Hà Nội", occurred_at="2026-10-06T09:00:00+07:00",
                       purpose="Làm việc với khách hàng tại Hà Nội", profile="TRAVEL",
@@ -507,19 +510,17 @@ def context_for(case):
         policies=[dict(id="policy:pilot", version="q32-v1", effective_from=interval[0],
                        effective_to=interval[1], profile="TRAVEL", rules=["EMPLOYEE_PAID_INVOICE_BOUNDED"])],
         grants=grants,
-        budgets=[dict(id=f"budget:{cid}", activity=activity, amount=8_000_000,
-                      effect_range=interval, actor=APPROVER, grant_ref=f"grant:{cid}:approver")],
-        ledger=[dict(id=f"advance:{cid}", external_key=f"company:bank-demo:ADV-{cid}",
-                     kind="ADVANCE_RECEIVED", scope=activity, payer="company:demo", payee=EMPLOYEE,
+        ledger=[dict(id=f"advance:{cid}", external_key=transaction,
+                     kind="ADVANCE_RECEIVED", scope=activity, payer=COMPANY_NAME, payee=EMPLOYEE,
                      amount=advance, event_at="2026-10-05T09:00:00+07:00",
                      recorded_at="2026-10-05T10:00:00+07:00", verification_state="CONFIRMED",
                      allocation_state="ALLOCATED", reverses_event_id=None,
                      witness_keys=[f"advance:{cid}"])],
         coverage=dict(employee=EMPLOYEE, activity=activity, start="2026-09-01T00:00:00+07:00",
-                      as_of=DATE, fund_ids=["company:bank-demo"],
+                      as_of=DATE, fund_ids=[fund],
                       flow_kinds=["ADVANCE_RECEIVED", "REIMBURSEMENT_RECEIVED", "EMPLOYEE_RETURN",
                                   "REVERSAL", "OBSERVED_UNALLOCATED"],
-                      opening_by_fund={"company:bank-demo": 0}, ledger_version="ledger:v1",
+                      opening_by_fund={fund: 0}, ledger_version="ledger:v1",
                       witness_keys=[f"coverage:{cid}"]),
         witnesses=[dict(record_key=f"advance:{cid}", quote=quote, actor=ACCOUNTANT,
                         scope=activity, observed_at="2026-10-05T10:00:00+07:00"),
@@ -529,20 +530,29 @@ def context_for(case):
     return organization
 
 
-def generate(output: Path) -> None:
+def _managed_output(output: Path, marker: str, stamp: str) -> Path:
     output = output.absolute()
     if output.is_symlink() or output.resolve() in {ROOT, ROOT / "data", Path("/"), Path.home()}:
         raise ValueError("unsafe output directory")
-    if any((output / name).is_symlink() for name in (MARKER, "manifest.json")):
+    if any((output / name).is_symlink() for name in (marker, "manifest.json")):
         raise ValueError("managed marker/manifest must not be a symlink")
-    if (output / MARKER).exists() and (output / MARKER).read_text() != "UC03 pilot input generator v1\n":
+    if (output / marker).exists() and (output / marker).read_text() != stamp:
         raise ValueError("foreign managed marker; refusing overwrite")
-    if output.exists() and any(output.iterdir()) and not (output / MARKER).is_file():
+    if output.exists() and any(output.iterdir()) and not (output / marker).is_file():
         raise ValueError("refusing unmanaged non-empty output; no files deleted")
     output.mkdir(parents=True, exist_ok=True)
-    (output / MARKER).write_text("UC03 pilot input generator v1\n")
+    (output / marker).write_text(stamp)
+    return output
+
+
+def _register_font() -> None:
     pdfmetrics.registerFont(TTFont("PilotNoto", str(FONT)))
     pdfmetrics.registerFontFamily("PilotNoto", normal="PilotNoto", bold="PilotNoto", italic="PilotNoto", boldItalic="PilotNoto")
+
+
+def generate(output: Path) -> None:
+    output = _managed_output(output, MARKER, "UC03 pilot input generator v1\n")
+    _register_font()
     entries = []
     for case in CASES:
         cid, folder, number, _, _, _, _, total, _, _ = case
@@ -558,6 +568,8 @@ def generate(output: Path) -> None:
         if cid == "UC03-F01":
             render_advance_documents(case, inp)
         json_write(inp / "organization.json", context_for(case))
+        if cid == "UC03-F01":
+            json_write(inp / "organization-cash.json", context_for(case, method="CASH"))
         json_write(inp / "submission.json", dict(employee=EMPLOYEE,
                    activity=f"activity:{cid.lower()}", declared_purpose="Làm việc với khách hàng tại Hà Nội",
                    notes="Nhân viên nộp giấy quyết toán và hóa đơn dịch vụ; "
@@ -577,14 +589,62 @@ def generate(output: Path) -> None:
     json_write(output / "manifest.json", dict(schema_version="uc03-pilot-input/v1",
         data_origin="SYNTHETIC", runtime_status="EVIDENCE_READY_FINANCE_NOT_CONNECTED",
         corpus_status="INPUTS_GENERATED_NOT_RUNTIME_PASS", entries=entries))
-    print(f"generated 3 cases / 6 PDFs at {output}; gold never read or written")
+    print(f"generated 3 cases / 8 PDFs at {output}; gold never read or written")
+
+
+def generate_tc01(output: Path, context_path: Path) -> None:
+    """Read the server's TC01 fixture, not gold, and render two alternatives."""
+    from copy import deepcopy
+    from invoice_referee.domain.organization import OrganizationContext
+
+    context = OrganizationContext.model_validate_json(context_path.read_bytes())
+    events = [e for e in context.ledger if e.get("kind") == "ADVANCE_RECEIVED"]
+    if len(events) != 1 or int(events[0]["amount"]) != 4_000_000:
+        raise ValueError("TC01 renderer requires exactly one 4m advance")
+    people = {str(p["id"]): str(p["name"]) for p in context.people}
+    activity = context.activity or {}
+    claimant = people[str(events[0]["payee"])]
+    company = context.company_name
+    if not company or not activity.get("purpose"):
+        raise ValueError("TC01 company identity and work purpose are required")
+    marker = ".tc01-advance-managed"
+    allowed = {marker, TRANSFER_DOC, CASH_DOC, "context-chuyen-khoan.json", "context-tien-mat.json", "manifest.json"}
+    output = _managed_output(output, marker, "TC01 advance generator v1\n")
+    if any(p.is_symlink() or p.name not in allowed for p in output.iterdir()):
+        raise ValueError("unexpected files/symlinks in TC01 output; refusing overwrite")
+    _register_font()
+    case = ("TC01", "", "", "", "", 0, 0, 0, 4_000_000, "")
+    render_advance_documents(
+        case, output, purpose=f"Ứng tiền {str(activity['purpose']).removeprefix('Chi phí ')}",
+        claimant=claimant, company=company, accountant=people[ACCOUNTANT].split(" (", 1)[0],
+        approver=people[APPROVER].split(" (", 1)[0], advance_reference="TU-TC01",
+    )
+    for label, method, reference, fund in (
+        ("chuyen-khoan", "TRANSFER", "FT-TC01-0001", "company:bank-demo"),
+        ("tien-mat", "CASH", "PC-TC01-0001", "company:cash-demo"),
+    ):
+        variant = deepcopy(context.model_dump(mode="json"))
+        variant["ledger"][0].update(external_key=f"{method.lower()}:{reference}", payer=company)
+        variant["coverage"]["fund_ids"] = [fund]
+        variant["coverage"]["opening_by_fund"] = {fund: 0}
+        json_write(output / f"context-{label}.json", variant)
+    files = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(output.iterdir())
+             if p.name not in {marker, "manifest.json"}}
+    json_write(output / "manifest.json", dict(data_origin="SYNTHETIC", case_id="TC01", files=files,
+               alternatives=True, instruction="Use one payment method and its matching context; never sum both advances."))
+    print(f"generated TC01 transfer/cash alternatives at {output}; gold never read or written")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "data/test-kit/uc03-pilot")
+    parser.add_argument("--tc01-output", type=Path, help="Generate only the TC01 advance alternatives here")
+    parser.add_argument("--tc01-context", type=Path, default=ROOT / "data/demo/tc01-company-context.json")
     args = parser.parse_args()
-    generate(args.output)
+    if args.tc01_output is not None:
+        generate_tc01(args.tc01_output, args.tc01_context)
+    else:
+        generate(args.output)
 
 
 if __name__ == "__main__":

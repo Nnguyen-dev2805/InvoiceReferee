@@ -78,6 +78,9 @@ _SETTLEMENT_FORM = DocumentProfile(
     any_of_fields=("printed_total", "printed_return", "printed_reimbursement"),
     field_importance={
         "declared_name": "CRITICAL",
+        # Optional source date used to compare settlement-paper chronology with
+        # an advance voucher. It is never a substitute for the work period.
+        "document_date": "NON_CRITICAL",
         "trip_destination": "CRITICAL",
         "trip_start": "CRITICAL",
         "trip_end": "CRITICAL",
@@ -95,6 +98,7 @@ _SETTLEMENT_FORM = DocumentProfile(
     },
     allowed_fields=(
         "declared_name",
+        "document_date",
         "trip_destination",
         "trip_start",
         "trip_end",
@@ -162,6 +166,15 @@ _RECEIPT_LIKE = DocumentProfile(
         # evidence for backend dossier linking, never required.
         "advance_reference",
     ),
+)
+
+# A collection receipt can name both sides of a transfer. Keep this separate
+# from generic PAPER_RECEIPT so payment-specific party extraction does not widen
+# the vocabulary for ordinary purchase receipts.
+_COLLECTION_RECEIPT = DocumentProfile(
+    required_fields=_RECEIPT_LIKE.required_fields,
+    field_importance=_RECEIPT_LIKE.field_importance,
+    allowed_fields=(*_RECEIPT_LIKE.allowed_fields, "payee_name"),
 )
 
 _HOTEL = DocumentProfile(
@@ -304,7 +317,7 @@ DOCUMENT_PROFILES: dict[str, DocumentProfile] = {
     "SETTLEMENT_FORM": _SETTLEMENT_FORM,
     "E_INVOICE": _E_INVOICE,
     "PAPER_RECEIPT": _RECEIPT_LIKE,
-    "COLLECTION_RECEIPT": _RECEIPT_LIKE,
+    "COLLECTION_RECEIPT": _COLLECTION_RECEIPT,
     "HOTEL_RECEIPT": _HOTEL,
     "TRANSPORT_TICKET": _TRANSPORT,
     "PAYMENT_PROOF": _PAYMENT_PROOF,

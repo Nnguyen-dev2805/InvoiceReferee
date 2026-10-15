@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Callable, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from zoneinfo import ZoneInfo
 
 from invoice_referee.domain.case import (
@@ -33,6 +33,8 @@ from invoice_referee.domain.commands import (
     AttachSources,
     CaseCommand,
     CommandResult,
+    ConfirmCoverage,
+    ConfirmCoverage,
     Control,
     CreateDraft,
     Decide,
@@ -43,8 +45,16 @@ from invoice_referee.domain.commands import (
     Submit,
 )
 from invoice_referee.domain.common import Fact, SignedVnd, Vnd
-from invoice_referee.domain.evidence import SourceRef
-from invoice_referee.domain.finance import MoneyEvent, Projection
+from invoice_referee.domain.evidence import EvidenceRef, SourceRef
+from invoice_referee.domain.finance import (
+    ActivityAcceptance,
+    ActivityLinkSignal,
+    CoverageRecord,
+    EmployeeReturnDraft,
+    MoneyEvent,
+    MoneyMovementSignal,
+    Projection,
+)
 from invoice_referee.domain.issues import BusinessIssue
 from invoice_referee.workflow.controls import (
     StaleControlError,
@@ -175,25 +185,6 @@ def _unknown_projection() -> Projection:
         R=Fact[Vnd](key="projection:R", state="UNKNOWN"),
         unpaid=Fact[Vnd](key="projection:unpaid", state="UNKNOWN"),
         S=Fact[SignedVnd](key="projection:S", state="UNKNOWN"),
-    )
-
-
-def _context_issue(root_id: str) -> BusinessIssue:
-    return BusinessIssue(
-        id=f"issue:context:{root_id}",
-        kind="FACT",
-        field_or_rule="budget:B",
-        owner="org-data",
-        status="OPEN",
-        basis=(
-            "Context demo chưa có bản ghi ngân sách hoặc quyết định hoạt động "
-            "cho hoạt động này."
-        ),
-        refs=(),
-        question=(
-            "Tìm bản ghi ngân sách/quyết định hoạt động; chưa có số 0 thay thế "
-            "cho phần chưa xác minh."
-        ),
     )
 
 
@@ -360,9 +351,18 @@ class _DemoActivity(_ContextModel):
     status: Literal["AUTHORIZED", "PROPOSED"] = "AUTHORIZED"
     # Server-owned business profile (T1); defaults to TRAVEL for older contexts.
     profile: str = "TRAVEL"
+    # Server-owned dossier identities used by backend settlement linking.
+    references: tuple[str, ...] = ()
     budget: _DemoBudget | None = None
     # Optional STUB hand-transcription for the dev/UI path (contracts §5).
     transcription: tuple[dict[str, object], ...] | None = None
+
+    @field_validator("references", mode="before")
+    @classmethod
+    def _validate_references(cls, value: object) -> tuple[str, ...]:
+        from invoice_referee.workflow.context_records import validate_activity_references
+
+        return validate_activity_references(value)
 
 
 class _DemoGrant(_ContextModel):
@@ -849,13 +849,14 @@ class CaseWorkflow:
                 budget = activity.budget
                 cx.execute(
                     "INSERT INTO context_activities (activity_id, tenant, name, "
-                    "occurred_at, purpose, budget_amount, budget_effect_from, status, profile) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                    "occurred_at, purpose, budget_amount, budget_effect_from, status, profile, "
+                    "references_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                     "ON CONFLICT(tenant, activity_id) DO UPDATE SET name = excluded.name, "
                     "occurred_at = excluded.occurred_at, purpose = excluded.purpose, "
                     "budget_amount = excluded.budget_amount, "
                     "budget_effect_from = excluded.budget_effect_from, "
-                    "status = excluded.status, profile = excluded.profile",
+                    "status = excluded.status, profile = excluded.profile, "
+                    "references_json = excluded.references_json",
                     (
                         activity.id,
                         tenant,
@@ -870,6 +871,7 @@ class CaseWorkflow:
                         else None,
                         activity.status,
                         activity.profile,
+                        json.dumps(list(activity.references), ensure_ascii=False),
                     ),
                 )
             # Seed a demo STUB transcription for activities that declare one, so
@@ -985,6 +987,7 @@ class CaseWorkflow:
                 "purpose": activity.purpose,
                 "status": activity.status,
                 "profile": activity.profile,
+                "references": list(activity.references),
             }
             for activity in data.activities
         )
@@ -1025,6 +1028,7 @@ class CaseWorkflow:
         context = OrganizationContext.model_validate(
             {
                 "organization_id": tenant,
+                "company_name": data.organization.name,
                 "tenant": tenant,
                 "profile": "TRAVEL",
                 "data_origin": "SIMULATED",
@@ -1155,6 +1159,7 @@ class CaseWorkflow:
             "ANSWER_ISSUE": self._answer_issue,
             "DECIDE": self._decide,
             "RECORD_ACTUAL": self._record_actual,
+            "CONFIRM_COVERAGE": self._confirm_coverage,
             "MARK_EXECUTION": self._mark_execution,
             "CONTROL": self._control,
             "OVERRIDE": self._override,
@@ -1422,12 +1427,14 @@ class CaseWorkflow:
         *,
         method_hint: str | None = None,
     ):
-        """Read an uploaded advance document into a prefilled draft (plan D).
+        """Read an attached advance document into a durable, prefilled draft.
 
         The accountant uploads a transfer receipt or cash voucher; the evidence
         pipeline reads every page and extracts fields, and this returns a DRAFT
-        (never a committed event). Provider I/O runs OUTSIDE any transaction. A
-        read that yields no usable document is a typed failure, not a fake draft.
+        (never a committed event). The source must already belong to this root and
+        is loaded by its persisted source ID/digest. Provider I/O runs OUTSIDE any
+        transaction. The report and draft are stored so confirmation can validate
+        the exact read later, including after restart.
         """
         import hashlib
 
@@ -1436,7 +1443,11 @@ class CaseWorkflow:
         from invoice_referee.evidence.trace import RunBudget
         from invoice_referee.reconciliation.advance import draft_advance_from_document
 
-        # Scope/employee come from the stored case, never the client.
+        if session.persona != "accountant":
+            raise UnsupportedCommandError("Chỉ kế toán được bổ sung chứng từ ứng.")
+
+        # Scope/employee and source identities come from the stored root, never
+        # the client or a transient reference.
         connection = self.db.connect()
         try:
             row = connection.execute(
@@ -1455,19 +1466,32 @@ class CaseWorkflow:
             )
         sources = []
         source_bytes: dict[str, bytes] = {}
-        for index, (filename, media, payload) in enumerate(uploads, start=1):
-            source_id = f"source:{hashlib.sha256(payload).hexdigest()[:16]}:adv{index}"
+        for filename, media, payload in uploads:
+            digest = hashlib.sha256(payload).hexdigest()
+            connection = self.db.connect()
+            try:
+                stored = connection.execute(
+                    "SELECT * FROM case_sources WHERE tenant = ? AND root_id = ? "
+                    "AND digest = ? ORDER BY attached_at DESC, source_id DESC LIMIT 1",
+                    (session.tenant, root_id, digest),
+                ).fetchone()
+            finally:
+                connection.close()
+            if stored is None:
+                raise UnsupportedCommandError(
+                    "Chứng từ ứng chưa được lưu vào hồ sơ này. Tải lại chứng từ trước khi đọc."
+                )
             sources.append(
                 SourceRef(
-                    id=source_id,
-                    digest=hashlib.sha256(payload).hexdigest(),
+                    id=str(stored["source_id"]),
+                    digest=digest,
                     tenant=session.tenant,
                     media=media,  # type: ignore[arg-type]
-                    storage_key=f"{session.tenant}/{root_id}/{source_id}",
-                    filename=filename,
+                    storage_key=str(stored["storage_key"]),
+                    filename=str(stored["filename"] or filename),
                 )
             )
-            source_bytes[source_id] = payload
+            source_bytes[str(stored["source_id"])] = payload
         with self._trace_operation(
             "advance-draft-read",
             metadata={
@@ -1517,49 +1541,494 @@ class CaseWorkflow:
                 employee=str(row["employee"]),
                 method_hint=method_hint,
             )
-            # Already-recorded hint (14/10/2026): when this exact transaction
-            # identity is already in company history, reloading it is
-            # idempotent — say so upfront instead of letting A look doubled.
-            # Read-only checks on a short-lived connection (no transaction).
-            if draft.transaction_reference and draft.instrument_method:
-                from invoice_referee.reconciliation.advance_identity import (
-                    build_external_key,
+            draft_id = f"advance-draft:{uuid.uuid4().hex}"
+            draft = draft._replace(draft_id=draft_id)
+            now = self._now_iso()
+            # Link resolution and draft insertion share one short serialized
+            # transaction. A second root reading the same transaction after this
+            # insert sees the competing draft and cannot also auto-link it.
+            with self.db.transaction() as cx:
+                root = self._require_root(cx, session, root_id)
+                if str(root["activity"]) != draft.scope or str(root["employee"]) != draft.employee:
+                    raise CommandConflictError(
+                        "Phạm vi hồ sơ đã đổi trong lúc đọc chứng từ; hãy đọc lại bản nháp."
+                    )
+                activity_link = self._advance_activity_link(
+                    cx,
+                    session.tenant,
+                    str(root["employee"]),
+                    draft.activity_reference,
+                    current_activity=str(root["activity"]),
+                    root_id=root_id,
+                    advance_document=candidates[0],
+                    transaction_reference=draft.transaction_reference,
+                    instrument_method=draft.instrument_method,
+                    draft_refs=draft.refs,
                 )
+                matched_activity = (
+                    activity_link.activity_id
+                    if activity_link.status == "LINKED"
+                    and activity_link.activity_id == str(root["activity"])
+                    else None
+                )
+                draft = draft._replace(
+                    activity_link_status=(
+                        "CONFLICT"
+                        if activity_link.status == "LINKED" and matched_activity is None
+                        else activity_link.status
+                    ),
+                    matched_activity_id=matched_activity,
+                    activity_link_basis=activity_link.basis,
+                    activity_link_signals=activity_link.signals,
+                    activity_link_candidate_count=activity_link.candidate_count,
+                )
+                if draft.transaction_reference and draft.instrument_method:
+                    from invoice_referee.reconciliation.advance_identity import (
+                        build_external_key,
+                    )
 
-                key = build_external_key(
-                    draft.instrument_method.lower(), draft.transaction_reference
-                )
-                known = False
-                if key is not None:
-                    connection = self.db.connect()
-                    try:
+                    key = build_external_key(
+                        draft.instrument_method.lower(), draft.transaction_reference
+                    )
+                    if key is not None:
                         known = (
-                            connection.execute(
+                            cx.execute(
                                 "SELECT 1 FROM money_events WHERE tenant = ? "
                                 "AND external_key = ? LIMIT 1",
                                 (session.tenant, key),
                             ).fetchone()
                             is not None
                         )
-                    finally:
-                        connection.close()
-                    if not known:
-                        with self.db.transaction() as cx:
-                            known = (
-                                self._snapshot_ledger_entry(cx, session.tenant, key)
-                                is not None
-                            )
-                if known:
-                    draft = draft._replace(already_recorded=True)
-            draft_summary = (
-                draft.model_dump(mode="json")
-                if hasattr(draft, "model_dump")
-                else draft
-                if isinstance(draft, dict)
-                else {"status": "DRAFT_CREATED"}
-            )
-            operation.outputs.update(trace_read_report(report, draft=draft_summary))
+                        if not known:
+                            known = self._snapshot_ledger_entry(cx, session.tenant, key) is not None
+                        if known:
+                            draft = draft._replace(already_recorded=True)
+                draft_payload = {
+                    **draft._asdict(),
+                    "refs": [ref.model_dump(mode="json") for ref in draft.refs],
+                    "activity_link_signals": [
+                        signal.model_dump(mode="json")
+                        for signal in draft.activity_link_signals
+                    ],
+                }
+                cx.execute(
+                    "INSERT INTO case_advance_drafts (draft_id, tenant, root_id, source_id, "
+                    "actor, draft_json, report_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        draft_id,
+                        session.tenant,
+                        root_id,
+                        draft.source_id,
+                        session.actor_id,
+                        json.dumps(draft_payload, ensure_ascii=False),
+                        report.model_dump_json(),
+                        now,
+                    ),
+                )
+                self._audit(
+                    cx,
+                    tenant=session.tenant,
+                    root_id=root_id,
+                    session_id=session.session_id,
+                    actor=session.actor_id,
+                    action="READ_ADVANCE_DRAFT",
+                    detail=json.dumps(
+                        {
+                            "draft_id": draft_id,
+                            "source_id": draft.source_id,
+                            "link_status": draft.activity_link_status,
+                            "link_basis": draft.activity_link_basis,
+                            "candidate_count": draft.activity_link_candidate_count,
+                        },
+                        ensure_ascii=False,
+                    ),
+                )
+            operation.outputs.update(trace_read_report(
+                report,
+                draft={
+                    "draft_id": draft.draft_id,
+                    "activity_link_status": draft.activity_link_status,
+                    "activity_link_basis": draft.activity_link_basis,
+                    "candidate_count": draft.activity_link_candidate_count,
+                    "link_signals": [signal.model_dump(mode="json") for signal in draft.activity_link_signals],
+                },
+            ))
         return draft
+
+    def get_advance_draft(self, session: DemoSession, root_id: str, draft_id: str | None = None):
+        """Re-evaluate a saved draft against current state without provider I/O or money writes."""
+        from invoice_referee.domain.evidence import ReadResult
+
+        if session.persona != "accountant":
+            raise UnsupportedCommandError("Chỉ kế toán được mở bản nháp chứng từ ứng.")
+        with self.db.transaction() as cx:
+            root = self._require_root(cx, session, root_id)
+            saved = cx.execute(
+                "SELECT * FROM case_advance_drafts WHERE tenant = ? AND root_id = ? "
+                "AND (? IS NULL OR draft_id = ?) ORDER BY created_at DESC, rowid DESC LIMIT 1",
+                (session.tenant, root_id, draft_id, draft_id),
+            ).fetchone()
+            if saved is None:
+                raise NotFoundError("Chưa có bản nháp chứng từ ứng đã lưu cho hồ sơ này.")
+            payload = json.loads(saved["draft_json"])
+            report = ReadResult.model_validate_json(saved["report_json"])
+            source = cx.execute(
+                "SELECT * FROM case_sources WHERE tenant = ? AND root_id = ? AND source_id = ?",
+                (session.tenant, root_id, saved["source_id"]),
+            ).fetchone()
+            document = next((d for d in report.documents if d.source_id == saved["source_id"]), None)
+            refs = tuple(EvidenceRef.model_validate(ref) for ref in payload.get("refs", ()))
+            if (
+                source is None or document is None or not refs
+                or any(ref.source_id != source["source_id"] or ref.source_sha256 != source["digest"] for ref in refs)
+                or payload.get("scope") != root["activity"] or payload.get("employee") != root["employee"]
+            ):
+                raise CommandConflictError("Nguồn hoặc phạm vi bản nháp đã thay đổi; kiểm tra lại chứng từ.")
+            link = self._advance_activity_link(
+                cx, session.tenant, str(root["employee"]), payload.get("activity_reference"),
+                current_activity=str(root["activity"]), root_id=root_id,
+                advance_document=document, transaction_reference=payload.get("transaction_reference"),
+                instrument_method=payload.get("instrument_method"), draft_refs=refs,
+            )
+            matched = link.activity_id if link.status == "LINKED" and link.activity_id == root["activity"] else None
+            payload.update(
+                activity_link_status="CONFLICT" if link.status == "LINKED" and matched is None else link.status,
+                matched_activity_id=matched,
+                activity_link_basis=link.basis,
+                activity_link_signals=[signal.model_dump(mode="json") for signal in link.signals],
+                activity_link_candidate_count=link.candidate_count,
+            )
+            return {"draft": payload, "case_view": self._case_view(cx, root)}
+
+    async def read_employee_return_draft(
+        self,
+        session: DemoSession,
+        root_id: str,
+        source_id: str,
+        instruction_id: str,
+        *,
+        method_hint: str | None,
+        expected_case_version: int,
+    ) -> dict[str, object]:
+        """Read one employee return proof against a live COLLECT instruction.
+
+        The PDF is already stored in the root's case_sources. A saved read is
+        reused after retry/restart; this method creates no money event or coverage.
+        """
+        from datetime import time
+
+        from invoice_referee.domain.common import parse_vnd
+        from invoice_referee.domain.evidence import ReadResult, SourceRef
+        from invoice_referee.evidence.pipeline import read_root, trace_read_report
+        from invoice_referee.evidence.trace import RunBudget
+        from invoice_referee.reconciliation.advance import _method, _status
+        from invoice_referee.reconciliation.advance_identity import build_external_key
+        from invoice_referee.reconciliation.employee_return import (
+            match_employee_return,
+            read_field,
+        )
+        from invoice_referee.source_dates import parse_source_date
+
+        if session.persona != "employee":
+            raise UnsupportedCommandError("Chỉ nhân viên trong hồ sơ được tải chứng từ hoàn trả.")
+
+        connection = self.db.connect()
+        try:
+            root = connection.execute(
+                "SELECT * FROM cases WHERE id = ? AND tenant = ?",
+                (root_id, session.tenant),
+            ).fetchone()
+            if root is None:
+                raise NotFoundError("Hồ sơ không tồn tại trong tenant này.")
+            if str(root["employee"]) != session.actor_id:
+                raise UnsupportedCommandError("Nhân viên chỉ có thể gửi chứng từ cho hồ sơ của mình.")
+            if int(root["version"]) != expected_case_version:
+                raise StaleCommandError("Hồ sơ vừa thay đổi; tải lại rồi gửi lại chứng từ.")
+            instruction = connection.execute(
+                "SELECT * FROM instructions WHERE tenant = ? AND root_id = ? AND id = ?",
+                (session.tenant, root_id, instruction_id),
+            ).fetchone()
+            if (
+                instruction is None
+                or instruction["direction"] != "COLLECT"
+                or instruction["status"] not in ("ISSUED", "PARTIAL")
+                or int(instruction["amount"]) <= int(instruction["fulfilled_amount"])
+            ):
+                raise CommandConflictError("Không còn lệnh thu hiệu lực để gắn chứng từ hoàn trả.")
+            source = connection.execute(
+                "SELECT * FROM case_sources WHERE tenant = ? AND root_id = ? AND source_id = ?",
+                (session.tenant, root_id, source_id),
+            ).fetchone()
+            if source is None:
+                raise NotFoundError("Chứng từ hoàn trả chưa được lưu trong hồ sơ này.")
+            saved = connection.execute(
+                "SELECT * FROM case_money_drafts WHERE tenant = ? AND root_id = ? "
+                "AND source_id = ? AND instruction_id = ?",
+                (session.tenant, root_id, source_id, instruction_id),
+            ).fetchone()
+            if saved is not None:
+                report = ReadResult.model_validate_json(saved["report_json"])
+                existing_draft_id = str(saved["draft_id"])
+            else:
+                report = None
+                existing_draft_id = None
+            root_copy = dict(root)
+            instruction_copy = dict(instruction)
+            source_copy = dict(source)
+        finally:
+            connection.close()
+
+        if report is None:
+            reader, classifier, artifacts, provider_mode = self._evidence_wiring()
+            if reader is None:
+                raise UnsupportedCommandError("Chưa cấu hình đọc chứng từ (LIVE) cho môi trường này.")
+            source_ref = SourceRef(
+                id=str(source_copy["source_id"]),
+                digest=str(source_copy["digest"]),
+                tenant=session.tenant,
+                media=str(source_copy["media"]),  # type: ignore[arg-type]
+                storage_key=str(source_copy["storage_key"]),
+                filename=str(source_copy["filename"]),
+            )
+            source_path = self.uploads_dir / source_ref.storage_key
+            if not source_path.is_file():
+                raise UnsupportedCommandError("Không tìm thấy tệp hoàn trả đã lưu để đọc.")
+            with self._trace_operation(
+                "employee-return-draft-read",
+                metadata={"root_id": root_id, "instruction_id": instruction_id, "provider_mode": provider_mode},
+                tags=("operation", "employee-return-draft"),
+            ) as operation:
+                report = await read_root(
+                    sources=(source_ref,),
+                    reader=reader,
+                    classifier=classifier,
+                    artifacts=artifacts,
+                    source_bytes={source_id: source_path.read_bytes()},
+                    budget=RunBudget(),
+                    provider_mode=provider_mode,
+                    root_id=root_id,
+                    activity_profile=str(root_copy["profile"]),
+                )
+                operation.outputs.update(trace_read_report(report))
+
+        documents = sorted(
+            report.documents,
+            key=lambda document: (
+                document.document_type == "PAYMENT_PROOF",
+                document.profile_status == "CLEAR",
+                sum(field.state == "FOUND" for field in document.fields),
+            ),
+            reverse=True,
+        )
+        document = next(
+            (item for item in documents if item.document_type in ("PAYMENT_PROOF", "COLLECTION_RECEIPT")),
+            None,
+        )
+        if document is None:
+            raise UnsupportedCommandError("Không nhận diện được chứng từ chuyển tiền hoàn trả.")
+
+        field_names = (
+            "payer_name", "payee_name", "amount", "event_at",
+            "transaction_reference", "transaction_status",
+        )
+        values: dict[str, object | None] = {}
+        field_refs: dict[str, tuple[EvidenceRef, ...]] = {}
+        ambiguous_fields: list[str] = []
+        conflicting_fields: list[str] = []
+        for field_name in field_names:
+            value, refs, issue = read_field(document, field_name)
+            values[field_name] = value
+            field_refs[field_name] = refs
+            if issue == "ambiguous":
+                ambiguous_fields.append(field_name)
+            elif issue == "conflict":
+                conflicting_fields.append(field_name)
+
+        amount_value = parse_vnd(values["amount"])
+        amount = int(amount_value) if amount_value is not None else None
+        raw_date = str(values["event_at"]) if values["event_at"] is not None else None
+        source_day = parse_source_date(raw_date)
+        event_at = (
+            datetime.combine(source_day, time.min, _VN_TZ)
+            if source_day is not None
+            else None
+        )
+        instrument_method = _method(document, method_hint) or "TRANSFER"
+        instrument_status = _status(document)
+        transaction_reference = (
+            str(values["transaction_reference"]).strip()
+            if values["transaction_reference"] is not None
+            else None
+        )
+        external_key = (
+            build_external_key(instrument_method.lower(), transaction_reference)
+            if transaction_reference
+            else None
+        )
+        refs = tuple(dict.fromkeys(ref for source_refs in field_refs.values() for ref in source_refs))
+        missing_fields = tuple(
+            field_name
+            for field_name in field_names
+            if values[field_name] is None or field_name in ambiguous_fields or field_name in conflicting_fields
+        )
+
+        current = datetime.fromisoformat(self._now_iso()).astimezone(_VN_TZ)
+        instruction_day = datetime.fromisoformat(str(instruction_copy["created_at"])).astimezone(_VN_TZ).date()
+        with self.db.connect() as cx:
+            company_name = self._tenant_company_name(cx, session.tenant)
+        transaction_owner_root = None
+        already_recorded = False
+        if external_key is not None:
+            with self.db.connect() as cx:
+                owner = cx.execute(
+                    "SELECT root_id, payload_json FROM money_events WHERE tenant = ? AND external_key = ?",
+                    (session.tenant, external_key),
+                ).fetchone()
+                if owner is not None:
+                    transaction_owner_root = str(owner["root_id"])
+                    if transaction_owner_root == root_id:
+                        try:
+                            existing_event = MoneyEvent.model_validate_json(owner["payload_json"])
+                            already_recorded = existing_event.instruction_id == instruction_id
+                        except (TypeError, ValueError):
+                            already_recorded = False
+                else:
+                    snapshot = self._snapshot_ledger_entry(cx, session.tenant, external_key)
+                    if snapshot is not None:
+                        snapshot_scope = str(snapshot.get("scope") or snapshot.get("activity") or "")
+                        snapshot_event_at = snapshot.get("event_at")
+                        snapshot_amount = parse_vnd(snapshot.get("amount"))
+                        try:
+                            snapshot_day = datetime.fromisoformat(str(snapshot_event_at)).astimezone(_VN_TZ).date()
+                        except (TypeError, ValueError):
+                            snapshot_day = None
+                        already_recorded = (
+                            snapshot_scope == str(root_copy["activity"])
+                            and str(snapshot.get("kind") or "") == "EMPLOYEE_RETURN"
+                            and str(snapshot.get("verification_state") or "") == "CONFIRMED"
+                            and str(snapshot.get("allocation_state") or "") == "ALLOCATED"
+                            and amount is not None
+                            and snapshot_amount == amount
+                            and self._same_party(session.tenant, str(snapshot.get("payer") or ""), str(root_copy["employee"]))
+                            and self._same_party(session.tenant, str(snapshot.get("payee") or ""), company_name)
+                            and source_day is not None
+                            and snapshot_day == source_day
+                        )
+                        if not already_recorded:
+                            transaction_owner_root = "context:other-scope"
+        result = match_employee_return(
+            root_id=root_id,
+            instruction_id=instruction_id,
+            instruction_active=(
+                instruction_copy["status"] in ("ISSUED", "PARTIAL")
+                and int(instruction_copy["amount"]) > int(instruction_copy["fulfilled_amount"])
+            ),
+            instruction_remaining=max(
+                int(instruction_copy["amount"]) - int(instruction_copy["fulfilled_amount"]),
+                0,
+            ),
+            instruction_date=instruction_day,
+            as_of=current.date(),
+            employee_name=self.display_name(session.tenant, str(root_copy["employee"])),
+            company_name=company_name,
+            payer_name=str(values["payer_name"]) if values["payer_name"] is not None else None,
+            payee_name=str(values["payee_name"]) if values["payee_name"] is not None else None,
+            amount=amount,
+            event_date=source_day,
+            transaction_reference=transaction_reference,
+            instrument_status=instrument_status,
+            ambiguous_fields=tuple(ambiguous_fields),
+            conflicting_fields=tuple(conflicting_fields),
+            transaction_owner_root=transaction_owner_root,
+            already_recorded=already_recorded,
+            field_refs=field_refs,
+        )
+        draft = EmployeeReturnDraft(
+            draft_id=existing_draft_id or f"money-draft:{uuid.uuid4().hex}",
+            root_id=root_id,
+            employee=str(root_copy["employee"]),
+            activity=str(root_copy["activity"]),
+            instruction_id=instruction_id,
+            source_id=str(source_copy["source_id"]),
+            source_sha256=str(source_copy["digest"]),
+            source_filename=str(source_copy["filename"]),
+            status=(str(saved["status"]) if saved is not None else "WAITING_ACCOUNTANT"),
+            match_status=result.status,
+            amount=amount,
+            payer_name=str(values["payer_name"]) if values["payer_name"] is not None else None,
+            payee_name=str(values["payee_name"]) if values["payee_name"] is not None else None,
+            transaction_reference=transaction_reference,
+            external_key=external_key,
+            instrument_method=instrument_method,
+            instrument_status=instrument_status,
+            event_at=event_at,
+            instruction_amount=int(instruction_copy["amount"]),
+            instruction_remaining=max(
+                int(instruction_copy["amount"]) - int(instruction_copy["fulfilled_amount"]),
+                0,
+            ),
+            refs=refs,
+            missing_fields=missing_fields,
+            signals=result.signals,
+            uploaded_at=datetime.fromisoformat(str(saved["created_at"])) if saved is not None else datetime.fromisoformat(self._now_iso()),
+            confirmed_at=(datetime.fromisoformat(str(saved["confirmed_at"])) if saved is not None and saved["confirmed_at"] else None),
+            confirmed_by=(str(saved["confirmed_by"]) if saved is not None and saved["confirmed_by"] else None),
+            money_event_id=(str(saved["confirmed_event_id"]) if saved is not None and saved["confirmed_event_id"] else None),
+        )
+
+        now = self._now_iso()
+        with self.db.transaction() as cx:
+            root = self._require_root(cx, session, root_id)
+            self._require_version(root, expected_case_version)
+            current_instruction = cx.execute(
+                "SELECT * FROM instructions WHERE id = ? AND tenant = ? AND root_id = ?",
+                (instruction_id, session.tenant, root_id),
+            ).fetchone()
+            current_instruction_active = (
+                current_instruction is not None
+                and current_instruction["direction"] == "COLLECT"
+                and current_instruction["status"] in ("ISSUED", "PARTIAL")
+                and int(current_instruction["amount"]) > int(current_instruction["fulfilled_amount"])
+            )
+            if current_instruction is None or current_instruction["direction"] != "COLLECT":
+                raise CommandConflictError("Lệnh thu không còn thuộc hồ sơ này.")
+            cx.execute(
+                "INSERT OR IGNORE INTO case_money_drafts "
+                "(draft_id, tenant, root_id, instruction_id, source_id, status, draft_json, "
+                "report_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    draft.draft_id, session.tenant, root_id, instruction_id, source_id,
+                    draft.status, draft.model_dump_json(), report.model_dump_json(), now, now,
+                ),
+            )
+            saved_row = cx.execute(
+                "SELECT * FROM case_money_drafts WHERE tenant = ? AND root_id = ? "
+                "AND source_id = ? AND instruction_id = ?",
+                (session.tenant, root_id, source_id, instruction_id),
+            ).fetchone()
+            if saved_row is None:
+                raise CommandConflictError("Không lưu được bản nháp hoàn trả.")
+            if not current_instruction_active and saved_row["status"] != "CONFIRMED":
+                raise CommandConflictError("Lệnh thu đã thay đổi trong lúc đọc chứng từ; tải lại để đối chiếu.")
+            if saved_row["draft_id"] != draft.draft_id:
+                draft = EmployeeReturnDraft.model_validate_json(saved_row["draft_json"])
+            else:
+                self._audit(
+                    cx,
+                    tenant=session.tenant,
+                    root_id=root_id,
+                    session_id=session.session_id,
+                    actor=session.actor_id,
+                    action="READ_EMPLOYEE_RETURN_DRAFT",
+                    detail=json.dumps({
+                        "draft_id": draft.draft_id,
+                        "instruction_id": instruction_id,
+                        "source_id": source_id,
+                        "match_status": draft.match_status,
+                    }, ensure_ascii=False),
+                )
+            case_view = self._case_view(cx, root)
+        return {"draft": draft.model_dump(mode="json"), "case_view": case_view.model_dump(mode="json")}
 
     async def read_settlement_draft(
         self,
@@ -2238,9 +2707,10 @@ class CaseWorkflow:
                     "để kế toán xác minh. " + " ".join(link.reasons)
                 )
         # NOT_FOUND (or no typed report): the draft is accepted as an
-        # independent, server-managed dossier. It stays PROPOSED: no
-        # budget/grant is fabricated; genuinely new scope asks for
-        # B/authority (FACT, then AUTHORITY once verified missing).
+        # independent, server-managed dossier. It stays PROPOSED: no activity
+        # decision, grant, or legacy budget is fabricated. Later costs and
+        # effects still pass the ordinary evidence, policy, coverage, and
+        # action/scope authority gates; B is not one of those gates.
         name = (
             declaration.destination
             or declaration.declared_purpose
@@ -2682,6 +3152,936 @@ class CaseWorkflow:
         )
         return None if check.ok else check.reason
 
+    def _advance_activity_link(
+        self,
+        cx: sqlite3.Connection,
+        tenant: str,
+        employee: str,
+        activity_reference: str | None,
+        *,
+        current_activity: str,
+        root_id: str,
+        advance_document,
+        transaction_reference: str | None,
+        instrument_method: str | None,
+        draft_refs: tuple[EvidenceRef, ...] = (),
+    ):
+        """Decide the voucher/work link from explicit references or sourced facts.
+
+        Opening the current root is never evidence. Strong references still win
+        when unique and consistent; an unregistered voucher-only reference does
+        not stop the separate multi-field path. Candidate enumeration is tenant
+        scoped and the returned explanation contains no other-root identifiers.
+        """
+        import unicodedata
+
+        from invoice_referee.domain.evidence import ReadResult
+        from invoice_referee.domain.finance import ActivityLinkSignal
+        from invoice_referee.reconciliation.advance import _found_value
+        from invoice_referee.reconciliation.advance_identity import build_external_key
+        from invoice_referee.reconciliation.linking import (
+            ActivityCandidate,
+            AdvanceLinkCandidate,
+            AdvanceLinkEvidence,
+            LinkResult,
+            LedgerTxn,
+            link_advance_multifield,
+            link_dossier,
+        )
+
+        def _norm_text(value: object) -> str:
+            text = unicodedata.normalize("NFD", str(value or ""))
+            text = "".join(ch for ch in text if not unicodedata.combining(ch))
+            return " ".join(
+                "".join(ch for ch in text.casefold() if ch.isalnum() or ch.isspace()).split()
+            )
+
+        def _field_value(document, name: str):
+            candidates = [field for field in document.fields if field.field == name]
+            refs = tuple(dict.fromkeys(
+                ref for candidate in candidates for ref in candidate.refs
+            ))
+            if any(candidate.state == "AMBIGUOUS" for candidate in candidates):
+                return None, refs, "ambiguous"
+            found = [candidate for candidate in candidates if candidate.state == "FOUND"]
+            normalized = {_norm_text(candidate.value) for candidate in found}
+            if len(normalized) > 1:
+                return None, refs, "conflict"
+            if not found:
+                return None, refs, None
+            return found[0].value, refs, None
+
+        def _aliases(document, names: tuple[str, ...]):
+            values = []
+            refs: list[EvidenceRef] = []
+            issues: set[str] = set()
+            for name in names:
+                value, field_refs, issue = _field_value(document, name)
+                refs.extend(field_refs)
+                if issue:
+                    issues.add(issue)
+                if value is not None:
+                    values.append(value)
+            normalized = {_norm_text(value) for value in values}
+            if "conflict" in issues or len(normalized) > 1:
+                issues.add("conflict")
+            if "ambiguous" in issues:
+                return None, tuple(dict.fromkeys(refs)), "ambiguous"
+            if "conflict" in issues:
+                return None, tuple(dict.fromkeys(refs)), "conflict"
+            return (values[0] if values else None), tuple(dict.fromkeys(refs)), None
+
+        def _settlement_candidate(case_row, report_json: str | None):
+            report = None
+            if report_json:
+                try:
+                    report = ReadResult.model_validate_json(report_json)
+                except (TypeError, ValueError):
+                    report = None
+            forms = [
+                document for document in (report.documents if report is not None else ())
+                if document.document_type == "SETTLEMENT_FORM"
+            ]
+            clear_forms = [document for document in forms if document.profile_status == "CLEAR"]
+            source_forms = clear_forms or forms
+
+            def _read(name: str):
+                values = []
+                refs: list[EvidenceRef] = []
+                issues: set[str] = set()
+                for document in source_forms:
+                    value, field_refs, issue = _field_value(document, name)
+                    refs.extend(field_refs)
+                    if issue:
+                        issues.add(issue)
+                    if value is not None:
+                        values.append(value)
+                normalized = {_norm_text(value) for value in values}
+                if "conflict" in issues or len(normalized) > 1:
+                    issues.add("conflict")
+                if "ambiguous" in issues:
+                    issue = "ambiguous"
+                elif "conflict" in issues:
+                    issue = "conflict"
+                else:
+                    issue = None
+                return (values[0] if values and issue is None else None,
+                        tuple(dict.fromkeys(refs)), issue)
+
+            declared_name, employee_refs, employee_issue = _read("declared_name")
+            purpose, purpose_refs, purpose_issue = _read("purpose")
+            advance_value, advance_refs, advance_issue = _read("declared_advance")
+            document_date, date_refs, date_issue = _read("document_date")
+            work_start, work_start_refs, work_start_issue = _read("trip_start")
+            work_end, work_end_refs, work_end_issue = _read("trip_end")
+            reference, reference_refs, reference_issue = _read("advance_reference")
+            if purpose is None:
+                purpose = str(case_row["declared_purpose"] or case_row["activity_name"] or "")
+            try:
+                from invoice_referee.domain.common import parse_vnd
+
+                declared_advance = parse_vnd(advance_value)
+            except (TypeError, ValueError):
+                declared_advance = None
+            field_issues = {
+                "declared_name": employee_issue,
+                "purpose": purpose_issue,
+                "declared_advance": advance_issue,
+                "document_date": date_issue,
+                "trip_start": work_start_issue,
+                "trip_end": work_end_issue,
+                "advance_reference": reference_issue,
+            }
+            conflicts = tuple(name for name, issue in field_issues.items() if issue == "conflict")
+            ambiguous = tuple(name for name, issue in field_issues.items() if issue == "ambiguous")
+            person = cx.execute(
+                "SELECT name FROM context_people WHERE tenant = ? AND id = ?",
+                (tenant, str(case_row["employee"])),
+            ).fetchone()
+            employee_name = str(person["name"]) if person is not None else str(case_row["employee"])
+            return AdvanceLinkCandidate(
+                root_id=str(case_row["id"]),
+                activity_id=str(case_row["activity"]),
+                employee_id=str(case_row["employee"]),
+                employee_name=employee_name,
+                purpose=str(purpose) if purpose is not None else None,
+                declared_advance=int(declared_advance) if declared_advance is not None else None,
+                settlement_date=str(document_date) if document_date is not None else None,
+                declared_name=str(declared_name) if declared_name is not None else None,
+                source_clear=bool(clear_forms) and not conflicts and not ambiguous,
+                work_start=str(work_start) if work_start is not None else None,
+                work_end=str(work_end) if work_end is not None else None,
+                ambiguous_fields=ambiguous,
+                conflicting_fields=conflicts,
+                purpose_refs=purpose_refs,
+                declared_advance_refs=advance_refs,
+                settlement_date_refs=date_refs,
+                employee_refs=employee_refs,
+                declared_name_refs=employee_refs,
+                reference_refs=reference_refs,
+                work_period_refs=tuple(dict.fromkeys((*work_start_refs, *work_end_refs))),
+            ), (report, forms, clear_forms, reference, reference_issue)
+
+        # Load every root in this tenant. Other roots are considered internally
+        # for ambiguity/duplicate protection; their IDs/names are never returned.
+        rows = cx.execute(
+            "SELECT c.*, "
+            "(SELECT d.purpose FROM case_declarations d WHERE d.root_id = c.id "
+            "ORDER BY d.revision DESC LIMIT 1) AS declared_purpose, "
+            "r.report_json AS report_json "
+            "FROM cases c LEFT JOIN case_evidence_reports r ON r.root_id = c.id "
+            "AND r.tenant = c.tenant WHERE c.tenant = ? ORDER BY c.created_at, c.id",
+            (tenant,),
+        ).fetchall()
+        candidates: list[AdvanceLinkCandidate] = []
+        target_info = None
+        for case_row in rows:
+            candidate, info = _settlement_candidate(case_row, case_row["report_json"])
+            candidates.append(candidate)
+            if str(case_row["id"]) == root_id:
+                target_info = info
+        if target_info is None:
+            return LinkResult(
+                status="NOT_FOUND",
+                reasons=("Hồ sơ quyết toán không còn trong phạm vi tenant này.",),
+                owner="accountant",
+            )
+        report, settlement_forms, clear_forms, settlement_reference, reference_issue = target_info
+
+        # A strong reference that contradicts another reference is never
+        # overridden by the purpose/amount/date combination.
+        settlement_references: list[tuple[str, tuple[EvidenceRef, ...]]] = []
+        settlement_support_refs: list[EvidenceRef] = []
+        for document in clear_forms:
+            for candidate in document.fields:
+                if candidate.state != "FOUND":
+                    continue
+                if candidate.field in {"declared_name", "purpose", "declared_advance", "document_date"}:
+                    settlement_support_refs.extend(candidate.refs)
+                if candidate.field == "advance_reference" and candidate.value:
+                    settlement_references.append((str(candidate.value).strip(), candidate.refs))
+        distinct_settlement_refs = {_norm_text(value) for value, _ in settlement_references}
+        settlement_ref = settlement_references[0][0] if len(distinct_settlement_refs) == 1 else None
+        combined_refs = tuple(dict.fromkeys((
+            *draft_refs,
+            *settlement_support_refs,
+            *(ref for _value, refs in settlement_references for ref in refs),
+        )))
+        if len(distinct_settlement_refs) > 1 or reference_issue == "conflict":
+            return LinkResult(
+                status="CONFLICT",
+                refs=combined_refs,
+                reasons=("Các giấy quyết toán trong hồ sơ ghi mã khoản ứng mâu thuẫn nhau.",),
+                conflicting_fields=("activity",),
+                owner="accountant",
+            )
+        if activity_reference and settlement_ref and _norm_text(activity_reference) != _norm_text(settlement_ref):
+            return LinkResult(
+                status="CONFLICT",
+                refs=combined_refs,
+                reasons=("Mã khoản ứng trên biên nhận khác mã trên giấy quyết toán.",),
+                conflicting_fields=("activity",),
+                owner="accountant",
+            )
+
+        catalog: list[ActivityCandidate] = []
+        for item in cx.execute(
+            "SELECT activity_id, name, status, purpose, references_json "
+            "FROM context_activities WHERE tenant = ? ORDER BY activity_id",
+            (tenant,),
+        ):
+            try:
+                references = json.loads(item["references_json"] or "[]")
+            except (TypeError, ValueError):
+                references = []
+            catalog.append(
+                ActivityCandidate(
+                    activity_id=str(item["activity_id"]),
+                    name=str(item["name"]),
+                    status=str(item["status"] or "PROPOSED"),
+                    purpose=str(item["purpose"] or ""),
+                    references=tuple(str(v) for v in references if isinstance(v, str)),
+                )
+            )
+
+        external_key = None
+        if transaction_reference and instrument_method in ("TRANSFER", "CASH"):
+            external_key = build_external_key(instrument_method.lower(), transaction_reference)
+        transaction_owner_root = None
+        transaction_owner_activity = None
+        transaction_refs: tuple[EvidenceRef, ...] = ()
+        if external_key is not None:
+            event = cx.execute(
+                "SELECT root_id, scope, payload_json FROM money_events "
+                "WHERE tenant = ? AND external_key = ?",
+                (tenant, external_key),
+            ).fetchone()
+            if event is not None:
+                transaction_owner_root = str(event["root_id"])
+                transaction_owner_activity = str(event["scope"])
+                try:
+                    from invoice_referee.domain.finance import MoneyEvent
+
+                    transaction_refs = MoneyEvent.model_validate_json(event["payload_json"]).refs
+                except (TypeError, ValueError):
+                    transaction_refs = ()
+            else:
+                snapshot_event = self._snapshot_ledger_entry(cx, tenant, external_key)
+                if snapshot_event is not None:
+                    transaction_owner_activity = str(
+                        snapshot_event.get("scope") or snapshot_event.get("activity") or ""
+                    ) or None
+
+        other_draft_roots: list[str] = []
+        if external_key is not None:
+            for saved in cx.execute(
+                "SELECT root_id, draft_json FROM case_advance_drafts WHERE tenant = ? "
+                "AND root_id != ?",
+                (tenant, root_id),
+            ):
+                try:
+                    saved_draft = json.loads(saved["draft_json"] or "{}")
+                except (TypeError, ValueError):
+                    continue
+                saved_method = saved_draft.get("instrument_method")
+                saved_reference = saved_draft.get("transaction_reference")
+                saved_key = (
+                    build_external_key(str(saved_method).lower(), str(saved_reference))
+                    if saved_method and saved_reference
+                    else None
+                )
+                if saved_key == external_key:
+                    other_draft_roots.append(str(saved["root_id"]))
+
+        ledger: list[LedgerTxn] = []
+        for item in cx.execute(
+            "SELECT m.payload_json, c.employee AS employee_id FROM money_events m "
+            "JOIN cases c ON c.id = m.root_id AND c.tenant = m.tenant "
+            "WHERE m.tenant = ? ORDER BY m.recorded_at, m.id",
+            (tenant,),
+        ):
+            try:
+                from invoice_referee.domain.finance import MoneyEvent
+
+                event = MoneyEvent.model_validate_json(item["payload_json"])
+            except (TypeError, ValueError):
+                continue
+            namespace, separator, reference = event.external_key.partition(":")
+            ledger.append(
+                LedgerTxn(
+                    external_key=event.external_key,
+                    activity=event.scope,
+                    employee=str(item["employee_id"]),
+                    amount=event.amount,
+                    kind=event.kind,
+                    namespace=namespace if separator else None,
+                    reference=reference if separator else None,
+                    refs=event.refs,
+                )
+            )
+
+        from invoice_referee.reconciliation.linking import link_dossier
+
+        catalog_link = link_dossier(
+            employee=employee,
+            current_activity=None,
+            current_activity_proposed=True,
+            document_references=(activity_reference,) if activity_reference else (),
+            transaction_references=(transaction_reference,) if transaction_reference else (),
+            catalog=tuple(catalog),
+            ledger=tuple(ledger),
+        )
+        if catalog_link.status == "CONFLICT" or (
+            catalog_link.status == "LINKED" and catalog_link.activity_id != current_activity
+        ):
+            return LinkResult(
+                status="CONFLICT",
+                refs=combined_refs,
+                reasons=("Một căn cứ mạnh trỏ tới hồ sơ/hoạt động khác.",),
+                conflicting_fields=catalog_link.conflicting_fields or ("activity",),
+                owner="accountant",
+                signals=(ActivityLinkSignal(
+                    field="reference",
+                    state="CONFLICT",
+                    summary="Mã hồ sơ hoặc mã giao dịch khớp một hoạt động khác.",
+                    refs=tuple(dict.fromkeys((
+                        *draft_refs,
+                        *catalog_link.refs,
+                        *transaction_refs,
+                    ))),
+                ),),
+            )
+
+        mapped_reference_activity = None
+        transaction_activity = transaction_owner_activity
+        if catalog_link.status == "LINKED":
+            if catalog_link.basis == "DOCUMENT_REFERENCE":
+                mapped_reference_activity = current_activity
+            elif catalog_link.basis == "TRANSACTION_IDENTITY":
+                transaction_activity = current_activity
+        elif activity_reference and settlement_ref and _norm_text(activity_reference) == _norm_text(settlement_ref):
+            mapped_reference_activity = current_activity
+
+        target_person = cx.execute(
+            "SELECT name FROM context_people WHERE tenant = ? AND id = ?",
+            (tenant, employee),
+        ).fetchone()
+        employee_name = str(target_person["name"]) if target_person is not None else employee
+        person_rows = cx.execute(
+            "SELECT id, name FROM context_people WHERE tenant = ?",
+            (tenant,),
+        ).fetchall()
+        name_matches = [
+            str(person["id"])
+            for person in person_rows
+            if _norm_text(person["name"]) == _norm_text(employee_name)
+        ]
+        employee_name_unique = len(name_matches) == 1 and name_matches[0] == employee
+
+        def _payment_value(names: tuple[str, ...]):
+            values = []
+            refs: list[EvidenceRef] = []
+            issues: set[str] = set()
+            for name in names:
+                field_candidates = [f for f in advance_document.fields if f.field == name]
+                refs.extend(ref for f in field_candidates for ref in f.refs)
+                if any(f.state == "AMBIGUOUS" for f in field_candidates):
+                    issues.add("ambiguous")
+                found = [f for f in field_candidates if f.state == "FOUND"]
+                normalized = {_norm_text(f.value) for f in found}
+                if len(normalized) > 1:
+                    issues.add("conflict")
+                if found:
+                    values.append(found[0].value)
+            normalized_values = {_norm_text(value) for value in values}
+            if len(normalized_values) > 1:
+                issues.add("conflict")
+            issue = "conflict" if "conflict" in issues else "ambiguous" if "ambiguous" in issues else None
+            return (values[0] if values and issue is None else None), tuple(dict.fromkeys(refs)), issue
+
+        payer_name, payer_refs, payer_issue = _payment_value(("payer_name",))
+        payee_name, payee_refs, payee_issue = _payment_value(("payee_name",))
+        amount_value, amount_refs, amount_issue = _payment_value(("amount", "total_amount"))
+        _transaction_value, transaction_reference_refs, transaction_issue = _payment_value(
+            ("transaction_reference", "document_number")
+        )
+        # Prefer the field explicitly labelled as the transfer event. Only use
+        # the voucher's own document_date if no event_at was read; never mix an
+        # invoice date or settlement-paper date into this source date.
+        payment_date, payment_date_refs, payment_date_issue = _payment_value(("event_at",))
+        if payment_date is None and payment_date_issue is None:
+            payment_date, payment_date_refs, payment_date_issue = _payment_value(("document_date",))
+        payment_purpose, purpose_refs, purpose_issue = _payment_value(
+            ("payment_description", "description", "collection_reason")
+        )
+        from invoice_referee.domain.common import parse_vnd
+
+        amount = parse_vnd(amount_value)
+        conflicting_fields = tuple(
+            field_name
+            for field_name, issue in (
+                ("payer_name", payer_issue),
+                ("payee_name", payee_issue),
+                ("amount", amount_issue),
+                ("transaction_reference", transaction_issue),
+                ("event_at", payment_date_issue),
+                ("payment_purpose", purpose_issue),
+            )
+            if issue == "conflict"
+        )
+        ambiguous_fields = tuple(
+            field_name
+            for field_name, issue in (
+                ("payer_name", payer_issue),
+                ("payee_name", payee_issue),
+                ("amount", amount_issue),
+                ("transaction_reference", transaction_issue),
+                ("event_at", payment_date_issue),
+                ("payment_purpose", purpose_issue),
+            )
+            if issue == "ambiguous"
+        )
+        company_name = self._tenant_company_name(cx, tenant)
+        evidence = AdvanceLinkEvidence(
+            root_id=root_id,
+            activity_id=current_activity,
+            employee_id=employee,
+            employee_name=employee_name,
+            employee_name_unique=employee_name_unique,
+            expected_company_names=(company_name,) if company_name else (),
+            payer_name=str(payer_name) if payer_name is not None else None,
+            payee_name=str(payee_name) if payee_name is not None else None,
+            amount=int(amount) if amount is not None else None,
+            transaction_reference=transaction_reference,
+            payment_date=str(payment_date) if payment_date is not None else None,
+            payment_purpose=str(payment_purpose) if payment_purpose is not None else None,
+            payer_refs=payer_refs,
+            payee_refs=payee_refs,
+            amount_refs=amount_refs,
+            payment_date_refs=payment_date_refs,
+            payment_purpose_refs=purpose_refs,
+            activity_reference=activity_reference,
+            activity_reference_refs=tuple(ref for f in advance_document.fields if f.field == "advance_reference" and f.state == "FOUND" for ref in f.refs),
+            transaction_reference_refs=transaction_reference_refs,
+            transaction_owner_refs=transaction_refs,
+            mapped_reference_activity=mapped_reference_activity,
+            transaction_owner_root=transaction_owner_root,
+            transaction_owner_activity=transaction_activity,
+            other_draft_roots=tuple(other_draft_roots),
+            ambiguous_fields=ambiguous_fields,
+            conflicting_fields=conflicting_fields,
+        )
+        link = link_advance_multifield(evidence, tuple(candidates))
+        if link.activity_id != current_activity:
+            return LinkResult(
+                status="CONFLICT" if link.status == "LINKED" else link.status,
+                refs=tuple(dict.fromkeys((*combined_refs, *link.refs))),
+                reasons=("Căn cứ không xác định duy nhất hồ sơ đang mở.",),
+                conflicting_fields=("activity",) if link.status == "LINKED" else link.conflicting_fields,
+                owner="accountant",
+                signals=link.signals,
+                candidate_count=link.candidate_count,
+                requires_confirmation=link.status != "CONFLICT",
+            )
+        return LinkResult(
+            status=link.status,
+            activity_id=link.activity_id,
+            basis=link.basis,
+            refs=tuple(dict.fromkeys((*combined_refs, *link.refs))),
+            reasons=link.reasons,
+            conflicting_fields=link.conflicting_fields,
+            owner=link.owner,
+            requires_confirmation=link.requires_confirmation,
+            signals=link.signals,
+            candidate_count=link.candidate_count,
+        )
+
+    def _advance_record_basis(self, cx, session, row, money):
+        """Validate a user confirmation against the persisted read and root scope."""
+        from invoice_referee.domain.evidence import ReadResult
+        from invoice_referee.domain.common import EvidenceRef
+
+        draft_row = cx.execute(
+            "SELECT * FROM case_advance_drafts WHERE draft_id = ? AND tenant = ? "
+            "AND root_id = ?",
+            (money.advance_draft_id, session.tenant, str(row["id"])),
+        ).fetchone()
+        if draft_row is None:
+            raise UnsupportedCommandError("Bản đọc chứng từ ứng không thuộc hồ sơ này.")
+        try:
+            draft = json.loads(draft_row["draft_json"])
+            report = ReadResult.model_validate_json(draft_row["report_json"])
+        except (TypeError, ValueError) as error:
+            raise UnsupportedCommandError("Không khôi phục được bản đọc chứng từ ứng.") from error
+        if (
+            str(draft.get("scope")) != str(row["activity"])
+            or str(draft.get("employee")) != str(row["employee"])
+            or money.claimed_scope != str(row["activity"])
+        ):
+            raise CommandConflictError("Chứng từ ứng không cùng nhân viên và hồ sơ đang mở.")
+        document = next(
+            (
+                item
+                for item in report.documents
+                if item.source_id == str(draft_row["source_id"])
+            ),
+            None,
+        )
+        if document is None:
+            raise UnsupportedCommandError("Bản đọc không còn gắn với chứng từ đã lưu.")
+
+        def _norm(value: object) -> str:
+            import unicodedata
+
+            text = unicodedata.normalize("NFD", str(value or ""))
+            text = "".join(ch for ch in text if not unicodedata.combining(ch))
+            return " ".join("".join(ch for ch in text.casefold() if ch.isalnum() or ch.isspace()).split())
+
+        amount = draft.get("amount")
+        if amount is not None and int(amount) != money.amount:
+            raise CommandConflictError("Số tiền xác nhận khác số tiền đã đọc trên chứng từ.")
+        for name, source_key, submitted in (
+            ("bên chi", "payer_name", money.payer),
+            ("người nhận", "payee_name", money.payee),
+        ):
+            source_value = draft.get(source_key)
+            if source_value is not None and _norm(source_value) != _norm(submitted):
+                raise CommandConflictError(f"{name.capitalize()} xác nhận khác dữ kiện đã đọc.")
+        transaction_reference = draft.get("transaction_reference")
+        submitted_reference = money.instrument_reference or money.external_key.partition(":")[2]
+        if transaction_reference is not None and _norm(transaction_reference) != _norm(submitted_reference):
+            raise CommandConflictError("Mã giao dịch xác nhận khác mã đã đọc trên chứng từ.")
+        if draft.get("instrument_method") and money.instrument_method != draft["instrument_method"]:
+            raise CommandConflictError("Phương thức giao dịch khác bản đọc chứng từ.")
+        if draft.get("instrument_status") not in (None, "UNKNOWN") and money.instrument_status != draft["instrument_status"]:
+            raise CommandConflictError("Trạng thái xác nhận khác trạng thái đã đọc trên chứng từ.")
+        source_date = str(draft.get("event_at") or "")
+        if source_date:
+            try:
+                from zoneinfo import ZoneInfo
+
+                source_day = datetime.fromisoformat(source_date[:10]).date()
+                submitted_day = money.event_at.astimezone(
+                    ZoneInfo("Asia/Ho_Chi_Minh")
+                ).date()
+            except ValueError:
+                source_day = None
+                submitted_day = None
+            if source_day is not None and submitted_day is not None and source_day != submitted_day:
+                raise CommandConflictError("Ngày giao dịch xác nhận khác ngày đã đọc trên chứng từ.")
+
+        refs = tuple(EvidenceRef.model_validate(ref) for ref in draft.get("refs", ()))
+        if not refs or any(ref not in refs for ref in money.refs):
+            raise UnsupportedCommandError("Căn cứ xác nhận không thuộc bản đọc chứng từ đã lưu.")
+
+        # A missing OCR field may be corrected by the accountant from the same
+        # saved source. This remains visibly human-reviewed; a conflicting value
+        # already read from the source is rejected above and never overridden.
+        correctable_values = {
+            "payer_name": bool(money.payer.strip()),
+            "payee_name": bool(money.payee.strip()),
+            "amount": money.amount > 0,
+            "event_at": money.event_at is not None,
+            "transaction_reference": bool(submitted_reference.strip()),
+            "transaction_status": money.instrument_status is not None,
+        }
+        blocking_findings = [finding for finding in document.profile_findings if finding.blocking]
+        accountant_completed_missing_fields = (
+            document.profile_status == "NEEDS_HUMAN"
+            and bool(blocking_findings)
+            and all(
+                finding.code == "REQUIRED_FIELD_MISSING"
+                and finding.field in correctable_values
+                and correctable_values[str(finding.field)]
+                for finding in blocking_findings
+            )
+        )
+        source_reviewed = (
+            document.profile_status == "CLEAR"
+            or accountant_completed_missing_fields
+        )
+
+        link = self._advance_activity_link(
+            cx,
+            session.tenant,
+            str(row["employee"]),
+            str(draft["activity_reference"]) if draft.get("activity_reference") else None,
+            current_activity=str(row["activity"]),
+            root_id=str(row["id"]),
+            advance_document=document,
+            transaction_reference=str(draft["transaction_reference"])
+            if draft.get("transaction_reference") else None,
+            instrument_method=str(draft["instrument_method"])
+            if draft.get("instrument_method") else None,
+            draft_refs=refs,
+        )
+        current_activity = str(row["activity"])
+        if link.status == "CONFLICT" or (
+            link.status == "LINKED" and link.activity_id != current_activity
+        ):
+            raise CommandConflictError(
+                "Tham chiếu trên chứng từ ứng chỉ tới hồ sơ khác hoặc nhiều hồ sơ; không tự chuyển giao dịch."
+            )
+        if link.status == "LINKED":
+            link_basis = link.basis or "DOCUMENT_REFERENCE"
+            link_reason = (
+                " ".join(link.reasons).strip()
+                or "Căn cứ trên chứng từ khớp duy nhất với hồ sơ đang xác minh."
+            )
+        else:
+            link_reason = (money.activity_link_reason or "").strip()
+            if not money.activity_link_confirmed or len(link_reason) < 12:
+                raise UnsupportedCommandError(
+                    "Kế toán cần xác nhận rõ chứng từ thuộc công việc này và nêu căn cứ đối chiếu."
+                )
+            link_basis = "ACCOUNTANT_CONFIRMATION"
+        explanation = (
+            money.reason.strip()
+            or (money.completion_claim or "").strip()
+            or (money.activity_link_reason or "").strip()
+        )
+        needs_explanation = (
+            bool(draft.get("missing_fields"))
+            or accountant_completed_missing_fields
+            or link.status != "LINKED"
+        )
+        if needs_explanation and len(explanation) < 12:
+            raise UnsupportedCommandError(
+                "Cần giải thích căn cứ bổ sung thông tin hoặc liên kết công việc."
+            )
+        if not source_reviewed and money.instrument_status == "COMPLETED":
+            raise UnsupportedCommandError(
+                "Chứng từ còn vấn đề chưa giải quyết; giải thích không thay thế được căn cứ nhận tiền."
+            )
+        # The authenticated source-bound RecordActual command is the accountant's
+        # explicit confirmation. Text is only additional evidence for exceptions.
+        received = money.instrument_status == "COMPLETED"
+        record_reason = (
+            "Kế toán xác nhận ghi nhận tiền ứng thực nhận theo chứng từ đã kiểm tra."
+            if received else "Kế toán lưu chứng từ ứng chưa hoàn tất để đối chiếu."
+        )
+        if explanation:
+            record_reason += " Giải thích: " + explanation
+        return {
+            "draft_id": str(draft_row["draft_id"]),
+            "refs": tuple(dict.fromkeys((*refs, *link.refs))),
+            "link_basis": link_basis,
+            "link_reason": link_reason,
+            "link_signals": link.signals,
+            "source_clear": source_reviewed,
+            "record_reason": record_reason,
+            "completion_claim": record_reason if received else None,
+        }
+
+    def _employee_return_record_basis(self, cx, session, row, money):
+        """Revalidate a saved employee return read before accountant confirmation."""
+        from invoice_referee.domain.evidence import ReadResult
+        from invoice_referee.reconciliation.employee_return import match_employee_return
+        if session.persona != "accountant":
+            raise UnsupportedCommandError("Chỉ kế toán được xác nhận tiền hoàn trả đã nhận.")
+        if not money.money_movement_draft_id:
+            raise UnsupportedCommandError("Cần xác nhận từ bản nháp chứng từ hoàn trả đã lưu.")
+        draft_row = cx.execute(
+            "SELECT * FROM case_money_drafts WHERE tenant = ? AND root_id = ? AND draft_id = ?",
+            (session.tenant, str(row["id"]), money.money_movement_draft_id),
+        ).fetchone()
+        if draft_row is None:
+            raise NotFoundError("Không tìm thấy bản nháp chứng từ hoàn trả trong hồ sơ này.")
+        try:
+            draft = EmployeeReturnDraft.model_validate_json(draft_row["draft_json"])
+            report = ReadResult.model_validate_json(draft_row["report_json"])
+        except (TypeError, ValueError) as error:
+            raise UnsupportedCommandError("Không khôi phục được bản đọc chứng từ hoàn trả.") from error
+        if (
+            draft.instruction_id != money.instruction_id
+            or draft.instruction_id != str(draft_row["instruction_id"])
+            or draft.root_id != str(row["id"])
+            or draft.employee != str(row["employee"])
+            or draft.activity != str(row["activity"])
+            or money.claimed_scope != str(row["activity"])
+        ):
+            raise CommandConflictError("Bản nháp hoàn trả không thuộc lệnh và hồ sơ đang mở.")
+        source = cx.execute(
+            "SELECT root_id, digest FROM case_sources WHERE tenant = ? AND root_id = ? AND source_id = ?",
+            (session.tenant, str(row["id"]), draft.source_id),
+        ).fetchone()
+        document = next(
+            (item for item in report.documents if item.source_id == draft.source_id), None
+        )
+        if (
+            source is None
+            or str(source["digest"]) != draft.source_sha256
+            or document is None
+            or document.profile_status != "CLEAR"
+            or not draft.refs
+            or any(ref.source_id != draft.source_id or ref.source_sha256 != draft.source_sha256 for ref in draft.refs)
+        ):
+            raise UnsupportedCommandError("Chứng từ hoàn trả chưa đủ căn cứ nguồn đã đọc rõ.")
+        if draft.status == "CONFIRMED":
+            existing = cx.execute(
+                "SELECT payload_json FROM money_events WHERE tenant = ? AND root_id = ? AND external_key = ?",
+                (session.tenant, str(row["id"]), draft.external_key),
+            ).fetchone()
+            if existing is None:
+                raise CommandConflictError("Bản nháp đã xác nhận nhưng không còn giao dịch để đối chiếu.")
+        if draft.match_status not in ("MATCHED", "OVERPAY", "ALREADY_RECORDED"):
+            message = next((signal.summary for signal in draft.signals if signal.state in (
+                "CONFLICT", "STALE", "NOT_COMPLETED", "MISSING", "MISMATCH", "AMBIGUOUS"
+            )), "Chứng từ hoàn trả cần được xác minh trước khi ghi tiền.")
+            raise CommandConflictError(message)
+        if (
+            draft.amount is None
+            or money.amount != draft.amount
+            or money.external_key != draft.external_key
+            or money.instrument_reference != draft.transaction_reference
+            or money.instrument_method != draft.instrument_method
+            or money.instrument_status != draft.instrument_status
+        ):
+            raise CommandConflictError("Giao dịch xác nhận khác dữ kiện của bản đọc hoàn trả đã lưu.")
+        if draft.instrument_status != "COMPLETED":
+            raise UnsupportedCommandError("Chứng từ chưa hoàn tất; chưa thể ghi công ty đã nhận tiền.")
+        if not self._same_party(session.tenant, money.payer, str(row["employee"])):
+            raise CommandConflictError("Bên chuyển khoản hoàn trả không phải nhân viên của hồ sơ.")
+        if not self._same_party(session.tenant, money.payee, "company:demo"):
+            raise CommandConflictError("Bên nhận trên chứng từ hoàn trả không phải công ty.")
+        submitted_day = money.event_at.astimezone(_VN_TZ).date()
+        source_day = draft.event_at.astimezone(_VN_TZ).date() if draft.event_at else None
+        if source_day is None or submitted_day != source_day:
+            raise CommandConflictError("Ngày xác nhận khác ngày giao dịch trên chứng từ.")
+        if any(ref not in draft.refs for ref in money.refs):
+            raise UnsupportedCommandError("Căn cứ xác nhận không thuộc bản đọc chứng từ đã lưu.")
+
+        instruction = cx.execute(
+            "SELECT * FROM instructions WHERE tenant = ? AND root_id = ? AND id = ?",
+            (session.tenant, str(row["id"]), draft.instruction_id),
+        ).fetchone()
+        if instruction is None or instruction["direction"] != "COLLECT":
+            raise CommandConflictError("Không tìm thấy đúng lệnh thu của bản nháp.")
+        existing = cx.execute(
+            "SELECT root_id, payload_json FROM money_events WHERE tenant = ? AND external_key = ?",
+            (session.tenant, draft.external_key),
+        ).fetchone()
+        existing_event = None
+        if existing is not None:
+            if str(existing["root_id"]) != str(row["id"]):
+                raise CommandConflictError("Mã giao dịch hoàn trả đã thuộc hồ sơ khác.")
+            existing_event = MoneyEvent.model_validate_json(existing["payload_json"])
+            if (
+                existing_event.instruction_id not in (None, draft.instruction_id)
+                or existing_event.amount != draft.amount
+                or existing_event.kind != "EMPLOYEE_RETURN"
+            ):
+                raise CommandConflictError("Mã giao dịch đã được ghi với nội dung hoặc lệnh khác.")
+        remaining = max(
+            int(instruction["amount"]) - int(instruction["fulfilled_amount"]), 0
+        )
+        active = instruction["status"] in ("ISSUED", "PARTIAL") and remaining > 0
+        if not active and existing_event is None:
+            raise CommandConflictError("Lệnh thu đã hoàn tất hoặc không còn hiệu lực.")
+        current_day = datetime.fromisoformat(self._now_iso()).astimezone(_VN_TZ).date()
+        company_name = self._tenant_company_name(cx, session.tenant)
+        result = match_employee_return(
+            root_id=str(row["id"]),
+            instruction_id=draft.instruction_id,
+            instruction_active=active or existing_event is not None,
+            instruction_remaining=remaining,
+            instruction_date=datetime.fromisoformat(str(instruction["created_at"])).astimezone(_VN_TZ).date(),
+            as_of=current_day,
+            employee_name=self.display_name(session.tenant, str(row["employee"])),
+            company_name=company_name,
+            payer_name=draft.payer_name,
+            payee_name=draft.payee_name,
+            amount=draft.amount,
+            event_date=source_day,
+            transaction_reference=draft.transaction_reference,
+            instrument_status=draft.instrument_status,
+            transaction_owner_root=str(existing["root_id"]) if existing is not None else None,
+            already_recorded=existing_event is not None,
+            field_refs={signal.field: signal.refs for signal in draft.signals},
+        )
+        if result.status not in ("MATCHED", "OVERPAY", "ALREADY_RECORDED"):
+            detail = next((signal.summary for signal in result.signals if signal.state in (
+                "CONFLICT", "STALE", "NOT_COMPLETED", "MISSING", "MISMATCH", "AMBIGUOUS"
+            )), "Lệnh thu đã thay đổi; cần kiểm tra lại chứng từ.")
+            raise CommandConflictError(detail)
+        reason = "Kế toán xác nhận đã đối chiếu chứng từ hoàn trả với đúng lệnh thu."
+        return {
+            "draft_id": draft.draft_id,
+            "instruction_id": draft.instruction_id,
+            "money_event_id": str(existing_event.id) if existing_event is not None else None,
+            "refs": draft.refs,
+            "reason": reason,
+            "completion_claim": reason,
+            "match_status": result.status,
+            "draft": draft,
+        }
+
+    def _complete_employee_return_draft(
+        self, cx, *, session, draft_id: str, event_id: str | None, now: str
+    ) -> None:
+        row = cx.execute(
+            "SELECT draft_json FROM case_money_drafts WHERE tenant = ? AND draft_id = ?",
+            (session.tenant, draft_id),
+        ).fetchone()
+        if row is None:
+            return
+        draft = EmployeeReturnDraft.model_validate_json(row["draft_json"])
+        if draft.status != "CONFIRMED":
+            draft = draft.model_copy(update={
+                "status": "CONFIRMED",
+                "confirmed_at": datetime.fromisoformat(now),
+                "confirmed_by": session.actor_id,
+                "money_event_id": event_id,
+            })
+            cx.execute(
+                "UPDATE case_money_drafts SET status = 'CONFIRMED', draft_json = ?, "
+                "confirmed_event_id = ?, confirmed_at = ?, confirmed_by = ?, updated_at = ? "
+                "WHERE tenant = ? AND draft_id = ?",
+                (
+                    draft.model_dump_json(), event_id, now, session.actor_id, now,
+                    session.tenant, draft_id,
+                ),
+            )
+            self._audit(
+                cx,
+                tenant=session.tenant,
+                root_id=draft.root_id,
+                session_id=session.session_id,
+                actor=session.actor_id,
+                action="EMPLOYEE_RETURN_CONFIRMED",
+                detail=json.dumps({
+                    "draft_id": draft_id,
+                    "instruction_id": draft.instruction_id,
+                    "event_id": event_id,
+                }, ensure_ascii=False),
+            )
+
+    def _store_activity_acceptance(
+        self, cx, *, session, row, money, basis, now: str
+    ) -> bool:
+        acceptance_id = f"activity-acceptance:{uuid.uuid4().hex}"
+        acceptance = ActivityAcceptance(
+            root_id=str(row["id"]),
+            employee=str(row["employee"]),
+            activity=str(row["activity"]),
+            advance_external_key=money.external_key,
+            advance_draft_id=basis["draft_id"],
+            actor=session.actor_id,
+            accepted_at=datetime.fromisoformat(now),
+            link_basis=basis["link_basis"],
+            reason=(
+                f"{basis['link_reason']} Kế toán xác nhận: {money.reason.strip()}"
+            ),
+            refs=basis["refs"],
+            link_signals=tuple(basis.get("link_signals", ())),
+        )
+        cursor = cx.execute(
+            "INSERT OR IGNORE INTO case_activity_acceptances (acceptance_id, tenant, "
+            "root_id, employee, activity, advance_external_key, advance_draft_id, actor, "
+            "accepted_at, link_basis, reason, refs_json, link_signals_json) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                acceptance_id,
+                session.tenant,
+                str(row["id"]),
+                acceptance.employee,
+                acceptance.activity,
+                acceptance.advance_external_key,
+                acceptance.advance_draft_id,
+                acceptance.actor,
+                acceptance.accepted_at.isoformat(),
+                acceptance.link_basis,
+                acceptance.reason,
+                json.dumps(
+                    [ref.model_dump(mode="json") for ref in acceptance.refs],
+                    ensure_ascii=False,
+                ),
+                json.dumps(
+                    [signal.model_dump(mode="json") for signal in acceptance.link_signals],
+                    ensure_ascii=False,
+                ),
+            ),
+        )
+        if cursor.rowcount:
+            self._audit(
+                cx,
+                tenant=session.tenant,
+                root_id=str(row["id"]),
+                session_id=session.session_id,
+                actor=session.actor_id,
+                action="ACTIVITY_ACCEPTANCE_FROM_ADVANCE",
+                detail=json.dumps(
+                    {
+                        "advance_external_key": money.external_key,
+                        "activity": str(row["activity"]),
+                        "basis": acceptance.link_basis,
+                        "link_signals": [signal.summary for signal in acceptance.link_signals],
+                    },
+                    ensure_ascii=False,
+                ),
+            )
+        return bool(cursor.rowcount)
+
     def _tenant_company_name(self, cx: sqlite3.Connection, tenant: str) -> str | None:
         """The configured company name: newest snapshot that carries one."""
         for row in cx.execute(
@@ -2806,6 +4206,110 @@ class CaseWorkflow:
                 "Thiếu mã giao dịch có namespace (ví dụ ngân hàng:số UNC, quỹ:số phiếu); "
                 "giữ chứng từ chưa giải quyết, không tự bịa định danh."
             )
+        instruction_row = None
+        return_basis = None
+        if money.claimed_kind in ("REIMBURSEMENT_RECEIVED", "EMPLOYEE_RETURN"):
+            if session.persona != "accountant":
+                raise UnsupportedCommandError("Chỉ kế toán được xác nhận giao dịch theo lệnh chi/thu.")
+            if not money.instruction_id:
+                raise UnsupportedCommandError("Giao dịch phải gắn với đúng lệnh chi/thu đang hiệu lực.")
+            instruction_row = cx.execute(
+                "SELECT * FROM instructions WHERE id = ? AND tenant = ?",
+                (money.instruction_id, session.tenant),
+            ).fetchone()
+            expected_direction = (
+                "PAY" if money.claimed_kind == "REIMBURSEMENT_RECEIVED" else "COLLECT"
+            )
+            if (
+                instruction_row is None
+                or str(instruction_row["root_id"]) != root_id
+                or str(instruction_row["direction"]) != expected_direction
+            ):
+                raise CommandConflictError("Lệnh chi/thu không thuộc hồ sơ này hoặc sai chiều giao dịch.")
+            if not money.refs:
+                raise UnsupportedCommandError("Gắn chứng từ thực tế trước khi ghi nhận giao dịch.")
+            for ref in money.refs:
+                stored_source = cx.execute(
+                    "SELECT root_id, digest FROM case_sources WHERE source_id = ? AND tenant = ?",
+                    (str(ref.source_id), session.tenant),
+                ).fetchone()
+                if (
+                    stored_source is None
+                    or str(stored_source["root_id"]) != root_id
+                    or str(stored_source["digest"]) != str(ref.source_sha256)
+                ):
+                    raise UnsupportedCommandError(
+                        "Chứng từ giao dịch phải được lưu trong đúng hồ sơ trước khi xác nhận."
+                    )
+            existing_for_key = cx.execute(
+                "SELECT root_id, payload_json FROM money_events WHERE tenant = ? AND external_key = ?",
+                (session.tenant, money.external_key),
+            ).fetchone()
+            existing_instruction_id = None
+            if existing_for_key is not None:
+                if str(existing_for_key["root_id"]) != root_id:
+                    raise CommandConflictError("Mã giao dịch này đã được ghi nhận trong hồ sơ khác.")
+                try:
+                    existing_event = MoneyEvent.model_validate_json(existing_for_key["payload_json"])
+                except (TypeError, ValueError) as error:
+                    raise CommandConflictError("Không khôi phục được giao dịch đã ghi.") from error
+                existing_instruction_id = existing_event.instruction_id
+                if (
+                    existing_instruction_id is not None
+                    and existing_instruction_id != money.instruction_id
+                ):
+                    raise CommandConflictError("Mã giao dịch đã gắn với một lệnh khác.")
+            remaining = max(
+                int(instruction_row["amount"]) - int(instruction_row["fulfilled_amount"]),
+                0,
+            )
+            instruction_is_active = (
+                str(instruction_row["status"]) in ("ISSUED", "PARTIAL")
+                and remaining > 0
+            )
+            if not instruction_is_active and existing_for_key is None:
+                raise CommandConflictError("Lệnh chi/thu này đã hoàn tất hoặc không còn hiệu lực.")
+            if money.amount <= 0:
+                raise UnsupportedCommandError("Số tiền giao dịch phải lớn hơn 0 VND.")
+            if not money.refs:
+                raise UnsupportedCommandError("Gắn chứng từ thực tế trước khi ghi nhận giao dịch.")
+            if money.claimed_kind == "EMPLOYEE_RETURN":
+                if not money.money_movement_draft_id:
+                    raise UnsupportedCommandError("Cần xác nhận từ chứng từ hoàn trả đã lưu.")
+                return_basis = self._employee_return_record_basis(cx, session, row, money)
+                money = money.model_copy(update={
+                    "refs": return_basis["refs"],
+                    "reason": return_basis["reason"],
+                    "completion_claim": return_basis["completion_claim"],
+                })
+            elif money.money_movement_draft_id is not None:
+                raise UnsupportedCommandError("Bản nháp này chỉ có thể ghi nhận nhân viên hoàn trả.")
+        advance_basis = None
+        if money.advance_draft_id is not None:
+            if money.claimed_kind != "ADVANCE_RECEIVED":
+                raise UnsupportedCommandError("Bản đọc này chỉ có thể xác nhận khoản ứng.")
+            if session.persona != "accountant":
+                raise UnsupportedCommandError("Chỉ kế toán được xác nhận khoản ứng và liên kết công việc.")
+            if money.claimed_scope != str(row["activity"]):
+                raise UnsupportedCommandError("Khoản ứng phải gắn đúng phạm vi của hồ sơ này.")
+            advance_basis = self._advance_record_basis(cx, session, row, money)
+            money = money.model_copy(update={
+                "reason": advance_basis["record_reason"],
+                "completion_claim": advance_basis["completion_claim"],
+            })
+            for ref in advance_basis["refs"]:
+                stored_ref = cx.execute(
+                    "SELECT root_id, digest FROM case_sources WHERE source_id = ? AND tenant = ?",
+                    (str(ref.source_id), session.tenant),
+                ).fetchone()
+                if (
+                    stored_ref is None
+                    or str(stored_ref["root_id"]) != root_id
+                    or str(stored_ref["digest"]) != str(ref.source_sha256)
+                ):
+                    raise UnsupportedCommandError(
+                        "Căn cứ liên kết không còn thuộc đúng hồ sơ hoặc tệp nguồn đã thay đổi."
+                    )
         # external_key is unique per tenant: a re-sent transaction is not counted
         # twice, and the same key with a different MATERIAL payload (kind,
         # amount, payer, payee or scope — not just amount/kind) is a conflict
@@ -2818,6 +4322,10 @@ class CaseWorkflow:
             (session.tenant, money.external_key),
         ).fetchone()
         if existing is not None:
+            if str(existing["root_id"]) != root_id:
+                raise CommandConflictError(
+                    "Mã giao dịch này đã được ghi nhận trong hồ sơ khác."
+                )
             stored = {
                 "kind": existing["kind"],
                 "amount": int(existing["amount"]),
@@ -2836,6 +4344,46 @@ class CaseWorkflow:
                 raise CommandConflictError(
                     "external_key đã dùng cho một giao dịch khác nội dung."
                 )
+            if instruction_row is not None:
+                try:
+                    existing_event = MoneyEvent.model_validate_json(existing["payload_json"])
+                except (TypeError, ValueError) as error:
+                    raise CommandConflictError("Không xác minh được lệnh của giao dịch đã ghi.") from error
+                if (
+                    existing_event.instruction_id is not None
+                    and existing_event.instruction_id != money.instruction_id
+                ):
+                    raise CommandConflictError("Mã giao dịch đã gắn với một lệnh khác.")
+                if (
+                    return_basis is not None
+                    and existing_event.money_movement_draft_id not in (
+                        None, money.money_movement_draft_id
+                    )
+                ):
+                    raise CommandConflictError("Mã giao dịch đã gắn với một bản nháp hoàn trả khác.")
+            if return_basis is not None:
+                self._complete_employee_return_draft(
+                    cx,
+                    session=session,
+                    draft_id=return_basis["draft_id"],
+                    event_id=str(existing["id"]),
+                    now=now,
+                )
+            if (
+                advance_basis is not None
+                and existing["verification_state"] == "CONFIRMED"
+                and existing["allocation_state"] == "ALLOCATED"
+                and money.instrument_status == "COMPLETED"
+                and advance_basis["source_clear"]
+                and self._advance_party_block(
+                    cx, session.tenant, str(row["employee"]), money
+                ) is None
+            ):
+                if self._store_activity_acceptance(
+                    cx, session=session, row=row, money=money, basis=advance_basis, now=now
+                ):
+                    self._bump(cx, row, now)
+                    self._assess_and_commit(cx, session, self._reload(cx, row), now)
             return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
         # The witnessed imported ledger is the same transaction history under
         # another store: re-recording it must not raise A a second time.
@@ -2868,6 +4416,21 @@ class CaseWorkflow:
                 raise CommandConflictError(
                     "external_key đã dùng cho một giao dịch khác nội dung."
                 )
+            if (
+                advance_basis is not None
+                and str(snapshot_hit.get("verification_state") or "") == "CONFIRMED"
+                and str(snapshot_hit.get("allocation_state") or "") == "ALLOCATED"
+                and money.instrument_status == "COMPLETED"
+                and advance_basis["source_clear"]
+                and self._advance_party_block(
+                    cx, session.tenant, str(row["employee"]), money
+                ) is None
+            ):
+                if self._store_activity_acceptance(
+                    cx, session=session, row=row, money=money, basis=advance_basis, now=now
+                ):
+                    self._bump(cx, row, now)
+                    self._assess_and_commit(cx, session, self._reload(cx, row), now)
             return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
 
         kind = money.claimed_kind
@@ -2909,6 +4472,11 @@ class CaseWorkflow:
             instrument_method=money.instrument_method,
             instrument_status=money.instrument_status,
             instrument_reference=money.instrument_reference,
+            recorded_by=context.actor_id,
+            record_reason=money.reason,
+            advance_draft_id=money.advance_draft_id,
+            instruction_id=money.instruction_id,
+            money_movement_draft_id=money.money_movement_draft_id,
         )
         # A reversal must not exceed the unreversed original (§10.1).
         if money.reverses_event_id is not None:
@@ -2940,6 +4508,26 @@ class CaseWorkflow:
                 event.model_dump_json(),
             ),
         )
+        accepted_work = False
+        if (
+            advance_basis is not None
+            and money.instrument_status == "COMPLETED"
+            and advance_basis["source_clear"]
+            and advance_block_reason is None
+            and verification.verification_state == "CONFIRMED"
+            and verification.allocation_state == "ALLOCATED"
+        ):
+            accepted_work = self._store_activity_acceptance(
+                cx, session=session, row=row, money=money, basis=advance_basis, now=now
+            )
+        if return_basis is not None:
+            self._complete_employee_return_draft(
+                cx,
+                session=session,
+                draft_id=return_basis["draft_id"],
+                event_id=event.id,
+                now=now,
+            )
         self._audit(
             cx,
             tenant=session.tenant,
@@ -2949,10 +4537,11 @@ class CaseWorkflow:
             action="RECORD_ACTUAL",
             detail=json.dumps(
                 {
-                    "kind": event.kind,
-                    "amount": event.amount,
-                    "key": event.external_key,
-                    "verification": event.verification_state,
+                "kind": event.kind,
+                "amount": event.amount,
+                "key": event.external_key,
+                "verification": event.verification_state,
+                "activity_accepted": accepted_work,
                     **(
                         {"advance_block": advance_block_reason}
                         if advance_block_reason is not None
@@ -2965,6 +4554,145 @@ class CaseWorkflow:
         # Re-assess so the projection reflects the new money and the active
         # instruction's fulfillment is re-derived (contracts §4).
         self._reconcile_money(cx, session, self._reload(cx, row), now)
+        self._assess_and_commit(cx, session, self._reload(cx, row), now)
+        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
+    def _confirm_coverage(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        context: CommandContext,
+        command: ConfirmCoverage,
+    ) -> CommandResult:
+        from invoice_referee.domain.common import Fact
+        from invoice_referee.domain.finance import COVERAGE_REQUIRED_FLOW_KINDS
+
+        row = self._require_root(cx, session, command.root_id)
+        self._require_version(row, context.expected_case_version)
+        if session.persona != "accountant":
+            raise UnsupportedCommandError("Chỉ kế toán được xác nhận lịch sử tiền.")
+        now = self._now_iso()
+        confirmed_at = datetime.fromisoformat(now)
+        if command.start > confirmed_at:
+            raise UnsupportedCommandError("Ngày bắt đầu đối chiếu không được ở tương lai.")
+        if not command.funds or any(not item.strip() for item in command.funds):
+            raise UnsupportedCommandError("Chọn ít nhất một nguồn tiền đã đối chiếu.")
+        if len(set(command.funds)) != len(command.funds):
+            raise UnsupportedCommandError("Nguồn tiền bị lặp trong phạm vi đối chiếu.")
+        if len(set(command.flow_kinds)) != len(command.flow_kinds):
+            raise UnsupportedCommandError("Loại giao dịch bị lặp trong phạm vi đối chiếu.")
+        if set(COVERAGE_REQUIRED_FLOW_KINDS) != set(command.flow_kinds):
+            raise UnsupportedCommandError(
+                "Chọn đúng các loại đã đối chiếu: ứng, chi bổ sung, hoàn trả, đảo giao dịch và khoản chưa phân bổ."
+            )
+        if not command.witness_refs:
+            raise UnsupportedCommandError("Cần gắn ít nhất một chứng từ làm căn cứ đối chiếu.")
+        for ref in command.witness_refs:
+            source = cx.execute(
+                "SELECT root_id, digest FROM case_sources WHERE source_id = ? AND tenant = ?",
+                (str(ref.source_id), session.tenant),
+            ).fetchone()
+            if (
+                source is None
+                or str(source["root_id"]) != str(row["id"])
+                or str(source["digest"]) != str(ref.source_sha256)
+            ):
+                raise UnsupportedCommandError(
+                    "Căn cứ đối chiếu phải là chứng từ đã lưu trong đúng hồ sơ."
+                )
+
+        unallocated_rows = cx.execute(
+            "SELECT id FROM money_events WHERE tenant = ? AND root_id = ? "
+            "AND (verification_state != 'CONFIRMED' OR allocation_state != 'ALLOCATED') "
+            "ORDER BY id",
+            (session.tenant, str(row["id"])),
+        ).fetchall()
+        actual_unallocated = {str(item["id"]) for item in unallocated_rows}
+        from invoice_referee.workflow.context_records import context_ledger, load_context
+
+        organization = load_context(
+            cx,
+            session.tenant,
+            str(row["activity"]),
+            confirmed_at,
+        )
+        if organization is not None:
+            context_digest = hashlib.sha256(
+                organization.model_dump_json().encode("utf-8")
+            ).hexdigest()
+            actual_unallocated.update(
+                event.id
+                for event in context_ledger(organization, digest=context_digest)
+                if event.verification_state != "CONFIRMED"
+                or event.allocation_state != "ALLOCATED"
+            )
+        declared_unallocated = set(str(item) for item in command.unallocated_event_ids)
+        if actual_unallocated != declared_unallocated:
+            raise UnsupportedCommandError(
+                "Danh sách khoản chưa phân bổ đã thay đổi; tải lại lịch sử trước khi xác nhận."
+            )
+
+        ledger_version = cx.execute(
+            "SELECT COUNT(*) AS n FROM money_events WHERE tenant = ? AND root_id = ?",
+            (session.tenant, str(row["id"])),
+        ).fetchone()
+        version_value = int(ledger_version["n"]) if ledger_version else 0
+        coverage = CoverageRecord(
+            scope=str(row["activity"]),
+            start=command.start,
+            as_of=confirmed_at,
+            funds=tuple(command.funds),
+            flow_kinds=tuple(command.flow_kinds),  # type: ignore[arg-type]
+            opening_balance=Fact[int](
+                key="coverage:opening",
+                value=command.opening_balance,
+                state="KNOWN",
+                refs=command.witness_refs,
+            ),
+            ledger_version=str(version_value),
+            witness_refs=command.witness_refs,
+            source="ACCOUNTANT_CONFIRMATION",
+            employee=str(row["employee"]),
+            actor=context.actor_id,
+            recorded_at=confirmed_at,
+            reason=command.reason,
+            unallocated_event_ids=tuple(command.unallocated_event_ids),
+        )
+        coverage_id = f"coverage:{uuid.uuid4().hex}"
+        cx.execute(
+            "INSERT INTO case_coverage_records (coverage_id, tenant, root_id, "
+            "ledger_version, coverage_json, actor, recorded_at, reason) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                coverage_id,
+                session.tenant,
+                str(row["id"]),
+                str(version_value),
+                coverage.model_dump_json(),
+                context.actor_id,
+                now,
+                command.reason,
+            ),
+        )
+        self._bump(cx, row, now)
+        self._audit(
+            cx,
+            tenant=session.tenant,
+            root_id=str(row["id"]),
+            session_id=session.session_id,
+            actor=context.actor_id,
+            action="CONFIRM_HISTORY_COVERAGE",
+            detail=json.dumps(
+                {
+                    "coverage_id": coverage_id,
+                    "activity": str(row["activity"]),
+                    "ledger_version": str(version_value),
+                    "fund_count": len(coverage.funds),
+                    "flow_kind_count": len(coverage.flow_kinds),
+                },
+                ensure_ascii=False,
+            ),
+        )
         self._assess_and_commit(cx, session, self._reload(cx, row), now)
         return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
 
@@ -3165,24 +4893,21 @@ class CaseWorkflow:
             for e in self._load_money_events(cx, session.tenant, root_id)
             if e.verification_state == "CONFIRMED"
         )
+        from invoice_referee.workflow.money import fulfillment_for
+
         employee = str(row["employee"])
         for inst in cx.execute(
             "SELECT * FROM instructions WHERE root_id = ? AND status IN ('ISSUED','PARTIAL')",
             (root_id,),
         ).fetchall():
-            if inst["direction"] == "PAY":
-                matching = tuple(
-                    e
-                    for e in events
-                    if e.kind == "REIMBURSEMENT_RECEIVED" and e.payee == employee
-                )
-            else:
-                matching = tuple(
-                    e
-                    for e in events
-                    if e.kind == "EMPLOYEE_RETURN" and e.payee == "company:demo"
-                )
-            fulfilled = net_by_kind(matching, matching[0].kind) if matching else 0
+            expected_payee = employee if inst["direction"] == "PAY" else "company:demo"
+            fulfilled = fulfillment_for(
+                events,
+                payee=expected_payee,
+                direction=str(inst["direction"]),
+                instruction_id=str(inst["id"]),
+                legacy_after=datetime.fromisoformat(str(inst["created_at"])),
+            )
             amount = int(inst["amount"])
             capped = min(fulfilled, amount)
             status = (
@@ -4148,7 +5873,7 @@ class CaseWorkflow:
 
     def _case_view(self, cx: sqlite3.Connection, row: sqlite3.Row) -> CaseView:
         activity = cx.execute(
-            "SELECT name, budget_amount FROM context_activities "
+            "SELECT name FROM context_activities "
             "WHERE activity_id = ? AND tenant = ?",
             (row["activity"], row["tenant"]),
         ).fetchone()
@@ -4190,13 +5915,6 @@ class CaseWorkflow:
                 (str(row["id"]),),
             )
         )
-        if (
-            not issues
-            and (activity is None or activity["budget_amount"] is None)
-            and row["state"] == "DRAFT"
-        ):
-            issues = (_context_issue(str(row["id"])),)
-
         conclusion_row = cx.execute(
             "SELECT payload_json, decided_at FROM case_conclusions WHERE root_id = ? "
             "ORDER BY revision DESC LIMIT 1",
@@ -4261,6 +5979,147 @@ class CaseWorkflow:
                 (str(row["id"]),),
             )
         )
+        activity_acceptances = tuple(
+            ActivityAcceptance(
+                root_id=str(item["root_id"]),
+                employee=str(item["employee"]),
+                activity=str(item["activity"]),
+                advance_external_key=str(item["advance_external_key"]),
+                advance_draft_id=str(item["advance_draft_id"]),
+                actor=str(item["actor"]),
+                accepted_at=datetime.fromisoformat(str(item["accepted_at"])),
+                link_basis=str(item["link_basis"]),
+                reason=str(item["reason"]),
+                refs=tuple(
+                    EvidenceRef.model_validate(ref)
+                    for ref in json.loads(item["refs_json"] or "[]")
+                ),
+                link_signals=tuple(
+                    ActivityLinkSignal.model_validate({
+                        **signal,
+                        "refs": tuple(
+                            EvidenceRef.model_validate(ref)
+                            for ref in signal.get("refs", [])
+                        ),
+                    })
+                    for signal in json.loads(item["link_signals_json"] or "[]")
+                ),
+            )
+            for item in cx.execute(
+                "SELECT * FROM case_activity_acceptances WHERE tenant = ? AND root_id = ? "
+                "ORDER BY accepted_at, acceptance_id",
+                (str(row["tenant"]), str(row["id"])),
+            )
+        )
+        coverage_row = cx.execute(
+            "SELECT coverage_json FROM case_coverage_records WHERE tenant = ? AND root_id = ? "
+            "ORDER BY recorded_at DESC, coverage_id DESC LIMIT 1",
+            (str(row["tenant"]), str(row["id"])),
+        ).fetchone()
+        coverage_record = (
+            CoverageRecord.model_validate_json(coverage_row["coverage_json"])
+            if coverage_row is not None
+            else None
+        )
+        ledger_version_row = cx.execute(
+            "SELECT COUNT(*) AS n FROM money_events WHERE tenant = ? AND root_id = ?",
+            (str(row["tenant"]), str(row["id"])),
+        ).fetchone()
+        ledger_version = int(ledger_version_row["n"]) if ledger_version_row else 0
+        now_dt = datetime.fromisoformat(self._now_iso())
+        from invoice_referee.domain.case import CaseScope
+        from invoice_referee.reconciliation.admission import coverage_is_valid
+
+        coverage_current = (
+            coverage_is_valid(
+                coverage_record,
+                scope=CaseScope(
+                    tenant=str(row["tenant"]),
+                    employee=str(row["employee"]),
+                    activity=str(row["activity"]),
+                    profile=str(row["profile"]),
+                ),
+                as_of=now_dt,
+                current_ledger_version=ledger_version,
+            )
+            if coverage_record is not None
+            else False
+        )
+        local_money_history = tuple(
+            MoneyEvent.model_validate_json(event["payload_json"])
+            for event in cx.execute(
+                "SELECT payload_json FROM money_events WHERE tenant = ? AND root_id = ? "
+                "ORDER BY event_at, recorded_at, id",
+                (str(row["tenant"]), str(row["id"])),
+            )
+        )
+        from invoice_referee.workflow.context_records import context_ledger, load_context, merge_ledger
+
+        organization = load_context(
+            cx, str(row["tenant"]), str(row["activity"]), now_dt
+        )
+        if organization is not None:
+            import hashlib
+
+            org_digest = hashlib.sha256(
+                organization.model_dump_json().encode("utf-8")
+            ).hexdigest()
+            money_history, _history_conflicts = merge_ledger(
+                context_ledger(organization, digest=org_digest), local_money_history
+            )
+        else:
+            money_history = local_money_history
+        employee_return_drafts: list[EmployeeReturnDraft] = []
+        for draft_row in cx.execute(
+            "SELECT draft_json FROM case_money_drafts WHERE tenant = ? AND root_id = ? "
+            "ORDER BY created_at, draft_id",
+            (str(row["tenant"]), str(row["id"])),
+        ).fetchall():
+            draft = EmployeeReturnDraft.model_validate_json(draft_row["draft_json"])
+            if draft.status != "CONFIRMED":
+                current_instruction = cx.execute(
+                    "SELECT * FROM instructions WHERE tenant = ? AND root_id = ? AND id = ?",
+                    (str(row["tenant"]), str(row["id"]), draft.instruction_id),
+                ).fetchone()
+                is_active = (
+                    current_instruction is not None
+                    and current_instruction["direction"] == "COLLECT"
+                    and current_instruction["status"] in ("ISSUED", "PARTIAL")
+                    and int(current_instruction["amount"]) > int(current_instruction["fulfilled_amount"])
+                )
+                if not is_active:
+                    draft = draft.model_copy(update={
+                        "match_status": "STALE",
+                        "signals": tuple(signal for signal in draft.signals if signal.field != "instruction") + (
+                            MoneyMovementSignal(
+                                field="instruction",
+                                state="STALE",
+                                summary="Lệnh thu đã hoàn tất hoặc không còn hiệu lực.",
+                            ),
+                        ),
+                    })
+                else:
+                    remaining = max(
+                        int(current_instruction["amount"]) - int(current_instruction["fulfilled_amount"]),
+                        0,
+                    )
+                    draft = draft.model_copy(update={"instruction_remaining": remaining})
+                    amount_signal = next(
+                        (signal for signal in draft.signals if signal.field == "amount"), None
+                    )
+                    if draft.amount is not None and draft.amount > remaining:
+                        draft = draft.model_copy(update={
+                            "match_status": "OVERPAY",
+                            "signals": tuple(signal for signal in draft.signals if signal.field != "amount") + (
+                                MoneyMovementSignal(
+                                    field="amount",
+                                    state="OVERPAY",
+                                    summary=f"Số hoàn {draft.amount:,} VND vượt lệnh thu còn {remaining:,} VND.",
+                                    refs=amount_signal.refs if amount_signal is not None else (),
+                                ),
+                            ),
+                        })
+            employee_return_drafts.append(draft)
         # The typed evidence report (contracts §12.5): present after a LIVE/
         # RECORDED_REPLAY read; it is pipeline completion only, never finance.
         evidence_report = None
@@ -4306,6 +6165,13 @@ class CaseWorkflow:
             assessment_ready=assessment_ready,
             assessment_blocker=assessment_blocker,
             payment_basis=conclusion.payment_basis if conclusion is not None else (),
+            activity_acceptances=activity_acceptances,
+            coverage_record=coverage_record,
+            coverage_current=coverage_current,
+            money_history=tuple(
+                sorted(money_history, key=lambda event: (event.event_at, event.recorded_at, event.id))
+            ),
+            employee_return_drafts=tuple(employee_return_drafts),
             trace_refs=(
                 (self._last_trace_ref[str(row["id"])],)
                 if str(row["id"]) in self._last_trace_ref

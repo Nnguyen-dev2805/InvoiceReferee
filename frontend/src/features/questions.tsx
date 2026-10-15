@@ -40,6 +40,10 @@ export function formatQuestionTitle(question: string, hasBasis: boolean): string
 }
 
 export function formatIssueTarget(fieldOrRule: string): string {
+  if (fieldOrRule === "ledger:coverage" || fieldOrRule === "coverage") {
+    return "Lịch sử đối chiếu tiền";
+  }
+  if (fieldOrRule === "activity:acceptance") return "Công việc theo chứng từ ứng";
   if (fieldOrRule.includes("arithmetic:return") || fieldOrRule === "return") {
     return "Khớp số tiền hoàn ứng";
   }
@@ -63,7 +67,6 @@ export function formatIssueTarget(fieldOrRule: string): string {
     return `Khoản chi #${expenseNum}`;
   }
   if (fieldOrRule === "budget:B") return "Ngân sách hoạt động (B)";
-  if (fieldOrRule === "coverage") return "Lịch sử đối chiếu ứng/hoàn";
 
   const rawLast = fieldOrRule.split(":").pop() ?? fieldOrRule;
   if (rawLast === "return") return "Khoản hoàn ứng";
@@ -108,6 +111,7 @@ export function QuestionCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const invoiceReference = employeePaidInvoiceReference(issue.field_or_rule);
+  const historyCoverageIssue = issue.field_or_rule === "ledger:coverage";
 
   async function submit() {
     setBusy(true);
@@ -150,6 +154,24 @@ export function QuestionCard({
         </div>
       )}
 
+      {historyCoverageIssue ? (
+        <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+          <p className="text-xs text-amber-950">
+            Câu trả lời tự do không xác nhận được sổ tiền đầy đủ. Dùng biểu mẫu xác nhận đã đối chiếu lịch sử tiền để ghi phạm vi, số dư và chứng từ căn cứ.
+          </p>
+          <a
+            href="#history-coverage"
+            onClick={(event) => {
+              event.preventDefault();
+              document.getElementById("history-coverage")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+            className="inline-flex rounded bg-slate-950 px-3 py-2 font-medium text-white hover:bg-slate-800"
+          >
+            Tới xác nhận lịch sử tiền
+          </a>
+        </div>
+      ) : (
+      <>
       {/* Input Form */}
       <div className="space-y-3 pt-1">
         <div>
@@ -212,6 +234,8 @@ export function QuestionCard({
         <p role="alert" className="error p-2.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-xs">
           {error}
         </p>
+      )}
+      </>
       )}
     </div>
   );

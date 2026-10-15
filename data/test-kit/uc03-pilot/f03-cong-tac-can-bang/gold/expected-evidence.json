@@ -13,7 +13,7 @@
       ],
       "page_count": 1,
       "fields": {
-        "declared_name": "Nguyễn An",
+        "declared_name": "NGUYỄN MINH AN",
         "trip_destination": "Hà Nội",
         "trip_start": "2026-10-06",
         "trip_end": "2026-10-10",
@@ -38,7 +38,7 @@
       "page_count": 1,
       "fields": {
         "issuer_name": "Công ty TNHH Dịch vụ An Bình",
-        "buyer_name": "Công ty InvoiceReferee",
+        "buyer_name": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
         "issuer_tax_code": "0101234565",
         "buyer_tax_code": "0319999996",
         "document_number": "IR26101003",
@@ -47,7 +47,7 @@
         "total_amount": 4320000,
         "currency": "VND",
         "payment_method_text": "Chuyển khoản",
-        "buyer_person_name": "Nguyễn An"
+        "buyer_person_name": "NGUYỄN MINH AN"
       },
       "forbidden_role_inference": [
         "PAYMENT_EVIDENCE from buyer/signature/payment method alone"

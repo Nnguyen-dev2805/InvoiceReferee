@@ -67,13 +67,16 @@ def _workflow(tmp_path: Path) -> CaseWorkflow:
 
 
 async def _seed_draft(
-    wf: CaseWorkflow, tag: str = "x", activity: str = ACTIVITY
+    wf: CaseWorkflow,
+    tag: str = "x",
+    activity: str = ACTIVITY,
+    employee: str = EMPLOYEE,
 ) -> str:
-    session = wf.start_session(tenant=TENANT, persona="employee", actor_id=EMPLOYEE)
+    session = wf.start_session(tenant=TENANT, persona="employee", actor_id=employee)
     created = await wf.execute(
         CommandContext(
             session_id=session.session_id,
-            actor_id=EMPLOYEE,
+            actor_id=employee,
             command_id=f"cmd:1:{tag}",
             expected_case_version=0,
         ),
@@ -207,6 +210,34 @@ async def test_same_key_different_payee_conflicts(tmp_path: Path) -> None:
             payee="employee:someone-else",
             command_id="cmd:r2",
         )
+
+
+async def test_event_identity_already_owned_by_another_case_conflicts(tmp_path: Path) -> None:
+    wf = _workflow(tmp_path)
+    first_root = await _seed_draft(wf, tag="first", activity=ACTIVITY)
+    second_root = await _seed_draft(
+        wf, tag="second", activity=ACTIVITY, employee="employee:employee-b"
+    )
+    await _record(
+        wf,
+        first_root,
+        key="bank:ADV-CROSS-ROOT",
+        command_id="cmd:r1",
+    )
+
+    with pytest.raises(CommandConflictError, match="hồ sơ khác"):
+        await _record(
+            wf,
+            second_root,
+            key="bank:ADV-CROSS-ROOT",
+            command_id="cmd:r2",
+        )
+
+    rows = wf.db.connect().execute(
+        "SELECT root_id FROM money_events WHERE tenant = ? AND external_key = ?",
+        (TENANT, "bank:ADV-CROSS-ROOT"),
+    ).fetchall()
+    assert [row["root_id"] for row in rows] == [first_root]
 
 
 async def test_same_key_different_amount_conflicts(tmp_path: Path) -> None:

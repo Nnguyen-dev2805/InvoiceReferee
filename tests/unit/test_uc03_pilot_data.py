@@ -44,10 +44,15 @@ def test_pilot_sources_context_and_regeneration_are_independent_of_gold(tmp_path
         assert "Tôi xác nhận đã trực tiếp thanh toán" not in text
         assert "Tài liệu kèm theo" not in text
         # The invoice names the buyer person (the employee-paid binding key).
-        assert "Họ tên người mua: Nguyễn An" in text
+        assert "Họ tên người mua: NGUYỄN MINH AN" in text
+        assert "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH" in text
         # The service-in-provision line is removed from the invoice.
         assert "Dịch vụ được cung cấp tại" not in text
         org = json.loads((inp / "organization.json").read_text())
+        assert org["people"][0]["name"] == "NGUYỄN MINH AN"
+        assert org["company_name"] == "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH"
+        assert not org.get("budgets")
+        assert all("SET_BUDGET" not in grant["actions"] for grant in org["grants"])
         assert org["ledger"][0]["amount"] == advance
         assert org["ledger"][0]["kind"] == "ADVANCE_RECEIVED"
         assert org["coverage"]["opening_by_fund"] == {"company:bank-demo": 0}
@@ -101,3 +106,56 @@ def test_pilot_generator_does_not_follow_manifest_symlink(tmp_path):
     result = run_generator(output)
     assert result.returncode != 0
     assert sentinel.read_text() == "keep me"
+
+
+def test_tc01_advance_documents_match_their_context_and_regenerate(tmp_path):
+    output = tmp_path / "tc01"
+    command = [sys.executable, str(SCRIPT), "--tc01-output", str(output)]
+    result = subprocess.run(command, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert len(list(output.glob("*.pdf"))) == 2
+    for name in ("03-bien-nhan-chuyen-khoan.pdf", "04-phieu-chi-tien-mat.pdf"):
+        reader = PdfReader(output / name)
+        assert len(reader.pages) == 1
+        text = reader.pages[0].extract_text()
+        assert "NGUYỄN MINH AN" in text
+        assert "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH" in text
+        assert "tiếp khách phục vụ dự án Nâng cấp văn phòng 2026" in text
+        assert "4.000.000 đ" in text and "05/10/2026" in text
+        assert "TU-TC01" in text
+        assert "chuyến công tác Hà Nội" not in text
+    for method, reference in (("chuyen-khoan", "FT-TC01-0001"), ("tien-mat", "PC-TC01-0001")):
+        context = json.loads((output / f"context-{method}.json").read_text())
+        event = context["ledger"][0]
+        assert len(context["ledger"]) == 1 and event["amount"] == 4_000_000
+        assert event["external_key"].split(":", 1)[1] == reference
+        assert event["payer"] == "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH"
+        assert context.get("budget_amount") is None and not context.get("budgets")
+        assert all("SET_BUDGET" not in grant["actions"] for grant in context["grants"])
+    manifest = json.loads((output / "manifest.json").read_text())
+    before = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in output.iterdir()}
+    for name, digest in manifest["files"].items():
+        assert before[name] == digest
+    assert subprocess.run(command, capture_output=True).returncode == 0
+    assert before == {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in output.iterdir()}
+
+
+def test_business_gold_keeps_financial_oracles_without_a_budget_precondition():
+    expected = {
+        "f01-cong-tac-thu-lai-tien-thua": ("COLLECT", 760_000, "OUTSTANDING"),
+        "f02-cong-tac-cong-ty-chi-them": ("PAY", 400_000, "OUTSTANDING"),
+        "f03-cong-tac-can-bang": (None, None, "BALANCED"),
+    }
+    for folder, (direction, amount, conclusion) in expected.items():
+        gold = json.loads(
+            (ROOT / "data/test-kit/uc03-pilot" / folder / "gold/expected-business.json")
+            .read_text(encoding="utf-8")
+        )
+        result = gold["before_execution"]
+        assert result["conclusion"] == conclusion
+        if direction is None:
+            assert result["instruction"] is None
+        else:
+            assert result["instruction"]["direction"] == direction
+            assert result["instruction"]["amount"] == amount
+        assert all("B=8000000" not in precondition for precondition in gold["preconditions"])

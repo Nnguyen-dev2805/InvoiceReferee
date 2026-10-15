@@ -14,6 +14,7 @@
 - Scope employee/activity/VND; travel trước, local meeting sau gate. Không restore code/context rebuild hoặc B3/B7/legacy env names.
 - T incurred business cost xác minh (Q31); E eligible employee-paid; C company-direct không hoàn nhân viên; S=E−A−P+R. Missing proof không zero.
 - E<=8.000.000 đ, abs(S)<=4.000.000 đ auto; approver20.000.000 đ per-action/scope/time. Không per-category cap mặc định.
+- Activity budget B is legacy-compatible data only; it never creates a settlement FACT/POLICY/AUTHORITY gate or changes the decision basis (ADR0009).
 - Routine tự kết luận+instruction; người execute tiền/exceptions. Không bank integration/ký số/FX/vendor refund/multi-claim allocation.
 - Real received đúng scope vào phép tính dù trái quyền; incident riêng. PDF evidence units/page/quote support, không ref-id existence là đủ.
 - One extra recovery/issue+job budget; stale/Stop/late không commit; command và physical transaction idempotency khác nhau.
@@ -103,8 +104,8 @@ async def test_same_activity_has_one_root(app_fixture):
 ```
 - [x] RED: `rtk proxy uv run pytest tests/integration/test_root_session.py -q`.
 - [x] Implement SQLite WAL/DB unique, HttpOnly demo cookie/persona switch audit. API /api/demo/session,/api/demo/persona,/api/cases,/api/cases/{id},/api/cases/{id}/sources. User sees names/activity/date, no employee/operator/work ID entry.
-- [x] Activity catalog/server-generated proposed IDs theo contracts §10.4: same activity trả cùng root; hai activity có hai roots. Draft mới không tự cấp B/quyền; Decide đúng quyền hoặc synthetic context import có audit. Client tự gửi role/B không thành authority.
-- [x] Committed observable seed: travel B8, system8/4, approver20 per-action, ledger/opening/coverage witness refs. No E/S/forced outcome from gold. Missing-context activity doesn't auto zero. Doc metadata/data_origin SIMULATED, not true corporate auth.
+- [x] Activity catalog/server-generated proposed IDs theo contracts §10.4: same activity trả cùng root; hai activity có hai roots. Draft mới không tự cấp quyền; Decide đúng quyền hoặc synthetic context import có audit. Client tự gửi role/action không thành authority.
+- [x] Committed observable seed: legacy travel budget fields may remain; system8/4, approver20 per-action, ledger/opening/coverage witness refs. Budget B is ignored by settlement. No E/S/forced outcome from gold. Missing-context activity doesn't auto zero. Doc metadata/data_origin SIMULATED, not true corporate auth.
 - [x] Protocol/blank private study sheets: user recruits >=3 practitioners; matched manual/app tasks and order, whole human effort/draft/wait/onboarding/adverse effect, real written feedback/consent. Agent doesn't send/invent participants.
 - [x] GREEN tests + `rtk proxy npm --prefix frontend run build`. UI `rtk proxy uv run python scripts/dev.py --mode stub`: select/create twice/attach/list sources; accessible labels/keyboard/screenshot and mode/config diagnostics.
 - [x] Before npm/build/browser commands, resolve Node24 and verify `node --version` plus `npm --loglevel=verbose --version` show Node24 in the same scoped environment; record the exact selector/lockfile/command/exit. A green Node26 build does not satisfy the runtime pin.
@@ -116,17 +117,17 @@ async def test_same_activity_has_one_root(app_fixture):
 **Files:** Create reconciliation group; tests/unit/test_admissibility.py,test_finance.py,test_policy.py; modify api/views.py/dossier.
 **Consumes:** AssessmentInput and unit literals.
 **Produces:** Reconciler.assess(input)->AssessmentResult; confirm_admissibility(observation,unit,context)->Fact; project_finance(expenses,ledger,coverage)->Projection; evaluate_policy(input,projection)->tuple[BusinessIssue,...].
-- [x] Tests T10/E5/C3/unpaid2/B8 POLICY; personal E excluded but A2 debt2; material corporate personal charge unsupported/no finalS0; guest≠payer; missing opening/fund coverage unknown; grants wrong action/time; E12/A11/B14 AUTH; E8/S4 inclusive and +1đ.
+- [x] Historical T10/E5/C3/unpaid2/B8 POLICY check is retired by ADR0009. Current tests pin no-B collect/pay/balanced outcomes and B-invariance; personal exclusion, payer, coverage, action/time grants, E>8 and |S|>4 remain independent gates.
 ```python
-def test_incurred_budget_not_paid_budget():
+def test_verified_cost_is_not_gated_by_legacy_budget():
     r = Reconciler().assess(snapshot(T=10_000_000,E=5_000_000,C=3_000_000,A=2_000_000,P=0,R=0,B=8_000_000))
     assert r.projection.T.value == 10_000_000
-    assert any(i.kind == "POLICY" for i in r.issues)
-    assert r.allowed_effect is None
+    assert not any(i.field_or_rule == "budget:B" for i in r.issues)
+    assert r.allowed_effect.direction == "PAY" and r.allowed_effect.amount == 3_000_000
 ```
 - [x] RED: `rtk proxy uv run pytest tests/unit/test_admissibility.py tests/unit/test_finance.py tests/unit/test_policy.py -q`.
-- [x] Implement source predicates/coverage, E/T/S and independent governance incident, grant20 per action, policy expense-time/current commit authority, scoped exception. Unknown affecting money/rights no auto; chưa phân loại A/P có căn cứ phải FACT, không tự gán tiền chuyển thành ứng.
-- [x] Prior eligibility reused only unchanged valid cost_basis. Issuer expiry doesn't erase issued decisions; explicit revocation/new action rights checked. Partial temporal budgets not covering activity need scope clarification, not latest B blind.
+- [x] Implement source predicates/coverage, E/T/S and independent governance incident, grant20 per action, policy expense-time/current commit authority, scoped exception. Unknown affecting money/rights no auto; chưa phân loại A/P có căn cứ phải FACT, không tự gán tiền chuyển thành ứng. B no longer gates.
+- [x] Prior eligibility reused only unchanged valid cost_basis. Issuer expiry doesn't erase issued decisions; explicit revocation/new action rights checked. Legacy B changes do not alter cost_basis.
 - [x] Pin tests test_paid_ineligible_is_not_unpaid: T10/employee paid7/E5/C3 ⇒ unpaid0; business-incurred excluded E vẫn giữ T. test_new_paid_portion_requires_total_authority: E8→E9 ⇒ AUTHORITY; E8+P1 không đổi eligibility basis. CaseView.problems và SettlementConclusion theo contracts §10.2–3.
 - [x] GREEN unit suite. Kiểm component dossier bằng literal view fixture trong frontend/tests/dossier.test.tsx: known/unknown/rule/effect hiển thị tiếng Việt. Đây là component test; UI qua workflow thực được kiểm ở T5/T6, không tạo endpoint giả assessment trong production.
 - [x] Commit checkpoint "feat: reconcile evidence money and authority".
@@ -136,7 +137,7 @@ def test_incurred_budget_not_paid_budget():
 
 **Files:** scripts/build_packets.py, fonts/licenses, data/evaluation/development,holdout; evaluation/models.py,packets.py; tests/unit/test_packet_inventory.py.
 **Interfaces:** load_input(dir:Path)->PacketInput; load_gold(dir:Path)->GoldPacket scorer-only; validate_inventory(manifest:Path)->InventoryReport.
-- [x] Tests input excludes gold; root/economic/source clone overlap fail trước model selection. Pin grouping axes family/template/layout/issuer có lý do theo contracts §11; shared font/A4 không là leakage. Family overlap phải group hoặc disclosure within-family, không claim unseen-family. Travel15/holdout10+10, filenames không leak latent, embedded Vietnamese font/page refs.
+- [x] Tests input excludes gold; root/economic/source clone overlap fail trước model selection. Pin grouping axes family/template/layout/issuer có lý do theo contracts §11; shared font/A4 không là leakage. Family overlap phải group hoặc disclosure within-family, không claim unseen-family. Holdout10+10, filenames không leak latent, embedded Vietnamese font/page refs.
 ```python
 def test_packet_input_excludes_gold(tmp_path):
     p = load_input(write_test_packet(tmp_path))
@@ -145,10 +146,10 @@ def test_packet_input_excludes_gold(tmp_path):
   write_test_packet in tests/factories.py creates input/separate literal gold.
 - [x] RED: `rtk proxy uv run pytest tests/unit/test_packet_inventory.py -q`.
 - [x] Generate PDFs ReportLab+NotoSans; render scans pypdfium2. Mask/low-contrast source drawings then image-only PDF strips hidden numeric text. No seed truth in image metadata/filename; visually adjudicate observable gold, not generator claim of readability.
-- [x] Travel15: cleanCHI/THU/BALANCE, payer unknown, relation conflict, overB, cost/action authority, missing history/opening, duplicate, personal, material unsupported, pending bank, mixed PDF, amount conflict, supplementary costs. Independent roots/sources; mutations don't count15.
+- [ ] Current-scope travel inventory: 14 authoring cases remain after moving B-only D06 to `FUTURE_SCOPE_CASES` (ADR0009); original source/gold stay unchanged. The planned >=15 development-root gate is NOT_MET until an in-scope replacement is authored. No B-only policy case is silently rescored.
 - [x] Freeze holdout20 roots: routine10 varied source/money; human10 main strata FACT4/POLICY3/AUTHORITY3 with co-occurrence/stages documented. Don't force single label; actor/context/gold before run.
 - [x] GREEN inventory + native extract/render/manual check with PDF skill when creating actual artifacts. Store fonts/license once, no host font dependency; source provenance/data synthetic. Commit "test: add independent raw evaluation packets".
-**Gate:** Actual files/input/context/gold3 layers, not15 table rows. Baseline waits complete matrix.
+**Gate:** Actual files/input/context/gold3 layers, not inventory rows. The 15-root development floor is currently NOT_MET.
 
 ### T5 — LIVE EvidenceReader, readonly proposals and M0
 
@@ -174,7 +175,7 @@ async def test_model_cannot_record_money(reader_fixture):
 **Files:** src/invoice_referee/workflow/{service.py,snapshots.py,jobs.py,db.py,schema.sql}; src/invoice_referee/api/{routes.py,views.py}; frontend/src/features/{questions.tsx,approval.tsx,dossier.tsx}; tests/integration/test_submit_handoff.py; frontend/e2e/routine-and-fact.spec.ts. Integrator sở hữu transaction/schema boundary.
 **Consumes:** Reader/Reconciler + immutable read-set.
 **Produces:** execute(Submit/AnswerIssue/Decide)->CommandResult; atomic eligibility+FinancialEffect; QuestionCard.
-- [x] Tests T8/E5/C3/A2/B8 CHI3 once; missing payer card owner; incomplete funds noS0; stale/wrongowner/unproved approval no resolve; future B doesn't cover past without effect scope.
+- [x] Tests T8/E5/C3/A2 routine effect; missing payer card owner; incomplete funds noS0; stale/wrongowner/unproved approval no resolve. No activity-B gate or budget-setting flow.
 ```python
 async def test_routine_issues_one_payment(app_fixture):
     v = await app_fixture.submit_packet("travel-clean", mode="STUB")
@@ -230,7 +231,7 @@ async def test_stop_wins_over_late_worker(app_fixture):
 - [x] RED: `rtk proxy uv run pytest tests/integration/test_controls_races.py tests/integration/test_restart.py -q`.
 - [x] Atomic epoch/read-set/transitions, no provider I/O in transaction; persisted leases/retry counters,1active/root/2workers. Restart source cache, not financialeffects. Late result inactive audit only.
 - [x] Snapshot policy/grant/input by value/hash/version, oldbasis remainsafterchanges. CancelCHI4 leavesincurredT4, noactualcost release.
-- [x] test_authority_update_invalidates_read_set: snapshot B14/grant→barrier→B8/revoke import tăng context_version→worker release: không stale commit. test_command_payload_conflict: same tenant/actor/command, payload đổi amount/root ⇒409; same payload replay một historical result; tenant khác không leak.
+- [x] test_authority_update_invalidates_read_set: grant scope/action change→barrier→context version increments→worker release: không stale commit. Legacy B variation has no policy effect. test_command_payload_conflict: same tenant/actor/command, payload đổi amount/root ⇒409; same payload replay một historical result; tenant khác không leak.
 - [x] Override tagged DTO/API theo §9/§10.3; cancel chỉ suspend/supersede, không xóa actual. test_balanced_requires_all_gates: known E2/A2/coverage sạch ⇒ persisted BALANCED/SETTLED; unknown A không instruction vẫn WAITING; processing problem material không affirmative; unrelated source không blanket block.
 - [x] GREEN + backend restart mid-job and headed Stop/Resume/valid/deniedOverride audit actor/time/input/why/before-after.
 - [x] Commit "feat: enforce durable control and immutable audit".
@@ -266,6 +267,12 @@ def test_balanced_false_claim_is_dangerous():
 > defaulted `refs_ok=True` — now reads real refs. Baseline after fix: `core`
 > union=0; `escalation` union=0 release=true. Two honest route disagreements
 > remain surfaced (dev-over-budget, dev-supplementary), not hidden.
+
+> **Scope amendment (2026-10-15):** the `dev-over-budget` disagreement and D06
+> B-only case are out of the current decision space. Retain their historical
+> evidence/oracles, exclude B-only rows from current denominators, and do not
+> count the former disagreement as a current route error. Any revised benchmark
+> still needs the independent 15-root floor above.
 
 ### T10 — Clean clone and early public pilot
 
@@ -361,3 +368,23 @@ of method. No application implementation occurred in the planning/setup turns.
   submitted and persisted `SETTLED` with no instructions, but the browser stopped
   at an outdated accountant-dashboard locator. Reload/instruction UI checks were
   NOT_RUN. No extra provider run was made after those findings.
+
+## Post-plan correction — activity references and TC01 LIVE — 15/10/2026
+
+- [x] Validate and persist typed/legacy activity references through the real
+  importer/catalog path. Re-import of the same payload keeps activity identity;
+  a newer context replaces/removes old references. Existing migration v6 already
+  provides `references_json`; no duplicate migration was added.
+- [x] Add importer/composition-root and link regressions for restart, duplicate
+  references, tenant isolation, contradiction, weak-only candidates, reference-
+  only linking, and transaction identity. Targeted 29 tests and the full Python
+  suite pass; frontend unit tests/build and diff check pass.
+- [x] Run separate LIVE Playwright branches for transfer and cash. Both linked the
+  uploaded `TU-TC01` by `DOCUMENT_REFERENCE`; the separate DBs each retained one
+  4m context advance and re-upload confirmation created no `money_events` or
+  instruction rows. See
+  [TC01 LIVE evidence](../../final/reviews/2026-10-15-tc01-reference-import-live.md).
+- [ ] Overall LIVE acceptance remains FAIL: both cases stop in WAITING with
+  `T/E/S` unknown and no `COLLECT 760.000`; accountant OCR missed transfer payer
+  and cash payee, which required source-based UI correction for the idempotency
+  subcheck. Do not infer completion from the reference-link or idempotency pass.

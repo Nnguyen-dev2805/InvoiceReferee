@@ -35,7 +35,7 @@ class Grant(StrictModel):
 
 
 class BudgetDecision(StrictModel):
-    """A verified budget B for one activity over an explicit effect range."""
+    """Legacy activity budget record; accepted for import, ignored by decisions."""
 
     id: Id
     activity: Id
@@ -52,8 +52,9 @@ class CategoryPolicy(StrictModel):
     Imported from Hoangha's accepted rules: work/client meal <=5,000,000 VND per
     canonical expense, taxi/ride <=2,000,000 VND per canonical expense, and a
     30-calendar-day submission window from the established expense date. A
-    category with no explicit cap still passes ordinary B/authority gates; it is
-    never an implicit unlimited PASS. Bound to a policy version and scope.
+    category with no explicit cap still passes the ordinary policy, evidence and
+    authority gates; it is never an implicit unlimited PASS. Bound to a policy
+    version and scope.
     """
 
     id: Id

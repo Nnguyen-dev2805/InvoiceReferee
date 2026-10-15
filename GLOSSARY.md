@@ -29,6 +29,14 @@ _Avoid_: Đồng nhất với phê duyệt ngoại lệ hoặc xác nhận tiề
 Khoản tiền ứng mà nhân viên đã thực tế nhận từ công ty.
 _Avoid_: Đồng nhất với số xin ứng hoặc số ứng đã được duyệt.
 
+**Chấp nhận công việc theo chứng từ ứng**:
+Sự kiện kế toán xác nhận chứng từ ứng hoàn tất, đúng người nhận và đúng công việc, làm căn cứ công ty chấp nhận công việc đó.
+_Avoid_: Đồng nhất với trạng thái được ủy quyền, quyền công nhận chi phí hoặc quyền phát hành tiền.
+
+**Xác nhận đã đối chiếu lịch sử tiền**:
+Xác nhận có trách nhiệm rằng các dòng tiền của một nhân viên và hoạt động đã được kiểm tra đủ kỳ, nguồn tiền, loại giao dịch và số dư đầu kỳ.
+_Avoid_: Suy ra từ một hóa đơn, một chứng từ ứng hoặc câu trả lời tự do không có phạm vi và căn cứ.
+
 **Chi phí công ty trả trực tiếp**:
 Khoản chi công việc do công ty thanh toán trực tiếp cho bên cung cấp.
 _Avoid_: Cộng vào khoản tiền phải hoàn trả cho nhân viên.
@@ -53,9 +61,9 @@ _Avoid_: Gọi là đã thu hoặc tự coi tiền đã về công ty.
 Phạm vi tổ chức giao cho hệ thống để tự hoàn tất kết luận và yêu cầu chi/thu thường quy.
 _Avoid_: Coi vai trò hoặc chức danh tự động là quyền không giới hạn.
 
-**Ngân sách hoạt động**:
-Mức kinh phí được tổ chức chấp nhận cho một hoạt động công việc cụ thể, theo quyết định hoặc quy định có hiệu lực.
-_Avoid_: Đồng nhất với dự toán do nhân viên đề nghị hoặc tiền ứng thực nhận.
+**Ngân sách hoạt động (dữ liệu cũ)**:
+Bản ghi mức kinh phí gắn với một hoạt động có thể còn trong dữ liệu lịch sử; quyết toán hiện tại không dùng B để xác định chi phí được chấp nhận hay nghĩa vụ tiền.
+_Avoid_: Đồng nhất B với tiền ứng thực nhận, quyền theo action hoặc một gate của quyết toán hiện tại.
 
 **Xác nhận nghiệp vụ**:
 Thông tin được người có trách nhiệm xác nhận về một dữ kiện cụ thể, kèm căn cứ và phạm vi xác nhận.
@@ -88,6 +96,10 @@ _Avoid_: Gọi là xác minh ngân hàng hoặc tạo giao dịch ngân hàng/co
 **Liên kết hồ sơ (backend tự quyết)**:
 Việc backend xác định hồ sơ tạm ứng/công việc cho một quyết toán từ căn cứ mạnh (kế thừa/số hồ sơ/mã giao dịch), chỉ hỏi người khi căn cứ yếu hoặc mâu thuẫn.
 _Avoid_: Bắt nhân viên chọn mã hoạt động thường trực; tự gắn theo tên/ngày/số tiền giống nhau hoặc phần tử đầu danh sách.
+
+**MULTI_FIELD_MATCH (liên kết chứng từ ứng nhiều trường)**:
+Căn cứ backend dùng riêng khi kế toán đưa biên nhận ứng vào hồ sơ quyết toán: danh tính nhân viên duy nhất, bên chuyển khớp tổ chức, nội dung dự án đủ cụ thể và khớp, số nhận bằng số ứng khai, ngày giao dịch hợp lý, mã giao dịch chưa bị root khác sử dụng và chỉ một hồ sơ trong tenant phù hợp. Kết quả chỉ nối chứng từ với hồ sơ; kế toán vẫn phải xác nhận ghi nhận tiền.
+_Avoid_: Hiểu là một ngưỡng điểm/confidence, so tiền ứng với tổng chi phí, hoặc coi liên kết là xác nhận tiền/coverage/authority.
 
 **Định danh giao dịch ứng**:
 Mã giao dịch/số phiếu có namespace gắn đúng nguồn (`<namespace>:<reference>`), khác với internal event_id do server cấp; thiếu thì giữ chưa giải quyết, không bịa UUID.

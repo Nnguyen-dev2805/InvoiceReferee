@@ -23,6 +23,7 @@ from invoice_referee.domain.documents import (
 )
 from invoice_referee.evidence.trace import RunBudget
 from invoice_referee.evidence.xkiro import XkiroSchemaError
+from invoice_referee.source_dates import date_is_supported, parse_source_date
 
 _DIGITS = re.compile(r"\d")
 _NUMBER = re.compile(r"(\d{1,3}(?:[.\s]\d{3})+|\d+)")
@@ -164,31 +165,7 @@ def _quote_supported(quote: str, haystack: str) -> bool:
     return quote.strip() in haystack
 
 
-_ISO_DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
-_SLASH_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
-
-
-def _date_supported(iso: str, quote: str) -> bool | None:
-    """A date value is supported when its own y/m/d appear in the quote.
-
-    Handles a value normalized to ISO ("2026-10-10") or written DD/MM/YYYY
-    ("10/10/2026") against a source date written as prose ("Ngày 10 tháng 10 năm
-    2026") or a shared range line ("từ 06/10/2026 đến 10/10/2026"). Returns None
-    when the value is not a date.
-    """
-    iso_match = _ISO_DATE.match(iso)
-    if iso_match is not None:
-        year, month, day = (int(g) for g in iso_match.groups())
-    else:
-        slash_match = _SLASH_DATE.match(iso)
-        if slash_match is None:
-            return None
-        day, month, year = (int(g) for g in slash_match.groups())
-    nums = {int(n) for n in re.findall(r"\d+", quote)}
-    return {year, month, day} <= nums
-
-
-def _value_supported(value: object, quote: str) -> bool:
+def _value_supported(value: object, quote: str, *, field_name: str | None = None) -> bool:
     """The normalized value must be derivable from the exact quote.
 
     Token-based provenance (not "the first number in the quote"): a money value
@@ -204,10 +181,10 @@ def _value_supported(value: object, quote: str) -> bool:
     if isinstance(value, (list, tuple)):
         if not value:
             return False
-        return all(_value_supported(item, quote) for item in value)
+        return all(_value_supported(item, quote, field_name=field_name) for item in value)
     text = str(value).strip()
     # A normalized date (ISO) is supported when the quote carries the same date.
-    date_ok = _date_supported(text, quote)
+    date_ok = date_is_supported(text, quote, field_name=field_name)
     if date_ok is not None:
         return date_ok
     # Money/number: the value must be a real numeric token of the quote.
@@ -229,7 +206,17 @@ def _value_supported(value: object, quote: str) -> bool:
             return False
         longest = max(runs, key=len)
         return int(longest) in _numeric_tokens(quote)
-    return text in quote or text.lower() in quote.lower()
+    # Text values may be returned as a normalized single line while the source
+    # quote preserves OCR line breaks. Collapse whitespace only for this
+    # derivability check; the EvidenceRef keeps the exact, unmodified quote.
+    normalized_text = " ".join(text.split())
+    normalized_quote = " ".join(quote.split())
+    if not normalized_text:
+        return False
+    return (
+        normalized_text in normalized_quote
+        or normalized_text.casefold() in normalized_quote.casefold()
+    )
 
 
 def _ref(ocr: OcrSourceResult, page: int, quote: str) -> EvidenceRef:
@@ -274,9 +261,16 @@ def _validate_field(
     if (
         not quote
         or not _quote_supported(quote, haystack)
-        or not _value_supported(value, quote)
+        or not _value_supported(value, quote, field_name=field_name)
     ):
         return FieldCandidate(field=field_name, state="UNREADABLE")
+    if field_name in {"document_date", "event_at", "trip_start", "trip_end"}:
+        day = parse_source_date(str(value))
+        if day is None:
+            return FieldCandidate(field=field_name, state="UNREADABLE")
+        # Preserve source timestamps at their original precision; date-only values use ISO.
+        if not re.search(r"[T ]\d{2}:\d{2}", str(value)):
+            value = day.isoformat()
     return FieldCandidate(
         field=field_name,
         state="FOUND",
@@ -340,7 +334,13 @@ async def extract_document(
         "NOT_PRESENT, UNREADABLE, AMBIGUOUS, NOT_APPLICABLE), value (only when "
         "state=FOUND), quote (the exact substring copied from the OCR text; "
         "required when state=FOUND), page (1-based). Do not rename these keys "
-        "(never use 'name')."
+        "(never use 'name'). If a field value spans adjacent OCR lines, preserve "
+        "the exact line breaks in quote but you may join those same lines with "
+        "single spaces in value; never omit or alter words or diacritics."
+        " Return calendar dates as YYYY-MM-DD, while preserving the exact source date in quote. "
+        "Keep a transaction timestamp's time and offset only when the source states them. "
+        "Never invent a year, time, offset, or work date; distinguish document_date, event_at, "
+        "trip_start and trip_end. Mark incomplete/unreadable or ambiguous dates accordingly."
         + vocabulary_clause
         + " Each line_items entry is ONE COST ROW of a table and "
         "uses EXACTLY one key: fields, an array of the same field objects for that "
@@ -354,7 +354,7 @@ async def extract_document(
 
     with llm_trace_context(
         stage="extract",
-        prompt_version="document-extraction-v1",
+        prompt_version="document-extraction-v2",
         schema_version="document-fields-and-line-items-json-v1",
     ):
         payload = await _call_with_one_repair(llm, system=system, user=user, budget=budget)
@@ -442,7 +442,7 @@ async def _call_with_one_repair(
     try:
         with llm_trace_context(
             stage="extract",
-            prompt_version="document-extraction-v1",
+            prompt_version="document-extraction-v2",
             schema_version="document-fields-and-line-items-json-v1",
             attempt_kind="primary",
         ):
@@ -451,7 +451,7 @@ async def _call_with_one_repair(
         try:
             with llm_trace_context(
                 stage="extract",
-                prompt_version="document-extraction-v1",
+                prompt_version="document-extraction-v2",
                 schema_version="document-fields-and-line-items-json-v1",
                 attempt_kind="repair",
             ):

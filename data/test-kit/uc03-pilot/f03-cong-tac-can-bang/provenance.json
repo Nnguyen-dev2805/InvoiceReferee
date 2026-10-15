@@ -7,10 +7,11 @@
   },
   "intent_preserved": "verified balance zero, no instruction",
   "changes": [
-    "Company/person names become InvoiceReferee/Nguyễn An synthetic",
+    "Company/person names become An Thịnh/NGUYỄN MINH AN synthetic",
     "Trip place/date/purpose explicit",
     "Demo policy: a valid invoice bound to the right employee/dossier is the employee-paid basis; the printed payment-declaration sentence is removed",
-    "All amounts and positive/negative/zero net relation retained"
+    "All amounts and positive/negative/zero net relation retained",
+    "2026-10-15: regenerated source PDFs for NGUYỄN MINH AN / Công ty An Thịnh; amounts and business oracle unchanged."
   ],
   "story_change": "lodging retained; trip/date/context expanded"
 }

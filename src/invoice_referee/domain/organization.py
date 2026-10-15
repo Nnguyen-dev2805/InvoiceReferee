@@ -1,8 +1,8 @@
 """Typed organization context (contracts §2, §3, §5; plan A1).
 
 The organization context is the simulated-but-observable ledger/context an
-assessment rests on: the activity + authorization, people, policies, budgets,
-grants, the ledger (A/P/R so far), the coverage record and its witnesses. It
+assessment rests on: activity identity/authorization, people, policies, grants,
+the ledger (A/P/R so far), the coverage record and its witnesses. It
 never carries an expected E/S or a route.
 
 This DTO lives in the domain layer so both the workflow importer and the
@@ -19,16 +19,16 @@ class OrganizationContext(StrictModel):
     """Genuine simulated observable ledger/context — never the expected E/S.
 
     The typed records the importer turns into domain PolicyVersion / Grant /
-    BudgetDecision / MoneyEvent / CoverageRecord (plan A.1/A1). The legacy
-    ``tenant``/``profile``/``records``/``budget_amount`` fields are retained so
-    older generators keep loading.
+    MoneyEvent / CoverageRecord (plan A.1/A1). Legacy budget fields remain
+    loadable for older contexts but do not affect current settlement decisions.
+    The legacy ``tenant``/``profile``/``records`` fields also remain compatible.
     """
 
     tenant: Id = "tenant:demo"
     profile: str = "TRAVEL"
     # Simulated observable records only; no `expected`/`forced` routing fields.
     records: tuple[str, ...] = ()
-    # The activity's verified budget B, if one exists (observable org data).
+    # Legacy field: retained for older context files; ignored by current decisions.
     budget_amount: int | None = None
     # Typed records (plan A.1).
     organization_id: str | None = None

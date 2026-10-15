@@ -3,10 +3,10 @@
   "note": "Context công ty tổng hợp cho demo; không phải quyền thật của doanh nghiệp hay quy định pháp luật.",
   "organization": {
     "id": "tenant:demo",
-    "name": "Công ty Demo"
+    "name": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH"
   },
   "people": [
-    { "id": "employee:employee-a", "name": "Nguyễn Văn A" },
+    { "id": "employee:employee-a", "name": "NGUYỄN MINH AN" },
     { "id": "employee:accountant-demo", "name": "Trần Thị B (kế toán)" },
     { "id": "employee:approver", "name": "Lê Văn C (người quyết định)" }
   ],
@@ -164,7 +164,6 @@
       "actor": "employee:approver",
       "actions": [
         "AUTHORIZE_ACTIVITY",
-        "SET_BUDGET",
         "RECOGNIZE_COST",
         "EXCEPT_POLICY",
         "ISSUE_PAYMENT",

@@ -5,12 +5,12 @@ import { formatVnd } from "../format";
 import type { CaseView } from "../types";
 
 const MONEY_LABELS: Record<string, string> = {
-  P: "Đã hoàn",
-  R: "Đã thu hồi",
+  P: "Chi bổ sung đã nhận",
+  R: "Nhân viên đã hoàn trả",
   A: "Ứng thực nhận",
 };
 
-/** The accountant records actual money moved (bank/cash) against a root. */
+/** Accountant records a company payment only against an active PAY instruction and proof. */
 export function Execution({
   caseView,
   onCase,
@@ -19,37 +19,65 @@ export function Execution({
   onCase: (view: CaseView) => void;
   selectedQuote?: string | null;
 }) {
+  const [instructionId, setInstructionId] = useState("");
+  const [sourceId, setSourceId] = useState("");
+  const [page, setPage] = useState("1");
+  const [quote, setQuote] = useState("");
   const [amount, setAmount] = useState("");
-  const [payee, setPayee] = useState(caseView?.employee ?? "employee:employee-a");
-  const [completionClaim, setCompletionClaim] = useState("");
+  const [reference, setReference] = useState("");
+  const [eventAt, setEventAt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
   if (caseView === null) return null;
-
-  const summaryParts = caseView.summary.split(" · ");
-  const employeeName = summaryParts.length >= 3 ? summaryParts[2].trim() : null;
+  const activePays = caseView.instructions.filter(
+    (item) => item.direction === "PAY" && ["ISSUED", "PARTIAL"].includes(item.status) && item.remaining > 0,
+  );
 
   async function record() {
     if (caseView === null) return;
+    const instruction = activePays.find((item) => item.id === instructionId);
+    const source = caseView.sources.find((item) => item.id === sourceId);
+    const number = Number(amount);
+    const pageNumber = Number(page);
+    if (!instruction || !source || !reference.trim() || !eventAt || !quote.trim() || !Number.isSafeInteger(number) || number <= 0) {
+      setError("Chọn lệnh chi còn hiệu lực và chứng từ; nhập số tiền, mã giao dịch, ngày và căn cứ trên chứng từ.");
+      return;
+    }
+    if (number > instruction.remaining) {
+      setError(`Số tiền vượt phần còn lại của lệnh chi (${formatVnd(instruction.remaining)}).`);
+      return;
+    }
+    if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+      setError("Trang căn cứ phải là số nguyên từ 1 trở lên.");
+      return;
+    }
     setBusy(true);
     setError(null);
     setStatus(null);
     try {
       const result = await recordActual(caseView.id, {
-        external_key: `bank:${crypto.randomUUID()}`,
+        external_key: `transfer:${reference.trim()}`,
         claimed_kind: "REIMBURSEMENT_RECEIVED",
         claimed_scope: caseView.activity ?? "",
         payer: "company:demo",
-        payee,
-        amount: Number(amount),
-        event_at: new Date().toISOString(),
-        completion_claim: completionClaim || null,
-        reason: "Ghi nhận tiền thực tế",
-      });
+        payee: caseView.employee ?? "",
+        amount: number,
+        event_at: new Date(`${eventAt}T12:00:00+07:00`).toISOString(),
+        completion_claim: "Kế toán đã đối chiếu chứng từ và xác nhận tiền chi thực tế.",
+        reason: "Ghi nhận khoản công ty chi bổ sung theo đúng lệnh chi và chứng từ đã đối chiếu.",
+        instrument_method: "TRANSFER",
+        instrument_status: "COMPLETED",
+        instrument_reference: reference.trim(),
+        instruction_id: instruction.id,
+        refs: [{ source_id: source.id, source_sha256: source.digest, page: pageNumber, exact_quote: quote.trim() }],
+      }, caseView.version);
       onCase(result.case_view);
-      setStatus("Đã ghi nhận tiền thực tế thành công.");
+      setStatus("Đã ghi nhận khoản chi bổ sung theo lệnh và chứng từ.");
+      setAmount("");
+      setReference("");
+      setQuote("");
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -57,124 +85,46 @@ export function Execution({
     }
   }
 
-  const numericAmount = Number(amount);
-  const formattedPreview = !isNaN(numericAmount) && numericAmount > 0 ? formatVnd(numericAmount) : null;
-
   return (
     <section aria-labelledby="execution-title" className="space-y-4 select-none text-xs">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-        <h2 id="execution-title" className="text-xs font-semibold text-slate-900">
-          Ghi nhận dòng tiền thực tế vào sổ cái
-        </h2>
+      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+        <h2 id="execution-title" className="font-semibold text-slate-900">Dòng tiền thực tế</h2>
       </div>
-
-      {/* Confirmed Actual Money Summary */}
-      <div className="space-y-1.5">
-        <h3 className="text-xs font-semibold text-slate-700">
-          Dòng tiền thực tế đã ghi nhận trong sổ cái
-        </h3>
-        <div className="border-t border-b border-slate-200 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 grid grid-cols-1 sm:grid-cols-3">
-          {Object.entries(caseView.actual_money)
-            .filter(([key]) => key in MONEY_LABELS)
-            .map(([key, fact]) => (
-              <div
-                key={key}
-                data-testid={`actual-${key}`}
-                className="py-2.5 px-2 bg-white text-xs flex flex-col justify-between hover:bg-slate-50/50 transition-colors"
-              >
-                <span className="text-[11px] text-slate-500 font-medium">{MONEY_LABELS[key]}:</span>
-                <strong
-                  className={`font-mono-nums tabular-nums text-xs mt-1 ${
-                    fact.state === "KNOWN" && fact.value !== null
-                      ? "text-slate-900 font-semibold"
-                      : "text-slate-400 font-normal select-none"
-                  }`}
-                  title={fact.state === "KNOWN" && fact.value !== null ? undefined : "Chưa xác minh"}
-                >
-                  {fact.state === "KNOWN" && fact.value !== null
-                    ? formatVnd(fact.value)
-                    : "—"}
-                </strong>
-              </div>
-            ))}
+      <div className="space-y-1.5 border-b border-slate-200 pb-3">
+        <h3 className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Số đã xác minh</h3>
+        <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-3">
+          {Object.entries(caseView.actual_money).filter(([key]) => key in MONEY_LABELS).map(([key, fact]) => (
+            <div key={key} data-testid={`actual-${key}`} className="flex items-baseline justify-between py-1 sm:flex-col sm:justify-start">
+              <span className="text-[11px] font-medium text-slate-500">{MONEY_LABELS[key]}:</span>
+              <strong className={`font-mono tabular-nums text-xs sm:mt-1 ${fact.state === "KNOWN" && fact.value !== null ? "font-semibold text-slate-900" : "text-slate-400"}`}>
+                {fact.state === "KNOWN" && fact.value !== null ? formatVnd(fact.value) : "Chưa xác minh"}
+              </strong>
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* Input Form */}
-      <div className="space-y-3 pt-1">
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label htmlFor="received-amount" className="text-slate-700 block text-xs font-medium">
-              Số tiền giao dịch thực tế:
-            </label>
-            {formattedPreview && (
-              <span className="text-[11px] font-mono-nums tabular-nums text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                {formattedPreview}
-              </span>
-            )}
-          </div>
-          <input
-            id="received-amount"
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-            className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 font-mono-nums tabular-nums font-semibold focus:outline-none focus:border-slate-800"
-          />
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label htmlFor="received-payee" className="text-slate-700 block text-xs font-medium">
-              Người nhận tiền:
-            </label>
-            {employeeName && (
-              <span className="text-[11px] text-slate-500">
-                Nhân viên đề nghị: <strong className="text-slate-800 font-semibold">{employeeName}</strong>
-              </span>
-            )}
-          </div>
-          <input
-            id="received-payee"
-            value={payee}
-            onChange={(event) => setPayee(event.target.value)}
-            className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 font-mono-nums focus:outline-none focus:border-slate-800"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="completion-claim" className="text-slate-700 block text-xs font-medium mb-1">
-            Xác nhận giao dịch ngân hàng / Bằng chứng chuyển khoản:
-          </label>
-          <input
-            id="completion-claim"
-            value={completionClaim}
-            onChange={(event) => setCompletionClaim(event.target.value)}
-            className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800"
-          />
-        </div>
-      </div>
-
-      <div className="pt-1">
-        <button
-          type="button"
-          onClick={() => void record()}
-          disabled={busy || amount === ""}
-          className="bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs py-2.5 px-4 rounded transition-colors disabled:opacity-40 cursor-pointer"
-        >
-          {busy ? "Đang ghi nhận…" : "Ghi nhận vào sổ cái"}
-        </button>
-      </div>
-
-      {status !== null && (
-        <p role="status" aria-live="polite" className="status p-2.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs">
-          {status}
+      {activePays.length === 0 ? (
+        <p className="rounded border border-slate-200 bg-slate-50 p-3 text-slate-600" data-testid="no-active-pay">
+          Không có lệnh chi đang hiệu lực. Hồ sơ không cần ghi nhận khoản công ty chi bổ sung.
         </p>
+      ) : (
+        <div className="space-y-3 rounded-md border border-slate-200 bg-white p-3">
+          <h3 className="font-medium text-slate-800">Ghi nhận chi bổ sung đã thực hiện</h3>
+          <p className="text-slate-600">Chỉ ghi khi ngân hàng đã hoàn tất. Mã giao dịch phải lấy từ chứng từ; không tự tạo mã.</p>
+          <label className="block space-y-1"><span>Lệnh chi</span><select aria-label="Lệnh chi" value={instructionId} onChange={(event) => setInstructionId(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2"><option value="">Chọn lệnh chi</option>{activePays.map((item) => <option key={item.id} value={item.id}>{item.id} · còn {formatVnd(item.remaining)}</option>)}</select></label>
+          <label className="block space-y-1"><span>Chứng từ đã tải lên</span><select aria-label="Chứng từ chi bổ sung" value={sourceId} onChange={(event) => setSourceId(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2"><option value="">Chọn chứng từ</option>{caseView.sources.map((item) => <option key={item.id} value={item.id}>{item.filename ?? item.id}</option>)}</select></label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block space-y-1"><span>Số tiền thực chi (VND)</span><input aria-label="Số tiền thực chi" type="number" min="1" step="1" value={amount} onChange={(event) => setAmount(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2" /></label>
+            <label className="block space-y-1"><span>Mã giao dịch trên chứng từ</span><input aria-label="Mã giao dịch chi" value={reference} onChange={(event) => setReference(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2" /></label>
+            <label className="block space-y-1"><span>Ngày giao dịch</span><input aria-label="Ngày giao dịch chi" type="date" value={eventAt} onChange={(event) => setEventAt(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2" /></label>
+            <label className="block space-y-1"><span>Trang chứng từ</span><input aria-label="Trang chứng từ chi" type="number" min="1" step="1" value={page} onChange={(event) => setPage(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2" /></label>
+          </div>
+          <label className="block space-y-1"><span>Đoạn căn cứ trên chứng từ</span><textarea aria-label="Căn cứ chứng từ chi" rows={2} value={quote} onChange={(event) => setQuote(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2" /></label>
+          <div className="flex justify-end"><button type="button" onClick={() => void record()} disabled={busy} className="rounded bg-slate-950 px-4 py-2 font-semibold text-white disabled:opacity-40">{busy ? "Đang ghi nhận…" : "Xác nhận khoản chi đã nhận"}</button></div>
+        </div>
       )}
-      {error !== null && (
-        <p role="alert" className="error p-2.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-xs">
-          {error}
-        </p>
-      )}
+      {status && <p role="status" className="rounded border border-emerald-200 bg-emerald-50 p-2.5 text-emerald-800">{status}</p>}
+      {error && <p role="alert" className="rounded border border-rose-200 bg-rose-50 p-2.5 text-rose-800">{error}</p>}
     </section>
   );
 }

@@ -19,6 +19,7 @@ from httpx import ASGITransport, AsyncClient
 from invoice_referee.api.app import create_app
 from invoice_referee.api.routes import SESSION_COOKIE
 from invoice_referee.domain.case import CaseView, CommandContext
+from invoice_referee.domain.common import EvidenceRef
 from invoice_referee.domain.commands import (
     ActivityData,
     AnswerIssue,
@@ -77,6 +78,13 @@ TEST_PACKETS: dict[str, dict[str, object]] = {
         "facts": [
             {"field": "incurred", "value": 5_000_000, "role": "INVOICE"},
             {"field": "paid_employee", "value": 5_000_000, "role": "PAYMENT"},
+        ],
+    },
+    # No payer and no opening/history context: a B-only issue must not replace
+    # either the employee payer FACT or the accountant coverage FACT.
+    "missing-payer-no-history": {
+        "facts": [
+            {"field": "incurred", "value": 5_000_000, "role": "INVOICE"},
         ],
     },
     # E6/A2 => S4 => one I4.
@@ -420,7 +428,8 @@ class AppFixture:
         external_key: str | None = None,
         kind: str = "REIMBURSEMENT_RECEIVED",
         completion_claim: str | None = "Đã nhận đủ, đối chiếu sao kê ngân hàng",
-        refs: tuple = (),
+        refs: tuple | None = None,
+        instruction_id: str | None = None,
     ) -> CaseView:
         """Submit a routine root for `instruction_amount`, then record a receipt.
 
@@ -437,17 +446,31 @@ class AppFixture:
         packet = "money-i4" if instruction_amount == 4_000_000 else "money-i4"
         v = await self.submit_packet(packet, mode="STUB")
         root = v.id
+        expected_direction = "PAY" if kind == "REIMBURSEMENT_RECEIVED" else "COLLECT"
+        instruction = next(
+            item for item in v.instructions if item.direction == expected_direction
+        )
+        source = v.sources[0]
+        evidence_refs = refs if refs is not None else (
+            EvidenceRef(
+                source_id=source.id,
+                source_sha256=source.digest,
+                page=1,
+                exact_quote="Chứng từ giao dịch thực tế",
+            ),
+        )
         money = RecordMoneyInput(
             external_key=external_key or f"bank:txn-{uuid.uuid4().hex[:8]}",
             claimed_kind=kind,
-            claimed_scope="activity:travel-a",
-            payer="company:demo" if kind == "REIMBURSEMENT_RECEIVED" else "employee:employee-a",
-            payee=payee or DEFAULT_ACTOR,
+            claimed_scope=v.activity or "activity:travel-a",
+            payer="company:demo" if kind == "REIMBURSEMENT_RECEIVED" else DEFAULT_ACTOR,
+            payee=payee or (DEFAULT_ACTOR if kind == "REIMBURSEMENT_RECEIVED" else "company:demo"),
             amount=received,
             event_at=DEFAULT_OCCURRED_AT,
             completion_claim=completion_claim,
-            refs=refs,
+            refs=evidence_refs,
             reason="Ghi nhận tiền thực tế",
+            instruction_id=instruction_id or instruction.id,
         )
         context = self.ctx(
             actor="employee:accountant-demo",

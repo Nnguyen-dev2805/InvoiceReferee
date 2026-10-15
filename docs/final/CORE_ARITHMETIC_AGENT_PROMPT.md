@@ -93,7 +93,8 @@ bằng chứng RED, không thay cho test consumer/commit của bản sửa.
    phù hợp, bỏ advance ledger event; giấy vẫn khai4m. Phải WAITING, A/S UNKNOWN,
    không instruction, chuyển kế toán xác minh/ghi nhận ứng. Không PAY3.24m từ A0
    giả và không COLLECT760k từ số ứng in trên giấy. Có thể test cả coverage có sẵn
-   và coverage chưa có; hỏi đúng phần thiếu, không tạo ngân sách/payer issue giả.
+   và coverage chưa có; hỏi đúng phần thiếu, không tạo issue cho B legacy hoặc
+   một payer khi đã có căn cứ phù hợp.
 8. Sau khi kế toán ghi nhận actual4m qua đường có căn cứ/quyền hiện có và history
    đầy đủ → đánh giá lại COLLECT760k, retry không double count. Trạng thái chứng từ
    pending/failed không được thành actual confirmed.

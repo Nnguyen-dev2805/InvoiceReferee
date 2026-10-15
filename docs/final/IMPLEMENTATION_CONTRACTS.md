@@ -6,11 +6,13 @@ Ngày13/10/2026. Companion của implementation plan; cụ thể hóa Q1–Q31 v
 lead (cấu trúc DTO, enum, giới hạn pilot, thuật toán threshold) được ghi rõ bên dưới.
 §10 khóa chi tiết sau review; khi shorthand ở các mục trước chưa đủ, executor dùng
 §10, không tự mở nghiệp vụ hoặc suy đã đạt runtime từ contract.
+**Cập nhật 15/10/2026:** activity budget B là dữ liệu legacy, không phải gate; xem
+[ADR0009](../adr/0009-activity-budget-out-of-scope.md) và §16 của design.
 
 ## 1. Scope và scalar types
 
 Root unique trong một sandbox: (organization_id, employee_id, activity_id).
-Một root có nhiều revisions, không nhiều hồ sơ độc lập tiêu lại cùng ngân sách.
+Một root có nhiều revisions, không nhiều hồ sơ độc lập đếm lặp cùng nghĩa vụ tiền.
 DB unique bảo vệ tạo đồng thời; activity identity từ context tổ chức hoặc quyết
 định tạo hoạt động đúng quyền, không ghép từ tên/địa điểm/amount giống nhau.
 Expense economic identity khác document hash và money transaction identity.
@@ -32,8 +34,8 @@ optional bbox. Model không được sinh file URL/path hay tự cấp Fact.KNOW
 | domain/common.py | Id/Vnd, KnownAmount(value:Vnd,currency:Literal["VND"]), Fact[T], EvidenceRef; money formatting nằm frontend |
 | domain/evidence.py | SourceRef(id,digest,tenant,media,storage_key); EvidenceUnit(source,page_range,role); Observation(field,raw,normalized,read_state,ref); Relation(kind,from_id,to_id,state,refs); Confirmation(fact_key,value,actor,scope,refs,reason,observed_at); ReadResult(units,observations,relations,page_coverage,problems,trace_refs) |
 | domain/finance.py | Expense(id,economic_key,activity,incurred:Fact[Vnd],incurred_at,payments,eligibility,refs); ExpensePayment(external_key,payer,payee,amount,expense_id,received_state,refs); RecordMoneyInput(external_key,claimed_kind,claimed_scope,payer,payee,amount,event_at,completion_claim,reverses_event_id,refs,reason); MoneyEvent(id,external_key,kind,scope,payer,payee,amount,event_at,recorded_at,verification_state,allocation_state,reverses_event_id,refs); Projection(T/E/C/A/P/R/unpaid:Fact[Vnd],S:Fact[StrictInt],issues) |
-| domain/policy.py | PolicyVersion(id,version,effective_from/to,profile,rules); Grant(id,version,actor,actions,scope,max_amount,effective_from/to); BudgetDecision(id,activity,amount,effect_range,actor,grant_ref,refs); ExceptionDecision(rule_id,expense_ids,activity,max_effect,actions,actor,grant_ref,decided_at,effect_range,refs,reason) |
-| domain/case.py | CaseScope(tenant,employee,activity,profile); ReadSet(input_revision,control_epoch,context_version,ledger_version,usage_version); AssessmentInput(scope,expense_facts,observations,relations,confirmations,ledger,coverage,policy,grants,budget,exceptions,previous_eligibility,read_set,as_of); FinancialEffect(direction:PAY/COLLECT,amount:Vnd,employee,activity,basis); AssessmentResult(projection,issues,problems,required_authorizations,allowed_effect:FinancialEffect\|None,cost_basis,money_basis); CommandContext(session_id,actor_id,command_id,expected_case_version); EligibilityDecision(E,cost_basis,actor_or_system,grant_refs,refs); SettlementConclusion(status,projection,expense_dispositions,read_set,basis,refs,actor_or_system,decided_at); Instruction(id,root_id,direction,amount,status,basis,authority_refs,supersedes_id,fulfilled_amount:Vnd,remaining:Vnd,execution_state:NOT_STARTED/OPEN/CLOSED_CONFIRMED/UNKNOWN); CaseView(id,version,state,summary,sources,issues,problems,conclusion,instructions,actual_money:Projection,audit) |
+| domain/policy.py | PolicyVersion(id,version,effective_from/to,profile,rules); Grant(id,version,actor,actions,scope,max_amount,effective_from/to); BudgetDecision legacy record (accepted for old-context compatibility, not a current decision input); ExceptionDecision(rule_id,expense_ids,activity,max_effect,actions,actor,grant_ref,decided_at,effect_range,refs,reason) |
+| domain/case.py | CaseScope(tenant,employee,activity,profile); ReadSet(input_revision,control_epoch,context_version,ledger_version,usage_version); AssessmentInput(scope,expense_facts,observations,relations,confirmations,ledger,coverage,policy,grants,budget (legacy, ignored),exceptions,previous_eligibility,read_set,as_of); FinancialEffect(direction:PAY/COLLECT,amount:Vnd,employee,activity,basis); AssessmentResult(projection,issues,problems,required_authorizations,allowed_effect:FinancialEffect\|None,cost_basis,money_basis); CommandContext(session_id,actor_id,command_id,expected_case_version); EligibilityDecision(E,cost_basis,actor_or_system,grant_refs,refs); SettlementConclusion(status,projection,expense_dispositions,read_set,basis,refs,actor_or_system,decided_at); Instruction(id,root_id,direction,amount,status,basis,authority_refs,supersedes_id,fulfilled_amount:Vnd,remaining:Vnd,execution_state:NOT_STARTED/OPEN/CLOSED_CONFIRMED/UNKNOWN); CaseView(id,version,state,summary,sources,issues,problems,conclusion,instructions,actual_money:Projection,audit) |
 | domain/issues.py | BusinessIssue(id,kind FACT/POLICY/AUTHORITY,field_or_rule,owner,depends_on,status,basis,refs,question); ProcessingProblem(kind TECHNICAL/LIMIT/UNSUPPORTED,affected_fields,message); QuestionCard(issue_id,known_facts,excerpt_refs,required_answer,effects,owner); Answer(issue_id,basis_id,answer_kind,value,refs,reason); DecisionCommand(issue_ids,basis_id,actions,effect_scope,amount,reason,refs) |
 | adaptation/models.py | Opportunity(id,root_id,initial_basis,field,eligible_steps,features,score,threshold_version); Feedback(id,initial_basis,observed_action,correction,new_fact,exception,question_needed,final_correct,origin,data_origin,verification,verifier,refs); ThresholdVersion(id,threshold,selection_ids,validation_ids,activated_at,previous_id) |
 
@@ -51,7 +53,7 @@ DTO có thể có nested types nội bộ, không phải mỗi type/file/service
 | Company-direct/C | Company supplier payment có binding expense + actor/context đúng scope | Tên công ty trên hóa đơn |
 | A/P/R/received | Confirmed completed transfer/cash receipt/ledger có payer/payee/scope; reversal phải có event gốc | Requested/approved/debit-only/pending |
 | Activity purpose/link | Employee declaration được policy nhận + context compatible, không contradiction | Amount/date giống nhau hoặc opaque LLM confidence |
-| B/grant/exception | Immutable organization record hoặc command đúng quyền | Model output, client role, ảnh chữ ký/name match |
+| Grant/exception | Immutable organization record hoặc command đúng quyền | Model output, client role, ảnh chữ ký/name match |
 | Zero flows | Coverage đủ scope/time/opening balances/kinds/nguồn quỹ, known set empty | Thiếu file, chỉ xem tài khoản A hoặc tháng hiện tại |
 
 Confirmed actor lấy từ server session/grant. Confirmation tiền chứa field/value,
@@ -62,18 +64,31 @@ chưa tự chứng minh payer/received. Không xây generic semantic-proof engin
 predicate tests cho bảng trên và đo false-known raw với gold độc lập.
 
 Coverage record: employee/activity (hoặc all-activity rõ), start/as_of, fund set,
-flow kinds, opening balance, ledger_version, witness/source_refs. Unallocated
-material money/source không được bị bỏ rồi kết luận zero. Known unrelated sources
-được quarantine có lý do; unknown relevance là FACT; material unsupported blocks
-affected conclusion. Source encrypted/corrupt/over-limit là processing problem.
-Policy/grant/B có effective interval; policy eligibility theo expense time,
+all applicable flow kinds, opening balance, ledger_version, witness/source_refs.
+An accountant confirmation additionally stores its actor, reason, recorded_at,
+source kind, and unallocated event IDs. Its as_of is server time, never a future
+horizon. It remains current for that accounting date only while the root ledger
+version is unchanged; a later or backdated event on that root invalidates it, while
+an event in another root does not. A non-empty unallocated set keeps A/P/R UNKNOWN.
+Uploading an advance or answering `ledger:coverage` as free text does not create a
+coverage record. Known unrelated sources được quarantine có lý do; unknown
+relevance is FACT; material unsupported evidence blocks the affected conclusion.
+Source encrypted/corrupt/over-limit là processing problem.
+
+`ActivityAcceptance` records an accountant's source-bound confirmation that a
+completed advance voucher belongs to the dossier's employee and work. It includes
+actor, time, transaction key, reason and refs. It is a work-acceptance fact only:
+the activity remains PROPOSED and no grant, expense eligibility, or payment action
+is created (ADR0010).
+Policy/grant có effective interval; policy eligibility theo expense time,
 grant hành động theo decision/commit time; retroactive effect phải explicit.
+Legacy B có thể còn trong context nhưng không tham gia quyết định hiện tại (ADR0009).
 
 ### 3a. Phạm vi chi phí mở rộng (chốt 14/10/2026, plan general-expense)
 
 Một quy trình quyết toán chi phí công việc do nhân viên trả (có ứng hoặc đã xác
 minh không ứng), gồm công tác, tiếp khách tại chỗ, mua văn phòng phẩm/thiết bị nhỏ
-và dịch vụ vận hành nhỏ. Giữ nguyên 8/4/20 và B độc lập; không mang hạn mức 100tr
+và dịch vụ vận hành nhỏ. Giữ nguyên 8/4/20; B ngoài phạm vi quyết định hiện tại. Không mang hạn mức 100tr
 của Hoangha, không bắt routine chờ kế toán duyệt.
 
 - **Hồ sơ hoạt động do server/context sở hữu** (`TRAVEL` hoặc `WORK_EXPENSE`); giấy
@@ -81,8 +96,9 @@ của Hoangha, không bắt routine chờ kế toán duyệt.
   Giấy ngoài công tác **không** bị ép khai `trip_*` (T1).
 - **Hạn mức theo loại khoản (mỗi khoản canonical):** tiếp khách/bữa ăn ≤5.000.000 đ;
   taxi/đi lại ≤2.000.000 đ; **hạn nộp 30 ngày** từ ngày phát sinh có căn cứ; chi cá
-  nhân bị loại khỏi chi phí công việc. Loại không có hạn riêng vẫn qua B/8/4/20 và
-  căn cứ; **không** là PASS vô hạn (T3). Ngày nguồn thiếu là FACT, không thay bằng
+  nhân bị loại khỏi chi phí công việc. Loại không có hạn riêng vẫn qua
+  policy/evidence/authority và 8/4/20; B legacy không gate quyết định; **không** là
+  PASS vô hạn (T3). Ngày nguồn thiếu là FACT, không thay bằng
   ngày nộp.
 - **Phân bổ nhiều dòng một chứng từ:** tổng phân bổ không vượt tổng nguồn; chứng từ
   hỗ trợ (payment proof/acceptance) **không** thành expense thứ hai; nguồn thừa chưa
@@ -112,7 +128,7 @@ Luồng: upload → **Đọc chứng từ** → kiểm tra bản nháp → **Xá
 - **Gắn hoạt động do server kiểm.** Hồ sơ nháp tạo trước khi biết hoạt động (không
   bịa PROPOSED có ngày hiện tại). Nhân viên chọn hoạt động **theo tên** trong danh
   mục; khi nộp, server rebind hồ sơ nháp sang hoạt động AUTHORIZED đúng (hoặc từ
-  chối nếu không có trong danh mục). Profile/ngân sách/quyền/lịch sử lấy theo scope
+  chối nếu không có trong danh mục). Profile/policy/quyền/lịch sử lấy theo scope
   hoạt động đã gắn; không mượn context hoạt động khác.
 - **Tự liên kết hồ sơ (chốt 14/10/2026, ADR0008).** Nhân viên không chọn hoạt động
   thường trực trong luồng thông thường: backend tự liên kết quyết toán với hồ sơ
@@ -139,11 +155,12 @@ Luồng: upload → **Đọc chứng từ** → kiểm tra bản nháp → **Xá
 
 ## 4. Tiền, event và instruction
 
-T=sum incurred costs đã xác minh, không cắt về B; E=sum eligible employee-paid
-portions đã xác minh; C=company-direct actual portions; unpaid không tự vào E/C.
-S=E-A-P+R, không float. B8/invoice-incurred10/paid employee5/company3/unpaid2:
-T10, E candidate5, C3, POLICY; không create vendor instruction.
-Nếu unpaid đã biết không đổi quyền lợi employee hoặc phép kiểm B, chỉ notice
+T=sum incurred costs đã xác minh; E=sum eligible employee-paid portions đã xác
+minh; C=company-direct actual portions; unpaid không tự vào E/C. B legacy không
+giới hạn T và không tham gia eligibility hay instruction.
+S=E-A-P+R, không float. Invoice-incurred10/paid employee5/company3/unpaid2:
+T10, E candidate5, C3; không create vendor instruction chỉ từ unpaid.
+Nếu unpaid đã biết không đổi quyền lợi employee, chỉ notice
 “ngoài việc thực hiện tiền của hồ sơ”, không giả toàn invoice đã thanh toán.
 
 Cập nhật phạm vi 14/10/2026 (§14/§15, ADR006/ADR007):
@@ -182,6 +199,27 @@ Cập nhật phạm vi 14/10/2026 (§14/§15, ADR006/ADR007):
   thành CONFIRMED**; upload chưa tự thành received. `external_key` chống trùng theo
   (giao dịch/số phiếu); scope/actor do server kiểm. Một hồ sơ bị chặn ghi vào hoạt
   động khác (`claimed_scope` phải khớp root).
+- Voucher PDF/ảnh được lưu làm `case_sources` trước OCR; draft/report giữ đúng root,
+  source và digest. Ghi nhận thực tế phải trỏ tới draft đã lưu. Reference trùng với
+  giấy quyết toán và duy nhất là căn cứ mạnh. Reference mâu thuẫn là conflict;
+  reference chỉ có trên voucher nhưng chưa đăng ký vẫn được xét riêng bằng
+  `MULTI_FIELD_MATCH`: danh tính nhân viên duy nhất, bên chuyển thuộc nguồn tổ chức,
+  mục đích cụ thể khớp, tiền thực nhận bằng **tiền ứng khai trên giấy** (không phải
+  tổng chi phí), thứ tự ngày hợp lý, mã giao dịch chưa bị hồ sơ khác giữ và chỉ có
+  một hồ sơ phù hợp trong tenant. Quote/source refs của từng tín hiệu được lưu cùng
+  acceptance. Thiếu/đọc mâu thuẫn hoặc có ứng viên cạnh tranh thì kế toán xác nhận;
+  sai người/công ty, mã trỏ hồ sơ khác hoặc giao dịch đã thuộc root khác là conflict.
+  Liên kết tự động không ghi tiền; kế toán vẫn xác nhận bản nháp để tạo đúng một
+  money event. Nó không tạo coverage, grant hay authority.
+- **Xác nhận ứng bằng thao tác (15/10/2026):** với bản nháp có nguồn đã đọc rõ,
+  dữ kiện đầy đủ và liên kết hiện hành hợp lệ, command `RecordActual` có
+  `advance_draft_id` từ phiên kế toán là xác nhận có trách nhiệm. Không bắt nhập lại
+  câu xác nhận bằng chữ. Server kiểm lại nguồn/phạm vi/trạng thái/liên kết, tạo
+  lời xác nhận và lưu actor/time/draft/refs trong event/audit. Khi bổ sung dữ liệu
+  OCR thiếu phải có giải thích; liên kết thủ công dùng lý do liên kết có sẵn, không
+  nhập hai lần. Giải thích không vượt qua conflict hay chứng từ chưa giải quyết.
+  Nguồn pending/failed không thành received. Các đường ghi tiền khác giữ hợp đồng
+  xác nhận riêng; đây không phải mặc định mọi command tiền đều đã xác minh.
 - **Định danh và kiểm bên giao dịch (chốt 14/10/2026, ADR0008,
   `reconciliation/advance_identity.py` pure):** giữ `event_at` chứng từ,
   `recorded_at` là giờ máy chủ; người nhận phải là nhân viên hồ sơ (id hoặc tên
@@ -205,6 +243,18 @@ minh trái quyền hoặc làm mất P. Unknown completion/payee/scope giữ unk
 Linked reversal không xóa event; amount reversed <= unreversed original;
 bank refund của P giảm P, không tạo R giả. Record facts không bị business cap20
 làm mất tiền thật; actor cần quyền record, oversized/out-of-scope observed giữ audit.
+
+**Instruction-bound P/R (15/10/2026):** each new company supplementary payment
+(`REIMBURSEMENT_RECEIVED`, projected as P) names the active same-root PAY
+instruction and attached source refs. Each employee return (projected as R) must
+come from a durable employee-uploaded source/read draft attached to the active
+same-root COLLECT instruction; upload/OCR creates no money event. The accountant
+confirms the saved draft, and the server rechecks parties, amount, reference,
+date, completion, source digest and current instruction before recording R.
+Partial movements fulfill only that instruction; overpayment remains a blocker.
+Retries with the same transaction key are idempotent, while a different movement
+cannot reuse a fulfilled or foreign instruction. Legacy events without an
+instruction remain readable but cannot be submitted as new P/R commands.
 
 Projection không được giả zero cho breakdown chưa rõ. Bản đầu yêu cầu phân loại
 A/P có căn cứ trước khi tự kết luận S; nếu chỉ biết tiền công ty chuyển cho nhân
@@ -237,7 +287,7 @@ usage không cấm legitimate supplementation nhưng cấm claim root khác.
 | --- | --- | --- | --- | --- |
 | SUBMIT/DECLARE_PURPOSE | Orchestrate | Own scope | Không mặc định | Không mặc định |
 | CONFIRM_FINANCIAL_FACT/RECORD_ACTUAL | Không tự tạo fact | Không tự nâng declaration | Granted scope | Chỉ nếu có grant riêng |
-| AUTHORIZE_ACTIVITY/SET_BUDGET | Chỉ dùng record đã có | Không | Không | <=20m và effect scope |
+| AUTHORIZE_ACTIVITY | Chỉ dùng record đã có | Không | Không | <=20m và effect scope |
 | RECOGNIZE_COST | E<=8m | Không | Không | <=20m |
 | EXCEPT_POLICY | Không | Không | Không | Exact rule/scope/max_effect, <=20m |
 | ISSUE_PAYMENT/COLLECTION | abs(S)<=4m | Không | Execution đúng instruction | <=20m |
@@ -247,16 +297,16 @@ usage không cấm legitimate supplementation nhưng cấm claim root khác.
 Default server fixture cho employee submit/answer purpose; accountant financial
 confirm/record + stop/resume; approver actions bảng và stop/resume. System grant
 recognize/issue explicit scope/profile/time. One compound decision có thể approve
-nhiều actions khi actor có đủ grants, không nhiều clicks bắt buộc, không free-form
-“đồng ý” resolve all. Mỗi action20m theo đúng dimension (B/E/request), không role
+Mỗi action20m theo đúng dimension (E hoặc request), đúng action/scope/time.
+B và `SET_BUDGET` không là action/workflow trong phạm vi hiện tại.
+Một compound decision có thể approve nhiều actions khi actor có đủ grants, không
+nhiều clicks bắt buộc, không free-form “đồng ý” resolve all. Không role
 MANAGER unlimited. Không quyền demo thì explanation needs higher authority, không
 hứa xử lý trong app.
 
 | Data state | Expected issue/outcome |
 | --- | --- |
-| B chưa tìm thấy, có thể đã có | FACT org-data owner tìm căn cứ |
-| Đã xác minh chưa cấp B, policy cho cấp | AUTHORITY approver tạo B/activity decision |
-| B valid, T>B và có exception path | POLICY, giữ T |
+| B legacy thiếu/thấp/cao | Không issue và không đổi kết quả; dữ liệu B không là điều kiện quyết toán |
 | Cấm rõ không exception | Exclude cost with refs; vẫn đối soát advance obligation |
 | Missing payer và E maybe above8 | FACT trước, AUTHORITY nếu sau xác minh E>8 |
 | Material FX/vendor refund/multi-claim flow | UNSUPPORTED affected money, không company-policy “cấm chi” |
@@ -425,7 +475,8 @@ uncertainty if provider cannot resolve a snapshot, don't fake exact reproducibil
   `langsmith_enabled`/`langsmith_export_errors` (trạng thái export thực tế).
 
 Test helpers tests/factories.py là unit-only: snapshot(T:int,E:int,C:int,A:int,
-P:int,R:int,B:int,coverage:bool=True,**overrides) -> AssessmentInput, với verified
+P:int,R:int,B:int,coverage:bool=True,**overrides) -> AssessmentInput; B is a legacy
+compatibility field ignored by decisions, với verified
 evidence literals được tạo trực tiếp; không mô phỏng chất lượng OCR. app_fixture
 pytest fixture tạo tenant/context/tmp DB + injected Reader, root(ctx) -> Id;
 execute(ctx,command) và view(ctx,id) luôn qua cùng CaseWorkflow. Không dùng test
@@ -516,7 +567,7 @@ Ghi usage/eligibility/instruction atomically; financial money thật vẫn đư�
 nếu vi phạm; hủy/supersede instruction không xóa incurred expense hoặc usage owner.
 
 cost_basis hash chứa expense identity/incurred/time, eligible paid portions/payer/
-binding, activity purpose/relations, expense-time policy/B/exception scope và
+binding, activity purpose/relations, expense-time policy/exception scope và
 eligibility authorization. Thay đổi các trường đó phải reassess E **tổng**, không
 reuse grant8 rồi cộng portion mới để thành E9. money_basis chứa A/P/R net scoped
 events/coverage/ledger; receipt P đúng scope không đổi cost_basis. Khi có explicit
@@ -542,8 +593,10 @@ UNKNOWN relevance hoặc material related ⇒ chặn affected conclusion, hiện
 lý/ngoài khả năng hỗ trợ; proven unrelated ⇒ quarantine refs/reason, không blanket
 block. NOT_READ không MISSING; không đếm TECHNICAL như business escalation đúng.
 
-context_version aggregate tăng khi bất kỳ policy/grant/B/activity authorization/
-exception/revocation authoritative record đổi qua validated command/import. File
+context_version aggregate tăng khi context được import/đổi. Thay B legacy có thể
+khiến tác vụ đang chạy phải đọc lại theo optimistic concurrency, nhưng không đổi
+cost_basis hay outcome nghiệp vụ. Policy/grant/activity authorization/exception/
+revocation thay đổi vẫn là authoritative changes. File
 ngoài DB chỉ thành authority sau import có version/hash; runtime không đọc mutable
 file như quyền hiệu lực. Snapshot giữ bản cũ; commit transaction kiểm aggregate
 version, ledger/usage/input/control và grant hiệu lực hiện tại. Explicit revoke
@@ -571,11 +624,17 @@ cho field; basis digest và remaining RunBudget được lưu trước chọn R/
 
 Activity catalog do server/context giữ, UI chọn tên/ngày. CreateDraft có thể chọn
 existing authorized activity hoặc tạo ProposedActivity với server-generated ID;
-draft creation **không** cấp quyền hoạt động/B. ProposedActivity chưa có context
-hiện FACT tìm record hoặc AUTHORITY khi đã xác minh chưa cấp; Decide đúng grant
-AUTHORIZE_ACTIVITY/SET_BUDGET tạo record. Same activity→same root, two activities→
+draft creation **không** cấp quyền hoạt động hay grant. ProposedActivity giữ
+activity identity làm scope. Tenant snapshot cung cấp danh tính tổ chức, nhân viên,
+policy và grants; ledger, references và coverage chỉ được ghép cho đúng activity.
+Một `ActivityAcceptance` theo chứng từ ứng có thể đáp ứng FACT “công việc đã được
+công ty chấp nhận” nhưng không đổi status, không cấp `AUTHORIZE_ACTIVITY` hay grant.
+Chi phí/effect vẫn phải qua evidence, policy, coverage và action/scope authority.
+Không tạo một budget/authorization FACT chỉ vì thiếu B. `SET_BUDGET` không là
+action/workflow hiện hành.
+Same activity→same root, two activities→
 two roots. Demo context import chỉ synthetic validated input trong sandbox và
-audit import origin; không cho raw client role/B tự thành corporate authority.
+audit import origin; không cho raw client role/action tự thành corporate authority.
 
 ### 10.5. Recovery selection và activation attribution
 
@@ -715,6 +774,20 @@ giữ và E0 pin; profile/critical-field matrix pin tại Hoangha revision `1ee3
 - `validate_document(analysis, ocr, quality) -> DocumentAnalysis` pure sync: validate
   ownership source/page/block, quote chuẩn hoá khớp, schema, nhất quán state/value,
   required field và compatibility type/role.
+- Provenance cho text value được phép chuẩn hoá **chỉ whitespace** khi so với quote:
+  value một dòng có thể khớp quote nguồn nhiều dòng nếu chỉ khác dấu cách/newline.
+  `EvidenceRef.exact_quote` vẫn giữ nguyên chuỗi quote gốc; không bỏ dấu, sửa chính
+  tả, bỏ từ, fuzzy-match hay chấp nhận tên không được quote hỗ trợ.
+- Ngày nguồn dùng chung bộ chuẩn hoá lịch: ISO, DD/MM/YYYY (hoặc dấu `-`, `.`),
+  và `ngày DD tháng MM năm YYYY`. Extraction prompt v2 yêu cầu value ngày ở dạng
+  ISO, giữ nguyên quote; code vẫn nhận ngày chữ từ bản đọc cũ. Không đoán năm,
+  không lấy ngày lập giấy/hóa đơn làm ngày công việc. Kiểm chứng phải khớp đúng
+  thứ tự ngày/tháng/năm và ngày có tồn tại; không dùng tập hợp chữ số. Quote nhiều
+  ngày chỉ chọn đầu/cuối khi field `trip_start`/`trip_end` gắn khoảng `từ … đến …`
+  rõ ràng. Timestamp không được thêm giờ/offset mà nguồn không hỗ trợ.
+- Kế toán có thể GET lại bản nháp ứng đã lưu để tính lại liên kết theo nguồn và
+  trạng thái hiện hành, không gọi OCR/LLM, không đổi version, không ghi tiền hay
+  coverage. Xác nhận ghi tiền vẫn kiểm lại căn cứ trong transaction.
 - Confidence: `collect_low_confidence_blocks(ocr, threshold=0.85)` tạo candidate;
   `async review_ocr_quality(candidates, *, llm, budget) -> ConfidenceReview` một batch;
   `ConfidenceReview(status:ASSESSED|SKIPPED_NO_NUMERIC_CANDIDATES|TECHNICAL_ERROR,
@@ -746,6 +819,9 @@ giữ và E0 pin; profile/critical-field matrix pin tại Hoangha revision `1ee3
   `paper.document_type == SETTLEMENT_FORM` (giấy quyết toán upload). Không có form ⇒
   không gọi hàm này; report ghi finding `SETTLEMENT_FORM_MISSING`. Port core Hoangha revision `1ee33487…`
   (`application/paper_evidence_matching.py`): exact invoice ref → `AUTO_LINK`/1.0;
+  serial-only reference may match the suffix of a series-prefixed invoice number
+  only at a non-digit boundary and only when it identifies one candidate document;
+  duplicate serials remain suggestions for human selection;
   ngược lại amount 0.60 (≤1 VND) + semantic ≤0.30 + party 0.12/0.20 + non-original
   +0.10, cap 1.0; `<0.50` bỏ, `[0.50,0.75)` suggestion, `>=0.75` auto; tie theo thứ
   tự gắn nguồn.

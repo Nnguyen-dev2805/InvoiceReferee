@@ -22,6 +22,7 @@ from invoice_referee.domain.case import CommandContext
 from invoice_referee.domain.commands import (
     ActivityData,
     AttachSources,
+    ConfirmCoverage,
     CreateDraft,
     Declaration,
     RecordActual,
@@ -31,7 +32,7 @@ from invoice_referee.domain.commands import (
 from invoice_referee.domain.common import EvidenceRef
 from invoice_referee.domain.documents import DocumentAnalysis, DocumentLine, FieldCandidate
 from invoice_referee.domain.evidence import ReadResult
-from invoice_referee.domain.finance import RecordMoneyInput
+from invoice_referee.domain.finance import COVERAGE_REQUIRED_FLOW_KINDS, RecordMoneyInput
 from invoice_referee.workflow.db import Database
 from invoice_referee.workflow.service import CaseWorkflow
 
@@ -50,7 +51,7 @@ def _found(name: str, value: object, quote: str = "x") -> FieldCandidate:
 
 
 def _report(*, declared_advance: str | None = "4000000") -> ReadResult:
-    fields = [_found("declared_name", "Nguyễn An"), _found("printed_total", "3240000"),
+    fields = [_found("declared_name", "NGUYỄN MINH AN"), _found("printed_total", "3240000"),
               _found("purpose", "Làm việc với khách hàng tại Hà Nội")]
     if declared_advance is not None:
         fields.append(_found("declared_advance", declared_advance))
@@ -67,7 +68,7 @@ def _report(*, declared_advance: str | None = "4000000") -> ReadResult:
         source_id="source:2", document_id="source:2:1-1:E_INVOICE",
         document_type="E_INVOICE", roles=("ORIGINAL_EXPENSE_EVIDENCE",), page_range=(1, 1),
         fields=(_found("document_number", "IR26101001"), _found("issuer_name", "An Bình"),
-                _found("total_amount", "3240000"), _found("buyer_person_name", "Nguyễn An")),
+                _found("total_amount", "3240000"), _found("buyer_person_name", "NGUYỄN MINH AN")),
         confidence_status="ASSESSED", profile_status="CLEAR",
     )
     return ReadResult(provider_mode="LIVE", data_origin="LIVE_READ", documents=(paper, invoice))
@@ -142,6 +143,34 @@ async def _record_advance(wf: CaseWorkflow, root: str, *, method: str, status: s
     )
 
 
+async def _confirm_history_coverage(wf: CaseWorkflow, root: str) -> None:
+    row = wf._query_one("SELECT version FROM cases WHERE id = ?", (root,))
+    source = wf._query_one("SELECT source_id, digest FROM case_sources WHERE root_id = ?", (root,))
+    session = wf.start_session(tenant=TENANT, persona="accountant", actor_id=ACCOUNTANT)
+    await wf.execute(
+        CommandContext(
+            session_id=session.session_id,
+            actor_id=ACCOUNTANT,
+            command_id=f"cmd:coverage:{root}",
+            expected_case_version=int(row["version"]),
+        ),
+        ConfirmCoverage(
+            root_id=root,
+            start=datetime(2026, 10, 1, tzinfo=timezone(timedelta(hours=7))),
+            funds=("Tài khoản ngân hàng công ty",),
+            flow_kinds=COVERAGE_REQUIRED_FLOW_KINDS,
+            opening_balance=0,
+            witness_refs=(EvidenceRef(
+                source_id=source["source_id"],
+                source_sha256=source["digest"],
+                page=1,
+                exact_quote="Sổ giao dịch đối chiếu đầy đủ",
+            ),),
+            reason="Đã đối chiếu toàn bộ lịch sử tiền của đúng hoạt động.",
+        ),
+    )
+
+
 def _money(wf: CaseWorkflow, root: str) -> dict:
     with wf.db.transaction() as cx:
         row = cx.execute("SELECT * FROM cases WHERE id = ?", (root,)).fetchone()
@@ -167,6 +196,7 @@ async def test_flow1_no_record_blocks_then_transfer_records_and_collects(tmp_pat
     assert blocked["S"].state == "UNKNOWN"
 
     await _record_advance(wf, root, method="TRANSFER", status="COMPLETED", key="bank:ADV-F01")
+    await _confirm_history_coverage(wf, root)
     done = _money(wf, root)
     assert done["instructions"] == [("COLLECT", 760_000)]
     assert done["A"].value == 4_000_000
@@ -179,6 +209,7 @@ async def test_flow1_cash_voucher_also_records_and_collects(tmp_path: Path) -> N
     await _submit(wf, root)
     await _assess(wf, root)
     await _record_advance(wf, root, method="CASH", status="COMPLETED", key="cash:PC-F01")
+    await _confirm_history_coverage(wf, root)
     done = _money(wf, root)
     assert done["instructions"] == [("COLLECT", 760_000)]
     assert done["A"].value == 4_000_000
@@ -214,5 +245,6 @@ async def test_retry_does_not_double_count_the_advance(tmp_path: Path) -> None:
     await _record_advance(wf, root, method="TRANSFER", status="COMPLETED", key="bank:ADV-dup", command_id="cmd:rec:dup-1")
     # A retry with the SAME external key is idempotent: no second A.
     await _record_advance(wf, root, method="TRANSFER", status="COMPLETED", key="bank:ADV-dup", command_id="cmd:rec:dup-2")
+    await _confirm_history_coverage(wf, root)
     done = _money(wf, root)
     assert done["A"].value == 4_000_000  # not 8m

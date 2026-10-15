@@ -1,4 +1,4 @@
-import type { CaseView, CommandResultView, SessionPayload } from "./types";
+import type { ActivityLinkSignalView, CaseView, CommandResultView, EmployeeReturnDraftView, SessionPayload } from "./types";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -151,42 +151,91 @@ export async function controlCase(
 export async function recordActual(
   rootId: string,
   money: Record<string, unknown>,
+  version: number,
 ): Promise<CommandResultView> {
   return request<CommandResultView>(
     `/api/cases/${rootId}/actuals`,
     { money },
     newCommandId(),
+    version,
   );
 }
 
 export async function advanceDraft(
   rootId: string,
   files: File[],
+  version: number,
   method: "TRANSFER" | "CASH" | null = null,
 ): Promise<{
-  source_id: string;
-  amount: number | null;
-  payer_name: string | null;
-  payee_name: string | null;
-  transaction_reference: string | null;
-  instrument_method: "TRANSFER" | "CASH" | null;
-  instrument_status: "COMPLETED" | "PENDING" | "FAILED" | "UNKNOWN";
-  event_at: string | null;
-  missing_fields: string[];
-  requires_confirmation: boolean;
-  already_recorded?: boolean;
-  refs?: Array<{ source_id: string; source_sha256: string; page: number | null; exact_quote: string }>;
+  draft: {
+    source_id: string;
+    draft_id: string;
+    amount: number | null;
+    payer_name: string | null;
+    payee_name: string | null;
+    transaction_reference: string | null;
+    activity_reference: string | null;
+    activity_link_status: "LINKED" | "NEEDS_CONFIRMATION" | "NOT_FOUND" | "CONFLICT";
+    matched_activity_id: string | null;
+    activity_link_basis: string | null;
+    activity_link_signals: ActivityLinkSignalView[];
+    activity_link_candidate_count: number;
+    instrument_method: "TRANSFER" | "CASH" | null;
+    instrument_status: "COMPLETED" | "PENDING" | "FAILED" | "UNKNOWN";
+    event_at: string | null;
+    missing_fields: string[];
+    requires_confirmation: boolean;
+    already_recorded: boolean;
+    refs: Array<{ source_id: string; source_sha256: string; page: number | null; exact_quote: string }>;
+  };
+  case_view: CaseView;
 }> {
   const form = new FormData();
   for (const file of files) form.append("files", file);
   const query = method ? `?method=${method}` : "";
   const response = await fetch(`/api/cases/${rootId}/advance/draft${query}`, {
     method: "POST",
-    headers: { "X-Command-Id": newCommandId() },
+    headers: {
+      "X-Command-Id": newCommandId(),
+      "X-Expected-Version": String(version),
+    },
     body: form,
     credentials: "same-origin",
   });
   return parse(response);
+}
+
+export async function getAdvanceDraft(
+  rootId: string, draftId?: string,
+): Promise<Awaited<ReturnType<typeof advanceDraft>>> {
+  const query = draftId ? `?draft_id=${encodeURIComponent(draftId)}` : "";
+  return request(`/api/cases/${rootId}/advance/draft${query}`);
+}
+
+export async function confirmCoverage(
+  rootId: string,
+  coverage: {
+    start: string;
+    funds: string[];
+    flow_kinds: string[];
+    opening_balance: number;
+    unallocated_event_ids: string[];
+    witness_refs: Array<{
+      source_id: string;
+      source_sha256: string;
+      page: number | null;
+      exact_quote: string;
+    }>;
+    reason: string;
+  },
+  version: number,
+): Promise<CommandResultView> {
+  return request<CommandResultView>(
+    `/api/cases/${rootId}/coverage`,
+    coverage,
+    newCommandId(),
+    version,
+  );
 }
 
 export interface SettlementExpenseItem {
@@ -298,6 +347,20 @@ export async function attachSources(
     credentials: "same-origin",
   });
   return parse<CommandResultView>(response);
+}
+
+export async function readEmployeeReturnDraft(
+  rootId: string,
+  sourceId: string,
+  instructionId: string,
+  version: number,
+): Promise<{ case_view: CaseView; draft: EmployeeReturnDraftView }> {
+  return request(
+    `/api/cases/${rootId}/return-draft`,
+    { source_id: sourceId, instruction_id: instructionId, instrument_method: "TRANSFER" },
+    newCommandId(),
+    version,
+  );
 }
 
 export function errorMessage(cause: unknown): string {
