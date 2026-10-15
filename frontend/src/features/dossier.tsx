@@ -1,7 +1,7 @@
 import { formatVnd } from "../format";
 import type { CaseView } from "../types";
 
-const STATE_LABELS: Record<string, string> = {
+export const STATE_LABELS: Record<string, string> = {
   DRAFT: "Bản nháp",
   PROCESSING: "Đang xử lý",
   EVIDENCE_READY: "Đã đọc chứng từ",
@@ -11,6 +11,46 @@ const STATE_LABELS: Record<string, string> = {
   SETTLED: "Đã quyết toán",
   STOPPED: "Đã tạm dừng",
 };
+
+export function CaseStateBadge({ state }: { state: string }) {
+  const label = STATE_LABELS[state] ?? state;
+  const isSettled = state === "SETTLED";
+  const isReady = state === "READY_TO_EXECUTE";
+  const isWaiting = state === "WAITING";
+  const isStopped = state === "STOPPED" || state === "TECHNICAL_ERROR";
+  const isProcessing = state === "PROCESSING" || state === "EVIDENCE_READY";
+
+  const colorClass = isSettled
+    ? "bg-emerald-50 text-emerald-800 border-emerald-200/90"
+    : isReady
+    ? "bg-indigo-50 text-indigo-800 border-indigo-200/90"
+    : isWaiting
+    ? "bg-amber-50 text-amber-900 border-amber-200/90"
+    : isStopped
+    ? "bg-rose-50 text-rose-900 border-rose-200/90"
+    : isProcessing
+    ? "bg-blue-50 text-blue-700 border-blue-200/80"
+    : "bg-slate-100 text-slate-700 border-slate-200";
+
+  const dotClass = isSettled
+    ? "bg-emerald-600"
+    : isReady
+    ? "bg-indigo-600"
+    : isWaiting
+    ? "bg-amber-600"
+    : isStopped
+    ? "bg-rose-600"
+    : isProcessing
+    ? "bg-blue-500"
+    : "bg-slate-400";
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border ${colorClass}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
+      <span>{label}</span>
+    </span>
+  );
+}
 
 const BASIS_LABELS: Record<string, string> = {
   INDEPENDENT_PAYMENT: "Chứng từ thanh toán độc lập",
@@ -141,51 +181,15 @@ export function Dossier({
       aria-labelledby="dossier-title"
       className="space-y-6 select-none text-xs"
     >
-      {/* Header Info */}
-      <div className="pb-4 border-b border-slate-100 space-y-1.5">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <h2 id="dossier-title" className="text-base font-bold text-slate-900 tracking-tight">
-            Hồ sơ đối soát
-          </h2>
-          <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-600 font-mono-nums border border-slate-200">
-            v{caseView.version}
-          </span>
-          <span
-            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border ${
-              caseView.state === "SETTLED"
-                ? "bg-emerald-50 text-emerald-800 border-emerald-200/90"
-                : caseView.state === "READY_TO_EXECUTE"
-                ? "bg-indigo-50 text-indigo-800 border-indigo-200/90"
-                : caseView.state === "WAITING"
-                ? "bg-amber-50 text-amber-900 border-amber-200/90"
-                : caseView.state === "STOPPED"
-                ? "bg-rose-50 text-rose-900 border-rose-200/90"
-                : caseView.state === "PROCESSING" || caseView.state === "EVIDENCE_READY"
-                ? "bg-blue-50 text-blue-700 border-blue-200/80"
-                : "bg-slate-100 text-slate-700 border-slate-200"
-            }`}
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                caseView.state === "SETTLED"
-                  ? "bg-emerald-600"
-                  : caseView.state === "READY_TO_EXECUTE"
-                  ? "bg-indigo-600"
-                  : caseView.state === "WAITING"
-                  ? "bg-amber-600"
-                  : caseView.state === "STOPPED"
-                  ? "bg-rose-600"
-                  : caseView.state === "PROCESSING" || caseView.state === "EVIDENCE_READY"
-                  ? "bg-blue-500"
-                  : "bg-slate-400"
-              }`}
-            />
-            <span>{STATE_LABELS[caseView.state] ?? caseView.state}</span>
-          </span>
+      {/* Dossier Summary Line */}
+      <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+        <h2 id="dossier-title" className="sr-only">
+          Hồ sơ đối soát
+        </h2>
+        <div className="flex items-center gap-2 text-slate-600 text-xs">
+          <span className="text-slate-400 text-[11px] uppercase tracking-wider font-semibold">Hoạt động:</span>
+          <span className="text-slate-900 font-semibold">{formatSummary(caseView.summary)}</span>
         </div>
-        <p className="text-xs text-slate-500 font-normal">
-          {formatSummary(caseView.summary)}
-        </p>
       </div>
 
       {(caseView.activity_acceptances ?? []).length > 0 && (

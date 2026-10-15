@@ -75,7 +75,7 @@ export function formatIssueTarget(fieldOrRule: string): string {
   return `#${rawLast}`;
 }
 
-function roleMatchesOwner(role: string, owner: string, kind: string): boolean {
+export function roleMatchesOwner(role: string, owner: string, kind: string): boolean {
   if (role === "employee") {
     return owner === "employee" || owner.startsWith("employee:") || owner.startsWith("employee-");
   }
@@ -96,6 +96,86 @@ function formatOwner(owner: string): string {
   return owner;
 }
 
+export interface SettlementLineTotalTable {
+  items: { description: string; amount: string }[];
+  calculatedTotal: string;
+  printedTotal: string;
+  diff: string;
+}
+
+export function parseSettlementLineTotal(basis: string | undefined): SettlementLineTotalTable | null {
+  if (!basis) return null;
+  const match = basis.match(
+    /Tổng dòng chi phí \((.+?)\) là ([\d.,]+(?:\s*đ)?), nhưng tổng in trên giấy là ([\d.,]+(?:\s*đ)?) \(lệch ([\d.,]+(?:\s*đ)?)\)/i,
+  );
+  if (!match) return null;
+
+  const rawItems = match[1].split(/\s*\+\s*/);
+  const items: { description: string; amount: string }[] = [];
+
+  for (const raw of rawItems) {
+    const itemMatch = raw.trim().match(/^(.*?)\s*([\d.,]+\s*đ?)$/);
+    if (itemMatch) {
+      items.push({
+        description: itemMatch[1].trim(),
+        amount: itemMatch[2].trim(),
+      });
+    } else {
+      items.push({
+        description: raw.trim(),
+        amount: "",
+      });
+    }
+  }
+
+  return {
+    items,
+    calculatedTotal: match[2].trim(),
+    printedTotal: match[3].trim(),
+    diff: match[4].trim(),
+  };
+}
+
+export interface SettlementReturnTable {
+  advance: string;
+  total: string;
+  expected: string;
+  printed: string;
+  diff: string;
+  isReturn: boolean;
+}
+
+export function parseSettlementReturn(basis: string | undefined): SettlementReturnTable | null {
+  if (!basis) return null;
+  const matchReturn = basis.match(
+    /Giấy ghi ứng ([\d.,]+(?:\s*đ)?) [−-] chi ([\d.,]+(?:\s*đ)?) = ([\d.,]+(?:\s*đ)?) nhưng số hoàn lại in trên giấy là ([\d.,]+(?:\s*đ)?) \(lệch ([\d.,]+(?:\s*đ)?)\)/i,
+  );
+  if (matchReturn) {
+    return {
+      advance: matchReturn[1].trim(),
+      total: matchReturn[2].trim(),
+      expected: matchReturn[3].trim(),
+      printed: matchReturn[4].trim(),
+      diff: matchReturn[5].trim(),
+      isReturn: true,
+    };
+  }
+  const matchReimburse = basis.match(
+    /Giấy ghi chi ([\d.,]+(?:\s*đ)?) [−-] ứng ([\d.,]+(?:\s*đ)?) = ([\d.,]+(?:\s*đ)?) nhưng số đề nghị chi thêm là ([\d.,]+(?:\s*đ)?) \(lệch ([\d.,]+(?:\s*đ)?)\)/i,
+  );
+  if (matchReimburse) {
+    return {
+      total: matchReimburse[1].trim(),
+      advance: matchReimburse[2].trim(),
+      expected: matchReimburse[3].trim(),
+      printed: matchReimburse[4].trim(),
+      diff: matchReimburse[5].trim(),
+      isReturn: false,
+    };
+  }
+  return null;
+}
+
 /** One answerable question panel: known basis, the exact answer required, owner. */
 export function QuestionCard({
   issue,
@@ -112,6 +192,29 @@ export function QuestionCard({
   const [error, setError] = useState<string | null>(null);
   const invoiceReference = employeePaidInvoiceReference(issue.field_or_rule);
   const historyCoverageIssue = issue.field_or_rule === "ledger:coverage";
+  const lineTable = parseSettlementLineTotal(issue.basis);
+  const returnTable = parseSettlementReturn(issue.basis);
+
+  // Group refs by source and page
+  const groupedRefs = (issue.refs ?? []).reduce<
+    Record<string, { filename: string; page: number | null; quotes: string[] }>
+  >((acc, ref) => {
+    const filename =
+      caseView.sources.find((source) => source.id === ref.source_id)?.filename ??
+      ref.source_id;
+    const key = `${ref.source_id}::${ref.page ?? 1}`;
+    if (!acc[key]) {
+      acc[key] = {
+        filename,
+        page: ref.page ?? null,
+        quotes: [],
+      };
+    }
+    if (!acc[key].quotes.includes(ref.exact_quote)) {
+      acc[key].quotes.push(ref.exact_quote);
+    }
+    return acc;
+  }, {});
 
   async function submit() {
     setBusy(true);
@@ -138,115 +241,231 @@ export function QuestionCard({
 
   return (
     <div
-      className="space-y-3.5 text-xs"
+      className="space-y-4 text-xs max-w-2xl"
       data-testid={`question-${issue.kind}`}
     >
-      {/* Question */}
-      <h4 className="font-semibold text-slate-900 text-sm leading-snug">
-        {formatQuestionTitle(issue.question, Boolean(issue.basis))}
-      </h4>
+      {/* 1. Câu hỏi & Diễn giải */}
+      <div className="space-y-1.5">
+        <h4 className="font-semibold text-slate-900 text-sm leading-relaxed">
+          {formatQuestionTitle(issue.question, Boolean(issue.basis))}
+        </h4>
+        {!lineTable && !returnTable && issue.basis && issue.basis !== issue.question && (
+          <p className="text-slate-600 text-xs leading-relaxed">
+            {formatVndInText(issue.basis)}
+          </p>
+        )}
+      </div>
 
-      {/* Basis (clean subtle quote line, no nested box) */}
-      {issue.basis && (
-        <div className="pl-3 border-l-2 border-slate-300 py-0.5 text-xs">
-          <span className="text-[11px] text-slate-400 font-medium block">Căn cứ ghi nhận:</span>
-          <p className="text-slate-600 leading-relaxed font-medium">{formatVndInText(issue.basis)}</p>
+      {/* 2. Chứng từ liên quan */}
+      {Object.keys(groupedRefs).length > 0 && (
+        <div
+          aria-label="Trích dẫn nguồn cho căn cứ"
+          className="text-xs text-slate-600 flex items-baseline gap-2 flex-wrap pt-0.5"
+        >
+          <span className="text-slate-400 font-medium shrink-0">Chứng từ đối chiếu:</span>
+          {Object.entries(groupedRefs).map(([key, group]) => (
+            <span key={key} className="inline-flex items-baseline gap-1.5 flex-wrap">
+              <span className="font-semibold text-slate-800">{group.filename}</span>
+              <span className="text-slate-500">· trang {group.page ?? "?"}</span>
+              {!lineTable && !returnTable && (
+                <>
+                  <span className="text-slate-300">|</span>
+                  <span className="text-slate-400">Trích dẫn:</span>
+                  {group.quotes.map((quote, idx) => (
+                    <span
+                      key={idx}
+                      className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[11px] font-mono-nums"
+                    >
+                      {quote}
+                    </span>
+                  ))}
+                </>
+              )}
+            </span>
+          ))}
         </div>
       )}
 
-      {(issue.refs ?? []).length > 0 && (
-        <ul aria-label="Trích dẫn nguồn cho căn cứ" className="space-y-1 pl-3 text-[11px] text-slate-500">
-          {issue.refs?.map((ref, index) => {
-            const filename = caseView.sources.find((source) => source.id === ref.source_id)?.filename ?? ref.source_id;
-            return <li key={`${ref.source_id}:${ref.page}:${index}`}>
-              {filename} · trang {ref.page ?? "?"}: <q>{ref.exact_quote}</q>
-            </li>;
-          })}
-        </ul>
+      {/* 3. Bảng kê đối chiếu mini (Phương án A) */}
+      {lineTable && (
+        <div className="border border-slate-200 rounded overflow-hidden max-w-xl text-xs bg-white">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                <th className="py-2 px-3 font-semibold text-xs">Khoản mục trích xuất</th>
+                <th className="py-2 px-3 font-semibold text-xs text-right">Số tiền</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {lineTable.items.map((item, idx) => (
+                <tr key={idx} className="hover:bg-slate-50/50">
+                  <td className="py-2 px-3 text-slate-800">• {item.description}</td>
+                  <td className="py-2 px-3 text-right font-mono-nums text-slate-900 font-medium">
+                    {item.amount}
+                  </td>
+                </tr>
+              ))}
+              <tr className="bg-slate-50/60 font-semibold border-t border-slate-200">
+                <td className="py-2 px-3 text-slate-700">Tổng cộng các dòng chi</td>
+                <td className="py-2 px-3 text-right font-mono-nums text-slate-900">
+                  {lineTable.calculatedTotal}
+                </td>
+              </tr>
+              <tr className="bg-slate-50/60 font-semibold">
+                <td className="py-2 px-3 text-slate-700">Tổng in trên giấy quyết toán</td>
+                <td className="py-2 px-3 text-right font-mono-nums text-slate-900">
+                  {lineTable.printedTotal}
+                </td>
+              </tr>
+              <tr className="bg-rose-50/80 font-semibold border-t border-rose-200 text-rose-900">
+                <td className="py-2 px-3 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+                  <span>Chênh lệch chưa khớp</span>
+                </td>
+                <td className="py-2 px-3 text-right font-mono-nums text-rose-700 font-bold">
+                  {lineTable.diff.startsWith("+") || lineTable.diff.startsWith("-")
+                    ? lineTable.diff
+                    : `± ${lineTable.diff}`}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       )}
 
+      {returnTable && (
+        <div className="border border-slate-200 rounded overflow-hidden max-w-xl text-xs bg-white">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                <th className="py-2 px-3 font-semibold text-xs">Mục đối chiếu</th>
+                <th className="py-2 px-3 font-semibold text-xs text-right">Số tiền</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              <tr className="hover:bg-slate-50/50">
+                <td className="py-2 px-3 text-slate-800">• Tiền tạm ứng</td>
+                <td className="py-2 px-3 text-right font-mono-nums text-slate-900 font-medium">
+                  {returnTable.advance}
+                </td>
+              </tr>
+              <tr className="hover:bg-slate-50/50">
+                <td className="py-2 px-3 text-slate-800">• Tiền thực chi</td>
+                <td className="py-2 px-3 text-right font-mono-nums text-slate-900 font-medium">
+                  {returnTable.total}
+                </td>
+              </tr>
+              <tr className="bg-slate-50/60 font-semibold border-t border-slate-200">
+                <td className="py-2 px-3 text-slate-700">
+                  Số tiền {returnTable.isReturn ? "hoàn ứng" : "chi thêm"} theo phép tính
+                </td>
+                <td className="py-2 px-3 text-right font-mono-nums text-slate-900">
+                  {returnTable.expected}
+                </td>
+              </tr>
+              <tr className="bg-slate-50/60 font-semibold">
+                <td className="py-2 px-3 text-slate-700">
+                  Số tiền ghi trên giấy quyết toán
+                </td>
+                <td className="py-2 px-3 text-right font-mono-nums text-slate-900">
+                  {returnTable.printed}
+                </td>
+              </tr>
+              <tr className="bg-rose-50/80 font-semibold border-t border-rose-200 text-rose-900">
+                <td className="py-2 px-3 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+                  <span>Chênh lệch chưa khớp</span>
+                </td>
+                <td className="py-2 px-3 text-right font-mono-nums text-rose-700 font-bold">
+                  {returnTable.diff.startsWith("+") || returnTable.diff.startsWith("-")
+                    ? returnTable.diff
+                    : `± ${returnTable.diff}`}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* 3. Form giải trình */}
       {historyCoverageIssue ? (
-        <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3">
-          <p className="text-xs text-amber-950">
-            Câu trả lời tự do không xác nhận được sổ tiền đầy đủ. Dùng biểu mẫu xác nhận đã đối chiếu lịch sử tiền để ghi phạm vi, số dư và chứng từ căn cứ.
+        <div className="pt-2 text-xs text-slate-600 space-y-1">
+          <p className="font-medium text-slate-800">
+            Không áp dụng giải trình bằng văn bản tự do cho mục này.
           </p>
-          <a
-            href="#history-coverage"
-            onClick={(event) => {
-              event.preventDefault();
-              document.getElementById("history-coverage")?.scrollIntoView({ behavior: "smooth", block: "center" });
-            }}
-            className="inline-flex rounded bg-slate-950 px-3 py-2 font-medium text-white hover:bg-slate-800"
-          >
-            Tới xác nhận lịch sử tiền
-          </a>
+          <p className="text-slate-500">
+            Vui lòng chuyển sang tab <strong className="text-slate-700 font-semibold">Sổ cái & Dòng tiền</strong> ở trên để thực hiện đối chiếu và xác nhận.
+          </p>
         </div>
       ) : (
-      <>
-      {/* Input Form */}
-      <div className="space-y-3 pt-1">
-        <div>
-          <label htmlFor={`answer-${issue.id}`} className="text-slate-700 block text-xs font-medium mb-1.5">
-            {invoiceReference
-              ? `Số tiền VND nhân viên trực tiếp thanh toán cho hóa đơn ${invoiceReference}`
-              : "Nội dung giải trình / xác nhận:"}
-          </label>
-          {invoiceReference ? (
+        <div className="space-y-3 pt-3 border-t border-slate-200">
+          <div>
+            <label
+              htmlFor={`answer-${issue.id}`}
+              className="text-slate-900 block text-xs font-medium mb-1.5"
+            >
+              {invoiceReference
+                ? `Số tiền VND nhân viên trực tiếp thanh toán cho hóa đơn ${invoiceReference}`
+                : "Nội dung giải trình / xác nhận:"}
+            </label>
+            {invoiceReference ? (
+              <input
+                id={`answer-${issue.id}`}
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={1}
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 transition-colors"
+              />
+            ) : (
+              <textarea
+                id={`answer-${issue.id}`}
+                rows={3}
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded text-xs p-2.5 text-slate-900 focus:outline-none focus:border-slate-800 resize-y transition-colors leading-relaxed"
+              />
+            )}
+          </div>
+
+          <div>
+            <label
+              htmlFor={`reason-${issue.id}`}
+              className="text-slate-600 block text-[11px] font-medium mb-1"
+            >
+              {invoiceReference
+                ? "Lý do / xác nhận cụ thể"
+                : "Căn cứ / Ghi chú đính kèm (tùy chọn):"}
+            </label>
             <input
-              id={`answer-${issue.id}`}
-              type="number"
-              inputMode="numeric"
-              min={1}
-              step={1}
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-2 text-slate-900 focus:outline-none focus:border-slate-800 transition-colors"
+              id={`reason-${issue.id}`}
+              type="text"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              required={invoiceReference !== null}
+              className="w-full bg-white border border-slate-300 rounded text-xs px-3 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800 transition-colors"
             />
-          ) : (
-            <textarea
-              id={`answer-${issue.id}`}
-              rows={3}
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              className="w-full bg-white border border-slate-300 rounded text-xs p-2.5 text-slate-900 focus:outline-none focus:border-slate-800 resize-y transition-colors"
-            />
+          </div>
+
+          <div className="pt-1 flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => void submit()}
+              disabled={busy || value.trim() === "" || (invoiceReference !== null && reason.trim() === "")}
+              className="px-4 py-2 text-xs font-medium rounded transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed bg-slate-900 hover:bg-slate-800 text-white cursor-pointer"
+            >
+              {busy ? "Đang gửi…" : "Gửi giải trình"}
+            </button>
+          </div>
+
+          {error !== null && (
+            <p role="alert" className="error p-2.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-xs">
+              {error}
+            </p>
           )}
         </div>
-        <div>
-          <label htmlFor={`reason-${issue.id}`} className="text-slate-600 block text-[11px] font-medium mb-1.5">
-            {invoiceReference
-              ? "Lý do / xác nhận cụ thể"
-              : "Căn cứ / Ghi chú đính kèm (tùy chọn):"}
-          </label>
-          <input
-            id={`reason-${issue.id}`}
-            type="text"
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            required={invoiceReference !== null}
-            className="w-full bg-white border border-slate-300 rounded text-xs px-2.5 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800 transition-colors"
-          />
-        </div>
-      </div>
-
-      {/* Submit Action */}
-      <div className="pt-2 flex items-center justify-end">
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={busy || value.trim() === "" || (invoiceReference !== null && reason.trim() === "")}
-          className="font-medium text-xs px-4 py-1.5 rounded transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed bg-slate-900 hover:bg-slate-800 text-white cursor-pointer"
-        >
-          {busy ? "Đang gửi…" : "Gửi giải trình"}
-        </button>
-      </div>
-
-      {error !== null && (
-        <p role="alert" className="error p-2.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-xs">
-          {error}
-        </p>
-      )}
-      </>
       )}
     </div>
   );
@@ -262,6 +481,7 @@ export function Questions({
   currentRole?: string;
 }) {
   const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
+  const [isOtherIssuesOpen, setIsOtherIssuesOpen] = useState(false);
 
   if (caseView === null || caseView.issues.length === 0) return null;
 
@@ -274,18 +494,11 @@ export function Questions({
     myIssues.find((i) => i.id === activeIssueId)?.id ?? myIssues[0]?.id ?? null;
 
   return (
-    <section aria-labelledby="questions-title" className="space-y-5 select-none text-xs">
-      {/* 1. Actionable Issues for Current Role - Flat Open Section */}
-      {myIssues.length > 0 && (
+    <section aria-labelledby="questions-title" className="space-y-6 select-none text-xs max-w-3xl">
+      {/* 1. Actionable Issues for Current Role */}
+      {myIssues.length > 0 ? (
         <div className="space-y-3">
-          {/* Section Header */}
-          <div className="flex items-center justify-between">
-            <h2 id="questions-title" className="text-xs font-semibold text-slate-900">
-              Vấn đề cần bạn giải trình ({myIssues.length})
-            </h2>
-          </div>
-
-          {/* Minimalist Underline Tabs */}
+          {/* Minimalist Underline Tabs if multiple issues */}
           {myIssues.length > 1 && (
             <div className="flex border-b border-slate-200 gap-6 overflow-x-auto" role="tablist">
               {myIssues.map((issue) => {
@@ -316,7 +529,7 @@ export function Questions({
             </div>
           )}
 
-          {/* Panel Content - Flat, without nested card frame */}
+          {/* Panel Content */}
           <div className="pt-1">
             {myIssues.map((issue) => (
               <div
@@ -332,51 +545,56 @@ export function Questions({
             ))}
           </div>
         </div>
+      ) : (
+        <div className="py-8 text-center space-y-1 select-none text-xs text-slate-500">
+          <p className="font-semibold text-slate-800">
+            Bạn không có vấn đề nào cần giải trình trực tiếp
+          </p>
+          <p className="text-[11px] max-w-sm mx-auto">
+            Hồ sơ hiện chỉ có vấn đề thuộc trách nhiệm xử lý của bộ phận khác.
+          </p>
+        </div>
       )}
 
-      {/* 2. Pending Issues Assigned to Other Roles (Flat Reference List) */}
+      {/* 2. Pending Issues Assigned to Other Roles */}
       {otherIssues.length > 0 && (
-        <div className="space-y-2 pt-2">
-          <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
-            <h3 className="text-xs font-semibold text-slate-700">
-              Vấn đề đang chờ bộ phận khác ({otherIssues.length})
-            </h3>
-            <span className="text-[11px] text-slate-400 font-normal">
-              Tự động cập nhật
-            </span>
-          </div>
+        <div className="pt-6 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={() => setIsOtherIssuesOpen(!isOtherIssuesOpen)}
+            className="text-xs text-slate-500 hover:text-slate-800 font-medium inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>{isOtherIssuesOpen ? "▾ Thu gọn" : "▸ Xem"}</span>
+            <span>{otherIssues.length} vấn đề khác thuộc trách nhiệm của bộ phận liên quan</span>
+          </button>
 
-          <ul className="divide-y divide-slate-100 text-xs border-b border-slate-200">
-            {otherIssues.map((issue) => (
-              <li
-                key={issue.id}
-                className="py-3 px-1 flex items-start justify-between gap-4 hover:bg-slate-50/50 transition-colors"
-              >
-                <div className="space-y-1.5 min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                      {formatIssueTarget(issue.field_or_rule)}
-                    </span>
-                    <span className="text-[11px] text-slate-500">
+          {isOtherIssuesOpen && (
+            <ul className="mt-3 divide-y divide-slate-100 border-t border-b border-slate-200 text-xs">
+              {otherIssues.map((issue) => (
+                <li
+                  key={issue.id}
+                  className="py-3 flex items-start justify-between gap-4"
+                >
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="text-[11px] text-slate-500">
                       Phụ trách: <strong className="font-semibold text-slate-700">{formatOwner(issue.owner)}</strong>
-                    </span>
+                    </div>
+                    <p className="text-xs text-slate-900 font-medium leading-relaxed">
+                      {formatVndInText(issue.question)}
+                    </p>
+                    {issue.basis && (
+                      <p className="text-[11px] text-slate-500 leading-normal">
+                        Căn cứ: {formatVndInText(issue.basis)}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-900 font-medium leading-relaxed">
-                    {formatVndInText(issue.question)}
-                  </p>
-                  <p className="text-[11px] text-slate-500 leading-normal">
-                    Căn cứ: {formatVndInText(issue.basis)}
-                  </p>
-                </div>
-                <div className="text-right shrink-0 pt-0.5">
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                  <span className="text-[11px] text-slate-400 shrink-0">
                     Chờ xử lý
                   </span>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </section>

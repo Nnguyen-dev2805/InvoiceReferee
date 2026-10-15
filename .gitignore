@@ -32,3 +32,10 @@ frontend/dist/
 playwright-report/
 test-results/
 .DS_Store
+
+# Competition slide work, source drafts, and generated exports.
+docs/final/slides/
+docs/superpowers/plans/*slides*
+*.pptx
+~$*.pptx
+

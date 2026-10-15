@@ -6,11 +6,11 @@ import { Approval } from "./features/approval";
 import { Controls } from "./features/controls";
 import { Dashboard } from "./features/dashboard";
 import { DocumentViewer } from "./features/document_viewer";
-import { Dossier } from "./features/dossier";
+import { CaseStateBadge, Dossier } from "./features/dossier";
 import { Execution } from "./features/execution";
 import { EmployeeReturn } from "./features/employee_return";
 import { Intake } from "./features/intake";
-import { Questions } from "./features/questions";
+import { Questions, roleMatchesOwner } from "./features/questions";
 import { Verify } from "./features/verify";
 import { DebugModal } from "./features/debug_modal";
 import { roleWorkspaces } from "./roles";
@@ -38,7 +38,7 @@ export default function App() {
   const [isDebugOpen, setIsDebugOpen] = useState(false);
   const [isPersonaOpen, setIsPersonaOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
-  const [accountantTab, setAccountantTab] = useState<"dossier" | "cashflow">("dossier");
+  const [detailTab, setDetailTab] = useState<"dossier" | "issues" | "cashflow" | "return">("dossier");
   const personaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -110,6 +110,19 @@ export default function App() {
 
   const currentRole = session?.session.persona ?? "employee";
   const activePanels = roleWorkspaces(currentRole);
+  const activeDetailTab =
+    (currentRole !== "accountant" && detailTab === "cashflow") ||
+    (currentRole !== "employee" && detailTab === "return")
+      ? "dossier"
+      : detailTab;
+  const activeCollectsCount =
+    caseView?.instructions.filter(
+      (item) => item.direction === "COLLECT" && ["ISSUED", "PARTIAL"].includes(item.status) && item.remaining > 0,
+    ).length ?? 0;
+  const myIssuesCount =
+    caseView?.issues.filter((issue) =>
+      roleMatchesOwner(currentRole, issue.owner, issue.kind),
+    ).length ?? 0;
 
   return (
     <div className="app h-screen flex flex-col bg-slate-50 text-slate-800 font-sans overflow-hidden select-none">
@@ -259,6 +272,7 @@ export default function App() {
               currentRole={currentRole}
               onSelectCase={(c) => {
                 setCaseView(c);
+                setDetailTab("dossier");
                 if (c.state === "DRAFT" && currentRole === "employee") {
                   setViewMode("intake");
                 } else {
@@ -309,38 +323,44 @@ export default function App() {
                   </button>
                   <span className="text-slate-300">/</span>
                   {caseView && (
-                    caseList.length > 1 ? (
-                      <div className="relative inline-flex items-center">
-                        <label htmlFor="detail-case-select" className="sr-only">
-                          Chọn hồ sơ khác
-                        </label>
-                        <select
-                          id="detail-case-select"
-                          value={caseView.id}
-                          onChange={(e) => {
-                            const found = caseList.find((c) => c.id === e.target.value);
-                            if (found) {
-                              setCaseView(found);
-                              if (found.state === "DRAFT" && currentRole === "employee") {
-                                setViewMode("intake");
-                              }
-                            }
-                          }}
-                          className="text-xs font-mono-nums font-semibold text-slate-900 bg-transparent hover:bg-slate-100 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer transition-colors"
-                        >
-                          {caseList.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              Hồ sơ #{c.id.replace("case:", "").slice(0, 8)} (v{c.version})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    ) : (
-                      <span className="text-xs font-mono-nums font-semibold text-slate-900">
-                        Hồ sơ #{caseView.id.replace("case:", "").slice(0, 8)}{" "}
-                        <span className="text-slate-400 font-normal">(v{caseView.version})</span>
-                      </span>
-                    )
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                        <span>Hồ sơ đối soát</span>
+                        {caseList.length > 1 ? (
+                          <div className="relative inline-flex items-center">
+                            <label htmlFor="detail-case-select" className="sr-only">
+                              Chọn hồ sơ khác
+                            </label>
+                            <select
+                              id="detail-case-select"
+                              value={caseView.id}
+                              onChange={(e) => {
+                                const found = caseList.find((c) => c.id === e.target.value);
+                                if (found) {
+                                  setCaseView(found);
+                                  if (found.state === "DRAFT" && currentRole === "employee") {
+                                    setViewMode("intake");
+                                  }
+                                }
+                              }}
+                              className="text-xs font-mono-nums font-semibold text-slate-900 bg-transparent hover:bg-slate-100 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer transition-colors"
+                            >
+                              {caseList.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  #{c.id.replace("case:", "").slice(0, 8)} (v{c.version})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <span className="font-mono-nums font-semibold text-slate-900">
+                            #{caseView.id.replace("case:", "").slice(0, 8)}{" "}
+                            <span className="text-slate-400 font-normal">(v{caseView.version})</span>
+                          </span>
+                        )}
+                      </h2>
+                      <CaseStateBadge state={caseView.state} />
+                    </div>
                   )}
                 </div>
 
@@ -357,37 +377,86 @@ export default function App() {
                 )}
               </div>
 
-              {/* Role Workspace Tabs (Accountant: 2 clean tabs) */}
-              {currentRole === "accountant" && (
-                <div className="border-b border-slate-200 bg-white px-5 flex items-center gap-6 text-xs shrink-0 select-none">
+              {/* Role Workspace Tabs (Unified for all personas) */}
+              <div className="border-b border-slate-200 bg-white px-5 flex items-center gap-6 text-xs shrink-0 select-none">
+                {/* Tab 1: Đối soát chi phí */}
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeDetailTab === "dossier"}
+                  onClick={() => setDetailTab("dossier")}
+                  className={`py-2.5 font-medium border-b-2 text-xs transition-colors cursor-pointer flex items-center gap-2 ${
+                    activeDetailTab === "dossier"
+                      ? "border-slate-900 text-slate-950 font-semibold"
+                      : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+                  }`}
+                >
+                  <span>Đối soát chi phí</span>
+                </button>
+
+                {/* Tab 2: Vấn đề cần xử lý */}
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeDetailTab === "issues"}
+                  onClick={() => setDetailTab("issues")}
+                  className={`py-2.5 font-medium border-b-2 text-xs transition-colors cursor-pointer flex items-center gap-2 ${
+                    activeDetailTab === "issues"
+                      ? "border-slate-900 text-slate-950 font-semibold"
+                      : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
+                  }`}
+                >
+                  <span>Vấn đề cần xử lý</span>
+                  {myIssuesCount > 0 ? (
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-mono-nums font-semibold bg-amber-100 text-amber-900 border border-amber-300/80">
+                      {myIssuesCount}
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-mono-nums font-medium bg-slate-100 text-slate-500">
+                      0
+                    </span>
+                  )}
+                </button>
+
+                {/* Tab for Employee: Nộp chứng từ hoàn trả */}
+                {currentRole === "employee" && (
                   <button
                     type="button"
                     role="tab"
-                    aria-selected={accountantTab === "dossier"}
-                    onClick={() => setAccountantTab("dossier")}
+                    aria-selected={activeDetailTab === "return"}
+                    onClick={() => setDetailTab("return")}
                     className={`py-2.5 font-medium border-b-2 text-xs transition-colors cursor-pointer flex items-center gap-2 ${
-                      accountantTab === "dossier"
+                      activeDetailTab === "return"
                         ? "border-slate-900 text-slate-950 font-semibold"
                         : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
                     }`}
                   >
-                    <span>Đối soát chi phí</span>
+                    <span>Nộp chứng từ hoàn trả</span>
+                    {activeCollectsCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono-nums font-semibold bg-amber-100 text-amber-900 border border-amber-300/80">
+                        {activeCollectsCount}
+                      </span>
+                    )}
                   </button>
+                )}
+
+                {/* Tab 3: Sổ cái & Dòng tiền (Chỉ kế toán có thẩm quyền ghi sổ tiền) */}
+                {currentRole === "accountant" && (
                   <button
                     type="button"
                     role="tab"
-                    aria-selected={accountantTab === "cashflow"}
-                    onClick={() => setAccountantTab("cashflow")}
+                    aria-selected={activeDetailTab === "cashflow"}
+                    onClick={() => setDetailTab("cashflow")}
                     className={`py-2.5 font-medium border-b-2 text-xs transition-colors cursor-pointer flex items-center gap-2 ${
-                      accountantTab === "cashflow"
+                      activeDetailTab === "cashflow"
                         ? "border-slate-900 text-slate-950 font-semibold"
                         : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300"
                     }`}
                   >
                     <span>Sổ cái & Dòng tiền</span>
                   </button>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Scrollable Canvas for Workspaces */}
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
@@ -417,74 +486,24 @@ export default function App() {
                   </div>
                 )}
 
-                {/* ACCOUNTANT WORKSPACE: Tab 1 (Đối soát chi phí) vs Tab 2 (Sổ cái & Dòng tiền) */}
-                {currentRole === "accountant" ? (
-                  accountantTab === "dossier" ? (
-                    <>
-                      {/* 1. Dossier (Bảng đối soát tài chính, chứng từ hợp lệ, chênh lệch S) */}
-                      <Dossier
-                        caseView={caseView}
-                        hideIssues={activePanels.includes("questions") && (caseView?.issues.length ?? 0) > 0}
-                      />
-
-                      {/* 2. Questions Workspace */}
-                      {activePanels.includes("questions") && (
-                        <Questions
-                          caseView={caseView}
-                          onCase={(newCase) => {
-                            setCaseView(newCase);
-                            void restoreLatestCase();
-                          }}
-                          currentRole={currentRole}
-                        />
-                      )}
-
-                      {/* 3. Approval Workspace (Lệnh chi / thu phát sinh từ chênh lệch S) */}
-                      <Approval caseView={caseView} />
-                    </>
-                  ) : (
-                    <>
-                      {/* 4. Advance Workspace (Ghi nhận tạm ứng từ chứng từ) */}
-                      <Advance
-                        caseView={caseView}
-                        onCase={(newCase) => {
-                          setCaseView(newCase);
-                          void restoreLatestCase();
-                        }}
-                        onSourceSelected={setSelectedSourceId}
-                      />
-
-                      {/* 5. Execution Workspace (Ghi nhận dòng tiền thực tế vào sổ cái) */}
-                      <Execution
-                        caseView={caseView}
-                        onCase={(newCase) => {
-                          setCaseView(newCase);
-                          void restoreLatestCase();
-                        }}
-                      />
-                    </>
-                  )
-                ) : (
+                {/* TAB 1: Đối soát chi phí */}
+                {activeDetailTab === "dossier" && (
                   <>
-                    {/* OTHER ROLES (Employee / Approver) */}
-                    {activePanels.includes("dossier") && (
-                      <Dossier
-                        caseView={caseView}
-                        hideIssues={activePanels.includes("questions") && (caseView?.issues.length ?? 0) > 0}
-                      />
-                    )}
+                    <Dossier
+                      caseView={caseView}
+                      hideIssues={true}
+                    />
 
-                    {currentRole === "employee" && activePanels.includes("dossier") && (
-                      <EmployeeReturn
-                        caseView={caseView}
-                        onCase={(newCase) => {
-                          setCaseView(newCase);
-                          void restoreLatestCase();
-                        }}
-                      />
+                    {activePanels.includes("approval") && (
+                      <Approval caseView={caseView} />
                     )}
+                  </>
+                )}
 
-                    {activePanels.includes("questions") && (
+                {/* TAB 2: Vấn đề cần xử lý */}
+                {activeDetailTab === "issues" && (
+                  <>
+                    {(caseView?.issues.length ?? 0) > 0 ? (
                       <Questions
                         caseView={caseView}
                         onCase={(newCase) => {
@@ -493,12 +512,36 @@ export default function App() {
                         }}
                         currentRole={currentRole}
                       />
+                    ) : (
+                      <div className="py-12 px-4 text-center space-y-2 select-none">
+                        <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto text-sm font-bold border border-emerald-200">
+                          ✓
+                        </div>
+                        <h3 className="text-sm font-semibold text-slate-900">
+                          Không có vấn đề cần xử lý
+                        </h3>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                          Tất cả căn cứ chi tiêu, người nhận và số liệu đối soát đều đã được xác thực hợp lệ.
+                        </p>
+                      </div>
                     )}
+                  </>
+                )}
 
-                    {activePanels.includes("approval") && (
-                      <Approval caseView={caseView} />
-                    )}
+                {/* TAB: Nộp chứng từ hoàn trả (Chỉ nhân viên) */}
+                {activeDetailTab === "return" && currentRole === "employee" && (
+                  <EmployeeReturn
+                    caseView={caseView}
+                    onCase={(newCase) => {
+                      setCaseView(newCase);
+                      void restoreLatestCase();
+                    }}
+                  />
+                )}
 
+                {/* TAB 3: Sổ cái & Dòng tiền (Chỉ kế toán có thẩm quyền ghi sổ tiền) */}
+                {activeDetailTab === "cashflow" && currentRole === "accountant" && (
+                  <div className="max-w-3xl space-y-6">
                     {activePanels.includes("advance") && (
                       <Advance
                         caseView={caseView}
@@ -519,7 +562,7 @@ export default function App() {
                         }}
                       />
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </div>

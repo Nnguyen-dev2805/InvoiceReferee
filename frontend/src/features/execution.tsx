@@ -88,39 +88,134 @@ export function Execution({
   return (
     <section aria-labelledby="execution-title" className="space-y-4 select-none text-xs">
       <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-        <h2 id="execution-title" className="font-semibold text-slate-900">Dòng tiền thực tế</h2>
+        <h2 id="execution-title" className="font-semibold text-slate-900 text-xs">Dòng tiền thực tế</h2>
       </div>
-      <div className="space-y-1.5 border-b border-slate-200 pb-3">
-        <h3 className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Số đã xác minh</h3>
+      <div className="space-y-2 border-b border-slate-200 pb-4">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Số đã xác minh</h3>
         <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-3">
-          {Object.entries(caseView.actual_money).filter(([key]) => key in MONEY_LABELS).map(([key, fact]) => (
-            <div key={key} data-testid={`actual-${key}`} className="flex items-baseline justify-between py-1 sm:flex-col sm:justify-start">
-              <span className="text-[11px] font-medium text-slate-500">{MONEY_LABELS[key]}:</span>
-              <strong className={`font-mono tabular-nums text-xs sm:mt-1 ${fact.state === "KNOWN" && fact.value !== null ? "font-semibold text-slate-900" : "text-slate-400"}`}>
-                {fact.state === "KNOWN" && fact.value !== null ? formatVnd(fact.value) : "Chưa xác minh"}
-              </strong>
-            </div>
-          ))}
+          {Object.entries(caseView.actual_money).filter(([key]) => key in MONEY_LABELS).map(([key, fact]) => {
+            const isKnown = fact.state === "KNOWN" && fact.value !== null;
+            return (
+              <div
+                key={key}
+                data-testid={`actual-${key}`}
+                className="rounded-lg border border-slate-200 bg-white p-3 flex flex-col justify-between shadow-2xs"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-slate-500">{MONEY_LABELS[key]}</span>
+                  <span className={`w-2 h-2 rounded-full ${isKnown ? "bg-emerald-500" : "bg-slate-300"}`} />
+                </div>
+                <strong className={`font-mono tabular-nums text-sm mt-2 ${isKnown ? "font-semibold text-slate-900" : "font-normal text-slate-400"}`}>
+                  {fact.state === "KNOWN" && fact.value !== null ? formatVnd(fact.value) : "Chưa xác minh"}
+                </strong>
+              </div>
+            );
+          })}
         </div>
       </div>
       {activePays.length === 0 ? (
-        <p className="rounded border border-slate-200 bg-slate-50 p-3 text-slate-600" data-testid="no-active-pay">
+        <p className="rounded border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-500" data-testid="no-active-pay">
           Không có lệnh chi đang hiệu lực. Hồ sơ không cần ghi nhận khoản công ty chi bổ sung.
         </p>
       ) : (
-        <div className="space-y-3 rounded-md border border-slate-200 bg-white p-3">
-          <h3 className="font-medium text-slate-800">Ghi nhận chi bổ sung đã thực hiện</h3>
-          <p className="text-slate-600">Chỉ ghi khi ngân hàng đã hoàn tất. Mã giao dịch phải lấy từ chứng từ; không tự tạo mã.</p>
-          <label className="block space-y-1"><span>Lệnh chi</span><select aria-label="Lệnh chi" value={instructionId} onChange={(event) => setInstructionId(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2"><option value="">Chọn lệnh chi</option>{activePays.map((item) => <option key={item.id} value={item.id}>{item.id} · còn {formatVnd(item.remaining)}</option>)}</select></label>
-          <label className="block space-y-1"><span>Chứng từ đã tải lên</span><select aria-label="Chứng từ chi bổ sung" value={sourceId} onChange={(event) => setSourceId(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2"><option value="">Chọn chứng từ</option>{caseView.sources.map((item) => <option key={item.id} value={item.id}>{item.filename ?? item.id}</option>)}</select></label>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block space-y-1"><span>Số tiền thực chi (VND)</span><input aria-label="Số tiền thực chi" type="number" min="1" step="1" value={amount} onChange={(event) => setAmount(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2" /></label>
-            <label className="block space-y-1"><span>Mã giao dịch trên chứng từ</span><input aria-label="Mã giao dịch chi" value={reference} onChange={(event) => setReference(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2" /></label>
-            <label className="block space-y-1"><span>Ngày giao dịch</span><input aria-label="Ngày giao dịch chi" type="date" value={eventAt} onChange={(event) => setEventAt(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2" /></label>
-            <label className="block space-y-1"><span>Trang chứng từ</span><input aria-label="Trang chứng từ chi" type="number" min="1" step="1" value={page} onChange={(event) => setPage(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2" /></label>
+        <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-2xs">
+          <div>
+            <h3 className="font-semibold text-slate-800 text-xs">Ghi nhận chi bổ sung đã thực hiện</h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">Chỉ ghi khi ngân hàng đã hoàn tất. Mã giao dịch phải lấy từ chứng từ; không tự tạo mã.</p>
           </div>
-          <label className="block space-y-1"><span>Đoạn căn cứ trên chứng từ</span><textarea aria-label="Căn cứ chứng từ chi" rows={2} value={quote} onChange={(event) => setQuote(event.target.value)} className="w-full rounded border border-slate-300 px-2 py-2" /></label>
-          <div className="flex justify-end"><button type="button" onClick={() => void record()} disabled={busy} className="rounded bg-slate-950 px-4 py-2 font-semibold text-white disabled:opacity-40">{busy ? "Đang ghi nhận…" : "Xác nhận khoản chi đã nhận"}</button></div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block space-y-1">
+              <span className="text-slate-600 block text-[11px] font-medium">Lệnh chi</span>
+              <select
+                aria-label="Lệnh chi"
+                value={instructionId}
+                onChange={(event) => setInstructionId(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs cursor-pointer"
+              >
+                <option value="">Chọn lệnh chi</option>
+                {activePays.map((item) => (
+                  <option key={item.id} value={item.id}>{item.id} · còn {formatVnd(item.remaining)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block space-y-1">
+              <span className="text-slate-600 block text-[11px] font-medium">Chứng từ đã tải lên</span>
+              <select
+                aria-label="Chứng từ chi bổ sung"
+                value={sourceId}
+                onChange={(event) => setSourceId(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs cursor-pointer"
+              >
+                <option value="">Chọn chứng từ</option>
+                {caseView.sources.map((item) => (
+                  <option key={item.id} value={item.id}>{item.filename ?? item.id}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block space-y-1">
+              <span className="text-slate-600 block text-[11px] font-medium">Số tiền thực chi (VND)</span>
+              <input
+                aria-label="Số tiền thực chi"
+                type="number"
+                min="1"
+                step="1"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 font-mono tabular-nums text-xs text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-slate-600 block text-[11px] font-medium">Mã giao dịch trên chứng từ</span>
+              <input
+                aria-label="Mã giao dịch chi"
+                value={reference}
+                onChange={(event) => setReference(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-slate-600 block text-[11px] font-medium">Ngày giao dịch</span>
+              <input
+                aria-label="Ngày giao dịch chi"
+                type="date"
+                value={eventAt}
+                onChange={(event) => setEventAt(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-slate-600 block text-[11px] font-medium">Trang chứng từ</span>
+              <input
+                aria-label="Trang chứng từ chi"
+                type="number"
+                min="1"
+                step="1"
+                value={page}
+                onChange={(event) => setPage(event.target.value)}
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs"
+              />
+            </label>
+          </div>
+          <label className="block space-y-1">
+            <span className="text-slate-600 block text-[11px] font-medium">Đoạn căn cứ trên chứng từ</span>
+            <textarea
+              aria-label="Căn cứ chứng từ chi"
+              rows={2}
+              value={quote}
+              onChange={(event) => setQuote(event.target.value)}
+              className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs"
+            />
+          </label>
+          <div className="flex justify-end pt-1">
+            <button
+              type="button"
+              onClick={() => void record()}
+              disabled={busy}
+              className="rounded bg-slate-950 hover:bg-slate-800 px-4 py-2 font-medium text-white text-xs disabled:opacity-40 transition-colors shadow-2xs cursor-pointer"
+            >
+              {busy ? "Đang ghi nhận…" : "Xác nhận khoản chi đã nhận"}
+            </button>
+          </div>
         </div>
       )}
       {status && <p role="status" className="rounded border border-emerald-200 bg-emerald-50 p-2.5 text-emerald-800">{status}</p>}

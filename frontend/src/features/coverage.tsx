@@ -101,60 +101,77 @@ export function Coverage({
   }
 
   return (
-    <section id="history-coverage" aria-labelledby="coverage-title" className="space-y-3 border-t border-slate-200 pt-4 text-xs">
-      <div className="flex items-start justify-between gap-3">
+    <section id="history-coverage" aria-labelledby="coverage-title" className="space-y-3.5 border-t border-slate-200 pt-5 text-xs">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="coverage-title" className="font-semibold text-slate-900">
+          <h2 id="coverage-title" className="font-semibold text-slate-900 text-xs">
             Lịch sử tiền của hồ sơ
           </h2>
-          <p className="mt-1 text-slate-500">
+          <p className="mt-0.5 text-slate-500 text-[11px]">
             Kiểm tra các khoản đã ghi nhận. Tải chứng từ không tự xác nhận công ty đã nhận hoặc chi tiền.
           </p>
         </div>
         {caseView.coverage_record && (
           <div className="text-right">
-            <span className={`rounded border px-2 py-1 text-[11px] font-medium ${
+            <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-medium ${
               caseView.coverage_current
                 ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                 : "border-amber-200 bg-amber-50 text-amber-800"
             }`}>
               {caseView.coverage_current ? "Đã đối chiếu" : "Cần đối chiếu lại"}
             </span>
-            <p className="mt-1 text-[10px] text-slate-500">
+            <p className="mt-0.5 text-[10px] text-slate-400">
               {["MANAGED_HISTORY", "DOSSIER_RECORDS"].includes(caseView.coverage_record.source) ? "Hệ thống theo dõi đến" : "Mốc kiểm tra"}: {new Date(caseView.coverage_record.as_of).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}
             </p>
           </div>
         )}
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white p-3">
-        <h3 className="font-medium text-slate-800">Giao dịch đã ghi nhận trong hồ sơ</h3>
+      <div className="space-y-2">
+        <h3 className="font-semibold text-slate-800 text-xs">Giao dịch đã ghi nhận trong hồ sơ</h3>
         {history.length === 0 ? (
-          <p className="mt-1 text-slate-500">Chưa có giao dịch nào được ghi nhận.</p>
+          <p className="py-2.5 px-3 text-slate-400 italic bg-slate-50/60 rounded border border-slate-200/60 text-xs">
+            Chưa có giao dịch nào được ghi nhận.
+          </p>
         ) : (
-          <ul className="mt-2 divide-y divide-slate-100">
-            {history.map((event) => (
-              <li key={`${event.id}:${event.external_key}`} className="flex items-center justify-between gap-3 py-2">
-                <div className="min-w-0">
-                  <p className="font-medium text-slate-800">{KIND_LABELS[event.kind] ?? "Dòng tiền khác"}</p>
-                  <p className="truncate text-[11px] text-slate-500">
-                    {event.payer} → {event.payee} · {new Date(event.event_at).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" })}
-                  </p>
-                  {event.verification_state !== "CONFIRMED" || event.allocation_state !== "ALLOCATED" ? (
-                    <p className="mt-0.5 text-[11px] text-amber-800">
-                      {eventStateLabel(event)} — cần kiểm tra chứng từ này.
-                    </p>
-                  ) : null}
-                </div>
-                <strong className="shrink-0 font-mono-nums tabular-nums text-slate-900">
-                  {formatVnd(event.amount)}
-                </strong>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-hidden rounded border border-slate-200 bg-white shadow-2xs">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600">
+                  <th className="py-2 px-3">Loại giao dịch</th>
+                  <th className="py-2 px-3">Đối tượng &amp; Ngày</th>
+                  <th className="py-2 px-3 text-right">Số tiền</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {history.map((event) => (
+                  <tr key={`${event.id}:${event.external_key}`} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="py-2 px-3 align-top">
+                      <p className="font-medium text-slate-800">{KIND_LABELS[event.kind] ?? "Dòng tiền khác"}</p>
+                      {event.verification_state !== "CONFIRMED" || event.allocation_state !== "ALLOCATED" ? (
+                        <p className="mt-0.5 text-[10px] text-amber-800 font-medium">
+                          {eventStateLabel(event)} — cần kiểm tra chứng từ này.
+                        </p>
+                      ) : null}
+                    </td>
+                    <td className="py-2 px-3 align-top">
+                      <p className="truncate text-[11px] text-slate-600">
+                        {event.payer} → {event.payee} · {new Date(event.event_at).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" })}
+                      </p>
+                    </td>
+                    <td className="py-2 px-3 align-top text-right">
+                      <strong className="font-mono tabular-nums text-slate-900 font-semibold">
+                        {formatVnd(event.amount)}
+                      </strong>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         {unallocatedEventIds.length > 0 && (
-          <p className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-amber-900">
+          <p className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
             Chứng từ đang chờ xử lý hoặc chưa gắn được giao dịch. Hệ thống vẫn hiện khoản tiền này và không coi nó là 0.
           </p>
         )}
@@ -164,22 +181,44 @@ export function Coverage({
         const canConfirm = ["MATCHED", "OVERPAY"].includes(draft.match_status)
           && draft.amount !== null && draft.event_at !== null && draft.external_key !== null
           && draft.transaction_reference !== null && draft.instrument_status === "COMPLETED";
-        return <article key={draft.draft_id} className="rounded-md border border-amber-200 bg-amber-50 p-3" data-testid="accountant-return-review">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-semibold text-amber-950">Chờ xác nhận tiền hoàn</h3>
-            <strong className="font-mono tabular-nums">{draft.amount === null ? "Chưa đọc được số tiền" : formatVnd(draft.amount)}</strong>
-          </div>
-          <p className="mt-1 text-amber-900">{draft.source_filename} · lệnh thu {draft.instruction_id} · {draft.match_status}</p>
-          <p className="mt-1 text-[11px] text-slate-600">{draft.payer_name ?? "Chưa rõ bên chuyển"} → {draft.payee_name ?? "Chưa rõ bên nhận"} · {draft.transaction_reference ?? "Chưa có mã giao dịch"}</p>
-          {draft.signals.map((signal, index) => <p key={`${signal.field}-${index}`} className="mt-1 text-[11px] text-amber-900">{signal.summary}</p>)}
-          <div className="mt-2 flex justify-end"><button type="button" onClick={() => void confirmReturn(draft)} disabled={!canConfirm || confirmingDraft !== null} className="rounded bg-slate-950 px-3 py-2 font-semibold text-white disabled:opacity-40">{confirmingDraft === draft.draft_id ? "Đang xác nhận…" : "Kế toán xác nhận đã nhận"}</button></div>
-        </article>;
+        return (
+          <article key={draft.draft_id} className="rounded border border-amber-200 bg-amber-50/60 p-3 text-xs space-y-2" data-testid="accountant-return-review">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/60 pb-1.5">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <h3 className="font-semibold text-amber-950">Chờ xác nhận tiền hoàn</h3>
+              </div>
+              <strong className="font-mono tabular-nums text-slate-900 font-semibold">{draft.amount === null ? "Chưa đọc được số tiền" : formatVnd(draft.amount)}</strong>
+            </div>
+            <p className="text-amber-900">{draft.source_filename} · lệnh thu {draft.instruction_id} · {draft.match_status}</p>
+            <p className="text-[11px] text-slate-600">{draft.payer_name ?? "Chưa rõ bên chuyển"} → {draft.payee_name ?? "Chưa rõ bên nhận"} · {draft.transaction_reference ?? "Chưa có mã giao dịch"}</p>
+            {draft.signals.map((signal, index) => <p key={`${signal.field}-${index}`} className="text-[11px] text-amber-900">{signal.summary}</p>)}
+            <div className="pt-1 flex justify-end">
+              <button
+                type="button"
+                onClick={() => void confirmReturn(draft)}
+                disabled={!canConfirm || confirmingDraft !== null}
+                className="rounded bg-slate-950 hover:bg-slate-800 px-3.5 py-1.5 font-medium text-white text-xs disabled:opacity-40 transition-colors shadow-2xs cursor-pointer"
+              >
+                {confirmingDraft === draft.draft_id ? "Đang xác nhận…" : "Kế toán xác nhận đã nhận"}
+              </button>
+            </div>
+          </article>
+        );
       })}
 
       {unaccountedReturnClaims.map((amount, index) => (
-        <p key={`${amount}:${index}`} className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-950">
-          Giấy quyết toán khai nhân viên hoàn lại {formatVnd(amount)}. Đây là số khai trên giấy, chưa phải giao dịch công ty đã nhận; hiện chưa có giao dịch hoàn đã xác minh trong hồ sơ. Chỉ ghi khoản hoàn khi có chứng từ tiền thực nhận và kế toán xác nhận. Chưa có căn cứ tiền vào thì chưa ghi khoản hoàn là đã thu.
-        </p>
+        <div key={`${amount}:${index}`} className="flex items-start gap-2.5 rounded border border-amber-300 bg-amber-50/80 p-3 text-xs text-amber-950">
+          <span className="font-semibold text-amber-700 shrink-0 mt-0.5">⚠</span>
+          <div className="space-y-1">
+            <p className="font-semibold text-amber-950">
+              Giấy quyết toán khai nhân viên hoàn lại {formatVnd(amount)}.
+            </p>
+            <p className="text-[11px] text-amber-900 leading-relaxed">
+              Đây là số khai trên giấy, chưa phải giao dịch công ty đã nhận; hiện chưa có giao dịch hoàn đã xác minh trong hồ sơ. Chỉ ghi khoản hoàn khi có chứng từ tiền thực nhận và kế toán xác nhận. Chưa có căn cứ tiền vào thì chưa ghi khoản hoàn là đã thu.
+            </p>
+          </div>
+        </div>
       ))}
 
       {notice && <p role="status" className="rounded border border-emerald-200 bg-emerald-50 p-2.5 text-emerald-800">{notice}</p>}

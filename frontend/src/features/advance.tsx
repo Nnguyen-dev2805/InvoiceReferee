@@ -226,45 +226,56 @@ export function Advance({
 
   return (
     <section aria-labelledby="advance-title" className="space-y-4 select-none text-xs">
-      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+      <div className="flex items-center justify-between pb-2 border-b border-slate-200">
         <h2 id="advance-title" className="text-xs font-semibold text-slate-900">
           Ghi nhận tạm ứng từ chứng từ
         </h2>
       </div>
 
-      <div className="space-y-3 py-1">
-        <div className="flex items-center justify-between">
-          <label className="text-slate-700 font-medium text-xs">Phương thức ứng:</label>
-          <select
-            aria-label="Phương thức ứng"
-            value={method}
-            onChange={(event) => setMethod(event.target.value as "TRANSFER" | "CASH")}
-            className="bg-white border border-slate-300 rounded px-2.5 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:border-slate-800 cursor-pointer"
+      <div className="space-y-3 pt-1">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <label htmlFor="advance-method-select" className="text-slate-700 font-medium text-xs">Phương thức ứng:</label>
+            <select
+              id="advance-method-select"
+              aria-label="Phương thức ứng"
+              value={method}
+              onChange={(event) => setMethod(event.target.value as "TRANSFER" | "CASH")}
+              className="bg-white border border-slate-300 rounded px-2.5 py-1 text-xs font-medium text-slate-800 focus:outline-none focus:border-slate-800 cursor-pointer shadow-2xs"
+            >
+              <option value="TRANSFER">Chuyển khoản ngân hàng</option>
+              <option value="CASH">Tiền mặt</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void recheck()}
+            className="rounded border border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 disabled:opacity-40 transition-colors shadow-2xs cursor-pointer"
           >
-            <option value="TRANSFER">Chuyển khoản ngân hàng</option>
-            <option value="CASH">Tiền mặt</option>
-          </select>
+            Kiểm tra lại bản nháp đã lưu
+          </button>
         </div>
 
         <div>
           <label
             htmlFor="advance-file-input"
-            className={`border border-dashed rounded p-6 text-center flex flex-col items-center justify-center transition-colors block group ${
+            className={`border border-dashed rounded-lg p-5 text-center flex flex-col items-center justify-center transition-colors block group ${
               busy
                 ? "border-slate-400 bg-slate-50/80 cursor-wait pointer-events-none"
-                : "border-slate-300 hover:border-slate-500 bg-slate-50/50 hover:bg-slate-50 cursor-pointer"
+                : "border-slate-300 hover:border-slate-500 bg-slate-50/40 hover:bg-slate-50/80 cursor-pointer"
             }`}
           >
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 transition-colors ${
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center mb-2.5 transition-colors ${
               busy ? "bg-slate-200 text-slate-800" : "bg-slate-100 text-slate-500 group-hover:text-slate-900 group-hover:bg-slate-200"
             }`}>
               {busy ? (
-                <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
               ) : (
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               )}
@@ -312,13 +323,6 @@ export function Advance({
             />
           </label>
         </div>
-      </div>
-
-      <div className="flex justify-end">
-        <button type="button" disabled={busy} onClick={() => void recheck()}
-          className="rounded border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 disabled:opacity-40">
-          Kiểm tra lại bản nháp đã lưu
-        </button>
       </div>
 
       {/* Connected Micro-Stepper & Skeleton Preview during Active Processing */}
@@ -503,14 +507,14 @@ export function Advance({
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="sm:col-span-1 space-y-1">
               <div className="flex items-center justify-between">
-                <label htmlFor="advance-amount" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
+                <label htmlFor="advance-amount" className="text-slate-600 block text-[11px] font-medium">
                   Số tiền thực nhận:
                 </label>
                 {formattedPreview && (
-                  <span className="text-[11px] font-mono tabular-nums text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                  <span className="text-[11px] font-mono tabular-nums text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                     {formattedPreview}
                   </span>
                 )}
@@ -520,12 +524,12 @@ export function Advance({
                 aria-label="Số tiền thực nhận"
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
-                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 font-mono tabular-nums font-semibold text-xs text-slate-900 transition-colors"
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 font-mono tabular-nums font-semibold text-xs text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs"
               />
             </div>
 
             <div className="sm:col-span-1 space-y-1">
-              <label htmlFor="advance-ref" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
+              <label htmlFor="advance-ref" className="text-slate-600 block text-[11px] font-medium">
                 Mã giao dịch / Số phiếu:
               </label>
               <input
@@ -533,12 +537,12 @@ export function Advance({
                 aria-label="Mã giao dịch hoặc số phiếu"
                 value={reference}
                 onChange={(event) => setReference(event.target.value)}
-                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 font-mono text-xs text-slate-900 transition-colors"
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 font-mono text-xs text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs"
               />
             </div>
 
             <div className="sm:col-span-1 space-y-1">
-              <label htmlFor="advance-payer" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
+              <label htmlFor="advance-payer" className="text-slate-600 block text-[11px] font-medium">
                 Bên chi (theo chứng từ):
               </label>
               <input
@@ -546,12 +550,12 @@ export function Advance({
                 aria-label="Bên chi theo chứng từ"
                 value={payer}
                 onChange={(event) => setPayer(event.target.value)}
-                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 text-sm font-medium text-slate-900 transition-colors"
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-sm font-medium text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs"
               />
             </div>
 
             <div className="sm:col-span-1 space-y-1">
-              <label htmlFor="advance-payee" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
+              <label htmlFor="advance-payee" className="text-slate-600 block text-[11px] font-medium">
                 Người nhận (theo chứng từ):
               </label>
               <input
@@ -559,12 +563,12 @@ export function Advance({
                 aria-label="Người nhận theo chứng từ"
                 value={payee}
                 onChange={(event) => setPayee(event.target.value)}
-                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 text-sm font-medium text-slate-900 transition-colors"
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-sm font-medium text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs"
               />
             </div>
 
             <div className="sm:col-span-2 space-y-1">
-              <label htmlFor="advance-event-at" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
+              <label htmlFor="advance-event-at" className="text-slate-600 block text-[11px] font-medium">
                 Ngày giao dịch (theo chứng từ, giữ nguyên):
               </label>
               <input
@@ -572,7 +576,7 @@ export function Advance({
                 aria-label="Ngày giao dịch theo chứng từ"
                 value={eventAt}
                 onChange={(event) => setEventAt(event.target.value)}
-                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 text-xs text-slate-900 transition-colors"
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs"
               />
               <span className="text-[11px] text-slate-400 block pt-0.5">
                 Giữ ngày trên chứng từ; thời điểm kế toán xác nhận do máy chủ ghi riêng.
@@ -580,7 +584,7 @@ export function Advance({
             </div>
 
             <div className="sm:col-span-2 space-y-1">
-              <label htmlFor="advance-status" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
+              <label htmlFor="advance-status" className="text-slate-600 block text-[11px] font-medium">
                 Trạng thái theo nguồn:
               </label>
               <select
@@ -588,7 +592,7 @@ export function Advance({
                 aria-label="Trạng thái theo nguồn"
                 value={status}
                 onChange={(event) => setStatus(event.target.value)}
-                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 text-xs text-slate-900 transition-colors cursor-pointer"
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors cursor-pointer shadow-2xs"
               >
                 {Object.entries(STATUS_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -603,7 +607,7 @@ export function Advance({
 
             {draft.missing_fields.length > 0 && draft.activity_link_status === "LINKED" && (
             <div className="sm:col-span-2 space-y-1">
-              <label htmlFor="advance-claim" className="text-slate-500 block text-[11px] font-medium uppercase tracking-wider">
+              <label htmlFor="advance-claim" className="text-slate-600 block text-[11px] font-medium">
                 Căn cứ bổ sung thông tin:
               </label>
               <input
@@ -611,7 +615,7 @@ export function Advance({
                 aria-label="Căn cứ bổ sung thông tin"
                 value={completionClaim}
                 onChange={(event) => setCompletionClaim(event.target.value)}
-                className="w-full bg-transparent border-0 border-b border-slate-200 hover:border-slate-400 focus:border-slate-900 focus:outline-none rounded-none py-1.5 px-0 text-xs text-slate-900 transition-colors"
+                className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs"
               />
             </div>
             )}

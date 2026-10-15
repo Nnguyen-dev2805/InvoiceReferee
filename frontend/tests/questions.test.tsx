@@ -96,8 +96,9 @@ describe("invoice-scoped employee-paid answer", () => {
     const view = { ...caseView, issues: [coverageIssue] };
     render(<Questions caseView={view} onCase={() => {}} currentRole="accountant" />);
 
-    expect(screen.getByText(/Dùng biểu mẫu xác nhận đã đối chiếu lịch sử tiền/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Tới xác nhận lịch sử tiền" })).toHaveAttribute("href", "#history-coverage");
+    expect(screen.getByText(/Không áp dụng giải trình bằng văn bản tự do/)).toBeInTheDocument();
+    expect(screen.getByText(/Sổ cái & Dòng tiền/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Tới xác nhận lịch sử tiền" })).toBeNull();
     expect(screen.queryByLabelText("Nội dung giải trình / xác nhận:")).toBeNull();
     expect(screen.queryByRole("button", { name: "Gửi giải trình" })).toBeNull();
   });
