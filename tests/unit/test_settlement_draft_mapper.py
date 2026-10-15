@@ -115,6 +115,48 @@ def test_unread_money_stays_null_not_zero() -> None:
     assert draft["declared_advance"] is None
 
 
+def test_draft_keeps_an_unreadable_cost_row_instead_of_dropping_it() -> None:
+    paper = _paper().model_copy(update={
+        "line_items": (
+            DocumentLine(id="r1", fields=(
+                _found("description", "Chi phí tiếp khách"), _found("amount", "2000000"),
+            )),
+            DocumentLine(id="r2", fields=(
+                _found("description", "Chi phí phòng họp"),
+                FieldCandidate(field="amount", state="UNREADABLE"),
+            )),
+        ),
+    })
+
+    draft = build_settlement_draft(_report(documents=(paper,)), sources=_sources())
+
+    assert len(draft["expenses"]) == 2
+    assert draft["expenses"][1]["amount"] is None
+    assert draft["expenses"][1]["amount_state"] == "UNREADABLE"
+
+
+def test_draft_does_not_sum_only_the_readable_subset_of_cost_rows() -> None:
+    paper = _paper().model_copy(update={
+        "fields": tuple(field for field in _paper().fields if field.field != "printed_total"),
+        "line_items": (
+            DocumentLine(id="r1", fields=(
+                _found("description", "Chi phí tiếp khách"), _found("amount", "2000000"),
+            )),
+            DocumentLine(id="r2", fields=(
+                _found("description", "Chi phí phòng họp"),
+                FieldCandidate(field="amount", state="AMBIGUOUS", alternatives=(
+                    {"value": "1000000", "refs": (_ref("1.000.000"),)},
+                    {"value": "1500000", "refs": (_ref("1.500.000"),)},
+                )),
+            )),
+        ),
+    })
+
+    draft = build_settlement_draft(_report(documents=(paper,)), sources=_sources())
+
+    assert draft["incurred_total"] is None
+
+
 def test_no_original_evidence_marks_row_not_matched() -> None:
     # A row whose invoice is absent must NOT show a matched link.
     draft = build_settlement_draft(_report(documents=(_paper(),)), sources=_sources())

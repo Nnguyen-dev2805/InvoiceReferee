@@ -3,6 +3,40 @@
 This file records observed progress, not product policy or runtime configuration.
 The plan owns task acceptance; package/config files own executable commands.
 
+## TC05 row-total validation correction — 15/10/2026
+
+Closed the previously recorded TC05 negative review with one shared source-backed
+`SETTLEMENT_FORM` rule: the sum of represented itemized expenses must equal the
+paper's printed total. Summary/subtotal rows are excluded; missing or unreadable
+cost rows/totals remain unresolved, and an absent printed-total assertion creates
+no invented relation. The same finding is shown on the employee draft and blocks
+financial admission, leaving T/E/S unknown and emitting no instruction. Invoice
+linking/allocation semantics, S formula, policy/authority and other money rules
+were not broadened.
+
+Fresh isolated LIVE run on the original TC05 PDFs: Mistral OCR `mistral-ocr-latest`
+and configured LLM `qwen/qwen3.7-flash:free`; context explicitly SIMULATED
+(advance4m plus scoped grants/coverage), gold not loaded. OCR/extraction returned
+paper rows2m+1m, printed total3.5m, advance4m/refund500k, invoice3.24m. Draft
+shows the 500k mismatch with page/quote refs; final is WAITING with one employee
+FACT, T/E/S UNKNOWN, A4m, P/R0 and no instruction. Read-only Playwright opened
+the isolated pre-submit draft DB and final DB on private ports65111/65112; both
+surfaces show the source-backed question. No provider call was made by either
+view server. Exact outputs/screenshots are under
+`.runtime/tc05-live-review-20261015/fix-run-final/`.
+
+Verification: `rtk proxy uv run pytest -q` → exit0 (781 collected); frontend
+`npm --prefix frontend test -- --run` under Node24.19.0/npm11.12.1 → 45 passed,
+2 skipped; same runtime `npm --prefix frontend run build` → exit0;
+`git diff --check` → exit0. Targeted regressions
+cover TC05, unresolved rows/totals, summary rows, TC01, TC06, TC11, VAT boundary,
+and shared-invoice allocation. Invoice-description/service validity remains a
+separate question: matching the invoice number does not resolve it. Existing
+unrelated deletions of `frontend/link-*.png` were preserved. The fresh LIVE calls
+used only the isolated runtime; no write was made to the user's DB/server. No
+commit, push or reset.
+[Implementation and evidence](reviews/2026-10-15-tc05-live-arithmetic-fix.md).
+
 ## TC05 LIVE negative review — 15/10/2026
 
 Read-only application review of original Hoangha TC05 (paper rows2m+1m but

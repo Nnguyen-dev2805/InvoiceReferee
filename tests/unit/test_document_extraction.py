@@ -18,6 +18,7 @@ from invoice_referee.domain.documents import (
     OcrSourceResult,
     OcrWord,
 )
+from invoice_referee.reconciliation.document_arithmetic import check_document_arithmetic
 from invoice_referee.evidence.extraction import extract_document
 from invoice_referee.evidence.trace import RunBudget
 from invoice_referee.evidence.xkiro import XkiroSchemaError
@@ -515,6 +516,40 @@ async def test_raw_string_lines_do_not_crash_and_yield_no_rows() -> None:
     analysis = await extract_document(_ocr(), _classification(), llm=llm, budget=RunBudget())
     assert analysis.line_items == ()
     assert any(f.field == "total_amount" for f in analysis.fields)
+
+
+async def test_empty_structured_cost_row_is_preserved_for_arithmetic_review() -> None:
+    llm = FakeLlm({"fields": [], "line_items": [{"fields": []}]})
+
+    analysis = await extract_document(
+        _ocr(), _classification("SETTLEMENT_FORM"), llm=llm, budget=RunBudget()
+    )
+
+    assert len(analysis.line_items) == 1
+    assert analysis.line_items[0].fields == ()
+
+
+async def test_unstructured_settlement_rows_are_not_silently_treated_as_absent() -> None:
+    llm = FakeLlm({
+        "fields": [{
+            "field": "printed_total", "state": "FOUND", "value": "3500000",
+            "quote": "Tổng cộng: 3.500.000", "page": 1,
+        }],
+        "line_items": ["Tiếp khách 2.000.000", "Phòng họp 1.000.000"],
+    })
+
+    analysis = await extract_document(
+        _ocr("Tổng cộng: 3.500.000\nTiếp khách 2.000.000\nPhòng họp 1.000.000"),
+        _classification("SETTLEMENT_FORM"),
+        llm=llm,
+        budget=RunBudget(),
+    )
+
+    assert len(analysis.line_items) == 2
+    assert all(line.fields == () for line in analysis.line_items)
+    assert [finding.code for finding in check_document_arithmetic(analysis)] == [
+        "settlement-line-items-unresolved"
+    ]
 
 
 async def test_row_invoice_refs_list_value_is_stored_as_tuple() -> None:

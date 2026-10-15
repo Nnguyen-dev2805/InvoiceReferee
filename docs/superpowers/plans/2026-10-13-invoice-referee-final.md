@@ -194,6 +194,17 @@ async def test_routine_issues_one_payment(app_fixture):
 - [x] Commit "feat: complete routine and human recheck workflow".
 **Gate:** Actual persisted workflow handoff, instruction≠received.
 
+**TC05 arithmetic correction follow-up — 15/10/2026:** supplemental to T5/T6,
+not a change to invoice-link or allocation semantics. Shared settlement line-sum
+↔ printed-total validation is implemented in `reconciliation/document_arithmetic.py`
+and consumed by draft/admission; summary rows are excluded, unresolved rows stay
+unknown, and the employee FACT suppresses effect/instruction. Regression includes
+TC05, unreadable/ambiguous rows and totals, TC01/TC06/TC11, no inferred VAT, and
+shared-invoice allocation. Full Python suite, frontend suite/build and isolated
+read-only Playwright draft/final views passed. See
+`docs/final/reviews/2026-10-15-tc05-live-arithmetic-fix.md` and the latest status
+checkpoint for exact LIVE mode, artifacts and limits.
+
 ### T7 — Actual money, fulfillment and supplemental portions
 
 **Files:** src/invoice_referee/workflow/money.py,service.py,schema.sql; src/invoice_referee/domain/commands.py,finance.py,case.py; frontend/src/features/execution.tsx; tests/integration/test_money_execution.py; frontend/e2e/execution.spec.ts. Tất cả sibling Python paths nằm trong thư mục ghi đầu mỗi group.

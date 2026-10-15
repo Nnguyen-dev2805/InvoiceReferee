@@ -239,9 +239,11 @@ export async function confirmCoverage(
 }
 
 export interface SettlementExpenseItem {
-  description: string;
+  description: string | null;
   invoice_no?: string;
-  amount: number;
+  amount: number | null;
+  amount_state?: string;
+  description_state?: string;
   source_filename?: string;
   status?: string;
   matched_invoice?: string;
@@ -286,6 +288,7 @@ export interface SettlementDraftResponse {
   occurred_at: string | null;
   declared_purpose: string | null;
   incurred_total: number | null;
+  incurred_total_basis?: "PRINTED_TOTAL" | "ROW_SUM" | null;
   declared_advance: number | null;
   expenses: SettlementExpenseItem[];
   warnings: string[];
@@ -301,7 +304,12 @@ export interface SettlementArithmeticFinding {
   code: string;
   basis: string;
   question: string;
-  refs: unknown[];
+  refs: Array<{
+    source_id: string;
+    source_sha256: string;
+    page: number | null;
+    exact_quote: string;
+  }>;
 }
 
 export async function settlementDraft(

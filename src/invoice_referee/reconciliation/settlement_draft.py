@@ -20,7 +20,10 @@ from typing import Any
 from invoice_referee.domain.common import parse_vnd
 from invoice_referee.domain.documents import DocumentAnalysis, FieldCandidate
 from invoice_referee.domain.evidence import ReadResult, SourceRef
-from invoice_referee.reconciliation.document_arithmetic import check_document_arithmetic
+from invoice_referee.reconciliation.document_arithmetic import (
+    check_document_arithmetic,
+    is_settlement_summary_row,
+)
 
 # The settlement-form fields the review screen surfaces.
 _SURFACED_FIELDS = (
@@ -48,19 +51,28 @@ def _found(document: DocumentAnalysis, name: str) -> Any:
     return None
 
 
-def _line_field(line, name: str) -> Any:
+def _line_candidate(line, name: str) -> FieldCandidate | None:
     for candidate in line.fields:
-        if candidate.field == name and candidate.state == "FOUND":
-            return candidate.value
+        if candidate.field == name:
+            return candidate
     return None
+
+
+def _line_field(line, name: str) -> Any:
+    candidate = _line_candidate(line, name)
+    return candidate.value if candidate is not None and candidate.state == "FOUND" else None
 
 
 def _refs(line) -> list[dict[str, object]]:
     out: list[dict[str, object]] = []
     for candidate in line.fields:
-        if candidate.state == "FOUND":
-            for ref in candidate.refs:
-                out.append(ref.model_dump(mode="json"))
+        refs = list(candidate.refs)
+        for alternative in candidate.alternatives:
+            refs.extend(alternative.refs)
+        for ref in refs:
+            out.append(ref.model_dump(mode="json"))
+    for ref in line.refs:
+        out.append(ref.model_dump(mode="json"))
     return out
 
 
@@ -119,12 +131,21 @@ def build_settlement_draft(
     expenses: list[dict[str, object]] = []
     if paper is not None:
         for index, line in enumerate(paper.line_items, start=1):
-            amount = parse_vnd(_line_field(line, "amount"))
+            amount_candidate = _line_candidate(line, "amount")
+            description_candidate = _line_candidate(line, "description")
+            amount = (
+                parse_vnd(amount_candidate.value)
+                if amount_candidate is not None and amount_candidate.state == "FOUND"
+                else None
+            )
             refs_value = _line_field(line, "invoice_refs") or ()
             if isinstance(refs_value, str):
                 refs_value = (refs_value,)
             invoice_no = str(refs_value[0]) if refs_value else None
-            description = str(_line_field(line, "description") or "")
+            description_value = _line_field(line, "description")
+            description = str(description_value) if description_value is not None else None
+            if description is not None and is_settlement_summary_row(description):
+                continue
             # A row is matched only when a real link ties an invoice document to
             # it (by invoice number); never a guessed file.
             matched_filename = None
@@ -142,15 +163,23 @@ def build_settlement_draft(
                         if suggest_id is not None:
                             suggested_filename = names.get(suggest_id)
                         break
-            if amount is None:
-                continue
             expenses.append({
                 "description": description,
                 "invoice_no": invoice_no,
                 "amount": amount,
+                "amount_state": (
+                    amount_candidate.state if amount_candidate is not None
+                    else "NOT_PRESENT"
+                ),
+                "description_state": (
+                    description_candidate.state if description_candidate is not None
+                    else "NOT_PRESENT"
+                ),
                 "source_filename": names.get(paper.source_id),
-                "status": "CLEAR" if matched_filename is not None else (
+                "status": "UNRESOLVED" if amount is None or description is None else (
+                    "CLEAR" if matched_filename is not None else (
                     "SUGGESTED" if suggested_filename is not None else "UNMATCHED"
+                    )
                 ),
                 "matched_invoice": matched_filename,
                 "suggested_invoice": suggested_filename,
@@ -158,8 +187,14 @@ def build_settlement_draft(
             })
 
     incurred_total = printed_total
-    if incurred_total is None and expenses:
-        incurred_total = sum(int(e["amount"]) for e in expenses)  # type: ignore[arg-type]
+    incurred_total_basis = "PRINTED_TOTAL" if printed_total is not None else None
+    if (
+        incurred_total is None
+        and expenses
+        and all(isinstance(expense["amount"], int) for expense in expenses)
+    ):
+        incurred_total = sum(int(expense["amount"]) for expense in expenses)
+        incurred_total_basis = "ROW_SUM"
 
     invoices: list[dict[str, object]] = []
     for document in report.documents:
@@ -178,6 +213,9 @@ def build_settlement_draft(
         warnings.append("Chưa đọc được số tiền tạm ứng trên giấy; nhân viên vui lòng kiểm tra.")
     if printed_total is None and not expenses:
         warnings.append("Chưa đọc được tổng chi phí; nhân viên vui lòng kiểm tra.")
+    if printed_total is None and expenses and any(expense["amount"] is None for expense in expenses):
+        incurred_total = None
+        incurred_total_basis = None
     # Document-internal arithmetic (TC06/TC11): the SAME findings the reconciler
     # turns into blocking FACTs are surfaced here, so the employee sees the
     # contradiction on the review screen — not a silent "looks fine" draft.
@@ -211,6 +249,7 @@ def build_settlement_draft(
         "occurred_at": None,
         "declared_purpose": purpose,
         "incurred_total": incurred_total,
+        "incurred_total_basis": incurred_total_basis,
         "declared_advance": declared_advance,
         "expenses": expenses,
         "invoices": invoices,

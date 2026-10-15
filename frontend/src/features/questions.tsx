@@ -154,6 +154,17 @@ export function QuestionCard({
         </div>
       )}
 
+      {(issue.refs ?? []).length > 0 && (
+        <ul aria-label="Trích dẫn nguồn cho căn cứ" className="space-y-1 pl-3 text-[11px] text-slate-500">
+          {issue.refs?.map((ref, index) => {
+            const filename = caseView.sources.find((source) => source.id === ref.source_id)?.filename ?? ref.source_id;
+            return <li key={`${ref.source_id}:${ref.page}:${index}`}>
+              {filename} · trang {ref.page ?? "?"}: <q>{ref.exact_quote}</q>
+            </li>;
+          })}
+        </ul>
+      )}
+
       {historyCoverageIssue ? (
         <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3">
           <p className="text-xs text-amber-950">

@@ -26,6 +26,7 @@ from invoice_referee.domain.documents import (
     EvidenceMatchingResult,
     FieldCandidate,
 )
+from invoice_referee.reconciliation.document_arithmetic import is_settlement_summary_row
 
 ORIGINAL_EXPENSE_DOCUMENT_TYPES = frozenset(
     {"E_INVOICE", "PAPER_RECEIPT", "TRANSPORT_TICKET", "HOTEL_RECEIPT", "COLLECTION_RECEIPT"}
@@ -163,6 +164,8 @@ def match_paper_evidence(
     for position, row in enumerate(paper.line_items, start=1):
         item_id = f"ITEM-{position:03d}"
         description = _line_description(row)
+        if is_settlement_summary_row(description):
+            continue
         amount = _as_decimal(_line_field(row, "amount"))
         reason = _line_field(row, "no_evidence_reason")
         refs_value = _line_field(row, "invoice_refs")

@@ -79,6 +79,52 @@ def _tc11_paper() -> DocumentAnalysis:
     )
 
 
+def _tc05_paper() -> DocumentAnalysis:
+    def sourced(field: str, value: object, quote: str) -> FieldCandidate:
+        return FieldCandidate(
+            field=field, state="FOUND", value=value,
+            refs=(EvidenceRef(source_id="s1", source_sha256=SHA, page=1, exact_quote=quote),),
+        )
+
+    return DocumentAnalysis(
+        source_id="s1", document_id="s1:1-1:SETTLEMENT_FORM", document_type="SETTLEMENT_FORM",
+        roles=("SETTLEMENT_DECLARATION",), page_range=(1, 1),
+        fields=(
+            sourced("declared_name", "NGUYỄN MINH AN", "NGUYỄN MINH AN"),
+            sourced("declared_advance", "4000000", "Ứng kê khai: 4.000.000 đ"),
+            sourced("printed_total", "3500000", "Tổng cộng: 3.500.000 đ"),
+            sourced("printed_return", "500000", "Hoàn kê khai: 500.000 đ"),
+        ),
+        line_items=(
+            DocumentLine(id="r1", fields=(
+                sourced("description", "Chi phí tiếp khách", "Tiếp khách"),
+                sourced("amount", "2000000", "2.000.000 đ"),
+                sourced("invoice_refs", ("00000501",), "Hóa đơn 00000501"),
+            )),
+            DocumentLine(id="r2", fields=(
+                sourced("description", "Chi phí phòng họp", "Phòng họp"),
+                sourced("amount", "1000000", "1.000.000 đ"),
+                sourced("invoice_refs", ("00000501",), "Hóa đơn 00000501"),
+            )),
+        ),
+        confidence_status="ASSESSED", profile_status="CLEAR",
+    )
+
+
+def _tc05_invoice() -> DocumentAnalysis:
+    return DocumentAnalysis(
+        source_id="s2", document_id="s2:1-1:E_INVOICE", document_type="E_INVOICE",
+        roles=("ORIGINAL_EXPENSE_EVIDENCE",), page_range=(1, 1),
+        fields=(
+            _found("document_number", "00000501"), _found("issuer_name", "MINH PHÁT"),
+            _found("buyer_name", COMPANY), _found("subtotal", "3000000"),
+            _found("tax", "240000"), _found("total_amount", "3240000"),
+            _found("document_date", "10/10/2026"),
+        ),
+        confidence_status="ASSESSED", profile_status="CLEAR",
+    )
+
+
 def _tc11_invoice() -> DocumentAnalysis:
     # subtotal 5m + tax 400k = 5.4m, but the printed total is 5.5m (off by 100k).
     return DocumentAnalysis(
@@ -168,6 +214,66 @@ def test_tc01_consistent_invoice_has_no_arithmetic_fact() -> None:
     assert result.allowed_effect is not None
     assert result.allowed_effect.direction == "COLLECT"
     assert result.allowed_effect.amount == 760_000
+
+
+def test_tc05_row_total_contradiction_is_employee_fact_and_cost_stays_unknown() -> None:
+    inp = _admit(_report(_tc05_paper(), _tc05_invoice()), advance=4_000_000)
+
+    result = Reconciler().assess(inp)
+    facts = [issue for issue in result.issues if issue.field_or_rule == "expense:arithmetic:line_total"]
+
+    assert len(facts) == 1
+    assert facts[0].kind == "FACT" and facts[0].owner == "employee"
+    assert "3.000.000" in facts[0].basis and "3.500.000" in facts[0].basis and "500.000" in facts[0].basis
+    assert "3.000.000" in facts[0].question and "3.500.000" in facts[0].question
+    assert {ref.exact_quote for ref in facts[0].refs} >= {
+        "Tổng cộng: 3.500.000 đ", "Tiếp khách", "2.000.000 đ", "Phòng họp", "1.000.000 đ",
+    }
+    assert inp.expense_set_complete is False
+    assert all(expense.incurred.state == "UNKNOWN" for expense in inp.expense_facts)
+    assert not any(expense.payments for expense in inp.expense_facts)
+    assert result.projection.T.state == "UNKNOWN"
+    assert result.projection.E.state == "UNKNOWN"
+    assert result.allowed_effect is None
+    assert not any(issue.field_or_rule == "expense:T" for issue in result.issues)
+    assert not any(issue.field_or_rule == "expense:payer" for issue in result.issues)
+
+
+def test_summary_row_is_not_admitted_or_counted_as_a_second_cost() -> None:
+    paper = _tc05_paper().model_copy(update={
+        "fields": (
+            _found("declared_name", "NGUYỄN MINH AN"),
+            _found("declared_advance", "4000000"),
+            _found("printed_total", "3000000"),
+            _found("printed_return", "1000000"),
+        ),
+        "line_items": _tc05_paper().line_items + (DocumentLine(id="sum", fields=(
+            _found("description", "Tổng cộng"), _found("amount", "3000000"),
+        )),),
+    })
+    inp = _admit(_report(paper, _tc05_invoice()), advance=4_000_000)
+
+    result = Reconciler().assess(inp)
+
+    assert len(inp.expense_facts) == 2
+    assert not any(issue.field_or_rule.endswith(":missing_evidence") for issue in inp.admission_issues)
+    assert not any(issue.field_or_rule == "expense:arithmetic:line_total" for issue in result.issues)
+    assert result.allowed_effect is not None and result.allowed_effect.amount == 1_000_000
+
+
+async def test_tc05_workflow_commit_keeps_issue_and_emits_no_instruction(tmp_path: Path) -> None:
+    wf, root = await _seed_workflow(tmp_path, _report(_tc05_paper(), _tc05_invoice()))
+    with wf.db.transaction() as cx:
+        row = cx.execute("SELECT * FROM cases WHERE id = ?", (root,)).fetchone()
+        view = wf._case_view(cx, row)
+    assert view.state == "WAITING"
+    assert view.instructions == ()
+    assert view.actual_money.T.state == "UNKNOWN"
+    assert view.actual_money.E.state == "UNKNOWN"
+    assert any(
+        issue.kind == "FACT" and issue.field_or_rule == "expense:arithmetic:line_total"
+        for issue in view.issues
+    )
 
 
 # --- workflow commit boundary -----------------------------------------------

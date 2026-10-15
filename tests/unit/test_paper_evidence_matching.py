@@ -205,6 +205,21 @@ def test_explicit_allocation_allows_second_row_when_bounded() -> None:
     assert all(link.status == "AUTO_LINK" for link in result.links)
 
 
+def test_summary_total_row_is_not_matched_as_a_third_cost() -> None:
+    paper = _paper(rows=(
+        ("Chi phí tiếp khách", "1500000", ("HQ1",), None),
+        ("Chi phí phòng họp", "1500000", ("HQ1",), None),
+        ("Tổng cộng", "3000000", ("HQ1",), None),
+    ))
+    docs = (_invoice("DOC-1", number="HQ1", total="3000000"),)
+
+    result = match_paper_evidence(paper, docs)
+
+    assert [row.item_id for row in result.rows] == ["ITEM-001", "ITEM-002"]
+    assert len(result.links) == 2
+    assert all(link.status == "AUTO_LINK" for link in result.links)
+
+
 def test_overallocation_keeps_reuse_unresolved() -> None:
     paper = _paper(
         rows=(

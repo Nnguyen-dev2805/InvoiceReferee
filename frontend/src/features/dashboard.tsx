@@ -360,15 +360,36 @@ export function Dashboard({
                     ? "Hồ sơ quyết toán công tác"
                     : parsed.activity.trim();
 
-                // Status tag with subtle status dot
+                // Status tag with semantic status dot and background/border colors
                 let statusBadge = (
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium text-slate-600 bg-slate-100">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200/80">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
                     Đang đối soát
                   </span>
                 );
 
-                if (isEmployee) {
+                if (c.state === "SETTLED") {
+                  statusBadge = (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0"></span>
+                      {isAccountant ? "Đã cân bằng xong" : isApprover ? "Đã phê duyệt xong" : "Đã quyết toán xong"}
+                    </span>
+                  );
+                } else if (c.state === "STOPPED") {
+                  statusBadge = (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200/80">
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0"></span>
+                      Tạm dừng xử lý
+                    </span>
+                  );
+                } else if (c.state === "DRAFT") {
+                  statusBadge = (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span>
+                      Bản nháp
+                    </span>
+                  );
+                } else if (isEmployee) {
                   const myIssues = c.issues.filter(
                     (i) => i.owner === "employee" || i.owner.startsWith("employee:"),
                   );
@@ -381,23 +402,9 @@ export function Dashboard({
                     );
                   } else if (c.state === "READY_TO_EXECUTE") {
                     statusBadge = (
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/80">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0"></span>
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-800 border border-indigo-200/80">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0"></span>
                         Chờ sếp phê duyệt
-                      </span>
-                    );
-                  } else if (c.state === "SETTLED") {
-                    statusBadge = (
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0"></span>
-                        Đã quyết toán xong
-                      </span>
-                    );
-                  } else if (c.state === "STOPPED") {
-                    statusBadge = (
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200/80">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0"></span>
-                        Tạm dừng xử lý
                       </span>
                     );
                   }
@@ -414,16 +421,9 @@ export function Dashboard({
                     );
                   } else if (c.state === "READY_TO_EXECUTE") {
                     statusBadge = (
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/80">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0"></span>
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-800 border border-indigo-200/80">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0"></span>
                         Sẵn sàng duyệt
-                      </span>
-                    );
-                  } else if (c.state === "SETTLED") {
-                    statusBadge = (
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0"></span>
-                        Đã phê duyệt xong
                       </span>
                     );
                   }
@@ -435,25 +435,18 @@ export function Dashboard({
                         Chờ ghi nhận tạm ứng (A)
                       </span>
                     );
-                  } else if (sVal !== null && sVal > 0 && c.state !== "SETTLED") {
+                  } else if (sVal !== null && sVal > 0) {
                     statusBadge = (
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/80">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0"></span>
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-teal-50 text-teal-800 border border-teal-200/80">
+                        <span className="w-1.5 h-1.5 rounded-full bg-teal-600 shrink-0"></span>
                         Cần chi trả ({formatVnd(sVal)})
                       </span>
                     );
-                  } else if (sVal !== null && sVal < 0 && c.state !== "SETTLED") {
+                  } else if (sVal !== null && sVal < 0) {
                     statusBadge = (
                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200/80">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0"></span>
                         Cần thu hồi ({formatVnd(Math.abs(sVal))})
-                      </span>
-                    );
-                  } else if (c.state === "SETTLED") {
-                    statusBadge = (
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0"></span>
-                        Đã cân bằng xong
                       </span>
                     );
                   }

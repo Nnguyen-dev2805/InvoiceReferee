@@ -101,4 +101,31 @@ describe("invoice-scoped employee-paid answer", () => {
     expect(screen.queryByLabelText("Nội dung giải trình / xác nhận:")).toBeNull();
     expect(screen.queryByRole("button", { name: "Gửi giải trình" })).toBeNull();
   });
+
+  it("shows the exact source quotations attached to a blocking arithmetic FACT", () => {
+    const rowTotalIssue = {
+      ...issue,
+      id: "issue:fact:arithmetic:row-total",
+      field_or_rule: "expense:arithmetic:line_total",
+      basis: "Dòng tiếp khách và phòng họp cộng 3.000.000 đ, tổng in 3.500.000 đ.",
+      question: "Hai khoản chi cộng thành 3.000.000 đ, nhưng tổng trên giấy là 3.500.000 đ. Vui lòng làm rõ.",
+      refs: [{
+        source_id: "source:report", source_sha256: "a".repeat(64), page: 1,
+        exact_quote: "Tiếp khách 2.000.000 đ",
+      }],
+    };
+    const view = {
+      ...caseView,
+      sources: [{
+        id: "source:report", digest: "a".repeat(64), tenant: "tenant:demo" as const,
+        media: "PDF" as const, storage_key: "k/report", filename: "report_hoan_ung.pdf",
+      }],
+      issues: [rowTotalIssue],
+    };
+
+    render(<Questions caseView={view} onCase={() => {}} currentRole="employee" />);
+
+    expect(screen.getByLabelText("Trích dẫn nguồn cho căn cứ")).toHaveTextContent(/report_hoan_ung\.pdf.*trang 1/);
+    expect(screen.getByText("Tiếp khách 2.000.000 đ")).toBeInTheDocument();
+  });
 });

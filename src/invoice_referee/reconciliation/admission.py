@@ -39,7 +39,10 @@ from invoice_referee.domain.finance import (
 )
 from invoice_referee.domain.issues import BusinessIssue, ProcessingProblem
 from invoice_referee.domain.organization import OrganizationContext
-from invoice_referee.reconciliation.document_arithmetic import check_document_arithmetic
+from invoice_referee.reconciliation.document_arithmetic import (
+    check_document_arithmetic,
+    is_settlement_summary_row,
+)
 from invoice_referee.workflow.context_records import (
     context_budgets,
     context_category_policies,
@@ -232,6 +235,8 @@ def _match_expense_documents(
     if rows:
         for line in paper.line_items if paper is not None else ():
             description = str(_line_field(line, "description") or "")
+            if is_settlement_summary_row(description):
+                continue
             amount = _as_decimal(_line_field(line, "amount"))
             reason_value = _line_field(line, "no_evidence_reason")
             reason = str(reason_value) if reason_value is not None else None
@@ -819,13 +824,20 @@ def admit_evidence(
     if binding_issue is not None:
         issues.append(binding_issue)
 
-    # Document-internal arithmetic (TC06/TC11): a readable number is not a
-    # consistent number. The paper's own advance−cost=refund relation and the
-    # invoice's subtotal+tax=total relation are checked in code; a contradiction
-    # becomes a blocking FACT so no affirmative financial effect is issued while
-    # it is open. The source numbers are preserved (never silently rewritten).
+    # Document-internal arithmetic is shared with the employee draft. A paper
+    # row-total contradiction makes each amount from that disputed table
+    # unresolved, not just blocked at the final instruction boundary.
+    arithmetic_by_document = {
+        document.document_id: check_document_arithmetic(document)
+        for document in report.documents
+    }
+    line_total_unresolved = any(
+        finding.field_or_rule == "expense:arithmetic:line_total"
+        for findings in arithmetic_by_document.values()
+        for finding in findings
+    )
     for document in report.documents:
-        for finding in check_document_arithmetic(document):
+        for finding in arithmetic_by_document[document.document_id]:
             issues.append(
                 BusinessIssue(
                     id=f"issue:fact:arithmetic:{document.document_id}:{finding.code}",
@@ -882,7 +894,7 @@ def admit_evidence(
         expense_id = f"expense:{index}"
         # A cost whose source over-allocates is in dispute (TC08): its amount is
         # not a verified fact and must not become eligible/employee-paid money.
-        disputed = (
+        disputed = line_total_unresolved or (
             entry.document is not None
             and entry.document.document_id in disputed_documents
         )
@@ -977,7 +989,7 @@ def admit_evidence(
             )
             eligibility = "ELIGIBLE"
             payment_state = "PAID"
-        elif claim is not None and bound_ok:
+        elif not disputed and claim is not None and bound_ok:
             claim_amount = int(_as_decimal(claim.value) or 0)
             payments.append(
                 ExpensePayment(
@@ -994,7 +1006,7 @@ def admit_evidence(
             )
             eligibility = "ELIGIBLE"
             payment_state = "PAID"
-        elif claim is not None:
+        elif not disputed and claim is not None:
             # The declaration is not usable as a bounded E (the total exceeds a
             # limit, or S is unknown); keep the cost as a FACT to resolve, never
             # a silent E=0 or an out-of-bound E.
@@ -1042,7 +1054,7 @@ def admit_evidence(
 
     # completeness: every material source is resolved and at least one expense
     # is admitted; an empty/unknown-only report is NOT complete.
-    expense_set_complete = bool(expenses) and not material_unresolved
+    expense_set_complete = bool(expenses) and not material_unresolved and not line_total_unresolved
 
     return AssessmentInput(
         scope=scope,

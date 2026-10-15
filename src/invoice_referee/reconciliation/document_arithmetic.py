@@ -25,9 +25,11 @@ forced to reconcile).
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
+import unicodedata
 
 from invoice_referee.domain.common import EvidenceRef, parse_vnd
-from invoice_referee.domain.documents import DocumentAnalysis, FieldCandidate
+from invoice_referee.domain.documents import DocumentAnalysis, DocumentLine, FieldCandidate
 
 # Invoice-like documents carry the subtotal + tax (+ service charge − discount) =
 # total relationship. A ticket/receipt is not forced to carry VAT fields.
@@ -35,6 +37,10 @@ _INVOICE_TYPES = frozenset({"E_INVOICE"})
 # A money component whose value the total depends on. UNREADABLE/AMBIGUOUS here
 # means the total cannot be verified.
 _MATERIAL_INVOICE_COMPONENTS = ("tax", "discount", "service_charge")
+_SUMMARY_LINE_PREFIXES = (
+    "tong cong", "tong chi phi", "tong so tien", "tong thanh toan", "tong tien",
+    "cong tien", "cong chi phi", "subtotal", "sub total", "grand total", "total",
+)
 
 
 @dataclass(frozen=True)
@@ -76,9 +82,48 @@ def _refs(document: DocumentAnalysis, *names: str) -> tuple[EvidenceRef, ...]:
     return tuple(out)
 
 
+def _line_field(line: DocumentLine, name: str) -> FieldCandidate | None:
+    return next((candidate for candidate in line.fields if candidate.field == name), None)
+
+
+def _candidate_refs(candidate: FieldCandidate | None) -> list[EvidenceRef]:
+    if candidate is None:
+        return []
+    refs = list(candidate.refs)
+    for alternative in candidate.alternatives:
+        refs.extend(alternative.refs)
+    return refs
+
+
+def _unique_refs(refs: list[EvidenceRef]) -> tuple[EvidenceRef, ...]:
+    seen: set[tuple[str, str, int, str]] = set()
+    out: list[EvidenceRef] = []
+    for ref in refs:
+        key = (str(ref.source_id), ref.source_sha256, ref.page, ref.exact_quote)
+        if key not in seen:
+            seen.add(key)
+            out.append(ref)
+    return tuple(out)
+
+
+def _row_label(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value.casefold())
+    ascii_text = "".join(char for char in normalized if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]+", " ", ascii_text).strip()
+
+
+def is_settlement_summary_row(description: str) -> bool:
+    label = _row_label(description)
+    return any(label == prefix or label.startswith(prefix + " ") for prefix in _SUMMARY_LINE_PREFIXES)
+
+
 def _vnd(amount: int) -> str:
     """A plain integer VND for a question/basis (no locale separator)."""
     return str(int(amount))
+
+
+def _pretty_vnd(amount: int) -> str:
+    return f"{int(amount):,}".replace(",", ".")
 
 
 def check_document_arithmetic(document: DocumentAnalysis) -> tuple[ArithmeticFinding, ...]:
@@ -86,6 +131,7 @@ def check_document_arithmetic(document: DocumentAnalysis) -> tuple[ArithmeticFin
     findings: list[ArithmeticFinding] = []
     if document.document_type == "SETTLEMENT_FORM":
         findings.extend(_check_settlement_form(document))
+        findings.extend(_check_settlement_line_total(document))
     if document.document_type in _INVOICE_TYPES:
         findings.extend(_check_invoice(document))
     return tuple(findings)
@@ -140,6 +186,96 @@ def _check_settlement_form(document: DocumentAnalysis) -> list[ArithmeticFinding
             refs=_refs(document, "declared_advance", "printed_total", "printed_reimbursement"),
         ))
     return findings
+
+
+def _check_settlement_line_total(document: DocumentAnalysis) -> list[ArithmeticFinding]:
+    """Compare source-backed cost rows with the paper total; never sum partial rows."""
+    if not document.line_items:
+        return []
+
+    total_field = _field(document, "printed_total")
+    total = _found(document, "printed_total")
+    refs = _candidate_refs(total_field)
+    cost_rows: list[tuple[str, int]] = []
+    unresolved: list[str] = []
+
+    for index, line in enumerate(document.line_items, start=1):
+        description_field = _line_field(line, "description")
+        amount_field = _line_field(line, "amount")
+        refs.extend(line.refs)
+        refs.extend(_candidate_refs(description_field))
+        refs.extend(_candidate_refs(amount_field))
+
+        if description_field is None or description_field.state != "FOUND":
+            state = description_field.state if description_field is not None else "NOT_PRESENT"
+            unresolved.append(f"dòng {index} (nội dung {state})")
+            continue
+        if not isinstance(description_field.value, str):
+            unresolved.append(f"dòng {index} (nội dung không phải văn bản)")
+            continue
+        description = description_field.value.strip()
+        if not description:
+            unresolved.append(f"dòng {index} (thiếu nội dung)")
+            continue
+        if is_settlement_summary_row(description):
+            continue
+
+        if amount_field is None or amount_field.state != "FOUND":
+            state = amount_field.state if amount_field is not None else "NOT_PRESENT"
+            unresolved.append(f"'{description}' (số tiền {state})")
+            continue
+        amount = parse_vnd(amount_field.value)
+        if amount is None:
+            unresolved.append(f"'{description}' (không đọc được số tiền VND)")
+            continue
+        cost_rows.append((description, amount))
+
+    row_refs = _unique_refs(refs)
+    total_state = total_field.state if total_field is not None else "NOT_PRESENT"
+    if total is None and total_state in ("NOT_PRESENT", "NOT_APPLICABLE") and not unresolved:
+        # The paper makes no aggregate-total assertion to reconcile. Its sourced
+        # cost rows can still be assessed against original expense documents.
+        return []
+    if unresolved or not cost_rows or total is None:
+        reasons = unresolved[:]
+        if not cost_rows and not reasons:
+            reasons.append("không nhận diện được dòng chi phí nào ngoài dòng tổng/phụ")
+        if total is None and total_state not in ("NOT_PRESENT", "NOT_APPLICABLE"):
+            reasons.append(f"tổng trên giấy {total_state}")
+        details = "; ".join(reasons)
+        return [ArithmeticFinding(
+            code="settlement-line-items-unresolved",
+            field_or_rule="expense:arithmetic:line_total",
+            basis=(
+                "Không thể đối chiếu tổng dòng chi phí vì thiếu hoặc chưa đọc rõ "
+                f"{details}; không được bỏ dòng hay coi là 0."
+            ),
+            question=(
+                "Vui lòng làm rõ nội dung/số tiền của các dòng chưa đọc rõ và tổng trên giấy, "
+                "hoặc cung cấp giấy quyết toán đã sửa."
+            ),
+            refs=row_refs or document.refs,
+        )]
+
+    row_total = sum(amount for _, amount in cost_rows)
+    if row_total == total:
+        return []
+
+    difference = abs(row_total - total)
+    row_basis = " + ".join(f"{description} {_pretty_vnd(amount)} đ" for description, amount in cost_rows)
+    return [ArithmeticFinding(
+        code="settlement-line-total",
+        field_or_rule="expense:arithmetic:line_total",
+        basis=(
+            f"Tổng dòng chi phí ({row_basis}) là {_pretty_vnd(row_total)} đ, nhưng "
+            f"tổng in trên giấy là {_pretty_vnd(total)} đ (lệch {_pretty_vnd(difference)} đ)."
+        ),
+        question=(
+            f"Hai khoản chi cộng thành {_pretty_vnd(row_total)} đ, nhưng tổng trên giấy là "
+            f"{_pretty_vnd(total)} đ. Vui lòng làm rõ khoản thiếu hoặc cung cấp giấy quyết toán đã sửa."
+        ),
+        refs=row_refs or document.refs,
+    )]
 
 
 def _check_invoice(document: DocumentAnalysis) -> list[ArithmeticFinding]:

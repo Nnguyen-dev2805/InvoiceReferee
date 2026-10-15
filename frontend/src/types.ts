@@ -25,6 +25,13 @@ export interface SourceView {
   filename: string | null;
 }
 
+export interface EvidenceRefView {
+  source_id: string;
+  source_sha256: string;
+  page: number | null;
+  exact_quote: string;
+}
+
 export interface IssueView {
   id: string;
   kind: "FACT" | "POLICY" | "AUTHORITY";
@@ -33,6 +40,7 @@ export interface IssueView {
   status: string;
   basis: string;
   question: string;
+  refs?: EvidenceRefView[];
 }
 
 export interface InstructionView {

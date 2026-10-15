@@ -61,7 +61,49 @@ describe("Intake draft (W5)", () => {
     const body = document.body.textContent ?? "";
     expect(body).not.toContain("Công tác Hà Nội");
     expect(screen.getByText("Ứng nhân viên kê khai:")).toBeInTheDocument();
-    expect(screen.getByText("Tổng chi phí kê khai:")).toBeInTheDocument();
+    expect(screen.getByText("Tổng trên giấy (chưa xác minh):")).toBeInTheDocument();
+  });
+
+  it("shows the sourced row-total contradiction and labels the printed total as unresolved", async () => {
+    const basis = "Hai dòng chi 2000000 + 1000000 = 3000000 VND, nhưng tổng in trên giấy là 3500000 VND (lệch 500000 VND).";
+    const question = "Hai khoản chi cộng thành 3.000.000 đ, nhưng tổng trên giấy là 3.500.000 đ. Vui lòng làm rõ khoản thiếu hoặc cung cấp giấy quyết toán đã sửa.";
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/cases")) return new Response(JSON.stringify({ case_view: caseView(1, 0) }), { status: 200 });
+      if (url.endsWith("/sources")) return new Response(JSON.stringify({ case_view: caseView(2, 2) }), { status: 200 });
+      if (url.endsWith("/settlement/draft")) return new Response(JSON.stringify({
+        declared_name: "NGUYỄN MINH AN", destination: null, activity_name: null,
+        trip_start: null, trip_end: null, occurred_at: null,
+        declared_purpose: "Chi phí tiếp khách phục vụ dự án",
+        incurred_total: 3500000, declared_advance: 4000000,
+        expenses: [
+          { description: "Chi phí tiếp khách", invoice_no: "00000501", amount: 2000000 },
+          { description: "Chi phí phòng họp", invoice_no: "00000501", amount: 1000000 },
+        ],
+        warnings: [basis],
+        arithmetic_findings: [{
+          code: "settlement-line-total", basis, question,
+          refs: [
+            { source_id: "source:0", source_sha256: "a".repeat(64), page: 1, exact_quote: "Tổng cộng: 3.500.000 đ" },
+            { source_id: "source:0", source_sha256: "a".repeat(64), page: 1, exact_quote: "Tiếp khách 2.000.000 đ" },
+            { source_id: "source:0", source_sha256: "a".repeat(64), page: 1, exact_quote: "Phòng họp 1.000.000 đ" },
+          ],
+        }],
+        invoices: [],
+      }), { status: 200 });
+      return new Response("{}", { status: 200 });
+    }));
+    render(<Intake session={SESSION} onCase={() => {}} />);
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
+    await user.click(screen.getByRole("button", { name: "Đọc chứng từ" }));
+
+    expect(await screen.findByText(question)).toBeInTheDocument();
+    expect(screen.getByText("Tổng cộng: 3.500.000 đ")).toBeInTheDocument();
+    expect(screen.getByText("Tiếp khách 2.000.000 đ")).toBeInTheDocument();
+    expect(screen.getByText("Phòng họp 1.000.000 đ")).toBeInTheDocument();
+    expect(screen.getByText("Tổng trên giấy (chưa xác minh):")).toBeInTheDocument();
+    expect(screen.getByText("Chưa xác định")).toBeInTheDocument();
   });
 
   it("shows an error and keeps files on read failure; never invents facts", async () => {

@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
 
 import { api, attachSources, errorMessage, getSettlementDraft, settlementDraft, submitCase } from "../api";
-import type { SettlementLink } from "../api";
+import type { SettlementArithmeticFinding, SettlementLink } from "../api";
 import { formatVnd } from "../format";
 import type { CaseView, SessionPayload } from "../types";
 import { DocumentViewer } from "./document_viewer";
 
 export interface SettlementExpenseDraft {
-  description: string;
+  description: string | null;
   invoice_no?: string;
-  amount: number;
+  amount: number | null;
+  amount_state?: string;
+  description_state?: string;
   source_filename?: string;
   status?: string;
   matched_invoice?: string;
@@ -25,6 +27,7 @@ export interface IntakeDraftState {
   occurred_at: string | null;
   declared_purpose: string | null;
   incurred_total: number | null;
+  incurred_total_basis: "PRINTED_TOTAL" | "ROW_SUM" | null;
   declared_advance: number | null;
   expenses: SettlementExpenseDraft[];
   notes: string;
@@ -40,6 +43,7 @@ const EMPTY_DRAFT: IntakeDraftState = {
   occurred_at: null,
   declared_purpose: null,
   incurred_total: null,
+  incurred_total_basis: null,
   declared_advance: null,
   expenses: [],
   notes: "",
@@ -65,6 +69,7 @@ export function Intake({
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [arithmeticFindings, setArithmeticFindings] = useState<SettlementArithmeticFinding[]>([]);
   // Backend dossier link (14/10/2026): the server decides which advance/work
   // dossier this settlement belongs to. The employee only confirms when the
   // basis is weak (NEEDS_CONFIRMATION) — never by picking a standing code.
@@ -85,6 +90,7 @@ export function Intake({
         const resp = await getSettlementDraft(existingCase.id);
         if (cancelled) return;
         setWarnings(resp.warnings ?? []);
+        setArithmeticFindings(resp.arithmetic_findings ?? []);
         setDraft({
           declared_name: resp.declared_name,
           activity_name: resp.activity_name,
@@ -95,11 +101,14 @@ export function Intake({
           // One merged proposal-content field (see handleReadDocuments).
           declared_purpose: resp.declared_purpose ?? resp.activity_name,
           incurred_total: resp.incurred_total,
+          incurred_total_basis: resp.incurred_total_basis ?? null,
           declared_advance: resp.declared_advance,
           expenses: (resp.expenses ?? []).map((e) => ({
             description: e.description,
             invoice_no: e.invoice_no,
             amount: e.amount,
+            amount_state: e.amount_state,
+            description_state: e.description_state,
             source_filename: e.source_filename,
             status: e.status || "UNMATCHED",
             matched_invoice: e.matched_invoice,
@@ -146,6 +155,7 @@ export function Intake({
     setError(null);
     setStatus(null);
     setWarnings([]);
+    setArithmeticFindings([]);
     setStep("reading");
 
     try {
@@ -169,6 +179,7 @@ export function Intake({
       //    error and keep the files; no demo facts are invented.
       const resp = await settlementDraft(currentCase.id, files);
       setWarnings(resp.warnings ?? []);
+      setArithmeticFindings(resp.arithmetic_findings ?? []);
       setDraft({
         declared_name: resp.declared_name,
         activity_name: resp.activity_name,
@@ -181,11 +192,14 @@ export function Intake({
         // own travel field and is never fed the proposal content.
         declared_purpose: resp.declared_purpose ?? resp.activity_name,
         incurred_total: resp.incurred_total,
+        incurred_total_basis: resp.incurred_total_basis ?? null,
         declared_advance: resp.declared_advance,
         expenses: (resp.expenses ?? []).map((e) => ({
           description: e.description,
           invoice_no: e.invoice_no,
           amount: e.amount,
+          amount_state: e.amount_state,
+          description_state: e.description_state,
           source_filename: e.source_filename,
           status: e.status || "UNMATCHED",
           matched_invoice: e.matched_invoice,
@@ -259,7 +273,7 @@ export function Intake({
   // Chênh lệch kê khai dự kiến: T - A (chỉ khi cả hai số đã biết). Đây KHÔNG
   // phải kết luận tài chính S — S chính thức chỉ có sau đối soát.
   const netDifference =
-    draft.incurred_total !== null && draft.declared_advance !== null
+    arithmeticFindings.length === 0 && draft.incurred_total !== null && draft.declared_advance !== null
       ? draft.incurred_total - draft.declared_advance
       : null;
 
@@ -565,11 +579,11 @@ export function Intake({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setStep("upload")}
+              onClick={onBack ?? (() => setStep("upload"))}
               className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
             >
               <span className="font-mono">←</span>
-              <span>Chọn lại tệp</span>
+              <span>Quay lại</span>
             </button>
             <span className="text-slate-300">/</span>
             <span className="text-xs font-semibold text-slate-900">
@@ -591,15 +605,16 @@ export function Intake({
             </span>
           </div>
 
-          {onBack && (
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={onBack}
-              className="text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+              onClick={() => setStep("upload")}
+              className="text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors cursor-pointer px-2.5 py-1 rounded hover:bg-slate-100 border border-slate-200"
+              title="Quay lại bước chọn tệp để tải lên tài liệu khác"
             >
-              Đóng
+              Chọn lại tệp
             </button>
-          )}
+          </div>
         </div>
 
         {/* Scrollable Canvas */}
@@ -657,9 +672,34 @@ export function Intake({
             )}
           </div>
 
-          {warnings.length > 0 && (
+          {arithmeticFindings.length > 0 && (
+            <section role="alert" aria-label="Mâu thuẫn số học trên giấy quyết toán" className="space-y-3 rounded border border-rose-300 bg-rose-50 p-3 text-rose-950">
+              <div>
+                <h3 className="font-semibold">Có mâu thuẫn số liệu — chưa xác định tổng chi phí cuối cùng</h3>
+                <p className="mt-1 text-[11px] text-rose-900">Các số dưới đây được giữ nguyên theo chứng từ. Hệ thống chưa xác minh chi phí hoặc số tiền quyết toán.</p>
+              </div>
+              {arithmeticFindings.map((finding, index) => (
+                <article key={`${finding.code}:${index}`} className="space-y-1 border-t border-rose-200 pt-2">
+                  <p className="font-medium">{finding.basis}</p>
+                  <p>{finding.question}</p>
+                  {finding.refs.length > 0 && (
+                    <ul className="space-y-1 text-[11px] text-rose-900">
+                      {finding.refs.map((ref, refIndex) => {
+                        const sourceName = caseView?.sources.find((source) => source.id === ref.source_id)?.filename ?? ref.source_id;
+                        return <li key={`${ref.source_id}:${ref.page}:${refIndex}`}>
+                          {sourceName} · trang {ref.page ?? "?"}: <q>{ref.exact_quote}</q>
+                        </li>;
+                      })}
+                    </ul>
+                  )}
+                </article>
+              ))}
+            </section>
+          )}
+
+          {warnings.filter((warning) => !arithmeticFindings.some((finding) => finding.basis === warning)).length > 0 && (
             <div className="space-y-1">
-              {warnings.map((w, i) => (
+              {warnings.filter((warning) => !arithmeticFindings.some((finding) => finding.basis === warning)).map((w, i) => (
                 <div key={i} className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 flex items-center gap-1.5">
                   <span>⚠</span>
                   <span>{w}</span>
@@ -747,8 +787,10 @@ export function Intake({
                   draft.expenses.map((item, idx) => (
                     <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                       <td className="py-2.5 px-0">
-                        <span className="font-medium text-slate-900 block">{item.description}</span>
-                        {item.matched_invoice ? (
+                        <span className="font-medium text-slate-900 block">{item.description || `Dòng ${idx + 1} — chưa đọc được nội dung`}</span>
+                        {item.amount === null ? (
+                          <span className="text-[11px] text-amber-700 block mt-0.5">⚠ Chưa đọc rõ số tiền; dòng này chưa được tính vào tổng</span>
+                        ) : item.matched_invoice ? (
                           <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
                             <span className="text-emerald-600 font-bold">✓</span>
                             <span>Tệp: {item.matched_invoice}</span>
@@ -767,17 +809,18 @@ export function Intake({
                         {item.invoice_no || "—"}
                       </td>
                       <td className="py-2.5 px-0 text-right font-mono tabular-nums font-medium text-slate-900">
-                        {formatVnd(item.amount)}
+                        {item.amount === null ? "Chưa đọc được" : formatVnd(item.amount)}
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
               <tfoot className="border-t border-slate-200 divide-y divide-slate-100 text-xs">
-                {/* Row 1: Tổng chi phí kê khai (T) */}
                 <tr>
                   <td colSpan={2} className="py-2.5 px-0 font-medium text-slate-700">
-                    Tổng chi phí kê khai:
+                    {draft.incurred_total_basis === "ROW_SUM"
+                      ? "Tạm tính từ dòng chi phí (chưa đối soát):"
+                      : "Tổng trên giấy (chưa xác minh):"}
                   </td>
                   <td className="py-2.5 px-0 text-right font-semibold text-slate-950 font-mono tabular-nums">
                     {draft.incurred_total !== null ? formatVnd(draft.incurred_total) : "Chưa đọc được"}

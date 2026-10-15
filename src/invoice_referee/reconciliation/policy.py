@@ -129,8 +129,13 @@ def evaluate_policy(
     authorizations: list[str] = []
     activity = input.scope.activity
 
+    # A specific admission dispute owns the unresolved amount; a generic T FACT
+    # would ask for duplicate evidence and hide the concrete question.
+    all_disputed = bool(input.expense_facts) and all(
+        expense.id in input.disputed_expense_ids for expense in input.expense_facts
+    )
     # FACT: a required fact that is unresolved blocks any money conclusion.
-    if projection.T.state != "KNOWN":
+    if projection.T.state != "KNOWN" and not all_disputed:
         issues.append(
             _issue(
                 "issue:fact:incurred",
@@ -154,13 +159,8 @@ def evaluate_policy(
                 _evidence_refs(input, fields=("coverage", "advance", "reimbursed", "returned")),
             )
         )
-    # When EVERY admitted cost is in dispute (TC08), the payer basis is already
-    # known — only the amount is unresolved, and the specific dispute FACT owns
-    # that question. Asking "who paid?" would be a false/duplicate question, so
-    # the generic payer FACT is suppressed for that case.
-    all_disputed = bool(input.expense_facts) and all(
-        expense.id in input.disputed_expense_ids for expense in input.expense_facts
-    )
+    # When EVERY admitted cost is in dispute (TC08/TC05), the specific dispute
+    # FACT owns the unresolved amount. Asking "who paid?" would duplicate it.
     invoice_payer_questions = {
         issue.field_or_rule
         for issue in input.admission_issues

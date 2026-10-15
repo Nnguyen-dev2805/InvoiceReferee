@@ -387,7 +387,11 @@ async def extract_document(
     for entry in raw_lines:
         # Only a structured row ({fields: [...]}) is a line item. A raw OCR text
         # string is not a row and must not be turned into a fabricated field.
+        # On a settlement form, preserve a blank marker so malformed row output
+        # stays unresolved instead of making the row-total check disappear.
         if not isinstance(entry, dict):
+            if document_type == "SETTLEMENT_FORM":
+                lines.append(DocumentLine(id=f"{classification.document_id}:line:{len(lines) + 1}"))
             continue
         # Code owns the line id; the model's id is discarded. Line fields get
         # the same provenance validation as top-level fields (plan E5).
@@ -402,8 +406,6 @@ async def extract_document(
             for f in entry.get("fields", [])
             if isinstance(f, dict)
         )
-        if not line_fields:
-            continue
         index = len(lines) + 1
         lines.append(
             DocumentLine(

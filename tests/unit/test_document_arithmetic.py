@@ -12,7 +12,7 @@ UNREADABLE makes the check impossible -> a finding, never a silent zero.
 from __future__ import annotations
 
 from invoice_referee.domain.common import EvidenceRef
-from invoice_referee.domain.documents import DocumentAnalysis, FieldCandidate
+from invoice_referee.domain.documents import DocumentAnalysis, DocumentLine, FieldCandidate
 from invoice_referee.reconciliation.document_arithmetic import (
     ArithmeticFinding,
     check_document_arithmetic,
@@ -42,6 +42,19 @@ def _paper(**fields: object) -> DocumentAnalysis:
     )
 
 
+def _paper_with_lines(lines: tuple[DocumentLine, ...], **fields: object) -> DocumentAnalysis:
+    return _paper(**fields).model_copy(update={"line_items": lines})
+
+
+def _cost_line(identifier: str, description: str, amount: object) -> DocumentLine:
+    return DocumentLine(id=identifier, fields=(
+        _found("description", description, f"{description} dòng {identifier}"),
+        amount if isinstance(amount, FieldCandidate) else _found(
+            "amount", amount, f"{description} {amount} đ"
+        ),
+    ))
+
+
 def _invoice(**fields: object) -> DocumentAnalysis:
     return DocumentAnalysis(
         source_id="s", document_id="s:1-1:E_INVOICE", document_type="E_INVOICE",
@@ -66,6 +79,122 @@ def test_tc06_printed_refund_contradicts_advance_minus_total() -> None:
     basis = findings[0].basis
     assert "760000" in basis and "700000" in basis and "60000" in basis
     assert findings[0].refs, "the finding must carry the source refs"
+
+
+def test_tc05_itemized_cost_rows_must_match_the_printed_total() -> None:
+    paper = _paper_with_lines(
+        (
+            _cost_line("1", "Chi phí tiếp khách", "2000000"),
+            _cost_line("2", "Chi phí phòng họp", "1000000"),
+        ),
+        declared_advance="4000000",
+        printed_total="3500000",
+        printed_return="500000",
+    )
+
+    findings = check_document_arithmetic(paper)
+
+    assert _codes(findings) == ["settlement-line-total"]
+    finding = findings[0]
+    assert "2.000.000" in finding.basis and "1.000.000" in finding.basis
+    assert "3.000.000" in finding.basis and "3.500.000" in finding.basis and "500.000" in finding.basis
+    assert "3.000.000" in finding.question and "3.500.000" in finding.question
+    assert {ref.exact_quote for ref in finding.refs} >= {
+        "3500000", "Chi phí tiếp khách dòng 1", "Chi phí tiếp khách 2000000 đ",
+        "Chi phí phòng họp dòng 2", "Chi phí phòng họp 1000000 đ",
+    }
+
+
+def test_unreadable_cost_row_is_unresolved_not_a_zero() -> None:
+    paper = _paper_with_lines(
+        (
+            _cost_line("1", "Chi phí tiếp khách", "2000000"),
+            _cost_line("2", "Chi phí phòng họp", _state("amount", "UNREADABLE")),
+        ),
+        printed_total="3500000",
+    )
+
+    findings = check_document_arithmetic(paper)
+
+    assert _codes(findings) == ["settlement-line-items-unresolved"]
+    assert "Chi phí phòng họp" in findings[0].basis
+    assert "coi là 0" in findings[0].basis
+    assert findings[0].refs
+
+
+def test_ambiguous_line_amount_is_unresolved_not_partially_summed() -> None:
+    ambiguous = FieldCandidate(
+        field="amount", state="AMBIGUOUS", alternatives=(
+            {"value": "1000000", "refs": (_ref("1.000.000"),)},
+            {"value": "1500000", "refs": (_ref("1.500.000"),)},
+        ),
+    )
+    paper = _paper_with_lines(
+        (_cost_line("1", "Chi phí tiếp khách", "2000000"), _cost_line("2", "Chi phí khác", ambiguous)),
+        printed_total="3500000",
+    )
+
+    assert _codes(check_document_arithmetic(paper)) == ["settlement-line-items-unresolved"]
+
+
+def test_unreadable_printed_total_keeps_row_sum_unresolved() -> None:
+    paper = _paper_with_lines(
+        (_cost_line("1", "Chi phí tiếp khách", "3000000"),),
+        declared_advance="4000000",
+    ).model_copy(update={
+        "fields": _paper(declared_advance="4000000").fields + (_state("printed_total", "UNREADABLE"),),
+    })
+
+    findings = check_document_arithmetic(paper)
+
+    assert _codes(findings) == ["settlement-line-items-unresolved"]
+    assert "UNREADABLE" in findings[0].basis
+
+
+def test_absent_printed_total_does_not_invent_an_aggregate_relation() -> None:
+    paper = _paper_with_lines(
+        (_cost_line("1", "Chi phí tiếp khách", "3000000"),),
+    )
+
+    assert check_document_arithmetic(paper) == ()
+
+
+def test_total_and_subtotal_rows_are_not_counted_again() -> None:
+    paper = _paper_with_lines(
+        (
+            _cost_line("1", "Chi phí tiếp khách", "2000000"),
+            _cost_line("2", "Chi phí phòng họp", "1000000"),
+            _cost_line("sum", "Tổng cộng", "3000000"),
+            _cost_line("subtotal", "Cộng tiền", "3000000"),
+        ),
+        printed_total="3000000",
+    )
+
+    assert check_document_arithmetic(paper) == ()
+
+
+def test_unrelated_tax_field_does_not_reconcile_a_settlement_row_mismatch() -> None:
+    paper = _paper_with_lines(
+        (_cost_line("1", "Chi phí tiếp khách", "3000000"),),
+        printed_total="3240000",
+        tax="240000",
+    )
+
+    findings = check_document_arithmetic(paper)
+
+    assert _codes(findings) == ["settlement-line-total"]
+
+
+def test_settlement_line_sum_uses_the_shared_vnd_parser() -> None:
+    paper = _paper_with_lines(
+        (
+            _cost_line("1", "Chi phí tiếp khách", "2.000.000 đ"),
+            _cost_line("2", "Chi phí phòng họp", "1.000.000đ"),
+        ),
+        printed_total="3.000.000 đ",
+    )
+
+    assert check_document_arithmetic(paper) == ()
 
 
 def test_tc06_correct_refund_has_no_finding() -> None:

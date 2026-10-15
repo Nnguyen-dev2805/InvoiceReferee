@@ -152,27 +152,31 @@ export function Dossier({
           </span>
           <span
             className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border ${
-              caseView.state === "READY_TO_EXECUTE"
-                ? "bg-emerald-50 text-emerald-900 border-emerald-200/90"
+              caseView.state === "SETTLED"
+                ? "bg-emerald-50 text-emerald-800 border-emerald-200/90"
+                : caseView.state === "READY_TO_EXECUTE"
+                ? "bg-indigo-50 text-indigo-800 border-indigo-200/90"
                 : caseView.state === "WAITING"
                 ? "bg-amber-50 text-amber-900 border-amber-200/90"
-                : caseView.state === "SETTLED"
-                ? "bg-blue-50 text-blue-900 border-blue-200/90"
                 : caseView.state === "STOPPED"
                 ? "bg-rose-50 text-rose-900 border-rose-200/90"
+                : caseView.state === "PROCESSING" || caseView.state === "EVIDENCE_READY"
+                ? "bg-blue-50 text-blue-700 border-blue-200/80"
                 : "bg-slate-100 text-slate-700 border-slate-200"
             }`}
           >
             <span
               className={`w-1.5 h-1.5 rounded-full ${
-                caseView.state === "READY_TO_EXECUTE"
-                  ? "bg-emerald-500"
+                caseView.state === "SETTLED"
+                  ? "bg-emerald-600"
+                  : caseView.state === "READY_TO_EXECUTE"
+                  ? "bg-indigo-600"
                   : caseView.state === "WAITING"
-                  ? "bg-amber-500"
-                  : caseView.state === "SETTLED"
-                  ? "bg-blue-500"
+                  ? "bg-amber-600"
                   : caseView.state === "STOPPED"
-                  ? "bg-rose-500"
+                  ? "bg-rose-600"
+                  : caseView.state === "PROCESSING" || caseView.state === "EVIDENCE_READY"
+                  ? "bg-blue-500"
                   : "bg-slate-400"
               }`}
             />

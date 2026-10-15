@@ -905,6 +905,19 @@ giữ và E0 pin; profile/critical-field matrix pin tại Hoangha revision `1ee3
   là không áp dụng. Số nguồn nguyên bản được giữ; số tính lại chỉ để đối chiếu trong
   `basis`/`question`, không ghi đè tổng.
 - Dùng integer VND/`parse_vnd`, không float/dung sai tuỳ ý: lệch 60k/100k phải là FACT.
+- `SETTLEMENT_FORM`: khi chứng từ có `printed_total` và các dòng chi được biểu diễn,
+  tổng các dòng chi có mô tả và số tiền đọc được phải bằng `printed_total`
+  (`code=settlement-line-total`). Dòng `total`/`subtotal` không phải khoản chi và
+  không được cộng lần hai. Dòng chi được biểu diễn nhưng thiếu/không đọc rõ mô tả,
+  số tiền, hoặc tổng in trên giấy không đọc rõ ⇒ finding unresolved; không thay
+  bằng zero, không cộng riêng phần đọc được. Nếu `printed_total=NOT_PRESENT`/
+  `NOT_APPLICABLE`, không tự tạo quan hệ với zero. Không suy ra VAT, phí dịch vụ,
+  chiết khấu hay khoản thiếu để làm hai phía bằng nhau.
+- Cùng finding và căn cứ nguồn phải xuất hiện trong employee draft và admission.
+  Khi mismatch/unresolved ảnh hưởng các khoản chi, chi phí đủ điều kiện và T giữ
+  `UNKNOWN`, không ghi nhận payment basis hay instruction. Tách biệt với phép tính
+  S hiện hành và với việc liên kết dòng chi ↔ hóa đơn: liên kết số hóa đơn chỉ
+  chứng minh quan hệ tham chiếu, không xác nhận dịch vụ đã thực hiện.
 - `admit_evidence` biến mỗi finding thành `BusinessIssue(kind=FACT, owner=employee,
   field_or_rule=expense:arithmetic:*)`; Reconciler đặt `allowed_effect=None` khi có FACT
   này, và `_commit_assessment` không phát hành instruction. Approval/EXCEPT_POLICY chung

@@ -176,9 +176,17 @@ def test_invoice_basis_over_recognize_bound_still_establishes_e() -> None:
     # authority gate is applied later by policy, never by fabricating E=0.
     paper = _paper()
     invoice = _invoice()
-    big_paper = paper.model_copy(update={"line_items": (DocumentLine(id="row:1", fields=(
-        _found("description", "x"), _found("amount", "9000000"), _found("invoice_refs", ("IR26101001",)),
-    )),)})
+    # Keep this synthetic paper consistent with its 9m row/invoice so this test
+    # isolates the invoice-basis limit rather than a settlement-total FACT.
+    big_paper = paper.model_copy(update={
+        "fields": tuple(
+            _found("printed_total", "9000000") if field.field == "printed_total" else field
+            for field in paper.fields
+        ),
+        "line_items": (DocumentLine(id="row:1", fields=(
+            _found("description", "x"), _found("amount", "9000000"), _found("invoice_refs", ("IR26101001",)),
+        )),),
+    })
     big_invoice = invoice.model_copy(update={"fields": (
         _found("document_number", "IR26101001"), _found("issuer_name", "An Bình"),
         _found("total_amount", "9000000"), _found("buyer_person_name", "Nguyễn An"),
