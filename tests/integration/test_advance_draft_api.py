@@ -488,7 +488,13 @@ async def test_tc01_specific_multi_field_basis_auto_links_and_records_only_after
     assert len(updated["activity_acceptances"]) == 1
     assert updated["activity_acceptances"][0]["link_basis"] == "MULTI_FIELD_MATCH"
     assert len(updated["activity_acceptances"][0]["link_signals"]) >= 5
-    assert updated["coverage_record"] is None
+    assert updated["coverage_record"]["source"] == "DOSSIER_RECORDS"
+    assert updated["coverage_record"]["opening_balance"] is None
+    assert updated["coverage_current"] is True
+    assert updated["actual_money"]["A"]["value"] == 4_000_000
+    assert updated["actual_money"]["P"]["value"] == 0
+    assert updated["actual_money"]["R"]["value"] == 0
+    assert not any("coverage" in issue["field_or_rule"] for issue in updated["issues"])
     assert updated["instructions"] == []
     event = wf._query_one("SELECT payload_json FROM money_events WHERE root_id = ?", (root,))
     event_payload = json.loads(event["payload_json"])

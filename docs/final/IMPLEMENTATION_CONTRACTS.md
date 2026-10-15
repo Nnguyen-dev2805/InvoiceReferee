@@ -54,7 +54,7 @@ DTO có thể có nested types nội bộ, không phải mỗi type/file/service
 | A/P/R/received | Confirmed completed transfer/cash receipt/ledger có payer/payee/scope; reversal phải có event gốc | Requested/approved/debit-only/pending |
 | Activity purpose/link | Employee declaration được policy nhận + context compatible, không contradiction | Amount/date giống nhau hoặc opaque LLM confidence |
 | Grant/exception | Immutable organization record hoặc command đúng quyền | Model output, client role, ảnh chữ ký/name match |
-| Zero flows | Coverage đủ scope/time/opening balances/kinds/nguồn quỹ, known set empty | Thiếu file, chỉ xem tài khoản A hoặc tháng hiện tại |
+| Dòng tiền trong hồ sơ | `DOSSIER_RECORDS`: tổng các giao dịch đã xác nhận trong scope của hồ sơ; hoặc coverage legacy hợp lệ | Upload chưa xác nhận, số ứng/hoàn chỉ kê khai, khẳng định đã kiểm tra toàn bộ ngân hàng |
 
 Confirmed actor lấy từ server session/grant. Confirmation tiền chứa field/value,
 nguồn đã kiểm, scope/time/loại money, reason và verifier, không approval chung.
@@ -63,15 +63,33 @@ predicate, binding, quality/conflicts và literal locator. Exact quote có thậ
 chưa tự chứng minh payer/received. Không xây generic semantic-proof engine; viết
 predicate tests cho bảng trên và đo false-known raw với gold độc lập.
 
-Coverage record: employee/activity (hoặc all-activity rõ), start/as_of, fund set,
-all applicable flow kinds, opening balance, ledger_version, witness/source_refs.
-An accountant confirmation additionally stores its actor, reason, recorded_at,
-source kind, and unallocated event IDs. Its as_of is server time, never a future
-horizon. It remains current for that accounting date only while the root ledger
-version is unchanged; a later or backdated event on that root invalidates it, while
-an event in another root does not. A non-empty unallocated set keeps A/P/R UNKNOWN.
-Uploading an advance or answering `ledger:coverage` as free text does not create a
-coverage record. Known unrelated sources được quarantine có lý do; unknown
+**Luồng UI hiện hành — sửa theo quyết định tiếp theo ngày 15/10/2026:** không có
+checkbox/nút “Xác nhận lịch sử ban đầu”. Kế toán kiểm chứng từ ứng và bấm
+**Xác nhận ghi nhận** đúng một lần. Sau source/binding/party/completion guards,
+backend ghi A và tạo `DOSSIER_RECORDS` để đối soát các giao dịch đã ghi nhận cho
+đúng employee/activity. Không coi đây là lời kế toán xác nhận toàn bộ sổ ngân
+hàng, không tạo opening_balance=0 hoặc trích dẫn chứng minh không có khoản khác.
+Các loại chưa có giao dịch được phản ánh là chưa phát sinh **trong phạm vi sổ
+hồ sơ**, không phải khẳng định toàn bộ thực tế ngoài hệ thống bằng0.
+
+Chỉ dữ kiện được xác nhận vào A/P/R. Unknown/unallocated/conflicting events vẫn
+chặn đối soát; ứng kê khai thiếu bản ghi không tự thành A=0. Nhân viên upload
+bằng chứng hoàn chỉ tạo draft chờ kế toán; accountant xác nhận thực nhận theo
+đúng COLLECT mới tăng R. P/R đúng lệnh/source cập nhật trạng thái theo dõi trong
+transaction và audit. Bản ghi ứng import có thể bắt đầu theo dõi dossier khi
+xác nhận thực hiện đúng lệnh P/R, không bắt tạo thêm một khoản ứng.
+
+Mã giao dịch chống trùng, version/scope/role guards và giới hạn quyền giữ nguyên.
+Bổ sung quá khứ/ngoài luồng, đảo, unknown và context ledger thay đổi được kiểm
+lại; không có thao tác xác nhận lịch sử chung trên UI để bỏ qua vấn đề cụ thể.
+Legacy API `ConfirmMoneyHistory` / `MANAGED_HISTORY` giữ cho dữ liệu/caller cũ,
+nhưng UI không gọi và không yêu cầu người dùng thực hiện. Xác nhận lại một biên
+nhận ứng đã ghi có thể thiết lập dossier tracking mà không cộng A lần nữa.
+
+Coverage cấu trúc legacy (`CONTEXT` / `ACCOUNTANT_CONFIRMATION`) vẫn đọc được
+và giữ quy tắc cũ: scope/time/funds/kinds/opening/witness; xác nhận kế toán theo
+ngày và version sổ. Không tự chuyển legacy sang managed. Upload chứng từ hoặc
+trả lời `ledger:coverage` bằng văn bản không tạo checkpoint. Known unrelated sources được quarantine có lý do; unknown
 relevance is FACT; material unsupported evidence blocks the affected conclusion.
 Source encrypted/corrupt/over-limit là processing problem.
 

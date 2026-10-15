@@ -269,6 +269,16 @@ def _match_expense_documents(
     return out, ()
 
 
+def history_fingerprint(events: tuple[MoneyEvent, ...]) -> str:
+    """Financial context identity, independent of witness hashes/policy versions."""
+    import hashlib
+    import json
+
+    payload = [event.model_dump(mode="json", exclude={"refs"})
+               for event in sorted(events, key=lambda event: event.external_key)]
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
 def coverage_is_valid(
     coverage: CoverageRecord | None,
     *,
@@ -276,6 +286,7 @@ def coverage_is_valid(
     as_of: datetime,
     current_ledger_version: int | None = None,
     has_uncovered_local_events: bool = False,
+    current_context_ledger_fingerprint: str | None = None,
 ) -> bool:
     """Whether a coverage record is a VALID basis for a zero A/P/R (contracts §3).
 
@@ -292,6 +303,28 @@ def coverage_is_valid(
         return False
     if coverage.start > as_of:
         return False
+    if coverage.source in ("MANAGED_HISTORY", "DOSSIER_RECORDS"):
+        # Explicit full-history intake assertion plus versioned workflow events.
+        # It is not a PDF proving absence and does not expire at midnight.
+        return (
+            coverage.scope == scope.activity
+            and coverage.employee == scope.employee
+            and coverage.actor is not None
+            and coverage.recorded_at is not None
+            and coverage.recorded_at <= coverage.as_of <= as_of
+            and bool((coverage.reason or "").strip())
+            and (coverage.source == "DOSSIER_RECORDS" or (
+                coverage.opening_balance is not None
+                and coverage.opening_balance.state == "KNOWN"
+                and coverage.opening_balance.value == 0
+            ))
+            and set(COVERAGE_REQUIRED_FLOW_KINDS) <= set(coverage.flow_kinds)
+            and not coverage.unallocated_event_ids
+            and current_ledger_version is not None
+            and coverage.ledger_version == str(current_ledger_version)
+            and coverage.context_ledger_fingerprint is not None
+            and coverage.context_ledger_fingerprint == current_context_ledger_fingerprint
+        )
     if coverage.source == "ACCOUNTANT_CONFIRMATION":
         # A human confirmation remains usable for the same accounting date while
         # its root ledger version is unchanged; the server never invents a future
@@ -613,6 +646,7 @@ def admit_evidence(
         as_of=as_of,
         current_ledger_version=read_set.ledger_version,
         has_uncovered_local_events=has_uncovered_local_events,
+        current_context_ledger_fingerprint=history_fingerprint(ctx_ledger),
     ):
         issues.append(
             BusinessIssue(
@@ -620,9 +654,13 @@ def admit_evidence(
                 kind="FACT",
                 field_or_rule="ledger:coverage",
                 owner="accountant",
-                basis="Coverage hiện có không bao phủ thời điểm đánh giá hoặc thiếu scope/quỹ/loại dòng tiền/số dư đầu kỳ/căn cứ.",
+                basis=("Lịch sử tiền có thay đổi ngoài luồng được theo dõi hoặc cần đối chiếu lại sau khi bổ sung dữ liệu."
+                       if candidate_coverage.source in ("MANAGED_HISTORY", "DOSSIER_RECORDS") else
+                       "Coverage hiện có không bao phủ thời điểm đánh giá hoặc thiếu scope/quỹ/loại dòng tiền/số dư đầu kỳ/căn cứ."),
                 refs=candidate_coverage.witness_refs,
-                question="Xác minh coverage lịch sử đủ scope/thời gian/quỹ/loại dòng tiền/số dư đầu kỳ cho thời điểm quyết định.",
+                question=("Kiểm tra các khoản tiền của đúng công việc, bổ sung phần còn thiếu rồi xác nhận lại lịch sử."
+                          if candidate_coverage.source in ("MANAGED_HISTORY", "DOSSIER_RECORDS") else
+                          "Xác minh coverage lịch sử đủ scope/thời gian/quỹ/loại dòng tiền/số dư đầu kỳ cho thời điểm quyết định."),
             )
         )
         effective_coverage: CoverageRecord | None = None

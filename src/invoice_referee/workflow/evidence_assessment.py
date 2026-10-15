@@ -104,7 +104,7 @@ def _load_coverage_record(
 ) -> CoverageRecord | None:
     row = cx.execute(
         "SELECT coverage_json FROM case_coverage_records WHERE tenant = ? AND root_id = ? "
-        "ORDER BY recorded_at DESC, coverage_id DESC LIMIT 1",
+        "ORDER BY recorded_at DESC, rowid DESC LIMIT 1",
         (tenant, root_id),
     ).fetchone()
     if row is None:

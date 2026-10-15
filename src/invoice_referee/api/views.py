@@ -137,6 +137,10 @@ class EmployeeReturnDraftRequest(ApiModel):
     instrument_method: Literal["TRANSFER", "CASH"] = "TRANSFER"
 
 
+class ConfirmMoneyHistoryRequest(ApiModel):
+    all_prior_money_recorded: bool = Field(strict=True)
+
+
 class ConfirmCoverageRequest(ApiModel):
     start: UtcDatetime
     funds: list[str]

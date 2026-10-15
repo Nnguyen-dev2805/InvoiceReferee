@@ -200,7 +200,7 @@ test("TC01 links an unregistered voucher by source-backed fields, then accountan
     amount: 4_000_000,
     verification_state: "CONFIRMED",
   });
-  expect(view.coverage_record).toBeNull();
+  expect(view.coverage_record?.source).toBe("DOSSIER_RECORDS");
   expect(view.instructions).toEqual([]);
 
   await page.reload();
@@ -210,6 +210,6 @@ test("TC01 links an unregistered voucher by source-backed fields, then accountan
   expect(persisted.activity_acceptances).toHaveLength(1);
   expect(persisted.activity_acceptances[0].link_basis).toBe("MULTI_FIELD_MATCH");
   expect(persisted.money_history).toHaveLength(1);
-  expect(persisted.coverage_record).toBeNull();
+  expect(persisted.coverage_record?.source).toBe("DOSSIER_RECORDS");
   expect(persisted.instructions).toEqual([]);
 });

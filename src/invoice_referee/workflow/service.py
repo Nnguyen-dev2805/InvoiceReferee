@@ -34,7 +34,7 @@ from invoice_referee.domain.commands import (
     CaseCommand,
     CommandResult,
     ConfirmCoverage,
-    ConfirmCoverage,
+    ConfirmMoneyHistory,
     Control,
     CreateDraft,
     Decide,
@@ -1160,6 +1160,7 @@ class CaseWorkflow:
             "DECIDE": self._decide,
             "RECORD_ACTUAL": self._record_actual,
             "CONFIRM_COVERAGE": self._confirm_coverage,
+            "CONFIRM_MONEY_HISTORY": self._confirm_money_history,
             "MARK_EXECUTION": self._mark_execution,
             "CONTROL": self._control,
             "OVERRIDE": self._override,
@@ -4379,9 +4380,12 @@ class CaseWorkflow:
                     cx, session.tenant, str(row["employee"]), money
                 ) is None
             ):
-                if self._store_activity_acceptance(
+                accepted = self._store_activity_acceptance(
                     cx, session=session, row=row, money=money, basis=advance_basis, now=now
-                ):
+                )
+                from invoice_referee.workflow.money_history import record_dossier_history
+                tracked = record_dossier_history(cx, row, actor=context.actor_id, now=datetime.fromisoformat(now))
+                if accepted or tracked:
                     self._bump(cx, row, now)
                     self._assess_and_commit(cx, session, self._reload(cx, row), now)
             return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
@@ -4426,9 +4430,12 @@ class CaseWorkflow:
                     cx, session.tenant, str(row["employee"]), money
                 ) is None
             ):
-                if self._store_activity_acceptance(
+                accepted = self._store_activity_acceptance(
                     cx, session=session, row=row, money=money, basis=advance_basis, now=now
-                ):
+                )
+                from invoice_referee.workflow.money_history import record_dossier_history
+                tracked = record_dossier_history(cx, row, actor=context.actor_id, now=datetime.fromisoformat(now))
+                if accepted or tracked:
                     self._bump(cx, row, now)
                     self._assess_and_commit(cx, session, self._reload(cx, row), now)
             return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
@@ -4551,9 +4558,74 @@ class CaseWorkflow:
                 ensure_ascii=False,
             ),
         )
+        from invoice_referee.workflow.money_history import maintain_history, record_dossier_history
+
+        if (
+            advance_basis is not None and advance_basis["source_clear"]
+            and verification.verification_state == "CONFIRMED"
+            and verification.allocation_state == "ALLOCATED"
+            and advance_block_reason is None and money.instrument_status == "COMPLETED"
+        ):
+            record_dossier_history(cx, row, actor=context.actor_id, now=datetime.fromisoformat(now))
+        elif (
+            instruction_row is not None and money.instrument_status == "COMPLETED"
+            and verification.verification_state == "CONFIRMED"
+            and verification.allocation_state == "ALLOCATED"
+        ):
+            # A context-imported advance may have no local receipt checkpoint.
+            # The confirmed, instruction-bound movement starts dossier tracking.
+            record_dossier_history(cx, row, actor=context.actor_id,
+                                   now=datetime.fromisoformat(now), only_if_untracked=True)
+
+        tracked_history = maintain_history(
+            cx, row, event, now=datetime.fromisoformat(now),
+            controlled=(
+                session.persona == "accountant"
+                and verification.verification_state == "CONFIRMED"
+                and verification.allocation_state == "ALLOCATED"
+                and money.instrument_status == "COMPLETED"
+                and (advance_basis is not None or return_basis is not None or instruction_row is not None)
+                and money.reverses_event_id is None
+            ),
+        )
+        if tracked_history is not None:
+            self._audit(cx, tenant=session.tenant, root_id=root_id,
+                        session_id=session.session_id, actor=context.actor_id,
+                        action="TRACK_MONEY_HISTORY",
+                        detail=json.dumps({"coverage_id": tracked_history, "event_id": event.id}))
         # Re-assess so the projection reflects the new money and the active
         # instruction's fulfillment is re-derived (contracts §4).
         self._reconcile_money(cx, session, self._reload(cx, row), now)
+        self._assess_and_commit(cx, session, self._reload(cx, row), now)
+        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
+    def _confirm_money_history(self, cx, session, context, command: ConfirmMoneyHistory):
+        row = self._require_root(cx, session, command.root_id)
+        self._require_version(row, context.expected_case_version)
+        if session.persona != "accountant":
+            raise UnsupportedCommandError("Chỉ kế toán được xác nhận lịch sử tiền ban đầu.")
+        if not command.all_prior_money_recorded:
+            raise UnsupportedCommandError("Cần xác nhận đã ghi nhận đầy đủ các khoản tiền trước khi tiếp nhận.")
+        from invoice_referee.workflow.money_history import initial_history
+
+        now = self._now_iso()
+        try:
+            coverage = initial_history(cx, row, actor=context.actor_id, now=datetime.fromisoformat(now))
+        except ValueError as error:
+            raise UnsupportedCommandError(str(error)) from error
+        coverage_id = f"coverage:{uuid.uuid4().hex}"
+        cx.execute(
+            "INSERT INTO case_coverage_records (coverage_id, tenant, root_id, ledger_version, "
+            "coverage_json, actor, recorded_at, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (coverage_id, session.tenant, str(row["id"]), coverage.ledger_version,
+             coverage.model_dump_json(), context.actor_id, now, coverage.reason),
+        )
+        self._bump(cx, row, now)
+        self._audit(cx, tenant=session.tenant, root_id=str(row["id"]),
+                    session_id=session.session_id, actor=context.actor_id,
+                    action="CONFIRM_INITIAL_MONEY_HISTORY",
+                    detail=json.dumps({"coverage_id": coverage_id, "ledger_version": coverage.ledger_version,
+                                       "statement": coverage.reason}, ensure_ascii=False))
         self._assess_and_commit(cx, session, self._reload(cx, row), now)
         return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
 
@@ -6013,7 +6085,7 @@ class CaseWorkflow:
         )
         coverage_row = cx.execute(
             "SELECT coverage_json FROM case_coverage_records WHERE tenant = ? AND root_id = ? "
-            "ORDER BY recorded_at DESC, coverage_id DESC LIMIT 1",
+            "ORDER BY recorded_at DESC, rowid DESC LIMIT 1",
             (str(row["tenant"]), str(row["id"])),
         ).fetchone()
         coverage_record = (
@@ -6027,8 +6099,15 @@ class CaseWorkflow:
         ).fetchone()
         ledger_version = int(ledger_version_row["n"]) if ledger_version_row else 0
         now_dt = datetime.fromisoformat(self._now_iso())
+        import hashlib
         from invoice_referee.domain.case import CaseScope
-        from invoice_referee.reconciliation.admission import coverage_is_valid
+        from invoice_referee.reconciliation.admission import coverage_is_valid, history_fingerprint
+        from invoice_referee.workflow.context_records import context_ledger, load_context, merge_ledger
+
+        organization = load_context(cx, str(row["tenant"]), str(row["activity"]), now_dt)
+        imported_history = context_ledger(
+            organization, digest=hashlib.sha256(organization.model_dump_json().encode()).hexdigest()
+        ) if organization is not None else ()
 
         coverage_current = (
             coverage_is_valid(
@@ -6041,6 +6120,7 @@ class CaseWorkflow:
                 ),
                 as_of=now_dt,
                 current_ledger_version=ledger_version,
+                current_context_ledger_fingerprint=history_fingerprint(imported_history),
             )
             if coverage_record is not None
             else False
@@ -6053,22 +6133,7 @@ class CaseWorkflow:
                 (str(row["tenant"]), str(row["id"])),
             )
         )
-        from invoice_referee.workflow.context_records import context_ledger, load_context, merge_ledger
-
-        organization = load_context(
-            cx, str(row["tenant"]), str(row["activity"]), now_dt
-        )
-        if organization is not None:
-            import hashlib
-
-            org_digest = hashlib.sha256(
-                organization.model_dump_json().encode("utf-8")
-            ).hexdigest()
-            money_history, _history_conflicts = merge_ledger(
-                context_ledger(organization, digest=org_digest), local_money_history
-            )
-        else:
-            money_history = local_money_history
+        money_history, _history_conflicts = merge_ledger(imported_history, local_money_history)
         employee_return_drafts: list[EmployeeReturnDraft] = []
         for draft_row in cx.execute(
             "SELECT draft_json FROM case_money_drafts WHERE tenant = ? AND root_id = ? "

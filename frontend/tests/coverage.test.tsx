@@ -1,5 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Coverage } from "../src/features/coverage";
@@ -53,59 +52,28 @@ const baseCase = (): CaseView => ({
 afterEach(() => vi.restoreAllMocks());
 
 describe("Coverage", () => {
-  it("submits a scoped history confirmation using attached source refs", async () => {
-    const onCase = vi.fn();
-    let requestBody: Record<string, unknown> | null = null;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-        requestBody = JSON.parse(String(init?.body ?? "{}"));
-        return new Response(
-          JSON.stringify({ case_view: { ...baseCase(), version: 8, coverage_current: true } }),
-          { status: 200 },
-        );
-      }),
-    );
+  it("shows the source calendar day in Vietnam rather than the stored UTC day", () => {
+    const view = baseCase();
+    view.money_history![0].event_at = "2026-10-04T17:00:00Z";
+    render(<Coverage caseView={view} onCase={() => {}} />);
+    expect(screen.getByText("Công ty An Thịnh → Nguyễn An · 05/10/2026")).toBeInTheDocument();
+  });
 
-    render(<Coverage caseView={baseCase()} onCase={onCase} />);
-    const user = userEvent.setup();
-    expect(screen.getByText("Ứng thực nhận")).toBeInTheDocument();
-    expect(screen.getByText("Công ty An Thịnh → Nguyễn An · 2026-10-05")).toBeInTheDocument();
+  it("shows recorded money without any separate history confirmation", () => {
+    render(<Coverage caseView={baseCase()} onCase={() => {}} />);
     expect(screen.getByText("4.000.000 ₫")).toBeInTheDocument();
-    expect(screen.queryByText(/ledger:coverage|OBSERVED_UNALLOCATED|#coverage/)).toBeNull();
+    expect(screen.queryByLabelText("Đối chiếu từ ngày")).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Xác nhận lịch sử ban đầu" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Kế toán xác nhận đã nhận" })).toBeNull();
+  });
 
-    await user.type(screen.getByLabelText("Đối chiếu từ ngày"), "2026-10-01");
-    await user.type(screen.getByLabelText("Nguồn tiền hoặc quỹ đã kiểm tra"), "Tài khoản ngân hàng công ty");
-    await user.type(screen.getByLabelText("Số dư đầu kỳ (VND)"), "0");
-    await user.selectOptions(screen.getByLabelText("Chứng từ căn cứ đối chiếu"), "source:statement");
-    await user.type(screen.getByLabelText("Trang chứng từ"), "1");
-    await user.type(screen.getByLabelText("Đoạn căn cứ trên chứng từ"), "Sổ ngân hàng công ty đã đối chiếu");
-    await user.type(screen.getByLabelText("Lý do xác nhận"), "Đã kiểm tra đầy đủ giao dịch trong kỳ đối chiếu cho hồ sơ này.");
-    await user.click(screen.getByRole("button", { name: "Xác nhận đã đối chiếu lịch sử tiền" }));
-
-    await waitFor(() => expect(requestBody).not.toBeNull());
-    const body = requestBody as unknown as Record<string, unknown>;
-    expect(body.start).toBe("2026-10-01T00:00:00+07:00");
-    expect(body.funds).toEqual(["Tài khoản ngân hàng công ty"]);
-    expect(body.flow_kinds).toEqual([
-      "ADVANCE_RECEIVED",
-      "REIMBURSEMENT_RECEIVED",
-      "EMPLOYEE_RETURN",
-      "REVERSAL",
-      "OBSERVED_UNALLOCATED",
-    ]);
-    expect(body.opening_balance).toBe(0);
-    expect(body.unallocated_event_ids).toEqual([]);
-    expect(body.witness_refs).toEqual([
-      {
-        source_id: "source:statement",
-        source_sha256: "a".repeat(64),
-        page: 1,
-        exact_quote: "Sổ ngân hàng công ty đã đối chiếu",
-      },
-    ]);
-    expect(body).not.toHaveProperty("as_of");
-    expect(onCase).toHaveBeenCalledWith(expect.objectContaining({ version: 8 }));
+  it("does not request another history confirmation for current tracked money", () => {
+    const view = baseCase();
+    view.coverage_current = true;
+    render(<Coverage caseView={view} onCase={() => {}} />);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Xác nhận lịch sử ban đầu" })).toBeNull();
   });
 
   it("keeps unallocated events visible and does not present them as zero", () => {
@@ -123,6 +91,7 @@ describe("Coverage", () => {
     render(<Coverage caseView={view} onCase={() => {}} />);
     expect(screen.getByText(/Chứng từ đang chờ xử lý hoặc chưa gắn được giao dịch/)).toBeInTheDocument();
     expect(screen.getByText(/1\.000\.000/)).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).toBeNull();
   });
 
   it("surfaces a paper-declared employee return that has no confirmed receipt event", () => {

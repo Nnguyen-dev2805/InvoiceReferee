@@ -288,12 +288,15 @@ class CoverageRecord(StrictModel):
     witness_refs: tuple[EvidenceRef, ...] = ()
     # Metadata exists for an accountable, case-specific confirmation. Imported
     # compatibility coverage keeps source="CONTEXT" and the defaults below.
-    source: Literal["CONTEXT", "ACCOUNTANT_CONFIRMATION"] = "CONTEXT"
+    source: Literal["CONTEXT", "ACCOUNTANT_CONFIRMATION", "MANAGED_HISTORY", "DOSSIER_RECORDS"] = "CONTEXT"
     employee: Id | None = None
     actor: Id | None = None
     recorded_at: UtcDatetime | None = None
     reason: str | None = None
     unallocated_event_ids: tuple[Id, ...] = ()
+    # Only MANAGED_HISTORY: the financial import seen at the explicit intake
+    # confirmation. Other policy/context changes do not invent money history.
+    context_ledger_fingerprint: str | None = None
 
 
 class Projection(StrictModel):

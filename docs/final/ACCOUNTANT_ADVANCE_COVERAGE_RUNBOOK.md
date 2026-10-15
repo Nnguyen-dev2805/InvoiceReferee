@@ -34,23 +34,17 @@ dịch, người xác nhận và căn cứ chấp nhận hoạt động. Chấp 
 chuyển trạng thái `PROPOSED` thành `AUTHORIZED`, cũng không cấp quyền phát hành
 lệnh.
 
-## 3. Xác nhận đã đối chiếu lịch sử tiền
+## 3. Sau khi ghi nhận ứng — không xác nhận thêm
 
-1. Mở biểu mẫu **Xác nhận đã đối chiếu lịch sử tiền**.
-2. Chọn ngày bắt đầu, từng tài khoản/quỹ đã kiểm tra và nhập số dư đầu kỳ có căn
-   cứ. Chọn chứng từ đã tải, trang và trích dẫn làm căn cứ.
-3. Đối chiếu toàn bộ kỳ cho đúng nhân viên và hoạt động, gồm tiền ứng, khoản công
-   ty trả thêm/hoàn ứng, tiền nhân viên trả lại, giao dịch đảo và khoản tiền chưa
-   phân loại. Xử lý mọi khoản chưa phân loại trước khi xác nhận.
-   Nếu giấy quyết toán khai một khoản hoàn nhưng sổ chưa có giao dịch công ty nhận,
-   phân biệt rõ hai điều đó. Chỉ ghi `R` khi có căn cứ tiền thực nhận; ghi lý do
-   xác nhận kế toán nêu cách đã xử lý khoản khai báo chưa được chứng minh.
-4. Ghi lý do, xác nhận với vai trò kế toán và xem thời điểm `as of` do máy chủ ghi.
+Bấm **Xác nhận ghi nhận** ở bước2 là đủ. Khi chứng từ rõ, đúng người/công việc
+và giao dịch hoàn tất, hệ thống ghi A một lần rồi tự đối soát tiền của hồ sơ.
+Không còn form, checkbox hoặc nút xác nhận lịch sử ban đầu. Bảng lịch sử chỉ
+hiển thị các khoản đã ghi nhận; không cần nhập lại hoặc tick để qua bước.
 
-Không có dòng giao dịch không đồng nghĩa số tiền bằng 0. Chỉ số tiền được xác
-nhận sau khi đối chiếu mới chuyển thành giá trị đã biết. Xác nhận có phạm vi theo
-nhân viên/hoạt động, gắn với phiên bản sổ và hết hiệu lực khi sổ thay đổi hoặc
-sang ngày kế toán tiếp theo.
+Với TC01, nếu các căn cứ khác đều hợp lệ: A4triệu/E3,24triệu → COLLECT760.000.
+Nếu giấy khai ứng mà chưa có bản ghi thì bổ sung chính chứng từ ứng; không coi
+ứng chưa xác minh là0. Có khoản chưa rõ/trùng/mâu thuẫn thì xử lý đúng khoản đó.
+Đây là theo dõi sổ của hồ sơ, không phải kiểm chứng toàn bộ tài khoản ngân hàng.
 
 ## 4. Đọc kết quả và giới hạn
 
@@ -61,7 +55,7 @@ thể phát hành `COLLECT 760.000` khi toàn bộ căn cứ, coverage và quy�
 được thu. Chỉ ghi nhận hoàn tất khi có chứng từ tiền trả thực tế. Tiền nhân viên
 đã trả lại sẽ làm giảm số còn phải thu; không phát lệnh thu lần hai cho cùng số.
 
-Coverage là xác nhận có trách nhiệm của kế toán dựa trên sổ/chứng từ được nêu.
+Sổ hồ sơ tổng hợp các khoản đã được xác nhận theo chứng từ.
 Nó không phải kết nối ngân hàng hay kiểm chứng độc lập từ ngân hàng. Mọi khoản
 không đọc được, thiếu căn cứ hoặc chưa phân loại phải giữ ở trạng thái chưa xác
 định và chuyển người xử lý.
@@ -94,3 +88,16 @@ Lượt này gọi OCR/model providers thật. Đầu ra phụ thuộc chất l�
 trường thiếu và chỉnh từ chứng từ gốc như bước 2. Không tải lại bản test thành
 chứng cứ nghiệp vụ thật, không dùng số liệu mẫu để xác nhận lịch sử công ty và
 không chạy vào DB đang chứa dữ liệu người dùng.
+
+## 6. Nhân viên hoàn tiền và đóng hồ sơ
+
+1. Có COLLECT 760.000 còn hiệu lực: nhân viên chọn lệnh, tải bằng chứng hoàn tiền
+   rồi bấm **Tải lên và đọc**. Chưa ghi R, hiển thị chờ kế toán xác nhận.
+2. Kế toán kiểm tra và bấm **Kế toán xác nhận đã nhận**. Giao dịch đúng luồng cập nhật sổ hồ sơ tự động; không có bước xác nhận lịch sử riêng.
+3. Đủ 760.000: R=760.000, S=0; không còn blocker thì hồ sơ **Đã quyết toán**.
+   Hoàn một phần giữ phần còn phải thu; sai người nhận/thất bại không ghi tiền;
+   hoàn thừa giữ actual và có blocker, không tự đóng.
+
+Kiểm chứng 15/10/2026: xem `reviews/2026-10-15-managed-money-history.md`.
+
+Cập nhật luồng không có xác nhận lịch sử riêng: `reviews/2026-10-15-no-extra-history-confirmation.md`.

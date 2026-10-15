@@ -137,6 +137,58 @@ async def test_accountant_coverage_is_structured_and_used_by_admission(workspace
     assert set(assessment.coverage.flow_kinds) == set(FLOW_KINDS)
 
 
+async def test_initial_history_confirmation_needs_no_fabricated_pdf_or_fund(workspace):
+    client, workflow, root = workspace
+    view = (await client.get(f"/api/cases/{root}")).json()
+    response = await client.post(
+        f"/api/cases/{root}/money-history/confirm",
+        headers={"X-Command-Id": "cmd:initial-history", "X-Expected-Version": str(view["version"])},
+        json={"all_prior_money_recorded": True},
+    )
+    assert response.status_code == 200, response.text
+    view = response.json()["case_view"]
+    assert view["coverage_current"] is True
+    record = view["coverage_record"]
+    assert record["source"] == "MANAGED_HISTORY"
+    assert record["actor"] == ACCOUNTANT
+    assert record["employee"] == EMPLOYEE
+    assert record["witness_refs"] == []  # Never invent a quote proving absence.
+    assert record["ledger_version"] == "0"
+    assert workflow._query_one("SELECT COUNT(*) AS n FROM money_events")["n"] == 0
+
+    # An unchanged checkpoint remains usable after a restart and another day.
+    restarted = CaseWorkflow(workflow.db, uploads_dir=workflow.uploads_dir,
+                             clock=lambda: datetime.fromisoformat("2026-10-16T12:00:00+07:00"))
+    session = restarted.start_session(tenant=TENANT, persona="accountant", actor_id=ACCOUNTANT)
+    assert restarted.view(session, root).coverage_current is True
+
+
+async def test_initial_history_requires_explicit_confirmation_and_current_version(workspace):
+    client, workflow, root = workspace
+    view = (await client.get(f"/api/cases/{root}")).json()
+    for statement in (False, True):
+        response = await client.post(
+            f"/api/cases/{root}/money-history/confirm",
+            headers={"X-Command-Id": f"cmd:bad-history:{statement}",
+                     "X-Expected-Version": str(view["version"] - 1 if statement else view["version"])},
+            json={"all_prior_money_recorded": statement},
+        )
+        assert response.status_code in (400, 409), response.text
+    assert workflow._query_one("SELECT COUNT(*) AS n FROM case_coverage_records")["n"] == 0
+
+
+async def test_employee_cannot_establish_initial_history(workspace):
+    client, workflow, root = workspace
+    employee = workflow.start_session(tenant=TENANT, persona="employee", actor_id=EMPLOYEE)
+    client.cookies.set(SESSION_COOKIE, employee.session_id)
+    response = await client.post(
+        f"/api/cases/{root}/money-history/confirm",
+        headers={"X-Command-Id": "cmd:employee-initial", "X-Expected-Version": "1"},
+        json={"all_prior_money_recorded": True},
+    )
+    assert response.status_code == 403, response.text
+
+
 async def test_employee_cannot_confirm_money_history(workspace) -> None:
     _, workflow, root = workspace
     from httpx import ASGITransport, AsyncClient

@@ -648,11 +648,7 @@ export function Advance({
       <Coverage
         caseView={caseView}
         onCase={onCase}
-        showConfirmation={
-          !caseView.coverage_record
-          || !caseView.coverage_current
-          || caseView.issues.some((issue) => issue.field_or_rule.toLowerCase().includes("coverage"))
-        }
+
       />
     </section>
   );

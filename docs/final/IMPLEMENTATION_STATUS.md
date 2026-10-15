@@ -3,6 +3,70 @@
 This file records observed progress, not product policy or runtime configuration.
 The plan owns task acceptance; package/config files own executable commands.
 
+## TC05 LIVE negative review — 15/10/2026
+
+Read-only application review of original Hoangha TC05 (paper rows2m+1m but
+printed total3.5m; invoice3.24m). Both PDFs rendered/visually inspected, then
+production LIVE OCR/LLM through create/attach/draft/submit on isolated SQLite,
+with explicitly simulated advance4m/activity/grants/coverage to isolate the
+arithmetic gate. Gold not loaded. OCR and structured extraction preserve all
+numbers, but draft warnings are empty and final issues=[] / READY_TO_EXECUTE /
+COLLECT1000000. This is **business FAIL**, not acceptance PASS. Read-only
+Playwright observes the same UI/API result. Two artifact-based regressions RED.
+
+Missing rule: paper row sum versus printed total; existing advance−printed_total
+and invoice subtotal+tax checks pass their respective relations. No app fix or
+user DB write/reset, no commit/push/subagent. Private view server stopped.
+[Source analysis and evidence](reviews/2026-10-15-tc05-live-negative.md).
+
+## Receipt confirmation only — no initial-history UI — 15/10/2026
+
+Supersedes the ordinary UI checkpoint below by explicit user correction. Removed
+the initial-history checkbox/button and frontend call. Confirming a clear,
+completed source-bound advance now records A once and starts `DOSSIER_RECORDS`
+reconciliation atomically. This represents recorded dossier money, not an
+accountant declaration that all external bank history is complete. No fabricated
+opening balance/fund/absence quote. Unknown/unallocated/conflicting money blocks.
+Employee upload alone never changes R; accountant confirms the proof to record
+R, fulfill COLLECT and close when S0/no blockers. Imported advances also support
+P/R without the separate initial-history action; legacy APIs remain compatible.
+
+Verification: Python **765 passed**; frontend **43 passed / 2 skipped**, Node24
+build/diff check pass. Isolated TC01 browser starts with zero money: one advance
+confirmation immediately yields COLLECT760000; no initial history request;
+employee proof keeps R0; accountant receipt gives R760000/S0/SETTLED, reload
+persists. Stored LIVE originals + deterministic return adapters; fresh LIVE
+NOT_RUN. Backend8000 restarted LIVE; ten business-table fingerprints unchanged.
+No user financial command/reset, commit/push or subagent.
+[Evidence](reviews/2026-10-15-no-extra-history-confirmation.md).
+
+Earlier initial-history UI/statement below is historical, not the current flow.
+
+## One initial money-history confirmation, then managed execution — 15/10/2026
+
+User-approved replacement of the long coverage UI: one unchecked accountant
+statement that all prior money of this employee/work is recorded, no omitted
+carry-in. A new source `MANAGED_HISTORY` lives in existing coverage JSON; server
+owns actor/scope/time/ledger version/context-money fingerprint. No fake fund,
+bank balance or PDF absence quote. Verified source-bound A / instruction-bound
+P/R update the valid checkpoint atomically, with audit, without another prompt.
+Historical/out-of-band/reversed/unresolved/unallocated money or changed context
+ledger invalidates it; a stale checkpoint is not automatically repaired.
+Legacy coverage keeps its old semantics, without silent migration.
+
+Verification: full Python **763 passed**, frontend **43 passed / 2 skipped**,
+Node24 build and diff check pass. Initial API/UI, tied-clock latest-checkpoint and
+Vietnam date-display regressions observed RED→GREEN. Isolated Playwright on a
+copied TC01 DB went from one history assertion through employee proof upload
+(R unchanged), accountant receipt760k to S0 / SETTLED, reload preserved. Original
+OCR was stored LIVE; new return used deterministic adapters, fresh LIVE NOT_RUN.
+Backend8000 restarted with the same command, LIVE health and new route checked;
+ten business-table fingerprints unchanged. No user financial command, reset,
+commit/push or subagent. [Evidence](reviews/2026-10-15-managed-money-history.md).
+
+The instruction-bound checkpoint below predates this update: managed history no
+longer asks for reconfirmation after each properly confirmed workflow movement.
+
 ## Instruction-bound money movement and return review — 15/10/2026
 
 New P/R events are bound to the active same-root PAY/COLLECT instruction and

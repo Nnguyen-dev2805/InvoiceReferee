@@ -243,26 +243,10 @@ test("TC01 new activity: durable advance, scoped coverage, COLLECT 760000", asyn
     expect.objectContaining({ kind: "ADVANCE_RECEIVED", amount: 4_000_000, verification_state: "CONFIRMED" }),
   );
 
-  // This is an accountable synthetic-history confirmation. The evidence link is
-  // the uploaded settlement report; the external ledger is not independently
-  // bank-verified by this demo.
-  await expect(page.getByText(/Giấy quyết toán khai nhân viên hoàn lại 760\.000/)).toBeVisible();
-  await page.getByLabel("Đối chiếu từ ngày").fill("2026-10-01");
-  await page.getByLabel("Nguồn tiền hoặc quỹ đã kiểm tra").fill("Tài khoản ngân hàng công ty");
-  await page.getByLabel("Số dư đầu kỳ (VND)").fill("0");
-  await page.getByLabel("Chứng từ căn cứ đối chiếu").selectOption({ label: "report_hoan_ung.pdf" });
-  await page.getByLabel("Trang chứng từ").fill("1");
-  await page.getByLabel("Đoạn căn cứ trên chứng từ").fill("Số tiền đã tạm ứng: 4.000.000 đồng");
-  await page.getByLabel("Lý do xác nhận").fill(
-    "Giấy quyết toán khai nhân viên hoàn 760.000 đồng. Đã đối chiếu lịch sử nhận tiền của công ty trong toàn kỳ cho đúng nhân viên và công việc, nhưng chưa có giao dịch công ty nhận khoản hoàn này. Chưa xác minh tiền đã vào công ty nên chưa ghi R=760.000; tiếp tục theo dõi khoản còn phải thu.",
-  );
-  const coverageResponse = page.waitForResponse(
-    (response) => response.request().method() === "POST" && /\/coverage(?:\?|$)/.test(response.url()),
-    { timeout: 120_000 },
-  );
-  await page.getByRole("button", { name: "Xác nhận đã đối chiếu lịch sử tiền" }).click();
-  const coverageResult = await (await coverageResponse).json();
-  const afterCoverage = coverageResult.case_view;
+  // One source-bound receipt confirmation also enables dossier-scoped reconciliation.
+  await expect(page.getByRole("checkbox", { name: /đã ghi nhận đầy đủ các khoản tiền/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Xác nhận lịch sử ban đầu" })).toHaveCount(0);
+  const afterCoverage = afterAdvance;
   evidence.after_coverage = snapshot(afterCoverage);
   expect(afterCoverage.coverage_current).toBe(true);
   expect(afterCoverage.actual_money.E).toMatchObject({ value: 3_240_000, state: "KNOWN" });

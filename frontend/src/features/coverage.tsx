@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { confirmCoverage, errorMessage, recordActual } from "../api";
+import { errorMessage, recordActual } from "../api";
 import { formatVnd } from "../format";
 import type { CaseView } from "../types";
 
@@ -45,36 +45,13 @@ function eventStateLabel(event: { verification_state: string; allocation_state: 
 export function Coverage({
   caseView,
   onCase,
-  showConfirmation = true,
 }: {
   caseView: CaseView | null;
   onCase: (view: CaseView) => void;
-  showConfirmation?: boolean;
 }) {
-  const [start, setStart] = useState("");
-  const [funds, setFunds] = useState("");
-  const [openingBalance, setOpeningBalance] = useState("");
-  const [sourceId, setSourceId] = useState("");
-  const [page, setPage] = useState("");
-  const [quote, setQuote] = useState("");
-  const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmingDraft, setConfirmingDraft] = useState<string | null>(null);
-
-  useEffect(() => {
-    const record = caseView?.coverage_record;
-    if (!record) return;
-    setStart(record.start.slice(0, 10));
-    setFunds(record.funds.join(", "));
-    setOpeningBalance(record.opening_balance?.value === null || record.opening_balance?.value === undefined ? "" : String(record.opening_balance.value));
-    const witness = record.witness_refs[0] as { source_id?: string; page?: number; exact_quote?: string } | undefined;
-    setSourceId(witness?.source_id ?? "");
-    setPage(witness?.page ? String(witness.page) : "");
-    setQuote(witness?.exact_quote ?? "");
-    setReason(record.reason ?? "");
-  }, [caseView?.id, caseView?.coverage_record?.recorded_at]);
 
   const history = caseView?.money_history ?? [];
   const returnClaims = caseView === null ? [] : reportedEmployeeReturns(caseView);
@@ -123,72 +100,15 @@ export function Coverage({
     }
   }
 
-  async function submit() {
-    if (caseView === null) return;
-    const amount = Number(openingBalance);
-    const pageNumber = Number(page);
-    if (!start || !funds.trim() || !Number.isSafeInteger(amount) || amount < 0) {
-      setError("Nhập ngày bắt đầu, nguồn tiền/quỹ và số dư đầu kỳ bằng VND nguyên.");
-      return;
-    }
-    if (!sourceId || !Number.isInteger(pageNumber) || pageNumber < 1 || !quote.trim()) {
-      setError("Chọn chứng từ, trang và đoạn căn cứ đã dùng để đối chiếu.");
-      return;
-    }
-    if (reason.trim().length < 12) {
-      setError("Ghi rõ cách đã đối chiếu lịch sử tiền cho hồ sơ này.");
-      return;
-    }
-    const source = caseView.sources.find((item) => item.id === sourceId);
-    if (source === undefined) {
-      setError("Chứng từ căn cứ không còn trong hồ sơ. Tải lại trang và chọn lại.");
-      return;
-    }
-
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-    try {
-      const result = await confirmCoverage(
-        caseView.id,
-        {
-          start: `${start}T00:00:00+07:00`,
-          funds: funds.split(/[\n,;]/).map((item) => item.trim()).filter(Boolean),
-          flow_kinds: FLOW_KINDS.map(([kind]) => kind),
-          opening_balance: amount,
-          unallocated_event_ids: unallocatedEventIds,
-          witness_refs: [{
-            source_id: source.id,
-            source_sha256: source.digest,
-            page: pageNumber,
-            exact_quote: quote.trim(),
-          }],
-          reason: reason.trim(),
-        },
-        caseView.version,
-      );
-      onCase(result.case_view);
-      setNotice(
-        result.case_view.coverage_current
-          ? "Đã lưu xác nhận đối chiếu cho hồ sơ này."
-          : "Đã lưu phạm vi đối chiếu; còn khoản chưa phân bổ nên hệ thống chưa coi chúng là 0.",
-      );
-    } catch (cause) {
-      setError(errorMessage(cause));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <section id="history-coverage" aria-labelledby="coverage-title" className="space-y-3 border-t border-slate-200 pt-4 text-xs">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id="coverage-title" className="font-semibold text-slate-900">
-            Xác nhận đã đối chiếu lịch sử tiền
+            Lịch sử tiền của hồ sơ
           </h2>
           <p className="mt-1 text-slate-500">
-            Chỉ xác nhận sau khi kiểm tra đầy đủ sổ tiền của đúng nhân viên và công việc.
+            Kiểm tra các khoản đã ghi nhận. Tải chứng từ không tự xác nhận công ty đã nhận hoặc chi tiền.
           </p>
         </div>
         {caseView.coverage_record && (
@@ -201,7 +121,7 @@ export function Coverage({
               {caseView.coverage_current ? "Đã đối chiếu" : "Cần đối chiếu lại"}
             </span>
             <p className="mt-1 text-[10px] text-slate-500">
-              Mốc kiểm tra: {new Date(caseView.coverage_record.as_of).toLocaleString("vi-VN")}
+              {["MANAGED_HISTORY", "DOSSIER_RECORDS"].includes(caseView.coverage_record.source) ? "Hệ thống theo dõi đến" : "Mốc kiểm tra"}: {new Date(caseView.coverage_record.as_of).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}
             </p>
           </div>
         )}
@@ -218,11 +138,11 @@ export function Coverage({
                 <div className="min-w-0">
                   <p className="font-medium text-slate-800">{KIND_LABELS[event.kind] ?? "Dòng tiền khác"}</p>
                   <p className="truncate text-[11px] text-slate-500">
-                    {event.payer} → {event.payee} · {event.event_at.slice(0, 10)}
+                    {event.payer} → {event.payee} · {new Date(event.event_at).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" })}
                   </p>
                   {event.verification_state !== "CONFIRMED" || event.allocation_state !== "ALLOCATED" ? (
                     <p className="mt-0.5 text-[11px] text-amber-800">
-                      {eventStateLabel(event)} — cần xử lý trước khi khẳng định đủ lịch sử.
+                      {eventStateLabel(event)} — cần kiểm tra chứng từ này.
                     </p>
                   ) : null}
                 </div>
@@ -258,135 +178,9 @@ export function Coverage({
 
       {unaccountedReturnClaims.map((amount, index) => (
         <p key={`${amount}:${index}`} className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-950">
-          Giấy quyết toán khai nhân viên hoàn lại {formatVnd(amount)}. Đây là số khai trên giấy, chưa phải giao dịch công ty đã nhận; hiện chưa có giao dịch hoàn đã xác minh trong hồ sơ. Hãy đối chiếu chứng từ tiền thực nhận và nêu rõ kết luận về khoản này trong lý do. Chưa có căn cứ tiền vào thì chưa ghi khoản hoàn là đã thu.
+          Giấy quyết toán khai nhân viên hoàn lại {formatVnd(amount)}. Đây là số khai trên giấy, chưa phải giao dịch công ty đã nhận; hiện chưa có giao dịch hoàn đã xác minh trong hồ sơ. Chỉ ghi khoản hoàn khi có chứng từ tiền thực nhận và kế toán xác nhận. Chưa có căn cứ tiền vào thì chưa ghi khoản hoàn là đã thu.
         </p>
       ))}
-
-      <div className="rounded-md border border-slate-200 bg-white p-3">
-        <h3 className="font-medium text-slate-800">Phạm vi cần kiểm tra</h3>
-        <ul className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2 text-slate-600">
-          {FLOW_KINDS.map(([, label]) => <li key={label}>• {label}</li>)}
-        </ul>
-        <p className="mt-2 text-[11px] text-slate-500">
-          Mốc đối chiếu do máy chủ ghi lúc xác nhận; giao dịch mới hoặc ghi bổ sung sẽ yêu cầu đối chiếu lại.
-        </p>
-      </div>
-
-      {showConfirmation && <>
-      {!caseView.coverage_current && caseView.coverage_record && <p className="rounded border border-amber-200 bg-amber-50 p-2.5 text-amber-900">Sổ tiền thay đổi sau lần đối chiếu trước. Kiểm tra lại lịch sử và xác nhận lại; dữ liệu chưa xác minh không được tính là 0.</p>}
-      {caseView.issues.filter((issue) => issue.field_or_rule.toLowerCase().includes("coverage")).map((issue) => <p key={issue.id} className="rounded border border-amber-200 bg-amber-50 p-2.5 text-amber-900">{issue.question} · {issue.basis}</p>)}
-      <div className="grid grid-cols-1 gap-3 rounded-md border border-slate-200 bg-white p-3 sm:grid-cols-2">
-        <div>
-          <label htmlFor="coverage-start" className="mb-1 block font-medium text-slate-700">
-            Đối chiếu từ ngày
-          </label>
-          <input
-            id="coverage-start"
-            aria-label="Đối chiếu từ ngày"
-            type="date"
-            value={start}
-            onChange={(event) => setStart(event.target.value)}
-            className="w-full rounded border border-slate-300 px-2.5 py-2"
-          />
-        </div>
-        <div>
-          <label htmlFor="coverage-funds" className="mb-1 block font-medium text-slate-700">
-            Nguồn tiền hoặc quỹ đã kiểm tra
-          </label>
-          <input
-            id="coverage-funds"
-            aria-label="Nguồn tiền hoặc quỹ đã kiểm tra"
-            value={funds}
-            onChange={(event) => setFunds(event.target.value)}
-            placeholder="Ví dụ: tài khoản ngân hàng, quỹ tiền mặt"
-            className="w-full rounded border border-slate-300 px-2.5 py-2"
-          />
-        </div>
-        <div>
-          <label htmlFor="coverage-opening" className="mb-1 block font-medium text-slate-700">
-            Số dư đầu kỳ (VND)
-          </label>
-          <input
-            id="coverage-opening"
-            aria-label="Số dư đầu kỳ (VND)"
-            type="number"
-            min={0}
-            step={1}
-            value={openingBalance}
-            onChange={(event) => setOpeningBalance(event.target.value)}
-            className="w-full rounded border border-slate-300 px-2.5 py-2"
-          />
-        </div>
-        <div>
-          <label htmlFor="coverage-source" className="mb-1 block font-medium text-slate-700">
-            Chứng từ căn cứ đối chiếu
-          </label>
-          <select
-            id="coverage-source"
-            aria-label="Chứng từ căn cứ đối chiếu"
-            value={sourceId}
-            onChange={(event) => setSourceId(event.target.value)}
-            className="w-full rounded border border-slate-300 px-2.5 py-2"
-          >
-            <option value="">Chọn chứng từ đã tải lên</option>
-            {caseView.sources.map((source) => (
-              <option key={source.id} value={source.id}>{source.filename ?? source.id}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="coverage-page" className="mb-1 block font-medium text-slate-700">
-            Trang chứng từ
-          </label>
-          <input
-            id="coverage-page"
-            aria-label="Trang chứng từ"
-            type="number"
-            min={1}
-            step={1}
-            value={page}
-            onChange={(event) => setPage(event.target.value)}
-            className="w-full rounded border border-slate-300 px-2.5 py-2"
-          />
-        </div>
-        <div>
-          <label htmlFor="coverage-quote" className="mb-1 block font-medium text-slate-700">
-            Đoạn căn cứ trên chứng từ
-          </label>
-          <input
-            id="coverage-quote"
-            aria-label="Đoạn căn cứ trên chứng từ"
-            value={quote}
-            onChange={(event) => setQuote(event.target.value)}
-            className="w-full rounded border border-slate-300 px-2.5 py-2"
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <label htmlFor="coverage-reason" className="mb-1 block font-medium text-slate-700">
-            Lý do xác nhận
-          </label>
-          <textarea
-            id="coverage-reason"
-            aria-label="Lý do xác nhận"
-            rows={2}
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            className="w-full rounded border border-slate-300 px-2.5 py-2"
-          />
-        </div>
-      </div>
-
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={busy}
-          className="rounded bg-slate-950 px-4 py-2 font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {busy ? "Đang lưu xác nhận…" : "Xác nhận đã đối chiếu lịch sử tiền"}
-        </button>
-      </div>
-      </>}
 
       {notice && <p role="status" className="rounded border border-emerald-200 bg-emerald-50 p-2.5 text-emerald-800">{notice}</p>}
       {error && <p role="alert" className="rounded border border-rose-200 bg-rose-50 p-2.5 text-rose-800">{error}</p>}

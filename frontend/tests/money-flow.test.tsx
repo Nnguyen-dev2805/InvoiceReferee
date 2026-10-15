@@ -69,7 +69,7 @@ describe("money-flow UI", () => {
       return new Response(JSON.stringify({ case_view: { ...view, version: 5 }, job_id: null, duplicate_command: false }), { status: 200 });
     }));
     const user = userEvent.setup();
-    render(<Coverage caseView={view} onCase={onCase} showConfirmation={false} />);
+    render(<Coverage caseView={view} onCase={onCase} />);
     expect(screen.queryByRole("button", { name: "Xác nhận đã đối chiếu lịch sử tiền" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Kế toán xác nhận đã nhận" }));
     await waitFor(() => expect(requestBody).not.toBeNull());

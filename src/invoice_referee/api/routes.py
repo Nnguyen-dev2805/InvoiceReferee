@@ -22,6 +22,7 @@ from invoice_referee.domain.commands import (
     AttachSources,
     CommandResult,
     ConfirmCoverage,
+    ConfirmMoneyHistory,
     Control,
     CreateDraft,
     Decide,
@@ -557,6 +558,19 @@ async def confirm_coverage(
             witness_refs=tuple(payload.witness_refs),
             reason=payload.reason,
         ),
+    )
+
+
+@router.post("/cases/{root_id}/money-history/confirm")
+async def confirm_money_history(
+    request: Request, root_id: str, payload: views.ConfirmMoneyHistoryRequest
+) -> CommandResult:
+    session = _require_session(request)
+    if session.persona != "accountant":
+        raise HTTPException(status_code=403, detail="Chỉ kế toán được xác nhận lịch sử tiền ban đầu.")
+    return await _workflow(request).execute(
+        _command_context(request, session, require_version=True),
+        ConfirmMoneyHistory(root_id=root_id, all_prior_money_recorded=payload.all_prior_money_recorded),
     )
 
 

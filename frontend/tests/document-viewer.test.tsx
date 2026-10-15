@@ -39,18 +39,21 @@ const MOCK_CASE: CaseView = {
 };
 
 describe("DocumentViewer", () => {
-  it("renders tabs with filename and format badge without raw commit hashes", () => {
+  it("renders document switcher with filename and format badge without raw commit hashes", async () => {
     render(<DocumentViewer caseView={MOCK_CASE} />);
 
-    // Renders the filenames
+    // Renders active document filename
     expect(screen.getByText("giay_quyet_toan.pdf")).toBeInTheDocument();
-    expect(screen.getByText("hoa_don_vat.png")).toBeInTheDocument();
 
     // Does NOT render raw git commit hashes (e.g. abcdef)
     expect(screen.queryByText("abcdef")).not.toBeInTheDocument();
 
     // Renders external link button
     expect(screen.getByRole("link", { name: /Mở tab mới/ })).toBeInTheDocument();
+
+    // Opens dropdown to view other documents
+    await userEvent.setup().click(screen.getByRole("button", { name: /Chọn chứng từ/ }));
+    expect(screen.getByText("hoa_don_vat.png")).toBeInTheDocument();
   });
 
   it("renders empty state when no sources or pending files exist", () => {
@@ -74,8 +77,17 @@ describe("DocumentViewer", () => {
     render(<Harness />);
     expect(screen.getByRole("img", { name: "hoa_don_vat.png" })).toBeInTheDocument();
 
-    await userEvent.setup().click(screen.getByRole("button", { name: /giay_quyet_toan\.pdf/ }));
+    // Switches document via previous flipper button
+    await userEvent.setup().click(screen.getByRole("button", { name: /Chứng từ trước/ }));
+    expect(screen.getByTitle("giay_quyet_toan.pdf")).toBeInTheDocument();
 
+    // Switches document via next flipper button
+    await userEvent.setup().click(screen.getByRole("button", { name: /Chứng từ tiếp theo/ }));
+    expect(screen.getByRole("img", { name: "hoa_don_vat.png" })).toBeInTheDocument();
+
+    // Switches document via dropdown selection
+    await userEvent.setup().click(screen.getByRole("button", { name: /Chọn chứng từ/ }));
+    await userEvent.setup().click(screen.getByRole("button", { name: /giay_quyet_toan\.pdf/ }));
     expect(screen.getByTitle("giay_quyet_toan.pdf")).toBeInTheDocument();
   });
 });

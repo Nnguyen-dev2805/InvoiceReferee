@@ -107,6 +107,7 @@ export interface MoneyHistoryView {
 }
 
 export interface CoverageRecordView {
+  context_ledger_fingerprint?: string | null;
   scope: string;
   employee: string | null;
   start: string;

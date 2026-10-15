@@ -47,16 +47,18 @@ tenant identity needed to check the company and employee.
    is required. The server derives the statement and records actor/time/source.
    Missing-field completion needs a reason; manual linkage uses its existing
    reason. Text cannot waive a conflicting source.
-4. The accountant confirms coverage through a separate structured command. It
-   records the employee/activity, period start, server-owned confirmation time,
-   funds, all movement kinds, opening balance, unallocated event IDs, witness
-   references, reason, actor and root ledger version. Admission consumes this
-   `CoverageRecord`; a free-text answer does not.
-5. A coverage record cannot be future-dated. It remains usable for the same
-   accounting date only while the covered root ledger version is unchanged. A
-   later or backdated event on that root makes it stale. An event in another root
-   does not. A non-empty unallocated set cannot establish A/P/R zeros. Uploading
-   an advance never creates coverage.
+4. Superseding user correction on 15/10/2026: no initial-history checkbox or
+   separate confirmation action in the ordinary UI. Confirming a valid source-bound
+   advance records A once and enables `DOSSIER_RECORDS` reconciliation atomically.
+   Its universe is the dossier's recorded money, not all external bank history.
+   No actor statement of complete prior history, fake zero opening, fund or absence
+   quote is generated. Unconfirmed uploads/declarations do not become actual money.
+5. Completed source-bound advances and active-instruction-bound P/R update the
+   dossier tracking, while unknown/unallocated/conflicting money remains blocking.
+   Employee proof upload leaves R unchanged; only accountant confirmation records
+   receipt. A confirmed imported advance may start tracking when the accountant
+   records a source-bound P/R. Legacy coverage APIs and payloads remain readable;
+   `MANAGED_HISTORY` is compatibility data, never an extra UI requirement.
 6. Context composition takes organization ID/name, people, policies and grants
    from tenant snapshots. It overlays the selected activity identity and only
    that activity's references, ledger, budgets and coverage. A new proposed
@@ -80,9 +82,9 @@ tenant identity needed to check the company and employee.
 - Database changes are additive (`case_advance_drafts`,
   `case_activity_acceptances`, and `case_coverage_records`). Existing user data is
   not rewritten by this implementation session.
-- The accountant's coverage confirmation is an accountable business statement,
-  not a bank integration or cryptographic verification. The UI preserves the
-  source locator and actor/reason so the assertion can be reviewed.
+- Dossier tracking is not a bank integration or a complete-history assertion.
+  Positive money events retain source locators and responsible accountant audit.
+  No one receipt proves all external history.
 - Existing action limits, grants, policy, arithmetic, payer binding, tenant
   isolation and Stop/Resume behavior remain separate gates.
 

@@ -124,6 +124,12 @@ class RecordActual(StrictModel):
     money: RecordMoneyInput
 
 
+class ConfirmMoneyHistory(StrictModel):
+    kind: Literal["CONFIRM_MONEY_HISTORY"] = "CONFIRM_MONEY_HISTORY"
+    root_id: Id
+    all_prior_money_recorded: bool
+
+
 class ConfirmCoverage(StrictModel):
     """Accountant's structured reconciliation of one dossier's money history."""
 
@@ -171,6 +177,7 @@ CaseCommand = Annotated[
         Decide,
         RecordActual,
         ConfirmCoverage,
+        ConfirmMoneyHistory,
         Control,
         Override,
         MarkExecution,
