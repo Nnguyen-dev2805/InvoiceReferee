@@ -36,7 +36,6 @@ COPY --from=frontend /web/dist ./frontend/dist
 ENV INVOICE_REFEREE_DB=/data/invoice-referee.sqlite \
     INVOICE_REFEREE_UPLOADS=/data/uploads \
     PORT=8000
-VOLUME ["/data"]
 EXPOSE 8000
 
 # One entry: the same scripts/dev.py the pilot uses, against the volume.
