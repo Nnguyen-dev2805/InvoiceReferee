@@ -23,7 +23,7 @@ def _workflow(tmp_path: Path) -> CaseWorkflow:
     db.migrate()
     wf = CaseWorkflow(db, uploads_dir=tmp_path / "uploads")
     wf.import_demo_context(
-        Path(__file__).resolve().parents[2] / "data" / "demo" / "company-context.json",
+        Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "legacy-company-context.json",
         origin="SIMULATED",
     )
     return wf

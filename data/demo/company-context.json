@@ -1,166 +1,120 @@
 {
-  "data_origin": "SIMULATED",
-  "note": "Context công ty tổng hợp cho demo; không phải quyền thật của doanh nghiệp hay quy định pháp luật.",
-  "organization": {
-    "id": "tenant:demo",
-    "name": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH"
-  },
-  "people": [
-    { "id": "employee:employee-a", "name": "NGUYỄN MINH AN" },
-    { "id": "employee:accountant-demo", "name": "Trần Thị B (kế toán)" },
-    { "id": "employee:approver", "name": "Lê Văn C (người quyết định)" }
+  "tenant": "tenant:demo",
+  "profile": "WORK_EXPENSE",
+  "records": [
+    "Danh tính, quyền và chính sách công ty là dữ liệu mô phỏng độc lập với chứng từ chi phí."
   ],
-  "activities": [
+  "organization_id": "tenant:demo",
+  "company_name": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+  "company_tax_id": "0319999996",
+  "activity": null,
+  "people": [
     {
-      "id": "activity:travel-a",
-      "name": "Công tác Hà Nội",
-      "occurred_at": "2026-10-05T09:00:00+07:00",
-      "purpose": "Làm việc với đối tác tại Hà Nội",
-      "status": "AUTHORIZED",
-      "budget": {
-        "amount": 8000000,
-        "effect_from": "2026-10-01T00:00:00+07:00",
-        "record_key": "budget:travel-a",
-        "quote": "Ngân sách hoạt động Công tác Hà Nội: 8.000.000 VND (hiệu lực từ 01/10/2026)."
+      "id": "employee:employee-a",
+      "name": "NGUYỄN MINH AN"
+    },
+    {
+      "id": "employee:accountant-demo",
+      "name": "Trần Thị B (kế toán)"
+    },
+    {
+      "id": "employee:approver",
+      "name": "Lê Văn C (người quyết định)"
+    }
+  ],
+  "policies": [
+    {
+      "id": "policy:uc03:TRAVEL",
+      "version": "uc03-v1",
+      "profile": "TRAVEL",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "rules": [
+        "EMPLOYEE_PAID_INVOICE_BOUNDED"
+      ]
+    },
+    {
+      "id": "policy:uc03:WORK_EXPENSE",
+      "version": "uc03-v1",
+      "profile": "WORK_EXPENSE",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "rules": [
+        "EMPLOYEE_PAID_INVOICE_BOUNDED"
+      ]
+    }
+  ],
+  "category_policies": [
+    {
+      "id": "category:uc03:TRAVEL",
+      "version": "uc03-v1",
+      "profile": "TRAVEL",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "per_item_caps": {
+        "CLIENT_MEAL": 5000000,
+        "WORK_CLIENT_MEAL": 5000000,
+        "TAXI": 2000000
       },
-      "transcription": [
-        { "field": "incurred", "value": 8000000, "role": "INVOICE", "quote": "Tổng chi 8.000.000" },
-        { "field": "paid_employee", "value": 5000000, "role": "PAYMENT", "quote": "Nhân viên trả 5.000.000" },
-        { "field": "paid_company", "value": 3000000, "role": "PAYMENT", "quote": "Công ty trả 3.000.000" },
-        { "field": "advance", "value": 2000000, "role": "ADVANCE", "quote": "Ứng 2.000.000" },
-        { "field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn" },
-        { "field": "economic_key", "value": "invoice:travel-a", "role": "INVOICE", "quote": "Hóa đơn travel-a" }
+      "submission_window_days": 30,
+      "excluded_categories": [
+        "PERSONAL"
       ]
     },
     {
-      "id": "activity:travel-b",
-      "name": "Công tác Đà Nẵng",
-      "occurred_at": "2026-11-02T09:00:00+07:00",
-      "purpose": "Khảo sát nhà cung cấp tại Đà Nẵng",
-      "status": "AUTHORIZED",
-      "transcription": [
-        { "field": "incurred", "value": 5000000, "role": "INVOICE", "quote": "Tổng chi 5.000.000" },
-        { "field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn" }
-      ]
-    },
-    {
-      "id": "activity:travel-c",
-      "name": "Công tác Hải Phòng",
-      "occurred_at": "2026-10-20T09:00:00+07:00",
-      "purpose": "Làm việc với chi nhánh Hải Phòng",
-      "status": "AUTHORIZED",
-      "budget": {
-        "amount": 8000000,
-        "effect_from": "2026-10-01T00:00:00+07:00",
-        "record_key": "budget:travel-c",
-        "quote": "Ngân sách hoạt động Công tác Hải Phòng: 8.000.000 VND."
+      "id": "category:uc03:WORK_EXPENSE",
+      "version": "uc03-v1",
+      "profile": "WORK_EXPENSE",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "per_item_caps": {
+        "CLIENT_MEAL": 5000000,
+        "WORK_CLIENT_MEAL": 5000000,
+        "TAXI": 2000000
       },
-      "transcription": [
-        { "field": "incurred", "value": 8000000, "role": "INVOICE", "quote": "Tổng chi 8.000.000" },
-        { "field": "paid_employee", "value": 5000000, "role": "PAYMENT", "quote": "Nhân viên trả 5.000.000" },
-        { "field": "paid_company", "value": 3000000, "role": "PAYMENT", "quote": "Công ty trả 3.000.000" },
-        { "field": "advance", "value": 2000000, "role": "ADVANCE", "quote": "Ứng 2.000.000" },
-        { "field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn" },
-        { "field": "economic_key", "value": "invoice:travel-c", "role": "INVOICE", "quote": "Hóa đơn travel-c" }
-      ]
-    },
-    {
-      "id": "activity:travel-d",
-      "name": "Công tác Cần Thơ",
-      "occurred_at": "2026-10-25T09:00:00+07:00",
-      "purpose": "Khảo sát đối tác Cần Thơ",
-      "status": "AUTHORIZED",
-      "transcription": [
-        { "field": "incurred", "value": 5000000, "role": "INVOICE", "quote": "Tổng chi 5.000.000" },
-        { "field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn" }
-      ]
-    },
-    {
-      "id": "activity:travel-e",
-      "name": "Công tác Huế",
-      "occurred_at": "2026-10-28T09:00:00+07:00",
-      "purpose": "Làm việc với đối tác Huế",
-      "status": "AUTHORIZED",
-      "budget": {
-        "amount": 8000000,
-        "effect_from": "2026-10-01T00:00:00+07:00",
-        "record_key": "budget:travel-e",
-        "quote": "Ngân sách hoạt động Công tác Huế: 8.000.000 VND."
-      },
-      "transcription": [
-        { "field": "incurred", "value": 8000000, "role": "INVOICE", "quote": "Tổng chi 8.000.000" },
-        { "field": "paid_employee", "value": 5000000, "role": "PAYMENT", "quote": "Nhân viên trả 5.000.000" },
-        { "field": "paid_company", "value": 3000000, "role": "PAYMENT", "quote": "Công ty trả 3.000.000" },
-        { "field": "advance", "value": 2000000, "role": "ADVANCE", "quote": "Ứng 2.000.000" },
-        { "field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn" },
-        { "field": "economic_key", "value": "invoice:travel-e", "role": "INVOICE", "quote": "Hóa đơn travel-e" }
-      ]
-    },
-    {
-      "id": "activity:travel-f",
-      "name": "Công tác Nghệ An",
-      "occurred_at": "2026-10-30T09:00:00+07:00",
-      "purpose": "Làm việc với đối tác Nghệ An",
-      "status": "AUTHORIZED",
-      "budget": {
-        "amount": 8000000,
-        "effect_from": "2026-10-01T00:00:00+07:00",
-        "record_key": "budget:travel-f",
-        "quote": "Ngân sách hoạt động Công tác Nghệ An: 8.000.000 VND."
-      },
-      "transcription": [
-        { "field": "incurred", "value": 8000000, "role": "INVOICE", "quote": "Tổng chi 8.000.000" },
-        { "field": "paid_employee", "value": 5000000, "role": "PAYMENT", "quote": "Nhân viên trả 5.000.000" },
-        { "field": "paid_company", "value": 3000000, "role": "PAYMENT", "quote": "Công ty trả 3.000.000" },
-        { "field": "advance", "value": 2000000, "role": "ADVANCE", "quote": "Ứng 2.000.000" },
-        { "field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn" },
-        { "field": "economic_key", "value": "invoice:travel-f", "role": "INVOICE", "quote": "Hóa đơn travel-f" }
-      ]
-    },
-    {
-      "id": "activity:travel-g",
-      "name": "Công tác Thanh Hóa",
-      "occurred_at": "2026-11-05T09:00:00+07:00",
-      "purpose": "Làm việc với đối tác Thanh Hóa",
-      "status": "AUTHORIZED",
-      "budget": {
-        "amount": 8000000,
-        "effect_from": "2026-10-01T00:00:00+07:00",
-        "record_key": "budget:travel-g",
-        "quote": "Ngân sách hoạt động Công tác Thanh Hóa: 8.000.000 VND."
-      },
-      "transcription": [
-        { "field": "incurred", "value": 8000000, "role": "INVOICE", "quote": "Tổng chi 8.000.000" },
-        { "field": "paid_employee", "value": 5000000, "role": "PAYMENT", "quote": "Nhân viên trả 5.000.000" },
-        { "field": "paid_company", "value": 3000000, "role": "PAYMENT", "quote": "Công ty trả 3.000.000" },
-        { "field": "advance", "value": 2000000, "role": "ADVANCE", "quote": "Ứng 2.000.000" },
-        { "field": "coverage", "value": 1, "role": "LEDGER", "quote": "Đối chiếu đủ giai đoạn" },
-        { "field": "economic_key", "value": "invoice:travel-g", "role": "INVOICE", "quote": "Hóa đơn travel-g" }
+      "submission_window_days": 30,
+      "excluded_categories": [
+        "PERSONAL"
       ]
     }
   ],
   "grants": [
     {
-      "id": "grant:system:recognize",
-      "version": "v1",
+      "id": "grant:tenant:demo:recognize",
+      "version": "uc03-v1",
       "actor": "system:referee",
-      "actions": ["RECOGNIZE_COST"],
+      "actions": [
+        "RECOGNIZE_COST"
+      ],
       "scope": "tenant:demo",
       "max_amount": 8000000,
-      "effective_from": "2026-10-01T00:00:00+07:00"
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL",
+        "WORK_EXPENSE"
+      ]
     },
     {
-      "id": "grant:system:issue",
-      "version": "v1",
+      "id": "grant:tenant:demo:issue",
+      "version": "uc03-v1",
       "actor": "system:referee",
-      "actions": ["ISSUE_PAYMENT", "ISSUE_COLLECTION"],
+      "actions": [
+        "ISSUE_PAYMENT",
+        "ISSUE_COLLECTION"
+      ],
       "scope": "tenant:demo",
       "max_amount": 4000000,
-      "effective_from": "2026-10-01T00:00:00+07:00"
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL",
+        "WORK_EXPENSE"
+      ]
     },
     {
-      "id": "grant:approver:per-action",
-      "version": "v1",
+      "id": "grant:tenant:demo:approver",
+      "version": "uc03-v1",
       "actor": "employee:approver",
       "actions": [
         "AUTHORIZE_ACTIVITY",
@@ -172,24 +126,1717 @@
       ],
       "scope": "tenant:demo",
       "max_amount": 20000000,
-      "effective_from": "2026-10-01T00:00:00+07:00"
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL",
+        "WORK_EXPENSE"
+      ]
+    },
+    {
+      "id": "grant:tenant:demo:accountant",
+      "version": "uc03-v1",
+      "actor": "employee:accountant-demo",
+      "actions": [
+        "CONFIRM_FINANCIAL_FACT",
+        "RECORD_ACTUAL",
+        "STOP",
+        "RESUME"
+      ],
+      "scope": "tenant:demo",
+      "max_amount": 120000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL",
+        "WORK_EXPENSE"
+      ]
+    }
+  ],
+  "ledger": [
+    {
+      "id": "advance:tc01",
+      "external_key": "transfer:FT-TC01-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc01",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 4000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc02",
+      "external_key": "transfer:FT-TC02-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc02",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 5000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc03",
+      "external_key": "transfer:FT-TC03-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc03",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 4320000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc04",
+      "external_key": "transfer:FT-TC04-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc04",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 85000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc05",
+      "external_key": "transfer:FT-TC05-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc05",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 4000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc06",
+      "external_key": "transfer:FT-TC06-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc06",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 4000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc07",
+      "external_key": "transfer:FT-TC07-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc07",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 4000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc08",
+      "external_key": "transfer:FT-TC08-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc08",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 4000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc09",
+      "external_key": "transfer:FT-TC09-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc09",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 4000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc10",
+      "external_key": "transfer:FT-TC10-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc10",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 4000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc11",
+      "external_key": "transfer:FT-TC11-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc11",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 6000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc12",
+      "external_key": "transfer:FT-TC12-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc12",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 4000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc13",
+      "external_key": "transfer:FT-TC13-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc13",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 3000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc14",
+      "external_key": "transfer:FT-TC14-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc14",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 120000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc15",
+      "external_key": "transfer:FT-TC15-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc15",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 3000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc16",
+      "external_key": "transfer:FT-TC16-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc16",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 12000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc17",
+      "external_key": "transfer:FT-TC17-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc17",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 6000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc18",
+      "external_key": "transfer:FT-TC18-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc18",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 5000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc19",
+      "external_key": "transfer:FT-TC19-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc19",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 4000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc20",
+      "external_key": "transfer:FT-TC20-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc20",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 2000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc21",
+      "external_key": "transfer:FT-TC21-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc21",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 15000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc22",
+      "external_key": "transfer:FT-TC22-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc22",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 9000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc23",
+      "external_key": "transfer:FT-TC23-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc23",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 9000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc24",
+      "external_key": "transfer:FT-TC24-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc24",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 3000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    },
+    {
+      "id": "advance:tc25",
+      "external_key": "transfer:FT-TC25-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc25",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 5000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    }
+  ],
+  "coverage": null,
+  "coverages": [
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc01",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC01:initial-v1",
+      "witness_keys": [
+        "coverage:TC01"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc02",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC02:initial-v1",
+      "witness_keys": [
+        "coverage:TC02"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc03",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC03:initial-v1",
+      "witness_keys": [
+        "coverage:TC03"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc04",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC04:initial-v1",
+      "witness_keys": [
+        "coverage:TC04"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc05",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC05:initial-v1",
+      "witness_keys": [
+        "coverage:TC05"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc06",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC06:initial-v1",
+      "witness_keys": [
+        "coverage:TC06"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc07",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC07:initial-v1",
+      "witness_keys": [
+        "coverage:TC07"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc08",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC08:initial-v1",
+      "witness_keys": [
+        "coverage:TC08"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc09",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC09:initial-v1",
+      "witness_keys": [
+        "coverage:TC09"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc10",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC10:initial-v1",
+      "witness_keys": [
+        "coverage:TC10"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc11",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC11:initial-v1",
+      "witness_keys": [
+        "coverage:TC11"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc12",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC12:initial-v1",
+      "witness_keys": [
+        "coverage:TC12"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc13",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC13:initial-v1",
+      "witness_keys": [
+        "coverage:TC13"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc14",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC14:initial-v1",
+      "witness_keys": [
+        "coverage:TC14"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc15",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC15:initial-v1",
+      "witness_keys": [
+        "coverage:TC15"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc16",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC16:initial-v1",
+      "witness_keys": [
+        "coverage:TC16"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc17",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC17:initial-v1",
+      "witness_keys": [
+        "coverage:TC17"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc18",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC18:initial-v1",
+      "witness_keys": [
+        "coverage:TC18"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc19",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC19:initial-v1",
+      "witness_keys": [
+        "coverage:TC19"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc20",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC20:initial-v1",
+      "witness_keys": [
+        "coverage:TC20"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc21",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC21:initial-v1",
+      "witness_keys": [
+        "coverage:TC21"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc22",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC22:initial-v1",
+      "witness_keys": [
+        "coverage:TC22"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc23",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC23:initial-v1",
+      "witness_keys": [
+        "coverage:TC23"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc24",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC24:initial-v1",
+      "witness_keys": [
+        "coverage:TC24"
+      ]
+    },
+    {
+      "employee": "employee:employee-a",
+      "activity": "activity:tc25",
+      "start": "2026-10-01T00:00:00+07:00",
+      "as_of": "2026-10-16T12:00:00+07:00",
+      "fund_ids": [
+        "company:bank-demo"
+      ],
+      "flow_kinds": [
+        "ADVANCE_RECEIVED",
+        "REIMBURSEMENT_RECEIVED",
+        "EMPLOYEE_RETURN",
+        "REVERSAL",
+        "OBSERVED_UNALLOCATED"
+      ],
+      "opening_by_fund": {
+        "company:bank-demo": 0
+      },
+      "ledger_version": "ledger:TC25:initial-v1",
+      "witness_keys": [
+        "coverage:TC25"
+      ]
     }
   ],
   "witnesses": [
     {
-      "kind": "LEDGER_OPENING",
-      "record_key": "ledger:opening:2026-09",
-      "quote": "Số dư theo dõi công tác của Nguyễn Văn A tại 01/10/2026: 0 VND (chưa có ứng nào được ghi)."
+      "record_key": "advance:tc01",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc01",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 4000000 VND cho Nguyễn Minh An, activity:tc01; không suy từ giấy quyết toán."
     },
     {
-      "kind": "LEDGER_COVERAGE",
-      "record_key": "ledger:coverage:2026-10",
-      "quote": "Sổ theo dõi ứng/hoàn cho Nguyễn Văn A được đối chiếu đủ giai đoạn 01/10/2026–13/10/2026."
+      "record_key": "coverage:TC01",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc01",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc01: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
     },
     {
-      "kind": "BUDGET",
-      "record_key": "budget:travel-a",
-      "quote": "Ngân sách hoạt động Công tác Hà Nội: 8.000.000 VND (hiệu lực từ 01/10/2026)."
+      "record_key": "advance:tc02",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc02",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 5000000 VND cho Nguyễn Minh An, activity:tc02; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC02",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc02",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc02: đúng một khoản ứng 5000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc03",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc03",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 4320000 VND cho Nguyễn Minh An, activity:tc03; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC03",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc03",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc03: đúng một khoản ứng 4320000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc04",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc04",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 85000000 VND cho Nguyễn Minh An, activity:tc04; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC04",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc04",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc04: đúng một khoản ứng 85000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc05",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc05",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 4000000 VND cho Nguyễn Minh An, activity:tc05; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC05",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc05",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc05: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc06",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc06",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 4000000 VND cho Nguyễn Minh An, activity:tc06; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC06",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc06",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc06: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc07",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc07",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 4000000 VND cho Nguyễn Minh An, activity:tc07; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC07",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc07",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc07: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc08",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc08",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 4000000 VND cho Nguyễn Minh An, activity:tc08; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC08",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc08",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc08: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc09",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc09",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 4000000 VND cho Nguyễn Minh An, activity:tc09; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC09",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc09",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc09: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc10",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc10",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 4000000 VND cho Nguyễn Minh An, activity:tc10; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC10",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc10",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc10: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc11",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc11",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 6000000 VND cho Nguyễn Minh An, activity:tc11; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC11",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc11",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc11: đúng một khoản ứng 6000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc12",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc12",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 4000000 VND cho Nguyễn Minh An, activity:tc12; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC12",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc12",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc12: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc13",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc13",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 3000000 VND cho Nguyễn Minh An, activity:tc13; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC13",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc13",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc13: đúng một khoản ứng 3000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc14",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc14",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 120000000 VND cho Nguyễn Minh An, activity:tc14; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC14",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc14",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc14: đúng một khoản ứng 120000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc15",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc15",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 3000000 VND cho Nguyễn Minh An, activity:tc15; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC15",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc15",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc15: đúng một khoản ứng 3000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc16",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc16",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 12000000 VND cho Nguyễn Minh An, activity:tc16; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC16",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc16",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc16: đúng một khoản ứng 12000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc17",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc17",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 6000000 VND cho Nguyễn Minh An, activity:tc17; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC17",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc17",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc17: đúng một khoản ứng 6000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc18",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc18",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 5000000 VND cho Nguyễn Minh An, activity:tc18; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC18",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc18",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc18: đúng một khoản ứng 5000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc19",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc19",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 4000000 VND cho Nguyễn Minh An, activity:tc19; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC19",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc19",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc19: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc20",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc20",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 2000000 VND cho Nguyễn Minh An, activity:tc20; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC20",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc20",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc20: đúng một khoản ứng 2000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc21",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc21",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 15000000 VND cho Nguyễn Minh An, activity:tc21; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC21",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc21",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc21: đúng một khoản ứng 15000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc22",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc22",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 9000000 VND cho Nguyễn Minh An, activity:tc22; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC22",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc22",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc22: đúng một khoản ứng 9000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc23",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc23",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 9000000 VND cho Nguyễn Minh An, activity:tc23; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC23",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc23",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc23: đúng một khoản ứng 9000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc24",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc24",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 3000000 VND cho Nguyễn Minh An, activity:tc24; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC24",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc24",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc24: đúng một khoản ứng 3000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    },
+    {
+      "record_key": "advance:tc25",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc25",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 5000000 VND cho Nguyễn Minh An, activity:tc25; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC25",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc25",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc25: đúng một khoản ứng 5000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
     }
-  ]
+  ],
+  "activities": [
+    {
+      "activity_id": "activity:tc01",
+      "name": "TC01 — Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC01"
+      ],
+      "authorization": {
+        "id": "auth:TC01",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc02",
+      "name": "TC02 — Mua thiết bị văn phòng phục vụ hoạt động công ty",
+      "purpose": "Mua thiết bị văn phòng phục vụ hoạt động công ty",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC02"
+      ],
+      "authorization": {
+        "id": "auth:TC02",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc03",
+      "name": "TC03 — Chi phí lưu trú trong chuyến công tác",
+      "purpose": "Chi phí lưu trú trong chuyến công tác",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "TRAVEL",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC03"
+      ],
+      "authorization": {
+        "id": "auth:TC03",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc04",
+      "name": "TC04 — Mua thiết bị máy tính cho nhân viên",
+      "purpose": "Mua thiết bị máy tính cho nhân viên",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC04"
+      ],
+      "authorization": {
+        "id": "auth:TC04",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc05",
+      "name": "TC05 — Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC05"
+      ],
+      "authorization": {
+        "id": "auth:TC05",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc06",
+      "name": "TC06 — Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC06"
+      ],
+      "authorization": {
+        "id": "auth:TC06",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc07",
+      "name": "TC07 — Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC07"
+      ],
+      "authorization": {
+        "id": "auth:TC07",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc08",
+      "name": "TC08 — Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC08"
+      ],
+      "authorization": {
+        "id": "auth:TC08",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc09",
+      "name": "TC09 — Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC09"
+      ],
+      "authorization": {
+        "id": "auth:TC09",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc10",
+      "name": "TC10 — Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC10"
+      ],
+      "authorization": {
+        "id": "auth:TC10",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc11",
+      "name": "TC11 — Mua thiết bị văn phòng phục vụ hoạt động công ty",
+      "purpose": "Mua thiết bị văn phòng phục vụ hoạt động công ty",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC11"
+      ],
+      "authorization": {
+        "id": "auth:TC11",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc12",
+      "name": "TC12 — Chi phí tiếp khách lần nộp thứ hai",
+      "purpose": "Chi phí tiếp khách lần nộp thứ hai",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC12"
+      ],
+      "authorization": {
+        "id": "auth:TC12",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc13",
+      "name": "TC13 — Mua đồ uống phục vụ cá nhân sau giờ làm",
+      "purpose": "Mua đồ uống phục vụ cá nhân sau giờ làm",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC13"
+      ],
+      "authorization": {
+        "id": "auth:TC13",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc14",
+      "name": "TC14 — Mua máy chủ phục vụ hệ thống nội bộ",
+      "purpose": "Mua máy chủ phục vụ hệ thống nội bộ",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC14"
+      ],
+      "authorization": {
+        "id": "auth:TC14",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc15",
+      "name": "TC15 — Sửa chữa máy in văn phòng",
+      "purpose": "Sửa chữa máy in văn phòng",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC15"
+      ],
+      "authorization": {
+        "id": "auth:TC15",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc16",
+      "name": "TC16 — Hoàn ứng chi phí chuyến công tác Đà Nẵng",
+      "purpose": "Hoàn ứng chi phí chuyến công tác Đà Nẵng",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "TRAVEL",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC16"
+      ],
+      "authorization": {
+        "id": "auth:TC16",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc17",
+      "name": "TC17 — Hoàn ứng chi phí tiếp khách và tổ chức cuộc họp",
+      "purpose": "Hoàn ứng chi phí tiếp khách và tổ chức cuộc họp",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC17"
+      ],
+      "authorization": {
+        "id": "auth:TC17",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc18",
+      "name": "TC18 — Hoàn ứng sửa chữa máy in văn phòng",
+      "purpose": "Hoàn ứng sửa chữa máy in văn phòng",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC18"
+      ],
+      "authorization": {
+        "id": "auth:TC18",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc19",
+      "name": "TC19 — Hoàn ứng chuyến khảo sát khách hàng",
+      "purpose": "Hoàn ứng chuyến khảo sát khách hàng",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "TRAVEL",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC19"
+      ],
+      "authorization": {
+        "id": "auth:TC19",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc20",
+      "name": "TC20 — Hoàn ứng chuyến khảo sát hiện trường",
+      "purpose": "Hoàn ứng chuyến khảo sát hiện trường",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "TRAVEL",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC20"
+      ],
+      "authorization": {
+        "id": "auth:TC20",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc21",
+      "name": "TC21 — Hoàn ứng chi phí tổ chức hội nghị",
+      "purpose": "Hoàn ứng chi phí tổ chức hội nghị",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC21"
+      ],
+      "authorization": {
+        "id": "auth:TC21",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc22",
+      "name": "TC22 — Hoàn ứng mua và lắp đặt thiết bị mạng",
+      "purpose": "Hoàn ứng mua và lắp đặt thiết bị mạng",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC22"
+      ],
+      "authorization": {
+        "id": "auth:TC22",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc23",
+      "name": "TC23 — Hoàn ứng mua vật tư văn phòng",
+      "purpose": "Hoàn ứng mua vật tư văn phòng",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "WORK_EXPENSE",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC23"
+      ],
+      "authorization": {
+        "id": "auth:TC23",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc24",
+      "name": "TC24 — Hoàn ứng chuyến công tác ngắn ngày",
+      "purpose": "Hoàn ứng chuyến công tác ngắn ngày",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "TRAVEL",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC24"
+      ],
+      "authorization": {
+        "id": "auth:TC24",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    },
+    {
+      "activity_id": "activity:tc25",
+      "name": "TC25 — Hoàn ứng chi phí công tác tỉnh",
+      "purpose": "Hoàn ứng chi phí công tác tỉnh",
+      "occurred_at": "2026-10-10T09:00:00+07:00",
+      "profile": "TRAVEL",
+      "status": "AUTHORIZED",
+      "references": [
+        "TU-TC25"
+      ],
+      "authorization": {
+        "id": "auth:TC25",
+        "actor": "employee:approver",
+        "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+      }
+    }
+  ],
+  "financial_as_of": "2026-10-16T12:00:00+07:00",
+  "data_origin": "SIMULATED"
 }

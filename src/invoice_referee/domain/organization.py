@@ -35,6 +35,7 @@ class OrganizationContext(StrictModel):
     # The scoped organization's legal name (T2): used to bind a company-buyer-only
     # invoice to the dossier via composite claimant/company/activity identity.
     company_name: str | None = None
+    company_tax_id: str | None = None
     activity: dict[str, object] | None = None
     people: tuple[dict[str, object], ...] = ()
     policies: tuple[dict[str, object], ...] = ()
@@ -46,6 +47,9 @@ class OrganizationContext(StrictModel):
     grants: tuple[dict[str, object], ...] = ()
     ledger: tuple[dict[str, object], ...] = ()
     coverage: dict[str, object] | None = None
+    # A shared demo may carry one history snapshot per activity; the loader
+    # exposes only the selected activity's snapshot as ``coverage``.
+    coverages: tuple[dict[str, object], ...] = ()
     witnesses: tuple[dict[str, object], ...] = ()
     # The other activities the demo context declares (id + name + purpose), so a
     # snapshot built from the demo importer can be scoped per activity without

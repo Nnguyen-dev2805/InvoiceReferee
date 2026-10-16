@@ -1,0 +1,178 @@
+{
+  "tenant": "tenant:demo",
+  "profile": "TRAVEL",
+  "records": [
+    "Danh tính, quyền và chính sách công ty là dữ liệu mô phỏng độc lập với chứng từ chi phí."
+  ],
+  "organization_id": "tenant:demo",
+  "company_name": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+  "company_tax_id": "0319999996",
+  "activity": {
+    "activity_id": "activity:tc03",
+    "name": "TC03 — Chi phí lưu trú trong chuyến công tác",
+    "purpose": "Chi phí lưu trú trong chuyến công tác",
+    "occurred_at": "2026-10-10T09:00:00+07:00",
+    "profile": "TRAVEL",
+    "status": "AUTHORIZED",
+    "references": [
+      "TU-TC03"
+    ],
+    "authorization": {
+      "id": "auth:TC03",
+      "actor": "employee:approver",
+      "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+    }
+  },
+  "people": [
+    {
+      "id": "employee:employee-a",
+      "name": "NGUYỄN MINH AN"
+    },
+    {
+      "id": "employee:accountant-demo",
+      "name": "Trần Thị B (kế toán)"
+    },
+    {
+      "id": "employee:approver",
+      "name": "Lê Văn C (người quyết định)"
+    }
+  ],
+  "policies": [
+    {
+      "id": "policy:uc03:TRAVEL",
+      "version": "uc03-v1",
+      "profile": "TRAVEL",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "rules": [
+        "EMPLOYEE_PAID_INVOICE_BOUNDED"
+      ]
+    },
+    {
+      "id": "policy:uc03:WORK_EXPENSE",
+      "version": "uc03-v1",
+      "profile": "WORK_EXPENSE",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "rules": [
+        "EMPLOYEE_PAID_INVOICE_BOUNDED"
+      ]
+    }
+  ],
+  "category_policies": [
+    {
+      "id": "category:uc03:TRAVEL",
+      "version": "uc03-v1",
+      "profile": "TRAVEL",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "per_item_caps": {
+        "CLIENT_MEAL": 5000000,
+        "WORK_CLIENT_MEAL": 5000000,
+        "TAXI": 2000000
+      },
+      "submission_window_days": 30,
+      "excluded_categories": [
+        "PERSONAL"
+      ]
+    },
+    {
+      "id": "category:uc03:WORK_EXPENSE",
+      "version": "uc03-v1",
+      "profile": "WORK_EXPENSE",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "per_item_caps": {
+        "CLIENT_MEAL": 5000000,
+        "WORK_CLIENT_MEAL": 5000000,
+        "TAXI": 2000000
+      },
+      "submission_window_days": 30,
+      "excluded_categories": [
+        "PERSONAL"
+      ]
+    }
+  ],
+  "grants": [
+    {
+      "id": "grant:activity:tc03:recognize",
+      "version": "uc03-v1",
+      "actor": "system:referee",
+      "actions": [
+        "RECOGNIZE_COST"
+      ],
+      "scope": "activity:tc03",
+      "max_amount": 8000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL",
+        "WORK_EXPENSE"
+      ]
+    },
+    {
+      "id": "grant:activity:tc03:issue",
+      "version": "uc03-v1",
+      "actor": "system:referee",
+      "actions": [
+        "ISSUE_PAYMENT",
+        "ISSUE_COLLECTION"
+      ],
+      "scope": "activity:tc03",
+      "max_amount": 4000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL",
+        "WORK_EXPENSE"
+      ]
+    },
+    {
+      "id": "grant:activity:tc03:approver",
+      "version": "uc03-v1",
+      "actor": "employee:approver",
+      "actions": [
+        "AUTHORIZE_ACTIVITY",
+        "RECOGNIZE_COST",
+        "EXCEPT_POLICY",
+        "ISSUE_PAYMENT",
+        "ISSUE_COLLECTION",
+        "OVERRIDE"
+      ],
+      "scope": "activity:tc03",
+      "max_amount": 20000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL",
+        "WORK_EXPENSE"
+      ]
+    },
+    {
+      "id": "grant:activity:tc03:accountant",
+      "version": "uc03-v1",
+      "actor": "employee:accountant-demo",
+      "actions": [
+        "CONFIRM_FINANCIAL_FACT",
+        "RECORD_ACTUAL",
+        "STOP",
+        "RESUME"
+      ],
+      "scope": "activity:tc03",
+      "max_amount": 120000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL",
+        "WORK_EXPENSE"
+      ]
+    }
+  ],
+  "ledger": [],
+  "coverage": null,
+  "coverages": [],
+  "witnesses": [],
+  "activities": [],
+  "financial_as_of": "2026-10-16T12:00:00+07:00",
+  "data_origin": "SIMULATED"
+}

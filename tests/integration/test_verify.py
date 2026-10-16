@@ -78,7 +78,7 @@ async def test_core_and_escalation_suites_pass_on_the_corpus(legacy_corpus) -> N
     db.migrate()
     workflow = CaseWorkflow(db, uploads_dir=tmp / "up")
     workflow.import_demo_context(
-        Path(__file__).resolve().parents[2] / "data" / "demo" / "company-context.json",
+        Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "legacy-company-context.json",
         origin="SIMULATED",
     )
     runner = EvaluationRunner(workflow=workflow)

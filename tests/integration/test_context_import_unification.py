@@ -16,7 +16,7 @@ from invoice_referee.workflow.context_records import load_context
 from invoice_referee.workflow.db import Database
 from invoice_referee.workflow.service import CaseWorkflow
 
-DEMO = Path(__file__).resolve().parents[2] / "data" / "demo" / "company-context.json"
+DEMO = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "legacy-company-context.json"
 
 
 def _workflow(tmp_path: Path) -> CaseWorkflow:

@@ -20,6 +20,7 @@ export default defineConfig({
     command:
       `rm -rf ${E2E_DIR} && ` +
       `uv run python scripts/dev.py --mode stub --port 8010 ` +
+      `--context tests/fixtures/legacy-company-context.json ` +
       `--db ${E2E_DIR}/app.sqlite --uploads ${E2E_DIR}/uploads`,
     url: "http://127.0.0.1:8010/api/demo/session",
     reuseExistingServer: false,

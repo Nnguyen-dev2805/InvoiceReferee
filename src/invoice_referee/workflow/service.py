@@ -833,6 +833,13 @@ class CaseWorkflow:
         self, context_path: str | Path, *, origin: str = "SIMULATED"
     ) -> str:
         raw = Path(context_path).read_bytes()
+        payload = json.loads(raw)
+        if isinstance(payload, dict) and "organization_id" in payload:
+            from invoice_referee.domain.organization import OrganizationContext
+
+            return self.import_company_context(
+                OrganizationContext.model_validate_json(raw), origin=origin
+            )
         digest = hashlib.sha256(raw).hexdigest()
         data = _DemoContext.model_validate_json(raw)
         tenant = data.organization.id

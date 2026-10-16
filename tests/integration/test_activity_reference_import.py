@@ -16,7 +16,7 @@ from invoice_referee.workflow.db import Database
 
 ROOT = Path(__file__).resolve().parents[2]
 TYPED_CONTEXT = ROOT / "data/demo/tc01-company-context.json"
-LEGACY_CONTEXT = ROOT / "data/demo/company-context.json"
+LEGACY_CONTEXT = ROOT / "tests/fixtures/legacy-company-context.json"
 TENANT = "tenant:demo"
 EMPLOYEE = "employee:employee-a"
 TC01 = "activity:tc01"

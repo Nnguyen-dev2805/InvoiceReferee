@@ -37,7 +37,7 @@ from invoice_referee.workflow.db import Database
 from invoice_referee.workflow.service import CaseWorkflow
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEMO_CONTEXT_PATH = PROJECT_ROOT / "data" / "demo" / "company-context.json"
+DEMO_CONTEXT_PATH = PROJECT_ROOT / "tests" / "fixtures" / "legacy-company-context.json"
 
 TENANT_DEMO = "tenant:demo"
 DEFAULT_ACTOR = "employee:employee-a"

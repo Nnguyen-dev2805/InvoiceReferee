@@ -19,7 +19,7 @@ from invoice_referee.workflow.context_records import (
 )
 from invoice_referee.workflow.db import Database
 
-DEMO = Path(__file__).resolve().parents[2] / "data" / "demo" / "company-context.json"
+DEMO = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "legacy-company-context.json"
 
 
 def test_build_workflow_context_reaches_typed_loader(tmp_path: Path) -> None:

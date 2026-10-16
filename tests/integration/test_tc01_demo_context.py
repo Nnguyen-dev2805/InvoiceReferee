@@ -49,7 +49,7 @@ def test_typed_context_startup_preserves_identity_and_actual_advance(tmp_path):
 
 
 def test_legacy_company_identity_survives_import(tmp_path):
-    path = Path("data/demo/company-context.json")
+    path = Path("tests/fixtures/legacy-company-context.json")
     name = json.loads(path.read_text())["organization"]["name"]
     wf = build_workflow(Settings(_env_file=None), "STUB", db=Database(tmp_path / "app.sqlite"),
                         uploads_dir=tmp_path / "uploads", context_path=path)
@@ -64,7 +64,7 @@ def test_explicit_demo_clock_reaches_workflow(tmp_path):
 
     args = build_parser().parse_args(["--demo-as-of", "2026-10-14T23:00:00+07:00"])
     wf, _ = build_dev(str(tmp_path / "dev.sqlite"), str(tmp_path / "uploads"),
-                      "data/demo/company-context.json", settings=Settings(_env_file=None),
+                      "tests/fixtures/legacy-company-context.json", settings=Settings(_env_file=None),
                       demo_as_of=args.demo_as_of)
     assert wf._clock() == AS_OF
 

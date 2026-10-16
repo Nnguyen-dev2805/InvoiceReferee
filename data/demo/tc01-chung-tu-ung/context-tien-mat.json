@@ -1,31 +1,27 @@
 {
   "tenant": "tenant:demo",
   "profile": "WORK_EXPENSE",
-  "records": [],
-  "budget_amount": null,
+  "records": [
+    "Danh tính, quyền và chính sách công ty là dữ liệu mô phỏng độc lập với chứng từ chi phí."
+  ],
   "organization_id": "tenant:demo",
   "company_name": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+  "company_tax_id": "0319999996",
   "activity": {
     "activity_id": "activity:tc01",
-    "name": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
-    "occurred_at": "2026-10-10T09:00:00+07:00",
+    "name": "TC01 — Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
     "purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+    "occurred_at": "2026-10-10T09:00:00+07:00",
     "profile": "WORK_EXPENSE",
     "status": "AUTHORIZED",
-    "authorization": {
-      "id": "auth:tc01",
-      "actor": "employee:approver",
-      "grant_ref": "grant:tc01:approver",
-      "effect_range": [
-        "2026-10-01T00:00:00+07:00",
-        "2026-12-31T23:59:59+07:00"
-      ],
-      "reason": "Cho phép tiếp khách phục vụ dự án Nâng cấp văn phòng 2026 (quyết định demo).",
-      "record_key": "auth:tc01"
-    },
     "references": [
       "TU-TC01"
-    ]
+    ],
+    "authorization": {
+      "id": "auth:TC01",
+      "actor": "employee:approver",
+      "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+    }
   },
   "people": [
     {
@@ -43,11 +39,21 @@
   ],
   "policies": [
     {
-      "id": "policy:tc01",
-      "version": "q32-v1",
+      "id": "policy:uc03:TRAVEL",
+      "version": "uc03-v1",
+      "profile": "TRAVEL",
       "effective_from": "2026-10-01T00:00:00+07:00",
       "effective_to": "2026-12-31T23:59:59+07:00",
+      "rules": [
+        "EMPLOYEE_PAID_INVOICE_BOUNDED"
+      ]
+    },
+    {
+      "id": "policy:uc03:WORK_EXPENSE",
+      "version": "uc03-v1",
       "profile": "WORK_EXPENSE",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
       "rules": [
         "EMPLOYEE_PAID_INVOICE_BOUNDED"
       ]
@@ -55,11 +61,27 @@
   ],
   "category_policies": [
     {
-      "id": "category:tc01",
-      "version": "v1",
+      "id": "category:uc03:TRAVEL",
+      "version": "uc03-v1",
+      "profile": "TRAVEL",
       "effective_from": "2026-10-01T00:00:00+07:00",
       "effective_to": "2026-12-31T23:59:59+07:00",
+      "per_item_caps": {
+        "CLIENT_MEAL": 5000000,
+        "WORK_CLIENT_MEAL": 5000000,
+        "TAXI": 2000000
+      },
+      "submission_window_days": 30,
+      "excluded_categories": [
+        "PERSONAL"
+      ]
+    },
+    {
+      "id": "category:uc03:WORK_EXPENSE",
+      "version": "uc03-v1",
       "profile": "WORK_EXPENSE",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
       "per_item_caps": {
         "CLIENT_MEAL": 5000000,
         "WORK_CLIENT_MEAL": 5000000,
@@ -71,11 +93,10 @@
       ]
     }
   ],
-  "budgets": [],
   "grants": [
     {
-      "id": "grant:tc01:recognize",
-      "version": "v1",
+      "id": "grant:activity:tc01:recognize",
+      "version": "uc03-v1",
       "actor": "system:referee",
       "actions": [
         "RECOGNIZE_COST"
@@ -85,12 +106,13 @@
       "effective_from": "2026-10-01T00:00:00+07:00",
       "effective_to": "2026-12-31T23:59:59+07:00",
       "allowed_profiles": [
+        "TRAVEL",
         "WORK_EXPENSE"
       ]
     },
     {
-      "id": "grant:tc01:issue",
-      "version": "v1",
+      "id": "grant:activity:tc01:issue",
+      "version": "uc03-v1",
       "actor": "system:referee",
       "actions": [
         "ISSUE_PAYMENT",
@@ -101,31 +123,34 @@
       "effective_from": "2026-10-01T00:00:00+07:00",
       "effective_to": "2026-12-31T23:59:59+07:00",
       "allowed_profiles": [
+        "TRAVEL",
         "WORK_EXPENSE"
       ]
     },
     {
-      "id": "grant:tc01:approver",
-      "version": "v1",
+      "id": "grant:activity:tc01:approver",
+      "version": "uc03-v1",
       "actor": "employee:approver",
       "actions": [
         "AUTHORIZE_ACTIVITY",
         "RECOGNIZE_COST",
         "EXCEPT_POLICY",
         "ISSUE_PAYMENT",
-        "ISSUE_COLLECTION"
+        "ISSUE_COLLECTION",
+        "OVERRIDE"
       ],
       "scope": "activity:tc01",
       "max_amount": 20000000,
       "effective_from": "2026-10-01T00:00:00+07:00",
       "effective_to": "2026-12-31T23:59:59+07:00",
       "allowed_profiles": [
+        "TRAVEL",
         "WORK_EXPENSE"
       ]
     },
     {
-      "id": "grant:tc01:accountant",
-      "version": "v1",
+      "id": "grant:activity:tc01:accountant",
+      "version": "uc03-v1",
       "actor": "employee:accountant-demo",
       "actions": [
         "CONFIRM_FINANCIAL_FACT",
@@ -134,10 +159,11 @@
         "RESUME"
       ],
       "scope": "activity:tc01",
-      "max_amount": 20000000,
+      "max_amount": 120000000,
       "effective_from": "2026-10-01T00:00:00+07:00",
       "effective_to": "2026-12-31T23:59:59+07:00",
       "allowed_profiles": [
+        "TRAVEL",
         "WORK_EXPENSE"
       ]
     }
@@ -155,17 +181,14 @@
       "recorded_at": "2026-10-05T10:00:00+07:00",
       "verification_state": "CONFIRMED",
       "allocation_state": "ALLOCATED",
-      "reverses_event_id": null,
-      "witness_keys": [
-        "advance:tc01"
-      ]
+      "reverses_event_id": null
     }
   ],
   "coverage": {
     "employee": "employee:employee-a",
     "activity": "activity:tc01",
-    "start": "2026-09-01T00:00:00+07:00",
-    "as_of": "2026-10-14T23:00:00+07:00",
+    "start": "2026-10-01T00:00:00+07:00",
+    "as_of": "2026-10-16T12:00:00+07:00",
     "fund_ids": [
       "company:cash-demo"
     ],
@@ -179,28 +202,29 @@
     "opening_by_fund": {
       "company:cash-demo": 0
     },
-    "ledger_version": "ledger:tc01:20261014-2300",
+    "ledger_version": "ledger:TC01:initial-v1",
     "witness_keys": [
-      "coverage:tc01"
+      "coverage:TC01"
     ]
   },
+  "coverages": [],
   "witnesses": [
     {
       "record_key": "advance:tc01",
-      "quote": "Bản ghi ứng thực nhận mô phỏng: công ty đã chi 4.000.000 đ cho NGUYỄN MINH AN, hoạt động activity:tc01 ngày 05/10/2026.",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc01",
-      "observed_at": "2026-10-05T10:00:00+07:00"
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 4000000 VND cho Nguyễn Minh An, activity:tc01; không suy từ giấy quyết toán."
     },
     {
-      "record_key": "coverage:tc01",
-      "quote": "Lịch sử mô phỏng đã đối chiếu đến 14/10/2026 23:00 +07:00: số dư đầu kỳ 0, ứng thực nhận 4.000.000 đ; chưa có chi thêm, hoàn trả, đảo giao dịch hoặc khoản chưa phân bổ trong scope TC01.",
+      "record_key": "coverage:TC01",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc01",
-      "observed_at": "2026-10-14T23:00:00+07:00"
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc01: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
     }
   ],
   "activities": [],
-  "financial_as_of": "2026-10-14T23:00:00+07:00",
+  "financial_as_of": "2026-10-16T12:00:00+07:00",
   "data_origin": "SIMULATED"
 }

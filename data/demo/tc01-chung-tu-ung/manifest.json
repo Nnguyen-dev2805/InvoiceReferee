@@ -4,8 +4,8 @@
   "files": {
     "03-bien-nhan-chuyen-khoan.pdf": "f8dd97896dd8acaf6f34c75186756672ff41ec9beb5490b56fe71bcf3601c709",
     "04-phieu-chi-tien-mat.pdf": "302da7b840be6260cad4f6c6151d045afb0f85cf14666097a151be9bec81f0cf",
-    "context-chuyen-khoan.json": "dd692fbc433cfcfcce0010b97262b19afa9a1f75386e5e3fc11d6d0ff3891f39",
-    "context-tien-mat.json": "76f8f973734380f884035b8f08fa735e50714ebb132150387167b2ccd2f84486"
+    "context-chuyen-khoan.json": "85e76b829a16afc524df485f15d50c6a93ded2c21ee080c08dea84301a89f0f9",
+    "context-tien-mat.json": "3bea0548a2ced11e1ec834f738d8547c4c97b4adb6686e8d88c27ee4c40d6d94"
   },
   "alternatives": true,
   "instruction": "Use one payment method and its matching context; never sum both advances."

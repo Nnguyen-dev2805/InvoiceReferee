@@ -63,6 +63,16 @@ predicate, binding, quality/conflicts và literal locator. Exact quote có thậ
 chưa tự chứng minh payer/received. Không xây generic semantic-proof engine; viết
 predicate tests cho bảng trên và đo false-known raw với gold độc lập.
 
+Context demo 16/10/2026 có `company_tax_id` tùy chọn để lưu MST chuẩn tổ chức và
+giữ qua snapshot/scoped loader. Trường này là dữ kiện định danh; chỉ việc lưu
+trường không chứng minh predicate đối chiếu MST bên mua đã được triển khai.
+Danh mục mặc định và context riêng TC01–TC25 ở `data/demo/manifest.json`; các
+transcription/hoạt động demo cũ được tách thành fixture chỉ dành cho hồi quy.
+Theo yêu cầu chạy chung TC01–TC25, context mặc định chứa25 khoản ứng và
+`coverages` riêng theo activity. Scoped loader chỉ cung cấp đúng một khoản ứng
+và history của activity đang xét dưới `ledger`/`coverage`; các context một case
+cũ vẫn dùng `coverage` như trước. Không dùng lịch sử của case khác để xác lập0.
+
 **Luồng UI hiện hành — sửa theo quyết định tiếp theo ngày 15/10/2026:** không có
 checkbox/nút “Xác nhận lịch sử ban đầu”. Kế toán kiểm chứng từ ứng và bấm
 **Xác nhận ghi nhận** đúng một lần. Sau source/binding/party/completion guards,

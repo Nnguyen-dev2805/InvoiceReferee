@@ -1,0 +1,230 @@
+{
+  "tenant": "tenant:demo",
+  "profile": "WORK_EXPENSE",
+  "records": [
+    "Danh tính, quyền và chính sách công ty là dữ liệu mô phỏng độc lập với chứng từ chi phí."
+  ],
+  "organization_id": "tenant:demo",
+  "company_name": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+  "company_tax_id": "0319999996",
+  "activity": {
+    "activity_id": "activity:tc14",
+    "name": "TC14 — Mua máy chủ phục vụ hệ thống nội bộ",
+    "purpose": "Mua máy chủ phục vụ hệ thống nội bộ",
+    "occurred_at": "2026-10-10T09:00:00+07:00",
+    "profile": "WORK_EXPENSE",
+    "status": "AUTHORIZED",
+    "references": [
+      "TU-TC14"
+    ],
+    "authorization": {
+      "id": "auth:TC14",
+      "actor": "employee:approver",
+      "reason": "Phạm vi quyết toán giả lập; không phê duyệt tính hợp lệ từng khoản chi."
+    }
+  },
+  "people": [
+    {
+      "id": "employee:employee-a",
+      "name": "NGUYỄN MINH AN"
+    },
+    {
+      "id": "employee:accountant-demo",
+      "name": "Trần Thị B (kế toán)"
+    },
+    {
+      "id": "employee:approver",
+      "name": "Lê Văn C (người quyết định)"
+    }
+  ],
+  "policies": [
+    {
+      "id": "policy:uc03:TRAVEL",
+      "version": "uc03-v1",
+      "profile": "TRAVEL",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "rules": [
+        "EMPLOYEE_PAID_INVOICE_BOUNDED"
+      ]
+    },
+    {
+      "id": "policy:uc03:WORK_EXPENSE",
+      "version": "uc03-v1",
+      "profile": "WORK_EXPENSE",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "rules": [
+        "EMPLOYEE_PAID_INVOICE_BOUNDED"
+      ]
+    }
+  ],
+  "category_policies": [
+    {
+      "id": "category:uc03:TRAVEL",
+      "version": "uc03-v1",
+      "profile": "TRAVEL",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "per_item_caps": {
+        "CLIENT_MEAL": 5000000,
+        "WORK_CLIENT_MEAL": 5000000,
+        "TAXI": 2000000
+      },
+      "submission_window_days": 30,
+      "excluded_categories": [
+        "PERSONAL"
+      ]
+    },
+    {
+      "id": "category:uc03:WORK_EXPENSE",
+      "version": "uc03-v1",
+      "profile": "WORK_EXPENSE",
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "per_item_caps": {
+        "CLIENT_MEAL": 5000000,
+        "WORK_CLIENT_MEAL": 5000000,
+        "TAXI": 2000000
+      },
+      "submission_window_days": 30,
+      "excluded_categories": [
+        "PERSONAL"
+      ]
+    }
+  ],
+  "grants": [
+    {
+      "id": "grant:activity:tc14:recognize",
+      "version": "uc03-v1",
+      "actor": "system:referee",
+      "actions": [
+        "RECOGNIZE_COST"
+      ],
+      "scope": "activity:tc14",
+      "max_amount": 8000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL",
+        "WORK_EXPENSE"
+      ]
+    },
+    {
+      "id": "grant:activity:tc14:issue",
+      "version": "uc03-v1",
+      "actor": "system:referee",
+      "actions": [
+        "ISSUE_PAYMENT",
+        "ISSUE_COLLECTION"
+      ],
+      "scope": "activity:tc14",
+      "max_amount": 4000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL",
+        "WORK_EXPENSE"
+      ]
+    },
+    {
+      "id": "grant:activity:tc14:approver",
+      "version": "uc03-v1",
+      "actor": "employee:approver",
+      "actions": [
+        "AUTHORIZE_ACTIVITY",
+        "RECOGNIZE_COST",
+        "EXCEPT_POLICY",
+        "ISSUE_PAYMENT",
+        "ISSUE_COLLECTION",
+        "OVERRIDE"
+      ],
+      "scope": "activity:tc14",
+      "max_amount": 20000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL",
+        "WORK_EXPENSE"
+      ]
+    },
+    {
+      "id": "grant:activity:tc14:accountant",
+      "version": "uc03-v1",
+      "actor": "employee:accountant-demo",
+      "actions": [
+        "CONFIRM_FINANCIAL_FACT",
+        "RECORD_ACTUAL",
+        "STOP",
+        "RESUME"
+      ],
+      "scope": "activity:tc14",
+      "max_amount": 120000000,
+      "effective_from": "2026-10-01T00:00:00+07:00",
+      "effective_to": "2026-12-31T23:59:59+07:00",
+      "allowed_profiles": [
+        "TRAVEL",
+        "WORK_EXPENSE"
+      ]
+    }
+  ],
+  "ledger": [
+    {
+      "id": "advance:tc14",
+      "external_key": "transfer:FT-TC14-0001",
+      "kind": "ADVANCE_RECEIVED",
+      "scope": "activity:tc14",
+      "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+      "payee": "employee:employee-a",
+      "amount": 120000000,
+      "event_at": "2026-10-05T09:00:00+07:00",
+      "recorded_at": "2026-10-05T10:00:00+07:00",
+      "verification_state": "CONFIRMED",
+      "allocation_state": "ALLOCATED",
+      "reverses_event_id": null
+    }
+  ],
+  "coverage": {
+    "employee": "employee:employee-a",
+    "activity": "activity:tc14",
+    "start": "2026-10-01T00:00:00+07:00",
+    "as_of": "2026-10-16T12:00:00+07:00",
+    "fund_ids": [
+      "company:bank-demo"
+    ],
+    "flow_kinds": [
+      "ADVANCE_RECEIVED",
+      "REIMBURSEMENT_RECEIVED",
+      "EMPLOYEE_RETURN",
+      "REVERSAL",
+      "OBSERVED_UNALLOCATED"
+    ],
+    "opening_by_fund": {
+      "company:bank-demo": 0
+    },
+    "ledger_version": "ledger:TC14:initial-v1",
+    "witness_keys": [
+      "coverage:TC14"
+    ]
+  },
+  "coverages": [],
+  "witnesses": [
+    {
+      "record_key": "advance:tc14",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc14",
+      "observed_at": "2026-10-05T10:00:00+07:00",
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 120000000 VND cho Nguyễn Minh An, activity:tc14; không suy từ giấy quyết toán."
+    },
+    {
+      "record_key": "coverage:TC14",
+      "actor": "employee:accountant-demo",
+      "scope": "activity:tc14",
+      "observed_at": "2026-10-16T12:00:00+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc14: đúng một khoản ứng 120000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+    }
+  ],
+  "activities": [],
+  "financial_as_of": "2026-10-16T12:00:00+07:00",
+  "data_origin": "SIMULATED"
+}

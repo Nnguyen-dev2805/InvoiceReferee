@@ -30,7 +30,7 @@ from invoice_referee.evidence.trace import LangSmithTrace
 from invoice_referee.runtime import build_workflow
 from invoice_referee.workflow.db import Database
 
-DEMO_CONTEXT = Path(__file__).resolve().parents[2] / "data" / "demo" / "company-context.json"
+DEMO_CONTEXT = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "legacy-company-context.json"
 TENANT = "tenant:demo"
 EMPLOYEE = "employee:employee-a"
 ACTIVITY = "activity:travel-a"

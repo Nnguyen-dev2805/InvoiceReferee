@@ -1,5 +1,23 @@
 # Implementation checkpoint
 
+## TC01–TC25 demo context pack — 16/10/2026
+
+Default catalog now contains exactly25 cases and no legacy travel activities,
+transcription or budget fixtures. Follow-up: the same default context now also
+contains all25 simulated advances and per-activity history, so one app can skip
+advance-voucher upload for every linked case. Scoped/restart checks cover all25;
+this supersedes the earlier empty-money common catalog. Generated25 scoped confirmed-advance contexts
+and25 unrecorded-advance UI variants; source65PDF hashes unchanged. Current
+identity/policy/grants, explicit demo clock, scoped history and TC12 predecessor
+requirements are recorded in data/demo/manifest.json. Old activities moved to a
+regression-only fixture, not into public demo. Existing user DB/server unchanged.
+
+Minimal importer compatibility and company_tax_id persistence added; no new MST
+validation gate or financial policy. Follow-up shared-context checks21 pass; full Python782 pass /
+5 pre-existing employee-return date-fixture failures. Generator repeatability and
+diff check pass. Fresh LIVE/UI NOT_RUN; no claim25-case E2E passes.
+[Evidence and limits](reviews/2026-10-16-uc03-context-update.md).
+
 This file records observed progress, not product policy or runtime configuration.
 The plan owns task acceptance; package/config files own executable commands.
 

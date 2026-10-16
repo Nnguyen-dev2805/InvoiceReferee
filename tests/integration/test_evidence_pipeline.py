@@ -78,7 +78,7 @@ def _workflow(tmp_path: Path) -> CaseWorkflow:
     db = Database(tmp_path / "r.sqlite")
     db.migrate()
     wf = CaseWorkflow(db, uploads_dir=tmp_path / "up")
-    wf.import_demo_context(Path("data/demo/company-context.json"), origin="SIMULATED")
+    wf.import_demo_context(Path("tests/fixtures/legacy-company-context.json"), origin="SIMULATED")
     return wf
 
 

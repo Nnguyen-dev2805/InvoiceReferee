@@ -252,6 +252,7 @@ def load_context(
     # newer compatibility snapshot. Keep the newest non-empty declaration while
     # leaving effective policies/grants under the newest snapshot's authority.
     company_name = next((item.company_name for item in snapshots if item.company_name), None)
+    company_tax_id = next((item.company_tax_id for item in snapshots if item.company_tax_id), None)
     people = tenant_context.people or next(
         (item.people for item in snapshots if item.people), ()
     )
@@ -295,6 +296,13 @@ def load_context(
     coverage = scoped.coverage
     if coverage is not None and str(coverage.get("activity") or "") != activity:
         coverage = None
+    matching_coverages = tuple(
+        item for item in scoped.coverages if str(item.get("activity") or "") == activity
+    )
+    if len(matching_coverages) > 1:
+        raise ValueError(f"Multiple history snapshots for activity {activity}")
+    if coverage is None and matching_coverages:
+        coverage = matching_coverages[0]
     activity_entries = tuple(
         item
         for item in scoped.activities
@@ -313,11 +321,13 @@ def load_context(
             "organization_id": tenant_context.organization_id or tenant,
             "tenant": tenant,
             "company_name": company_name,
+            "company_tax_id": company_tax_id,
             "people": people,
             "activity": activity_payload,
             "activities": activity_entries,
             "ledger": scoped_ledger,
             "coverage": coverage,
+            "coverages": matching_coverages,
             "budgets": budgets,
             "witnesses": witnesses,
             "financial_as_of": (

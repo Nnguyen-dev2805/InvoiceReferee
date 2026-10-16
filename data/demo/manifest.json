@@ -1,0 +1,527 @@
+{
+  "schema_version": "uc03-contexts/v1",
+  "data_origin": "SIMULATED",
+  "assessment_at": "2026-10-16T12:00:00+07:00",
+  "company_tax_id": "0319999996",
+  "cases": [
+    {
+      "case_id": "TC01",
+      "context": "cases/tc01-hop-le-nhan-vien-hoan-tra-tien-thua/context.json",
+      "context_ui": "cases/tc01-hop-le-nhan-vien-hoan-tra-tien-thua/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc01-hop-le-nhan-vien-hoan-tra-tien-thua/hoa_don_dien_tu.pdf",
+          "sha256": "d8dddd4e839e8fa89c059bee610b9a85457757d577e7ec9ce352c9ad158f3019"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc01-hop-le-nhan-vien-hoan-tra-tien-thua/report_hoan_ung.pdf",
+          "sha256": "6af4c063a3662ad568f30536c58213cb95fd7e48018892ab8f14df7a312d977c"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC02",
+      "context": "cases/tc02-hop-le-cong-ty-thanh-toan-them/context.json",
+      "context_ui": "cases/tc02-hop-le-cong-ty-thanh-toan-them/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc02-hop-le-cong-ty-thanh-toan-them/hoa_don_dien_tu.pdf",
+          "sha256": "03e5473e19ce2c368cc1b696afd21f7e687c8170b094f9b19bbae4c6f4ce1d6d"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc02-hop-le-cong-ty-thanh-toan-them/report_hoan_ung.pdf",
+          "sha256": "5361b509da576e842896bf9df302af98336a76dd4406019af1da50cf3d3fcfe2"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC03",
+      "context": "cases/tc03-hop-le-khong-phat-sinh-chenh-lech/context.json",
+      "context_ui": "cases/tc03-hop-le-khong-phat-sinh-chenh-lech/context-ui.json",
+      "profile": "TRAVEL",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc03-hop-le-khong-phat-sinh-chenh-lech/hoa_don_dien_tu.pdf",
+          "sha256": "7e21f2f2403196bec51dfa86c0f054671a1466a958a8187feeb1df40530a3011"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc03-hop-le-khong-phat-sinh-chenh-lech/report_hoan_ung.pdf",
+          "sha256": "18f981f5fd6ecc541d316bdb4a0c8e51f44d5322e2cc69d88dbfebabc24d6b93"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC04",
+      "context": "cases/tc04-hop-le-nhieu-mat-hang-thiet-bi/context.json",
+      "context_ui": "cases/tc04-hop-le-nhieu-mat-hang-thiet-bi/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc04-hop-le-nhieu-mat-hang-thiet-bi/hoa_don_dien_tu.pdf",
+          "sha256": "b8c5b4efa03083986be17496845179ddcb9c5a490dc9d8dd0a23b7c42ceccebf"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc04-hop-le-nhieu-mat-hang-thiet-bi/report_hoan_ung.pdf",
+          "sha256": "c401a2cdd8dcc9e1d48348d1a40df832a2993a331a596538e89ecf020b394f6c"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC05",
+      "context": "cases/tc05-tong-cac-dong-tren-bao-cao-khong-khop/context.json",
+      "context_ui": "cases/tc05-tong-cac-dong-tren-bao-cao-khong-khop/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc05-tong-cac-dong-tren-bao-cao-khong-khop/hoa_don_dien_tu.pdf",
+          "sha256": "6216eae3e32cdf2394d97de0e90ccf0fce60f90596ff230fef1d2db28e96008c"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc05-tong-cac-dong-tren-bao-cao-khong-khop/report_hoan_ung.pdf",
+          "sha256": "b86695951b340957cba2a39aafc474c77e50d209d9ad2430ff4fe94141378d67"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC06",
+      "context": "cases/tc06-chenh-lech-quyet-toan-ghi-sai/context.json",
+      "context_ui": "cases/tc06-chenh-lech-quyet-toan-ghi-sai/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc06-chenh-lech-quyet-toan-ghi-sai/hoa_don_dien_tu.pdf",
+          "sha256": "3625468be7503fa3b973b81fdc9740b98c5451acca96d2a073ba490437751890"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc06-chenh-lech-quyet-toan-ghi-sai/report_hoan_ung.pdf",
+          "sha256": "8ff6df5d8a361ae2d00e2d767f858a6288a0168b227663cfbc11b50b00130c00"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC07",
+      "context": "cases/tc07-so-tien-bang-chu-tren-bao-cao-khong-khop/context.json",
+      "context_ui": "cases/tc07-so-tien-bang-chu-tren-bao-cao-khong-khop/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc07-so-tien-bang-chu-tren-bao-cao-khong-khop/hoa_don_dien_tu.pdf",
+          "sha256": "26b8605079ac11c75a874e9466abf4391285dcd94994178dd067a014565c47de"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc07-so-tien-bang-chu-tren-bao-cao-khong-khop/report_hoan_ung.pdf",
+          "sha256": "b86b3fb5efa4467bfad39bd3661134fb3d0f42acad6f0cbc0c93ca261bd7fa9c"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC08",
+      "context": "cases/tc08-bao-cao-va-hoa-don-lech-so-tien/context.json",
+      "context_ui": "cases/tc08-bao-cao-va-hoa-don-lech-so-tien/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc08-bao-cao-va-hoa-don-lech-so-tien/hoa_don_dien_tu.pdf",
+          "sha256": "3211a01c1fa54983aeb5809936c1f68396b043ff8395016b937656cfdbf9b817"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc08-bao-cao-va-hoa-don-lech-so-tien/report_hoan_ung.pdf",
+          "sha256": "2e6cee3a5bfe2d6878ab2a6008845a33a1855152d50589553a2bc41926b3d940"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC09",
+      "context": "cases/tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac/context.json",
+      "context_ui": "cases/tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac/hoa_don_dien_tu.pdf",
+          "sha256": "bcfa80a1a46117d9c8aa20db1644b74ac67c6193d954432a6184ffa3c5c313e2"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac/report_hoan_ung.pdf",
+          "sha256": "7b49e2e0168200e6532513d13251a7910e9e58a3e59a3fd1656737fa56f32d5d"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC10",
+      "context": "cases/tc10-hoa-don-thieu-ma-so-thue-nguoi-mua/context.json",
+      "context_ui": "cases/tc10-hoa-don-thieu-ma-so-thue-nguoi-mua/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc10-hoa-don-thieu-ma-so-thue-nguoi-mua/hoa_don_dien_tu.pdf",
+          "sha256": "51579a3d6c2e467ff69fb21446ae75e3f8c25588d2066e2401cf194f0b778d8f"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc10-hoa-don-thieu-ma-so-thue-nguoi-mua/report_hoan_ung.pdf",
+          "sha256": "082c2147228cd1d5f9ec938008fe0e9d118fc0af4ce931ff4dfd70b22c006cf2"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC11",
+      "context": "cases/tc11-so-hoc-tren-hoa-don-khong-nhat-quan/context.json",
+      "context_ui": "cases/tc11-so-hoc-tren-hoa-don-khong-nhat-quan/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc11-so-hoc-tren-hoa-don-khong-nhat-quan/hoa_don_dien_tu.pdf",
+          "sha256": "1ae75778de46915cf9c3434605165fbeed5cced0a7000c566de940b3f0b720c4"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc11-so-hoc-tren-hoa-don-khong-nhat-quan/report_hoan_ung.pdf",
+          "sha256": "6ad1a550687c94c4b2fd08edeed79e52a9cdd5ee4efbd7c8532e23e41e36269f"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC12",
+      "context": "cases/tc12-hoa-don-trung-dinh-danh-voi-ho-so-truoc/context.json",
+      "context_ui": "cases/tc12-hoa-don-trung-dinh-danh-voi-ho-so-truoc/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": "TC01",
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc12-hoa-don-trung-dinh-danh-voi-ho-so-truoc/hoa_don_dien_tu.pdf",
+          "sha256": "45a547bf6e9aba2147adbf431e1759309030087f3301a1906f5e321395cc6620"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc12-hoa-don-trung-dinh-danh-voi-ho-so-truoc/report_hoan_ung.pdf",
+          "sha256": "02248e2e6963fe3abe8f469762be6f33b255875dd71b768f78c957e169c4b803"
+        }
+      ],
+      "prerequisites": [
+        "TC12 cần hồ sơ khác đã tiêu thụ invoice của TC01; không dùng boolean duplicate."
+      ]
+    },
+    {
+      "case_id": "TC13",
+      "context": "cases/tc13-khoan-chi-ruou-bia-can-chuyen-policy/context.json",
+      "context_ui": "cases/tc13-khoan-chi-ruou-bia-can-chuyen-policy/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc13-khoan-chi-ruou-bia-can-chuyen-policy/hoa_don_dien_tu.pdf",
+          "sha256": "9acf672a2d723d60f16ccdb48eaf1bbf1356d59e6be76adc8bab8c5ad005a5b5"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc13-khoan-chi-ruou-bia-can-chuyen-policy/report_hoan_ung.pdf",
+          "sha256": "9ab08caf796cd86b1535b8629ceb35846d5c4db157c59932ce206bd5391f8c03"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC14",
+      "context": "cases/tc14-tong-ho-so-vuot-tham-quyen-100-trieu/context.json",
+      "context_ui": "cases/tc14-tong-ho-so-vuot-tham-quyen-100-trieu/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc14-tong-ho-so-vuot-tham-quyen-100-trieu/hoa_don_dien_tu.pdf",
+          "sha256": "4c3abef57943fdb9ea48554df77a6a29b7173a5a54edf6348a3df28ba0feec95"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc14-tong-ho-so-vuot-tham-quyen-100-trieu/report_hoan_ung.pdf",
+          "sha256": "dedf0e0493e94b4a9443e25defebb78675ade1a7bee74c5948a02885309a9cd6"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC15",
+      "context": "cases/tc15-evidence-cung-so-tien-nhung-sai-noi-dung/context.json",
+      "context_ui": "cases/tc15-evidence-cung-so-tien-nhung-sai-noi-dung/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc15-evidence-cung-so-tien-nhung-sai-noi-dung/hoa_don_dien_tu.pdf",
+          "sha256": "7fb7ec1859d0e2c2d859491617a58dd34c90ab0dafc47add0e676f1ffdf0cedb"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc15-evidence-cung-so-tien-nhung-sai-noi-dung/report_hoan_ung.pdf",
+          "sha256": "40845e70cf423ddb1cf94a17642b0031072b5cbcfd09fadf52eba7d6ff4d8da5"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC16",
+      "context": "cases/tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/context.json",
+      "context_ui": "cases/tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/context-ui.json",
+      "profile": "TRAVEL",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/hoa_don_khach_san.pdf",
+          "sha256": "689b74e5fc165aaab7bcf3d2dd460cdccc81774459bd886bd9c8c3c83d175b51"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/hoa_don_taxi.pdf",
+          "sha256": "3be0d44400459dfb29f7126a9231632249592d54ba3e01082fecd0f2c1e440b3"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/hoa_don_ve_may_bay.pdf",
+          "sha256": "1b4a595cf05f36ab6b4e6d62d8003b66fdd6404ad020afedf7cbe8d8e7437e52"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc16-hop-le-ba-hoa-don-trong-mot-bao-cao-cong-tac/report_hoan_ung.pdf",
+          "sha256": "2c5da32c468bfd26a816f11ae28307537324131ba2eb57153026f547f3094131"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC17",
+      "context": "cases/tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/context.json",
+      "context_ui": "cases/tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/hoa_don_nha_hang.pdf",
+          "sha256": "163a2b5e5bfd6ae2802220c467faa0d96b5260aedaed1140a9dfdc3853eb7a08"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/hoa_don_phong_hop.pdf",
+          "sha256": "642502d5821139383386c0550b2e19f02de2546037498fa96959bad5d8e6e01f"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/report_hoan_ung.pdf",
+          "sha256": "7d5342dda35c90d215449d504295d322b51548f4e11efce5761c5b2a5094f838"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc17-hop-le-hoa-don-kem-ve-dien-tu-thay-the/ve_dien_tu_bai_do_xe.pdf",
+          "sha256": "90a29084321eb05883e520a50676b02e81cf7b04f0b9a873eb005f39a3a4c9cd"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC18",
+      "context": "cases/tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/context.json",
+      "context_ui": "cases/tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/bien_ban_nghiem_thu.pdf",
+          "sha256": "72b46c3a1b9a08d40e6f80d1a85d9f97374b2074466bbed39c0c7f7b6135ea05"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/hoa_don_linh_kien.pdf",
+          "sha256": "10560d52458c84ae384c0f93c567f5afb1046487a03976d9e7c358024b581417"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/report_hoan_ung.pdf",
+          "sha256": "a591a6e2311e8baee6e7e467d9ac0a399a09c834ece658bc06895cdf0e9367c0"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc18-hop-le-mot-dong-dung-hai-tai-lieu-thay-the/xac_nhan_chuyen_khoan.pdf",
+          "sha256": "3f4480a8b2ca5ebcf93767baf2421e38aeb129fa8fd6b885d4280cd748563796"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC19",
+      "context": "cases/tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong/context.json",
+      "context_ui": "cases/tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong/context-ui.json",
+      "profile": "TRAVEL",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong/hoa_don_khach_san.pdf",
+          "sha256": "b66033f1719320d69930564653b5375ae247c4bc78dbe805131a517cb4e3aa8f"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong/hoa_don_taxi.pdf",
+          "sha256": "b0cf654f02e40eb12fdab9e51eff2d19759eaee196da816e581a7d2356770e5b"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc19-thieu-chung-tu-va-khong-co-ly-do-cho-mot-dong/report_hoan_ung.pdf",
+          "sha256": "490ceb2fd097860b445085f737a3a6976d5fabf25f91844d9dae3ab06f6fb0c2"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC20",
+      "context": "cases/tc20-co-ly-do-cho-dong-khong-co-chung-tu/context.json",
+      "context_ui": "cases/tc20-co-ly-do-cho-dong-khong-co-chung-tu/context-ui.json",
+      "profile": "TRAVEL",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc20-co-ly-do-cho-dong-khong-co-chung-tu/hoa_don_nhien_lieu.pdf",
+          "sha256": "58038726ca102ef4b5da47be0c424b94dfb1f69fe7774104530e83ce515de96f"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc20-co-ly-do-cho-dong-khong-co-chung-tu/report_hoan_ung.pdf",
+          "sha256": "341b7cb972560d139ddcef74e7845baa2c92a7b0af96fc06f75a0142088958d4"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc20-co-ly-do-cho-dong-khong-co-chung-tu/ve_dien_tu_cao_toc.pdf",
+          "sha256": "e47c995dcaec75ee8d6566d08968d16d1a89914dbc982f0029b446ddf6fe7584"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC21",
+      "context": "cases/tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem/context.json",
+      "context_ui": "cases/tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem/hoa_don_in_an.pdf",
+          "sha256": "f62132779909c611156edcd025b5b74a62bfbdd2a0a1fe9d6386754af0900c78"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem/hoa_don_thue_hoi_truong.pdf",
+          "sha256": "6af3f4aeceffa8417bd42b3c53cb70cfedb470d7da9a8eff1e7ed8de9988bd12"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc21-mot-hoa-don-duoc-khai-bao-nhung-chua-dinh-kem/report_hoan_ung.pdf",
+          "sha256": "480b0fce2c74713afd84fe2abd232b5eb406b1fbc378ad9f2e231a7f352275a0"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC22",
+      "context": "cases/tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong/context.json",
+      "context_ui": "cases/tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong/hoa_don_thiet_bi.pdf",
+          "sha256": "dd1a28efe5dd0d4cfefb023527e62c857ec71bea04deaa5f7081f899559e5713"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong/hoa_don_van_chuyen.pdf",
+          "sha256": "bc42a55e74d8f7d2d1b76f74589f8d8aff008e7b3568bebf4e94432269649bcb"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc22-mot-hoa-don-bi-dung-vuot-gia-tri-cho-hai-dong/report_hoan_ung.pdf",
+          "sha256": "cb6c3bdb3d6f3afce98a263cbfd3ac382181a6e84424ef2d8c21f806baf1e578"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC23",
+      "context": "cases/tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong/context.json",
+      "context_ui": "cases/tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong/context-ui.json",
+      "profile": "WORK_EXPENSE",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong/hoa_don_muc_in.pdf",
+          "sha256": "0c94bce5a697c9d5249ad40596fbc74a136778c6941a34f97169402ef5649084"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong/hoa_don_van_phong_pham.pdf",
+          "sha256": "294e59c200b0443829683d8c439009ffd240db2e4a5bb7c2f6c9527386c5a9c6"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc23-hop-le-mot-hoa-don-phan-bo-cho-nhieu-dong/report_hoan_ung.pdf",
+          "sha256": "0c7274b30aacae98a01a66dd9cfd362ca46133c1fc02538ea916b10c1013d0ee"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC24",
+      "context": "cases/tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/context.json",
+      "context_ui": "cases/tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/context-ui.json",
+      "profile": "TRAVEL",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/hoa_don_khach_san.pdf",
+          "sha256": "dcdf79e819850526f3d9a16929c2e23e6001d0c456df62e5393184e469ad3031"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/hoa_don_khong_khai_bao.pdf",
+          "sha256": "a2b479db87e131e5eb2e514c7fb8108136ea29ddb0842f864e4c6e977ebd2357"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/hoa_don_taxi.pdf",
+          "sha256": "322544a0fc8a6aaddccfbbbbe3840f862c62b64c20c07de759c48b27a5bb6575"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc24-co-hoa-don-dinh-kem-nhung-khong-xuat-hien-tren-report/report_hoan_ung.pdf",
+          "sha256": "4c641814be9f141606657e2bda91222e47f1dda722e23440d9edc1e026fde154"
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "case_id": "TC25",
+      "context": "cases/tc25-tai-lieu-thay-the-lech-so-tien-voi-report/context.json",
+      "context_ui": "cases/tc25-tai-lieu-thay-the-lech-so-tien-voi-report/context-ui.json",
+      "profile": "TRAVEL",
+      "requires_predecessor": null,
+      "sources": [
+        {
+          "path": "data/tham-khao/uc-03/tc25-tai-lieu-thay-the-lech-so-tien-voi-report/hoa_don_khach_san.pdf",
+          "sha256": "1f7ae1d7951ab4f4d4ba9494349cbbc9e83c8d8bcf1973cbc00d1dcecb578d60"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc25-tai-lieu-thay-the-lech-so-tien-voi-report/hoa_don_ve_tau.pdf",
+          "sha256": "9b1ee2de2ed767f294ee53ae223aadef11753fa7579a82b98c1d6644ac925944"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc25-tai-lieu-thay-the-lech-so-tien-voi-report/phieu_thu_di_chuyen.pdf",
+          "sha256": "5ecb81997c968f5636ded712b09f80777e0bbce602df7d6eccf73146c12366de"
+        },
+        {
+          "path": "data/tham-khao/uc-03/tc25-tai-lieu-thay-the-lech-so-tien-voi-report/report_hoan_ung.pdf",
+          "sha256": "6dc3ba18fdc7d42ab40b9c56fa8d20a9d0c6fbc934cb6e59862d3d30b29b4872"
+        }
+      ],
+      "prerequisites": []
+    }
+  ],
+  "notes": [
+    "Context giả lập là precondition, không là kết quả OCR/ngân hàng.",
+    "Context chung nạp25 khoản ứng, mỗi khoản/lịch sử thuộc đúng một activity; context riêng vẫn dùng cho test cô lập.",
+    "Mốc hoạt động 10/10 là lịch công việc giả lập; không tạo trip_start/trip_end từ ngày hóa đơn.",
+    "Quyền kế toán120 triệu chỉ ghi nhận sự kiện tiền đã xảy ra; không cho duyệt chi phí vượt20 triệu.",
+    "company_tax_id được lưu/đọc qua context; không thay thế việc kiểm gate MST trong ứng dụng."
+  ]
+}
