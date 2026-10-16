@@ -44,6 +44,7 @@ class XkiroClient:
     api_key: str
     model: str
     base_url: str
+    provider_name: str = "xkiro"
     timeout_s: float = DEFAULT_LLM_TIMEOUT_S
     transport: httpx.AsyncBaseTransport | None = None
     max_input_chars: int = DEFAULT_MAX_LLM_INPUT_CHARS
@@ -68,7 +69,9 @@ class XkiroClient:
         parsed: dict[str, object] | None = None
         trace_error: str | None = None
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_s, transport=self.transport) as client:
+            async with httpx.AsyncClient(
+                timeout=self.timeout_s, transport=self.transport
+            ) as client:
                 attempted = True
                 response = await client.post(
                     f"{self.base_url.rstrip('/')}/chat/completions",
@@ -96,7 +99,9 @@ class XkiroClient:
             try:
                 parsed_value = json.loads(content)
             except json.JSONDecodeError as error:
-                raise XkiroSchemaError("LLM returned non-JSON output", raw=content) from error
+                raise XkiroSchemaError(
+                    "LLM returned non-JSON output", raw=content
+                ) from error
             if not isinstance(parsed_value, dict):
                 raise XkiroSchemaError("LLM JSON must be an object", raw=content)
             parsed = parsed_value
@@ -119,6 +124,7 @@ class XkiroClient:
                         parsed_response=parsed,
                         usage=usage,
                         error=trace_error,
+                        provider=self.provider_name,
                     )
                 except Exception:
                     # Instrumentation never changes the provider result or failure.
@@ -126,7 +132,13 @@ class XkiroClient:
 
 
 def _trace_usage(value: object) -> dict[str, object]:
-    """Keep only provider-reported token counters; do not infer missing usage."""
+    """Keep only provider-reported counters; do not infer missing usage.
+
+    Reasoning/cached tokens are kept under their own namespaced keys when the
+    response provides them (flat or OpenAI-style `*_tokens_details` nesting).
+    Absent means UNKNOWN (key missing), never zero; reasoning tokens are never
+    added into completion tokens because containment is unknown.
+    """
     if not isinstance(value, dict):
         return {}
     keys = {
@@ -135,9 +147,18 @@ def _trace_usage(value: object) -> dict[str, object]:
         "total_tokens",
         "input_tokens",
         "output_tokens",
+        "reasoning_tokens",
+        "cached_tokens",
     }
-    return {
+    usage = {
         key: count
         for key, count in value.items()
         if key in keys and isinstance(count, int) and not isinstance(count, bool)
     }
+    details = value.get("completion_tokens_details")
+    if isinstance(details, dict) and isinstance(details.get("reasoning_tokens"), int):
+        usage.setdefault("reasoning_tokens", details["reasoning_tokens"])
+    details = value.get("prompt_tokens_details")
+    if isinstance(details, dict) and isinstance(details.get("cached_tokens"), int):
+        usage.setdefault("cached_tokens", details["cached_tokens"])
+    return usage

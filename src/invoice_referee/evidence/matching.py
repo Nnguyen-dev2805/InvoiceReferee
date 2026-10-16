@@ -29,12 +29,36 @@ from invoice_referee.domain.documents import (
 from invoice_referee.reconciliation.document_arithmetic import is_settlement_summary_row
 
 ORIGINAL_EXPENSE_DOCUMENT_TYPES = frozenset(
-    {"E_INVOICE", "PAPER_RECEIPT", "TRANSPORT_TICKET", "HOTEL_RECEIPT", "COLLECTION_RECEIPT"}
+    {
+        "E_INVOICE",
+        "PAPER_RECEIPT",
+        "TRANSPORT_TICKET",
+        "HOTEL_RECEIPT",
+        "COLLECTION_RECEIPT",
+    }
 )
 
 GENERIC_PARTY_TOKENS = {
-    "a", "an", "cap", "cong", "cung", "doanh", "khac", "nha", "nghiep", "phan", "tap",
-    "toan", "trach", "nhiem", "huu", "han", "tnhh", "ty", "mua", "tu",
+    "a",
+    "an",
+    "cap",
+    "cong",
+    "cung",
+    "doanh",
+    "khac",
+    "nha",
+    "nghiep",
+    "phan",
+    "tap",
+    "toan",
+    "trach",
+    "nhiem",
+    "huu",
+    "han",
+    "tnhh",
+    "ty",
+    "mua",
+    "tu",
 }
 
 _CATEGORY_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -78,11 +102,13 @@ def _normalize_text(value: str | None) -> str:
 
 def _party_similarity(line_description: str, issuer_name: str | None) -> float:
     line_tokens = {
-        t for t in _normalize_text(line_description).split()
+        t
+        for t in _normalize_text(line_description).split()
         if t not in GENERIC_PARTY_TOKENS and len(t) > 1
     }
     issuer_tokens = {
-        t for t in _normalize_text(issuer_name).split()
+        t
+        for t in _normalize_text(issuer_name).split()
         if t not in GENERIC_PARTY_TOKENS and len(t) > 1
     }
     if not line_tokens or not issuer_tokens:
@@ -91,8 +117,16 @@ def _party_similarity(line_description: str, issuer_name: str | None) -> float:
 
 
 def _party_identity_similarity(left: str, right: str | None) -> float:
-    left_tokens = {t for t in _normalize_text(left).split() if t not in GENERIC_PARTY_TOKENS and len(t) > 1}
-    right_tokens = {t for t in _normalize_text(right).split() if t not in GENERIC_PARTY_TOKENS and len(t) > 1}
+    left_tokens = {
+        t
+        for t in _normalize_text(left).split()
+        if t not in GENERIC_PARTY_TOKENS and len(t) > 1
+    }
+    right_tokens = {
+        t
+        for t in _normalize_text(right).split()
+        if t not in GENERIC_PARTY_TOKENS and len(t) > 1
+    }
     union = left_tokens | right_tokens
     return len(left_tokens & right_tokens) / len(union) if union else 0.0
 
@@ -111,7 +145,12 @@ def _semantic_similarity(line_description: str, document: DocumentAnalysis) -> f
 
 def _infer_category(description: str, documents: tuple[DocumentAnalysis, ...]) -> str:
     text = _normalize_text(
-        " ".join([description, *[_line_description(line) for d in documents for line in d.line_items]])
+        " ".join(
+            [
+                description,
+                *[_line_description(line) for d in documents for line in d.line_items],
+            ]
+        )
     )
     for category, tokens in _CATEGORY_KEYWORDS:
         if any(token in text for token in tokens):
@@ -150,9 +189,53 @@ def _as_decimal(value: object) -> Decimal | None:
 
 
 def _refs(document: DocumentAnalysis) -> tuple[EvidenceRef, ...]:
-    refs = [*document.refs, *(r for f in document.fields for r in f.refs),
-            *(r for row in document.line_items for f in row.fields for r in f.refs)]
+    refs = [
+        *document.refs,
+        *(r for f in document.fields for r in f.refs),
+        *(r for row in document.line_items for f in row.fields for r in f.refs),
+    ]
     return tuple(dict.fromkeys(refs))
+
+
+def identity_determined(
+    paper: DocumentAnalysis,
+    documents: tuple[DocumentAnalysis, ...],
+    links: tuple[EvidenceLink, ...],
+) -> bool:
+    """True when every suggestion already has a unique exact-number identity.
+
+    Only the amount is then in dispute, which code decides (allocation bounds
+    plus admission FACTs) — no LLM verdict on which number is true. Any
+    content-based or ambiguous-identity suggestion keeps the resolver.
+    """
+    suggestions = [link for link in links if link.status == "SUGGEST_LINK"]
+    if not suggestions:
+        return False
+    matchable = tuple(d for d in documents if d.document_type != "UNKNOWN")
+    rows = {
+        f"ITEM-{position:03d}": row
+        for position, row in enumerate(paper.line_items, start=1)
+        if not is_settlement_summary_row(_line_description(row))
+    }
+    for link in suggestions:
+        if link.method != "INVOICE_NUMBER_EXACT":
+            return False
+        row = rows.get(link.item_id)
+        if row is None:
+            return False
+        refs_value = _line_field(row, "invoice_refs") or ()
+        if isinstance(refs_value, str):
+            refs_value = (refs_value,)
+        candidates = {
+            document.document_id
+            for ref in refs_value
+            for document in matchable
+            if (number := document_field(document, "document_number")) is not None
+            and _invoice_ref_matches_number(str(ref), str(number))
+        }
+        if len(candidates) != 1 or link.document_id not in candidates:
+            return False
+    return True
 
 
 def match_paper_evidence(
@@ -176,7 +259,9 @@ def match_paper_evidence(
         reason = _line_field(row, "no_evidence_reason")
         refs_value = _line_field(row, "invoice_refs")
         normalized_refs = {
-            _normalize_identifier(r) for r in (refs_value or ()) if _normalize_identifier(r)
+            _normalize_identifier(r)
+            for r in (refs_value or ())
+            if _normalize_identifier(r)
         }
 
         # A numeric serial is an exact identifier only if it resolves to one
@@ -211,10 +296,14 @@ def match_paper_evidence(
                 and document.document_id not in ambiguous_exact_documents
             )
             amount_exact = bool(
-                amount is not None and total is not None and abs(amount - total) <= Decimal("1")
+                amount is not None
+                and total is not None
+                and abs(amount - total) <= Decimal("1")
             )
             semantic = _semantic_similarity(description, document)
-            party = _party_similarity(description, str(issuer) if issuer is not None else None)
+            party = _party_similarity(
+                description, str(issuer) if issuer is not None else None
+            )
 
             if invoice_exact:
                 score = Decimal("1")
@@ -239,9 +328,15 @@ def match_paper_evidence(
                     signals.append("nội dung")
                 if party >= 0.50:
                     signals.append("đơn vị phát hành")
-                explanation = "Khớp " + " và ".join(signals) if signals else "Không đủ dữ kiện để ghép."
+                explanation = (
+                    "Khớp " + " và ".join(signals)
+                    if signals
+                    else "Không đủ dữ kiện để ghép."
+                )
                 if document.document_id in ambiguous_exact_documents:
-                    explanation += " Số hóa đơn trùng với nhiều chứng từ; cần chọn đúng hóa đơn."
+                    explanation += (
+                        " Số hóa đơn trùng với nhiều chứng từ; cần chọn đúng hóa đơn."
+                    )
 
             if score < Decimal("0.50"):
                 continue
@@ -256,7 +351,9 @@ def match_paper_evidence(
                 # total, including the first use.
                 already = allocated.get(document.document_id)
                 if invoice_exact and amount is not None:
-                    over = total is not None and (already or Decimal("0")) + amount > total
+                    over = (
+                        total is not None and (already or Decimal("0")) + amount > total
+                    )
                     if over:
                         status = "SUGGEST_LINK"
                         allocated_amount = None
@@ -267,7 +364,9 @@ def match_paper_evidence(
                         ) + amount
                         allocated_amount = amount
                 elif already is None:
-                    allocated[document.document_id] = total if total is not None else Decimal("0")
+                    allocated[document.document_id] = (
+                        total if total is not None else Decimal("0")
+                    )
                 else:
                     status = "SUGGEST_LINK"
                     allocated_amount = None
@@ -291,11 +390,14 @@ def match_paper_evidence(
 
 
 def project_evidence_matches(
-    paper: DocumentAnalysis, documents: tuple[DocumentAnalysis, ...],
+    paper: DocumentAnalysis,
+    documents: tuple[DocumentAnalysis, ...],
     links: tuple[EvidenceLink, ...],
 ) -> EvidenceMatchingResult:
     """Validate allocations and rebuild every derived match view from one mapping."""
-    matchable = tuple(d for d in documents if d.document_type not in {"UNKNOWN", "SETTLEMENT_FORM"})
+    matchable = tuple(
+        d for d in documents if d.document_type not in {"UNKNOWN", "SETTLEMENT_FORM"}
+    )
     by_id = {d.document_id: d for d in matchable}
     rows, findings, projected = [], [], []
     auto_linked: set[str] = set()
@@ -312,7 +414,11 @@ def project_evidence_matches(
         seen_documents = set()
         for link in links:
             document = by_id.get(link.document_id)
-            if link.item_id != item_id or document is None or link.document_id in seen_documents:
+            if (
+                link.item_id != item_id
+                or document is None
+                or link.document_id in seen_documents
+            ):
                 continue
             seen_documents.add(link.document_id)
             status = link.status
@@ -320,52 +426,108 @@ def project_evidence_matches(
             total = _as_decimal(document_field(document, "total_amount"))
             refs_value = _line_field(row, "invoice_refs") or ()
             number = document_field(document, "document_number")
-            explicit = number is not None and any(_invoice_ref_matches_number(str(r), str(number)) for r in refs_value)
+            explicit = number is not None and any(
+                _invoice_ref_matches_number(str(r), str(number)) for r in refs_value
+            )
             if status == "AUTO_LINK":
                 supported_refs = _refs(document)
-                provenance_ok = any(ref in supported_refs and ref.source_id == document.source_id
-                                    for ref in link.refs)
-                conflicting_number = bool(refs_value and number is not None and not explicit)
+                provenance_ok = any(
+                    ref in supported_refs and ref.source_id == document.source_id
+                    for ref in link.refs
+                )
+                conflicting_number = bool(
+                    refs_value and number is not None and not explicit
+                )
                 llm_invalid = link.method == "LLM_RESOLVED" and (
-                    amount is None or total is None or abs(amount-total) > Decimal("1")
-                    or not any(r.source_id == document.source_id for r in link.refs))
-                if (conflicting_number or llm_invalid or link.source_id != document.source_id
-                    or not provenance_ok or (link.method == "INVOICE_NUMBER_EXACT" and not explicit)):
+                    amount is None
+                    or total is None
+                    or abs(amount - total) > Decimal("1")
+                    or not any(r.source_id == document.source_id for r in link.refs)
+                )
+                if (
+                    conflicting_number
+                    or llm_invalid
+                    or link.source_id != document.source_id
+                    or not provenance_ok
+                    or (link.method == "INVOICE_NUMBER_EXACT" and not explicit)
+                ):
                     status = "SUGGEST_LINK"
-                part = amount if (explicit or link.method == "LLM_RESOLVED") and amount is not None else total
+                part = (
+                    amount
+                    if (explicit or link.method == "LLM_RESOLVED")
+                    and amount is not None
+                    else total
+                )
                 used = allocated.get(link.document_id, Decimal("0"))
-                if (status != "AUTO_LINK" or part is None or total is None or part < 0 or used + part > total
+                if (
+                    status != "AUTO_LINK"
+                    or part is None
+                    or total is None
+                    or part < 0
+                    or used + part > total
                     or (link.document_id in allocated and not explicit)
-                    or (link.method == "LLM_RESOLVED" and document.profile_status != "CLEAR")):
+                    or (
+                        link.method == "LLM_RESOLVED"
+                        and document.profile_status != "CLEAR"
+                    )
+                ):
                     status, part = "SUGGEST_LINK", None
                 else:
                     allocated[link.document_id] = used + part
-            row_links.append(link.model_copy(update={"status": status, "allocated_amount": part}))
-        row_total = sum((link.allocated_amount or Decimal("0") for link in row_links
-                         if link.status == "AUTO_LINK"
-                         and by_id[link.document_id].document_type in ORIGINAL_EXPENSE_DOCUMENT_TYPES), Decimal("0"))
+            row_links.append(
+                link.model_copy(update={"status": status, "allocated_amount": part})
+            )
+        row_total = sum(
+            (
+                link.allocated_amount or Decimal("0")
+                for link in row_links
+                if link.status == "AUTO_LINK"
+                and by_id[link.document_id].document_type
+                in ORIGINAL_EXPENSE_DOCUMENT_TYPES
+            ),
+            Decimal("0"),
+        )
         if amount is not None and row_total > amount + Decimal("1"):
-            findings.append(EvidenceMatchFinding(code="SET_PAPER_AMOUNT_001", status="UNRESOLVED",
-                message=f"Khoản '{description}' ghi {amount} nhưng tổng phân bổ {row_total}.", refs=paper.refs))
-            row_links = [link.model_copy(update={"status": "SUGGEST_LINK", "allocated_amount": None})
-                         if link.status == "AUTO_LINK" else link for link in row_links]
+            findings.append(
+                EvidenceMatchFinding(
+                    code="SET_PAPER_AMOUNT_001",
+                    status="UNRESOLVED",
+                    message=f"Khoản '{description}' ghi {amount} nhưng tổng phân bổ {row_total}.",
+                    refs=paper.refs,
+                )
+            )
+            row_links = [
+                link.model_copy(
+                    update={"status": "SUGGEST_LINK", "allocated_amount": None}
+                )
+                if link.status == "AUTO_LINK"
+                else link
+                for link in row_links
+            ]
             allocated = allocation_before_row
         projected.extend(row_links)
         auto_links = [link for link in row_links if link.status == "AUTO_LINK"]
         auto_linked.update(link.document_id for link in auto_links)
 
         has_original = any(
-            next((d for d in matchable if d.document_id == link.document_id), None).document_type
+            next(
+                (d for d in matchable if d.document_id == link.document_id), None
+            ).document_type
             in ORIGINAL_EXPENSE_DOCUMENT_TYPES
             for link in auto_links
             if next((d for d in matchable if d.document_id == link.document_id), None)
         )
         has_alternative = bool(auto_links) and not has_original
         original_total = sum(
-            (link.allocated_amount for link in auto_links
-             if link.allocated_amount is not None
-             and next((d for d in matchable if d.document_id == link.document_id), None).document_type
-             in ORIGINAL_EXPENSE_DOCUMENT_TYPES),
+            (
+                link.allocated_amount
+                for link in auto_links
+                if link.allocated_amount is not None
+                and next(
+                    (d for d in matchable if d.document_id == link.document_id), None
+                ).document_type
+                in ORIGINAL_EXPENSE_DOCUMENT_TYPES
+            ),
             start=Decimal("0"),
         )
         original_total_value = original_total if has_original else None
@@ -382,9 +544,14 @@ def project_evidence_matches(
             DocumentRowMatch(
                 item_id=item_id,
                 paper_amount=amount,
-                category_candidate=_infer_category(description, tuple(
-                    d for d in matchable if d.document_id in {link.document_id for link in auto_links}
-                )),  # type: ignore[arg-type]
+                category_candidate=_infer_category(
+                    description,
+                    tuple(
+                        d
+                        for d in matchable
+                        if d.document_id in {link.document_id for link in auto_links}
+                    ),
+                ),  # type: ignore[arg-type]
                 evidence_status=evidence_status,  # type: ignore[arg-type]
                 alternative_evidence_type=alternative_type,  # type: ignore[arg-type]
                 matched_document_date=None,
@@ -439,64 +606,133 @@ def project_evidence_matches(
                 )
             )
 
-    unmatched = tuple(dict.fromkeys(d.source_id for d in matchable if d.document_id not in auto_linked))
+    unmatched = tuple(
+        dict.fromkeys(
+            d.source_id for d in matchable if d.document_id not in auto_linked
+        )
+    )
     if unmatched:
-        findings.append(EvidenceMatchFinding(code="SET_PAPER_UNMATCHED_001", status="UNRESOLVED",
-            message=f"Có {len(unmatched)} evidence chưa ghép được khoản chi.", refs=paper.refs))
-    return EvidenceMatchingResult(links=tuple(projected), rows=tuple(rows), findings=tuple(findings), unmatched_source_ids=unmatched)
+        findings.append(
+            EvidenceMatchFinding(
+                code="SET_PAPER_UNMATCHED_001",
+                status="UNRESOLVED",
+                message=f"Có {len(unmatched)} evidence chưa ghép được khoản chi.",
+                refs=paper.refs,
+            )
+        )
+    return EvidenceMatchingResult(
+        links=tuple(projected),
+        rows=tuple(rows),
+        findings=tuple(findings),
+        unmatched_source_ids=unmatched,
+    )
 
 
 async def resolve_evidence_suggestions(
-    result: EvidenceMatchingResult, documents: tuple[DocumentAnalysis, ...], *,
-    paper: DocumentAnalysis, llm: object, budget: RunBudget,
+    result: EvidenceMatchingResult,
+    documents: tuple[DocumentAnalysis, ...],
+    *,
+    paper: DocumentAnalysis,
+    llm: object,
+    budget: RunBudget,
 ) -> EvidenceMatchingResult:
     """Resolve only existing pairs from source-backed structured facts."""
     import json
     import math
-    from invoice_referee.evidence.prompts import EVIDENCE_LINK_SYSTEM_PROMPT, MATCHING_VERSION
+    from invoice_referee.evidence.prompts import (
+        EVIDENCE_LINK_SYSTEM_PROMPT,
+        MATCHING_VERSION,
+    )
     from invoice_referee.evidence.structured_output import complete_structured
     from invoice_referee.evidence.xkiro import XkiroError, XkiroSchemaError
+
     suggestions = [link for link in result.links if link.status == "SUGGEST_LINK"]
     if not suggestions:
         return result
     by_id = {d.document_id: d for d in documents}
-    paper_rows = {f"ITEM-{i:03d}": row for i, row in enumerate(paper.line_items, 1)
-                  if not is_settlement_summary_row(_line_description(row))}
+    paper_rows = {
+        f"ITEM-{i:03d}": row
+        for i, row in enumerate(paper.line_items, 1)
+        if not is_settlement_summary_row(_line_description(row))
+    }
+
     def facts(document):
         return {f.field: f.value for f in document.fields if f.state == "FOUND"}
+
     candidates = []
     for link in suggestions:
         row, doc = paper_rows.get(link.item_id), by_id.get(link.document_id)
         if row is not None and doc is not None:
-            candidates.append({"item_id": link.item_id, "document_id": link.document_id,
-                "row": facts(row), "document": {**facts(doc),
-                    "line_items": [{"description": _line_description(line)} for line in doc.line_items]},
-                "score": str(link.score), "explanation": link.explanation})
+            candidates.append(
+                {
+                    "item_id": link.item_id,
+                    "document_id": link.document_id,
+                    "row": facts(row),
+                    "document": {
+                        **facts(doc),
+                        "line_items": [
+                            {"description": _line_description(line)}
+                            for line in doc.line_items
+                        ],
+                    },
+                    "score": str(link.score),
+                    "explanation": link.explanation,
+                }
+            )
+
     def validate(payload):
         if not isinstance(payload.get("promotions"), list):
             raise XkiroSchemaError("promotions must be an array")
         for entry in payload["promotions"]:
-            if not isinstance(entry, dict) or not all(isinstance(entry.get(k), str) for k in ("item_id", "document_id")):
+            if not isinstance(entry, dict) or not all(
+                isinstance(entry.get(k), str) for k in ("item_id", "document_id")
+            ):
                 raise XkiroSchemaError("promotion item_id/document_id must be strings")
             confidence = entry.get("confidence")
-            if type(confidence) not in (float, int) or not math.isfinite(confidence) or not 0 <= confidence <= 1:
+            if (
+                type(confidence) not in (float, int)
+                or not math.isfinite(confidence)
+                or not 0 <= confidence <= 1
+            ):
                 raise XkiroSchemaError("promotion confidence must be finite in [0,1]")
-            if not isinstance(entry.get("rationale"), str) or not entry["rationale"].strip():
+            if (
+                not isinstance(entry.get("rationale"), str)
+                or not entry["rationale"].strip()
+            ):
                 raise XkiroSchemaError("promotion rationale is required")
-            if not isinstance(entry.get("basis"), list) or any(not isinstance(b, dict) for b in entry["basis"]):
+            if not isinstance(entry.get("basis"), list) or any(
+                not isinstance(b, dict) for b in entry["basis"]
+            ):
                 raise XkiroSchemaError("promotion basis must be an array of objects")
             for basis in entry["basis"]:
-                if not all(isinstance(basis.get(k), str) for k in ("kind", "left_field", "right_field")):
+                if not all(
+                    isinstance(basis.get(k), str)
+                    for k in ("kind", "left_field", "right_field")
+                ):
                     raise XkiroSchemaError("basis kind and selectors must be strings")
-                if basis["kind"] not in {"AMOUNT", "DOCUMENT_NUMBER", "ISSUER", "SERVICE"}:
+                if basis["kind"] not in {
+                    "AMOUNT",
+                    "DOCUMENT_NUMBER",
+                    "ISSUER",
+                    "SERVICE",
+                }:
                     raise XkiroSchemaError("basis kind is invalid")
         return payload
+
     try:
-        payload = await complete_structured(llm, system=EVIDENCE_LINK_SYSTEM_PROMPT,
-            user=json.dumps({"suggestions": candidates}, ensure_ascii=False, default=str),
-            budget=budget, validate=validate, stage="resolve-evidence-suggestions",
-            prompt_version=MATCHING_VERSION, schema_version="evidence-promotions-json-v2")
-    except XkiroError:
+        payload = await complete_structured(
+            llm,
+            system=EVIDENCE_LINK_SYSTEM_PROMPT,
+            user=json.dumps(
+                {"suggestions": candidates}, ensure_ascii=False, default=str
+            ),
+            budget=budget,
+            validate=validate,
+            stage="resolve-evidence-suggestions",
+            prompt_version=MATCHING_VERSION,
+            schema_version="evidence-promotions-json-v2",
+        )
+    except Exception:
         return result
     pairs = {(l.item_id, l.document_id) for l in suggestions}
     accepted = {}
@@ -505,42 +741,80 @@ async def resolve_evidence_suggestions(
             continue
         key = (entry.get("item_id"), entry.get("document_id"))
         confidence = entry.get("confidence")
-        if key not in pairs or type(confidence) not in (float, int) or not math.isfinite(confidence) or not 0.90 <= confidence <= 1:
+        if (
+            key not in pairs
+            or type(confidence) not in (float, int)
+            or not math.isfinite(confidence)
+            or not 0.90 <= confidence <= 1
+        ):
             continue
         row, doc = paper_rows.get(key[0]), by_id.get(key[1])
         if row is None or doc is None or doc.profile_status != "CLEAR":
             continue
         declared_refs = _line_field(row, "invoice_refs") or ()
         number = document_field(doc, "document_number")
-        if declared_refs and number is not None and not any(_invoice_ref_matches_number(str(ref), str(number)) for ref in declared_refs):
+        if (
+            declared_refs
+            and number is not None
+            and not any(
+                _invoice_ref_matches_number(str(ref), str(number))
+                for ref in declared_refs
+            )
+        ):
             continue
-        amount, total = _as_decimal(_line_field(row, "amount")), _as_decimal(document_field(doc, "total_amount"))
-        if amount is None or total is None or abs(amount-total) > Decimal("1"):
+        amount, total = (
+            _as_decimal(_line_field(row, "amount")),
+            _as_decimal(document_field(doc, "total_amount")),
+        )
+        if amount is None or total is None or abs(amount - total) > Decimal("1"):
             continue
         basis = entry.get("basis")
-        if not isinstance(basis, list) or not isinstance(entry.get("rationale"), str) or not entry["rationale"].strip():
+        if (
+            not isinstance(basis, list)
+            or not isinstance(entry.get("rationale"), str)
+            or not entry["rationale"].strip()
+        ):
             continue
         supported = set()
         invalid_semantic_basis = False
-        explicit_number_match = bool(number is not None and any(
-            _invoice_ref_matches_number(str(ref), str(number)) for ref in declared_refs
-        ))
+        explicit_number_match = bool(
+            number is not None
+            and any(
+                _invoice_ref_matches_number(str(ref), str(number))
+                for ref in declared_refs
+            )
+        )
         issuer = document_field(doc, "issuer_name")
-        issuer_match = bool(issuer and _party_identity_similarity(_line_description(row), str(issuer)) >= 0.90)
+        issuer_match = bool(
+            issuer
+            and _party_identity_similarity(_line_description(row), str(issuer)) >= 0.90
+        )
         service_descriptions = [_line_description(line) for line in doc.line_items]
         description = _line_description(row)
-        service_match = bool(description and service_descriptions and any(
-            _semantic_similarity(description, doc) >= 0.45
-            and _normalize_text(description) in _normalize_text(source_description)
-            for source_description in service_descriptions
-        ))
+        service_match = bool(
+            description
+            and service_descriptions
+            and any(
+                _semantic_similarity(description, doc) >= 0.45
+                and _normalize_text(description) in _normalize_text(source_description)
+                for source_description in service_descriptions
+            )
+        )
         for item in basis:
             if not isinstance(item, dict):
                 continue
-            selector = (item.get("kind"), item.get("left_field"), item.get("right_field"))
+            selector = (
+                item.get("kind"),
+                item.get("left_field"),
+                item.get("right_field"),
+            )
             if selector == ("AMOUNT", "row.amount", "document.total_amount"):
                 supported.add("AMOUNT")
-            elif selector == ("DOCUMENT_NUMBER", "row.invoice_refs", "document.document_number"):
+            elif selector == (
+                "DOCUMENT_NUMBER",
+                "row.invoice_refs",
+                "document.document_number",
+            ):
                 if explicit_number_match:
                     supported.add("DOCUMENT_NUMBER")
             elif selector == ("ISSUER", "row.description", "document.issuer_name"):
@@ -549,29 +823,67 @@ async def resolve_evidence_suggestions(
                 else:
                     invalid_semantic_basis = True
                     break
-            elif selector == ("SERVICE", "row.description", "document.line_items[*].description"):
+            elif selector == (
+                "SERVICE",
+                "row.description",
+                "document.line_items[*].description",
+            ):
                 if service_match:
                     supported.add("SERVICE")
                 else:
                     invalid_semantic_basis = True
                     break
-        if invalid_semantic_basis or "AMOUNT" not in supported or not supported - {"AMOUNT"}:
+        if (
+            invalid_semantic_basis
+            or "AMOUNT" not in supported
+            or not supported - {"AMOUNT"}
+        ):
             continue
         # Identical or competing candidates require a distinguishing signal;
         # selecting an ID or claiming higher confidence does not supply one.
-        competing = [c for c in candidates if c["item_id"] == key[0] and c["document_id"] != key[1]]
+        competing = [
+            c
+            for c in candidates
+            if c["item_id"] == key[0] and c["document_id"] != key[1]
+        ]
         if competing:
             continue
         accepted[key] = entry
     if not accepted:
         return result
-    links = tuple(link.model_copy(update={"status": "AUTO_LINK", "method": "LLM_RESOLVED",
-                      "explanation": accepted[(link.item_id, link.document_id)]["rationale"],
-                      "refs": tuple(dict.fromkeys((*link.refs, *_refs(by_id[link.document_id]), *paper.refs,
-                          *(r for f in paper_rows[link.item_id].fields for r in f.refs))))})
-                  if (link.item_id, link.document_id) in accepted else link for link in result.links)
+    links = tuple(
+        link.model_copy(
+            update={
+                "status": "AUTO_LINK",
+                "method": "LLM_RESOLVED",
+                "explanation": accepted[(link.item_id, link.document_id)]["rationale"],
+                "refs": tuple(
+                    dict.fromkeys(
+                        (
+                            *link.refs,
+                            *_refs(by_id[link.document_id]),
+                            *paper.refs,
+                            *(
+                                r
+                                for f in paper_rows[link.item_id].fields
+                                for r in f.refs
+                            ),
+                        )
+                    )
+                ),
+            }
+        )
+        if (link.item_id, link.document_id) in accepted
+        else link
+        for link in result.links
+    )
     projected = project_evidence_matches(paper, documents, links)
-    owned_codes = {"SET_PAPER_LINE_AMOUNT_001", "SET_PAPER_MATCH_001", "SET_PAPER_AMOUNT_001",
-                   "SET_PAPER_EVIDENCE_REQUIRED", "SET_PAPER_UNMATCHED_001"}
+    owned_codes = {
+        "SET_PAPER_LINE_AMOUNT_001",
+        "SET_PAPER_MATCH_001",
+        "SET_PAPER_AMOUNT_001",
+        "SET_PAPER_EVIDENCE_REQUIRED",
+        "SET_PAPER_UNMATCHED_001",
+    }
     retained = tuple(f for f in result.findings if f.code not in owned_codes)
     return projected.model_copy(update={"findings": (*retained, *projected.findings)})

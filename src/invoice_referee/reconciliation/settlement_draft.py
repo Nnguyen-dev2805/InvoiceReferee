@@ -60,7 +60,11 @@ def _line_candidate(line, name: str) -> FieldCandidate | None:
 
 def _line_field(line, name: str) -> Any:
     candidate = _line_candidate(line, name)
-    return candidate.value if candidate is not None and candidate.state == "FOUND" else None
+    return (
+        candidate.value
+        if candidate is not None and candidate.state == "FOUND"
+        else None
+    )
 
 
 def _refs(line) -> list[dict[str, object]]:
@@ -77,7 +81,9 @@ def _refs(line) -> list[dict[str, object]]:
 
 
 def _paper(report: ReadResult) -> DocumentAnalysis | None:
-    return next((d for d in report.documents if d.document_type == "SETTLEMENT_FORM"), None)
+    return next(
+        (d for d in report.documents if d.document_type == "SETTLEMENT_FORM"), None
+    )
 
 
 def _filename_by_source(sources: tuple[SourceRef, ...]) -> dict[str, str]:
@@ -119,8 +125,12 @@ def build_settlement_draft(
     purpose = _found(paper, "purpose") if paper is not None else None
     trip_start = _found(paper, "trip_start") if paper is not None else None
     trip_end = _found(paper, "trip_end") if paper is not None else None
-    printed_total = parse_vnd(_found(paper, "printed_total")) if paper is not None else None
-    declared_advance = parse_vnd(_found(paper, "declared_advance")) if paper is not None else None
+    printed_total = (
+        parse_vnd(_found(paper, "printed_total")) if paper is not None else None
+    )
+    declared_advance = (
+        parse_vnd(_found(paper, "declared_advance")) if paper is not None else None
+    )
 
     # invoice document_id -> matched source filename (only for a real AUTO_LINK);
     # a SUGGEST_LINK is surfaced separately as an unconfirmed suggestion.
@@ -143,48 +153,101 @@ def build_settlement_draft(
                 refs_value = (refs_value,)
             invoice_no = str(refs_value[0]) if refs_value else None
             description_value = _line_field(line, "description")
-            description = str(description_value) if description_value is not None else None
+            description = (
+                str(description_value) if description_value is not None else None
+            )
             if description is not None and is_settlement_summary_row(description):
                 continue
             # A row is matched only when a real link ties an invoice document to
-            # it (by invoice number); never a guessed file.
+            # it (by invoice number); never a guessed file. Number comparison
+            # uses the canonical series/suffix rule shared with the matcher
+            # (IR26E/00002502 matches 00002502), so draft and final agree.
             matched_filename = None
             suggested_filename = None
+            matched_doc_id = None
             if invoice_no is not None:
+                from invoice_referee.evidence.matching import (
+                    _invoice_ref_matches_number,
+                )
+
                 for document in report.documents:
                     number = _found(document, "document_number")
                     if number is None:
                         continue
-                    if _normalize(number) == _normalize(invoice_no):
+                    if _invoice_ref_matches_number(str(invoice_no), str(number)):
                         source_id = matched.get(document.document_id)
                         if source_id is not None:
                             matched_filename = names.get(source_id)
+                            matched_doc_id = document.document_id
                         suggest_id = suggested.get(document.document_id)
                         if suggest_id is not None:
                             suggested_filename = names.get(suggest_id)
                         break
-            expenses.append({
-                "description": description,
-                "invoice_no": invoice_no,
-                "amount": amount,
-                "amount_state": (
-                    amount_candidate.state if amount_candidate is not None
-                    else "NOT_PRESENT"
-                ),
-                "description_state": (
-                    description_candidate.state if description_candidate is not None
-                    else "NOT_PRESENT"
-                ),
-                "source_filename": names.get(paper.source_id),
-                "status": "UNRESOLVED" if amount is None or description is None else (
-                    "CLEAR" if matched_filename is not None else (
-                    "SUGGESTED" if suggested_filename is not None else "UNMATCHED"
+            if matched_doc_id is not None:
+                linked_doc = doc_by_id.get(matched_doc_id)
+                profile = (
+                    getattr(linked_doc, "profile_status", None)
+                    if linked_doc is not None
+                    else None
+                )
+                if profile is not None and profile != "CLEAR":
+                    # Linked but not yet trustworthy: keep the reference visible
+                    # and mark it as needing verification — never "not referenced".
+                    expenses.append(
+                        {
+                            "description": description,
+                            "invoice_no": invoice_no,
+                            "amount": amount,
+                            "amount_state": (
+                                amount_candidate.state
+                                if amount_candidate is not None
+                                else "NOT_PRESENT"
+                            ),
+                            "description_state": (
+                                description_candidate.state
+                                if description_candidate is not None
+                                else "NOT_PRESENT"
+                            ),
+                            "source_filename": names.get(paper.source_id),
+                            "status": "NEEDS_VERIFICATION",
+                            "matched_invoice": matched_filename,
+                            "suggested_invoice": suggested_filename,
+                            "refs": _refs(line),
+                        }
                     )
-                ),
-                "matched_invoice": matched_filename,
-                "suggested_invoice": suggested_filename,
-                "refs": _refs(line),
-            })
+                    continue
+            expenses.append(
+                {
+                    "description": description,
+                    "invoice_no": invoice_no,
+                    "amount": amount,
+                    "amount_state": (
+                        amount_candidate.state
+                        if amount_candidate is not None
+                        else "NOT_PRESENT"
+                    ),
+                    "description_state": (
+                        description_candidate.state
+                        if description_candidate is not None
+                        else "NOT_PRESENT"
+                    ),
+                    "source_filename": names.get(paper.source_id),
+                    "status": "UNRESOLVED"
+                    if amount is None or description is None
+                    else (
+                        "CLEAR"
+                        if matched_filename is not None
+                        else (
+                            "SUGGESTED"
+                            if suggested_filename is not None
+                            else "UNMATCHED"
+                        )
+                    ),
+                    "matched_invoice": matched_filename,
+                    "suggested_invoice": suggested_filename,
+                    "refs": _refs(line),
+                }
+            )
 
     incurred_total = printed_total
     incurred_total_basis = "PRINTED_TOTAL" if printed_total is not None else None
@@ -198,22 +261,36 @@ def build_settlement_draft(
 
     invoices: list[dict[str, object]] = []
     for document in report.documents:
-        if document.document_type in ("E_INVOICE", "PAPER_RECEIPT", "COLLECTION_RECEIPT"):
-            invoices.append({
-                "filename": names.get(document.source_id),
-                "invoice_no": _found(document, "document_number"),
-                "seller": _found(document, "issuer_name"),
-                "amount": parse_vnd(_found(document, "total_amount")),
-            })
+        if document.document_type in (
+            "E_INVOICE",
+            "PAPER_RECEIPT",
+            "COLLECTION_RECEIPT",
+        ):
+            invoices.append(
+                {
+                    "filename": names.get(document.source_id),
+                    "invoice_no": _found(document, "document_number"),
+                    "seller": _found(document, "issuer_name"),
+                    "amount": parse_vnd(_found(document, "total_amount")),
+                }
+            )
 
     warnings: list[str] = []
     if paper is None:
-        warnings.append("Không tìm thấy giấy quyết toán/đề nghị trong chứng từ đã tải lên.")
+        warnings.append(
+            "Không tìm thấy giấy quyết toán/đề nghị trong chứng từ đã tải lên."
+        )
     if declared_advance is None:
-        warnings.append("Chưa đọc được số tiền tạm ứng trên giấy; nhân viên vui lòng kiểm tra.")
+        warnings.append(
+            "Chưa đọc được số tiền tạm ứng trên giấy; nhân viên vui lòng kiểm tra."
+        )
     if printed_total is None and not expenses:
         warnings.append("Chưa đọc được tổng chi phí; nhân viên vui lòng kiểm tra.")
-    if printed_total is None and expenses and any(expense["amount"] is None for expense in expenses):
+    if (
+        printed_total is None
+        and expenses
+        and any(expense["amount"] is None for expense in expenses)
+    ):
         incurred_total = None
         incurred_total_basis = None
     # Document-internal arithmetic (TC06/TC11): the SAME findings the reconciler
@@ -222,12 +299,14 @@ def build_settlement_draft(
     arithmetic_findings: list[dict[str, object]] = []
     for document in report.documents:
         for finding in check_document_arithmetic(document):
-            arithmetic_findings.append({
-                "code": finding.code,
-                "basis": finding.basis,
-                "question": finding.question,
-                "refs": [ref.model_dump(mode="json") for ref in finding.refs],
-            })
+            arithmetic_findings.append(
+                {
+                    "code": finding.code,
+                    "basis": finding.basis,
+                    "question": finding.question,
+                    "refs": [ref.model_dump(mode="json") for ref in finding.refs],
+                }
+            )
             warnings.append(finding.basis)
 
     # The "activity content" shown on the review screen: a travel paper names its

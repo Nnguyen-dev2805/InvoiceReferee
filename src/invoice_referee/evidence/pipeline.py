@@ -202,7 +202,9 @@ def trace_read_report(
         findings.append(
             {
                 "code": getattr(problem, "kind", "TECHNICAL"),
-                "status": "BLOCKING" if getattr(problem, "blocking", False) else "OBSERVED",
+                "status": "BLOCKING"
+                if getattr(problem, "blocking", False)
+                else "OBSERVED",
                 "affected_fields": list(getattr(problem, "affected_fields", ())),
                 "next_action": getattr(problem, "next_action", None),
             }
@@ -253,9 +255,7 @@ def transcribe_text(text: str) -> Transcription | None:
     payer_line = next(
         (line for line in lines if "người thanh toán" in line.lower()), ""
     )
-    amount_line = next(
-        (line for line in lines if "đã thanh toán" in line.lower()), ""
-    )
+    amount_line = next((line for line in lines if "đã thanh toán" in line.lower()), "")
     if payer_line and amount_line:
         nums = _amounts(amount_line)
         payer_name = payer_line.split(":", 1)[-1].strip().lower()
@@ -264,7 +264,9 @@ def transcribe_text(text: str) -> Transcription | None:
             field = "paid_company" if is_company else "paid_employee"
             facts.append(
                 TranscriptionFact(
-                    field=field, value=nums[0], role="PAYMENT",
+                    field=field,
+                    value=nums[0],
+                    role="PAYMENT",
                     quote=amount_line.strip() or "payment",
                 )
             )
@@ -276,7 +278,10 @@ def transcribe_text(text: str) -> Transcription | None:
                 if field == "coverage":
                     facts.append(
                         TranscriptionFact(
-                            field="coverage", value=1, role="LEDGER", quote=line.strip() or cue
+                            field="coverage",
+                            value=1,
+                            role="LEDGER",
+                            quote=line.strip() or cue,
                         )
                     )
                     seen.add(field)
@@ -297,7 +302,10 @@ def transcribe_text(text: str) -> Transcription | None:
     if invoice is not None:
         facts.append(
             TranscriptionFact(
-                field="economic_key", value=invoice.group(1), role="INVOICE", quote=invoice.group(1)
+                field="economic_key",
+                value=invoice.group(1),
+                role="INVOICE",
+                quote=invoice.group(1),
             )
         )
     if not facts:
@@ -382,16 +390,26 @@ async def read_root(
     from invoice_referee.domain.evidence import ReadResult
     from invoice_referee.evidence.classification import classify_documents
     from invoice_referee.evidence.extraction import extract_document
-    from invoice_referee.evidence.matching import match_paper_evidence, resolve_evidence_suggestions
-    from invoice_referee.evidence.ocr_quality import collect_low_confidence_blocks, review_ocr_quality
+    from invoice_referee.evidence.matching import (
+        match_paper_evidence,
+        resolve_evidence_suggestions,
+    )
+    from invoice_referee.evidence.ocr_quality import (
+        collect_low_confidence_blocks,
+        review_ocr_quality,
+    )
     from invoice_referee.evidence.document_validity import validate_document
     from invoice_referee.evidence.telemetry import step
-    from invoice_referee.reconciliation.document_arithmetic import check_document_arithmetic
+    from invoice_referee.reconciliation.document_arithmetic import (
+        check_document_arithmetic,
+    )
 
     from invoice_referee.domain.issues import ProcessingProblem
     from invoice_referee.evidence.prompts import evidence_reader_identity
-    reader_identity = evidence_reader_identity(reader=reader, classifier=classifier,
-                                               activity_profile=activity_profile)
+
+    reader_identity = evidence_reader_identity(
+        reader=reader, classifier=classifier, activity_profile=activity_profile
+    )
 
     ocr_results = []
     confidence_candidates = []
@@ -401,7 +419,9 @@ async def read_root(
         provider_client = getattr(reader, "provider", None)
         configured_provider = (
             getattr(provider_client, "provider_name", None)
-            or type(provider_client).__name__ if provider_client is not None else None
+            or type(provider_client).__name__
+            if provider_client is not None
+            else None
         )
         configured_model = getattr(provider_client, "model", None)
         expected_pages = None
@@ -411,7 +431,9 @@ async def read_root(
 
                 expected_pages = page_count_bytes(payload)
             except Exception:
-                expected_pages = None  # unreadable PDF: provider call reports the problem
+                expected_pages = (
+                    None  # unreadable PDF: provider call reports the problem
+                )
         with step(
             f"ocr:{source.id}",
             metadata={"trace_stage": "ocr"},
@@ -434,7 +456,10 @@ async def read_root(
                         "ocr",
                         {
                             "pages_read": 0,
-                            "coverage": {"expected_pages": expected_pages, "pages_read": 0},
+                            "coverage": {
+                                "expected_pages": expected_pages,
+                                "pages_read": 0,
+                            },
                             "read_state": "NOT_READ",
                             "review_regions": 0,
                             "artifact_ref": None,
@@ -454,8 +479,12 @@ async def read_root(
                 )
                 continue
             result = await reader.read_source(
-                source, budget=budget, artifacts=artifacts, source_bytes=payload,
-                expected_pages=expected_pages, root_id=root_id,
+                source,
+                budget=budget,
+                artifacts=artifacts,
+                source_bytes=payload,
+                expected_pages=expected_pages,
+                root_id=root_id,
             )
             s.inputs.update({"provider": result.provider, "model": result.model})
             source_candidates = collect_low_confidence_blocks(result)
@@ -478,9 +507,9 @@ async def read_root(
                             "pages_read": pages_read,
                             "complete": result.complete,
                         },
-                        "read_state": "READ" if pages_read and result.complete else (
-                            "PARTIAL" if pages_read else "NOT_READ"
-                        ),
+                        "read_state": "READ"
+                        if pages_read and result.complete
+                        else ("PARTIAL" if pages_read else "NOT_READ"),
                         "review_regions": len(source_candidates),
                         "artifact_ref": artifact_ref,
                         "complete": result.complete,
@@ -500,7 +529,11 @@ async def read_root(
             "block_id": candidate.block_id,
             "low_word_count": len(candidate.low_words),
             "min_confidence": min(
-                (word.confidence for word in candidate.low_words if word.confidence is not None),
+                (
+                    word.confidence
+                    for word in candidate.low_words
+                    if word.confidence is not None
+                ),
                 default=None,
             ),
         }
@@ -510,11 +543,14 @@ async def read_root(
         "confidence-review",
         metadata={"trace_stage": "confidence"},
         inputs=stage_payload(
-            "confidence", {"candidate_count": len(candidates), "candidates": candidate_summaries}
+            "confidence",
+            {"candidate_count": len(candidates), "candidates": candidate_summaries},
         ),
     ) as s:
         if candidates:
-            review = await review_ocr_quality(candidates, llm=classifier, budget=budget, sources=ocr)
+            review = await review_ocr_quality(
+                candidates, llm=classifier, budget=budget, sources=ocr
+            )
             decisions = [
                 {
                     "candidate_id": assessment.candidate_id,
@@ -554,7 +590,9 @@ async def read_root(
             # honestly rather than as a successful review.
             from invoice_referee.domain.documents import ConfidenceReview
 
-            review = ConfidenceReview(status="SKIPPED_NO_NUMERIC_CANDIDATES", block_assessments=())
+            review = ConfidenceReview(
+                status="SKIPPED_NO_NUMERIC_CANDIDATES", block_assessments=()
+            )
             s.skipped = "no_low_confidence_candidates"
             s.outputs.update(
                 stage_payload(
@@ -582,7 +620,8 @@ async def read_root(
         "classify",
         metadata={"trace_stage": "classification"},
         inputs=stage_payload(
-            "classification", {"source_count": len(ocr), "sources": classification_inputs}
+            "classification",
+            {"source_count": len(ocr), "sources": classification_inputs},
         ),
     ) as s:
         classifications = await classify_documents(ocr, llm=classifier, budget=budget)
@@ -609,154 +648,259 @@ async def read_root(
         with step(
             f"extract:{classification.document_type}",
             metadata={"trace_stage": "extraction"},
-            inputs=stage_payload("extraction", {
-                "document_id": classification.document_id,
-                "document_type": classification.document_type,
-                "source_id": source.source_id,
-                "source_digest": source.source_digest,
-                "page_range": list(classification.page_range),
-                "confidence_status": review.status,
-                "ocr_page_count": len(source.pages),
-                "classification_confidence": classification.classification_confidence,
-            }),
+            inputs=stage_payload(
+                "extraction",
+                {
+                    "document_id": classification.document_id,
+                    "document_type": classification.document_type,
+                    "source_id": source.source_id,
+                    "source_digest": source.source_digest,
+                    "page_range": list(classification.page_range),
+                    "confidence_status": review.status,
+                    "ocr_page_count": len(source.pages),
+                    "classification_confidence": classification.classification_confidence,
+                },
+            ),
         ) as s:
             calls_before = budget.llm_attempts
-            analysis = await extract_document(source, classification, llm=classifier, budget=budget)
+            analysis = await extract_document(
+                source, classification, llm=classifier, budget=budget
+            )
             llm_attempts = max(0, budget.llm_attempts - calls_before)
             analysis_summary = _trace_document_analysis(analysis)
             fields, lines = analysis_summary["fields"], analysis_summary["line_items"]
             provenance_findings = [
-                {"field": item["field"], "state": item["state"], "reason_code": "UNREADABLE_OR_UNRESOLVED"}
-                for item in fields if item["state"] in ("UNREADABLE", "AMBIGUOUS")
+                {
+                    "field": item["field"],
+                    "state": item["state"],
+                    "reason_code": "UNREADABLE_OR_UNRESOLVED",
+                }
+                for item in fields
+                if item["state"] in ("UNREADABLE", "AMBIGUOUS")
             ]
-            s.outputs.update(stage_payload("extraction", {
-                "document_id": analysis.document_id,
-                "document_type": analysis.document_type,
-                "source_id": analysis.source_id,
-                "source_digest": source.source_digest,
-                "page_range": list(analysis.page_range),
-                "parse_status": "PARSED" if fields or lines else "UNRESOLVED",
-                "field_count": len(fields),
-                "line_item_count": len(lines),
-                "fields": fields,
-                "line_items": lines,
-                "source_refs": analysis_summary["refs"]
-                    + [ref for line in lines for ref in line["refs"]]
-                    + [ref for field in fields for ref in field["refs"]],
-                "provenance_findings": provenance_findings,
-                "repair_attempts": max(0, llm_attempts - 1),
-                "llm_attempts": llm_attempts,
-            }))
+            s.outputs.update(
+                stage_payload(
+                    "extraction",
+                    {
+                        "document_id": analysis.document_id,
+                        "document_type": analysis.document_type,
+                        "source_id": analysis.source_id,
+                        "source_digest": source.source_digest,
+                        "page_range": list(analysis.page_range),
+                        "parse_status": "PARSED" if fields or lines else "UNRESOLVED",
+                        "field_count": len(fields),
+                        "line_item_count": len(lines),
+                        "fields": fields,
+                        "line_items": lines,
+                        "source_refs": analysis_summary["refs"]
+                        + [ref for line in lines for ref in line["refs"]]
+                        + [ref for field in fields for ref in field["refs"]],
+                        "provenance_findings": provenance_findings,
+                        "repair_attempts": max(0, llm_attempts - 1),
+                        "llm_attempts": llm_attempts,
+                    },
+                )
+            )
         with step(
             f"validate:{classification.document_type}",
             metadata={"trace_stage": "validation"},
-            inputs=stage_payload("validation", {
-                "document_id": analysis.document_id,
-                "document_type": analysis.document_type,
-                "source_id": source.source_id,
-                "confidence_status": analysis.confidence_status,
-                "input_fields": [_trace_field(field) for field in analysis.fields],
-            }),
+            inputs=stage_payload(
+                "validation",
+                {
+                    "document_id": analysis.document_id,
+                    "document_type": analysis.document_type,
+                    "source_id": source.source_id,
+                    "confidence_status": analysis.confidence_status,
+                    "input_fields": [_trace_field(field) for field in analysis.fields],
+                },
+            ),
         ) as s:
-            analysis = validate_document(analysis, source, review, activity_profile=activity_profile)
+            analysis = validate_document(
+                analysis, source, review, activity_profile=activity_profile
+            )
             arithmetic_findings = check_document_arithmetic(analysis)
-            s.outputs.update(stage_payload("validation", {
-                "document_id": analysis.document_id,
-                "document_type": analysis.document_type,
-                "profile_status": analysis.profile_status,
-                "fields": [_trace_field(field) for field in analysis.fields],
-                "findings": _trace_profile_findings(analysis.profile_findings),
-                "blocking_count": sum(1 for finding in analysis.profile_findings if finding.blocking),
-                "arithmetic_checks": {"state": "CHECKED_BY_SHARED_RULE", "findings": [
-                    {"code": finding.code, "field_or_rule": finding.field_or_rule,
-                     "basis": finding.basis, "refs": [_trace_ref(ref) for ref in finding.refs]}
-                    for finding in arithmetic_findings]},
-            }))
+            s.outputs.update(
+                stage_payload(
+                    "validation",
+                    {
+                        "document_id": analysis.document_id,
+                        "document_type": analysis.document_type,
+                        "profile_status": analysis.profile_status,
+                        "fields": [_trace_field(field) for field in analysis.fields],
+                        "findings": _trace_profile_findings(analysis.profile_findings),
+                        "blocking_count": sum(
+                            1
+                            for finding in analysis.profile_findings
+                            if finding.blocking
+                        ),
+                        "arithmetic_checks": {
+                            "state": "CHECKED_BY_SHARED_RULE",
+                            "findings": [
+                                {
+                                    "code": finding.code,
+                                    "field_or_rule": finding.field_or_rule,
+                                    "basis": finding.basis,
+                                    "refs": [_trace_ref(ref) for ref in finding.refs],
+                                }
+                                for finding in arithmetic_findings
+                            ],
+                        },
+                    },
+                )
+            )
         documents.append(analysis)
 
     # UNKNOWN classifications are visible only when they carry a bounded set of
     # alternatives; unsupported cases remain source-scoped processing problems.
     if unresolved_classes:
         from invoice_referee.domain.documents import DocumentAnalysis
+
         for classification in unresolved_classes:
-            source = next((r for r in ocr if r.source_id == classification.source_id), None)
+            source = next(
+                (r for r in ocr if r.source_id == classification.source_id), None
+            )
             if source is None:
                 continue
-            if not any(p.kind == "UNSUPPORTED" and classification.source_id in p.affected_fields
-                       for p in source_problems):
-                source_problems.append(ProcessingProblem(
-                    kind="UNSUPPORTED", affected_fields=(classification.source_id,),
-                    message="loại tài liệu chưa được phân loại chắc chắn; cần xác minh",
-                    relevance="MATERIAL", blocking=True, next_action="confirm_document_type",
-                ))
-            documents.append(DocumentAnalysis(
-                source_id=source.source_id, document_id=classification.document_id,
-                document_type="UNKNOWN", roles=("UNKNOWN",), page_range=classification.page_range,
-                classification_confidence=classification.classification_confidence,
-                alternative_document_types=classification.alternative_document_types,
-                classification_refs=classification.refs, refs=classification.refs,
-                confidence_status="UNRESOLVED", profile_status="UNKNOWN",
-                warnings=("classification_unresolved",),
-            ))
+            if not any(
+                p.kind == "UNSUPPORTED"
+                and classification.source_id in p.affected_fields
+                for p in source_problems
+            ):
+                source_problems.append(
+                    ProcessingProblem(
+                        kind="UNSUPPORTED",
+                        affected_fields=(classification.source_id,),
+                        message="loại tài liệu chưa được phân loại chắc chắn; cần xác minh",
+                        relevance="MATERIAL",
+                        blocking=True,
+                        next_action="confirm_document_type",
+                    )
+                )
+            documents.append(
+                DocumentAnalysis(
+                    source_id=source.source_id,
+                    document_id=classification.document_id,
+                    document_type="UNKNOWN",
+                    roles=("UNKNOWN",),
+                    page_range=classification.page_range,
+                    classification_confidence=classification.classification_confidence,
+                    alternative_document_types=classification.alternative_document_types,
+                    classification_refs=classification.refs,
+                    refs=classification.refs,
+                    confidence_status="UNRESOLVED",
+                    profile_status="UNKNOWN",
+                    warnings=("classification_unresolved",),
+                )
+            )
     if not documents and ocr and not source_problems:
-        source_problems.append(ProcessingProblem(
-            kind="UNSUPPORTED", affected_fields=tuple(r.source_id for r in ocr),
-            message="no supported document type was classified", relevance="MATERIAL",
-            blocking=True, next_action="confirm_document_type",
-        ))
+        source_problems.append(
+            ProcessingProblem(
+                kind="UNSUPPORTED",
+                affected_fields=tuple(r.source_id for r in ocr),
+                message="no supported document type was classified",
+                relevance="MATERIAL",
+                blocking=True,
+                next_action="confirm_document_type",
+            )
+        )
     if not sources:
-        source_problems.append(ProcessingProblem(
-            kind="UNSUPPORTED", affected_fields=(), message="no evidence sources provided",
-            relevance="MATERIAL", blocking=True, next_action="attach_sources",
-        ))
+        source_problems.append(
+            ProcessingProblem(
+                kind="UNSUPPORTED",
+                affected_fields=(),
+                message="no evidence sources provided",
+                relevance="MATERIAL",
+                blocking=True,
+                next_action="attach_sources",
+            )
+        )
 
     paper = next((d for d in documents if d.document_type == "SETTLEMENT_FORM"), None)
     with step(
         "match",
         metadata={"trace_stage": "matching"},
-        inputs=stage_payload("matching", {
-            "paper_document_id": paper.document_id if paper else None,
-            "document_count": len(documents),
-            "row_count": len(paper.line_items) if paper else 0,
-        }),
+        inputs=stage_payload(
+            "matching",
+            {
+                "paper_document_id": paper.document_id if paper else None,
+                "document_count": len(documents),
+                "row_count": len(paper.line_items) if paper else 0,
+            },
+        ),
     ) as s:
         llm_attempts_before = budget.llm_attempts
+        resolver_skipped: str | None = None
         if paper is not None:
             matching = match_paper_evidence(paper, tuple(documents))
-            suggestions_found = any(link.status == "SUGGEST_LINK" for link in matching.links)
-            suggestion_count = sum(1 for link in matching.links if link.status == "SUGGEST_LINK")
+            suggestions_found = any(
+                link.status == "SUGGEST_LINK" for link in matching.links
+            )
+            suggestion_count = sum(
+                1 for link in matching.links if link.status == "SUGGEST_LINK"
+            )
             if suggestions_found:
-                matching = await resolve_evidence_suggestions(
-                    matching, tuple(documents), paper=paper, llm=classifier, budget=budget
-                )
+                from invoice_referee.evidence.matching import identity_determined
+
+                if identity_determined(paper, tuple(documents), matching.links):
+                    # Identity is already unique by exact number; only the
+                    # amount is disputed, which code decides (allocation bounds
+                    # + admission FACTs). No LLM verdict on which number is true.
+                    resolver_skipped = "identity_determined"
+                else:
+                    resolver_skipped = None
+                    matching = await resolve_evidence_suggestions(
+                        matching,
+                        tuple(documents),
+                        paper=paper,
+                        llm=classifier,
+                        budget=budget,
+                    )
             else:
+                resolver_skipped = None
                 s.skipped = "no_suggested_links"
         else:
             s.skipped = "no_settlement_form"
             from invoice_referee.domain.documents import EvidenceMatchFinding
-            matching = EvidenceMatchingResult(findings=(EvidenceMatchFinding(
-                code="SETTLEMENT_FORM_MISSING", status="UNRESOLVED",
-                message="Không có giấy quyết toán (SETTLEMENT_FORM) để ghép chứng từ.", refs=(),
-            ),))
+
+            matching = EvidenceMatchingResult(
+                findings=(
+                    EvidenceMatchFinding(
+                        code="SETTLEMENT_FORM_MISSING",
+                        status="UNRESOLVED",
+                        message="Không có giấy quyết toán (SETTLEMENT_FORM) để ghép chứng từ.",
+                        refs=(),
+                    ),
+                )
+            )
             suggestions_found = False
             suggestion_count = 0
         actual_llm_calls = max(0, budget.llm_attempts - llm_attempts_before)
         matching_summary = _trace_matching(matching)
-        s.outputs.update(stage_payload("matching", {
-            "method": "rules+llm" if actual_llm_calls else "rules",
-            "paper_document_id": paper.document_id if paper else None,
-            "document_count": len(documents),
-            "row_count": len(paper.line_items) if paper else 0,
-            **matching_summary,
-            "suggestions": suggestion_count,
-            "llm_called": actual_llm_calls > 0,
-            "resolved_suggestions": any(link.method == "LLM_RESOLVED" for link in matching.links),
-        }))
+        s.outputs.update(
+            stage_payload(
+                "matching",
+                {
+                    "method": "rules+llm" if actual_llm_calls else "rules",
+                    "paper_document_id": paper.document_id if paper else None,
+                    "document_count": len(documents),
+                    "row_count": len(paper.line_items) if paper else 0,
+                    **matching_summary,
+                    "suggestions": suggestion_count,
+                    "llm_called": actual_llm_calls > 0,
+                    "resolver_skipped": resolver_skipped,
+                    "resolved_suggestions": any(
+                        link.method == "LLM_RESOLVED" for link in matching.links
+                    ),
+                },
+            )
+        )
 
     origin = {"LIVE": "LIVE_READ", "RECORDED_REPLAY": "RECORDED_REPLAY"}.get(
         provider_mode, "STUB_TRANSCRIPTION"
     )
-    problems = tuple(source_problems) + tuple(p for result in ocr for p in result.problems)
+    problems = tuple(source_problems) + tuple(
+        p for result in ocr for p in result.problems
+    )
     return ReadResult(
         provider_mode=provider_mode,
         data_origin=origin,
@@ -766,8 +910,549 @@ async def read_root(
         row_matches=matching.rows,
         match_findings=matching.findings,
         page_coverage_detail=tuple(
-            __import__("invoice_referee.domain.documents", fromlist=["PageCoverage"]).PageCoverage(
-                source_id=result.source_id, page=page.page, state="OCR_COMPLETE",
+            __import__(
+                "invoice_referee.domain.documents", fromlist=["PageCoverage"]
+            ).PageCoverage(
+                source_id=result.source_id,
+                page=page.page,
+                state="OCR_COMPLETE",
+                artifact_ref=result.raw_artifact_ref,
+            )
+            for result in ocr
+            for page in result.pages
+        ),
+        problems=problems,
+    )
+
+
+async def read_root_role_aware(
+    *,
+    sources: tuple[SourceRef, ...],
+    reader,
+    classifier,
+    artifacts,
+    source_bytes: dict[str, bytes],
+    budget: RunBudget,
+    provider_mode: ProviderMode,
+    root_id: str = "",
+    activity_profile: str | None = None,
+    cached_docs: dict[str, object] | None = None,
+    on_doc_done: object = None,
+) -> "ReadResult":
+    """Role-aware read: OCR all -> conditional confidence -> extraction by role.
+
+    Upload role (submitter intent) and document_type (content-determined) stay
+    distinct. Paper files get one SETTLEMENT_FORM extraction with a role-fit
+    check; each evidence file gets one combined type+facts extraction. No
+    standalone whole-set classification call on this path.
+
+    Budget/timeout exhaustion mid-pass keeps completed OCR/extraction/validation
+    results and records a TECHNICAL ``extraction-not-run`` problem naming the
+    stage/source/document — never a fake missing-source FACT. ``cached_docs``
+    (source_id -> validated DocumentAnalysis) lets a resume skip finished docs;
+    ``on_doc_done(source_id, analysis)`` persists each finished doc checkpoint.
+    """
+    from invoice_referee.domain.documents import EvidenceMatchingResult
+    from invoice_referee.domain.evidence import ReadResult
+    from invoice_referee.evidence.extraction import (
+        extract_evidence_document,
+        extract_paper_document,
+    )
+    from invoice_referee.evidence.matching import (
+        match_paper_evidence,
+        resolve_evidence_suggestions,
+    )
+    from invoice_referee.evidence.ocr_quality import (
+        collect_low_confidence_blocks,
+        review_ocr_quality,
+    )
+    from invoice_referee.evidence.document_validity import validate_document
+    from invoice_referee.evidence.telemetry import step
+    from invoice_referee.reconciliation.document_arithmetic import (
+        check_document_arithmetic,
+    )
+
+    from invoice_referee.domain.issues import ProcessingProblem
+    from invoice_referee.evidence.prompts import role_aware_reader_identity
+
+    reader_identity = role_aware_reader_identity(
+        reader=reader, classifier=classifier, activity_profile=activity_profile
+    )
+
+    missing_roles = [s.id for s in sources if not getattr(s, "upload_role", None)]
+    if missing_roles:
+        raise ValueError(
+            "read_root_role_aware requires upload_role on every source; "
+            f"missing: {', '.join(missing_roles)}. Use legacy read_root."
+        )
+
+    ocr_results = []
+    confidence_candidates = []
+    source_problems: list[ProcessingProblem] = []
+    ocr_by_id: dict[str, object] = {}
+    for source in sources:
+        payload = source_bytes.get(source.id)
+        provider_client = getattr(reader, "provider", None)
+        configured_provider = (
+            getattr(provider_client, "provider_name", None)
+            or type(provider_client).__name__
+            if provider_client is not None
+            else None
+        )
+        configured_model = getattr(provider_client, "model", None)
+        expected_pages = None
+        if payload is not None and source.media == "PDF":
+            try:
+                from invoice_referee.evidence.pdf import page_count_bytes
+
+                expected_pages = page_count_bytes(payload)
+            except Exception:
+                expected_pages = None
+        with step(
+            f"ocr:{source.id}",
+            metadata={"trace_stage": "ocr", "upload_role": source.upload_role},
+            inputs=stage_payload(
+                "ocr",
+                {
+                    "source_id": source.id,
+                    "source_digest": source.digest,
+                    "media": source.media,
+                    "expected_pages": expected_pages,
+                    "provider": configured_provider,
+                    "model": configured_model,
+                    "upload_role": source.upload_role,
+                },
+            ),
+        ) as s:
+            if payload is None:
+                s.skipped = "missing_source_bytes"
+                s.outputs.update(
+                    stage_payload(
+                        "ocr",
+                        {
+                            "pages_read": 0,
+                            "coverage": {
+                                "expected_pages": expected_pages,
+                                "pages_read": 0,
+                            },
+                            "read_state": "NOT_READ",
+                            "review_regions": 0,
+                            "artifact_ref": None,
+                            "complete": False,
+                        },
+                    )
+                )
+                source_problems.append(
+                    ProcessingProblem(
+                        kind="TECHNICAL",
+                        affected_fields=(source.id,),
+                        message=f"nguồn {source.id} không đọc được bytes",
+                        relevance="MATERIAL",
+                        blocking=True,
+                        next_action="reupload_source",
+                    )
+                )
+                continue
+            result = await reader.read_source(
+                source,
+                budget=budget,
+                artifacts=artifacts,
+                source_bytes=payload,
+                expected_pages=expected_pages,
+                root_id=root_id,
+            )
+            s.inputs.update({"provider": result.provider, "model": result.model})
+            source_candidates = collect_low_confidence_blocks(result)
+            confidence_candidates.extend(source_candidates)
+            artifact_ref = (
+                f"local-artifact:{Path(result.raw_artifact_ref).name}"
+                if result.raw_artifact_ref
+                else None
+            )
+            pages_read = len(result.pages)
+            s.outputs.update(
+                stage_payload(
+                    "ocr",
+                    {
+                        "provider": result.provider,
+                        "model": result.model,
+                        "pages_read": pages_read,
+                        "coverage": {
+                            "expected_pages": expected_pages,
+                            "pages_read": pages_read,
+                            "complete": result.complete,
+                        },
+                        "read_state": "READ"
+                        if pages_read and result.complete
+                        else ("PARTIAL" if pages_read else "NOT_READ"),
+                        "review_regions": len(source_candidates),
+                        "artifact_ref": artifact_ref,
+                        "complete": result.complete,
+                    },
+                )
+            )
+        ocr_results.append(result)
+        ocr_by_id[source.id] = result
+    ocr = tuple(ocr_results)
+
+    candidates = tuple(confidence_candidates)
+    with step(
+        "confidence-review",
+        metadata={"trace_stage": "confidence"},
+        inputs=stage_payload("confidence", {"candidate_count": len(candidates)}),
+    ) as s:
+        if candidates:
+            if not budget.can_call_llm():
+                s.skipped = "budget_exhausted_before_confidence"
+                from invoice_referee.domain.documents import ConfidenceReview
+
+                review = ConfidenceReview(
+                    status="TECHNICAL_ERROR", block_assessments=()
+                )
+                source_problems.append(
+                    ProcessingProblem(
+                        kind="TECHNICAL",
+                        affected_fields=tuple(
+                            sorted({c.source_id for c in candidates})
+                        ),
+                        message="hết budget trước confidence review; giữ OCR, chưa đánh giá readability",
+                        relevance="MATERIAL",
+                        blocking=True,
+                        next_action="retry_confidence_review",
+                    )
+                )
+            else:
+                review = await review_ocr_quality(
+                    candidates, llm=classifier, budget=budget, sources=ocr
+                )
+                s.outputs.update(
+                    stage_payload(
+                        "confidence",
+                        {"status": review.status, "candidate_count": len(candidates)},
+                    )
+                )
+        else:
+            from invoice_referee.domain.documents import ConfidenceReview
+
+            review = ConfidenceReview(
+                status="SKIPPED_NO_NUMERIC_CANDIDATES", block_assessments=()
+            )
+            s.skipped = "no_low_confidence_candidates"
+            s.outputs.update(
+                stage_payload(
+                    "confidence",
+                    {
+                        "status": review.status,
+                        "candidate_count": 0,
+                        "skipped": "no_low_confidence_candidates",
+                    },
+                )
+            )
+
+    documents = []
+    cache = dict(cached_docs or {})
+    papers = [s for s in sources if s.upload_role == "paper"]
+    evidences = [s for s in sources if s.upload_role == "evidence"]
+    if len(papers) != 1:
+        source_problems.append(
+            ProcessingProblem(
+                kind="TECHNICAL" if not papers else "UNSUPPORTED",
+                affected_fields=tuple(s.id for s in papers)
+                or tuple(s.id for s in sources),
+                message=(
+                    "thiếu file đơn quyết toán (cần đúng 1 file vai trò paper)"
+                    if not papers
+                    else f"có {len(papers)} file vai trò paper; chỉ nhận đúng 1 đơn chính"
+                ),
+                relevance="MATERIAL",
+                blocking=True,
+                next_action="fix_upload_role",
+            )
+        )
+    ordered = papers + evidences
+    for source in ordered:
+        ocr_result = ocr_by_id.get(source.id)
+        if ocr_result is None:
+            continue
+        if source.id in cache:
+            documents.append(cache[source.id])
+            continue
+        if not budget.can_call_llm():
+            source_problems.append(
+                ProcessingProblem(
+                    kind="TECHNICAL",
+                    affected_fields=(source.id,),
+                    message=(
+                        f"hết budget/thời gian trước extraction {source.upload_role} "
+                        f"{source.id}; OCR đã xong, extraction chưa chạy"
+                    ),
+                    relevance="MATERIAL",
+                    blocking=True,
+                    next_action="resume_extraction",
+                )
+            )
+            continue
+        role = source.upload_role
+        with step(
+            f"extract:{role}:{source.id}",
+            metadata={"trace_stage": "extraction", "upload_role": role},
+            inputs=stage_payload(
+                "extraction",
+                {
+                    "source_id": source.id,
+                    "source_digest": source.digest,
+                    "upload_role": role,
+                    "confidence_status": review.status,
+                    "ocr_page_count": len(ocr_result.pages),
+                },
+            ),
+        ) as s:
+            calls_before = budget.llm_attempts
+            role_note = ""
+            if role == "paper":
+                (
+                    analysis,
+                    role_fit,
+                    actual_type,
+                    role_note,
+                ) = await extract_paper_document(
+                    ocr_result, llm=classifier, budget=budget
+                )
+                if role_fit == "MISFIT":
+                    source_problems.append(
+                        ProcessingProblem(
+                            kind="UNSUPPORTED",
+                            affected_fields=(source.id,),
+                            message=(
+                                f"file vai trò paper nhưng nội dung là {actual_type}; "
+                                f"{role_note or 'chuyển file sang ô evidence và chọn lại vai trò'}"
+                            ),
+                            relevance="MATERIAL",
+                            blocking=True,
+                            next_action="fix_upload_role",
+                        )
+                    )
+            else:
+                analysis = await extract_evidence_document(
+                    ocr_result, llm=classifier, budget=budget
+                )
+                if analysis.document_type == "SETTLEMENT_FORM":
+                    source_problems.append(
+                        ProcessingProblem(
+                            kind="UNSUPPORTED",
+                            affected_fields=(source.id,),
+                            message=(
+                                "file vai trò evidence nhưng nội dung là đơn quyết toán; "
+                                "chuyển file sang ô đơn và chọn lại vai trò"
+                            ),
+                            relevance="MATERIAL",
+                            blocking=True,
+                            next_action="fix_upload_role",
+                        )
+                    )
+            llm_attempts = max(0, budget.llm_attempts - calls_before)
+            analysis_summary = _trace_document_analysis(analysis)
+            fields, lines = analysis_summary["fields"], analysis_summary["line_items"]
+            s.outputs.update(
+                stage_payload(
+                    "extraction",
+                    {
+                        "document_id": analysis.document_id,
+                        "document_type": analysis.document_type,
+                        "source_id": analysis.source_id,
+                        "upload_role": role,
+                        "parse_status": "PARSED" if fields or lines else "UNRESOLVED",
+                        "field_count": len(fields),
+                        "line_item_count": len(lines),
+                        "role_note": role_note,
+                        "repair_attempts": max(0, llm_attempts - 1),
+                        "llm_attempts": llm_attempts,
+                    },
+                )
+            )
+        with step(
+            f"validate:{analysis.document_type}",
+            metadata={"trace_stage": "validation", "upload_role": role},
+            inputs=stage_payload(
+                "validation",
+                {
+                    "document_id": analysis.document_id,
+                    "document_type": analysis.document_type,
+                    "source_id": source.id,
+                },
+            ),
+        ) as s:
+            analysis = validate_document(
+                analysis, ocr_result, review, activity_profile=activity_profile
+            )
+            arithmetic_findings = check_document_arithmetic(analysis)
+            s.outputs.update(
+                stage_payload(
+                    "validation",
+                    {
+                        "document_id": analysis.document_id,
+                        "document_type": analysis.document_type,
+                        "profile_status": analysis.profile_status,
+                        "blocking_count": sum(
+                            1
+                            for finding in analysis.profile_findings
+                            if finding.blocking
+                        ),
+                        "arithmetic_checks": {
+                            "state": "CHECKED_BY_SHARED_RULE",
+                            "findings": [
+                                {
+                                    "code": finding.code,
+                                    "field_or_rule": finding.field_or_rule,
+                                    "basis": finding.basis,
+                                }
+                                for finding in arithmetic_findings
+                            ],
+                        },
+                    },
+                )
+            )
+        documents.append(analysis)
+        cache[source.id] = analysis
+        if on_doc_done is not None:
+            try:
+                on_doc_done(source.id, analysis)  # type: ignore[operator]
+            except Exception:
+                pass
+
+    if not documents and ocr and not source_problems:
+        source_problems.append(
+            ProcessingProblem(
+                kind="UNSUPPORTED",
+                affected_fields=tuple(r.source_id for r in ocr),
+                message="no supported document was extracted",
+                relevance="MATERIAL",
+                blocking=True,
+                next_action="confirm_document_type",
+            )
+        )
+    if not sources:
+        source_problems.append(
+            ProcessingProblem(
+                kind="UNSUPPORTED",
+                affected_fields=(),
+                message="no evidence sources provided",
+                relevance="MATERIAL",
+                blocking=True,
+                next_action="attach_sources",
+            )
+        )
+
+    paper = next((d for d in documents if d.document_type == "SETTLEMENT_FORM"), None)
+    with step(
+        "match",
+        metadata={"trace_stage": "matching"},
+        inputs=stage_payload(
+            "matching",
+            {
+                "paper_document_id": paper.document_id if paper else None,
+                "document_count": len(documents),
+                "row_count": len(paper.line_items) if paper else 0,
+            },
+        ),
+    ) as s:
+        llm_attempts_before = budget.llm_attempts
+        resolver_skipped: str | None = None
+        if paper is not None:
+            matching = match_paper_evidence(paper, tuple(documents))
+            suggestions_found = any(
+                link.status == "SUGGEST_LINK" for link in matching.links
+            )
+            suggestion_count = sum(
+                1 for link in matching.links if link.status == "SUGGEST_LINK"
+            )
+            if suggestions_found:
+                from invoice_referee.evidence.matching import identity_determined
+
+                if identity_determined(paper, tuple(documents), matching.links):
+                    resolver_skipped = "identity_determined"
+                elif not budget.can_call_llm():
+                    resolver_skipped = None
+                    source_problems.append(
+                        ProcessingProblem(
+                            kind="TECHNICAL",
+                            affected_fields=(paper.source_id,),
+                            message="hết budget trước LLM resolver; giữ SUGGEST_LINK chưa phân giải",
+                            relevance="MATERIAL",
+                            blocking=True,
+                            next_action="resume_resolver",
+                        )
+                    )
+                else:
+                    resolver_skipped = None
+                    matching = await resolve_evidence_suggestions(
+                        matching,
+                        tuple(documents),
+                        paper=paper,
+                        llm=classifier,
+                        budget=budget,
+                    )
+            else:
+                resolver_skipped = None
+                s.skipped = "no_suggested_links"
+        else:
+            s.skipped = "no_settlement_form"
+            from invoice_referee.domain.documents import EvidenceMatchFinding
+
+            matching = EvidenceMatchingResult(
+                findings=(
+                    EvidenceMatchFinding(
+                        code="SETTLEMENT_FORM_MISSING",
+                        status="UNRESOLVED",
+                        message="Không có giấy quyết toán (SETTLEMENT_FORM) để ghép chứng từ.",
+                        refs=(),
+                    ),
+                )
+            )
+            suggestions_found = False
+            suggestion_count = 0
+        actual_llm_calls = max(0, budget.llm_attempts - llm_attempts_before)
+        matching_summary = _trace_matching(matching)
+        s.outputs.update(
+            stage_payload(
+                "matching",
+                {
+                    "method": "rules+llm" if actual_llm_calls else "rules",
+                    "paper_document_id": paper.document_id if paper else None,
+                    "document_count": len(documents),
+                    "row_count": len(paper.line_items) if paper else 0,
+                    **matching_summary,
+                    "suggestions": suggestion_count if paper is not None else 0,
+                    "llm_called": actual_llm_calls > 0,
+                    "resolver_skipped": resolver_skipped if paper is not None else None,
+                    "resolved_suggestions": any(
+                        link.method == "LLM_RESOLVED" for link in matching.links
+                    ),
+                },
+            )
+        )
+
+    origin = {"LIVE": "LIVE_READ", "RECORDED_REPLAY": "RECORDED_REPLAY"}.get(
+        provider_mode, "STUB_TRANSCRIPTION"
+    )
+    problems = tuple(source_problems) + tuple(
+        p for result in ocr for p in result.problems
+    )
+    return ReadResult(
+        provider_mode=provider_mode,
+        data_origin=origin,
+        reader_identity=reader_identity,
+        documents=tuple(documents),
+        links=matching.links,
+        row_matches=matching.rows,
+        match_findings=matching.findings,
+        page_coverage_detail=tuple(
+            __import__(
+                "invoice_referee.domain.documents", fromlist=["PageCoverage"]
+            ).PageCoverage(
+                source_id=result.source_id,
+                page=page.page,
+                state="OCR_COMPLETE",
                 artifact_ref=result.raw_artifact_ref,
             )
             for result in ocr

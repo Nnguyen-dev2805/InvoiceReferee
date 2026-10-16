@@ -211,6 +211,65 @@ class FileOcrReader:
         expected_pages: int | None = None,
         root_id: str = "",
     ) -> OcrSourceResult:
+        # Word documents never reach the OCR provider (it only accepts
+        # PDF/images): their text is converted locally with honest provenance
+        # (provider="local-office", no word confidence). A conversion failure
+        # is a TECHNICAL problem on the source, never an empty success.
+        if source.media in ("DOC", "DOCX"):
+            from invoice_referee.domain.documents import OcrPage
+            from invoice_referee.evidence.office import (
+                OFFICE_VERSION,
+                OfficeError,
+                extract_office_pages,
+            )
+
+            try:
+                texts = extract_office_pages(source_bytes, str(source.media))
+            except OfficeError as error:
+                from invoice_referee.domain.documents import OcrSourceResult as _Result
+                from invoice_referee.domain.issues import ProcessingProblem
+
+                return _Result(
+                    source_id=source.id,
+                    source_digest=source.digest,
+                    provider="local-office",
+                    model=OFFICE_VERSION,
+                    pages=(),
+                    problems=(
+                        ProcessingProblem(
+                            kind="TECHNICAL",
+                            affected_fields=(source.id,),
+                            message=f"không đọc được văn bản Word: {error}",
+                            relevance="MATERIAL",
+                            blocking=True,
+                            next_action="reupload_source",
+                        ),
+                    ),
+                    complete=False,
+                )
+            from invoice_referee.domain.documents import OcrSourceResult
+
+            pages = tuple(
+                OcrPage(page=index, markdown=text, blocks=())
+                for index, text in enumerate(texts, start=1)
+            )
+            raw_ref = artifacts.write(
+                tenant=source.tenant,
+                root_id=root_id,
+                source_id=source.id,
+                source_digest=source.digest,
+                version=OFFICE_VERSION,
+                payload={"pages": texts, "origin": OFFICE_VERSION},
+            )
+            return OcrSourceResult(
+                source_id=source.id,
+                source_digest=source.digest,
+                provider="local-office",
+                model=OFFICE_VERSION,
+                pages=pages,
+                raw_artifact_ref=raw_ref,
+                complete=True,
+            )
         return await self.provider.ocr_file(  # type: ignore[attr-defined]
             source,
             budget=budget,

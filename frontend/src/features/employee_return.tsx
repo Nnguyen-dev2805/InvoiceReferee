@@ -68,7 +68,7 @@ export function EmployeeReturn({
           </label>
           <label className="block space-y-1">
             <span className="font-medium text-slate-700">Chứng từ chuyển khoản</span>
-            <input aria-label="Chứng từ chuyển khoản hoàn trả" type="file" accept="application/pdf,image/png,image/jpeg" onChange={(event) => setFile(event.target.files?.[0] ?? null)} className="block w-full rounded border border-slate-300 px-2 py-1.5" />
+            <input aria-label="Chứng từ chuyển khoản hoàn trả" type="file" accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg" onChange={(event) => setFile(event.target.files?.[0] ?? null)} className="block w-full rounded border border-slate-300 px-2 py-1.5" />
           </label>
           <button type="button" onClick={() => void submit()} disabled={busy || !file || !instructionId} className="rounded bg-slate-950 px-4 py-2 font-semibold text-white disabled:opacity-40">
             {busy ? "Đang đọc…" : "Tải lên và đọc"}

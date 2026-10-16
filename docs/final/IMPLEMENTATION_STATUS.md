@@ -1,5 +1,62 @@
 # Implementation checkpoint
 
+## TC25 association/dispute + latency — implemented, 17/10/2026
+
+Tách association khỏi allocation (SUGGEST exact-number không còn là
+"unreferenced"), allocation FACT refs hai phía, triệt relevance/missing/
+source_date/payer/T giả khi disputed sở hữu câu hỏi, skip resolver khi
+identity duy nhất (trace `resolver_skipped`), telemetry provider từ adapter
+thật, Kimi reasoning_effort low (config, wire-fake, identity, requested/
+observed UNKNOWN), repair diagnostics bounded (quá khứ UNKNOWN), giữ quota/
+90s/không fallback.
+
+Verification: unit full (mới telemetry/effort/identity/admission/policy/
+repair/skip); integration trừ 6 pre-existing; frontend 46/2 + build.
+LIVE quota: TC25 5 LLM/38.6s, 1 FACT 900k/700k/200k, WAITING/BLOCKED không
+tiền, resolver 0; TC01 3 LLM/21.5s READY COLLECT 760000, 0 issues.
+Refs hai phía kiểm deterministic replay (giữ quota, không chạy lại).
+Browser read-only DB có sẵn 0 provider call PASS.
+[Acceptance](reviews/2026-10-16-tc25-association-dispute-acceptance.md),
+[plan](../../superpowers/plans/2026-10-17-tc25-association-latency.md).
+Bổ sung sau review (không LIVE mới):
+[follow-up plan](../../superpowers/plans/2026-10-17-latency-review-followup.md).
+No commit/push/reset.
+
+## Office uploads (DOC/DOCX) — implemented, 17/10/2026
+
+Nhận thêm DOC/DOCX ở mọi điểm nộp file (settlement sources + draft, advance
+draft, download mime, eval packets, UI 4 điểm). `Media` += DOC/DOCX;
+`_sniff_media` sniff theo nội dung (OOXML zip / OLE). Mistral chỉ nhận
+PDF/ảnh nên Word được chuyển text local (`evidence/office.py`,
+`provider="local-office"`, không word-confidence giả, giữ quote provenance):
+DOCX bằng stdlib zip+xml (đoạn + bảng, đã kiểm trên .docx thật);
+DOC bằng `olefile` + piece table (dep mới pure-python, round-trip OLE thật
+trong test). Lỗi convert thành TECHNICAL blocking, không empty-success.
+Verification: unit office 8 pass; integration docx attach→draft pass; full
+unit + integration (trừ 6 pre-existing) + frontend 46/2 + build + diff-check.
+No commit/push/reset.
+
+## Role-aware Kimi runtime + time budget — implemented, 16/10/2026
+
+Kimi-K3 default (`LLM_PROVIDER=kimi`, xKiro explicit, no silent fallback),
+role-aware upload (paper + evidence, migration v11, `read_root_role_aware`
+4 extraction/0 classify, legacy compat), budget guards giữ 90s + checkpoint/
+resume + finite retry, matching sync draft/final.
+
+Verification: unit full pass; integration pass trừ 6 pre-existing (5
+employee-return date-fixture + 1 raw6 thiếu legacy-corpus, đã xác minh fail
+identically trên cây sạch); frontend 46 passed/2 skipped + build ok (Node
+26/npm 11.12.1); `git diff --check` exit 0; ruff NOT_RUN (chưa cài).
+LIVE (DB riêng, Kimi verified requested==returned `moonshotai/Kimi-K3`):
+TC25 run-02 6 LLM/69.4s WAITING/BLOCKED, FACT 900k/700k/lệch 200k + chặn tiền
+(run-01 giữ lại: receipt unresolved, 7 FACT generic);
+TC01 3 LLM/27.8s READY_TO_EXECUTE COLLECT 760000, 0 issues;
+browser role-upload→draft→submit 11/11 PASS (badge + T/S đúng).
+[Acceptance](reviews/2026-10-16-role-aware-kimi-runtime-acceptance.md),
+[plan](../../superpowers/plans/2026-10-16-role-aware-kimi-runtime.md).
+Thay đổi pre-existing của người khác trong worktree được giữ nguyên.
+No commit/push/reset.
+
 ## Evidence prompt hardening — implemented; release gate partial, 16/10/2026
 
 Implemented shared schema repair1/readpass, strict contextual confidence,

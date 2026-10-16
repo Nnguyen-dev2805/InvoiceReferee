@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { api, attachSources, errorMessage, getSettlementDraft, settlementDraft, submitCase } from "../api";
+import { api, attachSources, errorMessage, getSettlementDraft, settlementDraftByRole, submitCase } from "../api";
 import type { SettlementArithmeticFinding, SettlementLink } from "../api";
 import { formatVnd, formatVndHint } from "../format";
 import type { CaseView, SessionPayload } from "../types";
@@ -64,10 +64,15 @@ export function Intake({
     existingCase && existingCase.state === "DRAFT" ? "reading" : "upload",
   );
   const [caseView, setCaseView] = useState<CaseView | null>(existingCase ?? null);
-  const [files, setFiles] = useState<File[]>([]);
+  // Role-aware upload (16/10/2026): the paper box holds exactly one settlement
+  // form; the evidence box holds many invoices/receipts. Roles are submitter
+  // intent and stay distinct from the content-determined document_type.
+  const [paperFiles, setPaperFiles] = useState<File[]>([]);
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [arithmeticFindings, setArithmeticFindings] = useState<SettlementArithmeticFinding[]>([]);
   // Backend dossier link (14/10/2026): the server decides which advance/work
@@ -91,6 +96,7 @@ export function Intake({
         const resp = await getSettlementDraft(existingCase.id);
         if (cancelled) return;
         setWarnings(resp.warnings ?? []);
+        setProcessingStatus(resp.processing_status ?? null);
         setArithmeticFindings(resp.arithmetic_findings ?? []);
         setDraft({
           declared_name: resp.declared_name,
@@ -140,15 +146,19 @@ export function Intake({
   }, [existingCase?.id]);
 
   function removeFile(index: number) {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+    setEvidenceFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
-  // Bước 2: “Đọc chứng từ”. Upload first, then read the SAME sources through the
-  // OCR pipeline (no fabricated fallback). A failure keeps the files and offers
-  // retry; it never shows a successful draft.
+  // Bước 2: “Đọc chứng từ”. Upload per role, then read the SAME sources
+  // through the OCR pipeline (no fabricated fallback). A failure keeps the
+  // files and offers retry; it never shows a successful draft.
   async function handleReadDocuments() {
-    if (files.length === 0) {
-      setError("Vui lòng chọn ít nhất một tệp chứng từ.");
+    if (paperFiles.length !== 1) {
+      setError("Vui lòng chọn đúng 1 tệp đơn quyết toán ở ô trên.");
+      return;
+    }
+    if (evidenceFiles.length === 0) {
+      setError("Vui lòng chọn ít nhất một hóa đơn/chứng từ kèm theo ở ô dưới.");
       return;
     }
 
@@ -171,15 +181,19 @@ export function Intake({
       const created = await api.createCase(activity);
       let currentCase = created.case_view;
 
-      // 2. Upload the sources.
-      const attached = await attachSources(currentCase.id, files, currentCase.version);
+      // 2. Upload the sources per role (one call per box so the server
+      //    records upload_role=paper / evidence with each file).
+      const attachedPaper = await attachSources(currentCase.id, paperFiles, currentCase.version, "paper");
+      currentCase = attachedPaper.case_view;
+      const attached = await attachSources(currentCase.id, evidenceFiles, currentCase.version, "evidence");
       currentCase = attached.case_view;
       setCaseView(currentCase);
 
       // 3. Read the draft through the OCR pipeline. On failure, surface the
       //    error and keep the files; no demo facts are invented.
-      const resp = await settlementDraft(currentCase.id, files);
+      const resp = await settlementDraftByRole(currentCase.id, paperFiles, evidenceFiles);
       setWarnings(resp.warnings ?? []);
+      setProcessingStatus(resp.processing_status ?? null);
       setArithmeticFindings(resp.arithmetic_findings ?? []);
       setDraft({
         declared_name: resp.declared_name,
@@ -348,117 +362,95 @@ export function Intake({
           {/* ------------------------------------------------------------- */}
           {step === "upload" && (
             <section aria-labelledby="intake-title" className="space-y-4 text-xs">
-              {files.length === 0 ? (
-                /* Trạng thái chưa chọn tệp: Dropzone lớn mời gọi */
-                <label
-                  htmlFor="source-files"
-                  className="border border-dashed border-slate-300 hover:border-slate-500 bg-slate-50/50 hover:bg-slate-50 rounded p-10 text-center flex flex-col items-center justify-center cursor-pointer transition-colors block group"
-                >
-                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-slate-900 group-hover:bg-slate-200 mb-3 transition-colors">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                  </div>
-                  <span className="font-semibold text-slate-800 block text-xs">
-                    Nhấn để chọn tệp hoặc kéo thả tài liệu vào đây
-                  </span>
-                  <span className="text-[11px] text-slate-500 block mt-1 max-w-lg">
-                    Hỗ trợ PDF, PNG, JPG (Giấy quyết toán, hóa đơn điện tử, vé, biên nhận — kèm ủy nhiệm chi / phiếu chi nếu có)
-                  </span>
-                  <input
-                    id="source-files"
-                    aria-label="Chứng từ (PDF/PNG/JPEG)"
-                    type="file"
-                    multiple
-                    accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
-                    onChange={(event) =>
-                      setFiles((prev) => [
-                        ...prev,
-                        ...Array.from(event.target.files ?? []).filter(
-                          (f) => !prev.some((p) => p.name === f.name),
-                        ),
-                      ])
-                    }
-                    className="sr-only"
-                  />
-                </label>
-              ) : (
-                /* Trạng thái ĐÃ CÓ TỆP: Bảng chứng từ làm tiêu điểm + Thanh thêm tệp gọn gàng */
-                <div className="space-y-3">
-                  <div className="border border-slate-200 rounded overflow-hidden bg-white">
-                    <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-900">
-                        Chứng từ đã chọn ({files.length})
-                      </span>
+              {/* Ô 1: đơn quyết toán — đúng 1 tệp */}
+              <div className="border border-slate-200 rounded overflow-hidden bg-white">
+                <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 text-xs">
+                  <span className="font-semibold text-slate-900">Đơn quyết toán (đúng 1 tệp)</span>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">Giấy đề nghị/quyết toán hoàn ứng có bảng chi.</span>
+                </div>
+                <div className="p-3.5 space-y-2">
+                  {paperFiles.map((f) => (
+                    <div key={f.name} className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-slate-800 truncate">{f.name}</span>
                       <button
                         type="button"
-                        onClick={() => {
-                          if (files.length <= 1 || window.confirm("Bạn có chắc chắn muốn xóa tất cả tệp chứng từ đã chọn?")) {
-                            setFiles([]);
-                          }
-                        }}
-                        className="text-[11px] text-slate-400 hover:text-rose-600 cursor-pointer font-medium transition-colors"
+                        onClick={() => setPaperFiles([])}
+                        className="text-[11px] text-slate-400 hover:text-rose-600 cursor-pointer font-medium"
                       >
-                        Xóa tất cả
+                        Xóa
                       </button>
                     </div>
-                    <ul className="divide-y divide-slate-100 text-xs">
-                      {files.map((f, idx) => {
-                        const ext = f.name.split(".").pop()?.toLowerCase();
-                        const isPdf = ext === "pdf";
-                        return (
-                          <li
-                            key={f.name}
-                            className="px-3.5 py-2.5 flex items-center justify-between hover:bg-slate-50/70 transition-colors"
-                          >
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <span
-                                className={`w-7 h-7 rounded flex items-center justify-center font-mono text-[10px] font-bold uppercase shrink-0 ${
-                                  isPdf
-                                    ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                    : "bg-sky-50 text-sky-700 border border-sky-200"
-                                }`}
-                              >
-                                {ext}
-                              </span>
-                              <span className="font-medium text-slate-800 truncate">{f.name}</span>
-                            </div>
-                            <div className="flex items-center gap-4 shrink-0 pl-3">
-                              <span className="font-mono tabular-nums text-[11px] text-slate-400">
-                                {(f.size / 1024).toFixed(1)} KB
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => removeFile(idx)}
-                                className="w-6 h-6 flex items-center justify-center rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer text-xs"
-                                title="Xóa tệp này"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
+                  ))}
+                  {paperFiles.length === 0 && (
+                    <label
+                      htmlFor="paper-file"
+                      className="border border-dashed border-slate-300 hover:border-slate-500 bg-slate-50/40 hover:bg-slate-50 rounded py-2.5 px-4 text-center flex items-center justify-center gap-2 cursor-pointer transition-colors block group text-xs text-slate-600 hover:text-slate-900"
+                    >
+                      <span className="font-medium">Chọn đơn quyết toán (PDF/DOC/DOCX/PNG/JPG)</span>
+                      <input
+                        id="paper-file"
+                        aria-label="Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"
+                        type="file"
+                        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg"
+                        onChange={(event) => {
+                          const picked = Array.from(event.target.files ?? []);
+                          if (picked.length > 0) setPaperFiles([picked[0]]);
+                        }}
+                        className="sr-only"
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
 
-                  {/* Dropzone thu gọn khi đã có file */}
+              {/* Ô 2: hóa đơn/chứng từ kèm theo — nhiều tệp */}
+              <div className="border border-slate-200 rounded overflow-hidden bg-white">
+                <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+                  <span>
+                    <span className="font-semibold text-slate-900">Hóa đơn / chứng từ kèm theo ({evidenceFiles.length})</span>
+                    <span className="text-[11px] text-slate-500 block mt-0.5">Hóa đơn điện tử, vé, phiếu thu… — loại chứng từ do hệ thống đọc từ nội dung.</span>
+                  </span>
+                  {evidenceFiles.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setEvidenceFiles([])}
+                      className="text-[11px] text-slate-400 hover:text-rose-600 cursor-pointer font-medium transition-colors"
+                    >
+                      Xóa tất cả
+                    </button>
+                  )}
+                </div>
+                {evidenceFiles.length > 0 && (
+                  <ul className="divide-y divide-slate-100 text-xs">
+                    {evidenceFiles.map((f, idx) => (
+                      <li key={f.name} className="px-3.5 py-2.5 flex items-center justify-between hover:bg-slate-50/70 transition-colors">
+                        <span className="font-medium text-slate-800 truncate">{f.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeFile(idx)}
+                          className="text-slate-400 hover:text-rose-600 cursor-pointer text-xs"
+                          title="Xóa tệp này"
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="p-3.5">
                   <label
-                    htmlFor="source-files"
+                    htmlFor="evidence-files"
                     className="border border-dashed border-slate-300 hover:border-slate-500 bg-slate-50/40 hover:bg-slate-50 rounded py-2.5 px-4 text-center flex items-center justify-center gap-2 cursor-pointer transition-colors block group text-xs text-slate-600 hover:text-slate-900"
                   >
-                    <svg className="w-4 h-4 text-slate-400 group-hover:text-slate-700 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    <span className="font-medium">Thêm chứng từ khác (kéo thả hoặc nhấn để chọn)</span>
+                    <span className="font-medium">Thêm hóa đơn / chứng từ (kéo thả hoặc nhấn để chọn)</span>
                     <input
-                      id="source-files"
-                      aria-label="Chứng từ (PDF/PNG/JPEG)"
+                      id="evidence-files"
+                      aria-label="Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"
                       type="file"
                       multiple
-                      accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                      accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg"
                       onChange={(event) =>
-                        setFiles((prev) => [
+                        setEvidenceFiles((prev) => [
                           ...prev,
                           ...Array.from(event.target.files ?? []).filter(
                             (f) => !prev.some((p) => p.name === f.name),
@@ -469,19 +461,19 @@ export function Intake({
                     />
                   </label>
                 </div>
-              )}
+              </div>
 
               {/* Nút hành động Bước 2: Đọc chứng từ */}
               <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                 <div className="text-xs text-slate-500">
-                  {files.length > 0 && (
-                    <span>Đã chọn <strong className="font-semibold text-slate-900">{files.length}</strong> tệp chứng từ</span>
+                  {(paperFiles.length > 0 || evidenceFiles.length > 0) && (
+                    <span>Đã chọn <strong className="font-semibold text-slate-900">1</strong> đơn + <strong className="font-semibold text-slate-900">{evidenceFiles.length}</strong> chứng từ kèm theo</span>
                   )}
                 </div>
                 <button
                   type="button"
                   onClick={() => void handleReadDocuments()}
-                  disabled={busy || files.length === 0}
+                  disabled={busy || paperFiles.length !== 1 || evidenceFiles.length === 0}
                   className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-medium text-xs px-4 py-2 rounded transition-colors cursor-pointer"
                 >
                   <span>Đọc chứng từ</span>
@@ -526,7 +518,7 @@ export function Intake({
                     </span>
                     <div>
                       <p className="text-xs font-medium text-slate-900">
-                        Đã tải lên {files.length > 0 ? `${files.length} tệp chứng từ` : "tài liệu chứng từ"}
+                        Đã tải lên 1 đơn + {evidenceFiles.length} chứng từ kèm theo
                       </p>
                       <p className="text-[11px] text-slate-400 mt-0.5">
                         Tệp nguồn đã sẵn sàng đưa vào luồng trích xuất
@@ -576,7 +568,7 @@ export function Intake({
       <div className={`w-full ${isViewerExpanded ? "md:w-3/4" : "md:w-1/2"} h-1/2 md:h-full overflow-hidden flex flex-col transition-all duration-200 ease-in-out`}>
         <DocumentViewer
           caseView={caseView}
-          pendingFiles={files}
+          pendingFiles={[...paperFiles, ...evidenceFiles]}
           isExpanded={isViewerExpanded}
           onToggleExpand={() => setIsViewerExpanded((v) => !v)}
         />
@@ -681,6 +673,21 @@ export function Intake({
               </div>
             )}
           </div>
+
+          {processingStatus === "technical_incomplete" && (
+            <div role="alert" className="text-xs text-rose-800 bg-rose-50 px-3 py-2 rounded border border-rose-200">
+              Đọc chứng từ chưa xong do lỗi kỹ thuật (hết thời gian/budget hoặc lỗi đọc).
+              Hãy bấm “Đọc chứng từ” lại để tiếp tục phần còn thiếu — không cần tải lại từ đầu.
+              Đây không phải yêu cầu bổ sung chứng từ mới.
+            </div>
+          )}
+
+          {processingStatus === "needs_supplement" && (
+            <div role="alert" className="text-xs text-amber-800 bg-amber-50 px-3 py-2 rounded border border-amber-200">
+              Một số tệp chưa đọc được hoặc sai ô (đơn/evidence). Kiểm tra cảnh báo dưới đây,
+              chuyển tệp đúng ô rồi đọc lại.
+            </div>
+          )}
 
           {arithmeticFindings.length > 0 && (
             <section role="alert" aria-label="Mâu thuẫn số học trên giấy quyết toán" className="space-y-3 rounded border border-rose-300 bg-rose-50 p-3 text-rose-950">

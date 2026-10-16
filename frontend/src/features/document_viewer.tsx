@@ -408,12 +408,12 @@ export function DocumentViewer({
                   Nhấn để chọn tệp hoặc kéo thả tài liệu vào đây
                 </span>
                 <span className="text-[11px] text-slate-500 block mt-1">
-                  Hỗ trợ PDF, PNG, JPG
+                  Hỗ trợ PDF, DOC, DOCX, PNG, JPG
                 </span>
                 <input
                   type="file"
                   multiple
-                  accept=".pdf,.png,.jpg,.jpeg"
+                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
                   onChange={(e) => {
                     if (e.target.files) {
                       onFilesSelected(Array.from(e.target.files));

@@ -110,7 +110,9 @@ class TraceSpan(StrictModel):
     run_type: str = "chain"
     inputs: dict[str, object] = {}
     outputs: dict[str, object] = {}
-    output_state: Literal["COLLECTED", "EMPTY", "NOT_COLLECTED", "REDACTED"] | None = None
+    output_state: Literal["COLLECTED", "EMPTY", "NOT_COLLECTED", "REDACTED"] | None = (
+        None
+    )
     error: str | None = None
     metadata: dict[str, object] = {}
     tags: tuple[str, ...] = ()
@@ -121,20 +123,56 @@ class TraceSpan(StrictModel):
 # sensitive word (e.g. ``token_count``) are NOT dropped — only real secrets and
 # private content are.
 _SENSITIVE_SUBSTRINGS = (
-    "raw", "content", "payload", "pdf", "image", "api_key", "apikey",
-    "secret", "authorization", "password", "credential", "bearer",
-    "cookie", "header", "base64",
+    "raw",
+    "content",
+    "payload",
+    "pdf",
+    "image",
+    "api_key",
+    "apikey",
+    "secret",
+    "authorization",
+    "password",
+    "credential",
+    "bearer",
+    "cookie",
+    "header",
+    "base64",
 )
 # Exact secret key names that contain a sensitive word but are not metrics.
-_SECRET_EXACT = frozenset({
-    "token", "access_token", "auth_token", "id_token", "refresh_token",
-    "tenant", "actor", "actor_id", "employee", "employee_id", "person",
-})
-_PRIVATE_VALUE_KEYS = (
-    "name", "account", "identity", "citizen", "passport", "phone", "email",
-    "address", "tax_code", "personal_id", "person_id", "employee_id", "actor_id",
+_SECRET_EXACT = frozenset(
+    {
+        "token",
+        "access_token",
+        "auth_token",
+        "id_token",
+        "refresh_token",
+        "tenant",
+        "actor",
+        "actor_id",
+        "employee",
+        "employee_id",
+        "person",
+    }
 )
-_ALWAYS_DROP_KEYS = frozenset({"quote", "exact_quote", "raw_quote", "ocr_text", "markdown"})
+_PRIVATE_VALUE_KEYS = (
+    "name",
+    "account",
+    "identity",
+    "citizen",
+    "passport",
+    "phone",
+    "email",
+    "address",
+    "tax_code",
+    "personal_id",
+    "person_id",
+    "employee_id",
+    "actor_id",
+)
+_ALWAYS_DROP_KEYS = frozenset(
+    {"quote", "exact_quote", "raw_quote", "ocr_text", "markdown"}
+)
 _TRACE_MAX_DEPTH = 7
 _TRACE_MAX_ITEMS = 40
 _TRACE_MAX_STRING_CHARS = 1200
@@ -162,7 +200,9 @@ def _is_sensitive_key(key: str) -> bool:
         return True
     # A numeric metric (token_count, total_tokens, latency_ms) is kept even when
     # its name contains a sensitive substring.
-    if lowered.endswith(("_count", "_tokens", "_ms", "_s", "_bytes", "_chars", "_seconds")):
+    if lowered.endswith(
+        ("_count", "_tokens", "_ms", "_s", "_bytes", "_chars", "_seconds")
+    ):
         return False
     return any(sensitive in lowered for sensitive in _SENSITIVE_SUBSTRINGS)
 
@@ -219,7 +259,12 @@ def _sanitize_value(
                 result[str(child_key)] = "[REDACTED]"
                 continue
             if _is_private_field(child_field) and lowered in {
-                "value", "normalized", "description", "party", "quote", "observed_text",
+                "value",
+                "normalized",
+                "description",
+                "party",
+                "quote",
+                "observed_text",
             }:
                 result[str(child_key)] = "[REDACTED]"
                 continue
@@ -268,58 +313,188 @@ def _bounded_trace_text(value: str, limits: _PayloadLimits) -> str:
 
 
 _TRACE_STAGE_KEYS: dict[str, frozenset[str]] = {
-    "ocr": frozenset({
-        "source_id", "source_digest", "media", "expected_pages", "provider", "model",
-        "pages_read", "coverage", "read_state", "review_regions", "artifact_ref", "complete",
-    }),
-    "confidence": frozenset({"candidate_count", "candidates", "status", "decisions", "findings", "skipped"}),
-    "classification": frozenset({
-        "status", "skipped", "source_count", "sources", "count", "documents",
-    }),
-    "extraction": frozenset({
-        "document_id", "document_type", "source_id", "source_digest", "page_range",
-        "confidence_status", "ocr_page_count", "classification_confidence", "parse_status",
-        "field_count", "line_item_count", "fields", "line_items", "source_refs",
-        "provenance_findings", "repair_attempts", "llm_attempts",
-    }),
-    "validation": frozenset({
-        "document_id", "document_type", "source_id", "profile_status", "confidence_status",
-        "input_fields", "findings", "fields", "blocking_count", "arithmetic_checks",
-    }),
-    "matching": frozenset({
-        "method", "paper_document_id", "document_count", "row_count", "links", "rows",
-        "findings", "suggestions", "llm_called", "resolved_suggestions",
-    }),
-    "admission": frozenset({
-        "status", "accepted_facts", "unverified_facts", "blocked_facts", "fact_count",
-        "issue_count", "issues", "read_set", "money_basis", "employee_paid_state",
-        "binding", "money_history", "relations", "confirmations", "problems",
-        "arithmetic_findings",
-    }),
-    "reconcile": frozenset({
-        "axes", "issues", "authorizations", "allowed_effect", "effect_blockers",
-        "decision_state", "state", "cost_basis", "money_basis",
-    }),
-    "commit": frozenset({
-        "state_before", "state_after", "version_before", "version_after", "input_revision",
-        "instruction", "conclusion_status", "committed",
-    }),
-    "command": frozenset({
-        "command", "status", "duplicate_command", "state", "case_version", "job_id",
-        "input_revision", "state_before", "state_after", "version_before", "version_after",
-        "instructions", "conclusion_status", "axes", "issues", "issue_count",
-    }),
-    "read_root": frozenset({
-        "status", "outcome", "provider_mode", "document_count", "link_count",
-        "row_match_count", "problem_count", "documents", "findings", "draft",
-        "state_after", "version_after",
-    }),
-    "llm": frozenset({
-        "status", "response_format", "parsed_json_summary", "parsed_json_sha256",
-        "requested_model", "returned_model", "usage",
-        "prompt_version", "schema_version", "attempt_index", "attempt_kind",
-        "stage_instance", "system_chars", "user_chars", "system_sha256", "user_sha256",
-    }),
+    "ocr": frozenset(
+        {
+            "source_id",
+            "source_digest",
+            "media",
+            "expected_pages",
+            "provider",
+            "model",
+            "pages_read",
+            "coverage",
+            "read_state",
+            "review_regions",
+            "artifact_ref",
+            "complete",
+        }
+    ),
+    "confidence": frozenset(
+        {"candidate_count", "candidates", "status", "decisions", "findings", "skipped"}
+    ),
+    "classification": frozenset(
+        {
+            "status",
+            "skipped",
+            "source_count",
+            "sources",
+            "count",
+            "documents",
+        }
+    ),
+    "extraction": frozenset(
+        {
+            "document_id",
+            "document_type",
+            "source_id",
+            "source_digest",
+            "page_range",
+            "confidence_status",
+            "ocr_page_count",
+            "classification_confidence",
+            "parse_status",
+            "field_count",
+            "line_item_count",
+            "fields",
+            "line_items",
+            "source_refs",
+            "provenance_findings",
+            "repair_attempts",
+            "llm_attempts",
+        }
+    ),
+    "validation": frozenset(
+        {
+            "document_id",
+            "document_type",
+            "source_id",
+            "profile_status",
+            "confidence_status",
+            "input_fields",
+            "findings",
+            "fields",
+            "blocking_count",
+            "arithmetic_checks",
+        }
+    ),
+    "matching": frozenset(
+        {
+            "method",
+            "paper_document_id",
+            "document_count",
+            "row_count",
+            "links",
+            "rows",
+            "findings",
+            "suggestions",
+            "llm_called",
+            "resolver_skipped",
+            "resolved_suggestions",
+        }
+    ),
+    "admission": frozenset(
+        {
+            "status",
+            "accepted_facts",
+            "unverified_facts",
+            "blocked_facts",
+            "fact_count",
+            "issue_count",
+            "issues",
+            "read_set",
+            "money_basis",
+            "employee_paid_state",
+            "binding",
+            "money_history",
+            "relations",
+            "confirmations",
+            "problems",
+            "arithmetic_findings",
+        }
+    ),
+    "reconcile": frozenset(
+        {
+            "axes",
+            "issues",
+            "authorizations",
+            "allowed_effect",
+            "effect_blockers",
+            "decision_state",
+            "state",
+            "cost_basis",
+            "money_basis",
+        }
+    ),
+    "commit": frozenset(
+        {
+            "state_before",
+            "state_after",
+            "version_before",
+            "version_after",
+            "input_revision",
+            "instruction",
+            "conclusion_status",
+            "committed",
+        }
+    ),
+    "command": frozenset(
+        {
+            "command",
+            "status",
+            "duplicate_command",
+            "state",
+            "case_version",
+            "job_id",
+            "input_revision",
+            "state_before",
+            "state_after",
+            "version_before",
+            "version_after",
+            "instructions",
+            "conclusion_status",
+            "axes",
+            "issues",
+            "issue_count",
+        }
+    ),
+    "read_root": frozenset(
+        {
+            "status",
+            "outcome",
+            "provider_mode",
+            "document_count",
+            "link_count",
+            "row_match_count",
+            "problem_count",
+            "documents",
+            "findings",
+            "draft",
+            "state_after",
+            "version_after",
+        }
+    ),
+    "llm": frozenset(
+        {
+            "status",
+            "response_format",
+            "parsed_json_summary",
+            "parsed_json_sha256",
+            "requested_model",
+            "returned_model",
+            "requested_effort",
+            "observed_effort",
+            "usage",
+            "prompt_version",
+            "schema_version",
+            "attempt_index",
+            "attempt_kind",
+            "stage_instance",
+            "system_chars",
+            "user_chars",
+            "system_sha256",
+            "user_sha256",
+        }
+    ),
 }
 
 
@@ -329,7 +504,9 @@ def stage_payload(stage: str, payload: dict[str, object]) -> dict[str, object]:
     if allowed is None:
         raise ValueError(f"Unknown trace stage: {stage}")
     selected = {key: value for key, value in payload.items() if key in allowed}
-    return filter_payload({"schema_version": f"invoice_referee.trace.{stage}.v1", **selected})
+    return filter_payload(
+        {"schema_version": f"invoice_referee.trace.{stage}.v1", **selected}
+    )
 
 
 def sanitize_trace_error(error: object, *, max_chars: int = 300) -> str:
@@ -344,10 +521,11 @@ def sanitize_trace_error(error: object, *, max_chars: int = 300) -> str:
         value,
     )
     value = re.sub(r"(?i)(authorization\s*[:=]\s*)[^\r\n]+", r"\1[REDACTED]", value)
-    value = re.sub(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", "[REDACTED_EMAIL]", value, flags=re.I)
+    value = re.sub(
+        r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", "[REDACTED_EMAIL]", value, flags=re.I
+    )
     value = re.sub(r"(?<!\w)(?:\+?\d[\d .()-]{7,}\d)(?!\w)", "[REDACTED_NUMBER]", value)
     return value[:max_chars]
-
 
 
 class LocalTrace:
@@ -403,7 +581,9 @@ class LangSmithTrace:
         )
         return self._client
 
-    def record(self, span: TraceSpan, *, payload: dict[str, object] | None = None) -> None:
+    def record(
+        self, span: TraceSpan, *, payload: dict[str, object] | None = None
+    ) -> None:
         # Local audit first and unconditionally — telemetry is optional on top.
         self.local.record(span)
         if not self.enabled:
@@ -413,7 +593,9 @@ class LangSmithTrace:
         except Exception as error:
             # Telemetry failure is not a business failure; the local span stands
             # and the failure is recorded for diagnostics (never silently lost).
-            self.export_errors.append(sanitize_trace_error(f"{type(error).__name__}: {error}"))
+            self.export_errors.append(
+                sanitize_trace_error(f"{type(error).__name__}: {error}")
+            )
 
     def flush(self, *, timeout: float = 5.0) -> None:
         """Wait briefly for the SDK's buffered creates to reach its transport."""
@@ -451,10 +633,12 @@ class LangSmithTrace:
         output_state = span.output_state or (
             "COLLECTED" if span_outputs else "NOT_COLLECTED"
         )
-        metadata = filter_payload({
-            **span.metadata,
-            "trace_output_state": output_state,
-        })
+        metadata = filter_payload(
+            {
+                **span.metadata,
+                "trace_output_state": output_state,
+            }
+        )
         extra = {
             "logical_run_id": span.run_id,
             "basis": span.basis,
@@ -489,7 +673,6 @@ class LangSmithTrace:
         if span.tags:
             create_kwargs["tags"] = list(span.tags)
         client.create_run(**create_kwargs)  # type: ignore[attr-defined]
-
 
 
 def build_trace(settings: object) -> LangSmithTrace:

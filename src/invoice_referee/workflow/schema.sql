@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS case_sources (
     media       TEXT NOT NULL,
     digest      TEXT NOT NULL,
     storage_key TEXT NOT NULL,
+    -- Role-aware upload (16/10/2026): submitter intent 'paper'|'evidence';
+    -- '' = legacy upload without a role (never guessed).
+    upload_role TEXT NOT NULL DEFAULT '',
     attached_at TEXT NOT NULL
 );
 

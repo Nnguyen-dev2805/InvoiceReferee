@@ -23,7 +23,6 @@ from invoice_referee.domain.organization import OrganizationContext
 __all__ = ["OrganizationContext"]
 
 
-
 Split = Literal["development", "calibration", "validation", "holdout"]
 Strata = Literal["routine", "FACT", "POLICY", "AUTHORITY", "TECHNICAL"]
 
@@ -32,7 +31,7 @@ class PacketSource(StrictModel):
     """One raw source file inside input/ (path relative to the packet root)."""
 
     filename: str = Field(min_length=1)
-    media: Literal["PDF", "PNG", "JPEG"]
+    media: Literal["PDF", "PNG", "JPEG", "DOC", "DOCX"]
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 

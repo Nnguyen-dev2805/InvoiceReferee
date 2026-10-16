@@ -205,6 +205,10 @@ def _media_for(filename: str) -> str:
         return "PNG"
     if suffix in ("jpg", "jpeg"):
         return "JPEG"
+    if suffix in ("doc",):
+        return "DOC"
+    if suffix in ("docx",):
+        return "DOCX"
     raise PacketError(f"unsupported source extension: {filename}")
 
 
@@ -300,12 +304,12 @@ def digest_packet_input(packet_dir: Path, *, stage_id: str = "ban-dau") -> str:
 
 
 def write_manifest(manifest: Path, meta: PacketMetadata) -> None:
-    Path(manifest).write_text(
-        meta.model_dump_json(indent=2), encoding="utf-8"
-    )
+    Path(manifest).write_text(meta.model_dump_json(indent=2), encoding="utf-8")
 
 
-def load_stub_readings(case_dir: Path, *, stage_id: str = "ban-dau") -> Transcription | None:
+def load_stub_readings(
+    case_dir: Path, *, stage_id: str = "ban-dau"
+) -> Transcription | None:
     """The STUB hand-transcription for a case (reader-only; plan A.1).
 
     This is called only by the runtime STUB reader path; `load_input` never

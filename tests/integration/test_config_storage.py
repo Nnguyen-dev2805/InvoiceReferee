@@ -23,7 +23,10 @@ def _workflow(tmp_path: Path) -> CaseWorkflow:
     db.migrate()
     wf = CaseWorkflow(db, uploads_dir=tmp_path / "uploads")
     wf.import_demo_context(
-        Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "legacy-company-context.json",
+        Path(__file__).resolve().parents[2]
+        / "tests"
+        / "fixtures"
+        / "legacy-company-context.json",
         origin="SIMULATED",
     )
     return wf
@@ -36,7 +39,13 @@ def test_missing_live_keys_are_reported_not_faked(monkeypatch) -> None:
         monkeypatch.delenv(name, raising=False)
     settings = Settings(_env_file=None)
     assert settings.live_ready is False
-    assert set(settings.missing_for_live()) == set(LIVE_REQUIRED_SETTINGS)
+    assert set(settings.missing_for_live()) == {
+        "MISTRAL_API_KEY",
+        "MISTRAL_OCR_MODEL",
+        "KIMI_TOKEN",
+        "KIMI_SECRET",
+        "KIMI_BASE_URL",
+    }
 
 
 def test_langsmith_is_opt_in_and_never_required(monkeypatch) -> None:
@@ -68,7 +77,9 @@ async def test_health_endpoint_reports_redacted_versions(app_fixture) -> None:
 
 async def test_sessions_are_isolated(app_fixture) -> None:
     # Two tenants never see each other's cases.
-    a = await app_fixture.create(employee="employee:employee-a", activity="activity:travel-a")
+    a = await app_fixture.create(
+        employee="employee:employee-a", activity="activity:travel-a"
+    )
     tenant_b = app_fixture.client_for(tenant="tenant:b")
     listed = await tenant_b.get("/api/cases")
     assert listed.status_code == 200

@@ -20,7 +20,7 @@ from invoice_referee.domain.documents import (
 )
 from invoice_referee.domain.issues import ProcessingProblem
 
-Media = Literal["PDF", "PNG", "JPEG"]
+Media = Literal["PDF", "PNG", "JPEG", "DOC", "DOCX"]
 EvidenceRole = Literal[
     "REQUEST",
     "INVOICE",
@@ -47,6 +47,11 @@ class SourceRef(StrictModel):
     # view exposes it so a client can present/select the right document instead
     # of guessing a filename from the opaque storage key (plan A8/E).
     filename: str | None = None
+    # Role-aware upload (16/10/2026): the submitter's intent for this file —
+    # 'paper' (đơn quyết toán) or 'evidence' (hóa đơn/chứng từ kèm theo).
+    # None = legacy upload without a role; the legacy classify-then-extract
+    # path stays for those records (never guessed as evidence).
+    upload_role: Literal["paper", "evidence"] | None = None
 
 
 class EvidenceUnit(StrictModel):

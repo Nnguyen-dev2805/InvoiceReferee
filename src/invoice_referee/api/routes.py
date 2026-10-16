@@ -11,7 +11,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 
 from invoice_referee.api import views
@@ -260,7 +260,19 @@ def get_source_content(request: Request, root_id: str, source_id: str) -> FileRe
     media_type = (
         "application/pdf"
         if matching.media == "PDF"
-        else ("image/png" if matching.media == "PNG" else "image/jpeg")
+        else (
+            "image/png"
+            if matching.media == "PNG"
+            else (
+                "image/jpeg"
+                if matching.media == "JPEG"
+                else (
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    if matching.media == "DOCX"
+                    else "application/msword"
+                )
+            )
+        )
     )
     return FileResponse(
         file_path,
@@ -272,23 +284,38 @@ def get_source_content(request: Request, root_id: str, source_id: str) -> FileRe
 
 @router.post("/cases/{root_id}/sources")
 async def attach_sources(
-    request: Request, root_id: str, files: list[UploadFile] = File(...)
+    request: Request,
+    root_id: str,
+    files: list[UploadFile] = File(...),
+    upload_role: str | None = Form(None),
 ) -> CommandResult:
+    """Attach uploaded files; one optional role applies to the whole call.
+
+    New UI calls once per box (paper box → role=paper, evidence box →
+    role=evidence). Legacy callers omit the role (None = legacy, never guessed).
+    """
     session = _require_session(request)
     workflow = _workflow(request)
     if not files:
         raise HTTPException(status_code=400, detail="Chưa chọn tệp chứng từ nào.")
+    role: str | None = None
+    if upload_role is not None and upload_role != "":
+        if upload_role not in ("paper", "evidence"):
+            raise HTTPException(
+                status_code=422, detail="upload_role phải là 'paper' hoặc 'evidence'."
+            )
+        role = upload_role
 
     prepared: list[tuple[str, Media, bytes]] = []
     for upload in files:
         data = await upload.read()
-        media = _sniff_media(data)
+        media = _sniff_media(data, upload.filename)
         if media is None:
             raise HTTPException(
                 status_code=415,
                 detail=(
                     f"Định dạng tệp '{upload.filename or 'không tên'}' không hỗ trợ. "
-                    "Chỉ nhận PDF, PNG hoặc JPEG."
+                    "Chỉ nhận PDF, DOC, DOCX, PNG hoặc JPEG."
                 ),
             )
         if len(data) > workflow.max_source_bytes:
@@ -316,6 +343,7 @@ async def attach_sources(
                 media=media,
                 digest=hashlib.sha256(data).hexdigest(),
                 storage_key=storage_key,
+                upload_role=role,  # type: ignore[arg-type]
             )
         )
 
@@ -390,13 +418,20 @@ async def run_verify(
     }
 
 
-def _sniff_media(data: bytes) -> Media | None:
+def _sniff_media(data: bytes, filename: str | None = None) -> Media | None:
     if data.startswith(b"%PDF"):
         return "PDF"
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
         return "PNG"
     if data.startswith(b"\xff\xd8\xff"):
         return "JPEG"
+    # Word documents (17/10/2026): content-sniffed, never by extension alone.
+    from invoice_referee.evidence.office import sniff_office
+
+    office = sniff_office(data)
+    if office is not None:
+        return office  # type: ignore[return-value]
+    _ = filename
     return None
 
 
@@ -494,12 +529,22 @@ async def record_actual(
     money = payload.money
     if money.claimed_kind in ("REIMBURSEMENT_RECEIVED", "EMPLOYEE_RETURN"):
         if session.persona != "accountant":
-            raise HTTPException(status_code=403, detail="Chỉ kế toán được xác nhận giao dịch theo lệnh chi/thu.")
-        if money.claimed_kind == "EMPLOYEE_RETURN" and not money.money_movement_draft_id:
-            raise HTTPException(status_code=422, detail="Cần xác nhận từ chứng từ hoàn trả đã lưu.")
+            raise HTTPException(
+                status_code=403,
+                detail="Chỉ kế toán được xác nhận giao dịch theo lệnh chi/thu.",
+            )
+        if (
+            money.claimed_kind == "EMPLOYEE_RETURN"
+            and not money.money_movement_draft_id
+        ):
+            raise HTTPException(
+                status_code=422, detail="Cần xác nhận từ chứng từ hoàn trả đã lưu."
+            )
     if money.claimed_kind == "ADVANCE_RECEIVED":
         if session.persona != "accountant":
-            raise HTTPException(status_code=403, detail="Chỉ kế toán được xác nhận chứng từ ứng.")
+            raise HTTPException(
+                status_code=403, detail="Chỉ kế toán được xác nhận chứng từ ứng."
+            )
         if not money.advance_draft_id:
             raise HTTPException(
                 status_code=422,
@@ -567,18 +612,26 @@ async def confirm_money_history(
 ) -> CommandResult:
     session = _require_session(request)
     if session.persona != "accountant":
-        raise HTTPException(status_code=403, detail="Chỉ kế toán được xác nhận lịch sử tiền ban đầu.")
+        raise HTTPException(
+            status_code=403, detail="Chỉ kế toán được xác nhận lịch sử tiền ban đầu."
+        )
     return await _workflow(request).execute(
         _command_context(request, session, require_version=True),
-        ConfirmMoneyHistory(root_id=root_id, all_prior_money_recorded=payload.all_prior_money_recorded),
+        ConfirmMoneyHistory(
+            root_id=root_id, all_prior_money_recorded=payload.all_prior_money_recorded
+        ),
     )
 
 
 @router.get("/cases/{root_id}/advance/draft")
-async def get_advance_draft(request: Request, root_id: str, draft_id: str | None = None):
+async def get_advance_draft(
+    request: Request, root_id: str, draft_id: str | None = None
+):
     session = _require_session(request)
     if session.persona != "accountant":
-        raise HTTPException(status_code=403, detail="Chỉ kế toán được mở bản nháp chứng từ ứng.")
+        raise HTTPException(
+            status_code=403, detail="Chỉ kế toán được mở bản nháp chứng từ ứng."
+        )
     return _workflow(request).get_advance_draft(session, root_id, draft_id)
 
 
@@ -598,15 +651,19 @@ async def advance_draft(
     session = _require_session(request)
     workflow = _workflow(request)
     if session.persona != "accountant":
-        raise HTTPException(status_code=403, detail="Chỉ kế toán được bổ sung chứng từ ứng.")
+        raise HTTPException(
+            status_code=403, detail="Chỉ kế toán được bổ sung chứng từ ứng."
+        )
     if not files:
         raise HTTPException(status_code=400, detail="Chưa chọn chứng từ ứng.")
     uploads: list[tuple[str, str, bytes]] = []
     for upload in files:
         data = await upload.read()
-        media = _sniff_media(data)
+        media = _sniff_media(data, upload.filename)
         if media is None:
-            raise HTTPException(status_code=415, detail="Chỉ nhận PDF, PNG hoặc JPEG.")
+            raise HTTPException(
+                status_code=415, detail="Chỉ nhận PDF, DOC, DOCX, PNG hoặc JPEG."
+            )
         if len(data) > workflow.max_source_bytes:
             raise HTTPException(status_code=413, detail="Tệp vượt giới hạn dung lượng.")
         uploads.append((upload.filename or "tep", media, data))
@@ -677,7 +734,10 @@ async def employee_return_draft(
     """Read an employee's return proof; money awaits accountant confirmation."""
     session = _require_session(request)
     if session.persona != "employee":
-        raise HTTPException(status_code=403, detail="Chỉ nhân viên của hồ sơ được tải chứng từ hoàn trả.")
+        raise HTTPException(
+            status_code=403,
+            detail="Chỉ nhân viên của hồ sơ được tải chứng từ hoàn trả.",
+        )
     context = _command_context(request, session, require_version=True)
     return await _workflow(request).read_employee_return_draft(
         session,
@@ -705,22 +765,43 @@ async def settlement_draft(
     request: Request,
     root_id: str,
     files: list[UploadFile] = File(default=[]),
+    paper: list[UploadFile] = File(default=[]),
+    evidence: list[UploadFile] = File(default=[]),
 ) -> dict[str, object]:
-    """Read uploaded settlement documents and return a prefilled draft for review."""
+    """Read uploaded settlement documents and return a prefilled draft for review.
+
+    New UI posts the paper box as ``paper`` (exactly one settlement form) and
+    the evidence box as ``evidence`` (many). Legacy callers post ``files``
+    without roles and keep the legacy classify-then-extract path.
+    """
     session = _require_session(request)
     workflow = _workflow(request)
-    if not files:
+    if not files and not paper and not evidence:
         return await workflow.get_settlement_draft(session, root_id)
-    uploads: list[tuple[str, str, bytes]] = []
-    for upload in files:
-        data = await upload.read()
-        media = _sniff_media(data)
-        if media is None:
-            raise HTTPException(status_code=415, detail="Chỉ nhận PDF, PNG hoặc JPEG.")
-        if len(data) > workflow.max_source_bytes:
-            raise HTTPException(status_code=413, detail="Tệp vượt giới hạn dung lượng.")
-        uploads.append((upload.filename or "tep", media, data))
-    draft = await workflow.read_settlement_draft(session, root_id, tuple(uploads))
+
+    async def _read_part(
+        uploads: list[UploadFile], role: str | None
+    ) -> list[tuple[str, str, bytes, str | None]]:
+        out: list[tuple[str, str, bytes, str | None]] = []
+        for upload in uploads:
+            data = await upload.read()
+            media = _sniff_media(data, upload.filename)
+            if media is None:
+                raise HTTPException(
+                    status_code=415, detail="Chỉ nhận PDF, DOC, DOCX, PNG hoặc JPEG."
+                )
+            if len(data) > workflow.max_source_bytes:
+                raise HTTPException(
+                    status_code=413, detail="Tệp vượt giới hạn dung lượng."
+                )
+            out.append((upload.filename or "tep", media, data, role))
+        return out
+
+    uploads: list[tuple[str, str, bytes, str | None]] = []
+    uploads.extend(await _read_part(files, None))
+    uploads.extend(await _read_part(paper, "paper"))
+    uploads.extend(await _read_part(evidence, "evidence"))
+    draft = await workflow.read_settlement_draft(session, root_id, tuple(uploads))  # type: ignore[arg-type]
     return draft
 
 

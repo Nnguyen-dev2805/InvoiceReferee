@@ -60,7 +60,13 @@ RECOGNIZE_LIMIT = 8_000_000
 ISSUE_LIMIT = 4_000_000
 
 _ORIGINAL_EXPENSE_TYPES = frozenset(
-    {"E_INVOICE", "PAPER_RECEIPT", "TRANSPORT_TICKET", "HOTEL_RECEIPT", "COLLECTION_RECEIPT"}
+    {
+        "E_INVOICE",
+        "PAPER_RECEIPT",
+        "TRANSPORT_TICKET",
+        "HOTEL_RECEIPT",
+        "COLLECTION_RECEIPT",
+    }
 )
 
 
@@ -88,10 +94,16 @@ def _field(document: DocumentAnalysis, name: str) -> object | None:
 # the settlement row + document text.
 _CATEGORY_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("TAXI", ("taxi", "grab", "xe om", "xe cong nghe")),
-    ("WORK_CLIENT_MEAL", ("tiep khach", "an uong", "nha hang", "bua an", "cafe", "chieu dai")),
+    (
+        "WORK_CLIENT_MEAL",
+        ("tiep khach", "an uong", "nha hang", "bua an", "cafe", "chieu dai"),
+    ),
     ("LODGING", ("khach san", "luu tru", "hotel", "phong nghi")),
     ("TRAVEL", ("ve may bay", "ve tau", "ve xe", "di chuyen", "cong tac phi")),
-    ("OFFICE_PURCHASE", ("van phong pham", "may in", "thiet bi", "giay in", "muc in", "mua sam")),
+    (
+        "OFFICE_PURCHASE",
+        ("van phong pham", "may in", "thiet bi", "giay in", "muc in", "mua sam"),
+    ),
     ("OPERATIONS", ("sua chua", "bao tri", "in an", "dich vu", "van hanh")),
     ("PERSONAL", ("ca nhan", "gia dinh")),
 )
@@ -105,11 +117,16 @@ def _normalize_text(value: object) -> str:
     return text.lower()
 
 
-def _infer_category(description: str, documents: tuple[DocumentAnalysis, ...]) -> str | None:
+def _infer_category(
+    description: str, documents: tuple[DocumentAnalysis, ...]
+) -> str | None:
     haystack = _normalize_text(description)
     for document in documents:
         for candidate in document.fields:
-            if candidate.state == "FOUND" and candidate.field in ("description", "service_charge"):
+            if candidate.state == "FOUND" and candidate.field in (
+                "description",
+                "service_charge",
+            ):
                 haystack += " " + _normalize_text(candidate.value)
         for line in document.line_items:
             for candidate in line.fields:
@@ -184,6 +201,11 @@ class _MatchedExpense(NamedTuple):
     description: str = ""
     no_evidence_reason: str | None = None
     paper_refs: tuple[EvidenceRef, ...] = ()
+    # Association without accepted allocation (17/10/2026, A1): the row's
+    # reference uniquely names this document (exact invoice number) but the
+    # amount is disputed, so the document is associated yet unaccepted. Keeps
+    # the relation visible without admitting money.
+    associated_document_id: str | None = None
 
 
 def _normalize_ref(value: str) -> str:
@@ -206,6 +228,25 @@ def _refs_match(a: str, b: str) -> bool:
     return na == nb or na.endswith(nb) or nb.endswith(na)
 
 
+def _row_refs(
+    row: DocumentLine, paper: DocumentAnalysis | None
+) -> tuple[EvidenceRef, ...]:
+    """All source refs naming a paper row (A3): its field quotes first.
+
+    Extraction rows carry quotes on fields, not on the row itself; falling
+    back to bare line/paper refs would leave live issues one-sided.
+    """
+    refs: list[EvidenceRef] = []
+    for candidate in row.fields:
+        refs.extend(candidate.refs)
+        for alternative in candidate.alternatives:
+            refs.extend(alternative.refs)
+    refs.extend(row.refs or ())
+    if paper is not None:
+        refs.extend(paper.refs or ())
+    return tuple(dict.fromkeys(refs))
+
+
 def _match_expense_documents(
     report: ReadResult, paper: DocumentAnalysis | None
 ) -> tuple[list[_MatchedExpense], tuple[DocumentAnalysis, ...]]:
@@ -218,8 +259,37 @@ def _match_expense_documents(
     """
     if paper is not None and report.links:
         from invoice_referee.evidence.matching import project_evidence_matches
+
         projection = project_evidence_matches(paper, report.documents, report.links)
-        originals = {d.document_id: d for d in report.documents if d.document_type in _ORIGINAL_EXPENSE_TYPES}
+        originals = {
+            d.document_id: d
+            for d in report.documents
+            if d.document_type in _ORIGINAL_EXPENSE_TYPES
+        }
+        from invoice_referee.evidence.matching import _invoice_ref_matches_number
+
+        # Association (17/10/2026, A1): a document the row references that is
+        # not accepted for allocation. Any link status counts, as does an
+        # explicit exact-number reference independent of links. Associated
+        # documents are related evidence, never "unreferenced".
+        associated: set[str] = set()
+        for link in projection.links:
+            if link.document_id in originals:
+                associated.add(link.document_id)
+        for row in paper.line_items:
+            description = str(_line_field(row, "description") or "")
+            if is_settlement_summary_row(description):
+                continue
+            refs_value = _line_field(row, "invoice_refs") or ()
+            if isinstance(refs_value, str):
+                refs_value = (refs_value,)
+            for ref in refs_value:
+                for document in originals.values():
+                    number = _field(document, "document_number")
+                    if number is not None and _invoice_ref_matches_number(
+                        str(ref), str(number)
+                    ):
+                        associated.add(document.document_id)
         out: list[_MatchedExpense] = []
         used = set()
         for index, row in enumerate(paper.line_items, 1):
@@ -227,24 +297,66 @@ def _match_expense_documents(
             if is_settlement_summary_row(description):
                 continue
             reason = _line_field(row, "no_evidence_reason")
-            row_links = [link for link in projection.links
-                         if link.item_id == f"ITEM-{index:03d}" and link.status == "AUTO_LINK"
-                         and link.document_id in originals
-                         and link.source_id == originals[link.document_id].source_id
-                         and originals[link.document_id].profile_status == "CLEAR"]
+            row_links = [
+                link
+                for link in projection.links
+                if link.item_id == f"ITEM-{index:03d}"
+                and link.status == "AUTO_LINK"
+                and link.document_id in originals
+                and link.source_id == originals[link.document_id].source_id
+                and originals[link.document_id].profile_status == "CLEAR"
+            ]
             if row_links:
                 for link in row_links:
                     document = originals[link.document_id]
                     if link.allocated_amount is not None:
-                        out.append(_MatchedExpense(link.allocated_amount, _document_refs(document),
-                            document, description, str(reason) if reason else None, row.refs or paper.refs))
+                        out.append(
+                            _MatchedExpense(
+                                link.allocated_amount,
+                                _document_refs(document),
+                                document,
+                                description,
+                                str(reason) if reason else None,
+                                _row_refs(row, paper),
+                            )
+                        )
                         used.add(document.document_id)
             else:
                 amount = _as_decimal(_line_field(row, "amount"))
                 if amount is not None:
-                    out.append(_MatchedExpense(amount, (), None, description,
-                        str(reason) if reason else None, row.refs or paper.refs))
-        return out, tuple(d for d in originals.values() if d.document_id not in used)
+                    refs_value = _line_field(row, "invoice_refs") or ()
+                    if isinstance(refs_value, str):
+                        refs_value = (refs_value,)
+                    unique_match: str | None = None
+                    for ref in refs_value:
+                        candidates = [
+                            document.document_id
+                            for document in originals.values()
+                            if (number := _field(document, "document_number"))
+                            is not None
+                            and _invoice_ref_matches_number(str(ref), str(number))
+                        ]
+                        if len(candidates) == 1:
+                            unique_match = candidates[0]
+                        else:
+                            unique_match = None
+                            break
+                    out.append(
+                        _MatchedExpense(
+                            amount,
+                            (),
+                            None,
+                            description,
+                            str(reason) if reason else None,
+                            _row_refs(row, paper),
+                            unique_match,
+                        )
+                    )
+        return out, tuple(
+            d
+            for d in originals.values()
+            if d.document_id not in used and d.document_id not in associated
+        )
     rows = _settlement_rows(paper)
     original = [
         d for d in report.documents if d.document_type in _ORIGINAL_EXPENSE_TYPES
@@ -261,6 +373,7 @@ def _match_expense_documents(
             if _refs_match(ref, key):
                 return document
         return None
+
     if rows:
         for line in paper.line_items if paper is not None else ():
             description = str(_line_field(line, "description") or "")
@@ -285,14 +398,31 @@ def _match_expense_documents(
                 cost = _as_decimal(_field(matched_doc, "total_amount"))
             if cost is None:
                 continue
-            out.append(_MatchedExpense(
-                cost, _document_refs(matched_doc) if matched_doc is not None else (),
-                matched_doc, description, reason,
-            ))
+            out.append(
+                _MatchedExpense(
+                    cost,
+                    _document_refs(matched_doc) if matched_doc is not None else (),
+                    matched_doc,
+                    description,
+                    reason,
+                    _row_refs(line, paper),
+                )
+            )
         # Any original document not referenced by a row is a relevance FACT (T4,
         # TC24): preserved as a zero-cost marker is wrong, so it is reported and
-        # NOT admitted as a second cost.
+        # NOT admitted as a second cost. A document sharing the referenced
+        # number with another candidate is associated (ambiguous identity),
+        # never "unreferenced" (A1).
         matched_docs = {id(d.document) for d in out if d.document is not None}
+        for line in paper.line_items if paper is not None else ():
+            refs_value = _line_field(line, "invoice_refs") or ()
+            if isinstance(refs_value, str):
+                refs_value = (refs_value,)
+            for ref in refs_value:
+                for document in original:
+                    number = _field(document, "document_number")
+                    if number is not None and _refs_match(str(ref), str(number)):
+                        matched_docs.add(id(document))
         return out, tuple(d for d in original if id(d) not in matched_docs)
     # No paper rows: each original document is its own cost.
     for document in original:
@@ -308,8 +438,10 @@ def history_fingerprint(events: tuple[MoneyEvent, ...]) -> str:
     import hashlib
     import json
 
-    payload = [event.model_dump(mode="json", exclude={"refs"})
-               for event in sorted(events, key=lambda event: event.external_key)]
+    payload = [
+        event.model_dump(mode="json", exclude={"refs"})
+        for event in sorted(events, key=lambda event: event.external_key)
+    ]
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
@@ -347,17 +479,21 @@ def coverage_is_valid(
             and coverage.recorded_at is not None
             and coverage.recorded_at <= coverage.as_of <= as_of
             and bool((coverage.reason or "").strip())
-            and (coverage.source == "DOSSIER_RECORDS" or (
-                coverage.opening_balance is not None
-                and coverage.opening_balance.state == "KNOWN"
-                and coverage.opening_balance.value == 0
-            ))
+            and (
+                coverage.source == "DOSSIER_RECORDS"
+                or (
+                    coverage.opening_balance is not None
+                    and coverage.opening_balance.state == "KNOWN"
+                    and coverage.opening_balance.value == 0
+                )
+            )
             and set(COVERAGE_REQUIRED_FLOW_KINDS) <= set(coverage.flow_kinds)
             and not coverage.unallocated_event_ids
             and current_ledger_version is not None
             and coverage.ledger_version == str(current_ledger_version)
             and coverage.context_ledger_fingerprint is not None
-            and coverage.context_ledger_fingerprint == current_context_ledger_fingerprint
+            and coverage.context_ledger_fingerprint
+            == current_context_ledger_fingerprint
         )
     if coverage.source == "ACCOUNTANT_CONFIRMATION":
         # A human confirmation remains usable for the same accounting date while
@@ -382,7 +518,9 @@ def coverage_is_valid(
             return False
         if coverage.unallocated_event_ids:
             return False
-        if current_ledger_version is None or coverage.ledger_version != str(current_ledger_version):
+        if current_ledger_version is None or coverage.ledger_version != str(
+            current_ledger_version
+        ):
             return False
     elif has_uncovered_local_events:
         # A snapshot's complete company history predates a newly recorded root
@@ -406,7 +544,9 @@ def _claimant_name(organization: OrganizationContext, employee: str) -> str | No
     return None
 
 
-def _declared_name(paper: DocumentAnalysis | None) -> tuple[str, tuple[EvidenceRef, ...]] | None:
+def _declared_name(
+    paper: DocumentAnalysis | None,
+) -> tuple[str, tuple[EvidenceRef, ...]] | None:
     if paper is None:
         return None
     for candidate in paper.fields:
@@ -523,8 +663,10 @@ def _invoice_binding(
         if _normalize_name(person[0]) == _normalize_name(context_name):
             return True, None
         return False, BusinessIssue(
-            id="issue:fact:claimant-binding", kind="FACT",
-            field_or_rule="expense:claimant_binding", owner="employee",
+            id="issue:fact:claimant-binding",
+            kind="FACT",
+            field_or_rule="expense:claimant_binding",
+            owner="employee",
             basis=f"Chứng từ ghi người mua '{person[0]}', hồ sơ gắn '{context_name}'.",
             refs=person[1],
             question="Xác nhận/correct người mua trên chứng từ hoặc sửa lại cho đúng.",
@@ -536,8 +678,10 @@ def _invoice_binding(
         return False, None
     if _normalize_name(buyer_company) != _normalize_name(company_name):
         return False, BusinessIssue(
-            id="issue:fact:buyer-binding", kind="FACT",
-            field_or_rule="expense:buyer_binding", owner="employee",
+            id="issue:fact:buyer-binding",
+            kind="FACT",
+            field_or_rule="expense:buyer_binding",
+            owner="employee",
             basis=f"Bên mua trên hóa đơn '{buyer_company}' không khớp tổ chức '{company_name}'.",
             refs=_document_refs(document)[:1],
             question="Xác nhận bên mua trên hóa đơn khớp tổ chức của hồ sơ.",
@@ -663,8 +807,10 @@ def admit_evidence(
     # receipt is recorded would miscompute S and the Q32 bound (plan A1/A3).
     ctx_ledger = context_ledger(organization, digest=org_digest)
     merged_ledger, _conflicts = merge_ledger(ctx_ledger, tuple(ledger))
-    candidate_coverage = coverage if coverage is not None else context_coverage(
-        organization, digest=org_digest
+    candidate_coverage = (
+        coverage
+        if coverage is not None
+        else context_coverage(organization, digest=org_digest)
     )
     # A coverage OBJECT is not a valid coverage: it must cover the assessment
     # time and name scope/funds/kinds/opening/witnesses (contracts §3). An
@@ -688,13 +834,19 @@ def admit_evidence(
                 kind="FACT",
                 field_or_rule="ledger:coverage",
                 owner="accountant",
-                basis=("Lịch sử tiền có thay đổi ngoài luồng được theo dõi hoặc cần đối chiếu lại sau khi bổ sung dữ liệu."
-                       if candidate_coverage.source in ("MANAGED_HISTORY", "DOSSIER_RECORDS") else
-                       "Coverage hiện có không bao phủ thời điểm đánh giá hoặc thiếu scope/quỹ/loại dòng tiền/số dư đầu kỳ/căn cứ."),
+                basis=(
+                    "Lịch sử tiền có thay đổi ngoài luồng được theo dõi hoặc cần đối chiếu lại sau khi bổ sung dữ liệu."
+                    if candidate_coverage.source
+                    in ("MANAGED_HISTORY", "DOSSIER_RECORDS")
+                    else "Coverage hiện có không bao phủ thời điểm đánh giá hoặc thiếu scope/quỹ/loại dòng tiền/số dư đầu kỳ/căn cứ."
+                ),
                 refs=candidate_coverage.witness_refs,
-                question=("Kiểm tra các khoản tiền của đúng công việc, bổ sung phần còn thiếu rồi xác nhận lại lịch sử."
-                          if candidate_coverage.source in ("MANAGED_HISTORY", "DOSSIER_RECORDS") else
-                          "Xác minh coverage lịch sử đủ scope/thời gian/quỹ/loại dòng tiền/số dư đầu kỳ cho thời điểm quyết định."),
+                question=(
+                    "Kiểm tra các khoản tiền của đúng công việc, bổ sung phần còn thiếu rồi xác nhận lại lịch sử."
+                    if candidate_coverage.source
+                    in ("MANAGED_HISTORY", "DOSSIER_RECORDS")
+                    else "Xác minh coverage lịch sử đủ scope/thời gian/quỹ/loại dòng tiền/số dư đầu kỳ cho thời điểm quyết định."
+                ),
             )
         )
         effective_coverage: CoverageRecord | None = None
@@ -766,9 +918,7 @@ def admit_evidence(
     # Classify each material source as resolved or unresolved.
     material_unresolved = any(
         d.profile_status != "CLEAR" for d in report.documents
-    ) or any(
-        d.document_type == "UNKNOWN" for d in report.documents
-    )
+    ) or any(d.document_type == "UNKNOWN" for d in report.documents)
 
     matched, unreferenced_documents = _match_expense_documents(report, paper)
     claims = _claim_index(confirmations, scope=scope)
@@ -803,13 +953,20 @@ def admit_evidence(
             continue
         allocated = allocation_totals[entry.document.document_id]
         if allocated > int(doc_total):
-            disputed_documents[entry.document.document_id] = (allocated, int(doc_total), allocated - int(doc_total))
+            disputed_documents[entry.document.document_id] = (
+                allocated,
+                int(doc_total),
+                allocated - int(doc_total),
+            )
             disputed_entry_by_doc.setdefault(entry.document.document_id, entry)
     # A rejected link must not erase the source's explicit over-allocation.
     # Keep the paper assertion separately from the validated accepted mapping.
     if paper is not None:
         from invoice_referee.evidence.matching import _invoice_ref_matches_number
-        originals = [d for d in report.documents if d.document_type in _ORIGINAL_EXPENSE_TYPES]
+
+        originals = [
+            d for d in report.documents if d.document_type in _ORIGINAL_EXPENSE_TYPES
+        ]
         declared_totals: dict[str, int] = {}
         for row in paper.line_items:
             description = str(_line_field(row, "description") or "")
@@ -819,29 +976,68 @@ def admit_evidence(
             references = _line_field(row, "invoice_refs") or ()
             if isinstance(references, str):
                 references = (references,)
-            candidates = [d for d in originals if _field(d, "document_number") is not None
-                and any(_invoice_ref_matches_number(str(r), str(_field(d, "document_number"))) for r in references)]
+            candidates = [
+                d
+                for d in originals
+                if _field(d, "document_number") is not None
+                and any(
+                    _invoice_ref_matches_number(
+                        str(r), str(_field(d, "document_number"))
+                    )
+                    for r in references
+                )
+            ]
             if len(candidates) == 1 and row_amount is not None:
                 document = candidates[0]
-                declared_totals[document.document_id] = declared_totals.get(document.document_id, 0) + int(row_amount)
+                declared_totals[document.document_id] = declared_totals.get(
+                    document.document_id, 0
+                ) + int(row_amount)
         for document in originals:
             total = _as_decimal(_field(document, "total_amount"))
             declared = declared_totals.get(document.document_id)
             if total is not None and declared is not None and declared > int(total):
-                disputed_documents[document.document_id] = (declared, int(total), declared-int(total))
-                disputed_entry_by_doc.setdefault(document.document_id,
-                    _MatchedExpense(Decimal(declared), _document_refs(document), document))
+                disputed_documents[document.document_id] = (
+                    declared,
+                    int(total),
+                    declared - int(total),
+                )
+                disputed_entry_by_doc.setdefault(
+                    document.document_id,
+                    _MatchedExpense(
+                        Decimal(declared),
+                        _document_refs(document),
+                        document,
+                        "",
+                        None,
+                        _row_refs(row, paper),
+                    ),
+                )
         if report.links:
             from invoice_referee.evidence.matching import project_evidence_matches
+
             projected = project_evidence_matches(paper, report.documents, report.links)
             for index, finding in enumerate(projected.findings):
-                if finding.code == "SET_PAPER_AMOUNT_001" and finding.status == "UNRESOLVED":
-                    issues.append(BusinessIssue(id=f"issue:fact:row-allocation:{index}", kind="FACT",
-                        field_or_rule="expense:allocation:row", owner="employee", basis=finding.message,
-                        refs=finding.refs or paper.refs,
-                        question="Xác nhận phân bổ từng chứng từ cho dòng chi; tổng không được vượt số kê khai."))
+                if (
+                    finding.code == "SET_PAPER_AMOUNT_001"
+                    and finding.status == "UNRESOLVED"
+                ):
+                    issues.append(
+                        BusinessIssue(
+                            id=f"issue:fact:row-allocation:{index}",
+                            kind="FACT",
+                            field_or_rule="expense:allocation:row",
+                            owner="employee",
+                            basis=finding.message,
+                            refs=finding.refs or paper.refs,
+                            question="Xác nhận phân bổ từng chứng từ cho dòng chi; tổng không được vượt số kê khai.",
+                        )
+                    )
     for document_id, (allocated, doc_total, difference) in disputed_documents.items():
         entry = disputed_entry_by_doc[document_id]
+        # Two-sided provenance (A3): the paper row's refs first (the declared
+        # assertion), then the document's refs (the contradicting evidence).
+        doc_refs = _document_refs(entry.document) if entry.document is not None else ()
+        two_sided = tuple(dict.fromkeys((*entry.paper_refs, *doc_refs)))
         issues.append(
             BusinessIssue(
                 id=f"issue:fact:allocation:{document_id}",
@@ -852,7 +1048,7 @@ def admit_evidence(
                     f"Kê khai {allocated} nhưng chứng từ chỉ chứng minh {doc_total} "
                     f"(lệch {difference}); số tiền đang tranh chấp."
                 ),
-                refs=_document_refs(entry.document) if entry.document is not None else (),
+                refs=two_sided,
                 question=(
                     f"Xác nhận/sửa số tiền: kê khai {allocated} nhưng chứng từ "
                     f"{doc_total} (lệch {difference}); cung cấp chứng từ "
@@ -916,9 +1112,11 @@ def admit_evidence(
 
     # A/P/R known only when coverage exists; used to bound the Q32 path.
     a_known = effective_coverage is not None
-    advance_total = sum(
-        int(e.amount) for e in merged_ledger if e.kind == "ADVANCE_RECEIVED"
-    ) if a_known else None
+    advance_total = (
+        sum(int(e.amount) for e in merged_ledger if e.kind == "ADVANCE_RECEIVED")
+        if a_known
+        else None
+    )
 
     # The Q32 bound is on the TOTAL declared E (<=8m) and abs(TOTAL S) (<=4m),
     # not per-row: two 5m claims must not both be accepted just because each row
@@ -953,14 +1151,19 @@ def admit_evidence(
 
     expenses: list[Expense] = []
     disputed_expense_ids: list[str] = []
+    documents_by_id = {d.document_id: d for d in report.documents}
     for index, entry in enumerate(matched, start=1):
         amount, refs = entry.amount, entry.refs
         expense_id = f"expense:{index}"
         # A cost whose source over-allocates is in dispute (TC08): its amount is
         # not a verified fact and must not become eligible/employee-paid money.
-        disputed = line_total_unresolved or (bool(disputed_documents) and entry.document is None) or (
-            entry.document is not None
-            and entry.document.document_id in disputed_documents
+        disputed = (
+            line_total_unresolved
+            or (bool(disputed_documents) and entry.document is None)
+            or (
+                entry.document is not None
+                and entry.document.document_id in disputed_documents
+            )
         )
         # The service evidence must name the cost; the settlement row is the
         # canonical cost identity. Ref-less rows still carry the document refs.
@@ -991,23 +1194,34 @@ def admit_evidence(
         # (`expense:missing_required_evidence`) and its scoped exception are
         # applied by the policy engine once the facts are established.
         if entry.document is None:
-            issues.append(
-                BusinessIssue(
-                    id=f"issue:fact:missing_evidence:{expense_id}",
-                    kind="FACT",
-                    field_or_rule=f"{expense_id}:missing_evidence",
-                    owner="employee",
-                    basis=(
-                        f"Khoản '{entry.description or expense_id}' chưa có chứng từ gốc "
-                        "xác lập dịch vụ/số tiền/nhân viên đã trả."
-                        + (f" Lý do khai: {entry.no_evidence_reason}." if entry.no_evidence_reason else "")
-                    ),
-                    refs=entry.paper_refs,
-                    question=(
-                        "Cung cấp chứng từ gốc hoặc xác lập dịch vụ/số tiền/người trả cho khoản này."
-                    ),
+            # A row whose reference uniquely names a disputed document is
+            # owned by the specific allocation FACT, not by a generic
+            # missing-evidence question (A2). Truly uncovered rows keep it.
+            if not (
+                entry.associated_document_id is not None
+                and entry.associated_document_id in disputed_documents
+            ):
+                issues.append(
+                    BusinessIssue(
+                        id=f"issue:fact:missing_evidence:{expense_id}",
+                        kind="FACT",
+                        field_or_rule=f"{expense_id}:missing_evidence",
+                        owner="employee",
+                        basis=(
+                            f"Khoản '{entry.description or expense_id}' chưa có chứng từ gốc "
+                            "xác lập dịch vụ/số tiền/nhân viên đã trả."
+                            + (
+                                f" Lý do khai: {entry.no_evidence_reason}."
+                                if entry.no_evidence_reason
+                                else ""
+                            )
+                        ),
+                        refs=entry.paper_refs,
+                        question=(
+                            "Cung cấp chứng từ gốc hoặc xác lập dịch vụ/số tiền/người trả cho khoản này."
+                        ),
+                    )
                 )
-            )
         invoice_reference = _invoice_reference(entry.document)
         if (
             not disputed
@@ -1094,10 +1308,25 @@ def admit_evidence(
         incurred = (
             Fact[int](key=f"{expense_id}:incurred", state="UNKNOWN", refs=refs)
             if disputed
-            else Fact[int](key=f"{expense_id}:incurred", value=int(amount), state="KNOWN", refs=refs)
+            else Fact[int](
+                key=f"{expense_id}:incurred",
+                value=int(amount),
+                state="KNOWN",
+                refs=refs,
+            )
         )
         if disputed:
             disputed_expense_ids.append(expense_id)
+        # An allocation-blocked row keeps its associated document's date when
+        # the date itself is established (A2): the dispute is about the
+        # amount, so the deadline policy still runs on the real date instead
+        # of asking for a missing day.
+        associated_document = (
+            documents_by_id.get(entry.associated_document_id or "")
+            if entry.document is None
+            and entry.associated_document_id in disputed_documents
+            else None
+        )
         expenses.append(
             Expense(
                 id=expense_id,
@@ -1112,13 +1341,17 @@ def admit_evidence(
                 category=_infer_category(
                     entry.description, (entry.document,) if entry.document else ()
                 ),
-                source_date=_source_date(entry.document),
+                source_date=_source_date(entry.document)
+                if entry.document is not None
+                else _source_date(associated_document),
             )
         )
 
     # completeness: every material source is resolved and at least one expense
     # is admitted; an empty/unknown-only report is NOT complete.
-    expense_set_complete = bool(expenses) and not material_unresolved and not line_total_unresolved
+    expense_set_complete = (
+        bool(expenses) and not material_unresolved and not line_total_unresolved
+    )
 
     return AssessmentInput(
         scope=scope,

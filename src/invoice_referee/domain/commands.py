@@ -79,6 +79,9 @@ class SourceUpload(StrictModel):
     media: Media
     digest: str = Field(min_length=1)
     storage_key: str = Field(min_length=1)
+    # Role-aware upload (16/10/2026): submitter intent, kept distinct from the
+    # content-determined document_type. None = legacy caller without a role.
+    upload_role: Literal["paper", "evidence"] | None = None
 
 
 class CreateDraft(StrictModel):

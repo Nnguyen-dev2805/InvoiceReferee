@@ -297,6 +297,7 @@ export interface SettlementDraftResponse {
   field_states?: Record<string, string>;
   provider_mode?: string | null;
   data_origin?: string | null;
+  processing_status?: "ready" | "technical_incomplete" | "needs_supplement" | null;
   link?: SettlementLink | null;
 }
 
@@ -327,6 +328,24 @@ export async function settlementDraft(
   return parse<SettlementDraftResponse>(response);
 }
 
+/** Role-aware draft read (16/10/2026): paper box + evidence box stay distinct. */
+export async function settlementDraftByRole(
+  rootId: string,
+  paper: File[],
+  evidence: File[],
+): Promise<SettlementDraftResponse> {
+  const form = new FormData();
+  for (const file of paper) form.append("paper", file);
+  for (const file of evidence) form.append("evidence", file);
+  const response = await fetch(`/api/cases/${rootId}/settlement/draft`, {
+    method: "POST",
+    headers: { "X-Command-Id": newCommandId() },
+    body: form,
+    credentials: "same-origin",
+  });
+  return parse<SettlementDraftResponse>(response);
+}
+
 export async function getSettlementDraft(
   rootId: string,
 ): Promise<SettlementDraftResponse> {
@@ -342,9 +361,11 @@ export async function attachSources(
   rootId: string,
   files: File[],
   version: number,
+  uploadRole?: "paper" | "evidence",
 ): Promise<CommandResultView> {
   const form = new FormData();
   for (const file of files) form.append("files", file);
+  if (uploadRole) form.append("upload_role", uploadRole);
   const response = await fetch(`/api/cases/${rootId}/sources`, {
     method: "POST",
     headers: {

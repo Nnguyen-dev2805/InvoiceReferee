@@ -17,7 +17,14 @@ from invoice_referee.domain.common import EvidenceRef, Fact, KnownAmount, parse_
 
 AS_OF = datetime(2026, 10, 13, 3, 0, tzinfo=UTC)
 
-ORACLE_FIELD_NAMES = ("expected", "expected_amount", "latent", "oracle", "gold", "allowed")
+ORACLE_FIELD_NAMES = (
+    "expected",
+    "expected_amount",
+    "latent",
+    "oracle",
+    "gold",
+    "allowed",
+)
 
 
 def _ref(**overrides: object) -> EvidenceRef:
@@ -84,7 +91,15 @@ def test_domain_dtos_reject_oracle_fields() -> None:
 
 
 def test_no_domain_model_declares_oracle_fields() -> None:
-    from invoice_referee.domain import case, commands, common, evidence, finance, issues, policy
+    from invoice_referee.domain import (
+        case,
+        commands,
+        common,
+        evidence,
+        finance,
+        issues,
+        policy,
+    )
 
     for module in (common, evidence, finance, policy, case, issues, commands):
         for name, obj in vars(module).items():
@@ -113,9 +128,7 @@ def test_snapshot_builds_assessment_input() -> None:
     assert assessment.coverage.ledger_version == "ledger:v1"
     assert assessment.expense_facts[0].incurred.value == 10_000_000
 
-    uncovered = snapshot(
-        T=0, E=0, C=0, A=0, P=0, R=0, B=8_000_000, coverage=False
-    )
+    uncovered = snapshot(T=0, E=0, C=0, A=0, P=0, R=0, B=8_000_000, coverage=False)
     assert uncovered.coverage is None
     assert uncovered.expense_facts[0].incurred.state == "UNKNOWN"
 
@@ -191,7 +204,9 @@ def test_required_identity_fields_are_not_defaulted() -> None:
         )
 
 
-def test_settings_live_ready_tracks_missing_vars(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_settings_live_ready_tracks_missing_vars(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from invoice_referee.config import Settings
 
     monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
@@ -207,7 +222,23 @@ def test_settings_report_missing_live_vars(monkeypatch: pytest.MonkeyPatch) -> N
 
     settings = Settings(_env_file=None)
     assert settings.mistral_api_key is None
-    assert set(settings.missing_for_live()) == set(LIVE_REQUIRED_SETTINGS)
+    # Provider-aware refinement (16/10/2026): default kimi requires Mistral +
+    # Kimi creds only; xKiro stays an explicit alternative.
+    assert set(settings.missing_for_live()) == {
+        "MISTRAL_API_KEY",
+        "MISTRAL_OCR_MODEL",
+        "KIMI_TOKEN",
+        "KIMI_SECRET",
+        "KIMI_BASE_URL",
+    }
+    xkiro = Settings(_env_file=None, llm_provider="xkiro")  # type: ignore[call-arg]
+    assert set(xkiro.missing_for_live()) == {
+        "MISTRAL_API_KEY",
+        "MISTRAL_OCR_MODEL",
+        "XKIRO_API_KEY",
+        "XKIRO_BASE_URL",
+        "INVOICE_REFEREE_LLM_MODEL",
+    }
 
 
 # -- datetime boundary: aware, ISO-8601 JSON, normalized UTC (contracts §1) -----
@@ -253,9 +284,9 @@ def test_iso8601_json_datetime_accepted_at_domain_boundary() -> None:
         '{"activity_data": {"activity_id": "a", "name": "n", '
         '"occurred_at": "2026-10-13T03:00:00Z", "declared_purpose": "p"}}'
     )
-    assert CreateDraft.model_validate_json(payload).activity_data.occurred_at == datetime(
-        2026, 10, 13, 3, 0, tzinfo=UTC
-    )
+    assert CreateDraft.model_validate_json(
+        payload
+    ).activity_data.occurred_at == datetime(2026, 10, 13, 3, 0, tzinfo=UTC)
     # FastAPI parses a JSON body into a python dict before model validation, so
     # the python-mode path must accept the same ISO-8601 string.
     as_dict = CreateDraft.model_validate(
@@ -344,7 +375,10 @@ def test_mark_execution_rejects_not_started() -> None:
 
     for state in ("OPEN", "CLOSED_CONFIRMED", "UNKNOWN"):
         MarkExecution(
-            root_id="case:1", instruction_id="instruction:1", execution_state=state, reason="x"
+            root_id="case:1",
+            instruction_id="instruction:1",
+            execution_state=state,
+            reason="x",
         )
     with pytest.raises(ValidationError):
         MarkExecution(

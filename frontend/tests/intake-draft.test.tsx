@@ -55,7 +55,8 @@ describe("Intake draft (W5)", () => {
     }));
     render(<Intake session={SESSION} onCase={() => {}} />);
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "paper.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
     await user.click(screen.getByRole("button", { name: "Đọc chứng từ" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Xác nhận và nộp hồ sơ" })).toBeInTheDocument());
     const body = document.body.textContent ?? "";
@@ -95,7 +96,8 @@ describe("Intake draft (W5)", () => {
     }));
     render(<Intake session={SESSION} onCase={() => {}} />);
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "paper.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
     await user.click(screen.getByRole("button", { name: "Đọc chứng từ" }));
 
     expect(await screen.findByText(question)).toBeInTheDocument();
@@ -116,7 +118,8 @@ describe("Intake draft (W5)", () => {
     }));
     render(<Intake session={SESSION} onCase={() => {}} />);
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "paper.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
     await user.click(screen.getByRole("button", { name: "Đọc chứng từ" }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "Xác nhận và nộp hồ sơ" })).not.toBeInTheDocument();
@@ -139,7 +142,8 @@ describe("Intake draft (W5)", () => {
     }));
     render(<Intake session={SESSION} onCase={() => {}} />);
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "paper.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
     await user.click(screen.getByRole("button", { name: "Đọc chứng từ" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Xác nhận và nộp hồ sơ" })).toBeInTheDocument());
     expect(screen.getAllByText("Chưa đọc được").length).toBeGreaterThan(0);
@@ -166,7 +170,8 @@ describe("Intake draft (W5)", () => {
     }));
     render(<Intake session={SESSION} onCase={() => {}} />);
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "paper.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
     await user.click(screen.getByRole("button", { name: "Đọc chứng từ" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Xác nhận và nộp hồ sơ" })).toBeInTheDocument());
     // No standing-activity dropdown in the normal flow; one merged content field.
@@ -214,7 +219,8 @@ describe("Intake draft (W5)", () => {
     }));
     render(<Intake session={SESSION} onCase={() => {}} />);
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "paper.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "report.pdf", { type: "application/pdf" }));
     await user.click(screen.getByRole("button", { name: "Đọc chứng từ" }));
     await waitFor(() => expect(screen.getByText("Hồ sơ này quyết toán cho khoản tạm ứng nào?")).toBeInTheDocument());
     // Submitting without a choice is refused client-side.

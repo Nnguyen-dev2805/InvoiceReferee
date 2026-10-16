@@ -93,7 +93,8 @@ describe("Intake submit uploads pending files", () => {
     const user = userEvent.setup();
 
     const file = new File(["%PDF-1.4 x"], "hd.pdf", { type: "application/pdf" });
-    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), file);
+    await user.upload(screen.getByLabelText("Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "paper.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"), file);
     await user.click(screen.getByRole("button", { name: "Đọc chứng từ" }));
 
     await waitFor(() => {
@@ -137,7 +138,8 @@ describe("Intake submit uploads pending files", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Tạo hồ sơ" }));
     const file = new File(["%PDF-1.4 x"], "hd.pdf", { type: "application/pdf" });
-    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), file);
+    await user.upload(screen.getByLabelText("Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "paper.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"), file);
     await user.type(screen.getByLabelText(/Số hóa đơn/), "IR26101001");
     await user.type(screen.getByLabelText(/Số tiền/), "3240000");
     // Pick the document by its display name (the pending file).
@@ -185,7 +187,8 @@ describe("Intake submit uploads pending files", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Tạo hồ sơ" }));
     const file = new File(["%PDF-1.4 x"], "hd.pdf", { type: "application/pdf" });
-    await user.upload(screen.getByLabelText("Chứng từ (PDF/PNG/JPEG)"), file);
+    await user.upload(screen.getByLabelText("Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "paper.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"), file);
     await user.type(screen.getByLabelText(/Số hóa đơn/), "IR26101001");
     await user.type(screen.getByLabelText(/Số tiền/), "3240000");
     // No document selected, no quote -> the claim is not sent (never default to

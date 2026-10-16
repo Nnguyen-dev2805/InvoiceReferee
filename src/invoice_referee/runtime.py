@@ -20,24 +20,56 @@ from invoice_referee.workflow.service import CaseWorkflow
 
 
 def build_llm_client(settings: Settings):
-    """Build the configured X-Kiro LLM client, or fail loudly (plan E4 Step 5).
+    """Build the selected LLM client, or fail loudly (plan E4 Step 5 + 16/10 refinement).
 
-    A missing provider credential is reported with the setting name; LIVE is
-    never silently downgraded to STUB.
+    ``llm_provider="kimi"`` (default) uses Kimi-K3 via the Hoangha endpoint shape;
+    ``llm_provider="xkiro"`` keeps the xKiro alternative. A Kimi failure is never
+    silently retried as xKiro: selection happens once here, before any call.
     """
-    from invoice_referee.evidence.xkiro import XkiroClient
+    from invoice_referee.config import DEFAULT_KIMI_MODEL
+
+    provider = (getattr(settings, "llm_provider", "kimi") or "kimi").strip().lower()
+    if provider == "xkiro":
+        from invoice_referee.evidence.xkiro import XkiroClient
+
+        missing = [
+            name
+            for name in ("XKIRO_API_KEY", "XKIRO_BASE_URL", "INVOICE_REFEREE_LLM_MODEL")
+            if not getattr(settings, name.lower(), None)
+        ]
+        if missing:
+            raise ValueError(
+                f"LLM provider not configured: missing {', '.join(missing)}"
+            )
+        return XkiroClient(
+            api_key=settings.xkiro_api_key or "",
+            model=settings.invoice_referee_llm_model or "",
+            base_url=settings.xkiro_base_url or "",
+        )
+    if provider != "kimi":
+        raise ValueError(
+            f"Unknown llm_provider: {provider!r} (expected 'kimi' or 'xkiro')"
+        )
+    from invoice_referee.evidence.kimi import KimiClient
 
     missing = [
         name
-        for name in ("XKIRO_API_KEY", "XKIRO_BASE_URL", "INVOICE_REFEREE_LLM_MODEL")
+        for name in ("KIMI_TOKEN", "KIMI_SECRET", "KIMI_BASE_URL")
         if not getattr(settings, name.lower(), None)
     ]
     if missing:
         raise ValueError(f"LLM provider not configured: missing {', '.join(missing)}")
-    return XkiroClient(
-        api_key=settings.xkiro_api_key or "",
-        model=settings.invoice_referee_llm_model or "",
-        base_url=settings.xkiro_base_url or "",
+    effort = (getattr(settings, "kimi_reasoning_effort", None) or "low").strip().lower()
+    if effort not in ("low", "medium", "high"):
+        raise ValueError(
+            f"invalid KIMI_REASONING_EFFORT: {effort!r} (expected 'low', 'medium' or 'high')"
+        )
+    return KimiClient(
+        token=settings.kimi_token or "",
+        secret=settings.kimi_secret or "",
+        base_url=settings.kimi_base_url or "",
+        model=(settings.kimi_model or DEFAULT_KIMI_MODEL),
+        reasoning_effort=effort,
     )
 
 
@@ -93,7 +125,9 @@ def _wire_trace(workflow: CaseWorkflow, settings: Settings) -> None:
     workflow.enable_trace(TraceRecorder(build_trace(settings)))
 
 
-def _wire_live(workflow: CaseWorkflow, *, uploads_dir: str | Path, settings: Settings) -> None:
+def _wire_live(
+    workflow: CaseWorkflow, *, uploads_dir: str | Path, settings: Settings
+) -> None:
     """Compose the §12 evidence pipeline for LIVE (plan E7).
 
     The LIVE runtime uses the file-level OCR reader + the configured X-Kiro
@@ -123,7 +157,11 @@ def _wire_replay(workflow: CaseWorkflow, *, settings: Settings) -> None:
     from invoice_referee.evidence.replay import ReplayReader
 
     recording = getattr(settings, "replay_recording", None)
-    provider = ReplayReader(Path(recording)) if recording else ReplayReader(Path("/nonexistent"))
+    provider = (
+        ReplayReader(Path(recording))
+        if recording
+        else ReplayReader(Path("/nonexistent"))
+    )
     llm = build_llm_client(settings)
     workflow.enable_evidence_read(
         reader=FileOcrReader(provider=provider),

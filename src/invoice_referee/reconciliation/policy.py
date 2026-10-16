@@ -8,7 +8,11 @@ interval; the demo limits are E <= 8m (RECOGNIZE_COST), abs(S) <= 4m
 
 from __future__ import annotations
 
-from invoice_referee.domain.case import AssessmentInput, AssessmentResult, FinancialEffect
+from invoice_referee.domain.case import (
+    AssessmentInput,
+    AssessmentResult,
+    FinancialEffect,
+)
 from invoice_referee.domain.common import EvidenceRef
 from invoice_referee.domain.finance import Projection
 from invoice_referee.domain.issues import BusinessIssue
@@ -101,7 +105,9 @@ def _grant_covers(
             continue
         if not _profile_covers(input, grant):
             continue
-        if grant.effective_from <= when and (grant.effective_to is None or when <= grant.effective_to):
+        if grant.effective_from <= when and (
+            grant.effective_to is None or when <= grant.effective_to
+        ):
             if grant.max_amount >= amount:
                 return True
     return False
@@ -116,7 +122,9 @@ def _has_grant_ignoring_amount(input: AssessmentInput, action: str) -> bool:
             continue
         if not _profile_covers(input, grant):
             continue
-        if grant.effective_from <= when and (grant.effective_to is None or when <= grant.effective_to):
+        if grant.effective_from <= when and (
+            grant.effective_to is None or when <= grant.effective_to
+        ):
             return True
     return False
 
@@ -134,8 +142,17 @@ def evaluate_policy(
     all_disputed = bool(input.expense_facts) and all(
         expense.id in input.disputed_expense_ids for expense in input.expense_facts
     )
+    # A2: even with clean siblings, T UNKNOWN solely because disputed rows are
+    # unresolved belongs to the specific allocation FACTs, not to a generic
+    # "provide valid cost evidence" question.
+    unknown_expenses = [
+        expense for expense in input.expense_facts if expense.incurred.state != "KNOWN"
+    ]
+    t_owned_by_dispute = bool(unknown_expenses) and all(
+        expense.id in input.disputed_expense_ids for expense in unknown_expenses
+    )
     # FACT: a required fact that is unresolved blocks any money conclusion.
-    if projection.T.state != "KNOWN" and not all_disputed:
+    if projection.T.state != "KNOWN" and not all_disputed and not t_owned_by_dispute:
         issues.append(
             _issue(
                 "issue:fact:incurred",
@@ -156,7 +173,9 @@ def evaluate_policy(
                 "accountant",
                 "Thiếu lịch sử đối chiếu ứng/hoàn cho scope này.",
                 "Xác minh coverage lịch sử (scope/thời gian/loại dòng tiền).",
-                _evidence_refs(input, fields=("coverage", "advance", "reimbursed", "returned")),
+                _evidence_refs(
+                    input, fields=("coverage", "advance", "reimbursed", "returned")
+                ),
             )
         )
     # When EVERY admitted cost is in dispute (TC08/TC05), the specific dispute
@@ -171,6 +190,13 @@ def evaluate_policy(
     unresolved_payment_count = sum(
         expense.payment_state == "UNKNOWN" for expense in input.expense_facts
     )
+    # A2: a payer name on the associated evidence does not verify payment, but
+    # when every unresolved payment belongs to a disputed amount, the specific
+    # allocation FACT owns the question — not a generic "who paid?" ask.
+    pay_owned_by_dispute = unresolved_payment_count > 0 and all(
+        expense.payment_state != "UNKNOWN" or expense.id in input.disputed_expense_ids
+        for expense in input.expense_facts
+    )
     has_invoice_specific_coverage = (
         unresolved_payment_count > 0
         and len(invoice_payer_questions) >= unresolved_payment_count
@@ -178,6 +204,7 @@ def evaluate_policy(
     if (
         projection.E.state == "UNKNOWN"
         and not all_disputed
+        and not pay_owned_by_dispute
         and not has_invoice_specific_coverage
     ):
         # An incurred cost with no established payer is a FACT owned by the
@@ -190,7 +217,11 @@ def evaluate_policy(
                 "employee",
                 "Chưa xác minh ai thực tế đã trả khoản chi này.",
                 "Xác minh người trả (chứng từ thanh toán hoặc xác nhận có trách nhiệm).",
-                _evidence_refs(input, fields=("incurred", "paid_employee", "paid_company"), expense=True),
+                _evidence_refs(
+                    input,
+                    fields=("incurred", "paid_employee", "paid_company"),
+                    expense=True,
+                ),
             )
         )
 
@@ -209,7 +240,9 @@ def evaluate_policy(
                     "approver",
                     f"Chi phí đủ điều kiện {e_value} vượt mức tự công nhận {RECOGNIZE_LIMIT}.",
                     "Cấp quyết định công nhận chi phí trong phạm vi được giao.",
-                    _evidence_refs(input, fields=("paid_employee", "incurred"), expense=True),
+                    _evidence_refs(
+                        input, fields=("paid_employee", "incurred"), expense=True
+                    ),
                 )
             )
 
@@ -239,7 +272,9 @@ def evaluate_policy(
                         "approver",
                         f"Cần phát hành {action} {amount} vượt quyền tự xử lý {ISSUE_LIMIT}.",
                         "Cấp quyết định phát hành yêu cầu chi/thu trong phạm vi.",
-                        _evidence_refs(input, fields=("incurred", "paid_employee"), expense=True),
+                        _evidence_refs(
+                            input, fields=("incurred", "paid_employee"), expense=True
+                        ),
                     )
                 )
 

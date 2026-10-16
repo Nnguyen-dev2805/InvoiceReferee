@@ -96,6 +96,23 @@ _SETTLEMENT_FORM_ALIASES: dict[str, str] = {
     "reimbursement_amount": "printed_reimbursement",
 }
 
+# Receipt-like synonyms, scoped by document type (16/10/2026, TC25 LIVE):
+# a collection/paper/hotel receipt read by its printed labels (`receipt_number`,
+# `amount`, `receipt_date`) maps to the profile vocabulary. TRANSPORT_TICKET is
+# excluded on purpose: its money field is `fare_amount`, not `total_amount`.
+_RECEIPT_FORM_ALIASES: dict[str, str] = {
+    "receipt_number": "document_number",
+    "receipt_no": "document_number",
+    "receipt_date": "document_date",
+    "amount": "total_amount",
+    "receipt_amount": "total_amount",
+    "total": "total_amount",
+}
+
+_RECEIPT_FORM_TYPES = frozenset(
+    {"PAPER_RECEIPT", "HOTEL_RECEIPT", "COLLECTION_RECEIPT"}
+)
+
 
 def canonical_field_name(name: str, document_type: str | None = None) -> str:
     """Map a model field synonym to the code-owned profile vocabulary.
@@ -108,6 +125,8 @@ def canonical_field_name(name: str, document_type: str | None = None) -> str:
     key = (name or "").strip()
     if document_type == "SETTLEMENT_FORM":
         return _SETTLEMENT_FORM_ALIASES.get(key, _FIELD_ALIASES.get(key, key))
+    if document_type in _RECEIPT_FORM_TYPES:
+        return _RECEIPT_FORM_ALIASES.get(key, _FIELD_ALIASES.get(key, key))
     return _FIELD_ALIASES.get(key, key)
 
 
@@ -165,7 +184,9 @@ def _quote_supported(quote: str, haystack: str) -> bool:
     return quote.strip() in haystack
 
 
-def _value_supported(value: object, quote: str, *, field_name: str | None = None) -> bool:
+def _value_supported(
+    value: object, quote: str, *, field_name: str | None = None
+) -> bool:
     """The normalized value must be derivable from the exact quote.
 
     Token-based provenance (not "the first number in the quote"): a money value
@@ -181,21 +202,39 @@ def _value_supported(value: object, quote: str, *, field_name: str | None = None
     if isinstance(value, (list, tuple)):
         if not value:
             return False
-        return all(_value_supported(item, quote, field_name=field_name) for item in value)
+        return all(
+            _value_supported(item, quote, field_name=field_name) for item in value
+        )
     text = str(value).strip()
     if field_name == "transaction_status":
         # Deterministic enum normalization, not fuzzy inference. Compare the
         # entire value after a recognized label so negation cannot become paid.
         import unicodedata
+
         def status(raw: str) -> str | None:
             raw = unicodedata.normalize("NFKD", raw.casefold().replace("đ", "d"))
             raw = "".join(c for c in raw if not unicodedata.combining(c))
-            raw = re.sub(r"^(?:trang thai giao dich|trang thai|transaction status|status)\s*:\s*", "", raw.strip())
+            raw = re.sub(
+                r"^(?:trang thai giao dich|trang thai|transaction status|status)\s*:\s*",
+                "",
+                raw.strip(),
+            )
             raw = " ".join(raw.replace("_", " ").split())
-            return {"hoan tat": "COMPLETED", "thanh cong": "COMPLETED", "completed": "COMPLETED",
-                    "success": "COMPLETED", "successful": "COMPLETED", "pending": "PENDING",
-                    "processing": "PENDING", "dang xu ly": "PENDING", "failed": "FAILED",
-                    "that bai": "FAILED", "khong thanh cong": "FAILED", "cancelled": "FAILED"}.get(raw)
+            return {
+                "hoan tat": "COMPLETED",
+                "thanh cong": "COMPLETED",
+                "completed": "COMPLETED",
+                "success": "COMPLETED",
+                "successful": "COMPLETED",
+                "pending": "PENDING",
+                "processing": "PENDING",
+                "dang xu ly": "PENDING",
+                "failed": "FAILED",
+                "that bai": "FAILED",
+                "khong thanh cong": "FAILED",
+                "cancelled": "FAILED",
+            }.get(raw)
+
         source_status = status(quote)
         if status(text) is not None:
             return status(text) == source_status
@@ -273,18 +312,29 @@ def _validate_field(
     )
     if state == "AMBIGUOUS":
         from invoice_referee.domain.documents import ValueAlternative
+
         alternatives = []
         seen = set()
         for alternative in entry.get("alternatives", []):
-            candidate = _validate_field({**alternative, "field": field_name, "state": "FOUND"},
-                ocr=ocr, haystack=haystack, default_page=default_page, document_type=document_type, allowed_pages=allowed_pages)
+            candidate = _validate_field(
+                {**alternative, "field": field_name, "state": "FOUND"},
+                ocr=ocr,
+                haystack=haystack,
+                default_page=default_page,
+                document_type=document_type,
+                allowed_pages=allowed_pages,
+            )
             key = repr(candidate.value)
             if candidate.state == "FOUND" and key not in seen:
-                alternatives.append(ValueAlternative(value=candidate.value, refs=candidate.refs))
+                alternatives.append(
+                    ValueAlternative(value=candidate.value, refs=candidate.refs)
+                )
                 seen.add(key)
         if len(alternatives) < 2:
             return FieldCandidate(field=field_name, state="UNREADABLE")
-        return FieldCandidate(field=field_name, state="AMBIGUOUS", alternatives=tuple(alternatives))
+        return FieldCandidate(
+            field=field_name, state="AMBIGUOUS", alternatives=tuple(alternatives)
+        )
     if state != "FOUND":
         return FieldCandidate(field=field_name, state=state)  # type: ignore[arg-type]
     quote = str(entry.get("quote") or entry.get("exact_quote") or "")
@@ -300,11 +350,14 @@ def _validate_field(
         # Some providers encode the array as a JSON string. Decode only this
         # field and still validate every reference against its own source quote.
         import json
+
         try:
             decoded = json.loads(value)
         except (ValueError, TypeError):
             decoded = [value]
-        if not isinstance(decoded, list) or not all(isinstance(item, str) for item in decoded):
+        if not isinstance(decoded, list) or not all(
+            isinstance(item, str) for item in decoded
+        ):
             return FieldCandidate(field=field_name, state="UNREADABLE")
         value = decoded
     # A FOUND value needs an exact quote from the source AND a value derivable
@@ -372,9 +425,19 @@ async def extract_document(
     # invents its own labels (e.g. `department` for the trip destination) and a
     # correctly-read form is reported as missing required fields. The profile is
     # code-owned; the prompt only advertises it.
-    from invoice_referee.evidence.prompts import build_extraction_prompt, EXTRACTION_VERSION
-    system = build_extraction_prompt(classification.document_type,
-                                    tuple(f.strip() for f in _field_vocabulary(classification.document_type).split(",") if f.strip()))
+    from invoice_referee.evidence.prompts import (
+        build_extraction_prompt,
+        EXTRACTION_VERSION,
+    )
+
+    system = build_extraction_prompt(
+        classification.document_type,
+        tuple(
+            f.strip()
+            for f in _field_vocabulary(classification.document_type).split(",")
+            if f.strip()
+        ),
+    )
     user = _serialize(ocr, classification)
     from invoice_referee.evidence.telemetry import llm_trace_context
 
@@ -383,7 +446,9 @@ async def extract_document(
         prompt_version="document-extraction-v3",
         schema_version="document-fields-and-line-items-json-v1",
     ):
-        payload = await _call_with_one_repair(llm, system=system, user=user, budget=budget)
+        payload = await _call_with_one_repair(
+            llm, system=system, user=user, budget=budget
+        )
     if payload is None:
         return _unresolved(ocr, classification)
 
@@ -418,7 +483,11 @@ async def extract_document(
         # stays unresolved instead of making the row-total check disappear.
         if not isinstance(entry, dict):
             if document_type == "SETTLEMENT_FORM":
-                lines.append(DocumentLine(id=f"{classification.document_id}:line:{len(lines) + 1}"))
+                lines.append(
+                    DocumentLine(
+                        id=f"{classification.document_id}:line:{len(lines) + 1}"
+                    )
+                )
             continue
         # Code owns the line id; the model's id is discarded. Line fields get
         # the same provenance validation as top-level fields (plan E5).
@@ -476,6 +545,7 @@ async def _call_with_one_repair(
         if not isinstance(lines, list):
             raise XkiroSchemaError("line_items must be an array")
         from invoice_referee.domain.documents import FIELD_STATES
+
         entries = list(payload["fields"])
         for row in lines:
             if isinstance(row, dict) and isinstance(row.get("fields"), list):
@@ -488,25 +558,53 @@ async def _call_with_one_repair(
                 raise XkiroSchemaError(f"field[{index}].state is not a FieldState")
             name = entry.get("field") or entry.get("name") or entry.get("field_name")
             if not isinstance(name, str) or not name:
-                raise XkiroSchemaError(f"field[{index}].field must be a non-empty string")
+                raise XkiroSchemaError(
+                    f"field[{index}].field must be a non-empty string"
+                )
             from invoice_referee.domain.documents import MONEY_FIELD_HINTS
+
             values = [entry.get("value")]
             if isinstance(entry.get("alternatives"), list):
-                values.extend(alt.get("value") for alt in entry["alternatives"] if isinstance(alt, dict))
-            if any(isinstance(value, bool) or (isinstance(value, float) and any(h in name for h in MONEY_FIELD_HINTS))
-                   for value in values):
-                raise XkiroSchemaError(f"field[{index}] has an invalid boolean/float value")
+                values.extend(
+                    alt.get("value")
+                    for alt in entry["alternatives"]
+                    if isinstance(alt, dict)
+                )
+            if any(
+                isinstance(value, bool)
+                or (
+                    isinstance(value, float)
+                    and any(h in name for h in MONEY_FIELD_HINTS)
+                )
+                for value in values
+            ):
+                raise XkiroSchemaError(
+                    f"field[{index}] has an invalid boolean/float value"
+                )
             page = entry.get("page")
             if page is not None and (type(page) is not int or page < 1):
-                raise XkiroSchemaError(f"field[{index}].page must be a positive integer")
+                raise XkiroSchemaError(
+                    f"field[{index}].page must be a positive integer"
+                )
             if state == "AMBIGUOUS":
                 alternatives = entry.get("alternatives")
-                if not isinstance(alternatives, list) or len(alternatives) < 2 or any(
-                    not isinstance(alt, dict) or "value" not in alt or not isinstance(alt.get("quote"), str)
-                    or ("page" in alt and (type(alt["page"]) is not int or alt["page"] < 1))
-                    for alt in alternatives
+                if (
+                    not isinstance(alternatives, list)
+                    or len(alternatives) < 2
+                    or any(
+                        not isinstance(alt, dict)
+                        or "value" not in alt
+                        or not isinstance(alt.get("quote"), str)
+                        or (
+                            "page" in alt
+                            and (type(alt["page"]) is not int or alt["page"] < 1)
+                        )
+                        for alt in alternatives
+                    )
                 ):
-                    raise XkiroSchemaError(f"field[{index}] needs at least two well-formed alternatives")
+                    raise XkiroSchemaError(
+                        f"field[{index}] needs at least two well-formed alternatives"
+                    )
         for index, row in enumerate(lines):
             if isinstance(row, dict) and not isinstance(row.get("fields", []), list):
                 raise XkiroSchemaError(f"line_items[{index}].fields must be an array")
@@ -514,12 +612,21 @@ async def _call_with_one_repair(
 
     try:
         return await complete_structured(
-            llm, system=system, user=user, budget=budget, validate=validate,
-            stage="extract", prompt_version="document-extraction-v3",
+            llm,
+            system=system,
+            user=user,
+            budget=budget,
+            validate=validate,
+            stage="extract",
+            prompt_version="document-extraction-v3",
             schema_version="document-fields-and-line-items-json-v1",
         )
-    except XkiroSchemaError:
-        return None
+    except Exception as error:
+        from invoice_referee.evidence.kimi import KimiSchemaError as _KimiSchemaError
+
+        if isinstance(error, (XkiroSchemaError, _KimiSchemaError)):
+            return None
+        raise
 
 
 def _unresolved(
@@ -568,4 +675,221 @@ def _serialize(ocr: OcrSourceResult, classification: DocumentClassification) -> 
             ],
         },
         ensure_ascii=False,
+    )
+
+
+def _serialize_role_aware(
+    ocr: OcrSourceResult,
+    *,
+    document_id: str,
+    page_range: tuple[int, int],
+    upload_role: str,
+) -> str:
+    import json
+
+    start, end = page_range
+    return json.dumps(
+        {
+            "source_id": ocr.source_id,
+            "document_id": document_id,
+            "page_range": [start, end],
+            "upload_role": upload_role,
+            "pages": [
+                {"page": page.page, "markdown": page.markdown}
+                for page in ocr.pages
+                if start <= page.page <= end
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+
+def _pseudo_classification(
+    ocr: OcrSourceResult,
+    *,
+    document_type: str,
+    page_range: tuple[int, int],
+    confidence: float | None = None,
+) -> DocumentClassification:
+    """Code-owned unit for role-aware extraction (no standalone classifier)."""
+    from invoice_referee.evidence.classification import compatible_roles
+
+    try:
+        roles = compatible_roles(document_type)
+    except Exception:
+        roles = ("UNKNOWN",)
+    return DocumentClassification(
+        document_id=f"{ocr.source_id}:{page_range[0]}-{page_range[1]}:{document_type}",
+        source_id=ocr.source_id,
+        page_range=page_range,
+        document_type=document_type,  # type: ignore[arg-type]
+        roles=roles,  # type: ignore[arg-type]
+        classification_confidence=confidence,
+    )
+
+
+def _build_analysis(
+    ocr: OcrSourceResult,
+    classification: DocumentClassification,
+    *,
+    payload: dict,
+    document_type: str,
+) -> DocumentAnalysis:
+    haystack = _source_pages_text(ocr, classification.page_range)
+    raw_fields = payload.get("fields")
+    raw_lines = payload.get("line_items")
+    if raw_lines is None:
+        raw_lines = payload.get("lines") or []
+    if not isinstance(raw_fields, list) or not isinstance(raw_lines, list):
+        return _unresolved(ocr, classification)
+    fields: list[FieldCandidate] = [
+        _validate_field(
+            entry,
+            ocr=ocr,
+            haystack=haystack,
+            default_page=classification.page_range[0],
+            document_type=document_type,
+            allowed_pages=classification.page_range,
+        )
+        for entry in raw_fields
+        if isinstance(entry, dict)
+    ]
+    lines: list[DocumentLine] = []
+    for entry in raw_lines:
+        if not isinstance(entry, dict):
+            if document_type == "SETTLEMENT_FORM":
+                lines.append(
+                    DocumentLine(
+                        id=f"{classification.document_id}:line:{len(lines) + 1}"
+                    )
+                )
+            continue
+        line_fields = tuple(
+            _validate_field(
+                f,
+                ocr=ocr,
+                haystack=haystack,
+                default_page=classification.page_range[0],
+                document_type=document_type,
+                allowed_pages=classification.page_range,
+            )
+            for f in entry.get("fields", [])
+            if isinstance(f, dict)
+        )
+        index = len(lines) + 1
+        lines.append(
+            DocumentLine(
+                id=f"{classification.document_id}:line:{index}", fields=line_fields
+            )
+        )
+    return DocumentAnalysis(
+        source_id=ocr.source_id,
+        document_id=classification.document_id,
+        document_type=document_type,  # type: ignore[arg-type]
+        roles=classification.roles,
+        role_refs=classification.role_refs,
+        page_range=classification.page_range,
+        block_ids=classification.block_ids,
+        classification_confidence=classification.classification_confidence,
+        alternative_document_types=classification.alternative_document_types,
+        classification_refs=classification.refs,
+        fields=tuple(fields),
+        line_items=tuple(lines),
+        confidence_status="UNRESOLVED",
+        confidence_refs=(),
+        profile_status="UNKNOWN",
+        profile_findings=(),
+        refs=classification.refs,
+        warnings=(),
+    )
+
+
+async def extract_paper_document(
+    ocr: OcrSourceResult, *, llm: object, budget: RunBudget
+) -> tuple[DocumentAnalysis, str, str, str]:
+    """Extract a paper-role file as SETTLEMENT_FORM + role-fit check (one call).
+
+    Returns (analysis, role_fit, actual_type, role_note). role_fit is FIT, MISFIT
+    or UNRESOLVED (call failed). A MISFIT is reported, never forced into a
+    settlement shape.
+    """
+    from invoice_referee.evidence.document_profiles import DOCUMENT_PROFILES
+    from invoice_referee.evidence.prompts import build_paper_extraction_prompt
+
+    page_range = (1, max((page.page for page in ocr.pages), default=1))
+    classification = _pseudo_classification(
+        ocr, document_type="SETTLEMENT_FORM", page_range=page_range
+    )
+    profile = DOCUMENT_PROFILES.get("SETTLEMENT_FORM")
+    allowed = tuple(profile.allowed_fields) if profile is not None else ()
+    system = build_paper_extraction_prompt(allowed)
+    user = _serialize_role_aware(
+        ocr,
+        document_id=classification.document_id,
+        page_range=page_range,
+        upload_role="paper",
+    )
+    payload = await _call_with_one_repair(llm, system=system, user=user, budget=budget)
+    if payload is None:
+        return _unresolved(ocr, classification), "UNRESOLVED", "UNKNOWN", ""
+    analysis = _build_analysis(
+        ocr, classification, payload=payload, document_type="SETTLEMENT_FORM"
+    )
+    role_fit = str(payload.get("role_fit") or "UNRESOLVED").upper()
+    if role_fit not in ("FIT", "MISFIT"):
+        # Heuristic fallback (no extra model call): a paper with no usable
+        # settlement content is flagged MISFIT for human fix, never forced.
+        has_content = bool(analysis.fields or analysis.line_items)
+        role_fit = "FIT" if has_content else "MISFIT"
+    actual_type = str(payload.get("actual_type") or "UNKNOWN").upper()
+    role_note = str(payload.get("role_note") or "")
+    return analysis, role_fit, actual_type, role_note
+
+
+async def extract_evidence_document(
+    ocr: OcrSourceResult, *, llm: object, budget: RunBudget
+) -> DocumentAnalysis:
+    """Combined type + facts extraction for one evidence file (one call).
+
+    The model determines document_type from content and extracts with that
+    type's vocabulary in the same response. Code validates the returned type
+    against the taxonomy and re-checks every field with that type's profile.
+    UNKNOWN stays UNKNOWN; nothing is forced into an invoice shape.
+    """
+    from invoice_referee.evidence.document_profiles import DOCUMENT_PROFILES
+    from invoice_referee.evidence.prompts import build_evidence_extraction_prompt
+
+    page_range = (1, max((page.page for page in ocr.pages), default=1))
+    system = build_evidence_extraction_prompt(tuple(DOCUMENT_PROFILES))
+    provisional_id = f"{ocr.source_id}:{page_range[0]}-{page_range[1]}:evidence"
+    user = _serialize_role_aware(
+        ocr, document_id=provisional_id, page_range=page_range, upload_role="evidence"
+    )
+    payload = await _call_with_one_repair(llm, system=system, user=user, budget=budget)
+    proposed = payload.get("document_type") if isinstance(payload, dict) else None
+    document_type = (
+        proposed
+        if isinstance(proposed, str) and proposed in DOCUMENT_PROFILES
+        else "UNKNOWN"
+    )
+    classification = _pseudo_classification(
+        ocr, document_type=document_type, page_range=page_range
+    )
+    if payload is None:
+        return _unresolved(ocr, classification)
+    if document_type == "UNKNOWN":
+        return DocumentAnalysis(
+            source_id=ocr.source_id,
+            document_id=classification.document_id,
+            document_type="UNKNOWN",
+            roles=("UNKNOWN",),
+            page_range=page_range,
+            classification_confidence=None,
+            alternative_document_types=(),
+            confidence_status="UNRESOLVED",
+            profile_status="UNKNOWN",
+            warnings=("evidence_type_unresolved",),
+        )
+    return _build_analysis(
+        ocr, classification, payload=payload, document_type=document_type
     )

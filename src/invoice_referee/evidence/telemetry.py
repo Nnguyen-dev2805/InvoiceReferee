@@ -60,8 +60,8 @@ class LlmTraceContext:
     attempt_kind: str = "provider_call"
 
 
-_current_llm_context: contextvars.ContextVar[LlmTraceContext | None] = contextvars.ContextVar(
-    "invoice_referee_llm_trace_context", default=None
+_current_llm_context: contextvars.ContextVar[LlmTraceContext | None] = (
+    contextvars.ContextVar("invoice_referee_llm_trace_context", default=None)
 )
 
 
@@ -85,7 +85,9 @@ def code_revision() -> str:
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, timeout=2,
+            capture_output=True,
+            text=True,
+            timeout=2,
             cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
         )
         if out.returncode == 0 and out.stdout.strip():
@@ -326,7 +328,12 @@ def null_operation(name: str = "noop") -> Iterator[Operation]:
 
 
 @contextmanager
-def step(name: str, *, metadata: dict[str, object] | None = None, inputs: dict[str, object] | None = None) -> Iterator[Step]:
+def step(
+    name: str,
+    *,
+    metadata: dict[str, object] | None = None,
+    inputs: dict[str, object] | None = None,
+) -> Iterator[Step]:
     """Attach a child step to the current operation, if any (else a no-op).
 
     Lets a nested helper (e.g. `read_root`) emit a step without threading the
@@ -364,6 +371,83 @@ def llm_trace_context(
         _current_llm_context.reset(token)
 
 
+import re
+
+_REDACT_QUOTED = re.compile(r"""("[^"]{2,}"|'[^']{2,}')""")
+
+
+def _sanitized_summary(message: str, *, max_chars: int = 200) -> str:
+    """Redact quoted spans (possible OCR/model text) and bound the length."""
+    return _REDACT_QUOTED.sub("…", message)[:max_chars]
+
+
+_FIELD_INDEX = re.compile(r"(?:field|line_items)\[(\d+)\]")
+
+
+def classify_schema_error(error: BaseException) -> tuple[str, str, str]:
+    """Split a validator failure into (error_code, field_path, category).
+
+    Only code-owned validator vocabulary is used; raw responses, quotes and
+    model values never enter these parts.
+    """
+    message = str(error)
+    error_code = type(error).__name__
+    match = _FIELD_INDEX.search(message)
+    field_path = f"field[{match.group(1)}]" if match else ""
+    lowered = message.lower()
+    if "must be an array" in lowered or "must be an object" in lowered:
+        category = "shape"
+    elif "fieldstate" in lowered:
+        category = "state"
+    elif "non-empty string" in lowered:
+        category = "identity"
+    elif "boolean/float" in lowered:
+        category = "value"
+    elif "positive integer" in lowered:
+        category = "page"
+    elif "alternatives" in lowered:
+        category = "alternatives"
+    elif "cover" in lowered or "exactly once" in lowered:
+        category = "coverage"
+    else:
+        category = "other"
+    return error_code, field_path, category
+
+
+def record_repair_diagnostic(
+    *,
+    stage: str,
+    attempt: str,
+    error_code: str,
+    field_path: str,
+    validation_category: str,
+    summary: str,
+) -> None:
+    """Buffer one structured repair diagnostic on the current operation (B2).
+
+    Explains WHY a shared schema-repair call was spent, without raw responses,
+    quotes, names or accounts. Observability only; never changes provider
+    results, validation or budget accounting. Past runs without this record
+    report cause UNKNOWN.
+    """
+    operation = current_operation()
+    if operation is None:
+        return
+    entry = {
+        "stage": stage,
+        "attempt": attempt,
+        "error_code": error_code,
+        "field_path": field_path,
+        "validation_category": validation_category,
+        "summary": _sanitized_summary(summary),
+    }
+    existing = operation.outputs.get("repair_diagnostics")
+    if isinstance(existing, list):
+        existing.append(entry)
+    else:
+        operation.outputs["repair_diagnostics"] = [entry]
+
+
 def record_llm_call(
     *,
     started_at: datetime,
@@ -375,6 +459,9 @@ def record_llm_call(
     parsed_response: dict[str, object] | None,
     usage: dict[str, object],
     error: str | None,
+    provider: str = "xkiro",
+    requested_effort: str | None = None,
+    observed_effort: str | None = None,
 ) -> None:
     """Buffer one `run_type=llm` child for an actual provider request."""
     operation = current_operation()
@@ -386,7 +473,9 @@ def record_llm_call(
     stage_name = (
         context.stage
         if context is not None
-        else current_step.name if current_step is not None else "structured_output"
+        else current_step.name
+        if current_step is not None
+        else "structured_output"
     )
     stage_instance = current_step.name if current_step is not None else stage_name
     attempt_scope = current_step.run_id if current_step is not None else stage_name
@@ -405,7 +494,9 @@ def record_llm_call(
         canonical_response = json.dumps(
             parsed_response, sort_keys=True, separators=(",", ":"), ensure_ascii=False
         )
-        parsed_json_sha256 = hashlib.sha256(canonical_response.encode("utf-8")).hexdigest()
+        parsed_json_sha256 = hashlib.sha256(
+            canonical_response.encode("utf-8")
+        ).hexdigest()
         known_lists = ("documents", "fields", "line_items", "assessments", "promotions")
         parsed_json_summary = {
             "top_level_keys": sorted(str(key) for key in parsed_response.keys()),
@@ -420,6 +511,7 @@ def record_llm_call(
         "llm",
         {
             "requested_model": requested_model,
+            "requested_effort": requested_effort,
             "prompt_version": prompt_version,
             "schema_version": schema_version,
             "attempt_index": attempt_index,
@@ -440,6 +532,8 @@ def record_llm_call(
             "parsed_json_sha256": parsed_json_sha256,
             "requested_model": requested_model,
             "returned_model": returned_model,
+            "requested_effort": requested_effort,
+            "observed_effort": observed_effort,
             "usage": usage,
             "prompt_version": prompt_version,
             "schema_version": schema_version,
@@ -467,7 +561,7 @@ def record_llm_call(
             output_state="COLLECTED",
             error=sanitize_trace_error(error) if error is not None else None,
             metadata={
-                "provider": "xkiro",
+                "provider": provider,
                 "stage": stage_name,
                 "requested_model": requested_model,
                 "returned_model": returned_model,

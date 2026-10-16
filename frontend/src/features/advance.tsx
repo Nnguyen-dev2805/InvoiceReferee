@@ -305,7 +305,7 @@ export function Advance({
                   Nhấn để chọn tệp hoặc kéo thả tài liệu vào đây
                 </span>
                 <span className="text-[11px] text-slate-500 block mt-1 max-w-md">
-                  Hỗ trợ PDF, PNG, JPG (Ủy nhiệm chi ngân hàng, giấy báo nợ, phiếu chi tiền mặt)
+                  Hỗ trợ PDF, DOC, DOCX, PNG, JPG (Ủy nhiệm chi ngân hàng, giấy báo nợ, phiếu chi tiền mặt)
                 </span>
               </>
             )}
@@ -313,7 +313,7 @@ export function Advance({
               id="advance-file-input"
               type="file"
               aria-label="Chứng từ ứng"
-              accept=".pdf,.png,.jpg,.jpeg"
+              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
               disabled={busy}
               onChange={(event) => {
                 const file = event.target.files?.[0];
