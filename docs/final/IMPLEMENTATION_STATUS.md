@@ -1,5 +1,25 @@
 # Implementation checkpoint
 
+## Verify/scorer hardened and integrated — 17/10/2026
+
+Merged `codex/verify-scorer` into main at06e03767 (implementation a0afeb7b),
+preserving S6 shared API/frontend changes. Fixed false-green suite membership,
+missing/forged references/authority, wrong or extra questions, unknown/zeroed
+financial projections. Whole input/context/gold/recording inventory locked.
+
+Current real replay acceptance: **NEEDS_RECORDING**, not4/4 or5/5 PASS.
+Existing files are synthetic mechanism fixtures, not real OCR/LLM captures.
+Exact requests/reader identity required; no fabricated confidence or LIVE fallback.
+Question linguistic quality stays NOT_REVIEWED. No new provider calls.
+
+Combined backend999pass/6inheritedfail (1005total); frontend69pass/2skip + build.
+API nonempty DB isolation/network-block regressions pass. Browser Core4/Esc5
+shows NEEDS_RECORDING and restores last report after reload. S6 post-merge A2 browser18/18PASS; Verify after settlement preserves the whole
+app DB dump. First10s response timeout retained. All attempt details in `.runtime/verify-fix-merge-20261017/`.
+Full suite not GREEN; real model benchmark NOT_RUN; no production certification.
+[Acceptance](reviews/2026-10-16-verify-scorer-acceptance.md).
+
+
 ## Hoangha S6 — targeted/browser PASS, full suite FAIL (6 inherited), 17/10/2026
 
 S6 backend/API/frontend + digital/paper/self-expense + exception/OCR region đã

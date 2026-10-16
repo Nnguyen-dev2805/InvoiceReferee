@@ -62,3 +62,20 @@ plus displayed basis; explicit independent E/A/P/R/S expectations; preserved
 actual authority IDs resolved against visible grant action/scope/profile/actor/
 amount/time. Added positive actual arithmetic-card and grant tests alongside
 wrong-field/value/grant counterexamples. No reviewer re-approval is claimed.
+
+## Combined main integration checkpoint
+
+Implementation commit a0afeb7b; merge06e03767. Tracked shared hunks auto-merged;
+S6 modifications remain. Full combined pytest1005 tests:999PASS/6FAIL, exact same
+six names as pre-merge main baseline (combined-baseline-comparison.json).
+Frontend69PASS/2SKIP/buildPASS. Verify browser Core4/Escalation5/reload PASS with
+NEEDS_RECORDING,0completed,0passed,releasefalse; all attempts stored privately.
+Independent review fixes tested, no claim reviewer approved the later snapshot.
+No LIVE/provider calls, push, deploy, user DB/port8000 mutation.
+
+S6 browser after merge: first attempt timed out at the script's10s actual-response
+wait although the DB committed P1m; preserved under failed-s6/. Retry used a fresh
+isolated DB with tracing disabled/outbound network blocked:18/18PASS, SETTLED,
+P3.7m/S0/PAYFULFILLED/CLOSED_CONFIRMED. Running both Verify suites after this
+settlement left the entire app DB SQL dump unchanged (post-settlement-isolation.json).
+This is deterministic browser evidence, not LIVE provider or latency validation.

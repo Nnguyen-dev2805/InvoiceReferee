@@ -174,3 +174,27 @@ BROWSER_BASE_URL=http://127.0.0.1:65135 rtk proxy node frontend/s6-flow-c.mjs   
 - Đây là RECORDED_REPLAY synthetic fixture, không chứng minh OCR/LLM LIVE.
   Hạn mức ngoại lệ production chưa được chốt. Không gọi legacy initial-history
   endpoint từ UI; recheck mới không tạo MANAGED_HISTORY/opening0.
+
+
+## 8. Verify Core4/Escalation5 — honest replay
+
+- Open **Kiểm chuẩn**; choose Replay (default) or explicitly confirm LIVE quota.
+- Current public Replay must report **Chưa có recording thật phù hợp** /
+  `NEEDS_RECORDING`, completed0, releasefalse. Existing `data/verify` recording
+  JSON files are **SYNTHETIC_FIXTURE**, not provider captures. Do not alter this
+  label or fabricate confidence to turn the result green.
+- CLI: `rtk proxy uv run --frozen --python 3.12 python -m invoice_referee.cli evaluate --suite core --mode replay`
+  (or `--suite escalation`). Missing captures exit1 honestly. `--mode stub` is
+  mechanism-only and cannot release the public benchmark.
+- `POST /api/verify` and `GET /api/verify/last` use an isolated evaluation service,
+  never the running app workflow/DB. Reports under `.runtime/verify/run-*/` are
+  retained per attempt; `last.json` is atomically replaced. Single-process run
+  lock +150s/case; busy requests return409.
+- `data/verify/manifest.json` locks file content, suite members, explicit upload
+  roles and context/gold files. No symlink/escape allowed. A deliberate dataset
+  revision requires a refreshed manifest and compatible real captures.
+- Exact replay protocol is documented in `data/verify/README.md`. Captures must
+  match prompts/schema/model/profile/request/source inventory. Missing/mismatch
+  never calls a live provider. Human question quality remains NOT_REVIEWED.
+- Combined merge evidence `.runtime/verify-fix-merge-20261017/`; six known backend
+  failures remain, so do not report full-regression green or model-quality success.
