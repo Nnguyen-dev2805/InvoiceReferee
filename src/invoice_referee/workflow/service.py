@@ -565,25 +565,32 @@ class CaseWorkflow:
             )
         ]
         case = cx.execute(
-            "SELECT version FROM cases WHERE id = ?", (root_id,)
+            "SELECT version, profile FROM cases WHERE id = ?", (root_id,)
         ).fetchone()
+        from invoice_referee.evidence.prompts import evidence_reader_identity
+        identity = evidence_reader_identity(
+            reader=self._evidence_reader, classifier=self._evidence_classifier,
+            activity_profile=case["profile"] if case else None,
+        )
         return {
             "tenant": tenant,
             "root_id": root_id,
-            "sources": sources,
+            "sources": sorted(sources),
+            "reader_identity": identity,
             "case_version": int(case["version"]) if case is not None else None,
         }
 
     def _evidence_basis_current(self, cx: sqlite3.Connection, job: sqlite3.Row) -> bool:
         stored = job["input_basis_json"] if "input_basis_json" in job.keys() else None
         if not stored:
-            return True
+            return False
         try:
             basis = json.loads(stored)
         except (TypeError, ValueError):
-            return True
+            return False
         current = self._evidence_basis(cx, str(job["tenant"]), str(job["root_id"]))
-        return basis.get("sources") == current.get("sources")
+        return (basis.get("sources") == current.get("sources")
+                and basis.get("reader_identity") == current.get("reader_identity"))
 
     def _mark_evidence_job(
         self, cx: sqlite3.Connection, job_id: str, *, phase: str, status: str
@@ -646,6 +653,7 @@ class CaseWorkflow:
         self, cx, *, tenant: str, root_id: str, report, basis: dict | None = None
     ) -> None:
         """Persist the typed report with its input basis (no state change)."""
+        basis = {**self._evidence_basis(cx, tenant, root_id), **(basis or {})}
         cx.execute(
             "INSERT OR REPLACE INTO case_evidence_reports (root_id, tenant, report_json, "
             "input_basis_json, created_at) VALUES (?, ?, ?, ?, ?)",
@@ -698,6 +706,8 @@ class CaseWorkflow:
             )
         )
         if basis.get("sources") != current:
+            return None
+        if basis.get("reader_identity") != self._evidence_basis(cx, tenant, root_id).get("reader_identity"):
             return None
         report = ReadResult.model_validate_json(row["report_json"])
         # A failed/empty read is not a reusable report.
@@ -1777,6 +1787,13 @@ class CaseWorkflow:
             if saved is not None:
                 report = ReadResult.model_validate_json(saved["report_json"])
                 existing_draft_id = str(saved["draft_id"])
+                from invoice_referee.evidence.prompts import evidence_reader_identity
+                current_identity = evidence_reader_identity(reader=self._evidence_reader,
+                    classifier=self._evidence_classifier, activity_profile=str(root["profile"]))
+                if report.reader_identity != current_identity and saved["status"] != "CONFIRMED":
+                    # An explicit POST may refresh the read. GET/review still
+                    # retains historical evidence and never calls providers.
+                    report = None
             else:
                 report = None
                 existing_draft_id = None
@@ -1988,6 +2005,8 @@ class CaseWorkflow:
         with self.db.transaction() as cx:
             root = self._require_root(cx, session, root_id)
             self._require_version(root, expected_case_version)
+            if (saved is None or saved["status"] != "CONFIRMED") and report.reader_identity != self._evidence_basis(cx, session.tenant, root_id)["reader_identity"]:
+                raise StaleCommandError("Cấu hình đọc đã thay đổi; hãy đọc lại chứng từ hoàn trả.")
             current_instruction = cx.execute(
                 "SELECT * FROM instructions WHERE id = ? AND tenant = ? AND root_id = ?",
                 (instruction_id, session.tenant, root_id),
@@ -2008,6 +2027,11 @@ class CaseWorkflow:
                     draft.draft_id, session.tenant, root_id, instruction_id, source_id,
                     draft.status, draft.model_dump_json(), report.model_dump_json(), now, now,
                 ),
+            )
+            cx.execute(
+                "UPDATE case_money_drafts SET draft_json=?, report_json=?, updated_at=? "
+                "WHERE tenant=? AND draft_id=? AND status != 'CONFIRMED'",
+                (draft.model_dump_json(), report.model_dump_json(), now, session.tenant, draft.draft_id),
             )
             saved_row = cx.execute(
                 "SELECT * FROM case_money_drafts WHERE tenant = ? AND root_id = ? "
@@ -2137,6 +2161,9 @@ class CaseWorkflow:
             )
             source_bytes[source_id] = payload
 
+        with self.db.transaction() as cx:
+            captured_basis = self._evidence_basis(cx, session.tenant, root_id)
+
         # One operation root for the draft read; spans buffer locally and flush
         # after the transaction below (no network inside the txn).
         with self._trace_operation(
@@ -2166,19 +2193,15 @@ class CaseWorkflow:
             operation.outputs["documents"] = len(report.documents)
             operation.outputs["warnings"] = len(draft.get("warnings", []))
 
-            # Persist the typed report + its input basis so a submit on the same
-            # sources reuses this read instead of calling OCR/LLM again (W3).
+            # Preserve the identity captured before provider I/O. Never stamp an
+            # older/mixed read as if it were produced by the new configuration.
             with self.db.transaction() as cx:
-                self._store_evidence_report(
-                    cx,
-                    tenant=session.tenant,
-                    root_id=root_id,
-                    report=report,
-                    basis={
-                        "sources": sorted(s.digest for s in attached),
-                        "case_version": int(row["version"]),
-                    },
-                )
+                current_basis = self._evidence_basis(cx, session.tenant, root_id)
+                if (captured_basis["reader_identity"] != current_basis["reader_identity"]
+                    or captured_basis["sources"] != current_basis["sources"]):
+                    raise UnsupportedCommandError("Bản đọc đã cũ do nguồn hoặc cấu hình đọc thay đổi; hãy đọc lại.")
+                self._store_evidence_report(cx, tenant=session.tenant, root_id=root_id,
+                    report=report, basis=captured_basis)
                 # Backend dossier link (14/10/2026): the server decides which
                 # advance/work dossier this settlement belongs to; the draft
                 # carries the decision for review, never an activity dropdown.

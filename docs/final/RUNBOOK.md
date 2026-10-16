@@ -13,6 +13,31 @@ bằng chứng runtime.
   `XKIRO_API_KEY`, `XKIRO_BASE_URL`, `INVOICE_REFEREE_LLM_MODEL`.
   LangSmith là **opt-in**, không bắt buộc.
 
+### Kiểm chứng evidence prompt hardening (16/10/2026)
+
+Các prompt nằm trong `src/invoice_referee/evidence/prompts.py`; reader identity
+bao gồm prompt/profile/model và representation `ocr-pages-block-words-v2`.
+Đổi prompt/model làm bản đọc cũ hết điều kiện reuse; không cần xóa DB. GET bản
+nháp vẫn không gọi provider; đọc lại tường minh mới dùng cấu hình mới. Không tự
+ghi nhận ứng/hoàn chỉ vì OCR đọc được biên nhận.
+
+Chạy audit cô lập (đủ tám development case, không dùng DB web):
+
+```bash
+rtk proxy uv run --frozen python scripts/run_prompt_hardening_audit.py \
+  --mode LIVE --manifest data/demo/manifest.json \
+  --as-of 2026-10-16T12:00:00+07:00 \
+  --output-dir .runtime/prompt-hardening/new-audit
+```
+
+Output directory phải mới. Cần provider keys thật; thiếu key trả NOT_RUN, không
+hạ STUB. Mỗi case có DB/uploads/artifacts riêng. `--baseline-ref 08acde6` chạy thêm
+baseline frozen; gold/scoring chỉ ở harness ngoài runtime. Luôn giữ các lượt lỗi.
+Exit1 có thể gồm gap dữ liệu như TC03: profile TRAVEL thiếu nơi/thời gian trên giấy,
+nên chưa đạt mục tiêu BALANCED; không sửa nguồn hoặc tự điền ngày để ép PASS.
+Xem [acceptance report](reviews/2026-10-16-evidence-prompt-hardening-acceptance.md)
+để biết bản code và gate thực sự được kiểm, không dùng hướng dẫn này làm proof.
+
 ## 2. Clean clone → chạy mặc định (LIVE)
 
 **Mặc định là LIVE**: server đọc tài liệu bạn upload (Mistral OCR + model). Điền

@@ -110,6 +110,7 @@ async def test_low_word_triggers_one_assessment_per_candidate() -> None:
                         "canonical_fields": ["total_amount"],
                         "observed_text": "450.000",
                         "reason": "low confidence on an amount",
+                        "requires_verification": True,
                     }
                 ]
             }
@@ -156,6 +157,50 @@ async def test_llm_error_is_technical() -> None:
 
     review = await review_ocr_quality(candidates, llm=BoomLlm(), budget=RunBudget())
     assert review.status == "TECHNICAL_ERROR"
+
+
+async def test_candidate_only_assessment_is_not_assessed():
+    ocr = _src((_page((OcrWord(text="450.000", confidence=0.4),)),))
+    candidates = collect_low_confidence_blocks(ocr)
+    llm = FakeLlm(responses=[{"assessments": [{"candidate_id": candidates[0].candidate_id}]}] * 2)
+    review = await review_ocr_quality(candidates, llm=llm, budget=RunBudget())
+    assert review.status == "TECHNICAL_ERROR"
+
+
+async def test_context_and_offsets_are_scoped_to_candidate_source():
+    import json
+    block = OcrBlock(id="b1", kind="text", content="450.000", words=(
+        OcrWord(text="450.000", confidence=0.4, block_start=0, block_end=7),))
+    src = _src((OcrPage(page=1, markdown="Trước\n450.000\nSau", blocks=(
+        OcrBlock(id="previous", kind="text", content="Trước"), block,
+        OcrBlock(id="next", kind="text", content="Sau"))),))
+    candidates = collect_low_confidence_blocks(src)
+    class Llm:
+        async def complete_json(self, *, system, user, budget):
+            request = json.loads(user)
+            assert request["candidates"][0]["previous_block"] == "Trước"
+            assert request["candidates"][0]["next_block"] == "Sau"
+            assert request["candidates"][0]["source_id"] == "source:1"
+            return {"assessments": [{"candidate_id": candidates[0].candidate_id,
+                "importance": "CRITICAL", "quality_state": "UNCERTAIN", "review_action": "ASK_HUMAN",
+                "requires_verification": True, "canonical_fields": ["total_amount"], "reason": "Số chưa rõ"}]}
+    review = await review_ocr_quality(candidates, llm=Llm(), budget=RunBudget(), sources=(src,))
+    assert review.status == "ASSESSED"
+
+
+async def test_list_valued_quality_state_is_a_schema_error_not_a_crash():
+    src = _src((_page((OcrWord(text="450.000", confidence=0.4),)),))
+    candidates = collect_low_confidence_blocks(src)
+    item = {"candidate_id": candidates[0].candidate_id, "importance": "CRITICAL",
+            "quality_state": [], "review_action": "ASK_HUMAN", "requires_verification": True,
+            "canonical_fields": ["total_amount"], "reason": "Không chắc"}
+    llm = FakeLlm(responses=[{"assessments": [item]}, {"assessments": [{**item, "quality_state": "UNCERTAIN"}]}])
+    try:
+        result = await review_ocr_quality(candidates, llm=llm, budget=RunBudget())
+    except Exception as error:
+        result = error
+    assert not isinstance(result, Exception)
+    assert result.status == "ASSESSED"
 
 
 def test_effective_requires_verification_follows_hoangha_rule() -> None:

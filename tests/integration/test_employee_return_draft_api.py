@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.factories import clear_ocr_page
+
 import json
 from datetime import datetime, timezone
 
@@ -45,7 +47,7 @@ class _ReturnReader:
             source_digest=source.digest,
             provider="fake-return-reader",
             model="fixture",
-            pages=(OcrPage(page=1, markdown=self.text),),
+            pages=(clear_ocr_page(markdown=self.text),),
         )
 
 
@@ -198,6 +200,22 @@ async def _confirm_return(app_fixture, view, collect, draft, *, command_id: str)
             "refs": draft["refs"],
         }},
     )
+
+
+async def test_explicit_return_read_after_model_change_does_not_reuse_old_status(app_fixture, tmp_path):
+    view, collect = await _collect_case(app_fixture, tmp_path, reference="RET-VERSION-1")
+    employee, source, response = await _upload_employee_return(app_fixture, view, collect, reference="RET-VERSION-1")
+    assert response.status_code == 200
+    wf = app_fixture.workflow
+    wf._evidence_classifier.model = "new-return-reader-version"
+    wf._evidence_classifier.status = "Đang xử lý"
+    wf._evidence_reader.text = _return_text(status="Đang xử lý", reference="RET-VERSION-1")
+    reread = await employee.post(f"/api/cases/{view.id}/return-draft",
+        headers={"X-Command-Id": "cmd:reread-version", "X-Expected-Version": str(response.json()["case_view"]["version"])},
+        json={"source_id": source["id"], "instruction_id": collect.id})
+    assert reread.status_code == 200, reread.text
+    assert reread.json()["draft"]["instrument_status"] == "PENDING"
+    assert reread.json()["case_view"]["employee_return_drafts"][-1]["instrument_status"] == "PENDING"
 
 
 def _client(app_fixture, *, actor: str, persona: str):

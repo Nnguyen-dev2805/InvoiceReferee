@@ -8,6 +8,8 @@ assessment is not connected. STUB keeps the existing assessment path.
 
 from __future__ import annotations
 
+from tests.factories import clear_ocr_page
+
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -41,18 +43,7 @@ class FakeEvidenceReader:
             source_digest=source.digest,
             provider="fake",
             model="m",
-            pages=(
-                OcrPage(
-                    page=1,
-                    markdown=markdown,
-                    blocks=(
-                        OcrBlock(
-                            id="b1", kind="text", content=markdown,
-                            words=(OcrWord(text="100.000", block_start=0, block_end=7, confidence=0.95),),
-                        ),
-                    ),
-                ),
-            ),
+            pages=(clear_ocr_page(markdown),),
         )
 
 
@@ -64,7 +55,8 @@ class StubClassifier:
             source_id = json.loads(user)["documents"][0]["source_id"]
             return {"documents": [
                 {"source_id": source_id, "page_range": [1, 1],
-                 "document_type": "SETTLEMENT_FORM", "roles": ["SETTLEMENT_DECLARATION"]}
+                 "document_type": "SETTLEMENT_FORM", "classification_confidence": 0.95,
+                 "roles": ["SETTLEMENT_DECLARATION"]}
             ]}
         # One FOUND field with a real quote from the fake OCR text, so the run is
         # genuinely usable (a run with no FOUND field is a technical failure).
@@ -72,6 +64,40 @@ class StubClassifier:
             {"field": "printed_total", "state": "FOUND", "value": "100000",
              "quote": "Tổng cộng: 100.000", "page": 1}
         ], "lines": []}
+
+
+async def test_unknown_classification_records_alternatives_without_extraction(tmp_path: Path) -> None:
+    from invoice_referee.domain.evidence import SourceRef
+    from invoice_referee.evidence.artifacts import ArtifactStore
+    from invoice_referee.evidence.pipeline import read_root
+
+    class UnknownClassifier:
+        def __init__(self) -> None:
+            self.extraction_calls = 0
+
+        async def complete_json(self, *, system: str, user: str, budget: RunBudget) -> dict:
+            if "documents" in system:
+                import json
+                source_id = json.loads(user)["documents"][0]["source_id"]
+                return {"documents": [{"source_id": source_id, "page_range": [1, 1],
+                    "document_type": "UNKNOWN", "classification_confidence": 0.99,
+                    "roles": ["UNKNOWN"]}]}
+            self.extraction_calls += 1
+            return {"fields": [{"field": "total_amount", "state": "FOUND", "value": "100000",
+                "quote": "100.000", "page": 1}], "line_items": []}
+
+    source = SourceRef(id="source:unknown", digest="b" * 64, tenant="tenant:demo",
+                       media="PDF", storage_key="unknown.pdf")
+    classifier = UnknownClassifier()
+    report = await read_root(
+        sources=(source,), reader=FileOcrReader(provider=FakeEvidenceReader()), classifier=classifier,
+        artifacts=ArtifactStore(root=tmp_path / "artifacts"), source_bytes={source.id: b"pdf"},
+        budget=RunBudget(), provider_mode="LIVE", root_id="root:unknown",
+    )
+    assert classifier.extraction_calls == 0
+    assert report.documents[0].document_type == "UNKNOWN"
+    assert report.documents[0].fields == ()
+    assert any(problem.kind == "UNSUPPORTED" for problem in report.problems)
 
 
 def _workflow(tmp_path: Path) -> CaseWorkflow:
@@ -215,6 +241,38 @@ async def test_stub_path_still_assesses_finance(tmp_path: Path) -> None:
     view = wf.view(_ctx(wf, "r5"), root)
     assert view.evidence_report is None
     assert view.state != "EVIDENCE_READY"
+
+
+async def test_unknown_classification_skips_extraction_and_is_reported(tmp_path: Path) -> None:
+    from invoice_referee.domain.evidence import SourceRef
+    from invoice_referee.evidence.artifacts import ArtifactStore
+    from invoice_referee.evidence.pipeline import read_root
+
+    class UnknownClassifier:
+        def __init__(self):
+            self.calls = []
+        async def complete_json(self, *, system: str, user: str, budget: RunBudget) -> dict:
+            if 'document_type' in system and 'classification' in system.lower():
+                import json
+                source_id = json.loads(user)["documents"][0]["source_id"]
+                return {"documents": [{"source_id": source_id, "page_range": [1, 1],
+                    "document_type": "UNKNOWN", "classification_confidence": 0.99,
+                    "roles": ["UNKNOWN"]}]}
+            self.calls.append(system)
+            return {"fields": [{"field": "total_amount", "state": "FOUND", "value": "100000",
+                "quote": "100.000", "page": 1}], "line_items": []}
+
+    source = SourceRef(id="source:unknown", digest="b" * 64, tenant="tenant:demo",
+                       media="PDF", storage_key="unknown.pdf")
+    reader = FileOcrReader(provider=FakeEvidenceReader())
+    classifier = UnknownClassifier()
+    report = await read_root(sources=(source,), reader=reader, classifier=classifier,
+        artifacts=ArtifactStore(root=tmp_path / "a"), source_bytes={source.id: b"pdf"},
+        budget=RunBudget(), provider_mode="LIVE", root_id="root:unknown")
+    assert not classifier.calls
+    assert report.documents[0].document_type == "UNKNOWN"
+    assert report.documents[0].fields == ()
+    assert any(problem.kind == "UNSUPPORTED" for problem in report.problems)
 
 
 async def test_missing_source_bytes_produces_a_problem(tmp_path: Path) -> None:

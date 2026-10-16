@@ -22,11 +22,14 @@ AdvanceStatus = Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"]
 # The field vocabulary the read may expose for an instrument document.
 _STATUS_MAP: dict[str, AdvanceStatus] = {
     "completed": "COMPLETED",
+    "success": "COMPLETED",
+    "successful": "COMPLETED",
     "hoàn tất": "COMPLETED",
     "thành công": "COMPLETED",
     "đã nhận": "COMPLETED",
     "đã giao": "COMPLETED",
     "pending": "PENDING",
+    "processing": "PENDING",
     "đang xử lý": "PENDING",
     "chờ xử lý": "PENDING",
     "failed": "FAILED",
@@ -100,10 +103,8 @@ def _refs(document: DocumentAnalysis) -> tuple[EvidenceRef, ...]:
 def _status(document: DocumentAnalysis) -> AdvanceStatus:
     raw = _found_value(document, "transaction_status")
     if raw is not None:
-        text = str(raw).strip().casefold()
-        for token, status in _STATUS_MAP.items():
-            if token in text:
-                return status
+        text = " ".join(str(raw).strip().casefold().split())
+        return _STATUS_MAP.get(text, "UNKNOWN")
     # A receipt-like cash voucher may state the handover in
     # `payment_confirmation_text` ("Số tiền đã giao … đã nhận …"); a stated
     # handover is COMPLETED, otherwise the status stays UNKNOWN.
@@ -112,6 +113,8 @@ def _status(document: DocumentAnalysis) -> AdvanceStatus:
     )
     if confirmation is not None:
         text = str(confirmation).casefold()
+        if any(token in text for token in ("chưa", "không", "not ", "pending", "failed")):
+            return "UNKNOWN"
         if "đã nhận" in text or "đã giao" in text or "hoàn tất" in text:
             return "COMPLETED"
     return "UNKNOWN"

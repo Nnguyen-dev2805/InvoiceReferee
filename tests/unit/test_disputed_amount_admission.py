@@ -89,8 +89,8 @@ def _org() -> OrganizationContext:
     }))
 
 
-def _admit():
-    report = ReadResult(provider_mode="LIVE", data_origin="LIVE_READ", documents=(_paper(), _invoice()))
+def _admit(report=None):
+    report = report or ReadResult(provider_mode="LIVE", data_origin="LIVE_READ", documents=(_paper(), _invoice()))
     return admit_evidence(
         report, scope=CaseScope(tenant="tenant:tc08", employee="employee:employee-a",
                                 activity="activity:1", profile="WORK_EXPENSE"),
@@ -135,3 +135,14 @@ def test_dispute_does_not_raise_a_false_payer_or_budget_fact() -> None:
     rules = {i.field_or_rule for i in result.issues}
     assert "expense:payer" not in rules
     assert "expense:allocation:s2:1-1:E_INVOICE" in rules
+
+
+def test_rejected_overallocation_mapping_preserves_specific_dispute():
+    from invoice_referee.evidence.matching import match_paper_evidence
+    paper, invoice = _paper(), _invoice()
+    matches = match_paper_evidence(paper, (paper, invoice))
+    report = ReadResult(provider_mode="LIVE", data_origin="LIVE_READ", documents=(paper, invoice),
+                        links=matches.links, row_matches=matches.rows, match_findings=matches.findings)
+    inp = _admit(report)
+    assert any("allocation" in i.field_or_rule and "260000" in i.basis for i in inp.admission_issues)
+    assert Reconciler().assess(inp).allowed_effect is None

@@ -14,6 +14,8 @@ import hashlib
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
+from tests.factories import clear_ocr_page
+
 from invoice_referee.config import Settings
 from invoice_referee.domain.case import CommandContext
 from invoice_referee.domain.commands import (
@@ -64,10 +66,7 @@ class FakeOcr:
         markdown = "GIẤY QUYẾT TOÁN\nTổng cộng: 3.240.000\nỨng: 4.000.000"
         return OcrSourceResult(
             source_id=source.id, source_digest=source.digest, provider="fake", model="m",
-            pages=(OcrPage(page=1, markdown=markdown, blocks=(
-                OcrBlock(id="b1", kind="text", content=markdown,
-                         words=(OcrWord(text="3.240.000", block_start=0, block_end=9, confidence=0.95),)),
-            )),),
+            pages=(clear_ocr_page(markdown),),
         )
 
 
@@ -79,7 +78,7 @@ class StubClassifier:
             sid = json.loads(user)["documents"][0]["source_id"]
             return {"documents": [{"source_id": sid, "page_range": [1, 1],
                                    "document_type": "SETTLEMENT_FORM",
-                                   "roles": ["SETTLEMENT_DECLARATION"]}]}
+                                   "roles": ["SETTLEMENT_DECLARATION"], "classification_confidence": 0.99}]}
         return {"fields": [{"field": "printed_total", "state": "FOUND",
                             "value": "3240000", "quote": "Tổng cộng: 3.240.000", "page": 1}],
                 "lines": []}
@@ -263,9 +262,7 @@ async def test_validation_trace_surfaces_shared_arithmetic_findings(tmp_path: Pa
                 source_digest=source.digest,
                 provider="fake",
                 model="fake-ocr",
-                pages=(OcrPage(page=1, markdown=markdown, blocks=(OcrBlock(
-                    id="b1", kind="text", content=markdown, words=()
-                ),)),),
+                pages=(clear_ocr_page(markdown),),
             )
 
     class ArithmeticLlm:
@@ -277,6 +274,7 @@ async def test_validation_trace_surfaces_shared_arithmetic_findings(tmp_path: Pa
                     "page_range": [1, 1],
                     "document_type": "SETTLEMENT_FORM",
                     "roles": ["SETTLEMENT_DECLARATION"],
+                    "classification_confidence": 0.99,
                 }]}
             return {"fields": [
                 {"field": "declared_advance", "state": "FOUND", "value": "4000000", "quote": "4.000.000", "page": 1},

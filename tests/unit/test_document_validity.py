@@ -104,6 +104,66 @@ def test_missing_critical_word_confidence_blocks() -> None:
     assert result.profile_status == "NEEDS_HUMAN"
 
 
+def test_scored_label_does_not_verify_unscored_amount():
+    ocr = _ocr((OcrWord(text="Tổng cộng:", block_start=0, block_end=10, confidence=0.99),
+                OcrWord(text="450.000", block_start=11, block_end=18, confidence=None)))
+    result = validate_document(_analysis((_found("total_amount", "450000"),)), ocr,
+                               ConfidenceReview(status="SKIPPED_NO_NUMERIC_CANDIDATES"))
+    assert result.fields[0].state == "UNREADABLE"
+
+
+def test_scored_percent_does_not_cover_unmapped_money():
+    text = "Thuế 8% - Tổng: 120.000"
+    ocr = _ocr((OcrWord(text="8%", block_start=5, block_end=7, confidence=.99),), markdown=text)
+    result = validate_document(_analysis((_found("total_amount", "120000", quote=text),)), ocr,
+                               ConfidenceReview(status="SKIPPED_NO_NUMERIC_CANDIDATES"))
+    assert result.fields[0].state == "UNREADABLE"
+
+
+def test_identifier_quote_spanning_adjacent_blocks_retains_own_word_scores():
+    from tests.factories import clear_ocr_page
+    left, right = "Ký hiệu: IR26E", "Số: 00000101"
+    blocks = (clear_ocr_page(left).blocks[0].model_copy(update={"id": "left"}),
+              clear_ocr_page(right).blocks[0].model_copy(update={"id": "right"}))
+    ocr = OcrSourceResult(source_id="source:1", source_digest=SHA, provider="test", model="test",
+        pages=(OcrPage(page=1, markdown=left+"\n\n"+right, blocks=blocks),))
+    result = validate_document(_analysis((_found("document_number", "IR26E00000101", quote=left+"\n\n"+right),)),
+        ocr, ConfidenceReview(status="SKIPPED_NO_NUMERIC_CANDIDATES"))
+    assert result.fields[0].state == "FOUND"
+
+
+def test_settlement_row_reference_is_a_critical_value():
+    ocr = OcrSourceResult(source_id="source:1", source_digest=SHA, provider="fake", model="fake",
+        pages=(OcrPage(page=1, markdown="Mã: IR-001", blocks=(OcrBlock(id="b1", kind="text",
+            content="Mã: IR-001", words=(OcrWord(text="IR-001", confidence=0.4),)),)),))
+    analysis = _analysis((), document_type="SETTLEMENT_FORM").model_copy(update={"line_items": (
+        DocumentLine(id="row1", fields=(_found("invoice_refs", ("IR-001",), quote="IR-001"),)),)})
+    result = validate_document(analysis, ocr, _review("ASK_HUMAN", requires=True))
+    assert result.line_items[0].fields[0].state == "UNREADABLE"
+
+
+def test_blurred_label_does_not_demote_clear_amount_in_same_block():
+    ocr = _ocr((OcrWord(text="Tổng cộng:", block_start=0, block_end=10, confidence=0.4),
+                OcrWord(text="450.000", block_start=11, block_end=18, confidence=0.99)))
+    result = validate_document(_analysis((_found("total_amount", "450000", quote="450.000"),)),
+                               ocr, _review("ASK_HUMAN", requires=True))
+    assert result.fields[0].state == "FOUND"
+
+
+def test_technical_review_does_not_verify_low_critical_candidate():
+    ocr = _ocr((OcrWord(text="450.000", confidence=0.4),))
+    result = validate_document(_analysis((_found("total_amount", "450000"),)), ocr,
+                               ConfidenceReview(status="TECHNICAL_ERROR"))
+    assert result.fields[0].state == "UNREADABLE"
+
+
+def test_noncritical_label_cannot_override_uncertain_critical_value():
+    review = _review("CONTINUE", requires=False)
+    ocr = _ocr((OcrWord(text="450.000", confidence=0.4),))
+    result = validate_document(_analysis((_found("total_amount", "450000"),)), ocr, review)
+    assert result.fields[0].state == "UNREADABLE"
+
+
 def test_readable_ask_human_with_omitted_flag_blocks() -> None:
     ocr = _ocr((OcrWord(text="450.000", confidence=0.9),))
     analysis = _analysis((_found("total_amount", "450000"),))
@@ -159,6 +219,35 @@ def test_empty_invoice_fails_required_fields() -> None:
     result = validate_document(analysis, ocr, ConfidenceReview(status="SKIPPED_NO_NUMERIC_CANDIDATES"))
     assert result.profile_status == "NEEDS_HUMAN"
     assert any(f.code == "REQUIRED_FIELD_MISSING" for f in result.profile_findings)
+
+
+def test_unscored_critical_quote_without_ocr_words_is_unreadable():
+    ocr = OcrSourceResult(
+        source_id="source:1", source_digest=SHA, provider="mistral", model="ocr-1",
+        pages=(OcrPage(page=1, markdown="Tổng cộng: 450.000", blocks=()),),
+    )
+    result = validate_document(
+        _analysis((_found("total_amount", "450000"),)),
+        ocr,
+        ConfidenceReview(status="SKIPPED_NO_NUMERIC_CANDIDATES"),
+    )
+    assert result.fields[0].state == "UNREADABLE"
+
+
+def test_low_confidence_line_item_amount_is_unreadable():
+    from invoice_referee.domain.common import EvidenceRef
+    quote = "450.000"
+    field = FieldCandidate(
+        field="amount", state="FOUND", value="450000",
+        refs=(EvidenceRef(source_id="source:1", source_sha256=SHA, page=1, exact_quote=quote),),
+    )
+    analysis = _analysis((), document_type="SETTLEMENT_FORM").model_copy(update={
+        "line_items": (DocumentLine(id="line:1", fields=(field,)),),
+    })
+    ocr = _ocr((OcrWord(text=quote, confidence=0.4),), markdown=f"Tổng cộng: {quote}")
+    review = _review("ASK_HUMAN", requires=True)
+    result = validate_document(analysis, ocr, review)
+    assert result.line_items[0].fields[0].state == "UNREADABLE"
 
 
 def test_unrelated_flagged_block_does_not_block_a_clean_field() -> None:

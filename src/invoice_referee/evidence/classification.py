@@ -8,6 +8,8 @@ and never selects an extraction schema.
 
 from __future__ import annotations
 
+import math
+
 from invoice_referee.domain.common import EvidenceRef
 from invoice_referee.domain.documents import (
     DocumentClassification,
@@ -114,32 +116,29 @@ async def classify_documents(
         source.source_id: {page.page: page.markdown for page in source.pages} for source in ocr
     }
 
-    system = (
-        "You classify each document's type and evidence role from its OCR text "
-        "only (never the filename). Reply as JSON {\"documents\": [...]}, one "
-        "entry per document unit, with EXACTLY these keys: "
-        "source_id (echo the submitted id), page_range ([start, end], 1-based), "
-        "document_type (one of: "
-        + ", ".join(DEFAULT_TYPE_ROLES)
-        + "), roles (a JSON array drawn from: SETTLEMENT_DECLARATION, "
-        "ORIGINAL_EXPENSE_EVIDENCE, PAYMENT_EVIDENCE, SUPPORTING_DOCUMENT, "
-        "UNKNOWN), alternative_document_types (array, optional), "
-        "classification_confidence (0..1), signals (array). "
-        "Do not rename these keys and do not add a details object. An unclear "
-        "document is document_type UNKNOWN with alternatives; do not guess."
-    )
-    user = _serialize(ocr)
-    try:
-        from invoice_referee.evidence.telemetry import llm_trace_context
+    from invoice_referee.evidence.prompts import build_classification_prompt, CLASSIFICATION_VERSION
+    from invoice_referee.evidence.structured_output import complete_structured
+    from invoice_referee.evidence.xkiro import XkiroSchemaError
 
-        with llm_trace_context(
-            stage="classify",
-            prompt_version="document-classification-v1",
-            schema_version="document-classification-json-v1",
-        ):
-            payload = await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
-    except XkiroError as error:
-        raise XkiroError("classification failed") from error
+    def validate(payload: dict) -> dict:
+        documents = payload.get("documents")
+        if not isinstance(documents, list) or any(not isinstance(d, dict) for d in documents):
+            raise XkiroSchemaError("documents must be an array of objects")
+        covered = {sid: set() for sid in expected}
+        for document in documents:
+            sid = document.get("source_id")
+            if isinstance(sid, str) and sid in page_text:
+                start, end = _as_page_range(document.get("page_range"), page_text[sid])
+                if start < min(page_text[sid]) or end > max(page_text[sid]):
+                    raise XkiroSchemaError("classification page_range outside submitted pages")
+                covered[sid].update(range(start, end + 1))
+        if any(set(page_text[sid]) - covered[sid] for sid in expected):
+            raise XkiroSchemaError("classification must cover every submitted source/page")
+        return payload
+
+    payload = await complete_structured(llm, system=build_classification_prompt(tuple(DEFAULT_TYPE_ROLES)),
+        user=_serialize(ocr), budget=budget, validate=validate, stage="classify",
+        prompt_version=CLASSIFICATION_VERSION, schema_version="document-classification-json-v1")
 
     documents = payload.get("documents")
     if not isinstance(documents, list):
@@ -156,14 +155,25 @@ async def classify_documents(
         # Accept the canonical keys and the aliases a model may emit instead
         # (type / evidence_role). A free-form label outside the taxonomy maps to
         # UNKNOWN — never a guessed schema, never a crash.
-        raw_type = _first_str(entry, "document_type", "type", "documentType", "doc_type")
-        document_type = raw_type if raw_type in DEFAULT_TYPE_ROLES else "UNKNOWN"
-        allowed = compatible_roles(document_type)
-        roles = tuple(
-            role for role in _role_list(entry) if role in allowed
+        proposed_type = _first_str(entry, "document_type", "type", "documentType", "doc_type")
+        confidence = entry.get("classification_confidence", entry.get("confidence"))
+        confidence_valid = (
+            type(confidence) in (int, float) and math.isfinite(confidence)
+            and 0 <= confidence <= 1
         )
-        if not roles:
-            roles = allowed
+        document_type = proposed_type if proposed_type in DEFAULT_TYPE_ROLES else "UNKNOWN"
+        if not confidence_valid or confidence < 0.5:
+            document_type = "UNKNOWN"
+        alternatives = tuple(
+            alt for alt in (entry.get("alternative_document_types") or ())
+            if isinstance(alt, str) and alt in DEFAULT_TYPE_ROLES and alt != "UNKNOWN"
+        )
+        if document_type == "UNKNOWN" and not alternatives and proposed_type in DEFAULT_TYPE_ROLES and proposed_type != "UNKNOWN":
+            alternatives = (proposed_type,)
+        roles = ("UNKNOWN",) if document_type == "UNKNOWN" else tuple(
+            role for role in _role_list(entry) if role in compatible_roles(document_type)
+        ) or compatible_roles(document_type)
+        confidence_value = confidence if confidence_valid else None
         page_range = _as_page_range(entry.get("page_range"), page_text[source_id])
         start, end = page_range
         # The model proposes a range; code validates it against the OCR pages
@@ -195,17 +205,8 @@ async def classify_documents(
                 document_type=document_type,  # type: ignore[arg-type]
                 roles=roles,
                 role_refs={role: (_ref(source_id, digest, start, quote),) for role in roles},
-                alternative_document_types=tuple(
-                    alt for alt in (entry.get("alternative_document_types") or ())
-                    if alt in DEFAULT_TYPE_ROLES
-                ),
-                classification_confidence=(
-                    entry.get("classification_confidence")
-                    if isinstance(entry.get("classification_confidence"), (int, float))
-                    else entry.get("confidence")
-                    if isinstance(entry.get("confidence"), (int, float))
-                    else None
-                ),
+                alternative_document_types=alternatives,
+                classification_confidence=confidence_value,
                 signals=tuple(entry.get("signals") or ()),
                 refs=(_ref(source_id, digest, start, quote),),
             )

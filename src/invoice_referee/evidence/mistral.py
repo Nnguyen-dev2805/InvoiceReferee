@@ -50,14 +50,38 @@ def _parse_words(block: dict) -> tuple[OcrWord, ...]:
 
 def _parse_blocks(page: dict) -> tuple[OcrBlock, ...]:
     out: list[OcrBlock] = []
+    markdown = str(page.get("markdown") or "")
+    page_scores = (page.get("confidence_scores") or {}).get("word_confidence_scores") or []
+    cursor = 0
     for index, block in enumerate(page.get("blocks") or []):
+        content = str(block.get("content") or "")
+        words = _parse_words(block)
+        start = markdown.find(content, cursor) if content else -1
+        if start >= 0:
+            cursor = start + len(content)
+        if not words and start >= 0:
+            mapped = []
+            for score in page_scores:
+                offset, text = score.get("start_index"), score.get("text")
+                if type(offset) is not int or not isinstance(text, str) or not text:
+                    continue
+                end = offset + len(text)
+                if markdown[offset:end] != text:
+                    continue
+                left, right = max(offset, start), min(end, start + len(content))
+                if left >= right:
+                    continue
+                confidence = score.get("confidence")
+                mapped.append(OcrWord(text=markdown[left:right], block_start=left-start,
+                    block_end=right-start, confidence=float(confidence) if type(confidence) in (int, float) else None))
+            words = tuple(mapped)
         out.append(
             OcrBlock(
                 id=str(block.get("block_id") or f"b{index}"),
                 kind=str(block.get("type") or "text"),
                 content=str(block.get("content") or ""),
                 bbox=None,
-                words=_parse_words(block),
+                words=words,
             )
         )
     return tuple(out)

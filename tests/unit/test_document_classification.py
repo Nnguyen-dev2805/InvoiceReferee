@@ -8,6 +8,21 @@ schema. A PDF may hold several units with distinct, code-owned document ids.
 
 from __future__ import annotations
 
+
+async def test_classifier_omitting_a_source_page_cannot_succeed():
+    import pytest
+    from invoice_referee.domain.documents import OcrSourceResult, OcrPage
+    from invoice_referee.evidence.classification import classify_documents
+    from invoice_referee.evidence.trace import RunBudget
+    from invoice_referee.evidence.xkiro import XkiroError
+    source = OcrSourceResult(source_id="s", source_digest="a"*64, provider="test", model="test",
+        pages=(OcrPage(page=1, markdown="invoice"), OcrPage(page=2, markdown="another invoice")))
+    class Llm:
+        async def complete_json(self, **kwargs):
+            return {"documents": [{"source_id": "s", "page_range": [1, 1], "document_type": "E_INVOICE", "classification_confidence": .99}]}
+    with pytest.raises(XkiroError):
+        await classify_documents((source,), llm=Llm(), budget=RunBudget())
+
 import pytest
 
 from invoice_referee.domain.documents import OcrPage, OcrSourceResult
@@ -79,7 +94,9 @@ async def test_classification_batch_precedes_extraction() -> None:
                     "source_id": "source:1",
                     "page_range": [1, 1],
                     "document_type": "E_INVOICE",
+                    "classification_confidence": 0.95,
                     "roles": ["ORIGINAL_EXPENSE_EVIDENCE"],
+                    "classification_confidence": 0.95,
                     "signals": ["header"],
                 }
             ]
@@ -111,6 +128,46 @@ async def test_unknown_never_selects_a_guessed_schema() -> None:
     assert result[0].alternative_document_types == ("E_INVOICE", "PAPER_RECEIPT")
 
 
+async def test_low_or_invalid_classification_confidence_stays_unknown() -> None:
+    ocr = (_ocr("source:1", (_page(1, "HÓA ĐƠN"),)),)
+    for confidence in (0.0, 0.49, float("nan"), float("inf")):
+        llm = FakeLlm({"documents": [{
+            "source_id": "source:1", "page_range": [1, 1],
+            "document_type": "E_INVOICE", "classification_confidence": confidence,
+            "alternative_document_types": ["E_INVOICE"],
+        }]})
+        result = await classify_documents(ocr, llm=llm, budget=RunBudget())
+        assert result[0].document_type == "UNKNOWN"
+        assert result[0].roles == ("UNKNOWN",)
+        assert result[0].alternative_document_types == ("E_INVOICE",)
+        assert result[0].classification_confidence is None or result[0].classification_confidence < 0.5
+
+
+async def test_missing_classification_confidence_stays_unknown() -> None:
+    ocr = (_ocr("source:1", (_page(1, "HÓA ĐƠN"),)),)
+    llm = FakeLlm({"documents": [{
+        "source_id": "source:1", "page_range": [1, 1], "document_type": "E_INVOICE",
+        "classification_confidence": None,
+        "alternative_document_types": ["E_INVOICE"],
+    }]})
+    result = await classify_documents(ocr, llm=llm, budget=RunBudget())
+    assert result[0].document_type == "UNKNOWN"
+    assert result[0].roles == ("UNKNOWN",)
+    assert result[0].alternative_document_types == ("E_INVOICE",)
+
+
+async def test_high_confidence_classification_remains_supported() -> None:
+    ocr = (_ocr("source:1", (_page(1, "HÓA ĐƠN"),)),)
+    llm = FakeLlm({"documents": [{
+        "source_id": "source:1", "page_range": [1, 1], "document_type": "E_INVOICE",
+        "classification_confidence": 0.8,
+    }]})
+    result = await classify_documents(ocr, llm=llm, budget=RunBudget())
+    assert result[0].document_type == "E_INVOICE"
+    assert result[0].roles == ("ORIGINAL_EXPENSE_EVIDENCE",)
+    assert result[0].classification_confidence == 0.8
+
+
 async def test_model_cannot_add_an_incompatible_role() -> None:
     # The model claims PAYMENT_EVIDENCE on an invoice without separate payment
     # facts; the code-owned map must drop it.
@@ -122,6 +179,7 @@ async def test_model_cannot_add_an_incompatible_role() -> None:
                     "source_id": "source:1",
                     "page_range": [1, 1],
                     "document_type": "E_INVOICE",
+                    "classification_confidence": 0.95,
                     "roles": ["ORIGINAL_EXPENSE_EVIDENCE", "PAYMENT_EVIDENCE"],
                 }
             ]
@@ -145,6 +203,7 @@ async def test_mixed_pdf_has_two_document_units() -> None:
                     "source_id": "source:1",
                     "page_range": [1, 1],
                     "document_type": "E_INVOICE",
+                    "classification_confidence": 0.95,
                     "roles": ["ORIGINAL_EXPENSE_EVIDENCE"],
                 },
                 {
@@ -170,6 +229,7 @@ async def test_unexpected_source_id_is_rejected() -> None:
                     "source_id": "source:other",
                     "page_range": [1, 1],
                     "document_type": "E_INVOICE",
+                    "classification_confidence": 0.95,
                     "roles": ["ORIGINAL_EXPENSE_EVIDENCE"],
                 }
             ]
@@ -218,7 +278,8 @@ async def test_unknown_role_is_dropped() -> None:
     ocr = (_ocr("source:1", (_page(1, "x"),)),)
     llm = FakeLlm({"documents": [
         {"source_id": "source:1", "page_range": [1, 1],
-         "document_type": "E_INVOICE", "roles": ["INVOICE_ROLE", "ORIGINAL_EXPENSE_EVIDENCE"]}
+         "document_type": "E_INVOICE", "classification_confidence": 0.95,
+         "roles": ["INVOICE_ROLE", "ORIGINAL_EXPENSE_EVIDENCE"]}
     ]})
     result = await classify_documents(ocr, llm=llm, budget=RunBudget())
     assert result[0].roles == ("ORIGINAL_EXPENSE_EVIDENCE",)
@@ -252,7 +313,7 @@ async def test_accepts_single_string_role() -> None:
     ocr = (_ocr("source:1", (_page(1, "x"),)),)
     llm = FakeLlm({"documents": [
         {"source_id": "source:1", "document_type": "E_INVOICE",
-         "roles": "ORIGINAL_EXPENSE_EVIDENCE"}
+         "classification_confidence": 0.95, "roles": "ORIGINAL_EXPENSE_EVIDENCE"}
     ]})
     result = await classify_documents(ocr, llm=llm, budget=RunBudget())
     assert result[0].roles == ("ORIGINAL_EXPENSE_EVIDENCE",)
@@ -266,7 +327,7 @@ async def test_classification_prompt_pins_the_schema_keys() -> None:
     class RecLlm:
         async def complete_json(self, *, system: str, user: str, budget: RunBudget) -> dict:
             captured["system"] = system
-            return {"documents": []}
+            return {"documents": [{"source_id": "source:1", "page_range": [1, 1], "document_type": "UNKNOWN", "classification_confidence": 0.1}]}
 
     await classify_documents((_ocr("source:1", (_page(1, "x"),)),), llm=RecLlm(), budget=RunBudget())
     for key in ("document_type", "roles", "page_range", "source_id"):

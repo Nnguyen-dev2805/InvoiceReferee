@@ -208,7 +208,7 @@ def _refs_match(a: str, b: str) -> bool:
 
 def _match_expense_documents(
     report: ReadResult, paper: DocumentAnalysis | None
-) -> list[_MatchedExpense]:
+) -> tuple[list[_MatchedExpense], tuple[DocumentAnalysis, ...]]:
     """One admitted cost per settlement row, matched to an original document.
 
     Each paper row is a cost. A row links to an original document by its invoice
@@ -216,6 +216,35 @@ def _match_expense_documents(
     required evidence can be raised as a FACT/POLICY (T5). When the paper has no
     rows, each original document is its own cost.
     """
+    if paper is not None and report.links:
+        from invoice_referee.evidence.matching import project_evidence_matches
+        projection = project_evidence_matches(paper, report.documents, report.links)
+        originals = {d.document_id: d for d in report.documents if d.document_type in _ORIGINAL_EXPENSE_TYPES}
+        out: list[_MatchedExpense] = []
+        used = set()
+        for index, row in enumerate(paper.line_items, 1):
+            description = str(_line_field(row, "description") or "")
+            if is_settlement_summary_row(description):
+                continue
+            reason = _line_field(row, "no_evidence_reason")
+            row_links = [link for link in projection.links
+                         if link.item_id == f"ITEM-{index:03d}" and link.status == "AUTO_LINK"
+                         and link.document_id in originals
+                         and link.source_id == originals[link.document_id].source_id
+                         and originals[link.document_id].profile_status == "CLEAR"]
+            if row_links:
+                for link in row_links:
+                    document = originals[link.document_id]
+                    if link.allocated_amount is not None:
+                        out.append(_MatchedExpense(link.allocated_amount, _document_refs(document),
+                            document, description, str(reason) if reason else None, row.refs or paper.refs))
+                        used.add(document.document_id)
+            else:
+                amount = _as_decimal(_line_field(row, "amount"))
+                if amount is not None:
+                    out.append(_MatchedExpense(amount, (), None, description,
+                        str(reason) if reason else None, row.refs or paper.refs))
+        return out, tuple(d for d in originals.values() if d.document_id not in used)
     rows = _settlement_rows(paper)
     original = [
         d for d in report.documents if d.document_type in _ORIGINAL_EXPENSE_TYPES
@@ -776,6 +805,41 @@ def admit_evidence(
         if allocated > int(doc_total):
             disputed_documents[entry.document.document_id] = (allocated, int(doc_total), allocated - int(doc_total))
             disputed_entry_by_doc.setdefault(entry.document.document_id, entry)
+    # A rejected link must not erase the source's explicit over-allocation.
+    # Keep the paper assertion separately from the validated accepted mapping.
+    if paper is not None:
+        from invoice_referee.evidence.matching import _invoice_ref_matches_number
+        originals = [d for d in report.documents if d.document_type in _ORIGINAL_EXPENSE_TYPES]
+        declared_totals: dict[str, int] = {}
+        for row in paper.line_items:
+            description = str(_line_field(row, "description") or "")
+            if is_settlement_summary_row(description):
+                continue
+            row_amount = _as_decimal(_line_field(row, "amount"))
+            references = _line_field(row, "invoice_refs") or ()
+            if isinstance(references, str):
+                references = (references,)
+            candidates = [d for d in originals if _field(d, "document_number") is not None
+                and any(_invoice_ref_matches_number(str(r), str(_field(d, "document_number"))) for r in references)]
+            if len(candidates) == 1 and row_amount is not None:
+                document = candidates[0]
+                declared_totals[document.document_id] = declared_totals.get(document.document_id, 0) + int(row_amount)
+        for document in originals:
+            total = _as_decimal(_field(document, "total_amount"))
+            declared = declared_totals.get(document.document_id)
+            if total is not None and declared is not None and declared > int(total):
+                disputed_documents[document.document_id] = (declared, int(total), declared-int(total))
+                disputed_entry_by_doc.setdefault(document.document_id,
+                    _MatchedExpense(Decimal(declared), _document_refs(document), document))
+        if report.links:
+            from invoice_referee.evidence.matching import project_evidence_matches
+            projected = project_evidence_matches(paper, report.documents, report.links)
+            for index, finding in enumerate(projected.findings):
+                if finding.code == "SET_PAPER_AMOUNT_001" and finding.status == "UNRESOLVED":
+                    issues.append(BusinessIssue(id=f"issue:fact:row-allocation:{index}", kind="FACT",
+                        field_or_rule="expense:allocation:row", owner="employee", basis=finding.message,
+                        refs=finding.refs or paper.refs,
+                        question="Xác nhận phân bổ từng chứng từ cho dòng chi; tổng không được vượt số kê khai."))
     for document_id, (allocated, doc_total, difference) in disputed_documents.items():
         entry = disputed_entry_by_doc[document_id]
         issues.append(
@@ -894,7 +958,7 @@ def admit_evidence(
         expense_id = f"expense:{index}"
         # A cost whose source over-allocates is in dispute (TC08): its amount is
         # not a verified fact and must not become eligible/employee-paid money.
-        disputed = line_total_unresolved or (
+        disputed = line_total_unresolved or (bool(disputed_documents) and entry.document is None) or (
             entry.document is not None
             and entry.document.document_id in disputed_documents
         )

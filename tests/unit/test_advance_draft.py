@@ -8,6 +8,15 @@ draft never invents a value and never sets a "received" state.
 
 from __future__ import annotations
 
+
+def test_negated_or_unknown_status_never_becomes_completed():
+    from invoice_referee.reconciliation.advance import _status
+    from invoice_referee.domain.documents import DocumentAnalysis
+    for text in ("NOT COMPLETED", "Chưa hoàn tất", "Không thành công", "not successful"):
+        document = DocumentAnalysis(source_id="s", document_id="d", document_type="PAYMENT_PROOF",
+            fields=(_found("transaction_status", text),))
+        assert _status(document) != "COMPLETED"
+
 from invoice_referee.domain.documents import DocumentAnalysis, FieldCandidate
 from invoice_referee.domain.common import EvidenceRef
 from invoice_referee.reconciliation.advance import draft_advance_from_document

@@ -7,6 +7,8 @@ recorded and no case version changes. The client cannot set the actor/scope.
 
 from __future__ import annotations
 
+from tests.factories import clear_ocr_page
+
 import asyncio
 import json
 from pathlib import Path
@@ -59,7 +61,7 @@ class _Reader:
         status_text = "Đang xử lý" if "pending" in source.filename.lower() else "Hoàn tất"
         return OcrSourceResult(
             source_id=source.id, source_digest=source.digest, provider="fake", model="fake",
-            pages=(OcrPage(page=1, markdown=f"BIÊN NHẬN CHUYỂN KHOẢN\nCÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH\nSố tiền 4.000.000 đ\nNgày giao dịch 05/10/2026\nTrạng thái {status_text}\nBên nhận NGUYỄN MINH AN\nMã giao dịch FT-1\nMã hồ sơ {self.activity_reference}\nNội dung chuyển tiền {self.payment_purpose}\nNgân hàng Demo"),),
+            pages=(clear_ocr_page(markdown=f"BIÊN NHẬN CHUYỂN KHOẢN\nCÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH\nSố tiền 4.000.000 đ\nNgày giao dịch 05/10/2026\nTrạng thái {status_text}\nBên nhận NGUYỄN MINH AN\nMã giao dịch FT-1\nMã hồ sơ {self.activity_reference}\nNội dung chuyển tiền {self.payment_purpose}\nNgân hàng Demo"),),
         )
 
 

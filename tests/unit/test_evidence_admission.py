@@ -10,6 +10,7 @@ WITHOUT letting a model output become verified money.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from invoice_referee.domain.case import CaseScope, ReadSet
 from invoice_referee.domain.common import EvidenceRef
@@ -161,6 +162,34 @@ def test_clear_report_and_claim_yields_one_expense_with_refs() -> None:
     assert expense.eligibility == "ELIGIBLE"
     assert expense.refs, "the expense must carry source refs"
     assert inp.expense_set_complete is True
+
+
+def test_admission_uses_confirmed_mapping_without_inventing_payer():
+    from invoice_referee.reconciliation.admission import _match_expense_documents
+    paper = _paper(rows=(("Bữa ăn", "3240000", ()),))
+    invoice = _invoice()
+    invoice = invoice.model_copy(update={"fields": tuple(field.model_copy(update={
+        "refs": tuple(ref.model_copy(update={"source_id": invoice.source_id}) for ref in field.refs)
+    }) for field in invoice.fields)})
+    link = EvidenceLink(item_id="ITEM-001", source_id=invoice.source_id,
+                        document_id=invoice.document_id, status="AUTO_LINK", method="LLM_RESOLVED",
+                        score=Decimal("0.95"), allocated_amount=Decimal("3240000"),
+                        explanation="Source-backed service match", refs=(_ref().model_copy(update={"source_id": invoice.source_id}),))
+    report = _report((paper, invoice), links=(link,))
+    matched, extra = _match_expense_documents(report, paper)
+    assert matched[0].document is invoice
+    assert extra == ()
+    assert _admit(report).expense_facts[0].payments == ()
+
+
+def test_suggested_mapping_does_not_fall_back_to_printed_ref():
+    from invoice_referee.reconciliation.admission import _match_expense_documents
+    paper, invoice = _paper(), _invoice()
+    link = EvidenceLink(item_id="ITEM-001", source_id=invoice.source_id,
+                        document_id=invoice.document_id, status="SUGGEST_LINK", method="AMOUNT_AND_CONTENT",
+                        score=Decimal("0.65"), explanation="Unresolved allocation")
+    matched, _ = _match_expense_documents(_report((paper, invoice), links=(link,)), paper)
+    assert matched[0].document is None
 
 
 def test_employee_paid_portion_carries_q32_basis_not_bank_fact() -> None:

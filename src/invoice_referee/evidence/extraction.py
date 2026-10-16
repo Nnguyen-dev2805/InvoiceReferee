@@ -183,6 +183,25 @@ def _value_supported(value: object, quote: str, *, field_name: str | None = None
             return False
         return all(_value_supported(item, quote, field_name=field_name) for item in value)
     text = str(value).strip()
+    if field_name == "transaction_status":
+        # Deterministic enum normalization, not fuzzy inference. Compare the
+        # entire value after a recognized label so negation cannot become paid.
+        import unicodedata
+        def status(raw: str) -> str | None:
+            raw = unicodedata.normalize("NFKD", raw.casefold().replace("đ", "d"))
+            raw = "".join(c for c in raw if not unicodedata.combining(c))
+            raw = re.sub(r"^(?:trang thai giao dich|trang thai|transaction status|status)\s*:\s*", "", raw.strip())
+            raw = " ".join(raw.replace("_", " ").split())
+            return {"hoan tat": "COMPLETED", "thanh cong": "COMPLETED", "completed": "COMPLETED",
+                    "success": "COMPLETED", "successful": "COMPLETED", "pending": "PENDING",
+                    "processing": "PENDING", "dang xu ly": "PENDING", "failed": "FAILED",
+                    "that bai": "FAILED", "khong thanh cong": "FAILED", "cancelled": "FAILED"}.get(raw)
+        source_status = status(quote)
+        if status(text) is not None:
+            return status(text) == source_status
+        # Preserve an unknown source status only verbatim. Never accept a
+        # substring such as COMPLETED inside NOT COMPLETED.
+        return " ".join(text.casefold().split()) == " ".join(quote.casefold().split())
     # A normalized date (ISO) is supported when the quote carries the same date.
     date_ok = date_is_supported(text, quote, field_name=field_name)
     if date_ok is not None:
@@ -235,6 +254,7 @@ def _validate_field(
     haystack: str,
     default_page: int,
     document_type: str | None = None,
+    allowed_pages: tuple[int, int] | None = None,
 ) -> FieldCandidate:
     """Build one FieldCandidate, verifying provenance for FOUND (plan E5).
 
@@ -251,16 +271,48 @@ def _validate_field(
         str(entry.get("field") or entry.get("name") or entry.get("field_name") or ""),
         document_type,
     )
+    if state == "AMBIGUOUS":
+        from invoice_referee.domain.documents import ValueAlternative
+        alternatives = []
+        seen = set()
+        for alternative in entry.get("alternatives", []):
+            candidate = _validate_field({**alternative, "field": field_name, "state": "FOUND"},
+                ocr=ocr, haystack=haystack, default_page=default_page, document_type=document_type, allowed_pages=allowed_pages)
+            key = repr(candidate.value)
+            if candidate.state == "FOUND" and key not in seen:
+                alternatives.append(ValueAlternative(value=candidate.value, refs=candidate.refs))
+                seen.add(key)
+        if len(alternatives) < 2:
+            return FieldCandidate(field=field_name, state="UNREADABLE")
+        return FieldCandidate(field=field_name, state="AMBIGUOUS", alternatives=tuple(alternatives))
     if state != "FOUND":
         return FieldCandidate(field=field_name, state=state)  # type: ignore[arg-type]
     quote = str(entry.get("quote") or entry.get("exact_quote") or "")
-    page = int(entry.get("page") or default_page)
+    try:
+        page = int(entry.get("page") or default_page)
+    except (TypeError, ValueError):
+        return FieldCandidate(field=field_name, state="UNREADABLE")
+    if allowed_pages is not None and not allowed_pages[0] <= page <= allowed_pages[1]:
+        return FieldCandidate(field=field_name, state="UNREADABLE")
+    page_text = next((p.markdown for p in ocr.pages if p.page == page), "")
     value = entry.get("value")
+    if field_name == "invoice_refs" and isinstance(value, str):
+        # Some providers encode the array as a JSON string. Decode only this
+        # field and still validate every reference against its own source quote.
+        import json
+        try:
+            decoded = json.loads(value)
+        except (ValueError, TypeError):
+            decoded = [value]
+        if not isinstance(decoded, list) or not all(isinstance(item, str) for item in decoded):
+            return FieldCandidate(field=field_name, state="UNREADABLE")
+        value = decoded
     # A FOUND value needs an exact quote from the source AND a value derivable
     # from it; without a quote it cannot be FOUND (plan E5).
     if (
         not quote
         or not _quote_supported(quote, haystack)
+        or not _quote_supported(quote, page_text)
         or not _value_supported(value, quote, field_name=field_name)
     ):
         return FieldCandidate(field=field_name, state="UNREADABLE")
@@ -320,41 +372,15 @@ async def extract_document(
     # invents its own labels (e.g. `department` for the trip destination) and a
     # correctly-read form is reported as missing required fields. The profile is
     # code-owned; the prompt only advertises it.
-    vocabulary = _field_vocabulary(classification.document_type)
-    vocabulary_clause = (
-        f" For this document_type, use EXACTLY these field names where they apply: "
-        f"{vocabulary}."
-        if vocabulary
-        else ""
-    )
-    system = (
-        "Extract the fields and the TABLE ROWS of this document from its OCR text. "
-        'Reply as JSON {"fields": [...], "line_items": [...]}. Each field object '
-        "uses EXACTLY these keys: field (the field name), state (one of FOUND, "
-        "NOT_PRESENT, UNREADABLE, AMBIGUOUS, NOT_APPLICABLE), value (only when "
-        "state=FOUND), quote (the exact substring copied from the OCR text; "
-        "required when state=FOUND), page (1-based). Do not rename these keys "
-        "(never use 'name'). If a field value spans adjacent OCR lines, preserve "
-        "the exact line breaks in quote but you may join those same lines with "
-        "single spaces in value; never omit or alter words or diacritics."
-        " Return calendar dates as YYYY-MM-DD, while preserving the exact source date in quote. "
-        "Keep a transaction timestamp's time and offset only when the source states them. "
-        "Never invent a year, time, offset, or work date; distinguish document_date, event_at, "
-        "trip_start and trip_end. Mark incomplete/unreadable or ambiguous dates accordingly."
-        + vocabulary_clause
-        + " Each line_items entry is ONE COST ROW of a table and "
-        "uses EXACTLY one key: fields, an array of the same field objects for that "
-        "row, using row field names description, amount, invoice_refs (an array of "
-        "the document-number strings the row references) and no_evidence_reason. "
-        "Do NOT put plain OCR text lines in line_items; only table cost rows. "
-        "Never invent a value; a missing value is NOT_PRESENT, not zero."
-    )
+    from invoice_referee.evidence.prompts import build_extraction_prompt, EXTRACTION_VERSION
+    system = build_extraction_prompt(classification.document_type,
+                                    tuple(f.strip() for f in _field_vocabulary(classification.document_type).split(",") if f.strip()))
     user = _serialize(ocr, classification)
     from invoice_referee.evidence.telemetry import llm_trace_context
 
     with llm_trace_context(
         stage="extract",
-        prompt_version="document-extraction-v2",
+        prompt_version="document-extraction-v3",
         schema_version="document-fields-and-line-items-json-v1",
     ):
         payload = await _call_with_one_repair(llm, system=system, user=user, budget=budget)
@@ -378,6 +404,7 @@ async def extract_document(
             haystack=haystack,
             default_page=classification.page_range[0],
             document_type=document_type,
+            allowed_pages=classification.page_range,
         )
         for entry in raw_fields
         if isinstance(entry, dict)
@@ -402,6 +429,7 @@ async def extract_document(
                 haystack=haystack,
                 default_page=classification.page_range[0],
                 document_type=document_type,
+                allowed_pages=classification.page_range,
             )
             for f in entry.get("fields", [])
             if isinstance(f, dict)
@@ -439,27 +467,59 @@ async def _call_with_one_repair(
     llm: object, *, system: str, user: str, budget: RunBudget
 ) -> dict | None:
     """One extraction call; on a schema error, at most one repair call."""
-    from invoice_referee.evidence.telemetry import llm_trace_context
+    from invoice_referee.evidence.structured_output import complete_structured
+
+    def validate(payload: dict) -> dict:
+        if not isinstance(payload.get("fields"), list):
+            raise XkiroSchemaError("fields must be an array")
+        lines = payload.get("line_items", payload.get("lines", []))
+        if not isinstance(lines, list):
+            raise XkiroSchemaError("line_items must be an array")
+        from invoice_referee.domain.documents import FIELD_STATES
+        entries = list(payload["fields"])
+        for row in lines:
+            if isinstance(row, dict) and isinstance(row.get("fields"), list):
+                entries.extend(row["fields"])
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                raise XkiroSchemaError(f"field[{index}] must be an object")
+            state = entry.get("state")
+            if not isinstance(state, str) or state not in FIELD_STATES:
+                raise XkiroSchemaError(f"field[{index}].state is not a FieldState")
+            name = entry.get("field") or entry.get("name") or entry.get("field_name")
+            if not isinstance(name, str) or not name:
+                raise XkiroSchemaError(f"field[{index}].field must be a non-empty string")
+            from invoice_referee.domain.documents import MONEY_FIELD_HINTS
+            values = [entry.get("value")]
+            if isinstance(entry.get("alternatives"), list):
+                values.extend(alt.get("value") for alt in entry["alternatives"] if isinstance(alt, dict))
+            if any(isinstance(value, bool) or (isinstance(value, float) and any(h in name for h in MONEY_FIELD_HINTS))
+                   for value in values):
+                raise XkiroSchemaError(f"field[{index}] has an invalid boolean/float value")
+            page = entry.get("page")
+            if page is not None and (type(page) is not int or page < 1):
+                raise XkiroSchemaError(f"field[{index}].page must be a positive integer")
+            if state == "AMBIGUOUS":
+                alternatives = entry.get("alternatives")
+                if not isinstance(alternatives, list) or len(alternatives) < 2 or any(
+                    not isinstance(alt, dict) or "value" not in alt or not isinstance(alt.get("quote"), str)
+                    or ("page" in alt and (type(alt["page"]) is not int or alt["page"] < 1))
+                    for alt in alternatives
+                ):
+                    raise XkiroSchemaError(f"field[{index}] needs at least two well-formed alternatives")
+        for index, row in enumerate(lines):
+            if isinstance(row, dict) and not isinstance(row.get("fields", []), list):
+                raise XkiroSchemaError(f"line_items[{index}].fields must be an array")
+        return payload
 
     try:
-        with llm_trace_context(
-            stage="extract",
-            prompt_version="document-extraction-v2",
+        return await complete_structured(
+            llm, system=system, user=user, budget=budget, validate=validate,
+            stage="extract", prompt_version="document-extraction-v3",
             schema_version="document-fields-and-line-items-json-v1",
-            attempt_kind="primary",
-        ):
-            return await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
+        )
     except XkiroSchemaError:
-        try:
-            with llm_trace_context(
-                stage="extract",
-                prompt_version="document-extraction-v2",
-                schema_version="document-fields-and-line-items-json-v1",
-                attempt_kind="repair",
-            ):
-                return await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
-        except XkiroSchemaError:
-            return None
+        return None
 
 
 def _unresolved(
@@ -496,6 +556,9 @@ def _serialize(ocr: OcrSourceResult, classification: DocumentClassification) -> 
     start, end = classification.page_range
     return json.dumps(
         {
+            "source_id": ocr.source_id,
+            "document_id": classification.document_id,
+            "page_range": list(classification.page_range),
             "document_type": classification.document_type,
             "roles": list(classification.roles),
             "pages": [

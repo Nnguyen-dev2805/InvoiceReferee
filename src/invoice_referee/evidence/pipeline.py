@@ -389,6 +389,9 @@ async def read_root(
     from invoice_referee.reconciliation.document_arithmetic import check_document_arithmetic
 
     from invoice_referee.domain.issues import ProcessingProblem
+    from invoice_referee.evidence.prompts import evidence_reader_identity
+    reader_identity = evidence_reader_identity(reader=reader, classifier=classifier,
+                                               activity_profile=activity_profile)
 
     ocr_results = []
     confidence_candidates = []
@@ -511,7 +514,7 @@ async def read_root(
         ),
     ) as s:
         if candidates:
-            review = await review_ocr_quality(candidates, llm=classifier, budget=budget)
+            review = await review_ocr_quality(candidates, llm=classifier, budget=budget, sources=ocr)
             decisions = [
                 {
                     "candidate_id": assessment.candidate_id,
@@ -520,6 +523,9 @@ async def read_root(
                     "review_action": assessment.review_action,
                     "canonical_fields": list(assessment.canonical_fields),
                     "requires_verification": assessment.requires_verification,
+                    "reason": assessment.reason,
+                    "observed_text": assessment.observed_text,
+                    "human_question": assessment.human_question,
                 }
                 for assessment in review.block_assessments
             ]
@@ -593,170 +599,159 @@ async def read_root(
         )
 
     documents = []
-    for classification in classifications:
+    extraction_classes = [c for c in classifications if c.document_type != "UNKNOWN"]
+    unresolved_classes = [c for c in classifications if c.document_type == "UNKNOWN"]
+    unresolved_source_ids = {c.source_id for c in unresolved_classes}
+    for classification in extraction_classes:
         source = next((r for r in ocr if r.source_id == classification.source_id), None)
         if source is None:
             continue
         with step(
             f"extract:{classification.document_type}",
             metadata={"trace_stage": "extraction"},
-            inputs=stage_payload(
-                "extraction",
-                {
-                    "document_id": classification.document_id,
-                    "document_type": classification.document_type,
-                    "source_id": classification.source_id,
-                    "source_digest": source.source_digest,
-                    "page_range": list(classification.page_range),
-                    "confidence_status": review.status,
-                    "ocr_page_count": len(source.pages),
-                    "classification_confidence": classification.classification_confidence,
-                },
-            ),
+            inputs=stage_payload("extraction", {
+                "document_id": classification.document_id,
+                "document_type": classification.document_type,
+                "source_id": source.source_id,
+                "source_digest": source.source_digest,
+                "page_range": list(classification.page_range),
+                "confidence_status": review.status,
+                "ocr_page_count": len(source.pages),
+                "classification_confidence": classification.classification_confidence,
+            }),
         ) as s:
             calls_before = budget.llm_attempts
             analysis = await extract_document(source, classification, llm=classifier, budget=budget)
             llm_attempts = max(0, budget.llm_attempts - calls_before)
             analysis_summary = _trace_document_analysis(analysis)
-            fields = analysis_summary["fields"]
-            lines = analysis_summary["line_items"]
+            fields, lines = analysis_summary["fields"], analysis_summary["line_items"]
             provenance_findings = [
                 {"field": item["field"], "state": item["state"], "reason_code": "UNREADABLE_OR_UNRESOLVED"}
-                for item in fields
-                if item["state"] in ("UNREADABLE", "AMBIGUOUS")
+                for item in fields if item["state"] in ("UNREADABLE", "AMBIGUOUS")
             ]
-            s.outputs.update(
-                stage_payload(
-                    "extraction",
-                    {
-                        "document_id": analysis.document_id,
-                        "document_type": analysis.document_type,
-                        "source_id": analysis.source_id,
-                        "source_digest": source.source_digest,
-                        "page_range": list(analysis.page_range),
-                        "parse_status": "PARSED" if fields or lines else "UNRESOLVED",
-                        "field_count": len(fields),
-                        "line_item_count": len(lines),
-                        "fields": fields,
-                        "line_items": lines,
-                        "source_refs": analysis_summary["refs"]
-                        + [ref for line in lines for ref in line["refs"]]
-                        + [ref for field in fields for ref in field["refs"]],
-                        "provenance_findings": provenance_findings,
-                        "repair_attempts": max(0, llm_attempts - 1),
-                        "llm_attempts": llm_attempts,
-                    },
-                )
-            )
+            s.outputs.update(stage_payload("extraction", {
+                "document_id": analysis.document_id,
+                "document_type": analysis.document_type,
+                "source_id": analysis.source_id,
+                "source_digest": source.source_digest,
+                "page_range": list(analysis.page_range),
+                "parse_status": "PARSED" if fields or lines else "UNRESOLVED",
+                "field_count": len(fields),
+                "line_item_count": len(lines),
+                "fields": fields,
+                "line_items": lines,
+                "source_refs": analysis_summary["refs"]
+                    + [ref for line in lines for ref in line["refs"]]
+                    + [ref for field in fields for ref in field["refs"]],
+                "provenance_findings": provenance_findings,
+                "repair_attempts": max(0, llm_attempts - 1),
+                "llm_attempts": llm_attempts,
+            }))
         with step(
             f"validate:{classification.document_type}",
             metadata={"trace_stage": "validation"},
-            inputs=stage_payload(
-                "validation",
-                {
-                    "document_id": analysis.document_id,
-                    "document_type": analysis.document_type,
-                    "source_id": analysis.source_id,
-                    "confidence_status": analysis.confidence_status,
-                    "input_fields": [_trace_field(field) for field in analysis.fields],
-                },
-            ),
+            inputs=stage_payload("validation", {
+                "document_id": analysis.document_id,
+                "document_type": analysis.document_type,
+                "source_id": source.source_id,
+                "confidence_status": analysis.confidence_status,
+                "input_fields": [_trace_field(field) for field in analysis.fields],
+            }),
         ) as s:
-            analysis = validate_document(
-                analysis, source, review, activity_profile=activity_profile
-            )
-            # Reuse the existing document-arithmetic rule for telemetry. This
-            # only exposes its typed finding at the validation boundary; the
-            # financial consumer still evaluates it independently for admission.
+            analysis = validate_document(analysis, source, review, activity_profile=activity_profile)
             arithmetic_findings = check_document_arithmetic(analysis)
-            s.outputs.update(
-                stage_payload(
-                    "validation",
-                    {
-                        "document_id": analysis.document_id,
-                        "document_type": analysis.document_type,
-                        "profile_status": analysis.profile_status,
-                        "fields": [_trace_field(field) for field in analysis.fields],
-                        "findings": _trace_profile_findings(analysis.profile_findings),
-                        "blocking_count": sum(
-                            1 for finding in analysis.profile_findings if finding.blocking
-                        ),
-                        "arithmetic_checks": {
-                            "state": "CHECKED_BY_SHARED_RULE",
-                            "findings": [
-                                {
-                                    "code": finding.code,
-                                    "field_or_rule": finding.field_or_rule,
-                                    "basis": finding.basis,
-                                    "refs": [_trace_ref(ref) for ref in finding.refs],
-                                }
-                                for finding in arithmetic_findings
-                            ],
-                        },
-                    },
-                )
-            )
+            s.outputs.update(stage_payload("validation", {
+                "document_id": analysis.document_id,
+                "document_type": analysis.document_type,
+                "profile_status": analysis.profile_status,
+                "fields": [_trace_field(field) for field in analysis.fields],
+                "findings": _trace_profile_findings(analysis.profile_findings),
+                "blocking_count": sum(1 for finding in analysis.profile_findings if finding.blocking),
+                "arithmetic_checks": {"state": "CHECKED_BY_SHARED_RULE", "findings": [
+                    {"code": finding.code, "field_or_rule": finding.field_or_rule,
+                     "basis": finding.basis, "refs": [_trace_ref(ref) for ref in finding.refs]}
+                    for finding in arithmetic_findings]},
+            }))
         documents.append(analysis)
+
+    # UNKNOWN classifications are visible only when they carry a bounded set of
+    # alternatives; unsupported cases remain source-scoped processing problems.
+    if unresolved_classes:
+        from invoice_referee.domain.documents import DocumentAnalysis
+        for classification in unresolved_classes:
+            source = next((r for r in ocr if r.source_id == classification.source_id), None)
+            if source is None:
+                continue
+            if not any(p.kind == "UNSUPPORTED" and classification.source_id in p.affected_fields
+                       for p in source_problems):
+                source_problems.append(ProcessingProblem(
+                    kind="UNSUPPORTED", affected_fields=(classification.source_id,),
+                    message="loại tài liệu chưa được phân loại chắc chắn; cần xác minh",
+                    relevance="MATERIAL", blocking=True, next_action="confirm_document_type",
+                ))
+            documents.append(DocumentAnalysis(
+                source_id=source.source_id, document_id=classification.document_id,
+                document_type="UNKNOWN", roles=("UNKNOWN",), page_range=classification.page_range,
+                classification_confidence=classification.classification_confidence,
+                alternative_document_types=classification.alternative_document_types,
+                classification_refs=classification.refs, refs=classification.refs,
+                confidence_status="UNRESOLVED", profile_status="UNKNOWN",
+                warnings=("classification_unresolved",),
+            ))
+    if not documents and ocr and not source_problems:
+        source_problems.append(ProcessingProblem(
+            kind="UNSUPPORTED", affected_fields=tuple(r.source_id for r in ocr),
+            message="no supported document type was classified", relevance="MATERIAL",
+            blocking=True, next_action="confirm_document_type",
+        ))
+    if not sources:
+        source_problems.append(ProcessingProblem(
+            kind="UNSUPPORTED", affected_fields=(), message="no evidence sources provided",
+            relevance="MATERIAL", blocking=True, next_action="attach_sources",
+        ))
 
     paper = next((d for d in documents if d.document_type == "SETTLEMENT_FORM"), None)
     with step(
         "match",
         metadata={"trace_stage": "matching"},
-        inputs=stage_payload(
-            "matching",
-            {
-                "paper_document_id": paper.document_id if paper else None,
-                "document_count": len(documents),
-                "row_count": len(paper.line_items) if paper else 0,
-            },
-        ),
+        inputs=stage_payload("matching", {
+            "paper_document_id": paper.document_id if paper else None,
+            "document_count": len(documents),
+            "row_count": len(paper.line_items) if paper else 0,
+        }),
     ) as s:
         llm_attempts_before = budget.llm_attempts
         if paper is not None:
             matching = match_paper_evidence(paper, tuple(documents))
             suggestions_found = any(link.status == "SUGGEST_LINK" for link in matching.links)
             suggestion_count = sum(1 for link in matching.links if link.status == "SUGGEST_LINK")
-            # One bounded suggestion-resolution batch, only when suggestions exist.
             if suggestions_found:
                 matching = await resolve_evidence_suggestions(
-                    matching, tuple(documents), llm=classifier, budget=budget
+                    matching, tuple(documents), paper=paper, llm=classifier, budget=budget
                 )
             else:
                 s.skipped = "no_suggested_links"
         else:
             s.skipped = "no_settlement_form"
-            matching = EvidenceMatchingResult(
-                findings=(
-                    __import__("invoice_referee.domain.documents", fromlist=["EvidenceMatchFinding"]).EvidenceMatchFinding(
-                        code="SETTLEMENT_FORM_MISSING",
-                        status="UNRESOLVED",
-                        message="Không có giấy quyết toán (SETTLEMENT_FORM) để ghép chứng từ.",
-                        refs=(),
-                    ),
-                )
-            )
-            s.skipped = "no_settlement_form"
+            from invoice_referee.domain.documents import EvidenceMatchFinding
+            matching = EvidenceMatchingResult(findings=(EvidenceMatchFinding(
+                code="SETTLEMENT_FORM_MISSING", status="UNRESOLVED",
+                message="Không có giấy quyết toán (SETTLEMENT_FORM) để ghép chứng từ.", refs=(),
+            ),))
             suggestions_found = False
             suggestion_count = 0
         actual_llm_calls = max(0, budget.llm_attempts - llm_attempts_before)
         matching_summary = _trace_matching(matching)
-        s.outputs.update(
-            stage_payload(
-                "matching",
-                {
-                    "method": "rules+llm" if actual_llm_calls else "rules",
-                    "paper_document_id": paper.document_id if paper else None,
-                    "document_count": len(documents),
-                    "row_count": len(paper.line_items) if paper else 0,
-                    **matching_summary,
-                    "suggestions": suggestion_count,
-                    "llm_called": actual_llm_calls > 0,
-                    "resolved_suggestions": any(
-                        link.method == "LLM_RESOLVED" for link in matching.links
-                    ),
-                },
-            )
-        )
+        s.outputs.update(stage_payload("matching", {
+            "method": "rules+llm" if actual_llm_calls else "rules",
+            "paper_document_id": paper.document_id if paper else None,
+            "document_count": len(documents),
+            "row_count": len(paper.line_items) if paper else 0,
+            **matching_summary,
+            "suggestions": suggestion_count,
+            "llm_called": actual_llm_calls > 0,
+            "resolved_suggestions": any(link.method == "LLM_RESOLVED" for link in matching.links),
+        }))
 
     origin = {"LIVE": "LIVE_READ", "RECORDED_REPLAY": "RECORDED_REPLAY"}.get(
         provider_mode, "STUB_TRANSCRIPTION"
@@ -765,6 +760,7 @@ async def read_root(
     return ReadResult(
         provider_mode=provider_mode,
         data_origin=origin,
+        reader_identity=reader_identity,
         documents=tuple(documents),
         links=matching.links,
         row_matches=matching.rows,

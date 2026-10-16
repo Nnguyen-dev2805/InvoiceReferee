@@ -561,3 +561,13 @@ def gold_ambiguous_450_480():
     # The observable source is ambiguous (450 vs 480); the latent truth (450)
     # must not reward a lucky guess.
     return _gold("FACT", owner="employee")
+
+
+def clear_ocr_page(markdown: str, page: int = 1):
+    """Complete scored OCR for fixtures whose subject is not OCR uncertainty."""
+    import re
+    from invoice_referee.domain.documents import OcrPage, OcrBlock, OcrWord
+    words = tuple(OcrWord(text=m.group(), block_start=m.start(), block_end=m.end(), confidence=0.99)
+                  for m in re.finditer(r"\S+", markdown))
+    return OcrPage(page=page, markdown=markdown,
+                   blocks=(OcrBlock(id="clear", kind="text", content=markdown, words=words),))

@@ -817,12 +817,37 @@ giữ và E0 pin; profile/critical-field matrix pin tại Hoangha revision `1ee3
   trạng thái hiện hành, không gọi OCR/LLM, không đổi version, không ghi tiền hay
   coverage. Xác nhận ghi tiền vẫn kiểm lại căn cứ trong transaction.
 - Confidence: `collect_low_confidence_blocks(ocr, threshold=0.85)` tạo candidate;
-  `async review_ocr_quality(candidates, *, llm, budget) -> ConfidenceReview` một batch;
+  `async review_ocr_quality(candidates, *, llm, budget, sources=()) -> ConfidenceReview` một batch;
   `ConfidenceReview(status:ASSESSED|SKIPPED_NO_NUMERIC_CANDIDATES|TECHNICAL_ERROR,
   block_assessments)` với `BlockAssessment` có `importance/quality_state/review_action/
   canonical_fields/observed_text/reason/...`. `SKIPPED_NO_NUMERIC_CANDIDATES` **không**
   phải PASS. Model chỉ đánh giá readability; không thay text/thay value.
+- Adapter nối word confidence cấp trang của Mistral về block bằng offset và text
+  khớp chính xác; không bịa score khi thiếu. Quote qua các block liền nhau giữ
+  liên kết tới words của từng block trên đúng trang. Tiền critical phải có score
+  bao phủ token giá trị; score của nhãn/thuế suất không xác minh số tiền khác.
+  `SETTLEMENT_FORM` row `invoice_refs` chịu cùng guard critical như row amount.
 - Sửa schema: tối đa **một** repair call/root; sau đó giữ lỗi kỹ thuật + unresolved.
+  Refinement 16/10: quota chia sẻ trong `RunBudget` cho một read pass, có phản hồi
+  trước/diagnostic giới hạn kích thước; transport/provenance/số học không phải schema
+  repair. Không cắt nguồn hoặc tăng input/output cap để gọi sửa.
+- Refinement prompt 16/10: classification-v2, extraction-v3, confidence-review-v2,
+  suggestion-resolution-v2; hướng dẫn theo loại nằm trong `evidence/prompts.py`.
+  Confidence assessment phải khai đủ trường, bool/enum/ID/coverage được kiểm;
+  model NON_CRITICAL không được miễn giá trị critical đang UNCERTAIN/UNREADABLE.
+  Quote có offsets tin cậy chỉ bị ảnh hưởng bởi words chồng lên nó; thiếu offset
+  giữ fallback thận trọng. Chữ mờ ở block khác không làm mọi field hỏng.
+- `invoice_refs` là tuple/list mã nguồn; chuỗi chứa JSON array được decode có giới
+  hạn, từng phần tử vẫn phải được quote hỗ trợ, không duyệt chuỗi như từng ký tự.
+  Riêng `transaction_status`, code được phép đối chiếu enum chuẩn với toàn bộ nhãn
+  trạng thái tiếng Việt/Anh đã biết (sau bỏ label), giữ quote nguyên bản. Không
+  substring/fuzzy để biến "không thành công" hoặc "đang xử lý" thành COMPLETED.
+  Consumer ứng/hoàn cũng dùng whole-status recognition; trạng thái nguồn phủ định
+  hoặc chưa biết không được fallback substring thành hoàn tất.
+- Classification phải bao phủ mọi source/page đã OCR; thiếu range dùng chung
+  schema repair slot rồi giữ technical/unresolved nếu vẫn thiếu. Confidence thiếu,
+  không hữu hạn/ngoài [0,1] hoặc <0.5 giữ UNKNOWN với alternative, không chọn schema
+  đoán (ngưỡng kỹ thuật bảo thủ của implementation, không đo độ đúng dữ kiện tiền).
 - Cap X-Kiro: `MAX_LLM_INPUT_CHARS=120_000`, `MAX_OUTPUT_CHARS=20_000` (giới hạn
   pilot, không phải context window); ghi vào `RunManifest` (`max_llm_input_chars`,
   `max_llm_output_chars`, `limit_version`, `limit_origin`).
@@ -853,12 +878,22 @@ giữ và E0 pin; profile/critical-field matrix pin tại Hoangha revision `1ee3
   ngược lại amount 0.60 (≤1 VND) + semantic ≤0.30 + party 0.12/0.20 + non-original
   +0.10, cap 1.0; `<0.50` bỏ, `[0.50,0.75)` suggestion, `>=0.75` auto; tie theo thứ
   tự gắn nguồn.
-- `async resolve_evidence_suggestions(result, documents, *, llm, budget)` một batch khi
+- `async resolve_evidence_suggestions(result, documents, *, paper, llm, budget)` một batch khi
   có suggestion; model chỉ promote cặp có sẵn ở `>=0.90`, không tạo cặp mới.
+  Payload gồm structured row/document facts; confidence hữu hạn [0,1] và căn cứ
+  amount + định danh/dịch vụ. ISSUER/SERVICE vẫn là nhận định ngữ nghĩa của model,
+  không phải xác minh độc lập. Không ghi đè số chứng từ mâu thuẫn, chọn bừa giữa
+  nhiều candidate, hoặc vượt allocation/cardinality. Cặp cạnh tranh chưa có căn
+  cứ phân biệt tiếp tục unresolved.
 - Cardinality: một nguồn auto-link cho dòng khác mặc định chỉ suggestion; phân bổ
   nhiều dòng chỉ khi mỗi dòng lặp `invoice_ref` chuẩn hoá + amount, tổng ≤ giá trị
   chứng từ. Chứng từ hỗ trợ không tính là chứng từ gốc; `original_total` chỉ cộng
   chứng từ gốc/phần phân bổ gốc; amount thiếu giữ `None`.
+- Projection matching chung dựng lại links/rows/findings/unmatched/allocation sau
+  rule và promotion; tổng phần chứng từ gốc của một dòng không được nhân đôi số
+  kê khai. Admission nhận mapping hợp lệ đó, giữ raw allocation assertion để
+  không mất FACT khi link quá mức bị từ chối. Mapping không tự xác minh payer;
+  các điều kiện invoice binding/actual money/authority hiện hành vẫn độc lập.
 
 ### 12.5. ReadResult và consumer boundary
 
@@ -890,6 +925,10 @@ giữ và E0 pin; profile/critical-field matrix pin tại Hoangha revision `1ee3
   other-payer) do plan finance kế tiếp sở hữu.
 - Cache/artifact identity: `(tenant, root_id, source_id, source_digest, reader_config)`;
   `reader_config` gồm model/prompt/schema/profile/representation/requested-fields version.
+  Refinement 16/10: active report basis có reader_identity; report cũ thiếu identity
+  không được reuse như đọc bằng prompt mới. Direct settlement draft giữ identity
+  trước I/O và kiểm lại trước lưu, job kiểm trước publish. Không tự sửa quyết định
+  hoặc money của hồ sơ đã đóng khi nâng prompt.
   Artifact private dưới `uploads_dir.parent/"artifacts"`, cùng vòng đời nguồn, trần
   20 MiB/source, 40 MiB/root.
 - Worker: `async CaseWorkflow.run_evidence_job(job_id) -> None` →

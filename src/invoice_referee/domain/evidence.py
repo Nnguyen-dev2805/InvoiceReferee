@@ -111,6 +111,9 @@ class ReadResult(StrictModel):
     # --- §12 typed evidence report (all optional; STUB leaves them empty) ---
     provider_mode: str | None = None
     data_origin: str | None = None
+    # Additive metadata; legacy reports remain readable but are not a fresh
+    # provider read under another prompt/model identity.
+    reader_identity: str | None = None
     documents: tuple[DocumentAnalysis, ...] = ()
     links: tuple[EvidenceLink, ...] = ()
     row_matches: tuple[DocumentRowMatch, ...] = ()

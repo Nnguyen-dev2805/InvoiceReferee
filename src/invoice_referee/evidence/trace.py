@@ -43,6 +43,8 @@ class RunBudget:
     threshold: float = DEFAULT_THRESHOLD
     llm_attempts: int = 0
     ocr_attempts: int = 0
+    max_schema_repairs: int = 1
+    schema_repairs: int = 0
     started_at: float = field(default_factory=time.monotonic)
 
     def can_call_llm(self) -> bool:
@@ -53,6 +55,12 @@ class RunBudget:
 
     def charge_llm(self) -> None:
         self.llm_attempts += 1
+
+    def claim_schema_repair(self) -> bool:
+        if self.schema_repairs >= self.max_schema_repairs or not self.can_call_llm():
+            return False
+        self.schema_repairs += 1
+        return True
 
     def charge_ocr(self) -> None:
         self.ocr_attempts += 1

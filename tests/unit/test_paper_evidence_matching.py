@@ -22,7 +22,7 @@ SHA = "a" * 64
 
 
 def _ref(quote: str = "x") -> EvidenceRef:
-    return EvidenceRef(source_id="s", source_sha256=SHA, page=1, exact_quote=quote)
+    return EvidenceRef(source_id="source:1", source_sha256=SHA, page=1, exact_quote=quote)
 
 
 def _field(name: str, value: object, quote: str = "x") -> FieldCandidate:
@@ -93,6 +93,43 @@ def test_exact_number_preserves_hoangha_method() -> None:
     assert result.links[0].score == Decimal("1")
     assert result.links[0].method == "INVOICE_NUMBER_EXACT"
     assert result.links[0].status == "AUTO_LINK"
+
+
+def test_two_invoices_cannot_multiply_one_paper_row():
+    paper = _paper(rows=(("Chi phí", "100000", ("A", "B"), None),))
+    docs = (_invoice("D1", number="A", total="100000"), _invoice("D2", number="B", total="100000"))
+    result = match_paper_evidence(paper, docs)
+    assert not any(link.status == "AUTO_LINK" for link in result.links)
+    assert any(f.code == "SET_PAPER_AMOUNT_001" and f.status == "UNRESOLVED" for f in result.findings)
+
+
+def test_stored_link_needs_actual_provenance_and_its_method_basis():
+    from invoice_referee.evidence.matching import project_evidence_matches
+    from invoice_referee.domain.documents import EvidenceLink
+    paper = _paper(rows=(("Chi phí", "100000", (), None),))
+    doc = _invoice("D1", number="A", total="100000")
+    forged = _ref().model_copy(update={"source_sha256": "b"*64, "page": 99, "exact_quote": "Invented"})
+    for method, refs in [("LLM_RESOLVED", (forged,)), ("INVOICE_NUMBER_EXACT", ())]:
+        link = EvidenceLink(item_id="ITEM-001", document_id="D1", source_id=doc.source_id,
+            status="AUTO_LINK", method=method, score=Decimal("1"), explanation="forged", refs=refs)
+        projected = project_evidence_matches(paper, (doc,), (link,))
+        assert projected.rows[0].evidence_status == "NO_EVIDENCE"
+
+
+async def test_explicit_number_conflict_cannot_be_overridden_by_issuer():
+    from invoice_referee.evidence.matching import resolve_evidence_suggestions
+    from invoice_referee.evidence.trace import RunBudget
+    paper = _paper(rows=(("Đi lại", "100000", ("IR-A",), None),))
+    docs = (_invoice("D1", number="IR-B", issuer="Nhà cung cấp dịch vụ", total="100000"),)
+    class Llm:
+        async def complete_json(self, **kwargs):
+            return {"promotions": [{"item_id": "ITEM-001", "document_id": "D1", "confidence": 0.99,
+                "rationale": "Same issuer", "basis": [
+                  {"kind": "AMOUNT", "left_field": "row.amount", "right_field": "document.total_amount"},
+                  {"kind": "ISSUER", "left_field": "row.description", "right_field": "document.issuer_name"}]}]}
+    result = match_paper_evidence(paper, docs)
+    resolved = await resolve_evidence_suggestions(result, docs, paper=paper, llm=Llm(), budget=RunBudget())
+    assert not any(link.status == "AUTO_LINK" for link in resolved.links)
 
 
 def test_numeric_invoice_reference_matches_unique_series_prefixed_number() -> None:
@@ -246,11 +283,15 @@ async def test_suggestion_resolution_promotes_existing_pair_at_threshold() -> No
     from invoice_referee.evidence.matching import resolve_evidence_suggestions
     from invoice_referee.evidence.trace import RunBudget
 
-    # A weak-but-present suggestion pair; the LLM promotes only an existing pair.
-    paper = _paper(rows=(("Đi lại", "100000", (), None),))
-    docs = (_invoice("DOC-1", issuer="Nhà cung cấp dịch vụ", total="100000"),)
-    result = match_paper_evidence(paper, docs)
-    assert any(link.status == "SUGGEST_LINK" for link in result.links)
+    paper = _paper(rows=(("Dịch vụ B", "100000", (), None),))
+    document = _invoice("DOC-1", issuer="Nhà cung cấp A", total="100000", lines=("Dịch vụ B",))
+    document = document.model_copy(update={"profile_status": "CLEAR"})
+    result = match_paper_evidence(paper, (document,))
+    result = result.model_copy(update={"links": tuple(
+        link.model_copy(update={"status": "SUGGEST_LINK", "allocated_amount": None})
+        for link in result.links
+    )})
+    assert result.links and all(link.status == "SUGGEST_LINK" for link in result.links)
 
     class Llm:
         def __init__(self) -> None:
@@ -259,35 +300,178 @@ async def test_suggestion_resolution_promotes_existing_pair_at_threshold() -> No
         async def complete_json(self, *, system: str, user: str, budget: RunBudget) -> dict:
             self.calls += 1
             return {"promotions": [{"document_id": "DOC-1", "item_id": "ITEM-001",
-                                    "confidence": 0.95}]}
+                "confidence": 0.95, "rationale": "Source line matches claim", "basis": [
+                    {"kind": "AMOUNT", "left_field": "row.amount", "right_field": "document.total_amount"},
+                    {"kind": "SERVICE", "left_field": "row.description", "right_field": "document.line_items[*].description"}]}]}
 
     llm = Llm()
-    resolved = await resolve_evidence_suggestions(result, docs, llm=llm, budget=RunBudget())
+    resolved = await resolve_evidence_suggestions(result, (document,), paper=paper, llm=llm, budget=RunBudget())
     assert llm.calls == 1
-    promoted = [link for link in resolved.links if link.status == "AUTO_LINK"]
-    assert promoted and promoted[0].method == "LLM_RESOLVED"
+    assert resolved.links[0].status == "AUTO_LINK"
+    assert resolved.links[0].method == "LLM_RESOLVED"
+    assert resolved.links[0].allocated_amount == Decimal("100000")
+    assert resolved.rows[0].evidence_status == "ORIGINAL_EVIDENCE"
+    assert resolved.rows[0].original_total == Decimal("100000")
+    assert not any(f.code == "SET_PAPER_EVIDENCE_REQUIRED" for f in resolved.findings)
+
+
+async def test_resolver_does_not_promote_when_issuer_basis_contradicts_row():
+    from invoice_referee.evidence.matching import resolve_evidence_suggestions
+    from invoice_referee.evidence.trace import RunBudget
+    paper = _paper(rows=(("Nhà cung cấp khác", "100000", (), None),))
+    document = _invoice("DOC-1", issuer="Nhà cung cấp A", total="100000").model_copy(
+        update={"profile_status": "CLEAR"})
+    result = match_paper_evidence(paper, (document,))
+    result = result.model_copy(update={"links": tuple(
+        link.model_copy(update={"status": "SUGGEST_LINK", "allocated_amount": None})
+        for link in result.links
+    )})
+    class Llm:
+        async def complete_json(self, **kwargs):
+            return {"promotions": [{"item_id": "ITEM-001", "document_id": "DOC-1",
+                "confidence": 0.99, "rationale": "issuer matches", "basis": [
+                    {"kind": "AMOUNT", "left_field": "row.amount", "right_field": "document.total_amount"},
+                    {"kind": "ISSUER", "left_field": "row.description", "right_field": "document.issuer_name"}]}]}
+    resolved = await resolve_evidence_suggestions(result, (document,), paper=paper, llm=Llm(), budget=RunBudget())
+    assert resolved.links[0].status == "SUGGEST_LINK"
+
+
+async def test_resolver_does_not_promote_when_service_basis_contradicts_row():
+    from invoice_referee.evidence.matching import resolve_evidence_suggestions
+    from invoice_referee.evidence.trace import RunBudget
+    paper = _paper(rows=(("Dịch vụ A", "100000", (), None),))
+    document = _invoice("DOC-1", issuer="Nhà cung cấp", total="100000", lines=("Dịch vụ B",)).model_copy(
+        update={"profile_status": "CLEAR"})
+    result = match_paper_evidence(paper, (document,))
+    result = result.model_copy(update={"links": tuple(
+        link.model_copy(update={"status": "SUGGEST_LINK", "allocated_amount": None})
+        for link in result.links
+    )})
+    class Llm:
+        async def complete_json(self, **kwargs):
+            return {"promotions": [{"item_id": "ITEM-001", "document_id": "DOC-1",
+                "confidence": 0.99, "rationale": "service matches", "basis": [
+                    {"kind": "AMOUNT", "left_field": "row.amount", "right_field": "document.total_amount"},
+                    {"kind": "SERVICE", "left_field": "row.description", "right_field": "document.line_items[*].description"}]}]}
+    resolved = await resolve_evidence_suggestions(result, (document,), paper=paper, llm=Llm(), budget=RunBudget())
+    assert resolved.links[0].status == "SUGGEST_LINK"
+
+
+async def test_resolver_does_not_promote_amount_only_confidence():
+    from invoice_referee.evidence.matching import resolve_evidence_suggestions
+    from invoice_referee.evidence.trace import RunBudget
+    paper = _paper(rows=(("Dịch vụ B", "100000", (), None),))
+    document = _invoice("DOC-1", issuer="Nhà cung cấp A", total="100000", lines=("Dịch vụ B",)).model_copy(
+        update={"profile_status": "CLEAR"})
+    result = match_paper_evidence(paper, (document,))
+    result = result.model_copy(update={"links": tuple(
+        link.model_copy(update={"status": "SUGGEST_LINK", "allocated_amount": None})
+        for link in result.links
+    )})
+    class Llm:
+        async def complete_json(self, **kwargs):
+            return {"promotions": [{"item_id": "ITEM-001", "document_id": "DOC-1",
+                "confidence": 0.99, "rationale": "amount matches", "basis": [
+                    {"kind": "AMOUNT", "left_field": "row.amount", "right_field": "document.total_amount"}]}]}
+    resolved = await resolve_evidence_suggestions(result, (document,), paper=paper, llm=Llm(), budget=RunBudget())
+    assert resolved.links[0].status == "SUGGEST_LINK"
+
+
+async def test_resolver_handles_existing_single_candidate_gray_suggestion():
+    from invoice_referee.evidence.matching import resolve_evidence_suggestions
+    from invoice_referee.evidence.trace import RunBudget
+    paper = _paper(rows=(("Dịch vụ B", "100000", (), None),))
+    document = _invoice("DOC-1", issuer="Nhà cung cấp A", total="100000", lines=("Dịch vụ B",)).model_copy(
+        update={"profile_status": "CLEAR"})
+    result = match_paper_evidence(paper, (document,))
+    result = result.model_copy(update={"links": tuple(
+        link.model_copy(update={"status": "SUGGEST_LINK", "allocated_amount": None})
+        for link in result.links
+    )})
+    class Llm:
+        async def complete_json(self, **kwargs):
+            return {"promotions": [{"item_id": "ITEM-001", "document_id": "DOC-1",
+                "confidence": 0.99, "rationale": "source service matches", "basis": [
+                    {"kind": "AMOUNT", "left_field": "row.amount", "right_field": "document.total_amount"},
+                    {"kind": "SERVICE", "left_field": "row.description", "right_field": "document.line_items[*].description"}]}]}
+    resolved = await resolve_evidence_suggestions(result, (document,), paper=paper, llm=Llm(), budget=RunBudget())
+    assert resolved.links[0].status == "AUTO_LINK"
+    assert resolved.links[0].method == "LLM_RESOLVED"
+    assert resolved.links[0].allocated_amount == Decimal("100000")
+    assert resolved.rows[0].evidence_status == "ORIGINAL_EVIDENCE"
+    assert resolved.rows[0].original_total == Decimal("100000")
+    assert not any(f.code == "SET_PAPER_EVIDENCE_REQUIRED" for f in resolved.findings)
+
+
+async def test_resolver_retains_competing_candidates_as_suggestions():
+    from invoice_referee.evidence.matching import resolve_evidence_suggestions
+    from invoice_referee.evidence.trace import RunBudget
+    paper = _paper(rows=(("Dịch vụ B", "100000", (), None),))
+    first = _invoice("DOC-1", issuer="Nhà cung cấp A", total="100000", lines=("Dịch vụ B",)).model_copy(
+        update={"profile_status": "CLEAR"})
+    second = _invoice("DOC-2", issuer="Nhà cung cấp C", total="100000", lines=("Dịch vụ B",)).model_copy(
+        update={"profile_status": "CLEAR"})
+    result = match_paper_evidence(paper, (first, second))
+    result = result.model_copy(update={"links": tuple(
+        link.model_copy(update={"status": "SUGGEST_LINK", "allocated_amount": None})
+        for link in result.links
+    )})
+    class Llm:
+        async def complete_json(self, **kwargs):
+            return {"promotions": [{"item_id": "ITEM-001", "document_id": "DOC-1",
+                "confidence": 0.99, "rationale": "same service", "basis": [
+                    {"kind": "AMOUNT", "left_field": "row.amount", "right_field": "document.total_amount"},
+                    {"kind": "SERVICE", "left_field": "row.description", "right_field": "document.line_items[*].description"}]}]}
+    resolved = await resolve_evidence_suggestions(result, (first, second), paper=paper, llm=Llm(), budget=RunBudget())
+    assert all(link.status == "SUGGEST_LINK" for link in resolved.links)
+
+
+async def test_high_confidence_without_facts_cannot_promote():
+    from invoice_referee.evidence.matching import resolve_evidence_suggestions
+    from invoice_referee.evidence.trace import RunBudget
+    paper = _paper(rows=(("Dịch vụ B", "100000", (), None),))
+    document = _invoice("DOC-1", issuer="Nhà cung cấp A", total="100000", lines=("Dịch vụ B",)).model_copy(
+        update={"profile_status": "CLEAR"})
+    result = match_paper_evidence(paper, (document,))
+    result = result.model_copy(update={"links": tuple(
+        link.model_copy(update={"status": "SUGGEST_LINK", "allocated_amount": None})
+        for link in result.links
+    )})
+    class Llm:
+        async def complete_json(self, **kwargs):
+            return {"promotions": [{"item_id": "ITEM-001", "document_id": "DOC-1", "confidence": 0.99}]}
+    resolved = await resolve_evidence_suggestions(result, (document,), paper=paper, llm=Llm(), budget=RunBudget())
+    assert not any(link.status == "AUTO_LINK" for link in resolved.links)
+
+
+async def test_promoted_link_rebuilds_row_and_allocation():
+    await test_resolver_handles_existing_single_candidate_gray_suggestion()
 
 
 async def test_suggestion_resolution_cannot_create_a_new_pair() -> None:
     from invoice_referee.evidence.matching import resolve_evidence_suggestions
     from invoice_referee.evidence.trace import RunBudget
 
-    paper = _paper(rows=(("Đi lại", "100000", (), None),))
-    docs = (_invoice("DOC-1", issuer="Nhà cung cấp dịch vụ", total="100000"),)
-    result = match_paper_evidence(paper, docs)
+    paper = _paper(rows=(("Dịch vụ B", "100000", (), None),))
+    document = _invoice("DOC-1", issuer="Nhà cung cấp A", total="100000", lines=("Dịch vụ B",)).model_copy(
+        update={"profile_status": "CLEAR"})
+    result = match_paper_evidence(paper, (document,))
+    result = result.model_copy(update={"links": tuple(
+        link.model_copy(update={"status": "SUGGEST_LINK", "allocated_amount": None}) for link in result.links
+    )})
 
     class Llm:
         async def complete_json(self, *, system: str, user: str, budget: RunBudget) -> dict:
-            # Names a pair that was never suggested.
             return {"promotions": [{"document_id": "DOC-NOPE", "item_id": "ITEM-001",
-                                    "confidence": 0.99}]}
+                "confidence": 0.99, "rationale": "not an allowed pair", "basis": [
+                    {"kind": "AMOUNT", "left_field": "row.amount", "right_field": "document.total_amount"},
+                    {"kind": "SERVICE", "left_field": "row.description", "right_field": "document.line_items[*].description"}]}]}
 
-    resolved = await resolve_evidence_suggestions(result, docs, llm=Llm(), budget=RunBudget())
+    resolved = await resolve_evidence_suggestions(result, (document,), paper=paper, llm=Llm(), budget=RunBudget())
     assert resolved.links == result.links
 
 
 def test_first_explicit_allocation_cannot_exceed_source_total() -> None:
-    # A row claiming 600 against a 500 invoice must not auto-link.
     paper = _paper(rows=(("Dòng 1", "600000", ("HQ1",), None),))
     docs = (_invoice("DOC-1", number="HQ1", total="500000"),)
     result = match_paper_evidence(paper, docs)
@@ -295,10 +479,14 @@ def test_first_explicit_allocation_cannot_exceed_source_total() -> None:
     assert result.findings
 
 
+def test_party_identity_similarity_does_not_treat_generic_supplier_terms_as_identity():
+    from invoice_referee.evidence.matching import _party_identity_similarity
+    assert _party_identity_similarity("Nhà cung cấp khác", "Nhà cung cấp A") == 0
+    assert _party_identity_similarity("Công ty Minh Phát", "Minh Phát") == 1
+
+
 def test_unmatched_ids_are_source_ids_not_document_ids() -> None:
-    # An unrelated amount/description -> score < 0.50 -> genuinely unmatched.
     paper = _paper(rows=(("Dòng 1", "100000", (), None),))
     docs = (_invoice("DOC-1", issuer="Nhà cung cấp khác", total="999999"),)
     result = match_paper_evidence(paper, docs)
-    # The DTO field is unmatched_source_ids; the values must be source ids.
     assert result.unmatched_source_ids == ("source:1",)

@@ -73,7 +73,7 @@ async def test_actual_xkiro_repair_calls_emit_llm_spans_without_prompt_or_privat
     assert transport.calls == budget.llm_attempts == 2
     assert [run["inputs"]["attempt_index"] for run in runs] == [1, 2]
     assert [run["inputs"]["attempt_kind"] for run in runs] == ["primary", "repair"]
-    assert all(run["inputs"]["prompt_version"] == "document-extraction-v2" for run in runs)
+    assert all(run["inputs"]["prompt_version"] == "document-extraction-v3" for run in runs)
     assert all(run["inputs"]["schema_version"] == "document-fields-and-line-items-json-v1" for run in runs)
     assert all(run["inputs"]["system_sha256"] and run["inputs"]["user_sha256"] for run in runs)
     assert all("PRIVATE_PERSON" not in str(run["inputs"]) for run in runs)

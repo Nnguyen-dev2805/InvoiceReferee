@@ -1,5 +1,32 @@
 # Implementation checkpoint
 
+## Evidence prompt hardening — implemented; release gate partial, 16/10/2026
+
+Implemented shared schema repair1/readpass, strict contextual confidence,
+per-type prompts, source/page/unit/alternative validation, source-backed resolver
+and matching projection/admission, and reader identity/reuse/return refresh.
+Closed resume regressions: duplicate telemetry definitions; Mistral page-word
+confidence not bound to blocks; multi-block quotes; negated completed statuses;
+label/rate score used in place of money token; omitted classification pages.
+Policy/authority/S formula unchanged; dataset and user DB unchanged.
+
+Final frozen app source digest
+`66f163c12aaa9e2b59b6f7b4e133221509c5729895a0c2919d520613cc6cda83`.
+Full pytest842passed/5baseline-reproduced date-fixture failures; frontend46passed,
+2skipped/buildpass. Independent reviewer limited recheck closed its named blockers.
+Eight isolated LIVE development cases: TC01COLLECT760000, TC02PAY400000,
+TC05/06/11/15/22 block correctly; TC03WAITING because TRAVELpaper lacks tripcontext.
+Fresh UI TC01 upload→draft→submit→return760000→accountant→SETTLED/R760000/S0,
+one return event; UI TC06FACT60000/noinstruction; new private synthetic transfer
+andcash proofs each confirmedallocated4m. Original advance sample constraints
+remain disclosed; no source/gold edited to force PASS.
+
+P1–P6 core implemented. Whole-plan release not marked PASS: TC03balanced target
+needs a separate data/scope disposition; legacy date fixtures remain red. Latest
+acceptance, exact commands/artifacts, intermediate failures and limits are in the
+[acceptance report](reviews/2026-10-16-evidence-prompt-hardening-acceptance.md).
+No commit/push/deploy/reset.
+
 ## TC01–TC25 demo context pack — 16/10/2026
 
 Default catalog now contains exactly25 cases and no legacy travel activities,

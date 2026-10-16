@@ -9,6 +9,30 @@ a silent empty success.
 
 from __future__ import annotations
 
+
+def test_page_word_scores_bind_to_their_own_block_offsets():
+    from invoice_referee.evidence.mistral import _parse_blocks
+    page = {"markdown": "Tiêu đề\nTổng: 120.000", "blocks": [
+        {"content": "Tiêu đề", "type": "text"}, {"content": "Tổng: 120.000", "type": "text"}],
+        "confidence_scores": {"word_confidence_scores": [
+            {"text": "Tiêu đề", "start_index": 0, "confidence": 0.97},
+            {"text": "Tổng:", "start_index": 8, "confidence": 0.99},
+            {"text": " 120.000", "start_index": 13, "confidence": 0.4}]}}
+    blocks = _parse_blocks(page)
+    assert [w.text for w in blocks[1].words] == ["Tổng:", " 120.000"]
+    assert blocks[1].words[1].confidence == 0.4
+    assert blocks[1].words[1].block_start == 5
+    assert blocks[1].words[1].block_end == 13
+    assert all(w.text != "Tiêu đề" for w in blocks[1].words)
+
+
+def test_page_score_with_mismatching_offset_is_not_assigned():
+    from invoice_referee.evidence.mistral import _parse_blocks
+    blocks = _parse_blocks({"markdown": "Tổng: 120.000", "blocks": [{"content": "Tổng: 120.000"}],
+        "confidence_scores": {"word_confidence_scores": [
+            {"text": "999.000", "start_index": 6, "confidence": 0.99}]}})
+    assert blocks[0].words == ()
+
 import json
 from pathlib import Path
 

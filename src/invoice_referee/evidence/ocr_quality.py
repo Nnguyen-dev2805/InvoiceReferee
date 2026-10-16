@@ -102,6 +102,7 @@ async def review_ocr_quality(
     *,
     llm: object,
     budget: RunBudget,
+    sources: tuple[OcrSourceResult, ...] = (),
 ) -> ConfidenceReview:
     """One batched review of the low-confidence candidates (plan E3).
 
@@ -113,71 +114,87 @@ async def review_ocr_quality(
         return ConfidenceReview(status="SKIPPED_NO_NUMERIC_CANDIDATES", block_assessments=())
 
     expected = {candidate.candidate_id for candidate in candidates}
-    system = (
-        "You judge OCR readability only. For each candidate, return one "
-        "assessment with the same candidate_id. Never replace the OCR text or "
-        "supply a field value. Reply as JSON: {\"assessments\": [...]}."
-    )
-    user = _serialize_candidates(candidates)
-    try:
-        from invoice_referee.evidence.telemetry import llm_trace_context
+    from invoice_referee.evidence.prompts import OCR_CONFIDENCE_SYSTEM_PROMPT, CONFIDENCE_VERSION
+    from invoice_referee.evidence.structured_output import complete_structured
+    from invoice_referee.evidence.xkiro import XkiroSchemaError
 
-        with llm_trace_context(
-            stage="confidence-review",
-            prompt_version="ocr-confidence-review-v1",
-            schema_version="ocr-block-assessment-json-v1",
-        ):
-            payload = await llm.complete_json(system=system, user=user, budget=budget)  # type: ignore[attr-defined]
+    def validate(payload: dict) -> ConfidenceReview:
+        raw = payload.get("assessments")
+        if not isinstance(raw, list):
+            raise XkiroSchemaError("assessments must be an array")
+        seen = set()
+        assessments = []
+        required = {"candidate_id", "importance", "quality_state", "review_action",
+                    "requires_verification", "canonical_fields", "reason"}
+        for item in raw:
+            if not isinstance(item, dict) or not required <= item.keys():
+                raise XkiroSchemaError("assessment missing required fields")
+            candidate_id = item["candidate_id"]
+            if not isinstance(candidate_id, str) or candidate_id not in expected or candidate_id in seen:
+                raise XkiroSchemaError("assessment candidate_id missing, duplicate or unexpected")
+            if type(item["requires_verification"]) is not bool:
+                raise XkiroSchemaError("requires_verification must be a boolean")
+            if not isinstance(item["canonical_fields"], list) or not all(isinstance(f, str) for f in item["canonical_fields"]):
+                raise XkiroSchemaError("canonical_fields must be a string array")
+            if not isinstance(item["reason"], str) or not item["reason"].strip():
+                raise XkiroSchemaError("assessment reason is required")
+            verification = item["requires_verification"]
+            if not all(isinstance(item[key], str) for key in ("importance", "quality_state", "review_action")):
+                raise XkiroSchemaError("assessment enums must be strings")
+            if item["review_action"] != ("ASK_HUMAN" if verification else "CONTINUE"):
+                raise XkiroSchemaError("review_action disagrees with requires_verification")
+            if item["quality_state"] in {"UNKNOWN", "UNCERTAIN", "UNREADABLE"} and not verification and item["importance"] != "NON_CRITICAL":
+                raise XkiroSchemaError("uncertain accounting value requires verification")
+            try:
+                assessments.append(BlockAssessment(**{**item, "canonical_fields": tuple(item["canonical_fields"])}))
+            except Exception as error:
+                raise XkiroSchemaError(f"invalid assessment: {error}") from error
+            seen.add(candidate_id)
+        if seen != expected:
+            raise XkiroSchemaError("assessments must cover all candidates exactly once")
+        return ConfidenceReview(status="ASSESSED", block_assessments=tuple(assessments))
+
+    try:
+        return await complete_structured(llm, system=OCR_CONFIDENCE_SYSTEM_PROMPT,
+            user=_serialize_candidates(candidates, sources), budget=budget, validate=validate,
+            stage="confidence-review", prompt_version=CONFIDENCE_VERSION,
+            schema_version="ocr-block-assessment-json-v2")
     except XkiroError:
         return ConfidenceReview(status="TECHNICAL_ERROR", block_assessments=())
 
-    raw = payload.get("assessments")
-    if not isinstance(raw, list):
-        return ConfidenceReview(status="TECHNICAL_ERROR", block_assessments=())
 
-    seen: set[str] = set()
-    assessments: list[BlockAssessment] = []
-    for item in raw:
-        if not isinstance(item, dict):
-            return ConfidenceReview(status="TECHNICAL_ERROR", block_assessments=())
-        candidate_id = str(item.get("candidate_id") or "")
-        if candidate_id not in expected or candidate_id in seen:
-            return ConfidenceReview(status="TECHNICAL_ERROR", block_assessments=())
-        seen.add(candidate_id)
-        try:
-            assessments.append(
-                BlockAssessment(
-                    candidate_id=candidate_id,
-                    importance=item.get("importance", "UNKNOWN"),
-                    quality_state=item.get("quality_state", "UNKNOWN"),
-                    review_action=item.get("review_action", "ASK_HUMAN"),
-                    canonical_fields=tuple(item.get("canonical_fields") or ()),
-                    observed_text=item.get("observed_text"),
-                    reason=str(item.get("reason") or ""),
-                    human_question=item.get("human_question"),
-                    requires_verification=item.get("requires_verification"),
-                )
-            )
-        except Exception:
-            return ConfidenceReview(status="TECHNICAL_ERROR", block_assessments=())
-    if seen != expected:
-        return ConfidenceReview(status="TECHNICAL_ERROR", block_assessments=())
-    return ConfidenceReview(status="ASSESSED", block_assessments=tuple(assessments))
-
-
-def _serialize_candidates(candidates: tuple[ConfidenceCandidate, ...]) -> str:
+def _serialize_candidates(candidates: tuple[ConfidenceCandidate, ...], sources: tuple[OcrSourceResult, ...] = ()) -> str:
     import json
+
+    def neighbors(candidate):
+        for source in sources:
+            if source.source_id != candidate.source_id:
+                continue
+            for page in source.pages:
+                if page.page != candidate.page:
+                    continue
+                for index, block in enumerate(page.blocks):
+                    if block.id == candidate.block_id:
+                        return {"previous_block": page.blocks[index - 1].content if index else None,
+                                "next_block": page.blocks[index + 1].content if index + 1 < len(page.blocks) else None}
+        return {"previous_block": None, "next_block": None}
 
     return json.dumps(
         {
+            "sources": [{"source_id": src.source_id,
+                         "pages": [{"page": page.page, "markdown": page.markdown} for page in src.pages]}
+                        for src in sources if any(c.source_id == src.source_id for c in candidates)],
+            "context_limited": not bool(sources),
             "candidates": [
                 {
                     "candidate_id": candidate.candidate_id,
+                    "source_id": candidate.source_id,
                     "page": candidate.page,
                     "block_id": candidate.block_id,
                     "content": candidate.content,
+                    **neighbors(candidate),
                     "low_words": [
-                        {"text": word.text, "confidence": word.confidence}
+                        {"text": word.text, "confidence": word.confidence, "block_start": word.block_start, "block_end": word.block_end}
                         for word in candidate.low_words
                     ],
                 }

@@ -7,6 +7,8 @@ call. A provider failure surfaces as an error, never a fabricated draft.
 
 from __future__ import annotations
 
+from tests.factories import clear_ocr_page
+
 import json
 from pathlib import Path
 
@@ -53,7 +55,7 @@ class _CountingReader:
             markdown = "HÓA ĐƠN GIÁ TRỊ GIA TĂNG\nSố: 00000101\nMINH PHÁT\nNgày 10/10/2026\nTổng cộng thanh toán 3.240.000"
         return OcrSourceResult(
             source_id=source.id, source_digest=source.digest, provider="fake", model="fake",
-            pages=(OcrPage(page=1, markdown=markdown),),
+            pages=(clear_ocr_page(markdown=markdown),),
         )
 
 
@@ -153,6 +155,41 @@ async def test_draft_uses_ocr_pipeline(tmp_path: Path) -> None:
     assert draft["declared_advance"] == 4_000_000
     assert draft["expenses"][0]["invoice_no"] == "00000101"
     assert draft["destination"] is None  # no invented Hà Nội trip
+
+
+async def test_model_change_invalidates_same_source_report(tmp_path: Path):
+    reader = _CountingReader()
+    wf = _workflow(tmp_path, reader)
+    root = await _case_with_sources(wf)
+    session = wf.start_session(tenant=TENANT, persona="employee", actor_id=ACTOR)
+    await wf.read_settlement_draft(session, root, (
+        ("report_hoan_ung.pdf", "PDF", PDF + b"report_hoan_ung.pdf"),
+        ("hoa_don_dien_tu.pdf", "PDF", PDF + b"hoa_don_dien_tu.pdf")))
+    with wf.db.transaction() as cx:
+        assert wf._reusable_report(cx, TENANT, root) is not None
+    wf._evidence_classifier.model = "different-model"
+    with wf.db.transaction() as cx:
+        assert wf._reusable_report(cx, TENANT, root) is None
+
+
+async def test_direct_read_cannot_be_stamped_with_model_changed_during_io(tmp_path):
+    reader = _CountingReader()
+    wf = _workflow(tmp_path, reader)
+    root = await _case_with_sources(wf)
+    session = wf.start_session(tenant=TENANT, persona="employee", actor_id=ACTOR)
+    old_read = reader.read_source
+    async def changing_read(*args, **kwargs):
+        wf._evidence_classifier.model = "changed-during-provider-io"
+        return await old_read(*args, **kwargs)
+    reader.read_source = changing_read
+    try:
+        await wf.read_settlement_draft(session, root, (
+            ("report_hoan_ung.pdf", "PDF", PDF + b"report_hoan_ung.pdf"),
+            ("hoa_don_dien_tu.pdf", "PDF", PDF + b"hoa_don_dien_tu.pdf")))
+    except Exception:
+        pass
+    with wf.db.transaction() as cx:
+        assert wf._reusable_report(cx, TENANT, root) is None
 
 
 async def test_submit_reuses_the_draft_report_without_second_ocr(tmp_path: Path) -> None:

@@ -8,6 +8,8 @@ travel paper is a FACT, never invented data.
 
 from __future__ import annotations
 
+from tests.factories import clear_ocr_page
+
 from invoice_referee.domain.documents import DocumentAnalysis, DocumentLine, FieldCandidate
 from invoice_referee.domain.common import EvidenceRef
 from invoice_referee.evidence.document_validity import validate_document
@@ -28,7 +30,7 @@ def _found(name: str, value: object, quote: str = "x") -> FieldCandidate:
 def _ocr(markdown: str) -> OcrSourceResult:
     return OcrSourceResult(
         source_id="s", source_digest=SHA, provider="fake", model="fake",
-        pages=(OcrPage(page=1, markdown=markdown),),
+        pages=(clear_ocr_page(markdown=markdown),),
     )
 
 
