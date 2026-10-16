@@ -1,0 +1,20 @@
+{
+  "stages": {
+    "ban-dau": {
+      "route": "AUTO",
+      "expected_amounts": {},
+      "owner": null,
+      "question_required": false,
+      "money_source_digests": [
+        "1971e2313142439968ebfd43ea974cf716e7dfb473954cc68dac2a4fb9513927"
+      ],
+      "expected_money": {
+        "E": 2160000,
+        "A": 2160000,
+        "P": 0,
+        "R": 0,
+        "S": 0
+      }
+    }
+  }
+}

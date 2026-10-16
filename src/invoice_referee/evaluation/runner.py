@@ -20,7 +20,33 @@ from invoice_referee.evaluation.scorer import (
 from invoice_referee.evaluation.reports import SuiteReport
 
 
-def actual_from_view(view, packet: PacketInput, *, mode: str, elapsed_ms: float) -> ActualResult:
+def _instruction_authority_valid(inst, view, packet):
+    """Resolve actual issuance IDs against the visible organization snapshot."""
+    from datetime import datetime
+    refs=tuple(getattr(inst,"authority_refs",()))
+    if not refs:return False
+    action={"PAY":"ISSUE_PAYMENT","COLLECT":"ISSUE_COLLECTION"}.get(inst.direction)
+    import json
+    from invoice_referee.domain.policy import Grant
+    grants={}
+    for raw in packet.organization.grants:
+        try:
+            grant=Grant.model_validate_json(json.dumps(raw)) if isinstance(raw,dict) else raw
+            grants[grant.id]=grant
+        except (ValueError,TypeError):continue
+    now=datetime.fromisoformat(packet.organization.financial_as_of or "2026-10-16T12:00:00+07:00")
+    for identifier in refs:
+        grant=grants.get(identifier)
+        if grant is None or grant.actor!="system:referee" or action not in grant.actions or grant.scope not in (getattr(view,"activity",None),packet.organization.tenant) or inst.amount>grant.max_amount:
+            return False
+        if grant.allowed_profiles and packet.profile not in grant.allowed_profiles:return False
+        start=grant.effective_from if isinstance(grant.effective_from,datetime) else datetime.fromisoformat(grant.effective_from)
+        end=grant.effective_to if isinstance(grant.effective_to,datetime) or grant.effective_to is None else datetime.fromisoformat(grant.effective_to)
+        if now<start or (end is not None and now>end):return False
+    return True
+
+
+def actual_from_view(view, packet: PacketInput, *, mode: str, elapsed_ms: float, source_documents: dict | None = None) -> ActualResult:
     """Read what the app actually persisted into an ActualResult (contracts §9).
 
     `refs_ok` reflects whether the issue/instruction actually carries evidence
@@ -31,21 +57,32 @@ def actual_from_view(view, packet: PacketInput, *, mode: str, elapsed_ms: float)
         ActualInstruction(
             direction=inst.direction,
             amount=inst.amount,
-            owner=None,
-            refs_ok=bool(inst.authority_refs) or bool(getattr(inst, "refs", ())),
+            owner=getattr(inst, "owner", None) or getattr(view, "employee", None),
+            refs_ok=_instruction_authority_valid(inst,view,packet),
+            authority_refs=tuple(getattr(inst,"authority_refs",())),
         )
         for inst in view.instructions
     )
     issues = tuple(
-        ActualIssue(kind=issue.kind, owner=issue.owner, refs_ok=bool(issue.refs))
+        ActualIssue(
+            kind=issue.kind,
+            owner=issue.owner,
+            field_or_rule=getattr(issue, "field_or_rule", None),
+            question=getattr(issue, "question", None),
+            basis=getattr(issue, "basis", None),
+            refs_ok=bool(issue.refs),
+            refs=tuple(issue.refs),
+            depends_on=tuple(getattr(issue, "depends_on", ())),
+        )
         for issue in view.issues
     )
-    technical = view.state == "TECHNICAL_ERROR"
+    technical = view.state in ("TECHNICAL_ERROR", "PROCESSING", "EVIDENCE_READY") or getattr(view,"assessment_ready",True) is False or any(getattr(p,"kind",None) in ("TECHNICAL","LIMIT") for p in getattr(view,"problems",()))
     # A false affirmative is a BALANCED conclusion reached without coverage:
     # the projection's A/P/R must be KNOWN (established by coverage), not
     # merely "no instruction issued". A legitimate S=0 with coverage is fine.
     money = view.actual_money
     money_states = {
+        "E": money.E.state,
         "A": money.A.state,
         "P": money.P.state,
         "R": money.R.state,
@@ -55,7 +92,7 @@ def actual_from_view(view, packet: PacketInput, *, mode: str, elapsed_ms: float)
         view.conclusion is not None
         and view.conclusion.status == "BALANCED"
         and not view.instructions
-        and (money.A.state != "KNOWN" or money.P.state != "KNOWN")
+        and any(getattr(money,k).state != "KNOWN" for k in ("E","A","P","R","S"))
     )
     return ActualResult(
         root_id=packet.root_id,
@@ -68,6 +105,11 @@ def actual_from_view(view, packet: PacketInput, *, mode: str, elapsed_ms: float)
         technical_error=technical,
         elapsed_ms=elapsed_ms,
         money_states=money_states,
+        unsupported=any(getattr(problem,"kind",None)=="UNSUPPORTED" for problem in getattr(view,"problems",())),
+        money_values={axis: getattr(money,axis).value for axis in ("E","A","P","R","S")},
+        pending_execution=any(i.execution_state in ("OPEN","UNKNOWN") for i in view.instructions),
+        source_documents=source_documents or {},
+        money_refs=tuple(ref for basis in getattr(view,"payment_basis",()) for ref in basis.refs),
     )
 
 

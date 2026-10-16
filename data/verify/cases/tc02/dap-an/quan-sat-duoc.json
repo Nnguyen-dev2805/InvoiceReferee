@@ -1,0 +1,13 @@
+{
+  "stages": {
+    "ban-dau": {
+      "facts": {
+        "incurred": 5400000,
+        "paid_employee": 5400000,
+        "advance": 5000000,
+        "coverage": 1,
+        "buyer_tax_code": "0319999996"
+      }
+    }
+  }
+}

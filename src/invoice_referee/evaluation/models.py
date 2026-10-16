@@ -96,6 +96,17 @@ class ObservableGold(StrictModel):
     facts: dict[str, str | int] = {}
 
 
+class ExpectedIssue(StrictModel):
+    """Literal per-stage oracle; values/quotes are authored independently."""
+    kind: Literal["FACT", "POLICY", "AUTHORITY"]
+    owner: str
+    field_or_rule: str
+    question_values: tuple[str, ...] = ()
+    source_digests: tuple[str, ...] = ()
+    required_quotes: tuple[str, ...] = ()
+    depends_on: tuple[str, ...] = ()
+
+
 class AllowedGold(StrictModel):
     """The acceptable outcome(s): route, amounts, owner, question."""
 
@@ -103,6 +114,9 @@ class AllowedGold(StrictModel):
     expected_amounts: dict[str, int] = {}
     owner: str | None = None
     question_required: bool = False
+    expected_issues: tuple[ExpectedIssue, ...] = ()
+    money_source_digests: tuple[str, ...] = ()
+    expected_money: dict[str, int] = {}
 
 
 class GoldPacket(StrictModel):

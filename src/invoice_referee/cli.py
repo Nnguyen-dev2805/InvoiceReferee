@@ -98,106 +98,59 @@ def _run_evaluate(argv: list[str]) -> int:
     import asyncio
     import json
 
-    from invoice_referee.evaluation.packets import load_gold, load_input
-    from invoice_referee.evaluation.reports import write_report
-    from invoice_referee.evaluation.runner import EvaluationRunner
-    from invoice_referee.evaluation.scorer import IndependentScorer
-    from invoice_referee.evaluation.suites import select_suite
-    from invoice_referee.workflow.db import Database
-    from invoice_referee.workflow.service import CaseWorkflow
+    from invoice_referee.evaluation.service import run_isolated_verify
 
     parser = argparse.ArgumentParser(prog="invoice-referee evaluate")
-    parser.add_argument("--suite", required=True, choices=("core", "escalation", "development"))
-    parser.add_argument("--mode", choices=("stub", "replay", "live"), default="stub")
-    parser.add_argument("--dataset", default=str(PROJECT_ROOT / "data" / "kiem-thu"))
-    parser.add_argument("--output", required=True)
+    parser.add_argument("--suite", choices=("core", "escalation", "development"), default="core")
+    parser.add_argument(
+        "--mode",
+        choices=("stub", "replay", "recorded_replay", "live"),
+        default="replay",
+    )
+    parser.add_argument(
+        "--dataset",
+        default=None,
+        help="Dataset directory (defaults to data/verify for benchmark, or data/kiem-thu for legacy)",
+    )
+    parser.add_argument("--output", default=None)
     args = parser.parse_args(argv)
 
-    mode = args.mode.upper()
+    mode_map = {
+        "stub": "STUB",
+        "replay": "RECORDED_REPLAY",
+        "recorded_replay": "RECORDED_REPLAY",
+        "live": "LIVE",
+    }
+    mode = mode_map.get(args.mode.lower(), "RECORDED_REPLAY")
     settings = Settings()
     if mode == "LIVE" and settings.missing_for_live():
         print("evaluate LIVE thiếu cấu hình: " + ", ".join(settings.missing_for_live()), file=sys.stderr)
         return 2
 
-    dataset = Path(args.dataset)
-    packets = select_suite(args.suite, dataset)
-    if not packets:
-        print(f"không có packet cho suite {args.suite} trong {dataset}", file=sys.stderr)
-        return 2
+    data_dir = Path(args.dataset) if args.dataset else None
+    result = asyncio.run(
+        run_isolated_verify(
+            suite=args.suite,
+            mode=mode,
+            data_dir=data_dir,
+            settings=settings,
+        )
+    )
 
-    async def _run() -> dict:
-        output_dir = Path(args.output)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        db = Database(output_dir / "evaluate.sqlite")
-        db.migrate()
-        workflow = CaseWorkflow(db, uploads_dir=output_dir / "uploads")
-        context_path = PROJECT_ROOT / "data" / "demo" / "company-context.json"
-        workflow.import_demo_context(context_path, origin="SIMULATED")
-        transcriber = None
-        if mode == "LIVE":
-            # A LIVE evaluation reads the packet sources through the real
-            # reader; a missing read stays unresolved, never a STUB fallback.
-            from invoice_referee.evidence.live_reader import MistralPageReader
-            from invoice_referee.evidence.pipeline import transcribe_root
-            from invoice_referee.evidence.trace import RunBudget
+    if args.output:
+        output = Path(args.output)
+        output.mkdir(parents=True, exist_ok=True)
+        path = output / f"{args.suite}-{mode.lower()}-report.json"
+        path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"evaluate report written: {path} (union={result['union_dangerous_miss']}, release={result['release']})")
+    else:
+        print(
+            f"evaluate suite={result['suite']} mode={result['mode']} "
+            f"passed={result['passed']}/{result['planned']} "
+            f"release={result['release']} status={result.get('status', 'UNKNOWN')} union={result['union_dangerous_miss']}"
+        )
 
-            uploads_dir = output_dir / "uploads"
-
-            async def transcriber(*, sources, budget=None, provider_mode="LIVE"):
-                return await transcribe_root(
-                    reader=MistralPageReader(
-                        uploads_dir=uploads_dir, settings=settings, budget=budget or RunBudget()
-                    ),
-                    sources=sources,
-                    budget=budget or RunBudget(),
-                    provider_mode=provider_mode,
-                )
-
-        runner = EvaluationRunner(workflow=workflow, transcriber=transcriber)
-        scorer = IndependentScorer()
-        rows = []
-        actuals = []
-        for packet_dir in packets:
-            from invoice_referee.evaluation.packets import bind_sources
-
-            packet_input = load_input(packet_dir, stage_id="ban-dau")
-            if mode == "STUB":
-                # The STUB reader assesses the case's own hand-transcription
-                # (reader-only; never part of load_input).
-                from invoice_referee.evaluation.packets import load_stub_readings
-
-                packet_input = packet_input.model_copy(
-                    update={"transcription": load_stub_readings(packet_dir, stage_id="ban-dau")}
-                )
-            # A LIVE/replay run reads the raw source bytes; bind them to this
-            # packet's stage so the resolver materializes exactly those files.
-            runner._source_resolver = bind_sources(packet_dir, packet_input, stage_id="ban-dau")
-            actual = await runner.run(packet_input, mode)
-            gold = load_gold(packet_dir, stage_id="ban-dau")
-            row = scorer.score(actual, gold)
-            rows.append(row)
-            actuals.append(actual)
-        report = scorer.release_gate(rows, total_human=sum(
-            1 for r in rows if r.expected_route in ("FACT", "POLICY", "AUTHORITY")
-        ))
-        return {
-            "suite": args.suite,
-            "mode": mode,
-            "total": len(rows),
-            "union_dangerous_miss": report.union_dangerous_miss,
-            "action_miss": report.action_miss,
-            "affirmative_miss": report.affirmative_miss,
-            "release": report.release,
-            "rows": [json.loads(r.model_dump_json()) for r in rows],
-        }
-
-    result = asyncio.run(_run())
-    output = Path(args.output)
-    output.mkdir(parents=True, exist_ok=True)
-    path = output / f"{args.suite}-{mode.lower()}-report.json"
-    path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"evaluate report written: {path} (union={result['union_dangerous_miss']})")
-    return 0
+    return 0 if result["release"] else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -216,3 +169,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     print(f"unknown command: {argv[0]}", file=sys.stderr)
     return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

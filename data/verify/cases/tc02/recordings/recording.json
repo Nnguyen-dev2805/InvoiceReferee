@@ -1,0 +1,228 @@
+{
+  "case_id": "TC02",
+  "data_origin": "SYNTHETIC_FIXTURE",
+  "digests": {
+    "report_hoan_ung.pdf": "5361b509da576e842896bf9df302af98336a76dd4406019af1da50cf3d3fcfe2",
+    "hoa_don_dien_tu.pdf": "03e5473e19ce2c368cc1b696afd21f7e687c8170b094f9b19bbae4c6f4ce1d6d"
+  },
+  "ocr": {
+    "5361b509da576e842896bf9df302af98336a76dd4406019af1da50cf3d3fcfe2": {
+      "pages": [
+        {
+          "page": 1,
+          "markdown": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH\n CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n Độc lập - Tự do - Hạnh phúc\n Thành phố Hồ Chí Minh, ngày 10 tháng 10 năm 2026\n GIẤY ĐỀ NGHỊ HOÀN ỨNG\n Về việc: Mua thiết bị văn phòng phục vụ hoạt động công ty\nKính gửi: Ban Giám đốc CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH\nNgười đề nghị: NGUYỄN MINH AN\nChức vụ: Nhân viên\nBộ phận: Hành chính nhân sự\nNội dung: Mua thiết bị văn phòng phục vụ hoạt động công ty\nSTT\nNỘI DUNG\nHÓA ĐƠN\nSỐ TIỀN\nGHI CHÚ\n1\nMua thiết bị văn phòng phục vụ hoạt động công ty\n00000201\n5.400.000\nĐính kèm hóa đơn điện tử\nTổng cộng\n5.400.000\nBằng chữ: Năm triệu bốn trăm nghìn đồng.\nSố tiền đã tạm ứng: 5.000.000 đồng\nSố tiền công ty thanh toán thêm: 400.000 đồng\nBằng chữ: Bốn trăm nghìn đồng.\n NGƯỜI ĐỀ NGHỊ HOÀN ỨNG\n (Đã ký)\nNGUYỄN MINH AN\n KẾ TOÁN\n (Đã ký)\nTRẦN THỊ THU HÀ\n GIÁM ĐỐC\n(Đã ký, đóng dấu)\nLÊ QUANG HUY\n",
+          "blocks": []
+        }
+      ],
+      "complete": true
+    },
+    "03e5473e19ce2c368cc1b696afd21f7e687c8170b094f9b19bbae4c6f4ce1d6d": {
+      "pages": [
+        {
+          "page": 1,
+          "markdown": "HÓA ĐƠN GIÁ TRỊ GIA TĂNG ĐIỆN TỬ\n Ngày 10 tháng 10 năm 2026\n Mẫu số: 1C26TAA\nKý hiệu: IR26E\nSố: 00000201\nĐơn vị bán hàng: CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ MINH PHÁT\nMã số thuế: 0101234565\nĐịa chỉ: 86 Trần Thái Tông, Phường Cầu Giấy, Thành phố Hà Nội\nĐơn vị mua hàng: CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH\nMã số thuế: 0319999996\nĐịa chỉ: 128 Nguyễn Văn Linh, Phường Tân Hưng, Thành phố Hồ Chí Minh\nHình thức thanh toán: Chuyển khoản\nSTT\nTÊN HÀNG HÓA, DỊCH VỤ\nĐVT\nSL\nĐƠN GIÁ\nTHÀNH TIỀN\n1\nMáy in văn phòng\nCái\n1\n5.000.000\n5.000.000\nCộng tiền hàng chưa thuế:\n5.000.000\nThuế GTGT (8%):\n400.000\nTỔNG CỘNG THANH TOÁN:\n5.400.000 VND\nSố tiền bằng chữ: Năm triệu bốn trăm nghìn đồng.\n NGƯỜI MUA HÀNG\n (Ký, ghi rõ họ tên)\n NGƯỜI BÁN HÀNG\nCÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ MINH\n PHÁT\nKý bởi: CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ\n MINH PHÁT\nNgười ký: PHẠM HOÀNG NAM\n Ký ngày: 10/10/2026\n",
+          "blocks": []
+        }
+      ],
+      "complete": true
+    }
+  },
+  "extractions": {
+    "paper": {
+      "role_fit": "FIT",
+      "actual_type": "SETTLEMENT_FORM",
+      "fields": [
+        {
+          "field": "declared_advance",
+          "state": "FOUND",
+          "value": 5000000,
+          "quote": "5.000.000",
+          "page": 1
+        },
+        {
+          "field": "printed_total",
+          "state": "FOUND",
+          "value": 5400000,
+          "quote": "5.400.000",
+          "page": 1
+        },
+        {
+          "field": "printed_reimbursement",
+          "state": "FOUND",
+          "value": 400000,
+          "quote": "400.000",
+          "page": 1
+        },
+        {
+          "field": "declared_name",
+          "state": "FOUND",
+          "value": "NGUYỄN MINH AN",
+          "quote": "NGUYỄN MINH AN",
+          "page": 1
+        },
+        {
+          "field": "purpose",
+          "state": "FOUND",
+          "value": "Mua thiết bị văn phòng phục vụ hoạt động công ty",
+          "quote": "Mua thiết bị văn phòng phục vụ hoạt động công ty",
+          "page": 1
+        }
+      ],
+      "line_items": [
+        {
+          "fields": [
+            {
+              "field": "description",
+              "state": "FOUND",
+              "value": "Mua thiết bị văn phòng phục vụ hoạt động công ty",
+              "quote": "Mua thiết bị văn phòng phục vụ hoạt động công ty",
+              "page": 1
+            },
+            {
+              "field": "amount",
+              "state": "FOUND",
+              "value": 5400000,
+              "quote": "5.400.000",
+              "page": 1
+            },
+            {
+              "field": "invoice_refs",
+              "state": "FOUND",
+              "value": [
+                "00000201"
+              ],
+              "quote": "00000201",
+              "page": 1
+            }
+          ]
+        }
+      ]
+    },
+    "evidence": {
+      "document_type": "E_INVOICE",
+      "fields": [
+        {
+          "field": "document_date",
+          "state": "FOUND",
+          "value": "2026-10-10",
+          "quote": "Ngày 10 tháng 10 năm 2026",
+          "page": 1
+        },
+        {
+          "field": "buyer_name",
+          "state": "FOUND",
+          "value": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+          "quote": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+          "page": 1
+        },
+        {
+          "field": "total_amount",
+          "state": "FOUND",
+          "value": 5400000,
+          "quote": "5.400.000",
+          "page": 1
+        },
+        {
+          "field": "tax",
+          "state": "FOUND",
+          "value": 400000,
+          "quote": "400.000",
+          "page": 1
+        },
+        {
+          "field": "subtotal",
+          "state": "FOUND",
+          "value": 5000000,
+          "quote": "5.000.000",
+          "page": 1
+        },
+        {
+          "field": "buyer_tax_code",
+          "state": "FOUND",
+          "value": "0319999996",
+          "quote": "0319999996",
+          "page": 1
+        },
+        {
+          "field": "issuer_name",
+          "state": "FOUND",
+          "value": "CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ MINH PHÁT",
+          "quote": "CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ MINH PHÁT",
+          "page": 1
+        },
+        {
+          "field": "document_number",
+          "state": "FOUND",
+          "value": "00000201",
+          "quote": "00000201",
+          "page": 1
+        }
+      ],
+      "line_items": [
+        {
+          "fields": [
+            {
+              "field": "item_name",
+              "state": "FOUND",
+              "value": "Máy in văn phòng",
+              "quote": "Máy in văn phòng",
+              "page": 1
+            },
+            {
+              "field": "line_amount",
+              "state": "FOUND",
+              "value": 5000000,
+              "quote": "5.000.000",
+              "page": 1
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "transcription": {
+    "data_origin": "RECORDED_REPLAY",
+    "facts": [
+      {
+        "field": "incurred",
+        "value": 5400000,
+        "role": "INVOICE",
+        "page": 1,
+        "quote": "Tổng cộng: 5.400.000"
+      },
+      {
+        "field": "paid_employee",
+        "value": 5400000,
+        "role": "PAYMENT",
+        "page": 1,
+        "quote": "Người thanh toán: NGUYỄN MINH AN"
+      },
+      {
+        "field": "advance",
+        "value": 5000000,
+        "role": "ADVANCE",
+        "page": 1,
+        "quote": "Số tiền đã tạm ứng: 5.000.000 đồng"
+      },
+      {
+        "field": "coverage",
+        "value": 1,
+        "role": "LEDGER",
+        "page": 1,
+        "quote": "Đối chiếu đủ chứng từ"
+      },
+      {
+        "field": "economic_key",
+        "value": "invoice:00000201",
+        "role": "INVOICE",
+        "page": 1,
+        "quote": "Số: 00000201"
+      }
+    ],
+    "relations": []
+  },
+  "provenance": {
+    "method": "pypdf_native_text_and_handwritten_extraction",
+    "provider_calls": 0
+  }
+}

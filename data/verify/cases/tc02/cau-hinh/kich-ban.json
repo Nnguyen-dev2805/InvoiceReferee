@@ -1,0 +1,8 @@
+{
+  "case_id": "TC02",
+  "slug": "tc02-hop-le-cong-ty-thanh-toan-them",
+  "upload_roles": {
+    "report_hoan_ung.pdf": "paper",
+    "hoa_don_dien_tu.pdf": "evidence"
+  }
+}

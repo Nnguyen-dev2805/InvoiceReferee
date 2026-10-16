@@ -1,0 +1,8 @@
+{
+  "case_id": "TC01",
+  "slug": "tc01-hop-le-nhan-vien-hoan-tra-tien-thua",
+  "upload_roles": {
+    "report_hoan_ung.pdf": "paper",
+    "hoa_don_dien_tu.pdf": "evidence"
+  }
+}

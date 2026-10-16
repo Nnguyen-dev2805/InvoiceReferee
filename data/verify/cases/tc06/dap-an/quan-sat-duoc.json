@@ -1,0 +1,12 @@
+{
+  "stages": {
+    "ban-dau": {
+      "facts": {
+        "incurred": 2970000,
+        "advance": 3800000,
+        "declared_difference": 770000,
+        "calculated_difference": 830000
+      }
+    }
+  }
+}

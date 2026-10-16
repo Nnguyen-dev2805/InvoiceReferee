@@ -120,25 +120,61 @@ export async function answerIssue(
   );
 }
 
-export async function runVerify(
-  suite: string,
-  mode: string,
-): Promise<{
+export interface VerifyRowView {
+  root_id: string;
+  expected_route: string;
+  actual_route: string;
+  passed: boolean;
+  union_dangerous_miss: number;
+  correct_auto_completion: number;
+  technical_failure: number;
+  failure_reasons: string[];
+  expected_amounts: Record<string, number>;
+  actual_amounts: Record<string, number>;
+  expected_owner: string | null;
+  actual_owner: string | null;
+  question_required: boolean;
+  question_present: boolean;
+  question_review?: string;
+  actual_issues?: Array<{kind:string; owner:string; field_or_rule?:string; question?:string; refs?:Array<{source_id:string;source_sha256:string;page:number;exact_quote:string}>}>;
+  elapsed_ms: number;
+}
+
+export interface VerifyReportView {
+  status?: "RUNNING" | "NEEDS_RECORDING" | "ERROR" | "COMPLETED";
+  question_review?: string;
+  run_id: string;
+  started_at: string;
+  finished_at: string;
   suite: string;
   mode: string;
-  total: number;
-  union_dangerous_miss: number;
+  planned: number;
+  attempted: number;
+  completed: number;
+  passed: number;
   release: boolean;
-  rows: Array<{
-    root_id: string;
-    expected_route: string;
-    actual_route: string;
-    union_dangerous_miss: number;
-    correct_auto_completion: number;
-    technical_failure: number;
-  }>;
-}> {
-  return request("/api/verify", { suite, mode }, newCommandId());
+  union_dangerous_miss: number;
+  dangerous_miss_rate: number | null;
+  completion_rate: number | null;
+  elapsed_ms: number;
+  versions: {
+    code: string;
+    config: string;
+    dataset: string;
+    recording: string;
+  };
+  rows: VerifyRowView[];
+}
+
+export async function runVerify(
+  suite: "core" | "escalation" | string = "core",
+  mode: "RECORDED_REPLAY" | "LIVE" | "STUB" | string = "RECORDED_REPLAY",
+): Promise<VerifyReportView> {
+  return request<VerifyReportView>("/api/verify", { suite, mode }, newCommandId());
+}
+
+export async function getLastVerify(): Promise<VerifyReportView | null> {
+  return request<VerifyReportView | null>("/api/verify/last");
 }
 
 export async function controlCase(

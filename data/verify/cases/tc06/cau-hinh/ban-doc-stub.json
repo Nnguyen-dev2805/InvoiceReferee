@@ -1,0 +1,48 @@
+{
+  "data_origin": "STUB_TRANSCRIPTION",
+  "facts": [
+    {
+      "field": "incurred",
+      "value": 2970000,
+      "role": "INVOICE",
+      "page": 1,
+      "quote": "Tổng cộng: 2.970.000"
+    },
+    {
+      "field": "paid_employee",
+      "value": 2970000,
+      "role": "PAYMENT",
+      "page": 1,
+      "quote": "Người thanh toán: NGUYỄN MINH AN"
+    },
+    {
+      "field": "advance",
+      "value": 3800000,
+      "role": "ADVANCE",
+      "page": 1,
+      "quote": "Số tiền đã tạm ứng: 3.800.000 đồng"
+    },
+    {
+      "field": "coverage",
+      "value": 1,
+      "role": "LEDGER",
+      "page": 1,
+      "quote": "Đối chiếu đủ chứng từ"
+    },
+    {
+      "field": "declared_return",
+      "value": 770000,
+      "role": "PAYMENT",
+      "page": 1,
+      "quote": "Số tiền nhân viên hoàn trả: 770.000 đồng"
+    },
+    {
+      "field": "economic_key",
+      "value": "invoice:00000601",
+      "role": "INVOICE",
+      "page": 1,
+      "quote": "Số: 00000601"
+    }
+  ],
+  "relations": []
+}

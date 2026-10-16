@@ -1,0 +1,11 @@
+{
+  "stages": {
+    "ban-dau": {
+      "facts": {
+        "real_payer": "employee:employee-a",
+        "delta": 60000,
+        "error": "DISCREPANCY_BETWEEN_DECLARED_AND_CALCULATED"
+      }
+    }
+  }
+}

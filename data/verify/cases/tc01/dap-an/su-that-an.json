@@ -1,0 +1,10 @@
+{
+  "stages": {
+    "ban-dau": {
+      "facts": {
+        "real_payer": "employee:employee-a",
+        "advance_settlement_diff": 760000
+      }
+    }
+  }
+}

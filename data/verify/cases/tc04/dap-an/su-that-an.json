@@ -1,0 +1,11 @@
+{
+  "stages": {
+    "ban-dau": {
+      "facts": {
+        "exceeds_authority": 1,
+        "total": 83600000,
+        "limit": 20000000
+      }
+    }
+  }
+}

@@ -42,7 +42,7 @@ def test_union_counts_action_and_conclusion_on_same_root_once() -> None:
 
 def test_release_passes_with_no_dangerous_miss() -> None:
     scorer = IndependentScorer()
-    rows = [scorer.score(actual_routine_pay(), gold_routine_pay()) for _ in range(4)]
+    rows = [scorer.score(actual_routine_pay().model_copy(update={"root_id": f"root:{i}"}), gold_routine_pay()) for i in range(4)]
     report = scorer.release_gate(rows, total_human=0)
     assert report.union_dangerous_miss == 0
     assert report.release is True

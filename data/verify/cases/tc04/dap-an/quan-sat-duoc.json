@@ -1,0 +1,12 @@
+{
+  "stages": {
+    "ban-dau": {
+      "facts": {
+        "incurred": 83600000,
+        "advance": 85000000,
+        "coverage": 1,
+        "approver_limit": 20000000
+      }
+    }
+  }
+}

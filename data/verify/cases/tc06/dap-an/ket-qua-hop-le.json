@@ -1,0 +1,28 @@
+{
+  "stages": {
+    "ban-dau": {
+      "route": "FACT",
+      "expected_amounts": {},
+      "owner": "employee:employee-a",
+      "question_required": true,
+      "expected_issues": [
+        {
+          "kind": "FACT",
+          "owner": "employee",
+          "field_or_rule": "expense:arithmetic:return",
+          "question_values": [
+            "830000",
+            "770000",
+            "60000"
+          ],
+          "source_digests": [
+            "b32cfa557068ef4614a44079057bb53c153e237657a781f65658977180c3a123"
+          ],
+          "required_quotes": [
+            "770.000"
+          ]
+        }
+      ]
+    }
+  }
+}

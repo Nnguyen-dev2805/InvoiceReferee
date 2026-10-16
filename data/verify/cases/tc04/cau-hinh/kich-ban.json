@@ -1,0 +1,8 @@
+{
+  "case_id": "TC04",
+  "slug": "tc04-hop-le-nhieu-mat-hang-thiet-bi",
+  "upload_roles": {
+    "report_hoan_ung.pdf": "paper",
+    "hoa_don_dien_tu.pdf": "evidence"
+  }
+}
