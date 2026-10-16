@@ -38,6 +38,7 @@ from invoice_referee.domain.finance import (
     MoneyEvent,
 )
 from invoice_referee.domain.issues import BusinessIssue, ProcessingProblem
+from invoice_referee.domain.policy import ExceptionDecision
 from invoice_referee.domain.organization import OrganizationContext
 from invoice_referee.reconciliation.document_arithmetic import (
     check_document_arithmetic,
@@ -66,6 +67,23 @@ _ORIGINAL_EXPENSE_TYPES = frozenset(
         "TRANSPORT_TICKET",
         "HOTEL_RECEIPT",
         "COLLECTION_RECEIPT",
+    }
+)
+
+# Evidence that can support a cost without being an original expense invoice
+# (TC18): acceptance/delivery records establish service/completion/value,
+# payment proofs establish payer/payee/amount/status. They never create a
+# second cost and never count as allocation money — association only.
+_ALTERNATIVE_EXPENSE_TYPES = frozenset(
+    {
+        "PAYMENT_PROOF",
+        "ACCEPTANCE_RECORD",
+        "DELIVERY_NOTE",
+        "GOODS_RECEIPT",
+        "SUPPLIER_CONFIRMATION",
+        "CONTRACT",
+        "PURCHASE_ORDER",
+        "QUOTATION",
     }
 )
 
@@ -173,6 +191,210 @@ def _document_refs(document: DocumentAnalysis) -> tuple[EvidenceRef, ...]:
     return tuple(refs)
 
 
+def _alternative_amount(document: DocumentAnalysis) -> Decimal | None:
+    """An alternative document's stated total (`total_amount` or `amount`)."""
+    for name in ("total_amount", "amount"):
+        value = _as_decimal(_field(document, name))
+        if value is not None:
+            return value
+    return None
+
+
+def _row_alternatives(
+    refs_value: tuple[str, ...],
+    alternatives: tuple[DocumentAnalysis, ...],
+) -> tuple[DocumentAnalysis, ...]:
+    """Alternative documents a row uniquely names by exact number (TC18).
+
+    Association only: ambiguous identity (one ref naming several documents)
+    attaches nothing — the row keeps its generic missing-evidence FACT.
+    """
+    from invoice_referee.evidence.matching import _invoice_ref_matches_number
+
+    matched: list[DocumentAnalysis] = []
+    for document in alternatives:
+        number = _field(document, "document_number")
+        if number is None:
+            continue
+        if not any(
+            _invoice_ref_matches_number(str(ref), str(number)) for ref in refs_value
+        ):
+            continue
+        candidates = [
+            other
+            for other in alternatives
+            if (other_number := _field(other, "document_number")) is not None
+            and any(
+                _invoice_ref_matches_number(str(ref), str(number))
+                and _invoice_ref_matches_number(str(ref), str(other_number))
+                for ref in refs_value
+            )
+        ]
+        if len(candidates) == 1:
+            matched.append(document)
+    return tuple(matched)
+
+
+def _alternative_service_ok(
+    alternatives: tuple[DocumentAnalysis, ...], amount: Decimal | None
+) -> bool:
+    """Some alternative document establishes the service value (≈ row amount)."""
+    if amount is None:
+        return False
+    return any(
+        (total := _alternative_amount(document)) is not None
+        and abs(total - amount) <= Decimal("1")
+        for document in alternatives
+        if document.document_type != "PAYMENT_PROOF"
+    )
+
+
+def _alternative_payment(
+    alternatives: tuple[DocumentAnalysis, ...],
+) -> DocumentAnalysis | None:
+    """A payment proof with payer/payee/amount/status all established."""
+    for document in alternatives:
+        if document.document_type != "PAYMENT_PROOF":
+            continue
+        if (
+            _field(document, "payer_name") is not None
+            and _field(document, "payee_name") is not None
+            and _alternative_amount(document) is not None
+            and _field(document, "transaction_status") is not None
+        ):
+            return document
+    return None
+
+
+def _alternative_parties(
+    alternatives: tuple[DocumentAnalysis, ...],
+) -> tuple[str | None, str | None, DocumentAnalysis | None, DocumentAnalysis | None]:
+    """(payee, issuer, payment_doc, service_doc) for the party-mismatch check."""
+    payment = _alternative_payment(alternatives)
+    service_doc: DocumentAnalysis | None = None
+    issuer: str | None = None
+    for document in alternatives:
+        if document.document_type == "PAYMENT_PROOF":
+            continue
+        name = _field(document, "issuer_name")
+        if name is not None:
+            service_doc, issuer = document, str(name)
+            break
+    payee = None
+    if payment is not None:
+        payee_value = _field(payment, "payee_name")
+        payee = str(payee_value) if payee_value is not None else None
+    return payee, issuer, payment, service_doc
+
+
+def _alternative_exception_covers(
+    exceptions: tuple[ExceptionDecision, ...], expense_id: str, activity: str
+) -> bool:
+    """An ACCEPTED missing-evidence exception covers one expense (S6)."""
+    return any(
+        exception.rule_id == "expense:missing_required_evidence"
+        and exception.activity == activity
+        and "EXCEPT_POLICY" in exception.actions
+        and exception.max_effect > 0
+        and expense_id in tuple(str(e) for e in exception.expense_ids)
+        for exception in exceptions
+    )
+
+
+def _alternative_paid_basis(entry: _MatchedExpense, scope, organization) -> str | None:
+    """The responsible actor when alternative payment evidence is solid (S6).
+
+    Returns None unless: a payment proof names payer/payee/amount/completed
+    status, the transfer amount matches the row, the payee agrees with the
+    service issuer (no party mismatch), and the named payer is the dossier
+    employee. Open amount/payer/payee FACTs keep blocking elsewhere — this
+    only fires when the evidence already settled them.
+    """
+    payment = _alternative_payment(entry.alternatives)
+    if payment is None:
+        return None
+    payee, issuer, _, _ = _alternative_parties(entry.alternatives)
+    if (
+        payee is None
+        or issuer is None
+        or _normalize_text(payee).replace("đ", "d")
+        != _normalize_text(issuer).replace("đ", "d")
+    ):
+        return None
+    status = _normalize_text(str(_field(payment, "transaction_status") or ""))
+    if not any(
+        token in status for token in ("thanh cong", "hoan tat", "completed", "success")
+    ):
+        return None
+    transfer_amount = _alternative_amount(payment)
+    if transfer_amount is None or abs(transfer_amount - entry.amount) > Decimal("1"):
+        return None
+    context_name = _claimant_name(organization, scope.employee)
+    payer_name = _field(payment, "payer_name")
+    if (
+        context_name is None
+        or payer_name is None
+        or _normalize_name(str(payer_name)) != _normalize_name(context_name)
+    ):
+        return None
+    return scope.employee
+
+
+def _note_contradiction(
+    entry: _MatchedExpense,
+) -> tuple[str, str, str] | None:
+    """A paper note that materially contradicts the sources (spec B.8).
+
+    Only contradictions with business effect count (paid/unpaid, amount,
+    party, attached set) — never a mere difference in wording. A wrong note
+    never retypes a document or rewrites a fact.
+    """
+    if entry.note is None:
+        return None
+    # `đ`/`Đ` do not decompose under NFD, so map them for loose matching.
+    note = _normalize_text(entry.note).replace("đ", "d")
+    if "hoa don" in note and entry.document is None and not entry.alternatives:
+        return (
+            "note_contradiction",
+            f"Ghi chú nêu hóa đơn đính kèm nhưng hồ sơ không có hóa đơn gốc cho khoản '{entry.description}'.",
+            "Xác nhận lại bộ chứng từ đính kèm đúng khoản này.",
+        )
+    if "hoa don" in note and entry.document is None and entry.alternatives:
+        original_named = any(
+            _field(document, "document_number") is not None
+            and document.document_type in _ORIGINAL_EXPENSE_TYPES
+            for document in entry.alternatives
+        )
+        if not original_named:
+            return (
+                "note_contradiction",
+                f"Ghi chú nêu hóa đơn đính kèm nhưng các tài liệu của khoản '{entry.description}' "
+                "đều là bằng chứng thay thế, không có hóa đơn gốc.",
+                "Xác nhận lại bộ chứng từ đính kèm đúng khoản này.",
+            )
+    paid_claim = any(
+        token in note for token in ("da tra", "da thanh toan", "da chi", "da chuyen")
+    )
+    if paid_claim:
+        payment = _alternative_payment(entry.alternatives)
+        status = (
+            _normalize_text(str(_field(payment, "transaction_status")))
+            if payment is not None
+            else ""
+        )
+        completed = any(
+            token in status
+            for token in ("thanh cong", "hoan tat", "completed", "success")
+        )
+        if not completed:
+            return (
+                "note_contradiction",
+                f"Ghi chú nêu đã thanh toán nhưng chưa có chứng từ giao dịch hoàn tất cho khoản '{entry.description}'.",
+                "Bổ sung chứng từ chứng minh trạng thái đã thanh toán.",
+            )
+    return None
+
+
 def _settlement_rows(
     paper: DocumentAnalysis | None,
 ) -> tuple[tuple[str, Decimal | None, tuple[str, ...]], ...]:
@@ -206,6 +428,17 @@ class _MatchedExpense(NamedTuple):
     # amount is disputed, so the document is associated yet unaccepted. Keeps
     # the relation visible without admitting money.
     associated_document_id: str | None = None
+    # Alternative evidence associated with the row (TC18, 17/10/2026):
+    # acceptance/payment/supporting documents the row explicitly references.
+    # They support claim axes (service, payment) but never create a second
+    # cost and never count as allocation money.
+    alternatives: tuple[DocumentAnalysis, ...] = ()
+    # The paper row's verbatim note, if any. Descriptive only: never an
+    # exception reason, never a document-type override (spec B).
+    note: str | None = None
+    # False when the row amount is missing/unreadable (S5): the row is kept
+    # with an UNKNOWN incurred, never dropped, zeroed or passed.
+    amount_known: bool = True
 
 
 def _normalize_ref(value: str) -> str:
@@ -341,15 +574,35 @@ def _match_expense_documents(
                         else:
                             unique_match = None
                             break
+                    row_alternatives = _row_alternatives(
+                        tuple(str(r) for r in refs_value),
+                        tuple(
+                            d
+                            for d in report.documents
+                            if d.document_type in _ALTERNATIVE_EXPENSE_TYPES
+                        ),
+                    )
+                    row_refs = _row_refs(row, paper)
+                    alt_refs: list[EvidenceRef] = []
+                    for alt in row_alternatives:
+                        alt_refs.extend(_document_refs(alt))
                     out.append(
                         _MatchedExpense(
                             amount,
-                            (),
+                            tuple(dict.fromkeys((*row_refs, *alt_refs)))
+                            if row_alternatives
+                            else (),
                             None,
                             description,
                             str(reason) if reason else None,
-                            _row_refs(row, paper),
+                            row_refs,
                             unique_match,
+                            alternatives=row_alternatives,
+                            note=(
+                                str(note_value)
+                                if (note_value := _line_field(row, "note")) is not None
+                                else None
+                            ),
                         )
                     )
         return out, tuple(
@@ -360,6 +613,9 @@ def _match_expense_documents(
     rows = _settlement_rows(paper)
     original = [
         d for d in report.documents if d.document_type in _ORIGINAL_EXPENSE_TYPES
+    ]
+    alternatives = [
+        d for d in report.documents if d.document_type in _ALTERNATIVE_EXPENSE_TYPES
     ]
     by_ref: dict[str, DocumentAnalysis] = {}
     for document in original:
@@ -396,16 +652,64 @@ def _match_expense_documents(
             cost = amount
             if cost is None and matched_doc is not None:
                 cost = _as_decimal(_field(matched_doc, "total_amount"))
+            # S5 fail-closed: a row without a recoverable amount is kept with
+            # an UNKNOWN incurred (amount_known=False), never dropped, zeroed
+            # or turned into a success. (row_alternatives/alt_refs above were
+            # already computed for a document-less row.)
             if cost is None:
+                if matched_doc is None:
+                    row_refs = _row_refs(line, paper)
+                    out.append(
+                        _MatchedExpense(
+                            Decimal(0),
+                            tuple(dict.fromkeys((*row_refs, *alt_refs)))
+                            if row_alternatives
+                            else (),
+                            None,
+                            description,
+                            reason,
+                            row_refs,
+                            alternatives=row_alternatives,
+                            note=(
+                                str(note_value)
+                                if (note_value := _line_field(line, "note")) is not None
+                                else None
+                            ),
+                            amount_known=False,
+                        )
+                    )
                 continue
+            # Alternative evidence the row explicitly references (TC18): kept
+            # as association with two-sided refs, never as a second cost.
+            row_alternatives = (
+                _row_alternatives(
+                    tuple(str(r) for r in refs_value), tuple(alternatives)
+                )
+                if matched_doc is None
+                else ()
+            )
+            alt_refs: list[EvidenceRef] = []
+            for alt in row_alternatives:
+                alt_refs.extend(_document_refs(alt))
+            row_refs = _row_refs(line, paper)
             out.append(
                 _MatchedExpense(
                     cost,
-                    _document_refs(matched_doc) if matched_doc is not None else (),
+                    tuple(dict.fromkeys((*row_refs, *alt_refs)))
+                    if row_alternatives
+                    else (
+                        _document_refs(matched_doc) if matched_doc is not None else ()
+                    ),
                     matched_doc,
                     description,
                     reason,
-                    _row_refs(line, paper),
+                    row_refs,
+                    alternatives=row_alternatives,
+                    note=(
+                        str(note_value)
+                        if (note_value := _line_field(line, "note")) is not None
+                        else None
+                    ),
                 )
             )
         # Any original document not referenced by a row is a relevance FACT (T4,
@@ -775,6 +1079,7 @@ def admit_evidence(
     read_set: ReadSet,
     as_of,
     activity_acceptances: tuple[ActivityAcceptance, ...] = (),
+    exceptions: tuple[ExceptionDecision, ...] = (),
 ) -> AssessmentInput:
     """Map a typed evidence report into an immutable AssessmentInput (pure)."""
     import hashlib
@@ -909,6 +1214,60 @@ def admit_evidence(
             effective_coverage = None
 
     budgets = context_budgets(organization, activity=scope.activity, digest=org_digest)
+    # S6 self-expense (18/10/2026): the employee asserted no advance for this
+    # scope. The ledger still decides: a CONFIRMED advance in scope contradicts
+    # the assertion, so a type-conflict FACT asks to switch to an advance
+    # settlement or clarify — the recorded advance is never deleted or ignored.
+    # An assertion alone never turns an UNKNOWN ledger into a KNOWN zero.
+    no_advance = next(
+        (
+            c
+            for c in confirmations
+            if c.fact_key == "settlement:no_advance" and c.scope == scope.activity
+        ),
+        None,
+    )
+    if no_advance is not None:
+        # Same-employee advances anywhere in the tenant ledger contradict the
+        # assertion (in-scope directly; elsewhere by naming that scope) — the
+        # recorded advance is never deleted or ignored.
+        same_employee_advances = [
+            event
+            for event in merged_ledger
+            if event.kind == "ADVANCE_RECEIVED"
+            and event.verification_state == "CONFIRMED"
+            and event.payee == scope.employee
+        ]
+        if same_employee_advances:
+            in_scope = [
+                event
+                for event in same_employee_advances
+                if event.scope == scope.activity
+            ]
+            mentioned = in_scope or same_employee_advances
+            total_advance = sum(int(event.amount) for event in mentioned)
+            scopes = sorted({event.scope for event in mentioned})
+            where = (
+                "trong phạm vi này" if in_scope else f"(phạm vi {', '.join(scopes)})"
+            )
+            issues.append(
+                BusinessIssue(
+                    id="issue:fact:advance_type_conflict",
+                    kind="FACT",
+                    field_or_rule="advance:type_conflict",
+                    owner="employee",
+                    basis=(
+                        f"Hồ sơ khai nhân viên tự chi (không nhận tạm ứng) nhưng sổ ghi "
+                        f"nhân viên đã nhận tạm ứng {total_advance} VND {where}. "
+                        f"Lý do khai: {no_advance.reason}."
+                    ),
+                    refs=tuple(no_advance.refs),
+                    question=(
+                        "Chuyển sang quyết toán tạm ứng cho đúng khoản ứng đã nhận, "
+                        "hoặc làm rõ khoản ứng này không thuộc phạm vi hồ sơ."
+                    ),
+                )
+            )
     policies = context_policies(organization, digest=org_digest, profile=scope.profile)
     grants = context_grants(organization, digest=org_digest)
     category_policies = context_category_policies(
@@ -1113,6 +1472,21 @@ def admit_evidence(
                 and entry.document.document_id in disputed_documents
             )
         )
+        # TC18: an alternative-supported row establishes its amount only when
+        # some alternative document corroborates the service value. Otherwise
+        # the amount stays UNKNOWN (never a silent zero, never a bare claim).
+        alternative_service_ok = (
+            entry.document is None
+            and bool(entry.alternatives)
+            and _alternative_service_ok(entry.alternatives, entry.amount)
+        )
+        alternative_unresolved = (
+            entry.document is None
+            and bool(entry.alternatives)
+            and not alternative_service_ok
+        )
+        # S5: a row whose amount never established stays UNKNOWN.
+        amount_unresolved = not entry.amount_known
         # The service evidence must name the cost; the settlement row is the
         # canonical cost identity. Ref-less rows still carry the document refs.
         payments: list[ExpensePayment] = []
@@ -1142,10 +1516,151 @@ def admit_evidence(
         # (`expense:missing_required_evidence`) and its scoped exception are
         # applied by the policy engine once the facts are established.
         if entry.document is None:
+            if entry.alternatives:
+                # TC18: an alternatively-supported row is owned by specific
+                # claim FACTs — service, payment, parties, reason — never by
+                # a generic missing-evidence ask, and the row is never dropped.
+                payment_doc = _alternative_payment(entry.alternatives)
+                payee, issuer, _, service_doc = _alternative_parties(entry.alternatives)
+                if not alternative_service_ok:
+                    issues.append(
+                        BusinessIssue(
+                            id=f"issue:fact:service_basis:{expense_id}",
+                            kind="FACT",
+                            field_or_rule=f"{expense_id}:service_basis",
+                            owner="employee",
+                            basis=(
+                                f"Khoản '{entry.description or expense_id}' chưa có tài liệu "
+                                "xác lập dịch vụ/giá trị tương ứng số kê khai."
+                            ),
+                            refs=tuple(dict.fromkeys((*entry.paper_refs, *refs))),
+                            question=(
+                                "Bổ sung tài liệu xác lập dịch vụ và giá trị cho khoản này."
+                            ),
+                        )
+                    )
+                if payment_doc is None:
+                    issues.append(
+                        BusinessIssue(
+                            id=f"issue:fact:payment_basis:{expense_id}",
+                            kind="FACT",
+                            field_or_rule=f"{expense_id}:payment_basis",
+                            owner="employee",
+                            basis=(
+                                f"Khoản '{entry.description or expense_id}' chưa có chứng từ "
+                                "thanh toán xác lập người trả/người nhận/số tiền/trạng thái."
+                            ),
+                            refs=tuple(dict.fromkeys((*entry.paper_refs, *refs))),
+                            question=(
+                                "Bổ sung chứng từ thanh toán (người trả, người nhận, "
+                                "số tiền, trạng thái giao dịch) cho khoản này."
+                            ),
+                        )
+                    )
+                mismatch = (
+                    payee is not None
+                    and issuer is not None
+                    and _normalize_text(payee).replace("đ", "d")
+                    != _normalize_text(issuer).replace("đ", "d")
+                )
+                if mismatch:
+                    # Two-sided provenance: the payment's refs first (the paid
+                    # assertion), then the service document's refs. A mismatch
+                    # is a facts gap, never a fraud verdict.
+                    two_sided = tuple(
+                        dict.fromkeys(
+                            (
+                                *(
+                                    _document_refs(payment_doc)
+                                    if payment_doc is not None
+                                    else ()
+                                ),
+                                *(
+                                    _document_refs(service_doc)
+                                    if service_doc is not None
+                                    else ()
+                                ),
+                            )
+                        )
+                    )
+                    issues.append(
+                        BusinessIssue(
+                            id=f"issue:fact:party_mismatch:{expense_id}",
+                            kind="FACT",
+                            field_or_rule=f"{expense_id}:party_mismatch",
+                            owner="employee",
+                            basis=(
+                                f"Bên nhận chuyển khoản '{payee}' khác bên cung cấp "
+                                f"dịch vụ '{issuer}'; chưa có căn cứ về quan hệ giữa "
+                                "hai bên này."
+                            ),
+                            refs=two_sided,
+                            question=(
+                                "Làm rõ quan hệ giữa bên nhận tiền và bên cung cấp "
+                                "dịch vụ (hoặc bổ sung chứng từ thanh toán đúng bên)."
+                            ),
+                        )
+                    )
+                note_issue = _note_contradiction(entry)
+                if note_issue is not None:
+                    field_or_rule, basis, question = note_issue
+                    issues.append(
+                        BusinessIssue(
+                            id=f"issue:fact:note_contradiction:{expense_id}",
+                            kind="FACT",
+                            field_or_rule=f"{expense_id}:{field_or_rule}",
+                            owner="employee",
+                            basis=basis,
+                            refs=entry.paper_refs,
+                            question=question,
+                        )
+                    )
+                if entry.no_evidence_reason is None:
+                    issues.append(
+                        BusinessIssue(
+                            id=f"issue:fact:exception_reason:{expense_id}",
+                            kind="FACT",
+                            field_or_rule=f"{expense_id}:exception_reason",
+                            owner="employee",
+                            basis=(
+                                f"Khoản '{entry.description or expense_id}' dùng bằng chứng "
+                                "thay thế nhưng chưa có lý do thiếu hóa đơn gốc."
+                            ),
+                            refs=entry.paper_refs,
+                            question=(
+                                "Bổ sung lý do thiếu hóa đơn gốc cho đúng khoản này "
+                                "(không dùng ghi chú mô tả thay lý do)."
+                            ),
+                        )
+                    )
+                elif (
+                    alternative_service_ok and payment_doc is not None and not mismatch
+                ):
+                    # Facts established, no original invoice: the missing-root
+                    # POLICY owns the row (same rule/exception as T5/TC20).
+                    # A reason is a declaration, never proof of payment.
+                    issues.append(
+                        BusinessIssue(
+                            id=f"issue:policy:missing_evidence:{expense_id}",
+                            kind="POLICY",
+                            field_or_rule=f"{expense_id}:missing_evidence",
+                            owner="accountant",
+                            basis=(
+                                f"Khoản '{entry.description or expense_id}' đã đủ dữ kiện "
+                                "nhưng thiếu hóa đơn gốc; cần chấp nhận ngoại lệ. "
+                                f"Lý do khai: {entry.no_evidence_reason}."
+                            ),
+                            refs=tuple(dict.fromkeys((*entry.paper_refs, *refs))),
+                            question=(
+                                "Xác nhận bằng chứng thay thế có được chấp nhận "
+                                "cho khoản chi này hay không."
+                            ),
+                        )
+                    )
             # A row whose reference uniquely names a disputed document is
             # owned by the specific allocation FACT, not by a generic
             # missing-evidence question (A2). Truly uncovered rows keep it.
-            if not (
+            elif not (
                 entry.associated_document_id is not None
                 and entry.associated_document_id in disputed_documents
             ):
@@ -1247,15 +1762,47 @@ def admit_evidence(
                     question="Xác minh căn cứ người trả (chứng từ thanh toán) cho khoản chi này.",
                 )
             )
+        elif (
+            not disputed
+            and entry.document is None
+            and entry.alternatives
+            and alternative_service_ok
+            and entry.no_evidence_reason is not None
+            and _alternative_exception_covers(exceptions, expense_id, scope.activity)
+            and _alternative_paid_basis(entry, scope, organization) is not None
+        ):
+            # Accepted alternative (S6, 18/10/2026): service + payment + parties
+            # established from the alternative set, reason stated, and a scoped
+            # EXCEPT_POLICY exception accepted. The exception supplies the
+            # missing-original basis — it closes no amount/payer/payee FACT
+            # (any open one keeps blocking above).
+            paid_basis = _alternative_paid_basis(entry, scope, organization)
+            assert paid_basis is not None
+            payments.append(
+                ExpensePayment(
+                    external_key=f"alternative:{scope.activity}:{expense_id}",
+                    payer=scope.employee,
+                    payee="vendor:evidence",
+                    amount=int(amount),
+                    expense_id=expense_id,
+                    received_state="CLEAR",
+                    refs=refs,
+                    basis_kind="ALTERNATIVE_ACCEPTED",
+                    responsible_actor=paid_basis,
+                )
+            )
+            eligibility = "ELIGIBLE"
+            payment_state = "PAID"
         else:
             eligibility = "UNKNOWN"
 
         # A disputed cost has no verified amount: T is UNKNOWN for it (never the
         # declared 3.5m, never a silent cut to 3.24m). The source refs are kept so
-        # the two numbers can be compared.
+        # the two numbers can be compared. The same holds for an alternative
+        # row whose service value is unestablished (TC18).
         incurred = (
             Fact[int](key=f"{expense_id}:incurred", state="UNKNOWN", refs=refs)
-            if disputed
+            if disputed or alternative_unresolved or amount_unresolved
             else Fact[int](
                 key=f"{expense_id}:incurred",
                 value=int(amount),
@@ -1263,7 +1810,7 @@ def admit_evidence(
                 refs=refs,
             )
         )
-        if disputed:
+        if disputed or alternative_unresolved or amount_unresolved:
             disputed_expense_ids.append(expense_id)
         # An allocation-blocked row keeps its associated document's date when
         # the date itself is established (A2): the dispute is about the
@@ -1291,7 +1838,17 @@ def admit_evidence(
                 ),
                 source_date=_source_date(entry.document)
                 if entry.document is not None
-                else _source_date(associated_document),
+                else (
+                    _source_date(associated_document)
+                    or next(
+                        (
+                            dated
+                            for alternative in entry.alternatives
+                            if (dated := _source_date(alternative)) is not None
+                        ),
+                        None,
+                    )
+                ),
             )
         )
 
@@ -1314,7 +1871,7 @@ def admit_evidence(
         grants=grants,
         budget=budgets,
         category_policy=category_policies,
-        exceptions=(),
+        exceptions=tuple(exceptions),
         previous_eligibility=None,
         read_set=read_set,
         as_of=as_of,

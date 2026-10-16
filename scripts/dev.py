@@ -30,8 +30,13 @@ FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
 
 
 def build_workflow(
-    db_path: str, uploads_dir: str, context_path: str, *, mode: str = "STUB",
-    settings: Settings | None = None, demo_as_of: datetime | None = None,
+    db_path: str,
+    uploads_dir: str,
+    context_path: str,
+    *,
+    mode: str = "STUB",
+    settings: Settings | None = None,
+    demo_as_of: datetime | None = None,
 ) -> tuple[CaseWorkflow, str]:
     from invoice_referee.runtime import build_workflow as compose_workflow
 
@@ -101,8 +106,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--db", default=str(DEFAULT_DB))
     parser.add_argument("--uploads", default=str(DEFAULT_UPLOADS))
     parser.add_argument("--context", default=str(DEFAULT_CONTEXT))
-    parser.add_argument("--demo-as-of", type=_demo_time, default=None,
-                        help="Mốc đối soát cố định cho fixture SIMULATED; mặc định dùng giờ thực.")
+    parser.add_argument(
+        "--demo-as-of",
+        type=_demo_time,
+        default=None,
+        help="Mốc đối soát cố định cho fixture SIMULATED; mặc định dùng giờ thực.",
+    )
+    parser.add_argument(
+        "--recording",
+        default=None,
+        help="RECORDED_REPLAY: file recording OCR keyed by digest (fixture).",
+    )
+    parser.add_argument(
+        "--fake-llm-dir",
+        default=None,
+        help="RECORDED_REPLAY: thư mục payload LLM canned + pages.json (CHỈ fixture/dev-test).",
+    )
     return parser
 
 
@@ -110,6 +129,14 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     mode = args.mode.upper()
+    if mode == "REPLAY":
+        mode = "RECORDED_REPLAY"
+    import os
+
+    if args.recording:
+        os.environ["REPLAY_RECORDING"] = args.recording
+    if args.fake_llm_dir:
+        os.environ["FAKE_LLM_DIR"] = args.fake_llm_dir
     settings = Settings()
     if mode == "LIVE" and settings.missing_for_live():
         print(
@@ -119,14 +146,18 @@ def main(argv: list[str] | None = None) -> int:
             "không có chế độ giả lập ngầm.",
         )
         return 2
-    if mode == "RECORDED_REPLAY":
+    if mode == "RECORDED_REPLAY" and not args.recording and not args.fake_llm_dir:
         print(
             "RECORDED_REPLAY chưa có read recording (đến ở T5). "
             "UI hiện chưa thực hiện đọc chứng từ; tiếp tục với server STUB nhãn REPLAY.",
         )
 
     workflow, digest = build_workflow(
-        args.db, args.uploads, args.context, mode=mode, settings=settings,
+        args.db,
+        args.uploads,
+        args.context,
+        mode=mode,
+        settings=settings,
         demo_as_of=args.demo_as_of,
     )
     app = create_app(
@@ -149,7 +180,9 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     if args.demo_as_of is not None:
-        print(f"  assessment: {args.demo_as_of.isoformat()} (mốc demo cố định; trace dùng giờ thực)")
+        print(
+            f"  assessment: {args.demo_as_of.isoformat()} (mốc demo cố định; trace dùng giờ thực)"
+        )
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
     return 0
 

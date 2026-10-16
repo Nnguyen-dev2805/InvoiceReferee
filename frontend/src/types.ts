@@ -30,6 +30,7 @@ export interface EvidenceRefView {
   source_sha256: string;
   page: number | null;
   exact_quote: string;
+  bbox?: [number, number, number, number] | null;
 }
 
 export interface IssueView {
@@ -68,6 +69,7 @@ export type PaymentBasisKind =
   | "FINANCIAL_CONFIRMATION"
   | "EMPLOYEE_PAID_INVOICE"
   | "EMPLOYEE_DECLARATION_Q32"
+  | "ALTERNATIVE_ACCEPTED"
   | "UNSPECIFIED_LEGACY";
 
 export interface PaymentBasisView {

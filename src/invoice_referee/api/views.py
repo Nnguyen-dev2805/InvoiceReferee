@@ -78,6 +78,14 @@ class SubmitRequest(ApiModel):
     declared_advance: int | None = None
     incurred_total: int | None = None
     original_declared_advance: int | None = None
+    # S6 digital intake (all optional; paper callers omit them).
+    settlement_type: Literal["ADVANCE_SETTLEMENT", "EMPLOYEE_REIMBURSEMENT"] = (
+        "ADVANCE_SETTLEMENT"
+    )
+    submission_source: Literal["PAPER_SCAN", "DIGITAL_FORM"] = "PAPER_SCAN"
+    digital_lines: list[DigitalLineRequest] = Field(default_factory=list)
+    no_advance_asserted: bool = False
+    no_advance_reason: str | None = None
 
 
 class AnswerRequest(ApiModel):
@@ -95,6 +103,34 @@ class DecisionRequest(ApiModel):
     effect_scope: str
     amount: int | None = None
     reason: str
+
+
+class RefuseRequest(ApiModel):
+    issue_ids: list[str] = Field(min_length=1)
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class DigitalLineRequest(ApiModel):
+    item_id: str
+    description: str
+    category: str | None = None
+    expense_date: str
+    amount: int
+    evidence_status: Literal["ORIGINAL", "ALTERNATIVE", "NO_EVIDENCE"] = "ORIGINAL"
+    alternative_type: str | None = None
+    exception_reason: str | None = None
+    note: str | None = None
+    source_ids: list[str] = Field(default_factory=list)
+
+
+class DigitalDeclarationRequest(ApiModel):
+    declared_purpose: str
+    settlement_type: Literal["ADVANCE_SETTLEMENT", "EMPLOYEE_REIMBURSEMENT"] = (
+        "ADVANCE_SETTLEMENT"
+    )
+    digital_lines: list[DigitalLineRequest] = Field(default_factory=list)
+    no_advance_asserted: bool = False
+    no_advance_reason: str | None = None
 
 
 class MoneyInput(ApiModel):
@@ -149,6 +185,17 @@ class ConfirmCoverageRequest(ApiModel):
     unallocated_event_ids: list[str] = Field(default_factory=list)
     witness_refs: list[EvidenceRef] = Field(default_factory=list)
     reason: str = Field(min_length=12)
+
+
+class RecheckDossierHistoryRequest(ApiModel):
+    reason: str = Field(min_length=12, max_length=2000)
+
+
+class MarkExecutionRequest(ApiModel):
+    instruction_id: str
+    execution_state: Literal["OPEN", "CLOSED_CONFIRMED", "UNKNOWN"]
+    refs: list[EvidenceRef] = Field(default_factory=list)
+    reason: str = Field(min_length=1, max_length=2000)
 
 
 class ControlRequest(ApiModel):

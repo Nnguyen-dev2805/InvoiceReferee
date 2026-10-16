@@ -57,7 +57,7 @@ def initial_history(cx, row, *, actor: str, now: datetime) -> CoverageRecord:
     )
 
 
-def record_dossier_history(cx, row, *, actor: str, now: datetime, only_if_untracked: bool = False) -> bool:
+def record_dossier_history(cx, row, *, actor: str, now: datetime, only_if_untracked: bool = False, reason: str | None = None) -> bool:
     """Scope is recorded dossier money, never an assertion of complete bank history.
 
     Called after a source-bound advance or an instruction-bound P/R succeeded.
@@ -84,7 +84,7 @@ def record_dossier_history(cx, row, *, actor: str, now: datetime, only_if_untrac
         as_of=now, recorded_at=now, ledger_version=str(version),
         flow_kinds=COVERAGE_REQUIRED_FLOW_KINDS,
         context_ledger_fingerprint=fingerprint,
-        reason="Đối soát các khoản tiền đã ghi nhận cho hồ sơ theo chứng từ được xác nhận; không xác nhận toàn bộ lịch sử ngân hàng.",
+        reason=reason or "Đối soát các khoản tiền đã ghi nhận cho hồ sơ theo chứng từ được xác nhận; không xác nhận toàn bộ lịch sử ngân hàng.",
         witness_refs=tuple(dict.fromkeys(ref for event in events for ref in event.refs)),
     )
     cx.execute(

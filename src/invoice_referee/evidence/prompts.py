@@ -52,9 +52,11 @@ declared_advance lấy số khai ứng, không phải tiền thực nhận đã 
 printed_return là số ghi nhân viên phải hoàn; printed_reimbursement là công ty chi thêm.
 Không tự tính số thiếu hoặc sửa số in sai. printed_total/amount_words giữ đúng nguồn.
 Mỗi cost row một entry, không lấy dòng tổng/subtotal làm khoản chi.
-Row fields: description, amount, invoice_refs (string array), no_evidence_reason.
+Row fields: description, amount, invoice_refs (string array), no_evidence_reason, note.
 invoice_refs.value phải là JSON array ["INV-X9"], không phải chuỗi chứa JSON hoặc một chuỗi ID.
 Giữ lý do thiếu chứng từ trong no_evidence_reason; không tự suy lý do khi trống.
+note là nguyên văn ghi chú trên giấy/dòng (tùy chọn, giữ đúng chữ); không dùng note làm
+no_evidence_reason và không suy loại tài liệu từ note.
 Không ghi đính kèm không có nghĩa được miễn chứng từ.
 """,
     "E_INVOICE": """

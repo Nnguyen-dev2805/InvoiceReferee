@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Coverage } from "../src/features/coverage";
@@ -111,4 +112,22 @@ describe("Coverage", () => {
     expect(screen.getByText(/Giấy quyết toán khai nhân viên hoàn lại 760.000 ₫/)).toBeInTheDocument();
     expect(screen.getByText(/chưa có giao dịch hoàn đã xác minh/)).toBeInTheDocument();
   });
+});
+
+it("offers history recheck only for explicit stale coverage", async () => {
+ const view=baseCase();view.coverage_current=false;
+ view.coverage_record={scope:view.activity!,employee:view.employee!,source:"DOSSIER_RECORDS",start:"2026-10-01T00:00:00Z",as_of:"2026-10-15T00:00:00Z",funds:[],flow_kinds:[],opening_balance:null,ledger_version:"1",witness_refs:[],actor:"employee:accountant-demo",recorded_at:"2026-10-15T00:00:00Z",reason:"Dòng tiền hồ sơ",unallocated_event_ids:[]};
+ view.issues=[{id:"issue:history",kind:"FACT",field_or_rule:"ledger:coverage",owner:"accountant",status:"OPEN",basis:"stale",refs:[],question:"kiểm tra lại"}];
+ const fetched=vi.fn(async()=>new Response(JSON.stringify({case_view:{...view,version:8,coverage_current:true}}),{status:200}));vi.stubGlobal("fetch",fetched);
+ const onCase=vi.fn();render(<Coverage caseView={view} onCase={onCase}/>);
+ const user=userEvent.setup();await user.click(screen.getByLabelText(/Tôi đã kiểm tra các giao dịch/));
+ await user.click(screen.getByRole("button",{name:"Xác nhận đã đối chiếu lại"}));
+ await waitFor(()=>expect(onCase).toHaveBeenCalledOnce());
+});
+
+it("does not mislabel missing coverage as a recheck", () => {
+ const view=baseCase();view.coverage_current=false;view.coverage_record=null;
+ view.issues=[{id:"issue:history",kind:"FACT",field_or_rule:"ledger:coverage",owner:"accountant",status:"OPEN",basis:"missing",refs:[],question:"kiểm tra"}];
+ render(<Coverage caseView={view} onCase={()=>{}}/>);
+ expect(screen.queryByRole("button",{name:"Xác nhận đã đối chiếu lại"})).toBeNull();
 });

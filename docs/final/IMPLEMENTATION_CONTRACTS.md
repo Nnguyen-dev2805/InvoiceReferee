@@ -37,6 +37,7 @@ optional bbox. Model không được sinh file URL/path hay tự cấp Fact.KNOW
 | domain/policy.py | PolicyVersion(id,version,effective_from/to,profile,rules); Grant(id,version,actor,actions,scope,max_amount,effective_from/to); BudgetDecision legacy record (accepted for old-context compatibility, not a current decision input); ExceptionDecision(rule_id,expense_ids,activity,max_effect,actions,actor,grant_ref,decided_at,effect_range,refs,reason) |
 | domain/case.py | CaseScope(tenant,employee,activity,profile); ReadSet(input_revision,control_epoch,context_version,ledger_version,usage_version); AssessmentInput(scope,expense_facts,observations,relations,confirmations,ledger,coverage,policy,grants,budget (legacy, ignored),exceptions,previous_eligibility,read_set,as_of); FinancialEffect(direction:PAY/COLLECT,amount:Vnd,employee,activity,basis); AssessmentResult(projection,issues,problems,required_authorizations,allowed_effect:FinancialEffect\|None,cost_basis,money_basis); CommandContext(session_id,actor_id,command_id,expected_case_version); EligibilityDecision(E,cost_basis,actor_or_system,grant_refs,refs); SettlementConclusion(status,projection,expense_dispositions,read_set,basis,refs,actor_or_system,decided_at); Instruction(id,root_id,direction,amount,status,basis,authority_refs,supersedes_id,fulfilled_amount:Vnd,remaining:Vnd,execution_state:NOT_STARTED/OPEN/CLOSED_CONFIRMED/UNKNOWN); CaseView(id,version,state,summary,sources,issues,problems,conclusion,instructions,actual_money:Projection,audit) |
 | domain/issues.py | BusinessIssue(id,kind FACT/POLICY/AUTHORITY,field_or_rule,owner,depends_on,status,basis,refs,question); ProcessingProblem(kind TECHNICAL/LIMIT/UNSUPPORTED,affected_fields,message); QuestionCard(issue_id,known_facts,excerpt_refs,required_answer,effects,owner); Answer(issue_id,basis_id,answer_kind,value,refs,reason); DecisionCommand(issue_ids,basis_id,actions,effect_scope,amount,reason,refs) |
+| domain/commands.py (S6) | DigitalExpenseLine(item_id ổn định,description,category?,expense_date,amount:int,evidence_status ORIGINAL/ALTERNATIVE/NO_EVIDENCE,alternative_type?,exception_reason?,note?,source_ids); Declaration += settlement_type ADVANCE_SETTLEMENT/EMPLOYEE_REIMBURSEMENT (default ADVANCE_SETTLEMENT), submission_source PAPER_SCAN/DIGITAL_FORM (default PAPER_SCAN), digital_lines, no_advance_asserted + no_advance_reason. Server validate toàn bộ + resolve source_ids trên attached sources; submit digital yêu cầu cùng canonical hash với bản đọc. |
 | adaptation/models.py | Opportunity(id,root_id,initial_basis,field,eligible_steps,features,score,threshold_version); Feedback(id,initial_basis,observed_action,correction,new_fact,exception,question_needed,final_correct,origin,data_origin,verification,verifier,refs); ThresholdVersion(id,threshold,selection_ids,validation_ids,activated_at,previous_id) |
 
 Read states CLEAR/MISSING/UNREADABLE/NOT_READ/ERROR là observation, không Fact.KNOWN.
@@ -92,6 +93,14 @@ xác nhận thực hiện đúng lệnh P/R, không bắt tạo thêm một kho�
 Mã giao dịch chống trùng, version/scope/role guards và giới hạn quyền giữ nguyên.
 Bổ sung quá khứ/ngoài luồng, đảo, unknown và context ledger thay đổi được kiểm
 lại; không có thao tác xác nhận lịch sử chung trên UI để bỏ qua vấn đề cụ thể.
+S6: khi checkpoint `DOSSIER_RECORDS` đã tồn tại nhưng không còn current, kế toán
+có grant `RECORD_ACTUAL` đúng scope/profile có thể dùng
+`RecheckDossierHistory(root_id,reason)` sau khi đối chiếu các khoản đã ghi.
+Lệnh versioned/idempotent này chỉ làm mới checkpoint dossier, giữ source
+`DOSSIER_RECORDS`, không tạo opening balance0 hoặc xác nhận toàn bộ ngân hàng;
+không có checkpoint, có giao dịch chưa xác minh/chưa phân bổ/mâu thuẫn thì từ chối.
+Không dùng thao tác này để tự đóng một vấn đề dữ kiện cụ thể.
+
 Legacy API `ConfirmMoneyHistory` / `MANAGED_HISTORY` giữ cho dữ liệu/caller cũ,
 nhưng UI không gọi và không yêu cầu người dùng thực hiện. Xác nhận lại một biên
 nhận ứng đã ghi có thể thiết lập dossier tracking mà không cộng A lần nữa.
@@ -457,9 +466,23 @@ uncertainty if provider cannot resolve a snapshot, don't fake exact reproducibil
 - CaseCommand tagged union trong domain/commands.py: CreateDraft(activity_data),
   AttachSources(root_id,uploads), ReviseDeclaration(root_id,declaration),
   Submit(root_id,declaration), AnswerIssue(root_id,Answer), Decide(root_id,DecisionCommand),
+  RefuseException(root_id,issue_ids,reason) (S6: accountant/approver từ chối ngoại lệ;
+  audit + REFUSED, issues giữ OPEN),
   RecordActual(root_id,RecordMoneyInput), Control(root_id,STOP/RESUME,reason),
   Override(root_id,supersedes_decision_id,DecisionCommand),
   MarkExecution(root_id,instruction_id,OPEN/CLOSED_CONFIRMED/UNKNOWN,refs,reason).
+  S6 bổ sung RecheckDossierHistory(root_id,reason), route
+  `/cases/{id}/money-history/recheck` (version + command-id bắt buộc).
+  MarkExecution route `/cases/{id}/mark-execution`: kiểm RECORD_ACTUAL grant
+  đúng actor/activity/profile/full instruction amount/time; lệnh phải thuộc root,
+  nguồn phải thuộc tenant/root/digest, đóng cần page/quote + reason, audit và
+  reassess cùng transaction. FULFILLED còn OPEN/UNKNOWN không được SETTLED.
+- Chấp nhận ngoại lệ thiếu chứng từ (S6): Decide với actions=[EXCEPT_POLICY] trên
+  issue `expense:<n>:missing_evidence`, kèm amount (số khai dòng, server tự lấy)
+  và reason; grant EXCEPT_POLICY đúng scope/effect/hạn mức được kiểm ở workflow
+  boundary; quyết định persist vào `case_exception_decisions` (ACCEPTED) và được
+  nạp vào AssessmentInput.exceptions ở mọi lần reassess — không resurrect issues.
+  Từ chối persist REFUSED và đổi nothing.
 - CommandResult(case_view,job_id:Id|None,duplicate_command:bool). Client mutations
   dùng expected_case_version; STOP là control signal được phép áp trên version mới
   nhất sau kiểm actor/idempotency, không fail chỉ vì financial commit vừa tăng version.

@@ -361,6 +361,42 @@ CREATE TABLE IF NOT EXISTS case_confirmations (
     UNIQUE (root_id, fact_key)
 );
 
+-- Digital web-form declarations (S6, 18/10/2026). The employee's typed rows
+-- (declaration, not OCR) with per-line evidence mapping. The read builds a
+-- synthetic paper from the latest revision; submit re-validates and requires
+-- the same canonical hash as the stored read.
+CREATE TABLE IF NOT EXISTS case_digital_declarations (
+    root_id     TEXT NOT NULL REFERENCES cases(id),
+    revision    INTEGER NOT NULL,
+    payload_json TEXT NOT NULL,
+    canonical_hash TEXT NOT NULL,
+    actor       TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (root_id, revision)
+);
+-- decision persists here (rule/expense/scope/effect/actor/grant/time/refs/reason)
+-- so reassessment keeps clearing the covered issues instead of resurrecting
+-- them. A refusal is kept with status REFUSED and changes no issue. Facts and
+-- actual money are never rewritten by either row.
+CREATE TABLE IF NOT EXISTS case_exception_decisions (
+    id          TEXT PRIMARY KEY,
+    tenant      TEXT NOT NULL,
+    root_id     TEXT NOT NULL REFERENCES cases(id),
+    rule_id     TEXT NOT NULL,
+    expense_ids_json TEXT NOT NULL DEFAULT '[]',
+    activity    TEXT NOT NULL,
+    max_effect  INTEGER NOT NULL,
+    actions_json TEXT NOT NULL DEFAULT '[]',
+    actor       TEXT NOT NULL,
+    grant_ref   TEXT,
+    decided_at  TEXT NOT NULL,
+    effect_from TEXT NOT NULL,
+    effect_to   TEXT,
+    refs_json   TEXT NOT NULL DEFAULT '[]',
+    reason      TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'ACCEPTED'
+);
+
 -- Append-only money ledger (contracts §4, §10.1). A recorded event is never
 -- edited or deleted; a reversal is a new linked event. external_key is unique
 -- per tenant so a re-sent transaction is not counted twice.

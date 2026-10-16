@@ -23,12 +23,16 @@ from invoice_referee.domain.commands import (
     CommandResult,
     ConfirmCoverage,
     ConfirmMoneyHistory,
+    RecheckDossierHistory,
     Control,
     CreateDraft,
     Decide,
     Declaration,
+    DigitalExpenseLine,
+    MarkExecution,
     Override,
     RecordActual,
+    RefuseException,
     SourceUpload,
     Submit,
 )
@@ -469,6 +473,25 @@ async def submit_case(
                 declared_advance=payload.declared_advance,
                 incurred_total=payload.incurred_total,
                 original_declared_advance=payload.original_declared_advance,
+                settlement_type=payload.settlement_type,
+                submission_source=payload.submission_source,
+                digital_lines=tuple(
+                    DigitalExpenseLine(
+                        item_id=line.item_id,
+                        description=line.description,
+                        category=line.category,
+                        expense_date=line.expense_date,
+                        amount=line.amount,
+                        evidence_status=line.evidence_status,  # type: ignore[arg-type]
+                        alternative_type=line.alternative_type,  # type: ignore[arg-type]
+                        exception_reason=line.exception_reason,
+                        note=line.note,
+                        source_ids=tuple(line.source_ids),
+                    )
+                    for line in payload.digital_lines
+                ),
+                no_advance_asserted=payload.no_advance_asserted,
+                no_advance_reason=payload.no_advance_reason,
             ),
             employee_paid_claims=claims,
         ),
@@ -803,6 +826,166 @@ async def settlement_draft(
     uploads.extend(await _read_part(evidence, "evidence"))
     draft = await workflow.read_settlement_draft(session, root_id, tuple(uploads))  # type: ignore[arg-type]
     return draft
+
+
+@router.post("/cases/{root_id}/declaration/digital")
+async def save_digital_declaration(
+    request: Request, root_id: str, payload: views.DigitalDeclarationRequest
+) -> dict[str, object]:
+    """Validate + persist a DIGITAL_FORM declaration (S6).
+
+    The server re-validates every row against attached case sources; files are
+    referenced by source id, never bare filename.
+    """
+    from invoice_referee.domain.commands import Declaration, DigitalExpenseLine
+
+    session = _require_session(request)
+    workflow = _workflow(request)
+    return workflow.save_digital_declaration(
+        session,
+        root_id,
+        Declaration(
+            declared_purpose=payload.declared_purpose,
+            settlement_type=payload.settlement_type,
+            submission_source="DIGITAL_FORM",
+            digital_lines=tuple(
+                DigitalExpenseLine(
+                    item_id=line.item_id,
+                    description=line.description,
+                    category=line.category,
+                    expense_date=line.expense_date,
+                    amount=line.amount,
+                    evidence_status=line.evidence_status,  # type: ignore[arg-type]
+                    alternative_type=line.alternative_type,  # type: ignore[arg-type]
+                    exception_reason=line.exception_reason,
+                    note=line.note,
+                    source_ids=tuple(line.source_ids),
+                )
+                for line in payload.digital_lines
+            ),
+            no_advance_asserted=payload.no_advance_asserted,
+            no_advance_reason=payload.no_advance_reason,
+        ).model_dump(mode="json"),
+    )
+
+
+@router.post("/cases/{root_id}/digital/draft")
+async def read_digital_draft(request: Request, root_id: str) -> dict[str, object]:
+    """Read attached evidence + the saved web declaration into a shared draft."""
+    session = _require_session(request)
+    workflow = _workflow(request)
+    return await workflow.read_digital_draft(session, root_id)
+
+
+@router.post("/cases/{root_id}/decisions/refuse")
+async def refuse_exception(
+    request: Request, root_id: str, payload: views.RefuseRequest
+) -> CommandResult:
+    """Record an exception refusal: audit + REFUSED row, issues stay OPEN."""
+    session = _require_session(request)
+    workflow = _workflow(request)
+    context = _command_context(request, session, require_version=True)
+    return await workflow.execute(
+        context,
+        RefuseException(
+            root_id=root_id,
+            issue_ids=tuple(payload.issue_ids),
+            reason=payload.reason,
+        ),
+    )
+
+
+@router.get("/cases/{root_id}/exceptions/preview")
+async def exception_preview(
+    request: Request, root_id: str, issue_id: str
+) -> dict[str, object]:
+    """Grant coverage for one exception decision by the current actor (S6).
+
+    Read-only: tells the accountant UI whether an accept would be authorized,
+    which grants cover it and the ceiling — never a grant itself.
+    """
+    session = _require_session(request)
+    workflow = _workflow(request)
+    return workflow.exception_grant_preview(session, root_id, issue_id)
+
+
+@router.get("/cases/{root_id}/sources/{source_id}/ocr-preview")
+async def ocr_preview(
+    request: Request,
+    root_id: str,
+    source_id: str,
+    page: int = 1,
+    x0: float = 0,
+    y0: float = 0,
+    x1: float = 0,
+    y1: float = 0,
+    ocr_width: float = 1000,
+    ocr_height: float = 1400,
+):
+    """Render one source page PNG with the review box (S6, accountant region view).
+
+    The box must come from a real source ref (bbox); without one the endpoint
+    refuses (409) and the UI falls back to file/page/quote + original link —
+    never an invented box.
+    """
+    from fastapi.responses import Response
+
+    from invoice_referee.evidence.ocr_preview import render_ocr_block_preview
+
+    session = _require_session(request)
+    workflow = _workflow(request)
+    if not (x1 > x0 and y1 > y0 and ocr_width > 0 and ocr_height > 0):
+        raise HTTPException(
+            status_code=409,
+            detail="Vùng OCR chưa có bbox nguồn; xem file/trang/trích dẫn gốc.",
+        )
+    case = workflow.view(_read_context(session), root_id)
+    matching = next((s for s in case.sources if s.id == source_id), None)
+    if matching is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy nguồn trong hồ sơ.")
+    file_path = workflow.uploads_dir / matching.storage_key
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=404, detail="Tệp chứng từ không tồn tại trên máy chủ."
+        )
+    try:
+        image = render_ocr_block_preview(
+            file_path,
+            page_index=page - 1,
+            bounding_box={
+                "top_left_x": x0,
+                "top_left_y": y0,
+                "bottom_right_x": x1,
+                "bottom_right_y": y1,
+            },
+            ocr_width=ocr_width,
+            ocr_height=ocr_height,
+            media=matching.media,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+    import io
+
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return Response(content=buffer.getvalue(), media_type="image/png")
+
+
+@router.post("/cases/{root_id}/money-history/recheck")
+async def recheck_dossier_history(request: Request, root_id: str, payload: views.RecheckDossierHistoryRequest) -> CommandResult:
+    session = _require_session(request)
+    context = _command_context(request, session, require_version=True)
+    return await _workflow(request).execute(context, RecheckDossierHistory(root_id=root_id, reason=payload.reason))
+
+
+@router.post("/cases/{root_id}/mark-execution")
+async def mark_execution(request: Request, root_id: str, payload: views.MarkExecutionRequest) -> CommandResult:
+    session = _require_session(request)
+    context = _command_context(request, session, require_version=True)
+    return await _workflow(request).execute(context, MarkExecution(
+        root_id=root_id, instruction_id=payload.instruction_id,
+        execution_state=payload.execution_state, refs=tuple(payload.refs), reason=payload.reason,
+    ))
 
 
 @router.post("/cases/{root_id}/control")

@@ -183,6 +183,9 @@ def build_settlement_draft(
 
     expenses: list[dict[str, object]] = []
     if paper is not None:
+        links_by_item: dict[str, list] = {}
+        for link in report.links:
+            links_by_item.setdefault(link.item_id, []).append(link)
         for index, line in enumerate(paper.line_items, start=1):
             amount_candidate = _line_candidate(line, "amount")
             description_candidate = _line_candidate(line, "description")
@@ -205,27 +208,31 @@ def build_settlement_draft(
             # it (by invoice number); never a guessed file. Number comparison
             # uses the canonical series/suffix rule shared with the matcher
             # (IR26E/00002502 matches 00002502), so draft and final agree.
+            # ALL row refs are resolved (one row may name several documents);
+            # the row shows the whole set, never only the first file.
             matched_filename = None
             suggested_filename = None
             matched_doc_id = None
-            if invoice_no is not None:
+            linked_doc = None
+            if refs_value:
                 from invoice_referee.evidence.matching import (
                     _invoice_ref_matches_number,
                 )
 
-                for document in report.documents:
-                    number = _found(document, "document_number")
-                    if number is None:
-                        continue
-                    if _invoice_ref_matches_number(str(invoice_no), str(number)):
-                        source_id = matched.get(document.document_id)
-                        if source_id is not None:
-                            matched_filename = names.get(source_id)
-                            matched_doc_id = document.document_id
-                        suggest_id = suggested.get(document.document_id)
-                        if suggest_id is not None:
-                            suggested_filename = names.get(suggest_id)
-                        break
+                for ref in refs_value:
+                    for document in report.documents:
+                        number = _found(document, "document_number")
+                        if number is None:
+                            continue
+                        if _invoice_ref_matches_number(str(ref), str(number)):
+                            source_id = matched.get(document.document_id)
+                            if source_id is not None and matched_filename is None:
+                                matched_filename = names.get(source_id)
+                                matched_doc_id = document.document_id
+                            suggest_id = suggested.get(document.document_id)
+                            if suggest_id is not None and suggested_filename is None:
+                                suggested_filename = names.get(suggest_id)
+                            break
             if matched_doc_id is not None:
                 linked_doc = doc_by_id.get(matched_doc_id)
                 profile = (
@@ -256,9 +263,44 @@ def build_settlement_draft(
                             "matched_invoice": matched_filename,
                             "suggested_invoice": suggested_filename,
                             "refs": _refs(line),
+                            "evidence_files": [
+                                {
+                                    "filename": names.get(
+                                        doc_by_id[link.document_id].source_id
+                                    )
+                                    if link.document_id in doc_by_id
+                                    else None,
+                                    "document_id": link.document_id,
+                                    "document_type": doc_by_id[
+                                        link.document_id
+                                    ].document_type
+                                    if link.document_id in doc_by_id
+                                    else None,
+                                    "link_status": link.status,
+                                }
+                                for link in links_by_item.get(f"ITEM-{index:03d}", [])
+                            ],
+                            "exception_reason": (
+                                str(reason_value)
+                                if (
+                                    reason_value := _line_field(
+                                        line, "no_evidence_reason"
+                                    )
+                                )
+                                is not None
+                                else None
+                            ),
                         }
                     )
                     continue
+            from invoice_referee.evidence.matching import (
+                ORIGINAL_EXPENSE_DOCUMENT_TYPES,
+            )
+
+            matched_is_alternative = (
+                linked_doc is not None
+                and linked_doc.document_type not in ORIGINAL_EXPENSE_DOCUMENT_TYPES
+            )
             conflict = conflict_by_item.get(f"ITEM-{index:03d}")
             dispute: dict[str, object] | None = None
             if conflict is not None and matched_filename is None:
@@ -310,15 +352,19 @@ def build_settlement_draft(
                     "status": "UNRESOLVED"
                     if amount is None or description is None
                     else (
-                        "CLEAR"
-                        if matched_filename is not None
+                        "ALTERNATIVE"
+                        if matched_is_alternative
                         else (
-                            "DISPUTED"
-                            if dispute is not None
+                            "CLEAR"
+                            if matched_filename is not None
                             else (
-                                "SUGGESTED"
-                                if suggested_filename is not None
-                                else "UNMATCHED"
+                                "DISPUTED"
+                                if dispute is not None
+                                else (
+                                    "SUGGESTED"
+                                    if suggested_filename is not None
+                                    else "UNMATCHED"
+                                )
                             )
                         )
                     ),
@@ -326,6 +372,30 @@ def build_settlement_draft(
                     "suggested_invoice": suggested_filename,
                     "dispute": dispute,
                     "refs": _refs(line),
+                    # The row's evidence set with roles (S6): every linked
+                    # document with its type + link status, so association,
+                    # allocation and validity stay visually distinct.
+                    "evidence_files": [
+                        {
+                            "filename": names.get(doc_by_id[link.document_id].source_id)
+                            if link.document_id in doc_by_id
+                            else None,
+                            "document_id": link.document_id,
+                            "document_type": doc_by_id[link.document_id].document_type
+                            if link.document_id in doc_by_id
+                            else None,
+                            "link_status": link.status,
+                        }
+                        for link in links_by_item.get(f"ITEM-{index:03d}", [])
+                    ],
+                    # The declared missing-original reason, if any; the draft
+                    # never invents one (spec B).
+                    "exception_reason": (
+                        str(reason_value)
+                        if (reason_value := _line_field(line, "no_evidence_reason"))
+                        is not None
+                        else None
+                    ),
                 }
             )
 

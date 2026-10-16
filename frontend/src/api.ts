@@ -81,6 +81,11 @@ export async function submitCase(
     incurred_total?: number | null;
     original_declared_advance?: number | null;
     confirmed_activity_id?: string | null;
+    settlement_type?: "ADVANCE_SETTLEMENT" | "EMPLOYEE_REIMBURSEMENT";
+    submission_source?: "PAPER_SCAN" | "DIGITAL_FORM";
+    digital_lines?: DigitalExpenseLineInput[];
+    no_advance_asserted?: boolean;
+    no_advance_reason?: string | null;
   } = {},
 ): Promise<CommandResultView> {
   return request<CommandResultView>(
@@ -159,6 +164,18 @@ export async function recordActual(
     newCommandId(),
     version,
   );
+}
+
+export async function markExecution(rootId: string, body: {
+  instruction_id: string; execution_state: "OPEN" | "CLOSED_CONFIRMED" | "UNKNOWN";
+  refs: Array<{source_id: string; source_sha256: string; page: number; exact_quote: string}>;
+  reason: string;
+}, version: number): Promise<CommandResultView> {
+  return request(`/api/cases/${rootId}/mark-execution`, body, newCommandId(), version);
+}
+
+export async function recheckMoneyHistory(rootId: string, version: number): Promise<CommandResultView> {
+  return request(`/api/cases/${rootId}/money-history/recheck`, {reason: "Kế toán đã đối chiếu các giao dịch đã ghi nhận cho đúng hồ sơ; không xác nhận toàn bộ lịch sử ngân hàng."}, newCommandId(), version);
 }
 
 export async function advanceDraft(
@@ -250,6 +267,15 @@ export interface SettlementExpenseItem {
   suggested_invoice?: string;
   dispute?: ReconciliationFinding | null;
   seller?: string;
+  evidence_files?: SettlementEvidenceFile[];
+  exception_reason?: string | null;
+}
+
+export interface SettlementEvidenceFile {
+  filename: string | null;
+  document_id: string;
+  document_type: string | null;
+  link_status: string;
 }
 
 export interface ReconciliationFindingRef {
@@ -402,6 +428,122 @@ export async function attachSources(
     credentials: "same-origin",
   });
   return parse<CommandResultView>(response);
+}
+
+export interface DigitalExpenseLineInput {
+  item_id: string;
+  description: string;
+  category?: string | null;
+  expense_date: string;
+  amount: number;
+  evidence_status: "ORIGINAL" | "ALTERNATIVE" | "NO_EVIDENCE";
+  alternative_type?: string | null;
+  exception_reason?: string | null;
+  note?: string | null;
+  source_ids: string[];
+}
+
+export interface DigitalDeclarationInput {
+  declared_purpose: string;
+  settlement_type: "ADVANCE_SETTLEMENT" | "EMPLOYEE_REIMBURSEMENT";
+  digital_lines: DigitalExpenseLineInput[];
+  no_advance_asserted: boolean;
+  no_advance_reason?: string | null;
+}
+
+export async function saveDigitalDeclaration(
+  rootId: string,
+  declaration: DigitalDeclarationInput,
+): Promise<{ revision: number; canonical_hash: string }> {
+  return request<{ revision: number; canonical_hash: string }>(
+    `/api/cases/${rootId}/declaration/digital`,
+    declaration,
+    newCommandId(),
+  );
+}
+
+export async function readDigitalDraft(
+  rootId: string,
+): Promise<SettlementDraftResponse> {
+  return request<SettlementDraftResponse>(
+    `/api/cases/${rootId}/digital/draft`,
+    {},
+    newCommandId(),
+  );
+}
+
+export async function refuseException(
+  rootId: string,
+  body: { issue_ids: string[]; reason: string },
+  version: number,
+): Promise<CommandResultView> {
+  return request<CommandResultView>(
+    `/api/cases/${rootId}/decisions/refuse`,
+    body,
+    newCommandId(),
+    version,
+  );
+}
+
+export async function decideIssues(
+  rootId: string,
+  body: {
+    issue_ids: string[];
+    basis_id: string;
+    actions: string[];
+    effect_scope: string;
+    amount?: number | null;
+    reason: string;
+  },
+  version: number,
+): Promise<CommandResultView> {
+  return request<CommandResultView>(
+    `/api/cases/${rootId}/decisions`,
+    body,
+    newCommandId(),
+    version,
+  );
+}
+
+export interface ExceptionPreview {
+  issue_id: string;
+  rule_id: string | null;
+  expense_id: string | null;
+  amount: number | null;
+  covered: boolean;
+  grants: Array<{
+    id: string;
+    max_amount: number;
+    effective_from: string;
+    effective_to: string | null;
+  }>;
+}
+
+export async function exceptionPreview(
+  rootId: string,
+  issueId: string,
+): Promise<ExceptionPreview> {
+  const response = await fetch(
+    `/api/cases/${rootId}/exceptions/preview?issue_id=${encodeURIComponent(issueId)}`,
+    { headers: { "X-Command-Id": newCommandId() }, credentials: "same-origin" },
+  );
+  return parse<ExceptionPreview>(response);
+}
+
+export function ocrPreviewUrl(
+  rootId: string,
+  sourceId: string,
+  page: number | null,
+  bbox: [number, number, number, number],
+): string {
+  const params = new URLSearchParams({
+    page: String(page ?? 1),
+    x0: String(bbox[0]),
+    y0: String(bbox[1]),
+    x1: String(bbox[2]),
+    y1: String(bbox[3]),
+  });
+  return `/api/cases/${rootId}/sources/${encodeURIComponent(sourceId)}/ocr-preview?${params}`;
 }
 
 export async function readEmployeeReturnDraft(

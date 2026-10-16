@@ -80,3 +80,37 @@ describe("money-flow UI", () => {
     expect(onCase).toHaveBeenCalledOnce();
   });
 });
+
+
+describe("execution closure", () => {
+  it("closes a fulfilled instruction with source proof and current version", async () => {
+    const view=baseCase();
+    view.sources=[{id:"source:pay",digest:"a".repeat(64),tenant:"tenant:demo",media:"PDF",storage_key:"proof",filename:"pay.pdf"}];
+    view.instructions=[{id:"instruction:pay",direction:"PAY",amount:3700000,status:"FULFILLED",basis:"S",fulfilled_amount:3700000,remaining:0,execution_state:"NOT_STARTED"}];
+    const onCase=vi.fn();
+    const fetchMock=vi.fn(async(_input: RequestInfo | URL, _init?: RequestInit)=>new Response(JSON.stringify({case_view:{...view,version:5,state:"SETTLED"}}),{status:200}));
+    vi.stubGlobal("fetch",fetchMock);
+    render(<Execution caseView={view} onCase={onCase}/>);
+    const user=userEvent.setup();
+    await user.selectOptions(screen.getByLabelText("Lệnh xác nhận thực hiện"),"instruction:pay");
+    await user.selectOptions(screen.getByLabelText("Chứng từ xác nhận thực hiện"),"source:pay");
+    await user.type(screen.getByLabelText("Căn cứ xác nhận thực hiện"),"Hoàn tất chuyển 3700000");
+    await user.type(screen.getByLabelText("Lý do xác nhận thực hiện"),"Đã kiểm tra đủ giao dịch, không còn tiền đang chuyển");
+    await user.click(screen.getByRole("button",{name:"Xác nhận đã hoàn tất thực hiện"}));
+    await waitFor(()=>expect(onCase).toHaveBeenCalledOnce());
+    expect(fetchMock.mock.calls[0][0]).toContain("/mark-execution");
+    const init=fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.headers).toMatchObject({"X-Expected-Version":"4"});
+    expect(JSON.parse(String(init.body))).toMatchObject({instruction_id:"instruction:pay",execution_state:"CLOSED_CONFIRMED",refs:[{source_id:"source:pay",page:1,exact_quote:"Hoàn tất chuyển 3700000"}]});
+  });
+});
+
+it("uploads a payout proof without writing money", async () => {
+ const view=baseCase();view.instructions=[{id:"instruction:pay",direction:"PAY",amount:3700000,status:"ISSUED",basis:"S",fulfilled_amount:0,remaining:3700000,execution_state:"NOT_STARTED"}];
+ const calls: string[]=[];const onCase=vi.fn();
+ vi.stubGlobal("fetch",vi.fn(async(input: RequestInfo | URL)=>{calls.push(String(input));return new Response(JSON.stringify({case_view:{...view,version:5,sources:[{id:"source:payout",filename:"payout.pdf",digest:"b".repeat(64)}]}}),{status:200});}));
+ render(<Execution caseView={view} onCase={onCase}/>);
+ const user=userEvent.setup();await user.upload(screen.getByLabelText("Tải chứng từ chi bổ sung"),new File(["pdf"],"payout.pdf",{type:"application/pdf"}));
+ await user.click(screen.getByRole("button",{name:"Lưu chứng từ chi bổ sung"}));
+ await waitFor(()=>expect(onCase).toHaveBeenCalledOnce());expect(calls).toEqual([`/api/cases/${view.id}/sources`]);
+});

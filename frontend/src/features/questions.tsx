@@ -3,6 +3,7 @@ import { useState } from "react";
 import { answerIssue, errorMessage } from "../api";
 import { formatVndHint } from "../format";
 import type { CaseView, IssueView } from "../types";
+import { ExceptionReview, OcrRegionView } from "./exception_review";
 
 const KIND_LABELS: Record<string, string> = {
   FACT: "Dữ kiện thực tế",
@@ -304,6 +305,23 @@ export function QuestionCard({
         </div>
       )}
 
+      {/* 2b. Vùng OCR cần kiểm tra (chỉ khi ref mang bbox nguồn) */}
+      {(issue.refs ?? []).filter((ref) => ref.bbox !== null && ref.bbox !== undefined).length > 0 && (
+        <div className="space-y-2 pt-1">
+          <p className="text-slate-400 font-medium text-xs">Vùng OCR cần kiểm tra:</p>
+          {(issue.refs ?? [])
+            .filter((ref) => ref.bbox !== null && ref.bbox !== undefined)
+            .map((ref, idx) => (
+              <OcrRegionView
+                key={`${ref.source_id}:${ref.page}:${idx}`}
+                caseView={caseView}
+                reference={ref}
+                onSourceSelected={onSourceSelected}
+              />
+            ))}
+        </div>
+      )}
+
       {/* 3. Bảng kê đối chiếu mini (Phương án A) */}
       {lineTable && (
         <div className="border border-slate-200 rounded overflow-hidden max-w-xl text-xs bg-white">
@@ -563,12 +581,22 @@ export function Questions({
                 key={issue.id}
                 className={issue.id === currentActiveId ? "block" : "hidden"}
               >
-                <QuestionCard
-                  issue={issue}
-                  caseView={caseView}
-                  onCase={onCase}
-                  onSourceSelected={onSourceSelected}
-                />
+                {issue.kind === "POLICY" &&
+                issue.field_or_rule.endsWith(":missing_evidence") ? (
+                  <ExceptionReview
+                    issue={issue}
+                    caseView={caseView}
+                    onCase={onCase}
+                    onSourceSelected={onSourceSelected}
+                  />
+                ) : (
+                  <QuestionCard
+                    issue={issue}
+                    caseView={caseView}
+                    onCase={onCase}
+                    onSourceSelected={onSourceSelected}
+                  />
+                )}
               </div>
             ))}
           </div>

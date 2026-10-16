@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { errorMessage, recordActual } from "../api";
+import { errorMessage, recordActual, markExecution, attachSources } from "../api";
 import { formatVnd, formatVndHint } from "../format";
 import type { CaseView } from "../types";
 
@@ -19,6 +19,7 @@ export function Execution({
   onCase: (view: CaseView) => void;
   selectedQuote?: string | null;
 }) {
+  const [proofFile, setProofFile] = useState<File | null>(null);
   const [instructionId, setInstructionId] = useState("");
   const [sourceId, setSourceId] = useState("");
   const [page, setPage] = useState("1");
@@ -34,6 +35,19 @@ export function Execution({
   const activePays = caseView.instructions.filter(
     (item) => item.direction === "PAY" && ["ISSUED", "PARTIAL"].includes(item.status) && item.remaining > 0,
   );
+
+  async function uploadProof() {
+    if (!caseView || !proofFile) return;
+    setBusy(true); setError(null);
+    try {
+      const result = await attachSources(caseView.id, [proofFile], caseView.version);
+      const source = result.case_view.sources.filter(s => s.filename === proofFile.name).at(-1);
+      onCase(result.case_view);
+      if (source) setSourceId(source.id);
+      setProofFile(null);
+      setStatus("Đã lưu chứng từ chi bổ sung. Tiền chưa được ghi nhận.");
+    } catch(cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
+  }
 
   async function record() {
     if (caseView === null) return;
@@ -122,6 +136,10 @@ export function Execution({
           <div>
             <h3 className="font-semibold text-slate-800 text-xs">Ghi nhận chi bổ sung đã thực hiện</h3>
             <p className="text-[11px] text-slate-500 mt-0.5">Chỉ ghi khi ngân hàng đã hoàn tất. Mã giao dịch phải lấy từ chứng từ; không tự tạo mã.</p>
+          </div>
+          <div className="space-y-2">
+            <label className="block">Tải chứng từ chi bổ sung<input type="file" aria-label="Tải chứng từ chi bổ sung" accept="application/pdf,image/png,image/jpeg" onChange={e=>setProofFile(e.target.files?.[0] ?? null)}/></label>
+            <button type="button" disabled={busy || !proofFile} onClick={()=>void uploadProof()} className="rounded border px-3 py-2 disabled:opacity-40">Lưu chứng từ chi bổ sung</button>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-1">
@@ -223,8 +241,45 @@ export function Execution({
           </div>
         </div>
       )}
+      <ExecutionClosure caseView={caseView} onCase={onCase} />
       {status && <p role="status" className="rounded border border-emerald-200 bg-emerald-50 p-2.5 text-emerald-800">{status}</p>}
       {error && <p role="alert" className="rounded border border-rose-200 bg-rose-50 p-2.5 text-rose-800">{error}</p>}
     </section>
   );
+}
+
+
+function ExecutionClosure({caseView, onCase}: {caseView: CaseView; onCase: (view: CaseView) => void}) {
+  const [instructionId, setInstructionId] = useState("");
+  const [sourceId, setSourceId] = useState("");
+  const [quote, setQuote] = useState("");
+  const [page, setPage] = useState("1");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pending = caseView.instructions.filter(i => i.status === "FULFILLED" && i.execution_state !== "CLOSED_CONFIRMED");
+  if (!pending.length) return null;
+  async function close() {
+    const source = caseView.sources.find(s => s.id === sourceId);
+    if (!source || !pending.some(i => i.id === instructionId) || !quote.trim() || !reason.trim() || !Number.isInteger(Number(page)) || Number(page) < 1) {
+      setError("Chọn lệnh, chứng từ, trang và nêu căn cứ, lý do đã hoàn tất thực hiện."); return;
+    }
+    setBusy(true); setError(null);
+    try {
+      const result = await markExecution(caseView.id, {instruction_id: instructionId, execution_state: "CLOSED_CONFIRMED",
+        refs: [{source_id: source.id, source_sha256: source.digest, page: Number(page), exact_quote: quote.trim()}], reason: reason.trim()}, caseView.version);
+      onCase(result.case_view);
+    } catch(cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
+  }
+  return <div className="rounded border border-slate-200 p-4 space-y-3">
+    <h3 className="font-semibold">Xác nhận hoàn tất thực hiện</h3>
+    <p>Tiền theo lệnh đã ghi nhận đủ. Xác nhận đợt thực hiện đã kết thúc, không còn giao dịch đang chuyển. Thao tác này không ghi thêm tiền.</p>
+    <label className="block">Lệnh xác nhận thực hiện<select aria-label="Lệnh xác nhận thực hiện" value={instructionId} onChange={e=>setInstructionId(e.target.value)}><option value="">Chọn lệnh</option>{pending.map(i=><option key={i.id} value={i.id}>{i.id}</option>)}</select></label>
+    <label className="block">Chứng từ xác nhận thực hiện<select aria-label="Chứng từ xác nhận thực hiện" value={sourceId} onChange={e=>setSourceId(e.target.value)}><option value="">Chọn chứng từ</option>{caseView.sources.map(s=><option key={s.id} value={s.id}>{s.filename ?? s.id}</option>)}</select></label>
+    <label className="block">Trang xác nhận thực hiện<input aria-label="Trang xác nhận thực hiện" type="number" min="1" value={page} onChange={e=>setPage(e.target.value)}/></label>
+    <label className="block">Căn cứ xác nhận thực hiện<textarea aria-label="Căn cứ xác nhận thực hiện" value={quote} onChange={e=>setQuote(e.target.value)}/></label>
+    <label className="block">Lý do xác nhận thực hiện<textarea aria-label="Lý do xác nhận thực hiện" value={reason} onChange={e=>setReason(e.target.value)}/></label>
+    <button type="button" disabled={busy} onClick={()=>void close()} className="rounded bg-slate-950 text-white px-3 py-2 disabled:opacity-40">Xác nhận đã hoàn tất thực hiện</button>
+    {error && <p role="alert">{error}</p>}
+  </div>;
 }

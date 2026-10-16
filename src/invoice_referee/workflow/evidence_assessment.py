@@ -27,7 +27,9 @@ from invoice_referee.reconciliation.admission import admit_evidence
 from invoice_referee.workflow.context_records import load_context
 
 
-def _load_confirmations(cx: sqlite3.Connection, tenant: str, root_id: str) -> tuple[Confirmation, ...]:
+def _load_confirmations(
+    cx: sqlite3.Connection, tenant: str, root_id: str
+) -> tuple[Confirmation, ...]:
     from invoice_referee.domain.common import EvidenceRef
 
     out: list[Confirmation] = []
@@ -36,7 +38,8 @@ def _load_confirmations(cx: sqlite3.Connection, tenant: str, root_id: str) -> tu
         (tenant, root_id),
     ).fetchall():
         refs = tuple(
-            EvidenceRef.model_validate(ref) for ref in json.loads(row["refs_json"] or "[]")
+            EvidenceRef.model_validate(ref)
+            for ref in json.loads(row["refs_json"] or "[]")
         )
         out.append(
             Confirmation(
@@ -52,7 +55,9 @@ def _load_confirmations(cx: sqlite3.Connection, tenant: str, root_id: str) -> tu
     return tuple(out)
 
 
-def _load_recorded_money(cx: sqlite3.Connection, tenant: str, root_id: str) -> tuple[MoneyEvent, ...]:
+def _load_recorded_money(
+    cx: sqlite3.Connection, tenant: str, root_id: str
+) -> tuple[MoneyEvent, ...]:
     return tuple(
         MoneyEvent.model_validate_json(row["payload_json"])
         for row in cx.execute(
@@ -81,13 +86,15 @@ def _load_activity_acceptances(
             reason=str(row["reason"]),
             refs=tuple(json.loads(row["refs_json"] or "[]")),
             link_signals=tuple(
-                ActivityLinkSignal.model_validate({
-                    **signal,
-                    "refs": tuple(
-                        EvidenceRef.model_validate(ref)
-                        for ref in signal.get("refs", [])
-                    ),
-                })
+                ActivityLinkSignal.model_validate(
+                    {
+                        **signal,
+                        "refs": tuple(
+                            EvidenceRef.model_validate(ref)
+                            for ref in signal.get("refs", [])
+                        ),
+                    }
+                )
                 for signal in json.loads(row["link_signals_json"] or "[]")
             ),
         )
@@ -97,6 +104,48 @@ def _load_activity_acceptances(
             (tenant, root_id),
         ).fetchall()
     )
+
+
+def _load_exception_decisions(
+    cx: sqlite3.Connection, tenant: str, root_id: str
+) -> tuple[ExceptionDecision, ...]:
+    """Accepted scoped exception decisions for this case (S6, 18/10/2026).
+
+    Refusals (REFUSED) change nothing and are excluded; only ACCEPTED rows
+    feed the reconciler's exception filter.
+    """
+    from invoice_referee.domain.policy import ExceptionDecision
+
+    out: list[ExceptionDecision] = []
+    for row in cx.execute(
+        "SELECT * FROM case_exception_decisions WHERE tenant = ? AND root_id = ? "
+        "AND status = 'ACCEPTED' ORDER BY decided_at, id",
+        (tenant, root_id),
+    ).fetchall():
+        out.append(
+            ExceptionDecision(
+                rule_id=str(row["rule_id"]),
+                expense_ids=tuple(json.loads(row["expense_ids_json"] or "[]")),
+                activity=str(row["activity"]),
+                max_effect=int(row["max_effect"]),
+                actions=tuple(json.loads(row["actions_json"] or "[]")),
+                actor=str(row["actor"]),
+                grant_ref=str(row["grant_ref"]) if row["grant_ref"] else None,
+                decided_at=datetime.fromisoformat(str(row["decided_at"])),
+                effect_range=(
+                    datetime.fromisoformat(str(row["effect_from"])),
+                    datetime.fromisoformat(str(row["effect_to"]))
+                    if row["effect_to"]
+                    else None,
+                ),
+                refs=tuple(
+                    EvidenceRef.model_validate(ref)
+                    for ref in json.loads(row["refs_json"] or "[]")
+                ),
+                reason=str(row["reason"]),
+            )
+        )
+    return tuple(out)
 
 
 def _load_coverage_record(
@@ -181,4 +230,5 @@ def build_evidence_assessment_input(
         read_set=read_set,
         as_of=as_of,
         activity_acceptances=_load_activity_acceptances(cx, tenant, root_id),
+        exceptions=_load_exception_decisions(cx, tenant, root_id),
     )

@@ -35,12 +35,14 @@ from invoice_referee.domain.commands import (
     CommandResult,
     ConfirmCoverage,
     ConfirmMoneyHistory,
+    RecheckDossierHistory,
     Control,
     CreateDraft,
     Decide,
     MarkExecution,
     Override,
     RecordActual,
+    RefuseException,
     ReviseDeclaration,
     Submit,
 )
@@ -1284,9 +1286,11 @@ class CaseWorkflow:
             "SUBMIT": self._submit,
             "ANSWER_ISSUE": self._answer_issue,
             "DECIDE": self._decide,
+            "REFUSE_EXCEPTION": self._refuse_exception,
             "RECORD_ACTUAL": self._record_actual,
             "CONFIRM_COVERAGE": self._confirm_coverage,
             "CONFIRM_MONEY_HISTORY": self._confirm_money_history,
+            "RECHECK_DOSSIER_HISTORY": self._recheck_dossier_history,
             "MARK_EXECUTION": self._mark_execution,
             "CONTROL": self._control,
             "OVERRIDE": self._override,
@@ -2602,6 +2606,175 @@ class CaseWorkflow:
         draft["link"] = link_to_payload(link)
         return draft
 
+    def save_digital_declaration(
+        self, session: DemoSession, root_id: str, declaration: dict
+    ) -> dict[str, object]:
+        """Validate + persist a DIGITAL_FORM declaration (S6, 18/10/2026).
+
+        Server re-validates every row against the case's attached sources.
+        Returns the revision and canonical hash the read/submit must match.
+        """
+        from invoice_referee.domain.commands import Declaration
+        from invoice_referee.reconciliation.digital_intake import (
+            canonical_digest,
+            validate_digital_declaration,
+        )
+
+        self._require_session_root(session, root_id)
+        import json as _json
+
+        # JSON round-trip: client lists become the strict tuples (the same
+        # coercion the HTTP boundary applies); handwritten dicts stay strict.
+        # This endpoint is digital-only: the source is server-set, never client.
+        parsed = Declaration.model_validate_json(
+            _json.dumps({**declaration, "submission_source": "DIGITAL_FORM"})
+        )
+        with self.db.transaction() as cx:
+            attached = {
+                str(r["source_id"])
+                for r in cx.execute(
+                    "SELECT source_id FROM case_sources WHERE root_id = ?",
+                    (root_id,),
+                ).fetchall()
+            }
+            validate_digital_declaration(parsed, attached_source_ids=attached)
+            revision = (
+                cx.execute(
+                    "SELECT COALESCE(MAX(revision), 0) AS r FROM "
+                    "case_digital_declarations WHERE root_id = ?",
+                    (root_id,),
+                ).fetchone()["r"]
+                + 1
+            )
+            digest = canonical_digest(parsed)
+            now = self._now_iso()
+            cx.execute(
+                "INSERT INTO case_digital_declarations (root_id, revision, payload_json, "
+                "canonical_hash, actor, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    root_id,
+                    revision,
+                    parsed.model_dump_json(),
+                    digest,
+                    session.actor_id,
+                    now,
+                ),
+            )
+        return {"revision": revision, "canonical_hash": digest}
+
+    def _latest_digital_declaration(self, cx, root_id: str):
+        from invoice_referee.domain.commands import Declaration
+
+        row = cx.execute(
+            "SELECT * FROM case_digital_declarations WHERE root_id = ? "
+            "ORDER BY revision DESC LIMIT 1",
+            (root_id,),
+        ).fetchone()
+        if row is None:
+            return None, None
+        return Declaration.model_validate_json(row["payload_json"]), str(
+            row["canonical_hash"]
+        )
+
+    async def read_digital_draft(
+        self, session: DemoSession, root_id: str
+    ) -> dict[str, object]:
+        """Read attached evidence + declared rows into a shared draft (S6).
+
+        Same representation and core as the paper draft: the synthetic paper
+        carries DECLARATION provenance, evidence mapping is server-resolved,
+        and the typed report is persisted for submit reuse (W3).
+        """
+        from invoice_referee.domain.evidence import SourceRef
+        from invoice_referee.evidence.trace import RunBudget
+        from invoice_referee.reconciliation.digital_intake import read_digital_report
+        from invoice_referee.reconciliation.settlement_draft import (
+            build_settlement_draft,
+        )
+        from invoice_referee.reconciliation.settlement_link import link_to_payload
+
+        self._require_session_root(session, root_id)
+        with self.db.transaction() as cx:
+            case = cx.execute(
+                "SELECT * FROM cases WHERE id = ? AND tenant = ?",
+                (root_id, session.tenant),
+            ).fetchone()
+            if case is None:
+                raise NotFoundError("Hồ sơ không tồn tại trong tenant này.")
+            declaration, _ = self._latest_digital_declaration(cx, root_id)
+            if declaration is None:
+                raise UnsupportedCommandError(
+                    "Chưa có khai báo web cho hồ sơ này; lưu form trước khi đọc."
+                )
+            attached = tuple(
+                SourceRef(
+                    id=r["source_id"],
+                    digest=r["digest"],
+                    tenant=r["tenant"],
+                    media=r["media"],
+                    storage_key=r["storage_key"],
+                    filename=r["filename"],
+                    upload_role=(str(r["upload_role"]) or None)
+                    if "upload_role" in r.keys() and r["upload_role"]
+                    else None,
+                )
+                for r in cx.execute(
+                    "SELECT * FROM case_sources WHERE root_id = ? ORDER BY attached_at, source_id",
+                    (root_id,),
+                )
+            )
+            captured_basis = self._evidence_basis(cx, session.tenant, root_id)
+        reader, classifier, artifacts, provider_mode = self._evidence_wiring()
+        if reader is None:
+            raise UnsupportedCommandError(
+                "Chưa cấu hình đọc chứng từ (LIVE) cho môi trường này."
+            )
+        source_bytes: dict[str, bytes] = {}
+        for source in attached:
+            payload = self._evidence_source_bytes.get(source.id)
+            if payload is None:
+                path = self.uploads_dir / source.storage_key
+                if path.is_file():
+                    payload = path.read_bytes()
+            if payload is not None:
+                source_bytes[source.id] = payload
+        report = await read_digital_report(
+            declaration=declaration,
+            root_id=root_id,
+            sources=attached,
+            reader=reader,
+            classifier=classifier,
+            artifacts=artifacts,
+            source_bytes=source_bytes,
+            budget=RunBudget(),
+            provider_mode=provider_mode,
+            activity_profile=str(case["profile"]) if "profile" in case.keys() else None,
+        )
+        draft = build_settlement_draft(report, sources=attached)
+        draft["processing_status"] = _draft_processing_status(report)
+        with self.db.transaction() as cx:
+            current_basis = self._evidence_basis(cx, session.tenant, root_id)
+            if captured_basis.get("sources") != current_basis.get("sources"):
+                raise UnsupportedCommandError(
+                    "Nguồn chứng từ đã đổi trong khi đọc; hãy đọc lại."
+                )
+            self._store_evidence_report(
+                cx,
+                tenant=session.tenant,
+                root_id=root_id,
+                report=report,
+                basis=captured_basis,
+            )
+            link = self._settlement_link_for(
+                cx,
+                tenant=session.tenant,
+                employee=str(case["employee"]),
+                case_activity=str(case["activity"]),
+                report=report,
+            )
+            draft["link"] = link_to_payload(link)
+        return draft
+
     def _settlement_link_for(
         self,
         cx: sqlite3.Connection,
@@ -2891,6 +3064,11 @@ class CaseWorkflow:
             # Backend dossier link (14/10/2026): the employee's confirmation of
             # a weak link, if any. The decided activity is on the case row.
             "confirmed_activity_id": declaration.confirmed_activity_id,
+            "settlement_type": declaration.settlement_type,
+            "submission_source": declaration.submission_source,
+            "no_advance_asserted": declaration.no_advance_asserted,
+            "no_advance_reason": declaration.no_advance_reason,
+            "digital_lines": [line.model_dump(mode="json") for line in declaration.digital_lines],
         }
         corrected: list[str] = []
         if (
@@ -3066,6 +3244,24 @@ class CaseWorkflow:
                     "Các căn cứ mạnh trỏ tới các hồ sơ khác nhau; giữ mâu thuẫn "
                     "để kế toán xác minh. " + " ".join(link.reasons)
                 )
+        # S6 self-expense (18/10/2026): with no advance/paper signal the link
+        # legitimately finds nothing — but the work itself still needs a scope.
+        # When the tenant catalog holds exactly one AUTHORIZED activity, the
+        # backend binds the dossier there (server-owned, single-candidate
+        # decision, never an employee-picked standing code). Otherwise the
+        # draft stays PROPOSED as before.
+        if (link is None or (link is not None and link.status == "NOT_FOUND")) and (
+            getattr(declaration, "settlement_type", "ADVANCE_SETTLEMENT")
+            == "EMPLOYEE_REIMBURSEMENT"
+        ):
+            authorized = [
+                entry
+                for entry in self.catalog(session.tenant)
+                if entry.status == "AUTHORIZED"
+            ]
+            if len(authorized) == 1:
+                self._rebind_case_activity(cx, session, row, root_id, authorized[0])
+                return self._reload(cx, row)
         # NOT_FOUND (or no typed report): the draft is accepted as an
         # independent, server-managed dossier. It stays PROPOSED: no activity
         # decision, grant, or legacy budget is fabricated. Later costs and
@@ -3170,6 +3366,39 @@ class CaseWorkflow:
         # the server resolves the file refs to the uploaded bytes and derives the
         # actor/scope/time. A foreign digest/ref is rejected before any write.
         self._record_employee_paid_claims(cx, session, row, command, now)
+        # S6 self-expense (18/10/2026): the employee's no-advance assertion is a
+        # scoped confirmation the ledger still judges — admission raises a
+        # type-conflict FACT when a confirmed advance exists in scope.
+        declaration = command.declaration
+        # S6 digital submit (18/10/2026): re-validate the declared rows against
+        # the attached sources and require the same canonical hash as the
+        # stored read — an edited-after-read declaration must be re-read.
+        if declaration.submission_source == "DIGITAL_FORM":
+            self._check_digital_submit(cx, session, row, declaration, now)
+        if (
+            declaration.settlement_type == "EMPLOYEE_REIMBURSEMENT"
+            and declaration.no_advance_asserted
+        ):
+            if not (declaration.no_advance_reason or "").strip():
+                raise UnsupportedCommandError("Khai không nhận tạm ứng cần có lý do.")
+            confirmation_id = f"confirmation:{hashlib.sha256((root_id + 'settlement:no_advance').encode()).hexdigest()[:16]}"
+            cx.execute(
+                "INSERT OR REPLACE INTO case_confirmations (id, tenant, root_id, fact_key, "
+                "value, actor, scope, refs_json, reason, observed_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    confirmation_id,
+                    session.tenant,
+                    root_id,
+                    "settlement:no_advance",
+                    "asserted",
+                    context.actor_id,
+                    str(row["activity"]),
+                    json.dumps([], ensure_ascii=False),
+                    declaration.no_advance_reason,
+                    now,
+                ),
+            )
         # The employee-confirmed draft (W4): persist the confirmed values + notes
         # and the original OCR value as an auditable declaration. This is what the
         # reconciliation consumes; it never overwrites the actual company ledger.
@@ -3481,6 +3710,18 @@ class CaseWorkflow:
                     f"Không có quyền thực hiện {action} trong phạm vi này."
                 )
         now = self._now_iso()
+        if not (decision.reason or "").strip():
+            raise UnsupportedCommandError("Quyết định cần có lý do.")
+        # S6 (18/10/2026): an accepted missing-evidence exception persists as a
+        # scoped decision row so reassessment keeps clearing the covered issues
+        # (the recomputed issue rows would otherwise resurrect them). Refusals
+        # go through REFUSE_EXCEPTION and persist nothing here.
+        if "EXCEPT_POLICY" in decision.actions:
+            if decision.amount is None:
+                raise UnsupportedCommandError(
+                    "Chấp nhận ngoại lệ cần số tiền hiệu lực."
+                )
+            self._persist_exception_decisions(cx, session, row, context, decision, now)
         for issue_id in decision.issue_ids:
             cx.execute(
                 "UPDATE case_issues SET status = 'RESOLVED', updated_at = ? WHERE id = ?",
@@ -3499,6 +3740,220 @@ class CaseWorkflow:
             ),
         )
         self._assess_and_commit(cx, session, self._reload(cx, row), now)
+        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
+    def _check_digital_submit(self, cx, session, row, declaration, now: str) -> None:
+        """Re-validate a digital submit against attached sources + stored read."""
+        from invoice_referee.domain.evidence import ReadResult
+        from invoice_referee.reconciliation.digital_intake import (
+            canonical_digest,
+            validate_digital_declaration,
+        )
+
+        root_id = str(row["id"])
+        attached = {
+            str(r["source_id"])
+            for r in cx.execute(
+                "SELECT source_id FROM case_sources WHERE root_id = ?", (root_id,)
+            ).fetchall()
+        }
+        validate_digital_declaration(declaration, attached_source_ids=attached)
+        digest = canonical_digest(declaration)
+        report_row = cx.execute(
+            "SELECT report_json FROM case_evidence_reports WHERE root_id = ?",
+            (root_id,),
+        ).fetchone()
+        if report_row is None or not report_row["report_json"]:
+            raise UnsupportedCommandError(
+                "Chưa có bản đọc cho khai báo web này; bấm Đọc trước khi nộp."
+            )
+        report = ReadResult.model_validate_json(report_row["report_json"])
+        paper = next(
+            (
+                d
+                for d in report.documents
+                if d.document_type == "SETTLEMENT_FORM"
+                and d.source_id == f"declaration:{root_id}"
+            ),
+            None,
+        )
+        read_hash = None
+        if paper is not None:
+            for line in paper.line_items:
+                for candidate in line.fields:
+                    for ref in candidate.refs:
+                        if ref.source_id == f"declaration:{root_id}":
+                            read_hash = ref.source_sha256
+                            break
+                    if read_hash is not None:
+                        break
+                if read_hash is not None:
+                    break
+        if read_hash != digest:
+            raise UnsupportedCommandError(
+                "Khai báo web đã đổi sau khi đọc; hãy lưu và đọc lại trước khi nộp."
+            )
+        revision = (
+            cx.execute(
+                "SELECT COALESCE(MAX(revision), 0) AS r FROM case_digital_declarations "
+                "WHERE root_id = ?",
+                (root_id,),
+            ).fetchone()["r"]
+            + 1
+        )
+        cx.execute(
+            "INSERT INTO case_digital_declarations (root_id, revision, payload_json, "
+            "canonical_hash, actor, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                root_id,
+                revision,
+                declaration.model_dump_json(),
+                digest,
+                session.actor_id,
+                now,
+            ),
+        )
+
+    def _persist_exception_decisions(
+        self, cx, session, row, context, decision, now: str
+    ) -> None:
+        """Persist accepted missing-evidence exceptions (S6).
+
+        Only issues shaped `expense:<id>:missing_evidence` are covered, with
+        rule `expense:missing_required_evidence` — the exact rule the
+        reconciler's exception filter honours. Anything else is not an
+        exception and is rejected rather than half-stored.
+        """
+        root_id = str(row["id"])
+        stored = 0
+        for issue_id in decision.issue_ids:
+            issue = cx.execute(
+                "SELECT * FROM case_issues WHERE id = ? AND root_id = ?",
+                (issue_id, root_id),
+            ).fetchone()
+            if issue is None:
+                raise UnsupportedCommandError("Vấn đề không thuộc hồ sơ này.")
+            field_or_rule = str(issue["field_or_rule"])
+            parts = field_or_rule.split(":")
+            if (
+                len(parts) != 3
+                or parts[0] != "expense"
+                or parts[2] != "missing_evidence"
+            ):
+                raise UnsupportedCommandError(
+                    f"Vấn đề {field_or_rule} không thuộc phạm vi ngoại lệ thiếu chứng từ."
+                )
+            expense_id = f"{parts[0]}:{parts[1]}"
+            covering = self._covering_grant_ids(
+                cx,
+                session.tenant,
+                context.actor_id,
+                "EXCEPT_POLICY",
+                decision.effect_scope,
+                int(decision.amount or 0),
+            )
+            decision_id = f"exc:{hashlib.sha256((root_id + field_or_rule + now).encode()).hexdigest()[:16]}"
+            cx.execute(
+                "INSERT INTO case_exception_decisions (id, tenant, root_id, rule_id, "
+                "expense_ids_json, activity, max_effect, actions_json, actor, grant_ref, "
+                "decided_at, effect_from, effect_to, refs_json, reason, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACCEPTED')",
+                (
+                    decision_id,
+                    session.tenant,
+                    root_id,
+                    "expense:missing_required_evidence",
+                    json.dumps([expense_id], ensure_ascii=False),
+                    decision.effect_scope,
+                    int(decision.amount or 0),
+                    json.dumps(list(decision.actions), ensure_ascii=False),
+                    context.actor_id,
+                    covering[0] if covering else None,
+                    now,
+                    now,
+                    None,
+                    json.dumps(
+                        [r.model_dump(mode="json") for r in decision.refs],
+                        ensure_ascii=False,
+                    ),
+                    decision.reason,
+                ),
+            )
+            stored += 1
+        if stored == 0:
+            raise UnsupportedCommandError("Không có vấn đề ngoại lệ nào để chấp nhận.")
+
+    def _refuse_exception(
+        self,
+        cx: sqlite3.Connection,
+        session: DemoSession,
+        context: CommandContext,
+        command,
+    ) -> CommandResult:
+        """Record an exception refusal (S6): audit + REFUSED row, issues stay OPEN."""
+        from invoice_referee.domain.commands import RefuseException
+
+        assert isinstance(command, RefuseException)
+        row = self._require_root(cx, session, command.root_id)
+        if session.persona not in ("accountant", "approver"):
+            raise UnsupportedCommandError(
+                "Chỉ kế toán hoặc người quyết định được từ chối ngoại lệ."
+            )
+        employee = cx.execute(
+            "SELECT employee FROM cases WHERE id = ?", (str(row["id"]),)
+        ).fetchone()
+        if employee is not None and context.actor_id == str(employee["employee"]):
+            raise UnsupportedCommandError(
+                "Không tự từ chối đề nghị ngoại lệ của chính mình."
+            )
+        root_id = str(row["id"])
+        now = self._now_iso()
+        for issue_id in command.issue_ids:
+            issue = cx.execute(
+                "SELECT * FROM case_issues WHERE id = ? AND root_id = ?",
+                (issue_id, root_id),
+            ).fetchone()
+            if issue is None:
+                raise UnsupportedCommandError("Vấn đề không thuộc hồ sơ này.")
+            if not str(issue["field_or_rule"]).endswith(":missing_evidence"):
+                raise UnsupportedCommandError(
+                    "Chỉ từ chối vấn đề ngoại lệ thiếu chứng từ."
+                )
+            cx.execute(
+                "INSERT INTO case_exception_decisions (id, tenant, root_id, rule_id, "
+                "expense_ids_json, activity, max_effect, actions_json, actor, grant_ref, "
+                "decided_at, effect_from, effect_to, refs_json, reason, status) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'REFUSED')",
+                (
+                    f"ref:{hashlib.sha256((root_id + issue_id + now).encode()).hexdigest()[:16]}",
+                    session.tenant,
+                    root_id,
+                    "expense:missing_required_evidence",
+                    json.dumps([], ensure_ascii=False),
+                    str(row["activity"]),
+                    0,
+                    json.dumps([], ensure_ascii=False),
+                    context.actor_id,
+                    None,
+                    now,
+                    now,
+                    None,
+                    json.dumps([], ensure_ascii=False),
+                    command.reason,
+                ),
+            )
+        self._audit(
+            cx,
+            tenant=session.tenant,
+            root_id=root_id,
+            session_id=session.session_id,
+            actor=context.actor_id,
+            action="REFUSE_EXCEPTION",
+            detail=json.dumps(
+                {"issue_ids": list(command.issue_ids), "reason": command.reason},
+                ensure_ascii=False,
+            ),
+        )
         return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
 
     def _advance_party_block(
@@ -5339,6 +5794,31 @@ class CaseWorkflow:
         self._assess_and_commit(cx, session, self._reload(cx, row), now)
         return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
 
+    def _recheck_dossier_history(self, cx, session, context, command: RecheckDossierHistory):
+        row = self._require_root(cx, session, command.root_id)
+        self._require_version(row, context.expected_case_version)
+        if session.persona != "accountant" or not self._actor_has_grant(
+            cx, session.tenant, context.actor_id, "RECORD_ACTUAL", str(row["activity"]), profile=str(row["profile"]),
+        ):
+            raise UnsupportedCommandError("Chỉ kế toán có quyền đối chiếu dòng tiền của hồ sơ.")
+        saved = cx.execute(
+            "SELECT coverage_json FROM case_coverage_records WHERE tenant = ? AND root_id = ? ORDER BY recorded_at DESC, rowid DESC LIMIT 1",
+            (session.tenant, command.root_id),
+        ).fetchone()
+        if saved is None or CoverageRecord.model_validate_json(saved["coverage_json"]).source != "DOSSIER_RECORDS":
+            raise UnsupportedCommandError("Chỉ đối chiếu lại checkpoint dòng tiền hồ sơ đã tồn tại.")
+        from invoice_referee.workflow.money_history import history_snapshot, record_dossier_history
+        now = self._now_iso()
+        events, _, _, unresolved = history_snapshot(cx, row, datetime.fromisoformat(now))
+        if unresolved or not events:
+            raise UnsupportedCommandError("Còn giao dịch chưa xác minh, chưa phân bổ hoặc mâu thuẫn; xử lý trước khi đối chiếu lại.")
+        record_dossier_history(cx, row, actor=context.actor_id, now=datetime.fromisoformat(now), reason=command.reason)
+        self._bump(cx, row, now)
+        self._audit(cx, tenant=session.tenant, root_id=command.root_id, session_id=session.session_id,
+                    actor=context.actor_id, action="RECHECK_DOSSIER_HISTORY", detail=json.dumps({"reason": command.reason}, ensure_ascii=False))
+        self._assess_and_commit(cx, session, self._reload(cx, row), now)
+        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
     def _confirm_coverage(
         self,
         cx: sqlite3.Connection,
@@ -5495,32 +5975,44 @@ class CaseWorkflow:
         command: MarkExecution,
     ) -> CommandResult:
         row = self._require_root(cx, session, command.root_id)
-        # MarkExecution belongs to the accountant with a grant on the root (§10.1).
+        self._require_version(row, context.expected_case_version)
         if session.persona not in ("accountant", "approver"):
-            raise UnsupportedCommandError(
-                "Chỉ kế toán/người có quyền đánh dấu thực hiện."
-            )
+            raise UnsupportedCommandError("Chỉ kế toán/người có quyền đánh dấu thực hiện.")
+        instruction = cx.execute(
+            "SELECT * FROM instructions WHERE id = ? AND root_id = ?",
+            (command.instruction_id, command.root_id),
+        ).fetchone()
+        if instruction is None or instruction["status"] in ("VOID", "SUPERSEDED"):
+            raise UnsupportedCommandError("Lệnh không thuộc hồ sơ hoặc không còn hiệu lực.")
+        if not self._actor_has_grant(
+            cx, session.tenant, context.actor_id, "RECORD_ACTUAL", str(row["activity"]),
+            amount=int(instruction["amount"]), profile=str(row["profile"]),
+        ):
+            raise UnsupportedCommandError("Không có quyền xác nhận thực hiện trong phạm vi/hạn mức này.")
+        if not command.reason.strip():
+            raise UnsupportedCommandError("Cần nêu lý do xác nhận thực hiện.")
+        if command.execution_state == "CLOSED_CONFIRMED" and not command.refs:
+            raise UnsupportedCommandError("Đóng thực hiện cần căn cứ chứng từ trong hồ sơ.")
+        for ref in command.refs:
+            source = cx.execute(
+                "SELECT digest FROM case_sources WHERE tenant = ? AND root_id = ? AND source_id = ?",
+                (session.tenant, command.root_id, str(ref.source_id)),
+            ).fetchone()
+            if source is None or str(source["digest"]) != str(ref.source_sha256) or not ref.exact_quote.strip() or ref.page is None or ref.page < 1:
+                raise UnsupportedCommandError("Căn cứ thực hiện phải đúng nguồn, trang và nội dung của hồ sơ.")
         now = self._now_iso()
         cx.execute(
-            "UPDATE instructions SET execution_state = ?, updated_at = ? WHERE id = ? "
-            "AND root_id = ?",
+            "UPDATE instructions SET execution_state = ?, updated_at = ? WHERE id = ? AND root_id = ?",
             (command.execution_state, now, command.instruction_id, str(row["id"])),
         )
+        self._bump(cx, row, now)
         self._audit(
-            cx,
-            tenant=session.tenant,
-            root_id=str(row["id"]),
-            session_id=session.session_id,
-            actor=context.actor_id,
-            action="MARK_EXECUTION",
-            detail=json.dumps(
-                {
-                    "instruction": command.instruction_id,
-                    "state": command.execution_state,
-                },
-                ensure_ascii=False,
-            ),
+            cx, tenant=session.tenant, root_id=str(row["id"]), session_id=session.session_id,
+            actor=context.actor_id, action="MARK_EXECUTION",
+            detail=json.dumps({"instruction": command.instruction_id, "state": command.execution_state,
+                               "reason": command.reason, "refs": [ref.model_dump(mode="json") for ref in command.refs]}, ensure_ascii=False),
         )
+        self._assess_and_commit(cx, session, self._reload(cx, row), now)
         return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
 
     def _control(
@@ -5619,6 +6111,108 @@ class CaseWorkflow:
         )
         self._assess_and_commit(cx, session, self._reload(cx, row), now)
         return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+
+    def exception_grant_preview(
+        self, session: DemoSession, root_id: str, issue_id: str
+    ) -> dict[str, object]:
+        """Read-only grant coverage for one exception decision (S6).
+
+        Never a grant itself: reports whether the current actor's accept would
+        be authorized, which grants cover it and the ceiling, plus the decided
+        amount taken from the stored read (server-side, never a client value).
+        """
+
+        with self.db.transaction() as cx:
+            row = self._require_root(cx, session, root_id)
+            issue = cx.execute(
+                "SELECT * FROM case_issues WHERE id = ? AND root_id = ?",
+                (issue_id, root_id),
+            ).fetchone()
+            if issue is None:
+                raise NotFoundError("Vấn đề không thuộc hồ sơ này.")
+            field_or_rule = str(issue["field_or_rule"])
+            parts = field_or_rule.split(":")
+            expense_id = f"{parts[0]}:{parts[1]}" if len(parts) == 3 else None
+            # expense:<n> maps to the paper's nth cost row in the stored read.
+            amount: int | None = self._exception_expense_amount(cx, root_id, expense_id)
+            grants: list[dict[str, object]] = []
+            covered = False
+            rule_id = None
+            if field_or_rule.endswith(":missing_evidence"):
+                rule_id = "expense:missing_required_evidence"
+                for grant_id in self._covering_grant_ids(
+                    cx,
+                    session.tenant,
+                    session.actor_id,
+                    "EXCEPT_POLICY",
+                    str(row["activity"]),
+                    amount or 0,
+                ):
+                    grant = cx.execute(
+                        "SELECT * FROM context_grants WHERE tenant = ? AND grant_id = ?",
+                        (session.tenant, grant_id),
+                    ).fetchone()
+                    if grant is not None:
+                        grants.append(
+                            {
+                                "id": str(grant["grant_id"]),
+                                "max_amount": int(grant["max_amount"]),
+                                "effective_from": str(grant["effective_from"]),
+                                "effective_to": str(grant["effective_to"])
+                                if grant["effective_to"]
+                                else None,
+                            }
+                        )
+                covered = bool(grants)
+            return {
+                "issue_id": issue_id,
+                "rule_id": rule_id,
+                "expense_id": expense_id,
+                "amount": amount,
+                "covered": covered,
+                "grants": grants,
+            }
+
+    def _exception_expense_amount(
+        self, cx, root_id: str, expense_id: str | None
+    ) -> int | None:
+        """The declared amount of one expense row from the stored read."""
+        if expense_id is None or not expense_id.startswith("expense:"):
+            return None
+        try:
+            position = int(expense_id.split(":")[1])
+        except (ValueError, IndexError):
+            return None
+        report_row = cx.execute(
+            "SELECT report_json FROM case_evidence_reports WHERE root_id = ?",
+            (root_id,),
+        ).fetchone()
+        if report_row is None or not report_row["report_json"]:
+            return None
+        from invoice_referee.domain.evidence import ReadResult
+        from invoice_referee.reconciliation.admission import _as_decimal, _line_field
+        from invoice_referee.reconciliation.document_arithmetic import (
+            is_settlement_summary_row,
+        )
+
+        report = ReadResult.model_validate_json(report_row["report_json"])
+        paper = next(
+            (d for d in report.documents if d.document_type == "SETTLEMENT_FORM"),
+            None,
+        )
+        if paper is None:
+            return None
+        rows = [
+            line
+            for line in paper.line_items
+            if not is_settlement_summary_row(
+                str(_line_field(line, "description") or "")
+            )
+        ]
+        if position < 1 or position > len(rows):
+            return None
+        value = _as_decimal(_line_field(rows[position - 1], "amount"))
+        return int(value) if value is not None else None
 
     def _covering_grant_ids(
         self,
@@ -6274,7 +6868,7 @@ class CaseWorkflow:
         ):
             # S=0 with every gate clean; only SETTLED if no execution is pending.
             pending = cx.execute(
-                "SELECT 1 FROM instructions WHERE root_id = ? AND status IN ('ISSUED','PARTIAL') "
+                "SELECT 1 FROM instructions WHERE root_id = ? AND status IN ('ISSUED','PARTIAL','FULFILLED') "
                 "AND execution_state IN ('OPEN','UNKNOWN') LIMIT 1",
                 (root_id,),
             ).fetchone()

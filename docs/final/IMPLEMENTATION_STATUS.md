@@ -1,5 +1,23 @@
 # Implementation checkpoint
 
+## Hoangha S6 — targeted/browser PASS, full suite FAIL (6 inherited), 17/10/2026
+
+S6 backend/API/frontend + digital/paper/self-expense + exception/OCR region đã
+triển khai. Continuation sửa paper self-expense mất type, MarkExecution API/UI
+và guards, fulfilled+unknown state, dossier-only coverage recheck, payout upload
+riêng và browser assertions. Không coi upload hoặc phát hành PAY là tiền đã nhận.
+
+Snapshot cuối: browser A10/A2 18/B10/C11/D9 đều PASS (fresh isolated replay DB);
+A2 reload SETTLED, P3.7tr/S0/PAYfulfilled remaining0/CLOSED_CONFIRMED. Full backend
+959pass/6fail; cả6 tái hiện trên handed-over package, không bỏ qua hoặc xfail.
+Frontend60pass/2skip + build/diff-check PASS; 0 providers. Independent review tìm
+3 vấn đề liên quan, regression fixes đã chạy; không claim reviewer duyệt lại.
+LIVE và production exception ceiling chưa nghiệm thu/chưa chốt; full plan chưa
+được coi unconditional PASS. B ngoài scope, 8/4/20tr không đổi.
+[Acceptance](reviews/2026-10-16-hoangha-expense-intake-integration-acceptance.md),
+[plan](../../superpowers/plans/2026-10-17-hoangha-expense-intake-tc18.md).
+Evidence `.runtime/s6-resume-20261017/`, `.runtime/s6-browser/`. No commit/push/deploy.
+
 ## Draft hiển thị mâu thuẫn liên chứng từ — implemented, 17/10/2026
 
 `cross_document_conflicts` + DTO `RowAmountConflict` dùng chung cho

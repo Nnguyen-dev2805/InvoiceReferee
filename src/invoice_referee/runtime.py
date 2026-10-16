@@ -151,7 +151,9 @@ def _wire_replay(workflow: CaseWorkflow, *, settings: Settings) -> None:
     """Compose the evidence pipeline for RECORDED_REPLAY (plan E7).
 
     Replay needs a captured recording; without one the read is a miss (never a
-    fabricated page), so the case stays unresolved.
+    fabricated page), so the case stays unresolved. A fixture LLM directory
+    (`fake_llm_dir`, dev/test fixture transport only) replaces the model calls
+    with canned payloads keyed by explicit fixture markers.
     """
     from invoice_referee.evidence.reader import FileOcrReader
     from invoice_referee.evidence.replay import ReplayReader
@@ -162,9 +164,21 @@ def _wire_replay(workflow: CaseWorkflow, *, settings: Settings) -> None:
         if recording
         else ReplayReader(Path("/nonexistent"))
     )
-    llm = build_llm_client(settings)
+    fake_llm_dir = getattr(settings, "fake_llm_dir", None)
+    if fake_llm_dir:
+        from invoice_referee.evidence.fake_transport import (
+            FakeLLM,
+            FakeReader,
+            load_llm_dir,
+        )
+
+        reader: object = FakeReader.from_dir(Path(fake_llm_dir))
+        llm = FakeLLM(load_llm_dir(Path(fake_llm_dir)))
+    else:
+        reader = FileOcrReader(provider=provider)
+        llm = build_llm_client(settings)
     workflow.enable_evidence_read(
-        reader=FileOcrReader(provider=provider),
+        reader=reader,
         classifier=llm,
         artifacts_root=Path(getattr(settings, "uploads_dir", ".")).parent / "artifacts",
         provider_mode="RECORDED_REPLAY",

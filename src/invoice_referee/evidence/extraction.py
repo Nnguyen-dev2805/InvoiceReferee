@@ -278,11 +278,35 @@ def _value_supported(
 
 
 def _ref(ocr: OcrSourceResult, page: int, quote: str) -> EvidenceRef:
+    # Carry the source block box when the quote sits inside a boxed OCR block
+    # (S6): the accountant region view renders exactly this box. No block, no
+    # box — never an invented bbox.
+    bbox: tuple[float, float, float, float] | None = None
+    for ocr_page in ocr.pages:
+        if ocr_page.page != page:
+            continue
+        for block in ocr_page.blocks:
+            if (
+                block.bbox is not None
+                and quote.strip()
+                and quote.strip() in block.content
+            ):
+                box = block.bbox
+                bbox = (
+                    box.top_left_x,
+                    box.top_left_y,
+                    box.bottom_right_x,
+                    box.bottom_right_y,
+                )
+                break
+        if bbox is not None:
+            break
     return EvidenceRef(
         source_id=ocr.source_id,
         source_sha256=ocr.source_digest,
         page=page,
         exact_quote=quote or "document",
+        bbox=bbox,
     )
 
 

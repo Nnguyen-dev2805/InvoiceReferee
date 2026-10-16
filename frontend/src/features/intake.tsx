@@ -5,6 +5,16 @@ import type { ReconciliationFinding, SettlementArithmeticFinding, SettlementLink
 import { formatVnd, formatVndHint } from "../format";
 import type { CaseView, SessionPayload } from "../types";
 import { DocumentViewer } from "./document_viewer";
+import {
+  DigitalForm,
+  draftValidationError,
+  newDigitalLine,
+  runDigitalRead,
+  toDigitalDeclarationInput,
+  type DigitalLineDraft,
+  type EntryWay,
+  type SettlementKind,
+} from "./digital_intake";
 
 export interface SettlementExpenseDraft {
   description: string | null;
@@ -17,6 +27,13 @@ export interface SettlementExpenseDraft {
   matched_invoice?: string;
   suggested_invoice?: string;
   dispute?: ReconciliationFinding | null;
+  evidence_files?: Array<{
+    filename: string | null;
+    document_id: string;
+    document_type: string | null;
+    link_status: string;
+  }>;
+  exception_reason?: string | null;
 }
 
 export interface IntakeDraftState {
@@ -105,6 +122,42 @@ export function Intake({
   const [draft, setDraft] = useState<IntakeDraftState>(EMPTY_DRAFT);
   const [isViewerExpanded, setIsViewerExpanded] = useState(false);
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  // S6 intake kinds (persisted across reload; the case stores them at submit).
+  const [settlementKind, setSettlementKind] = useState<SettlementKind>(() =>
+    (typeof localStorage !== "undefined" &&
+      localStorage.getItem("intake.settlementKind") === "EMPLOYEE_REIMBURSEMENT"
+      ? "EMPLOYEE_REIMBURSEMENT"
+      : "ADVANCE_SETTLEMENT") as SettlementKind,
+  );
+  const [entryWay, setEntryWay] = useState<EntryWay>(() =>
+    (typeof localStorage !== "undefined" &&
+      localStorage.getItem("intake.entryWay") === "DIGITAL_FORM"
+      ? "DIGITAL_FORM"
+      : "PAPER_SCAN") as EntryWay,
+  );
+  const [digitalPurpose, setDigitalPurpose] = useState("");
+  const [noAdvanceReason, setNoAdvanceReason] = useState("");
+  const [digitalLines, setDigitalLines] = useState<DigitalLineDraft[]>([newDigitalLine()]);
+  const [digitalPayload, setDigitalPayload] = useState<{
+    settlementKind: SettlementKind;
+    purpose: string;
+    noAdvanceReason: string;
+    lines: DigitalLineDraft[];
+  } | null>(null);
+
+  function pickSettlementKind(kind: SettlementKind) {
+    setSettlementKind(kind);
+    try {
+      localStorage.setItem("intake.settlementKind", kind);
+    } catch { /* private mode */ }
+  }
+
+  function pickEntryWay(way: EntryWay) {
+    setEntryWay(way);
+    try {
+      localStorage.setItem("intake.entryWay", way);
+    } catch { /* private mode */ }
+  }
 
   // Resume draft from server when an existing draft case is opened
   useEffect(() => {
@@ -144,6 +197,8 @@ export function Intake({
             matched_invoice: e.matched_invoice,
             suggested_invoice: e.suggested_invoice,
             dispute: e.dispute ?? null,
+            evidence_files: e.evidence_files ?? [],
+            exception_reason: e.exception_reason ?? null,
           })),
           notes: "",
           original_advance: resp.declared_advance,
@@ -177,6 +232,10 @@ export function Intake({
   // through the OCR pipeline (no fabricated fallback). A failure keeps the
   // files and offers retry; it never shows a successful draft.
   async function handleReadDocuments() {
+    if (settlementKind === "EMPLOYEE_REIMBURSEMENT" && !noAdvanceReason.trim()) {
+      setError("Vui lòng nêu lý do không nhận tạm ứng cho hồ sơ tự chi.");
+      return;
+    }
     if (paperFiles.length !== 1) {
       setError("Vui lòng chọn đúng 1 tệp đơn quyết toán ở ô trên.");
       return;
@@ -244,12 +303,82 @@ export function Intake({
           matched_invoice: e.matched_invoice,
           suggested_invoice: e.suggested_invoice,
           dispute: e.dispute ?? null,
+          evidence_files: e.evidence_files ?? [],
+          exception_reason: e.exception_reason ?? null,
         })),
         notes: "",
         original_advance: resp.declared_advance,
       });
       // The backend link decides the dossier; the employee confirms only a
       // weak link. No activity guessing on the client.
+      setLink(resp.link ?? null);
+      setConfirmedActivityId("");
+      setStep("review");
+    } catch (cause) {
+      setError(
+        `Không đọc được chứng từ: ${errorMessage(cause)}. Kiểm tra kết nối và thử lại; tệp đã tải vẫn được giữ.`,
+      );
+      setStep("upload");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDigitalRead() {
+    const invalid = draftValidationError(settlementKind, digitalPurpose, noAdvanceReason, digitalLines);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setStatus(null);
+    setWarnings([]);
+    setArithmeticFindings([]);
+    setStep("reading");
+    try {
+      const { caseId, draft: resp } = await runDigitalRead(
+        settlementKind, digitalPurpose, noAdvanceReason, digitalLines, setDigitalLines,
+      );
+      const view = await api.getCase(caseId);
+      setCaseView(view);
+      setWarnings(resp.warnings ?? []);
+      setProcessingStatus(resp.processing_status ?? null);
+      setArithmeticFindings(resp.arithmetic_findings ?? []);
+      setDraft({
+        declared_name: resp.declared_name,
+        activity_name: resp.activity_name,
+        destination: resp.destination,
+        trip_start: resp.trip_start,
+        trip_end: resp.trip_end,
+        occurred_at: resp.occurred_at,
+        declared_purpose: digitalPurpose,
+        incurred_total: resp.incurred_total,
+        incurred_total_basis: resp.incurred_total_basis ?? null,
+        declared_advance: resp.declared_advance,
+        expenses: (resp.expenses ?? []).map((e) => ({
+          description: e.description,
+          invoice_no: e.invoice_no,
+          amount: e.amount,
+          amount_state: e.amount_state,
+          description_state: e.description_state,
+          source_filename: e.source_filename,
+          status: e.status || "UNMATCHED",
+          matched_invoice: e.matched_invoice,
+          suggested_invoice: e.suggested_invoice,
+          dispute: e.dispute ?? null,
+          evidence_files: e.evidence_files ?? [],
+          exception_reason: e.exception_reason ?? null,
+        })),
+        notes: "",
+        original_advance: resp.declared_advance,
+      });
+      setDigitalPayload({
+        settlementKind,
+        purpose: digitalPurpose,
+        noAdvanceReason,
+        lines: digitalLines,
+      });
       setLink(resp.link ?? null);
       setConfirmedActivityId("");
       setStep("review");
@@ -287,17 +416,40 @@ export function Intake({
       const result = await submitCase(
         caseView.id,
         null,
-        draft.declared_purpose ?? "Quyết toán chi phí",
+        digitalPayload?.purpose ?? draft.declared_purpose ?? "Quyết toán chi phí",
         caseView.version,
         [],
         {
           notes: draft.notes.trim() || null,
           declared_name: draft.declared_name,
           destination: draft.destination ?? undefined,
-          declared_advance: draft.declared_advance,
+          declared_advance: digitalPayload ? undefined : draft.declared_advance,
           incurred_total: draft.incurred_total,
           original_declared_advance: draft.original_advance,
           confirmed_activity_id: confirmedActivityId || null,
+          ...(digitalPayload
+            ? {
+                settlement_type: digitalPayload.settlementKind,
+                submission_source: "DIGITAL_FORM" as const,
+                digital_lines: toDigitalDeclarationInput(
+                  digitalPayload.purpose,
+                  digitalPayload.settlementKind,
+                  digitalPayload.noAdvanceReason,
+                  digitalPayload.lines,
+                ).digital_lines,
+                no_advance_asserted:
+                  digitalPayload.settlementKind === "EMPLOYEE_REIMBURSEMENT",
+                no_advance_reason:
+                  digitalPayload.settlementKind === "EMPLOYEE_REIMBURSEMENT"
+                    ? digitalPayload.noAdvanceReason || null
+                    : null,
+              }
+            : {
+                settlement_type: settlementKind,
+                submission_source: "PAPER_SCAN" as const,
+                no_advance_asserted: settlementKind === "EMPLOYEE_REIMBURSEMENT",
+                no_advance_reason: settlementKind === "EMPLOYEE_REIMBURSEMENT" ? noAdvanceReason.trim() || null : null,
+              }),
         },
       );
       setCaseView(result.case_view);
@@ -387,6 +539,82 @@ export function Intake({
           {/* ------------------------------------------------------------- */}
           {step === "upload" && (
             <section aria-labelledby="intake-title" className="space-y-6 text-xs">
+              {/* S6: Loại hồ sơ + Cách lập (hai nhóm độc lập) */}
+              <div className="space-y-3 rounded border border-slate-200 bg-slate-50/60 px-3.5 py-3">
+                <div>
+                  <p className="font-semibold text-slate-900 mb-1.5">Loại hồ sơ</p>
+                  <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Loại hồ sơ">
+                    <label className={`rounded border px-3 py-2 cursor-pointer transition-colors ${settlementKind === "EMPLOYEE_REIMBURSEMENT" ? "border-slate-900 bg-white" : "border-slate-200 bg-white hover:border-slate-400"}`}>
+                      <input
+                        type="radio"
+                        name="settlement-kind"
+                        checked={settlementKind === "EMPLOYEE_REIMBURSEMENT"}
+                        onChange={() => pickSettlementKind("EMPLOYEE_REIMBURSEMENT")}
+                        className="sr-only"
+                      />
+                      <span className="font-medium text-slate-900 block">Nhân viên tự chi</span>
+                      <span className="text-[11px] text-slate-500">Không nhận tạm ứng; công ty hoàn chi được chấp nhận.</span>
+                    </label>
+                    <label className={`rounded border px-3 py-2 cursor-pointer transition-colors ${settlementKind === "ADVANCE_SETTLEMENT" ? "border-slate-900 bg-white" : "border-slate-200 bg-white hover:border-slate-400"}`}>
+                      <input
+                        type="radio"
+                        name="settlement-kind"
+                        checked={settlementKind === "ADVANCE_SETTLEMENT"}
+                        onChange={() => pickSettlementKind("ADVANCE_SETTLEMENT")}
+                        className="sr-only"
+                      />
+                      <span className="font-medium text-slate-900 block">Quyết toán tạm ứng</span>
+                      <span className="text-[11px] text-slate-500">Đối trừ với khoản ứng thực nhận.</span>
+                    </label>
+                  </div>
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-900 mb-1.5">Cách lập</p>
+                  <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Cách lập">
+                    <label className={`rounded border px-3 py-2 cursor-pointer transition-colors ${entryWay === "DIGITAL_FORM" ? "border-slate-900 bg-white" : "border-slate-200 bg-white hover:border-slate-400"}`}>
+                      <input
+                        type="radio"
+                        name="entry-way"
+                        checked={entryWay === "DIGITAL_FORM"}
+                        onChange={() => pickEntryWay("DIGITAL_FORM")}
+                        className="sr-only"
+                      />
+                      <span className="font-medium text-slate-900 block">Lập trên web</span>
+                      <span className="text-[11px] text-slate-500">Khai khoản và gắn chứng từ ngay trong form.</span>
+                    </label>
+                    <label className={`rounded border px-3 py-2 cursor-pointer transition-colors ${entryWay === "PAPER_SCAN" ? "border-slate-900 bg-white" : "border-slate-200 bg-white hover:border-slate-400"}`}>
+                      <input
+                        type="radio"
+                        name="entry-way"
+                        checked={entryWay === "PAPER_SCAN"}
+                        onChange={() => pickEntryWay("PAPER_SCAN")}
+                        className="sr-only"
+                      />
+                      <span className="font-medium text-slate-900 block">Tải đơn giấy</span>
+                      <span className="text-[11px] text-slate-500">Tải đơn + chứng từ để hệ thống đọc.</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+              {entryWay === "DIGITAL_FORM" ? (
+                <DigitalForm
+                  settlementKind={settlementKind}
+                  purpose={digitalPurpose}
+                  setPurpose={setDigitalPurpose}
+                  noAdvanceReason={noAdvanceReason}
+                  setNoAdvanceReason={setNoAdvanceReason}
+                  lines={digitalLines}
+                  setLines={setDigitalLines}
+                  onRead={() => void handleDigitalRead()}
+                  busy={busy}
+                />
+              ) : (
+              <>
+              {settlementKind === "EMPLOYEE_REIMBURSEMENT" && (
+                <label className="block space-y-1 text-xs">Lý do không nhận tạm ứng
+                  <textarea aria-label="Lý do không nhận tạm ứng" value={noAdvanceReason} onChange={e => setNoAdvanceReason(e.target.value)} className="w-full rounded border border-slate-300 p-2" />
+                </label>
+              )}
               {/* PHẦN 1: ĐƠN QUYẾT TOÁN */}
               <div className="space-y-2">
                 <div className="flex items-baseline justify-between">
@@ -587,6 +815,8 @@ export function Intake({
                   <span aria-hidden="true" className="font-mono">→</span>
                 </button>
               </div>
+              </>
+              )}
             </section>
           )}
 
@@ -916,6 +1146,32 @@ export function Intake({
                         <span className="font-medium text-slate-900 block">{item.description || `Dòng ${idx + 1} — chưa đọc được nội dung`}</span>
                         {item.amount === null ? (
                           <span className="text-[11px] text-amber-700 block mt-0.5">⚠ Chưa đọc rõ số tiền; dòng này chưa được tính vào tổng</span>
+                        ) : item.status === "ALTERNATIVE" && item.matched_invoice ? (
+                          <span className="block mt-1 rounded border border-amber-300 bg-amber-50 px-2 py-1.5">
+                            <span className="text-[11px] font-semibold text-amber-900 block">
+                              Bằng chứng thay thế — chờ xác minh và xác nhận ngoại lệ
+                            </span>
+                            <span className="text-[11px] text-amber-900 block">
+                              Tệp: {item.matched_invoice}
+                            </span>
+                            {(item.evidence_files ?? []).length > 1 && (
+                              <span className="text-[11px] text-amber-900 block">
+                                Cùng khoản: {(item.evidence_files ?? [])
+                                  .map((f) => f.filename)
+                                  .filter((n) => n && n !== item.matched_invoice)
+                                  .join(", ")}
+                              </span>
+                            )}
+                            {item.exception_reason ? (
+                              <span className="text-[11px] text-amber-900 block">
+                                Lý do: {item.exception_reason}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-amber-800 font-medium block">
+                                ⚠ Chưa có lý do thiếu hóa đơn gốc — cần bổ sung
+                              </span>
+                            )}
+                          </span>
                         ) : item.matched_invoice ? (
                           <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
                             <span className="text-emerald-600 font-bold">✓</span>

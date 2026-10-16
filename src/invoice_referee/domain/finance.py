@@ -43,12 +43,23 @@ VerificationState = Literal["OBSERVED", "CONFIRMED", "REJECTED"]
 AllocationState = Literal["UNALLOCATED", "ALLOCATED", "UNKNOWN"]
 
 ActivityLinkSignalField = Literal[
-    "employee", "company", "purpose", "advance_amount", "time",
-    "reference", "transaction", "candidates",
+    "employee",
+    "company",
+    "purpose",
+    "advance_amount",
+    "time",
+    "reference",
+    "transaction",
+    "candidates",
 ]
 ActivityLinkSignalState = Literal[
-    "MATCHED", "MISSING", "MISMATCH", "CONFLICT", "AMBIGUOUS",
-    "UNMAPPED", "NOT_CHECKED",
+    "MATCHED",
+    "MISSING",
+    "MISMATCH",
+    "CONFLICT",
+    "AMBIGUOUS",
+    "UNMAPPED",
+    "NOT_CHECKED",
 ]
 
 # How an employee-paid portion is established (ADR0007 + 14/10/2026 chốt). In
@@ -62,6 +73,7 @@ PaymentBasisKind = Literal[
     "FINANCIAL_CONFIRMATION",
     "EMPLOYEE_PAID_INVOICE",
     "EMPLOYEE_DECLARATION_Q32",
+    "ALTERNATIVE_ACCEPTED",
     "UNSPECIFIED_LEGACY",
 ]
 
@@ -145,7 +157,9 @@ class RecordMoneyInput(StrictModel):
     # that is not COMPLETED (pending/failed/unclear) never becomes confirmed
     # received money. Defaults None keep every existing caller unchanged.
     instrument_method: Literal["TRANSFER", "CASH"] | None = None
-    instrument_status: Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"] | None = None
+    instrument_status: Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"] | None = (
+        None
+    )
     instrument_reference: str | None = None
     # Source-bound workflow metadata for an accountant-reviewed advance voucher.
     advance_draft_id: Id | None = None
@@ -176,7 +190,9 @@ class MoneyEvent(StrictModel):
     # Source-reported instrument metadata retained for audit (plan D). None for
     # events recorded before the advance form existed.
     instrument_method: Literal["TRANSFER", "CASH"] | None = None
-    instrument_status: Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"] | None = None
+    instrument_status: Literal["COMPLETED", "PENDING", "FAILED", "UNKNOWN"] | None = (
+        None
+    )
     instrument_reference: str | None = None
     recorded_by: Id | None = None
     record_reason: str | None = None
@@ -197,11 +213,23 @@ class ActivityLinkSignal(StrictModel):
 
 
 MoneyMovementSignalField = Literal[
-    "instruction", "payer", "payee", "amount", "event_at", "transaction", "source_status"
+    "instruction",
+    "payer",
+    "payee",
+    "amount",
+    "event_at",
+    "transaction",
+    "source_status",
 ]
 MoneyMovementSignalState = Literal[
-    "MATCHED", "MISSING", "MISMATCH", "CONFLICT", "AMBIGUOUS", "OVERPAY",
-    "NOT_COMPLETED", "STALE",
+    "MATCHED",
+    "MISSING",
+    "MISMATCH",
+    "CONFLICT",
+    "AMBIGUOUS",
+    "OVERPAY",
+    "NOT_COMPLETED",
+    "STALE",
 ]
 
 
@@ -227,8 +255,13 @@ class EmployeeReturnDraft(StrictModel):
     source_filename: str
     status: Literal["WAITING_ACCOUNTANT", "CONFIRMED"] = "WAITING_ACCOUNTANT"
     match_status: Literal[
-        "MATCHED", "OVERPAY", "NEEDS_REVIEW", "CONFLICT", "NOT_COMPLETED",
-        "STALE", "ALREADY_RECORDED",
+        "MATCHED",
+        "OVERPAY",
+        "NEEDS_REVIEW",
+        "CONFLICT",
+        "NOT_COMPLETED",
+        "STALE",
+        "ALREADY_RECORDED",
     ]
     amount: Vnd | None = None
     payer_name: str | None = None
@@ -264,7 +297,10 @@ class ActivityAcceptance(StrictModel):
     actor: Id
     accepted_at: UtcDatetime
     link_basis: Literal[
-        "DOCUMENT_REFERENCE", "ACCOUNTANT_CONFIRMATION", "MULTI_FIELD_MATCH", "TRANSACTION_IDENTITY"
+        "DOCUMENT_REFERENCE",
+        "ACCOUNTANT_CONFIRMATION",
+        "MULTI_FIELD_MATCH",
+        "TRANSACTION_IDENTITY",
     ]
     reason: str
     refs: tuple[EvidenceRef, ...]
@@ -288,7 +324,9 @@ class CoverageRecord(StrictModel):
     witness_refs: tuple[EvidenceRef, ...] = ()
     # Metadata exists for an accountable, case-specific confirmation. Imported
     # compatibility coverage keeps source="CONTEXT" and the defaults below.
-    source: Literal["CONTEXT", "ACCOUNTANT_CONFIRMATION", "MANAGED_HISTORY", "DOSSIER_RECORDS"] = "CONTEXT"
+    source: Literal[
+        "CONTEXT", "ACCOUNTANT_CONFIRMATION", "MANAGED_HISTORY", "DOSSIER_RECORDS"
+    ] = "CONTEXT"
     employee: Id | None = None
     actor: Id | None = None
     recorded_at: UtcDatetime | None = None

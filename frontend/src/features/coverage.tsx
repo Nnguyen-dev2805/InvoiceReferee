@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 
-import { errorMessage, recordActual } from "../api";
+import { errorMessage, recordActual, recheckMoneyHistory } from "../api";
 import { formatVnd } from "../format";
 import type { CaseView } from "../types";
 
@@ -49,6 +49,8 @@ export function Coverage({
   caseView: CaseView | null;
   onCase: (view: CaseView) => void;
 }) {
+  const [checkedHistory, setCheckedHistory] = useState(false);
+  const [rechecking, setRechecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmingDraft, setConfirmingDraft] = useState<string | null>(null);
@@ -102,6 +104,18 @@ export function Coverage({
 
   return (
     <section id="history-coverage" aria-labelledby="coverage-title" className="space-y-3.5 border-t border-slate-200 pt-5 text-xs">
+      {caseView.coverage_record?.source === "DOSSIER_RECORDS" && caseView.coverage_current === false && caseView.issues.some(i => i.status === "OPEN" && i.field_or_rule === "ledger:coverage") && (
+        <div className="rounded border border-amber-200 bg-amber-50 p-3 space-y-2">
+          <p>Giao dịch bổ sung làm lịch sử cần đối chiếu lại. Chỉ xác nhận sau khi kiểm tra đủ các khoản của đúng hồ sơ.</p>
+          <label className="flex gap-2"><input type="checkbox" checked={checkedHistory} onChange={e => setCheckedHistory(e.target.checked)} />Tôi đã kiểm tra các giao dịch đã ghi nhận và xử lý đầy đủ chênh lệch trong hồ sơ này.</label>
+          <button type="button" disabled={!checkedHistory || rechecking} onClick={async () => {
+            setRechecking(true); setError(null);
+            try { const result = await recheckMoneyHistory(caseView.id, caseView.version); onCase(result.case_view); setCheckedHistory(false); }
+            catch(cause) { setError(errorMessage(cause)); } finally { setRechecking(false); }
+          }} className="rounded bg-slate-950 text-white px-3 py-2 disabled:opacity-40">Xác nhận đã đối chiếu lại</button>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="coverage-title" className="font-semibold text-slate-900 text-xs">

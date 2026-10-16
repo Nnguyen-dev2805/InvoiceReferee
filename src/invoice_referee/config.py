@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     langsmith_project: str = "invoice-referee"
     langsmith_agent_id: str | None = None
     langsmith_agent_environment: str | None = None
+    # RECORDED_REPLAY inputs (S6, 18/10/2026): a digest-keyed OCR recording and
+    # an optional directory of canned LLM payloads (dev/test fixture transport
+    # only — never production providers).
+    replay_recording: str | None = None
+    fake_llm_dir: str | None = None
 
     def missing_for_live(self) -> tuple[str, ...]:
         """The live-required settings that are absent or blank.

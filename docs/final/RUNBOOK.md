@@ -61,7 +61,8 @@ Ba chế độ (đều tường minh, không tự hạ cấp):
 | --- | --- | --- |
 | **LIVE** (mặc định) | `scripts/dev.py` | Đọc tài liệu thật; cần key trong `.env`. |
 | **STUB** | `scripts/dev.py --mode stub` | Bản ghi tay có sẵn, chạy offline (không cần key). |
-| **RECORDED_REPLAY** | `scripts/dev.py --mode replay` | Phát lại bản ghi provider (chưa có recording). |
+| **RECORDED_REPLAY** | `scripts/dev.py --mode replay` | Phát lại bản ghi provider; không recording thì read miss (không bịa). |
+| **REPLAY fixture (S6)** | xem dưới | Đọc fixture deterministic không provider (dev/test). |
 
 > Lưu ý: ở LIVE, sau khi pipeline chứng cứ đọc xong, consumer typed (plan A5) chạy
 > admission mapper thuần → Reconciler và phát hành yêu cầu chi/thu thật khi mọi gate
@@ -129,3 +130,47 @@ npm --prefix frontend exec playwright test      # browser checkpoint (Chromium)
 uv run invoice-referee evaluate --suite development --mode stub \
   --output .runtime/evidence/baseline
 ```
+
+## 7. Browser fixture S6 (không provider, không DB người dùng)
+
+Seed MỘT lần (PDF fixture chứa timestamp nên mỗi lần seed đổi digest —
+luôn seed rồi chạy server/flow ngay sau, không seed xen giữa):
+
+```bash
+rtk proxy uv run --frozen python scripts/seed_s6_browser.py  # -> .runtime/s6-browser/
+for spec in "65133:a" "65134:a2" "65132:b" "65135:c" "65136:d"; do
+  port="${spec%%:*}"; key="${spec##*:}"
+  rtk proxy uv run --frozen python scripts/dev.py --mode replay --port "$port" \
+    --db ".runtime/s6-browser/$key.sqlite" --uploads ".runtime/s6-browser/uploads-$key" \
+    --context ".runtime/s6-browser/context-$key.json" \
+    --fake-llm-dir .runtime/s6-browser/fake-llm \
+    --demo-as-of 2026-10-16T12:00:00+07:00 &
+done
+BROWSER_BASE_URL=http://127.0.0.1:65132 rtk proxy node frontend/s6-flow-b.mjs  # giấy tạm ứng
+BROWSER_BASE_URL=http://127.0.0.1:65133 rtk proxy node frontend/s6-flow-a.mjs   # tự chi + type-conflict
+BROWSER_BASE_URL=http://127.0.0.1:65134 rtk proxy node frontend/s6-flow-a2.mjs  # tự chi sạch + ngoại lệ + PAY + SETTLED
+BROWSER_BASE_URL=http://127.0.0.1:65135 rtk proxy node frontend/s6-flow-c.mjs   # grant thấp: chặn
+```
+
+- a: tự chi + advance đã ghi → `advance:type_conflict`. a2: tự chi + ledger rỗng +
+  grant EXCEPT mô phỏng 2tr → POLICY → accept → PAY 3.7tr → partial/full → SETTLED.
+  b: giấy tạm ứng mismatch → ALTERNATIVE + party_mismatch + OCR bbox. c: grant 100k →
+  preview uncovered + decide bị chặn.
+- Hạn mức ngoại lệ production CHƯA chốt (8tr chỉ là đề xuất); các grant trên là
+  fixture seed-only, không chạm company-context.json.
+
+### S6 continuation — 17/10/2026
+
+- Thêm `BROWSER_BASE_URL=http://127.0.0.1:65136 rtk proxy node frontend/s6-flow-d.mjs`
+  cho tự chi + đơn giấy. Paper S fixture khai ứng0, vẫn thiếu lý do alternative
+  nên đúng là FACT chứ không tự PASS; không sửa TC18 gốc hoặc gold.
+- A2 dùng `payout-partial.pdf` 1tr + `payout-final.pdf` 2.7tr, riêng với biên nhận
+  nhân viên trả nhà cung cấp. UI tải chứng từ → xác nhận actual → nếu checkpoint
+  dossier stale thì đối chiếu lại → xác nhận hoàn tất thực hiện có refs/reason.
+  Reload phải SETTLED, P3.7tr/S0, PAY remaining0/CLOSED_CONFIRMED.
+- Flow scripts kiểm POST response + financial state, không chỉ click + sleep.
+  Seed chỉ trước toàn bộ lượt; mỗi DB một lượt. Lưu DB/artifacts cũ trước reset
+  DB kiểm thử riêng. Không xóa `.runtime/s6-browser` khi server đang mở DB.
+- Đây là RECORDED_REPLAY synthetic fixture, không chứng minh OCR/LLM LIVE.
+  Hạn mức ngoại lệ production chưa được chốt. Không gọi legacy initial-history
+  endpoint từ UI; recheck mới không tạo MANAGED_HISTORY/opening0.

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Union
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from invoice_referee.domain.case import CaseView
 from invoice_referee.domain.common import EvidenceRef, Id, StrictModel, UtcDatetime, Vnd
@@ -56,6 +56,20 @@ class Declaration(StrictModel):
     incurred_total: Vnd | None = None
     # The OCR value the employee reviewed, kept so a correction is auditable.
     original_declared_advance: Vnd | None = None
+    # S6 (18/10/2026): Hoangha intake kinds. Defaults keep every old caller on
+    # the paper advance-settlement path; new clients set these explicitly.
+    settlement_type: Literal["ADVANCE_SETTLEMENT", "EMPLOYEE_REIMBURSEMENT"] = (
+        "ADVANCE_SETTLEMENT"
+    )
+    submission_source: Literal["PAPER_SCAN", "DIGITAL_FORM"] = "PAPER_SCAN"
+    # Web-form declared rows (DIGITAL_FORM only). The server validates each row
+    # and resolves source_ids against attached case sources.
+    digital_lines: tuple[DigitalExpenseLine, ...] = ()
+    # The employee asserts they received no advance for this scope. A
+    # declaration only: the ledger still decides, and a recorded advance in
+    # scope raises a type-conflict FACT instead of being ignored.
+    no_advance_asserted: bool = False
+    no_advance_reason: str | None = None
 
 
 class EmployeePaidClaim(StrictModel):
@@ -87,6 +101,48 @@ class SourceUpload(StrictModel):
 class CreateDraft(StrictModel):
     kind: Literal["CREATE_DRAFT"] = "CREATE_DRAFT"
     activity_data: ActivityData
+
+
+class DigitalExpenseLine(StrictModel):
+    """One employee-declared cost row from the web form (S6, 18/10/2026).
+
+    A declaration, not OCR: the server validates every field and resolves
+    `source_ids` against sources actually attached to this case. Files are
+    mapped by source id, never by bare filename.
+    """
+
+    item_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")
+    description: str = Field(min_length=1, max_length=500)
+    category: str | None = Field(default=None, pattern=r"^[A-Z_]{2,32}$")
+    expense_date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    amount: Vnd
+    evidence_status: Literal["ORIGINAL", "ALTERNATIVE", "NO_EVIDENCE"] = "ORIGINAL"
+    alternative_type: (
+        Literal[
+            "PAYMENT_PROOF",
+            "RECEIPT_OR_COLLECTION_NOTE",
+            "CONTRACT_OR_ACCEPTANCE",
+            "SUPPLIER_CONFIRMATION",
+            "OTHER",
+        ]
+        | None
+    ) = None
+    # Reason the original invoice is missing; required for ALTERNATIVE and
+    # NO_EVIDENCE, forbidden otherwise (a note is not a reason).
+    exception_reason: str | None = Field(default=None, max_length=1000)
+    note: str | None = Field(default=None, max_length=1000)
+    source_ids: tuple[Id, ...] = ()
+
+    @model_validator(mode="after")
+    def _reason_matches_status(self) -> DigitalExpenseLine:
+        has_reason = bool((self.exception_reason or "").strip())
+        if self.evidence_status in ("ALTERNATIVE", "NO_EVIDENCE") and not has_reason:
+            raise ValueError("ALTERNATIVE/NO_EVIDENCE lines require exception_reason")
+        if self.evidence_status == "ORIGINAL" and has_reason:
+            raise ValueError("ORIGINAL lines must not carry exception_reason")
+        if self.evidence_status == "ORIGINAL" and not self.source_ids:
+            raise ValueError("ORIGINAL lines require at least one attached source")
+        return self
 
 
 class AttachSources(StrictModel):
@@ -121,6 +177,21 @@ class Decide(StrictModel):
     decision: DecisionCommand
 
 
+class RefuseException(StrictModel):
+    """An accountant/approver refuses a requested policy exception (S6).
+
+    Records the refusal with reason and refs; the issues stay OPEN so the
+    employee can supplement and re-request. No grant is needed to refuse,
+    but the actor must be accountant or approver — never the employee
+    refusing their own request.
+    """
+
+    kind: Literal["REFUSE_EXCEPTION"] = "REFUSE_EXCEPTION"
+    root_id: Id
+    issue_ids: tuple[Id, ...] = Field(min_length=1)
+    reason: str = Field(min_length=1, max_length=2000)
+
+
 class RecordActual(StrictModel):
     kind: Literal["RECORD_ACTUAL"] = "RECORD_ACTUAL"
     root_id: Id
@@ -131,6 +202,12 @@ class ConfirmMoneyHistory(StrictModel):
     kind: Literal["CONFIRM_MONEY_HISTORY"] = "CONFIRM_MONEY_HISTORY"
     root_id: Id
     all_prior_money_recorded: bool
+
+
+class RecheckDossierHistory(StrictModel):
+    kind: Literal["RECHECK_DOSSIER_HISTORY"] = "RECHECK_DOSSIER_HISTORY"
+    root_id: Id
+    reason: str = Field(min_length=12, max_length=2000)
 
 
 class ConfirmCoverage(StrictModel):
@@ -178,9 +255,11 @@ CaseCommand = Annotated[
         Submit,
         AnswerIssue,
         Decide,
+        RefuseException,
         RecordActual,
         ConfirmCoverage,
         ConfirmMoneyHistory,
+        RecheckDossierHistory,
         Control,
         Override,
         MarkExecution,

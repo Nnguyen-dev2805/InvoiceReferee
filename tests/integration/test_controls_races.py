@@ -227,6 +227,11 @@ async def test_resume_does_not_reset_unresolved_execution(app_fixture):
         tenant="tenant:demo", persona="accountant", actor_id="employee:accountant-demo"
     )
 
+    # Explicit test-only execution authority; the production handler no longer
+    # treats an accountant persona alone as a scoped grant.
+    with app_fixture.db.transaction() as cx:
+        cx.execute("INSERT INTO context_grants (grant_id,tenant,version,actor,actions_json,scope,max_amount,effective_from,effective_to) VALUES (?,?,?,?,?,?,?,?,?)", ("grant:test-execution","tenant:demo","test","employee:accountant-demo",'["RECORD_ACTUAL"]',v.activity,20000000,"2026-01-01T00:00:00+00:00","2027-01-01T00:00:00+00:00"))
+
     def ctx(cid: str) -> CommandContext:
         return CommandContext(
             session_id=acct.session_id,
