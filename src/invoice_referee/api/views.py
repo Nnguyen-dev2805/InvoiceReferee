@@ -157,8 +157,8 @@ class ControlRequest(ApiModel):
 
 
 class VerifyRequest(ApiModel):
-    suite: Literal["core", "escalation", "development"] = "development"
-    mode: Literal["LIVE", "RECORDED_REPLAY", "STUB"] = "STUB"
+    suite: Literal["core", "escalation", "development"] = "core"
+    mode: Literal["RECORDED_REPLAY", "LIVE", "STUB"] = "RECORDED_REPLAY"
 
 
 class OverrideRequest(ApiModel):

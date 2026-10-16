@@ -375,47 +375,22 @@ def _prune_empty_upload_dirs(uploads_dir: Path, tenant: str, root_id: str) -> No
 async def run_verify(
     request: Request, payload: views.VerifyRequest
 ) -> dict[str, object]:
-    """Run a suite through the workflow and score with independent gold (§8)."""
-    from invoice_referee.evaluation.packets import (
-        load_gold,
-        load_input,
-        load_stub_readings,
-    )
-    from invoice_referee.evaluation.runner import EvaluationRunner
-    from invoice_referee.evaluation.scorer import IndependentScorer
-    from invoice_referee.evaluation.suites import select_suite
+    """Run a suite through an isolated workflow instance and score with independent gold (§8)."""
+    from invoice_referee.evaluation.service import run_isolated_verify
 
-    workflow = _workflow(request)
-    dataset = PROJECT_ROOT / "data" / "kiem-thu"
-    packets = select_suite(payload.suite, dataset)
-    runner = EvaluationRunner(workflow=workflow)
-    scorer = IndependentScorer()
-    rows = []
-    for packet_dir in packets:
-        packet_input = load_input(packet_dir, stage_id="ban-dau")
-        if payload.mode == "STUB":
-            packet_input = packet_input.model_copy(
-                update={
-                    "transcription": load_stub_readings(packet_dir, stage_id="ban-dau")
-                }
-            )
-        actual = await runner.run(packet_input, payload.mode)
-        gold = load_gold(packet_dir, stage_id="ban-dau")
-        rows.append(scorer.score(actual, gold))
-    report = scorer.release_gate(
-        rows,
-        total_human=sum(
-            1 for row in rows if row.expected_route in ("FACT", "POLICY", "AUTHORITY")
-        ),
-    )
-    return {
-        "suite": payload.suite,
-        "mode": payload.mode,
-        "total": len(rows),
-        "union_dangerous_miss": report.union_dangerous_miss,
-        "release": report.release,
-        "rows": [row.model_dump(mode="json") for row in rows],
-    }
+    settings = getattr(request.app.state, "settings", None)
+    try:
+        return await run_isolated_verify(suite=payload.suite, mode=payload.mode, settings=settings)
+    except ValueError as error:
+        raise HTTPException(status_code=409 if "VERIFY_BUSY" in str(error) else 422, detail=str(error)) from error
+
+
+@router.get("/verify/last")
+async def get_last_verify() -> dict[str, object] | None:
+    """Retrieve the last recorded verify report if present."""
+    from invoice_referee.evaluation.service import get_last_verify_report
+
+    return get_last_verify_report()
 
 
 def _sniff_media(data: bytes, filename: str | None = None) -> Media | None:

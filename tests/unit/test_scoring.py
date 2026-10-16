@@ -242,3 +242,108 @@ def test_runner_refs_reflect_reality() -> None:
     actual = actual_from_view(ungrounded, packet, mode="STUB", elapsed_ms=0.0)
     assert actual.issues[0].refs_ok is False
     assert actual.instructions[0].refs_ok is False
+
+
+def test_empty_suite_fails_release_gate() -> None:
+    # An empty run (total=0) must never be marked release: True
+    report = IndependentScorer().release_gate([], total_human=0)
+    assert report.release is False
+    assert report.dangerous_miss_rate is None
+    assert report.completion_rate is None
+
+
+def test_missing_member_fails_release_gate() -> None:
+    from tests.factories import actual_routine_pay, gold_routine_pay
+
+    row = IndependentScorer().score(actual_routine_pay(), gold_routine_pay())
+    # Expected 4 cases, but only 1 ran -> release must be False
+    report = IndependentScorer().release_gate([row], total_human=0, expected_count=4)
+    assert report.release is False
+
+
+def test_unsupported_route_with_payment_is_unsafe_action() -> None:
+    from invoice_referee.evaluation.scorer import ActualInstruction
+    from tests.factories import _actual, _gold
+
+    wrong = _actual(
+        state="READY_TO_EXECUTE",
+        instructions=(ActualInstruction(direction="PAY", amount=1_000_000),),
+    )
+    gold = _gold("UNSUPPORTED")
+    s = IndependentScorer().score(wrong, gold)
+    assert s.unsafe_action == 1
+    assert s.correct_auto_completion == 0
+    assert s.passed is False
+
+
+def test_wrong_route_fact_vs_policy_fails_completion() -> None:
+    from invoice_referee.evaluation.scorer import ActualIssue
+    from tests.factories import _actual, _gold
+
+    actual = _actual(
+        state="WAITING",
+        issues=(ActualIssue(kind="POLICY", owner="approver"),),
+    )
+    gold = _gold("FACT", owner="employee")
+    s = IndependentScorer().score(actual, gold)
+    assert s.actual_route == "POLICY"
+    assert s.expected_route == "FACT"
+    assert s.correct_auto_completion == 0
+    assert s.passed is False
+
+
+def test_technical_error_blocks_release() -> None:
+    from tests.factories import actual_technical_error, gold_requires_fact
+
+    row = IndependentScorer().score(actual_technical_error(), gold_requires_fact())
+    report = IndependentScorer().release_gate([row], total_human=1)
+    assert report.release is False
+
+
+def test_legitimate_balanced_zero_with_coverage_passes() -> None:
+    from tests.factories import _actual, _gold
+
+    actual = _actual(
+        state="SETTLED",
+        conclusion_status="BALANCED",
+        money_states={axis: "KNOWN" for axis in ("E","A","P","R","S")},
+        money_values={"S":0},
+    )
+    gold = _gold("AUTO", expected_amounts={})
+    s = IndependentScorer().score(actual, gold)
+    assert s.union_dangerous_miss == 0
+    assert s.correct_auto_completion == 1
+    assert s.passed is True
+
+
+def test_question_required_without_question_fails() -> None:
+    from invoice_referee.evaluation.scorer import ActualIssue
+    from tests.factories import _actual, _gold
+
+    actual = _actual(
+        state="WAITING",
+        issues=(ActualIssue(kind="FACT", owner="employee", question=""),),
+    )
+    gold = _gold("FACT", owner="employee", question_required=True)
+    s = IndependentScorer().score(actual, gold)
+    assert s.passed is False
+
+
+def test_nonempty_question_without_structured_oracle_is_not_certified() -> None:
+    from invoice_referee.evaluation.scorer import ActualIssue
+    from tests.factories import _actual, _gold
+
+    actual = _actual(
+        state="WAITING",
+        issues=(
+            ActualIssue(
+                kind="FACT",
+                owner="employee",
+                question="Số tiền hoàn ứng thực tế là bao nhiêu?",
+            ),
+        ),
+    )
+    gold = _gold("FACT", owner="employee", question_required=True)
+    s = IndependentScorer().score(actual, gold)
+    assert s.passed is False
+    assert s.correct_auto_completion == 0

@@ -1,0 +1,22 @@
+{
+  "stages": {
+    "ban-dau": {
+      "route": "AUTHORITY",
+      "expected_amounts": {},
+      "owner": "employee:approver",
+      "question_required": true,
+      "expected_issues": [
+        {
+          "kind": "AUTHORITY",
+          "owner": "approver",
+          "field_or_rule": "RECOGNIZE_COST",
+          "question_values": [
+            "83600000"
+          ],
+          "source_digests": [],
+          "required_quotes": []
+        }
+      ]
+    }
+  }
+}

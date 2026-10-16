@@ -1,0 +1,228 @@
+{
+  "case_id": "TC01",
+  "data_origin": "SYNTHETIC_FIXTURE",
+  "digests": {
+    "report_hoan_ung.pdf": "6af4c063a3662ad568f30536c58213cb95fd7e48018892ab8f14df7a312d977c",
+    "hoa_don_dien_tu.pdf": "d8dddd4e839e8fa89c059bee610b9a85457757d577e7ec9ce352c9ad158f3019"
+  },
+  "ocr": {
+    "6af4c063a3662ad568f30536c58213cb95fd7e48018892ab8f14df7a312d977c": {
+      "pages": [
+        {
+          "page": 1,
+          "markdown": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH\n CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n Độc lập - Tự do - Hạnh phúc\n Thành phố Hồ Chí Minh, ngày 10 tháng 10 năm 2026\n GIẤY ĐỀ NGHỊ HOÀN ỨNG\n Về việc: Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026\nKính gửi: Ban Giám đốc CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH\nNgười đề nghị: NGUYỄN MINH AN\nChức vụ: Nhân viên\nBộ phận: Hành chính nhân sự\nNội dung: Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026\nSTT\nNỘI DUNG\nHÓA ĐƠN\nSỐ TIỀN\nGHI CHÚ\n1\nChi phí tiếp khách phục vụ dự án Nâng cấp văn\nphòng 2026\n00000101\n3.240.000\nĐính kèm hóa đơn điện tử\nTổng cộng\n3.240.000\nBằng chữ: Ba triệu hai trăm bốn mươi nghìn đồng.\nSố tiền đã tạm ứng: 4.000.000 đồng\nSố tiền nhân viên hoàn trả công ty: 760.000 đồng\nBằng chữ: Bảy trăm sáu mươi nghìn đồng.\n NGƯỜI ĐỀ NGHỊ HOÀN ỨNG\n (Đã ký)\nNGUYỄN MINH AN\n KẾ TOÁN\n (Đã ký)\nTRẦN THỊ THU HÀ\n GIÁM ĐỐC\n(Đã ký, đóng dấu)\nLÊ QUANG HUY\n",
+          "blocks": []
+        }
+      ],
+      "complete": true
+    },
+    "d8dddd4e839e8fa89c059bee610b9a85457757d577e7ec9ce352c9ad158f3019": {
+      "pages": [
+        {
+          "page": 1,
+          "markdown": "HÓA ĐƠN GIÁ TRỊ GIA TĂNG ĐIỆN TỬ\n Ngày 10 tháng 10 năm 2026\n Mẫu số: 1C26TAA\nKý hiệu: IR26E\nSố: 00000101\nĐơn vị bán hàng: CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ MINH PHÁT\nMã số thuế: 0101234565\nĐịa chỉ: 86 Trần Thái Tông, Phường Cầu Giấy, Thành phố Hà Nội\nĐơn vị mua hàng: CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH\nMã số thuế: 0319999996\nĐịa chỉ: 128 Nguyễn Văn Linh, Phường Tân Hưng, Thành phố Hồ Chí Minh\nHình thức thanh toán: Chuyển khoản\nSTT\nTÊN HÀNG HÓA, DỊCH VỤ\nĐVT\nSL\nĐƠN GIÁ\nTHÀNH TIỀN\n1\nDịch vụ ăn uống tiếp khách\nSuất\n10\n300.000\n3.000.000\nCộng tiền hàng chưa thuế:\n3.000.000\nThuế GTGT (8%):\n240.000\nTỔNG CỘNG THANH TOÁN:\n3.240.000 VND\nSố tiền bằng chữ: Ba triệu hai trăm bốn mươi nghìn đồng.\n NGƯỜI MUA HÀNG\n (Ký, ghi rõ họ tên)\n NGƯỜI BÁN HÀNG\nCÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ MINH\n PHÁT\nKý bởi: CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ\n MINH PHÁT\nNgười ký: PHẠM HOÀNG NAM\n Ký ngày: 10/10/2026\n",
+          "blocks": []
+        }
+      ],
+      "complete": true
+    }
+  },
+  "extractions": {
+    "paper": {
+      "role_fit": "FIT",
+      "actual_type": "SETTLEMENT_FORM",
+      "fields": [
+        {
+          "field": "declared_advance",
+          "state": "FOUND",
+          "value": 4000000,
+          "quote": "4.000.000",
+          "page": 1
+        },
+        {
+          "field": "printed_total",
+          "state": "FOUND",
+          "value": 3240000,
+          "quote": "3.240.000",
+          "page": 1
+        },
+        {
+          "field": "printed_return",
+          "state": "FOUND",
+          "value": 760000,
+          "quote": "760.000",
+          "page": 1
+        },
+        {
+          "field": "declared_name",
+          "state": "FOUND",
+          "value": "NGUYỄN MINH AN",
+          "quote": "NGUYỄN MINH AN",
+          "page": 1
+        },
+        {
+          "field": "purpose",
+          "state": "FOUND",
+          "value": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+          "quote": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+          "page": 1
+        }
+      ],
+      "line_items": [
+        {
+          "fields": [
+            {
+              "field": "description",
+              "state": "FOUND",
+              "value": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+              "quote": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn\nphòng 2026",
+              "page": 1
+            },
+            {
+              "field": "amount",
+              "state": "FOUND",
+              "value": 3240000,
+              "quote": "3.240.000",
+              "page": 1
+            },
+            {
+              "field": "invoice_refs",
+              "state": "FOUND",
+              "value": [
+                "00000101"
+              ],
+              "quote": "00000101",
+              "page": 1
+            }
+          ]
+        }
+      ]
+    },
+    "evidence": {
+      "document_type": "E_INVOICE",
+      "fields": [
+        {
+          "field": "document_date",
+          "state": "FOUND",
+          "value": "2026-10-10",
+          "quote": "Ngày 10 tháng 10 năm 2026",
+          "page": 1
+        },
+        {
+          "field": "buyer_name",
+          "state": "FOUND",
+          "value": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+          "quote": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+          "page": 1
+        },
+        {
+          "field": "total_amount",
+          "state": "FOUND",
+          "value": 3240000,
+          "quote": "3.240.000",
+          "page": 1
+        },
+        {
+          "field": "tax",
+          "state": "FOUND",
+          "value": 240000,
+          "quote": "240.000",
+          "page": 1
+        },
+        {
+          "field": "subtotal",
+          "state": "FOUND",
+          "value": 3000000,
+          "quote": "3.000.000",
+          "page": 1
+        },
+        {
+          "field": "buyer_tax_code",
+          "state": "FOUND",
+          "value": "0319999996",
+          "quote": "0319999996",
+          "page": 1
+        },
+        {
+          "field": "issuer_name",
+          "state": "FOUND",
+          "value": "CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ MINH PHÁT",
+          "quote": "CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ MINH PHÁT",
+          "page": 1
+        },
+        {
+          "field": "document_number",
+          "state": "FOUND",
+          "value": "00000101",
+          "quote": "00000101",
+          "page": 1
+        }
+      ],
+      "line_items": [
+        {
+          "fields": [
+            {
+              "field": "item_name",
+              "state": "FOUND",
+              "value": "Dịch vụ ăn uống tiếp khách",
+              "quote": "Dịch vụ ăn uống tiếp khách",
+              "page": 1
+            },
+            {
+              "field": "line_amount",
+              "state": "FOUND",
+              "value": 3000000,
+              "quote": "3.000.000",
+              "page": 1
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "transcription": {
+    "data_origin": "RECORDED_REPLAY",
+    "facts": [
+      {
+        "field": "incurred",
+        "value": 3240000,
+        "role": "INVOICE",
+        "page": 1,
+        "quote": "Tổng cộng tiền thanh toán: 3.240.000"
+      },
+      {
+        "field": "paid_employee",
+        "value": 3240000,
+        "role": "PAYMENT",
+        "page": 1,
+        "quote": "Người thanh toán: NGUYỄN MINH AN"
+      },
+      {
+        "field": "advance",
+        "value": 4000000,
+        "role": "ADVANCE",
+        "page": 1,
+        "quote": "Số tiền đã tạm ứng: 4.000.000 đồng"
+      },
+      {
+        "field": "coverage",
+        "value": 1,
+        "role": "LEDGER",
+        "page": 1,
+        "quote": "Đối chiếu đủ chứng từ"
+      },
+      {
+        "field": "economic_key",
+        "value": "invoice:00000101",
+        "role": "INVOICE",
+        "page": 1,
+        "quote": "Số: 00000101"
+      }
+    ],
+    "relations": []
+  },
+  "provenance": {
+    "method": "pypdf_native_text_and_handwritten_extraction",
+    "provider_calls": 0
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "stages": {
+    "ban-dau": {
+      "route": "AUTO",
+      "expected_amounts": {
+        "PAY": 400000
+      },
+      "owner": "employee:employee-a",
+      "question_required": false,
+      "money_source_digests": [
+        "03e5473e19ce2c368cc1b696afd21f7e687c8170b094f9b19bbae4c6f4ce1d6d"
+      ],
+      "expected_money": {
+        "E": 5400000,
+        "A": 5000000,
+        "P": 0,
+        "R": 0,
+        "S": 400000
+      }
+    }
+  }
+}

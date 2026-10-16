@@ -1,0 +1,221 @@
+{
+  "case_id": "VFY-BAL-01",
+  "data_origin": "SYNTHETIC_FIXTURE",
+  "digests": {
+    "report_hoan_ung.pdf": "b0cf9264b32f8a546e47090c4f9606f15365a262f467dcd17793afd3f1668842",
+    "hoa_don_dien_tu.pdf": "1971e2313142439968ebfd43ea974cf716e7dfb473954cc68dac2a4fb9513927"
+  },
+  "ocr": {
+    "b0cf9264b32f8a546e47090c4f9606f15365a262f467dcd17793afd3f1668842": {
+      "pages": [
+        {
+          "page": 1,
+          "markdown": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n Độc lập - Tự do - Hạnh phúc\nThành phố Hồ Chí Minh, ngày 10 tháng 10 năm 2026\nGIẤY ĐỀ NGHỊ HOÀN ỨNG\nVề việc: Quyết toán chi phí mua văn phòng phẩm và vật tư dự án Quý 4/2026\nKính gửi: Ban Giám đốc CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH\nNgười đề nghị: NGUYỄN MINH AN\nBộ phận: Hành chính nhân sự\nChức vụ: Nhân viên\nMã nhân viên: NV-01\nNội dung: Quyết toán chi phí mua văn phòng phẩm và vật tư dự án Quý 4/2026\nSTT\nNỘI DUNG\nHÓA ĐƠN\nSỐ TIỀN\nGHI CHÚ\n1\nChi phí văn phòng phẩm phục vụ dự án Q4/2026\n00000888\n2.160.000\nĐính kèm HĐĐT\nTổng cộng\n2.160.000\nSố tiền bằng chữ: Hai triệu một trăm sáu mươi nghìn đồng.\nSố tiền đã tạm ứng: 2.160.000 đồng\nChênh lệch quyết toán (hoàn ứng / thanh toán thêm): 0 đồng\nBằng chữ: Không đồng (Quyết toán cân bằng).\nNGƯỜI ĐỀ NGHỊ\nKẾ TOÁN THANH TOÁN\nGIÁM ĐỐC DUYỆT\n(Ký, họ tên)\n(Ký, họ tên)\n(Ký, họ tên, đóng dấu)\nNGUYỄN MINH AN\nTRẦN THỊ B\nLÊ VĂN C\n",
+          "blocks": []
+        }
+      ],
+      "complete": true
+    },
+    "1971e2313142439968ebfd43ea974cf716e7dfb473954cc68dac2a4fb9513927": {
+      "pages": [
+        {
+          "page": 1,
+          "markdown": "HÓA ĐƠN GIÁ TRỊ GIA TĂNG ĐIỆN TỬ\n Ngày 10 tháng 10 năm 2026\nMẫu số: 1C26TAA\nKý hiệu: HH26E\nSố: 00000888\nĐơn vị bán hàng: CÔNG TY CỔ PHẦN VĂN PHÒNG PHẨM HỒNG HÀ\nMã số thuế: 0100108637\nĐịa chỉ: 25 Lý Thường Kiệt, Quận Hoàn Kiếm, Thành phố Hà Nội\nĐiện thoại: 024.3856.1234\nĐơn vị mua hàng: CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH\nMã số thuế: 0319999996\nĐịa chỉ: 128 Nguyễn Văn Linh, Phường Tân Hưng, Quận 7, TP. Hồ Chí Minh\nHọ tên người mua hàng: NGUYỄN MINH AN\nHình thức thanh toán: Chuyển khoản\nSTT\nTÊN HÀNG HÓA, DỊCH VỤ\nĐVT\nSL\nĐƠN GIÁ\nTHÀNH TIỀN\n1\nVăn phòng phẩm và vật tư phục vụ dự án Q4\nBộ\n4\n500.000\n2.000.000\nCộng tiền hàng chưa thuế:\n2.000.000\nThuế suất GTGT (8%):\nTiền thuế GTGT:\n160.000\nTổng cộng tiền thanh toán:\n2.160.000\nSố tiền viết bằng chữ: Hai triệu một trăm sáu mươi nghìn đồng.\nNGƯỜI MUA HÀNG\nNGƯỜI BÁN HÀNG\n(Ký, ghi rõ họ tên)\n(Chữ ký số điện tử hợp lệ)\nNGUYỄN MINH AN\nĐÃ KÝ ĐIỆN TỬ BỞI CTY CP VĂN PHÒNG PHẨM HỒNG HÀ\n",
+          "blocks": []
+        }
+      ],
+      "complete": true
+    }
+  },
+  "extractions": {
+    "paper": {
+      "role_fit": "FIT",
+      "actual_type": "SETTLEMENT_FORM",
+      "fields": [
+        {
+          "field": "declared_advance",
+          "state": "FOUND",
+          "value": 2160000,
+          "quote": "2.160.000",
+          "page": 1
+        },
+        {
+          "field": "printed_total",
+          "state": "FOUND",
+          "value": 2160000,
+          "quote": "2.160.000",
+          "page": 1
+        },
+        {
+          "field": "declared_name",
+          "state": "FOUND",
+          "value": "NGUYỄN MINH AN",
+          "quote": "NGUYỄN MINH AN",
+          "page": 1
+        },
+        {
+          "field": "purpose",
+          "state": "FOUND",
+          "value": "Quyết toán chi phí mua văn phòng phẩm và vật tư dự án Quý 4/2026",
+          "quote": "Quyết toán chi phí mua văn phòng phẩm và vật tư dự án Quý 4/2026",
+          "page": 1
+        }
+      ],
+      "line_items": [
+        {
+          "fields": [
+            {
+              "field": "description",
+              "state": "FOUND",
+              "value": "Chi phí văn phòng phẩm phục vụ dự án Q4/2026",
+              "quote": "Chi phí văn phòng phẩm phục vụ dự án Q4/2026",
+              "page": 1
+            },
+            {
+              "field": "amount",
+              "state": "FOUND",
+              "value": 2160000,
+              "quote": "2.160.000",
+              "page": 1
+            },
+            {
+              "field": "invoice_refs",
+              "state": "FOUND",
+              "value": [
+                "00000888"
+              ],
+              "quote": "00000888",
+              "page": 1
+            }
+          ]
+        }
+      ]
+    },
+    "evidence": {
+      "document_type": "E_INVOICE",
+      "fields": [
+        {
+          "field": "document_date",
+          "state": "FOUND",
+          "value": "2026-10-10",
+          "quote": "Ngày 10 tháng 10 năm 2026",
+          "page": 1
+        },
+        {
+          "field": "buyer_name",
+          "state": "FOUND",
+          "value": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+          "quote": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
+          "page": 1
+        },
+        {
+          "field": "total_amount",
+          "state": "FOUND",
+          "value": 2160000,
+          "quote": "2.160.000",
+          "page": 1
+        },
+        {
+          "field": "tax",
+          "state": "FOUND",
+          "value": 160000,
+          "quote": "160.000",
+          "page": 1
+        },
+        {
+          "field": "subtotal",
+          "state": "FOUND",
+          "value": 2000000,
+          "quote": "2.000.000",
+          "page": 1
+        },
+        {
+          "field": "buyer_tax_code",
+          "state": "FOUND",
+          "value": "0319999996",
+          "quote": "0319999996",
+          "page": 1
+        },
+        {
+          "field": "issuer_name",
+          "state": "FOUND",
+          "value": "CÔNG TY CỔ PHẦN VĂN PHÒNG PHẨM HỒNG HÀ",
+          "quote": "CÔNG TY CỔ PHẦN VĂN PHÒNG PHẨM HỒNG HÀ",
+          "page": 1
+        },
+        {
+          "field": "document_number",
+          "state": "FOUND",
+          "value": "00000888",
+          "quote": "00000888",
+          "page": 1
+        }
+      ],
+      "line_items": [
+        {
+          "fields": [
+            {
+              "field": "item_name",
+              "state": "FOUND",
+              "value": "Văn phòng phẩm và vật tư phục vụ dự án Q4",
+              "quote": "Văn phòng phẩm và vật tư phục vụ dự án Q4",
+              "page": 1
+            },
+            {
+              "field": "line_amount",
+              "state": "FOUND",
+              "value": 2000000,
+              "quote": "2.000.000",
+              "page": 1
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "transcription": {
+    "data_origin": "RECORDED_REPLAY",
+    "facts": [
+      {
+        "field": "incurred",
+        "value": 2160000,
+        "role": "INVOICE",
+        "page": 1,
+        "quote": "Tổng cộng tiền thanh toán: 2.160.000"
+      },
+      {
+        "field": "paid_employee",
+        "value": 2160000,
+        "role": "PAYMENT",
+        "page": 1,
+        "quote": "Người thanh toán: NGUYỄN MINH AN"
+      },
+      {
+        "field": "advance",
+        "value": 2160000,
+        "role": "ADVANCE",
+        "page": 1,
+        "quote": "Số tiền đã tạm ứng: 2.160.000 đồng"
+      },
+      {
+        "field": "coverage",
+        "value": 1,
+        "role": "LEDGER",
+        "page": 1,
+        "quote": "Đối chiếu đủ chứng từ"
+      },
+      {
+        "field": "economic_key",
+        "value": "invoice:00000888",
+        "role": "INVOICE",
+        "page": 1,
+        "quote": "Số: 00000888"
+      }
+    ],
+    "relations": []
+  },
+  "provenance": {
+    "method": "pypdf_native_text_and_handwritten_extraction",
+    "provider_calls": 0
+  }
+}
