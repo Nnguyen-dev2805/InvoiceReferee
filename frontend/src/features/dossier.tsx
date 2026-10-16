@@ -179,7 +179,7 @@ export function Dossier({
   return (
     <section
       aria-labelledby="dossier-title"
-      className="space-y-6 select-none text-xs"
+      className="space-y-6 text-xs"
     >
       {/* Dossier Summary Line */}
       <div className="pb-3 border-b border-slate-100 flex items-center justify-between">

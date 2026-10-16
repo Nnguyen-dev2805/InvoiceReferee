@@ -59,7 +59,7 @@ export function Approval({ caseView }: { caseView: CaseView | null }) {
     (i) => i.status === "ISSUED" || i.status === "PARTIAL",
   );
   return (
-    <section aria-labelledby="approval-title" className="space-y-3 select-none text-xs">
+    <section aria-labelledby="approval-title" className="space-y-3 text-xs">
       <div className="flex items-center justify-between pb-2 border-b border-slate-100">
         <h2 id="approval-title" className="text-xs font-semibold text-slate-900">
           Lệnh chi / thu ({active.length})

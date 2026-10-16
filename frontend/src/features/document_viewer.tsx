@@ -8,6 +8,8 @@ export interface DocumentViewerProps {
   onFilesSelected?: (files: File[]) => void;
   selectedSourceId?: string | null;
   onSourceSelected?: (sourceId: string) => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 export function DocumentViewer({
@@ -16,10 +18,14 @@ export function DocumentViewer({
   onFilesSelected,
   selectedSourceId = null,
   onSourceSelected,
+  isExpanded = false,
+  onToggleExpand,
 }: DocumentViewerProps) {
   const sources = caseView?.sources ?? [];
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on click outside or Escape
@@ -105,12 +111,18 @@ export function DocumentViewer({
     };
   }, [documentUrl]);
 
+  // Reset zoom and rotation when active document changes
+  useEffect(() => {
+    setZoom(1);
+    setRotation(0);
+  }, [activeTab?.id]);
+
   const isPdf = activeTab?.name.toLowerCase().endsWith(".pdf") ||
     activeTab?.source?.media === "PDF" ||
     activeTab?.file?.type === "application/pdf";
 
   return (
-    <section aria-label="Trình xem chứng từ gốc" className="h-full flex flex-col bg-slate-100 border-r border-slate-200 select-none overflow-hidden">
+    <section aria-label="Trình xem chứng từ gốc" className="h-full flex flex-col bg-slate-100 border-r border-slate-200 overflow-hidden">
       {/* 1. Sleek Streamlined Document Switcher Bar (h-11) */}
       <div className="h-11 bg-white border-b border-slate-200 flex items-center justify-between px-3 gap-2 shrink-0 z-20">
         {allTabs.length === 0 ? (
@@ -274,9 +286,57 @@ export function DocumentViewer({
           </div>
         )}
 
-        {/* Right Actions: Mở tab mới */}
-        {documentUrl && (
-          <div className="shrink-0 flex items-center pl-2">
+        {/* Right Actions: Zoom/Rotate + Mở tab mới + Mở rộng/Thu gọn */}
+        <div className="shrink-0 flex items-center gap-1 pl-2">
+          {!isPdf && documentUrl && (
+            <div className="flex items-center gap-0.5 bg-slate-50 border border-slate-200 rounded px-1 py-0.5 mr-1">
+              <button
+                type="button"
+                onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.25).toFixed(2))))}
+                disabled={zoom <= 0.5}
+                className="w-6 h-6 flex items-center justify-center rounded text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer text-xs font-bold"
+                title="Thu nhỏ ảnh (-25%)"
+                aria-label="Thu nhỏ ảnh"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setZoom(1);
+                  setRotation(0);
+                }}
+                className="px-1.5 h-6 flex items-center justify-center rounded text-[11px] font-mono text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition-colors cursor-pointer tabular-nums"
+                title="Nhấn để đặt lại kích thước 100% và góc xoay ban đầu"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoom((z) => Math.min(3, Number((z + 0.25).toFixed(2))))}
+                disabled={zoom >= 3}
+                className="w-6 h-6 flex items-center justify-center rounded text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer text-xs font-bold"
+                title="Phóng to ảnh (+25%)"
+                aria-label="Phóng to ảnh"
+              >
+                +
+              </button>
+              <div className="h-3.5 w-px bg-slate-200 mx-0.5" />
+              <button
+                type="button"
+                onClick={() => setRotation((r) => (r + 90) % 360)}
+                className="w-6 h-6 flex items-center justify-center rounded text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition-colors cursor-pointer text-xs"
+                title="Xoay ảnh 90° theo chiều kim đồng hồ"
+                aria-label="Xoay ảnh 90 độ"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {documentUrl && (
             <a
               href={documentUrl}
               target="_blank"
@@ -301,8 +361,28 @@ export function DocumentViewer({
                 />
               </svg>
             </a>
-          </div>
-        )}
+          )}
+
+          {onToggleExpand && (
+            <button
+              type="button"
+              onClick={onToggleExpand}
+              className="inline-flex items-center justify-center w-7 h-7 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+              title={isExpanded ? "Thu nhỏ về tỉ lệ 50/50" : "Mở rộng khung xem chứng từ (70/30)"}
+              aria-label={isExpanded ? "Thu gọn khung xem" : "Mở rộng khung xem"}
+            >
+              {isExpanded ? (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m2 14l7-7-7-7" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 2. Document Viewport (100% Height & Width) */}
@@ -353,11 +433,18 @@ export function DocumentViewer({
           />
         ) : (
           <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-900/5">
-            <img
-              src={documentUrl}
-              alt={activeTab.name}
-              className="max-w-full max-h-full object-contain rounded shadow-sm bg-white border border-slate-200"
-            />
+            <div
+              className="transition-transform duration-150 ease-out origin-center inline-flex items-center justify-center"
+              style={{
+                transform: `scale(${zoom}) rotate(${rotation}deg)`,
+              }}
+            >
+              <img
+                src={documentUrl}
+                alt={activeTab.name}
+                className="max-w-full max-h-full object-contain rounded shadow-sm bg-white border border-slate-200"
+              />
+            </div>
           </div>
         )}
       </div>

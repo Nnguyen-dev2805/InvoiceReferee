@@ -225,7 +225,7 @@ export function Advance({
   const formattedPreview = !isNaN(numericAmount) && numericAmount > 0 ? formatVnd(numericAmount) : null;
 
   return (
-    <section aria-labelledby="advance-title" className="space-y-4 select-none text-xs">
+    <section aria-labelledby="advance-title" className="space-y-4 text-xs">
       <div className="flex items-center justify-between pb-2 border-b border-slate-200">
         <h2 id="advance-title" className="text-xs font-semibold text-slate-900">
           Ghi nhận tạm ứng từ chứng từ

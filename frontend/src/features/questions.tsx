@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { answerIssue, errorMessage } from "../api";
+import { formatVndHint } from "../format";
 import type { CaseView, IssueView } from "../types";
 
 const KIND_LABELS: Record<string, string> = {
@@ -181,10 +182,12 @@ export function QuestionCard({
   issue,
   caseView,
   onCase,
+  onSourceSelected,
 }: {
   issue: IssueView;
   caseView: CaseView;
   onCase: (view: CaseView) => void;
+  onSourceSelected?: (sourceId: string) => void;
 }) {
   const [value, setValue] = useState("");
   const [reason, setReason] = useState("");
@@ -197,7 +200,7 @@ export function QuestionCard({
 
   // Group refs by source and page
   const groupedRefs = (issue.refs ?? []).reduce<
-    Record<string, { filename: string; page: number | null; quotes: string[] }>
+    Record<string, { source_id: string; filename: string; page: number | null; quotes: string[] }>
   >((acc, ref) => {
     const filename =
       caseView.sources.find((source) => source.id === ref.source_id)?.filename ??
@@ -205,6 +208,7 @@ export function QuestionCard({
     const key = `${ref.source_id}::${ref.page ?? 1}`;
     if (!acc[key]) {
       acc[key] = {
+        source_id: ref.source_id,
         filename,
         page: ref.page ?? null,
         quotes: [],
@@ -265,7 +269,21 @@ export function QuestionCard({
           <span className="text-slate-400 font-medium shrink-0">Chứng từ đối chiếu:</span>
           {Object.entries(groupedRefs).map(([key, group]) => (
             <span key={key} className="inline-flex items-baseline gap-1.5 flex-wrap">
-              <span className="font-semibold text-slate-800">{group.filename}</span>
+              {onSourceSelected ? (
+                <button
+                  type="button"
+                  onClick={() => onSourceSelected(group.source_id)}
+                  className="font-semibold text-sky-700 hover:text-sky-900 hover:underline cursor-pointer inline-flex items-center gap-1 text-left"
+                  title={`Xem chứng từ ${group.filename}`}
+                >
+                  <span>{group.filename}</span>
+                  <svg className="w-3 h-3 text-sky-500 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </button>
+              ) : (
+                <span className="font-semibold text-slate-800">{group.filename}</span>
+              )}
               <span className="text-slate-500">· trang {group.page ?? "?"}</span>
               {!lineTable && !returnTable && (
                 <>
@@ -409,16 +427,23 @@ export function QuestionCard({
                 : "Nội dung giải trình / xác nhận:"}
             </label>
             {invoiceReference ? (
-              <input
-                id={`answer-${issue.id}`}
-                type="number"
-                inputMode="numeric"
-                min={1}
-                step={1}
-                value={value}
-                onChange={(event) => setValue(event.target.value)}
-                className="w-full bg-white border border-slate-300 rounded text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 transition-colors"
-              />
+              <div className="space-y-1">
+                <input
+                  id={`answer-${issue.id}`}
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  step={1}
+                  value={value}
+                  onChange={(event) => setValue(event.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 transition-colors"
+                />
+                {formatVndHint(value) && (
+                  <p className="text-[11px] text-slate-500 font-mono tabular-nums">
+                    ≈ {formatVndHint(value)}
+                  </p>
+                )}
+              </div>
             ) : (
               <textarea
                 id={`answer-${issue.id}`}
@@ -475,10 +500,12 @@ export function Questions({
   caseView,
   onCase,
   currentRole = "employee",
+  onSourceSelected,
 }: {
   caseView: CaseView | null;
   onCase: (view: CaseView) => void;
   currentRole?: string;
+  onSourceSelected?: (sourceId: string) => void;
 }) {
   const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
   const [isOtherIssuesOpen, setIsOtherIssuesOpen] = useState(false);
@@ -494,7 +521,7 @@ export function Questions({
     myIssues.find((i) => i.id === activeIssueId)?.id ?? myIssues[0]?.id ?? null;
 
   return (
-    <section aria-labelledby="questions-title" className="space-y-6 select-none text-xs max-w-3xl">
+    <section aria-labelledby="questions-title" className="space-y-6 text-xs max-w-3xl">
       {/* 1. Actionable Issues for Current Role */}
       {myIssues.length > 0 ? (
         <div className="space-y-3">
@@ -540,6 +567,7 @@ export function Questions({
                   issue={issue}
                   caseView={caseView}
                   onCase={onCase}
+                  onSourceSelected={onSourceSelected}
                 />
               </div>
             ))}

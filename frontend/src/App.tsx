@@ -39,6 +39,7 @@ export default function App() {
   const [isPersonaOpen, setIsPersonaOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
   const [detailTab, setDetailTab] = useState<"dossier" | "issues" | "cashflow" | "return">("dossier");
+  const [isViewerExpanded, setIsViewerExpanded] = useState(false);
   const personaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -125,7 +126,7 @@ export default function App() {
     ).length ?? 0;
 
   return (
-    <div className="app h-screen flex flex-col bg-slate-50 text-slate-800 font-sans overflow-hidden select-none">
+    <div className="app h-screen flex flex-col bg-slate-50 text-slate-800 font-sans overflow-hidden">
       {/* 1. Header (48px / h-12) */}
       <header className="h-12 border-b border-slate-200 bg-white flex items-center justify-between px-4 text-xs select-none shrink-0 z-20">
         {/* Left: Brand / Home Link */}
@@ -299,17 +300,19 @@ export default function App() {
         ) : (
           /* DUAL-PANE SPLIT WORKSPACE (calc(100vh - 48px)) */
           <main className="h-[calc(100vh-48px)] flex flex-col md:flex-row overflow-hidden flex-1">
-            {/* LEFT PANE: Document & Evidence Inspector (50%) */}
-            <div className="w-full md:w-1/2 h-1/2 md:h-full overflow-hidden flex flex-col">
+            {/* LEFT PANE: Document & Evidence Inspector */}
+            <div className={`w-full ${isViewerExpanded ? "md:w-3/4" : "md:w-1/2"} h-1/2 md:h-full overflow-hidden flex flex-col transition-all duration-200 ease-in-out`}>
               <DocumentViewer
                 caseView={caseView}
                 selectedSourceId={selectedSourceId}
                 onSourceSelected={setSelectedSourceId}
+                isExpanded={isViewerExpanded}
+                onToggleExpand={() => setIsViewerExpanded((v) => !v)}
               />
             </div>
 
-            {/* RIGHT PANE: Role-Based Action & Audit Workspace (50%) */}
-            <div className="w-full md:w-1/2 h-1/2 md:h-full overflow-hidden flex flex-col bg-white">
+            {/* RIGHT PANE: Role-Based Action & Audit Workspace */}
+            <div className={`w-full ${isViewerExpanded ? "md:w-1/4" : "md:w-1/2"} h-1/2 md:h-full overflow-hidden flex flex-col bg-white transition-all duration-200 ease-in-out`}>
               {/* Sleek Subheader Bar (h-11) */}
               <div className="h-11 border-b border-slate-200 px-5 flex items-center justify-between shrink-0 bg-white z-10">
                 <div className="flex items-center gap-2">
@@ -511,6 +514,7 @@ export default function App() {
                           void restoreLatestCase();
                         }}
                         currentRole={currentRole}
+                        onSourceSelected={setSelectedSourceId}
                       />
                     ) : (
                       <div className="py-12 px-4 text-center space-y-2 select-none">

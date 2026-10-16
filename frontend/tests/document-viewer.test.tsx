@@ -90,4 +90,34 @@ describe("DocumentViewer", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: /giay_quyet_toan\.pdf/ }));
     expect(screen.getByTitle("giay_quyet_toan.pdf")).toBeInTheDocument();
   });
+
+  it("renders zoom, rotation, and expand controls when viewing an image document", async () => {
+    let toggled = false;
+    render(
+      <DocumentViewer
+        caseView={MOCK_CASE}
+        selectedSourceId="source:2"
+        isExpanded={false}
+        onToggleExpand={() => {
+          toggled = true;
+        }}
+      />,
+    );
+
+    // Zoom controls are visible for images
+    expect(screen.getByRole("button", { name: "Phóng to ảnh" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Thu nhỏ ảnh" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Xoay ảnh 90 độ" })).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
+
+    // Click zoom in
+    await userEvent.setup().click(screen.getByRole("button", { name: "Phóng to ảnh" }));
+    expect(screen.getByText("125%")).toBeInTheDocument();
+
+    // Click expand toggle
+    const expandBtn = screen.getByRole("button", { name: "Mở rộng khung xem" });
+    expect(expandBtn).toBeInTheDocument();
+    await userEvent.setup().click(expandBtn);
+    expect(toggled).toBe(true);
+  });
 });

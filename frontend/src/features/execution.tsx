@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { errorMessage, recordActual } from "../api";
-import { formatVnd } from "../format";
+import { formatVnd, formatVndHint } from "../format";
 import type { CaseView } from "../types";
 
 const MONEY_LABELS: Record<string, string> = {
@@ -86,7 +86,7 @@ export function Execution({
   }
 
   return (
-    <section aria-labelledby="execution-title" className="space-y-4 select-none text-xs">
+    <section aria-labelledby="execution-title" className="space-y-4 text-xs">
       <div className="flex items-center justify-between border-b border-slate-200 pb-2">
         <h2 id="execution-title" className="font-semibold text-slate-900 text-xs">Dòng tiền thực tế</h2>
       </div>
@@ -163,6 +163,11 @@ export function Execution({
                 onChange={(event) => setAmount(event.target.value)}
                 className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 font-mono tabular-nums text-xs text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-950 transition-colors shadow-2xs"
               />
+              {formatVndHint(amount) && (
+                <span className="text-[11px] text-slate-500 font-mono tabular-nums block">
+                  ≈ {formatVndHint(amount)}
+                </span>
+              )}
             </label>
             <label className="block space-y-1">
               <span className="text-slate-600 block text-[11px] font-medium">Mã giao dịch trên chứng từ</span>

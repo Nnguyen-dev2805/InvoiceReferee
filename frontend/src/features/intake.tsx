@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { api, attachSources, errorMessage, getSettlementDraft, settlementDraft, submitCase } from "../api";
 import type { SettlementArithmeticFinding, SettlementLink } from "../api";
-import { formatVnd } from "../format";
+import { formatVnd, formatVndHint } from "../format";
 import type { CaseView, SessionPayload } from "../types";
 import { DocumentViewer } from "./document_viewer";
 
@@ -76,6 +76,7 @@ export function Intake({
   const [link, setLink] = useState<SettlementLink | null>(null);
   const [confirmedActivityId, setConfirmedActivityId] = useState<string>("");
   const [draft, setDraft] = useState<IntakeDraftState>(EMPTY_DRAFT);
+  const [isViewerExpanded, setIsViewerExpanded] = useState(false);
 
   // Resume draft from server when an existing draft case is opened
   useEffect(() => {
@@ -391,7 +392,11 @@ export function Intake({
                       </span>
                       <button
                         type="button"
-                        onClick={() => setFiles([])}
+                        onClick={() => {
+                          if (files.length <= 1 || window.confirm("Bạn có chắc chắn muốn xóa tất cả tệp chứng từ đã chọn?")) {
+                            setFiles([]);
+                          }
+                        }}
                         className="text-[11px] text-slate-400 hover:text-rose-600 cursor-pointer font-medium transition-colors"
                       >
                         Xóa tất cả
@@ -567,13 +572,18 @@ export function Intake({
 
   return (
     <main className="h-[calc(100vh-48px)] flex flex-col md:flex-row overflow-hidden flex-1">
-      {/* LEFT PANE: Document & Evidence Inspector (50%) */}
-      <div className="w-full md:w-1/2 h-1/2 md:h-full overflow-hidden flex flex-col">
-        <DocumentViewer caseView={caseView} pendingFiles={files} />
+      {/* LEFT PANE: Document & Evidence Inspector */}
+      <div className={`w-full ${isViewerExpanded ? "md:w-3/4" : "md:w-1/2"} h-1/2 md:h-full overflow-hidden flex flex-col transition-all duration-200 ease-in-out`}>
+        <DocumentViewer
+          caseView={caseView}
+          pendingFiles={files}
+          isExpanded={isViewerExpanded}
+          onToggleExpand={() => setIsViewerExpanded((v) => !v)}
+        />
       </div>
 
-      {/* RIGHT PANE: Extracted Draft Workspace (50%) */}
-      <div className="w-full md:w-1/2 h-1/2 md:h-full overflow-hidden flex flex-col bg-white">
+      {/* RIGHT PANE: Extracted Draft Workspace */}
+      <div className={`w-full ${isViewerExpanded ? "md:w-1/4" : "md:w-1/2"} h-1/2 md:h-full overflow-hidden flex flex-col bg-white transition-all duration-200 ease-in-out`}>
         {/* Sleek Subheader Bar (h-11) */}
         <div className="h-11 border-b border-slate-200 px-5 flex items-center justify-between shrink-0 bg-white z-10">
           <div className="flex items-center gap-2">
@@ -842,21 +852,28 @@ export function Intake({
                     </div>
                   </td>
                   <td className="py-2.5 px-0 text-right">
-                    <div className="inline-flex items-center gap-1 justify-end">
-                      <input
-                        id="draft-advance"
-                        aria-label="Ứng nhân viên kê khai:"
-                        type="number"
-                        value={draft.declared_advance ?? ""}
-                        onChange={(e) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            declared_advance: e.target.value === "" ? null : Number(e.target.value),
-                          }))
-                        }
-                        className="w-32 text-right bg-transparent border-0 border-b border-slate-300 hover:border-slate-500 focus:border-slate-900 rounded-none py-0.5 px-0 font-mono tabular-nums font-semibold text-slate-900 focus:outline-none transition-colors"
-                      />
-                      <span className="text-slate-500 font-medium">đ</span>
+                    <div className="flex flex-col items-end">
+                      <div className="inline-flex items-center gap-1 justify-end">
+                        <input
+                          id="draft-advance"
+                          aria-label="Ứng nhân viên kê khai:"
+                          type="number"
+                          value={draft.declared_advance ?? ""}
+                          onChange={(e) =>
+                            setDraft((prev) => ({
+                              ...prev,
+                              declared_advance: e.target.value === "" ? null : Number(e.target.value),
+                            }))
+                          }
+                          className="w-32 text-right bg-transparent border-0 border-b border-slate-300 hover:border-slate-500 focus:border-slate-900 rounded-none py-0.5 px-0 font-mono tabular-nums font-semibold text-slate-900 focus:outline-none transition-colors"
+                        />
+                        <span className="text-slate-500 font-medium">đ</span>
+                      </div>
+                      {formatVndHint(draft.declared_advance) && (
+                        <span className="text-[10px] text-slate-500 font-mono tabular-nums pt-0.5">
+                          ≈ {formatVndHint(draft.declared_advance)}
+                        </span>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -35,7 +35,11 @@ test-results/
 
 # Competition slide work, source drafts, and generated exports.
 docs/final/slides/
+docs/final/presentation/
+docs/final/PRESENTATION_RESEARCH.md
+.frontend-slides/
 docs/superpowers/plans/*slides*
 *.pptx
 ~$*.pptx
+
 
