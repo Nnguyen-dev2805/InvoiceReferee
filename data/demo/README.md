@@ -18,12 +18,12 @@ Bản tổng hợp từ nội dung PDF, **chưa phải kết quả chạy pipeli
 | [TC02](../tham-khao/uc-03/tc02-hop-le-cong-ty-thanh-toan-them/) | 5,4 | 5 | Mua máy in; số tiền khớp. | **Chi 400.000 đ**. |
 | [TC03](../tham-khao/uc-03/tc03-hop-le-khong-phat-sinh-chenh-lech/) | 4,32 | 4,32 | Chi và ứng bằng nhau. | **Cân bằng**, không tạo lệnh số 0. |
 | [TC04](../tham-khao/uc-03/tc04-hop-le-nhieu-mat-hang-thiet-bi/) | 83,6 | 85 | Chi phí vượt quyền demo 20 triệu. | **AUTHORITY**; chưa phát hành tiền. Chênh lệch kê khai: thu 1,4 triệu. |
-| [TC05](../tham-khao/uc-03/tc05-tong-cac-dong-tren-bao-cao-khong-khop/) | 3,5 | 4 | Hai dòng cộng 3 triệu, giấy ghi 3,5 triệu; hóa đơn 3,24 triệu. | **FACT**; làm rõ số học và căn cứ dịch vụ, chưa chốt tiền. |
-| [TC06](../tham-khao/uc-03/tc06-chenh-lech-quyet-toan-ghi-sai/) | 3,24 | 4 | Giấy ghi hoàn 700.000, phép tính ra 760.000. | **FACT** về lệch 60.000; không âm thầm sửa và phát hành tiền. |
-| [TC07](../tham-khao/uc-03/tc07-so-tien-bang-chu-tren-bao-cao-khong-khop/) | 3,24 | 4 | Số là 3,24 triệu, bằng chữ là 3,5 triệu. | **FACT**; xác nhận/sửa giá trị đúng trước khi tính tiền. |
-| [TC08](../tham-khao/uc-03/tc08-bao-cao-va-hoa-don-lech-so-tien/) | 3,5 | 4 | Giấy cao hơn hóa đơn 3,24 triệu đúng 260.000. | **FACT**; giải quyết chênh lệch trước khi chốt chi phí. |
-| [TC09](../tham-khao/uc-03/tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac/) | 3,24 | 4 | MST bên mua 7777777777 cần đối chiếu tổ chức. | **FACT nếu sai tổ chức**; chưa tự nhận hóa đơn là hợp lệ. |
-| [TC10](../tham-khao/uc-03/tc10-hoa-don-thieu-ma-so-thue-nguoi-mua/) | 3,24 | 4 | Hóa đơn trống MST người mua. | Bổ sung/xác minh danh tính và điều kiện chứng từ theo policy; chưa tự cho qua. |
+| [TC05](../tham-khao/uc-03/tc05-tong-cac-dong-tren-bao-cao-khong-khop/) | 3,7 | 4,5 | Hai dòng cộng 3,2 triệu, giấy ghi 3,7 triệu; hóa đơn 3,456 triệu. | **FACT**; làm rõ số học và căn cứ dịch vụ, chưa chốt tiền. |
+| [TC06](../tham-khao/uc-03/tc06-chenh-lech-quyet-toan-ghi-sai/) | 2,97 | 3,8 | Giấy ghi hoàn 770.000, phép tính ra 830.000. | **FACT** về lệch 60.000; không âm thầm sửa và phát hành tiền. |
+| [TC07](../tham-khao/uc-03/tc07-so-tien-bang-chu-tren-bao-cao-khong-khop/) | 3,78 | 4,8 | Số là 3,78 triệu, bằng chữ là 4,04 triệu. | **FACT**; xác nhận/sửa giá trị đúng trước khi tính tiền. |
+| [TC08](../tham-khao/uc-03/tc08-bao-cao-va-hoa-don-lech-so-tien/) | 3,284 | 4,2 | Giấy cao hơn hóa đơn 3,024 triệu đúng 260.000. | **FACT**; giải quyết chênh lệch trước khi chốt chi phí. |
+| [TC09](../tham-khao/uc-03/tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac/) | 2,916 | 3,6 | MST bên mua 7777777777 cần đối chiếu tổ chức. | **FACT nếu sai tổ chức**; chưa tự nhận hóa đơn là hợp lệ. |
+| [TC10](../tham-khao/uc-03/tc10-hoa-don-thieu-ma-so-thue-nguoi-mua/) | 3,6288 | 4,6 | Hóa đơn trống MST người mua. | Bổ sung/xác minh danh tính và điều kiện chứng từ theo policy; chưa tự cho qua. |
 | [TC11](../tham-khao/uc-03/tc11-so-hoc-tren-hoa-don-khong-nhat-quan/) | 5,5 | 6 | Tiền hàng 5 triệu + thuế 400.000 = 5,4 triệu, tổng in 5,5 triệu. | **FACT**; chưa phát hành thu 500.000 hay 600.000 khi chưa sửa nguồn. |
 | [TC12](../tham-khao/uc-03/tc12-hoa-don-trung-dinh-danh-voi-ho-so-truoc/) | 3,24 | 4 | Invoice 00000101; cần lịch sử sử dụng để xác định trùng. | Nếu đã dùng: chặn cộng lại. Nếu chưa dùng và đủ căn cứ: **thu 760.000 đ**. |
 | [TC13](../tham-khao/uc-03/tc13-khoan-chi-ruou-bia-can-chuyen-policy/) | 2,16 | 3 | Rượu vang cho mục đích cá nhân sau giờ làm. | Loại khỏi chi công việc: **T=E=0; thu 3 triệu**, không chỉ thu 840.000. |

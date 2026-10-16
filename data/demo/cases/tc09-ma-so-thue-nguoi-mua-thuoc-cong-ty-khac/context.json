@@ -9,8 +9,8 @@
   "company_tax_id": "0319999996",
   "activity": {
     "activity_id": "activity:tc09",
-    "name": "TC09 — Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
-    "purpose": "Chi phí tiếp khách phục vụ dự án Nâng cấp văn phòng 2026",
+    "name": "TC09 — Chi phí tiếp khách chuyên gia tư vấn kiến trúc giải pháp Cloud",
+    "purpose": "Chi phí tiếp khách chuyên gia tư vấn kiến trúc giải pháp Cloud",
     "occurred_at": "2026-10-10T09:00:00+07:00",
     "profile": "WORK_EXPENSE",
     "status": "AUTHORIZED",
@@ -176,7 +176,7 @@
       "scope": "activity:tc09",
       "payer": "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH",
       "payee": "employee:employee-a",
-      "amount": 4000000,
+      "amount": 3600000,
       "event_at": "2026-10-05T09:00:00+07:00",
       "recorded_at": "2026-10-05T10:00:00+07:00",
       "verification_state": "CONFIRMED",
@@ -214,14 +214,14 @@
       "actor": "employee:accountant-demo",
       "scope": "activity:tc09",
       "observed_at": "2026-10-05T10:00:00+07:00",
-      "quote": "Fixture độc lập: công ty đã ứng thực nhận 4000000 VND cho Nguyễn Minh An, activity:tc09; không suy từ giấy quyết toán."
+      "quote": "Fixture độc lập: công ty đã ứng thực nhận 3600000 VND cho Nguyễn Minh An, activity:tc09; không suy từ giấy quyết toán."
     },
     {
       "record_key": "coverage:TC09",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc09",
       "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc09: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "quote": "Sổ hồ sơ giả lập activity:tc09: đúng một khoản ứng 3600000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
     }
   ],
   "activities": [],

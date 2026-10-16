@@ -85,11 +85,11 @@
       "sources": [
         {
           "path": "data/tham-khao/uc-03/tc05-tong-cac-dong-tren-bao-cao-khong-khop/hoa_don_dien_tu.pdf",
-          "sha256": "6216eae3e32cdf2394d97de0e90ccf0fce60f90596ff230fef1d2db28e96008c"
+          "sha256": "d33f8bed5a780e105dcfae73482a8195cfdfdc7605559395169317fd371a20e2"
         },
         {
           "path": "data/tham-khao/uc-03/tc05-tong-cac-dong-tren-bao-cao-khong-khop/report_hoan_ung.pdf",
-          "sha256": "b86695951b340957cba2a39aafc474c77e50d209d9ad2430ff4fe94141378d67"
+          "sha256": "1be0443bae843a3d997886a6e0480535bb43ea03f5d43a31d028bea6fa27f95e"
         }
       ],
       "prerequisites": []
@@ -103,11 +103,11 @@
       "sources": [
         {
           "path": "data/tham-khao/uc-03/tc06-chenh-lech-quyet-toan-ghi-sai/hoa_don_dien_tu.pdf",
-          "sha256": "3625468be7503fa3b973b81fdc9740b98c5451acca96d2a073ba490437751890"
+          "sha256": "d9ecd697bf72e3e260396e1ce9649b3427da13b94a2ef7d272103645cfb935cd"
         },
         {
           "path": "data/tham-khao/uc-03/tc06-chenh-lech-quyet-toan-ghi-sai/report_hoan_ung.pdf",
-          "sha256": "8ff6df5d8a361ae2d00e2d767f858a6288a0168b227663cfbc11b50b00130c00"
+          "sha256": "b32cfa557068ef4614a44079057bb53c153e237657a781f65658977180c3a123"
         }
       ],
       "prerequisites": []
@@ -121,11 +121,11 @@
       "sources": [
         {
           "path": "data/tham-khao/uc-03/tc07-so-tien-bang-chu-tren-bao-cao-khong-khop/hoa_don_dien_tu.pdf",
-          "sha256": "26b8605079ac11c75a874e9466abf4391285dcd94994178dd067a014565c47de"
+          "sha256": "35c49ee432f0e42228a49bd0d22733ee888ce9c15a0a3d642995757a9a010b51"
         },
         {
           "path": "data/tham-khao/uc-03/tc07-so-tien-bang-chu-tren-bao-cao-khong-khop/report_hoan_ung.pdf",
-          "sha256": "b86b3fb5efa4467bfad39bd3661134fb3d0f42acad6f0cbc0c93ca261bd7fa9c"
+          "sha256": "5458f9ef660a5827951dfd451907daafb5003807e22a1fad4957a1b39587a3e6"
         }
       ],
       "prerequisites": []
@@ -139,11 +139,11 @@
       "sources": [
         {
           "path": "data/tham-khao/uc-03/tc08-bao-cao-va-hoa-don-lech-so-tien/hoa_don_dien_tu.pdf",
-          "sha256": "3211a01c1fa54983aeb5809936c1f68396b043ff8395016b937656cfdbf9b817"
+          "sha256": "0e4252b62f4fa9797fdf8d0e2da557cd0deedd7bcbb81266f12da9cbcc9d10e4"
         },
         {
           "path": "data/tham-khao/uc-03/tc08-bao-cao-va-hoa-don-lech-so-tien/report_hoan_ung.pdf",
-          "sha256": "2e6cee3a5bfe2d6878ab2a6008845a33a1855152d50589553a2bc41926b3d940"
+          "sha256": "6a18b064d38b435b5dfdcd73822b7181b6b0dc0e9fd3263faa3dd9c55a6ff3c6"
         }
       ],
       "prerequisites": []
@@ -157,11 +157,11 @@
       "sources": [
         {
           "path": "data/tham-khao/uc-03/tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac/hoa_don_dien_tu.pdf",
-          "sha256": "bcfa80a1a46117d9c8aa20db1644b74ac67c6193d954432a6184ffa3c5c313e2"
+          "sha256": "2e1016329537614cf7c5263389dcf4ff63ec3ff002e0a3ec80adeb74dd3be779"
         },
         {
           "path": "data/tham-khao/uc-03/tc09-ma-so-thue-nguoi-mua-thuoc-cong-ty-khac/report_hoan_ung.pdf",
-          "sha256": "7b49e2e0168200e6532513d13251a7910e9e58a3e59a3fd1656737fa56f32d5d"
+          "sha256": "2ac27afbb81fc96d639804dcd85e839c5301d26d69e7511c2b2f4b9b5ab8b32f"
         }
       ],
       "prerequisites": []
@@ -175,11 +175,11 @@
       "sources": [
         {
           "path": "data/tham-khao/uc-03/tc10-hoa-don-thieu-ma-so-thue-nguoi-mua/hoa_don_dien_tu.pdf",
-          "sha256": "51579a3d6c2e467ff69fb21446ae75e3f8c25588d2066e2401cf194f0b778d8f"
+          "sha256": "c7597810a6f67fd689f0ebab4e0384e802548d7483e1e6990df8f87b7825d454"
         },
         {
           "path": "data/tham-khao/uc-03/tc10-hoa-don-thieu-ma-so-thue-nguoi-mua/report_hoan_ung.pdf",
-          "sha256": "082c2147228cd1d5f9ec938008fe0e9d118fc0af4ce931ff4dfd70b22c006cf2"
+          "sha256": "7e2913107e858dbd56909f7ffd58d9f10bc451cd738a18114e61167b13f82423"
         }
       ],
       "prerequisites": []

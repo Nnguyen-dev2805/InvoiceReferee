@@ -22,15 +22,15 @@
   },
   "implementation_status": "COVERED",
   "accounting_facts": {
-    "report_line_sum": "3240000",
-    "report_total": "3240000",
-    "advance_amount": "4000000",
-    "declared_difference": "760000",
-    "invoice_subtotal": "3000000",
-    "invoice_tax": "240000",
-    "invoice_total": "3240000",
+    "report_line_sum": "3780000",
+    "report_total": "3780000",
+    "advance_amount": "4800000",
+    "declared_difference": "1020000",
+    "invoice_subtotal": "3500000",
+    "invoice_tax": "280000",
+    "invoice_total": "3780000",
     "buyer_tax_code": "0319999996",
     "expected_company_tax_code": "0319999996"
   },
-  "rationale": "Tổng bằng số là 3.240.000 VND nhưng bằng chữ thể hiện 3.500.000 VND."
+  "rationale": "Tổng bằng số là 3.780.000 VND nhưng bằng chữ thể hiện 4.040.000 VND."
 }
