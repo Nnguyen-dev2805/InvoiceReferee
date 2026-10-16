@@ -814,3 +814,112 @@ def test_content_based_suggestion_keeps_resolver() -> None:
     result = match_paper_evidence(paper, (receipt,))
     assert any(link.status == "SUGGEST_LINK" for link in result.links)
     assert identity_determined(paper, (receipt,), result.links) is False
+
+
+def _paper_doc(rows) -> "DocumentAnalysis":
+    return _paper(rows=rows)
+
+
+def test_cross_document_conflict_tc25_shape() -> None:
+    from invoice_referee.evidence.matching import cross_document_conflicts
+
+    paper = DocumentAnalysis(
+        source_id="source:1",
+        document_id="DOC-FORM",
+        document_type="SETTLEMENT_FORM",  # type: ignore[arg-type]
+        roles=("SETTLEMENT_DECLARATION",),
+        page_range=(1, 1),
+        fields=(),
+        line_items=(
+            DocumentLine(
+                id="row:1",
+                fields=(
+                    _field(
+                        "description",
+                        "Di chuyển nội thành",
+                        quote="Di chuyển nội thành 900000 ref PT-251026-016",
+                    ),
+                    _field(
+                        "amount",
+                        Decimal("900000"),
+                        quote="Di chuyển nội thành 900000 ref PT-251026-016",
+                    ),
+                    _field(
+                        "invoice_refs",
+                        ("PT-251026-016",),
+                        quote="Di chuyển nội thành 900000 ref PT-251026-016",
+                    ),
+                ),
+            ),
+        ),
+        confidence_status="ASSESSED",
+        profile_status="CLEAR",
+    )
+    receipt = DocumentAnalysis(
+        source_id="source:9",
+        document_id="doc:receipt",
+        document_type="COLLECTION_RECEIPT",  # type: ignore[arg-type]
+        roles=("ORIGINAL_EXPENSE_EVIDENCE",),
+        page_range=(1, 1),
+        fields=(
+            _field("document_number", "PT-251026-016", quote="Số phiếu: PT-251026-016"),
+            _field("total_amount", Decimal("700000"), quote="Số tiền: 700000"),
+        ),
+        confidence_status="ASSESSED",
+        profile_status="CLEAR",
+    )
+    (conflict,) = cross_document_conflicts(paper, (receipt,))
+    assert conflict.code == "row-amount-disputed"
+    assert conflict.item_ids == ("ITEM-001",)
+    assert conflict.document_id == "doc:receipt"
+    assert conflict.paper_amount == 900000
+    assert conflict.document_total == 700000
+    assert conflict.difference == 200000
+    assert conflict.blocking is True
+    quotes = [ref.exact_quote for ref in conflict.row_refs + conflict.doc_refs]
+    assert any("900" in quote for quote in quotes)
+    assert any("700" in quote for quote in quotes)
+
+
+def test_cross_document_conflict_none_when_amounts_match() -> None:
+    from invoice_referee.evidence.matching import cross_document_conflicts
+
+    paper = _paper(rows=(("Vé tàu", "1080000", ("00002501",), None),))
+    invoice = _invoice("doc:inv", number="00002501", total="1080000")
+    assert cross_document_conflicts(paper, (invoice,)) == ()
+
+
+def test_cross_document_conflict_ambiguous_identity_yields_none() -> None:
+    from invoice_referee.evidence.matching import cross_document_conflicts
+
+    paper = _paper(rows=(("Di chuyển", "900000", ("016",), None),))
+    first = _invoice("doc:first", number="PT-251026-016", total="900000")
+    second = _invoice("doc:second", number="XX-251026-016", total="900000")
+    assert cross_document_conflicts(paper, (first, second)) == ()
+
+
+def test_cross_document_conflict_aggregates_shared_document_once() -> None:
+    from invoice_referee.evidence.matching import cross_document_conflicts
+
+    paper = _paper(
+        rows=(
+            ("Dòng một", "600000", ("INV-9",), None),
+            ("Dòng hai", "500000", ("INV-9",), None),
+        )
+    )
+    invoice = _invoice("doc:inv9", number="INV-9", total="1000000")
+    (conflict,) = cross_document_conflicts(paper, (invoice,))
+    assert conflict.paper_amount == 1100000
+    assert conflict.document_total == 1000000
+    assert conflict.difference == 100000
+    assert conflict.item_ids == ("ITEM-001", "ITEM-002")
+
+
+def test_cross_document_conflict_skips_unreadable_amounts_without_zero() -> None:
+    from invoice_referee.evidence.matching import cross_document_conflicts
+
+    paper = _paper(rows=(("Mờ", None, ("PT-1",), None),))
+    receipt = _invoice(
+        "doc:r", number="PT-1", total="700000", document_type="COLLECTION_RECEIPT"
+    )
+    assert cross_document_conflicts(paper, (receipt,)) == ()

@@ -248,7 +248,32 @@ export interface SettlementExpenseItem {
   status?: string;
   matched_invoice?: string;
   suggested_invoice?: string;
+  dispute?: ReconciliationFinding | null;
   seller?: string;
+}
+
+export interface ReconciliationFindingRef {
+  source_id: string;
+  source_sha256: string;
+  page: number | null;
+  exact_quote: string;
+}
+
+export interface ReconciliationFinding {
+  code: string;
+  item_ids?: string[];
+  document_id: string;
+  document_filename: string | null;
+  paper_source_id?: string | null;
+  document_source_id?: string | null;
+  status: string;
+  paper_amount: number | null;
+  document_total: number | null;
+  difference: number | null;
+  basis: string;
+  question: string;
+  refs: ReconciliationFindingRef[];
+  blocking: boolean;
 }
 
 export interface SettlementInvoiceItem {
@@ -298,6 +323,7 @@ export interface SettlementDraftResponse {
   provider_mode?: string | null;
   data_origin?: string | null;
   processing_status?: "ready" | "technical_incomplete" | "needs_supplement" | null;
+  reconciliation_findings?: ReconciliationFinding[];
   link?: SettlementLink | null;
 }
 

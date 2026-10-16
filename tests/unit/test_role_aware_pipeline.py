@@ -442,7 +442,9 @@ def test_hotel_suffix_match_syncs_draft_and_final():
 def test_evidence_prompt_names_per_type_vocabulary():
     from invoice_referee.evidence.prompts import build_evidence_extraction_prompt
 
-    prompt = build_evidence_extraction_prompt(("E_INVOICE", "COLLECTION_RECEIPT", "UNKNOWN"))
+    prompt = build_evidence_extraction_prompt(
+        ("E_INVOICE", "COLLECTION_RECEIPT", "UNKNOWN")
+    )
     assert "COLLECTION_RECEIPT" in prompt
     assert "document_number" in prompt and "total_amount" in prompt
     assert "receipt_number/amount" in prompt  # the anti-pattern is named
@@ -451,7 +453,10 @@ def test_evidence_prompt_names_per_type_vocabulary():
 def test_receipt_aliases_map_to_profile_vocabulary():
     from invoice_referee.evidence.extraction import canonical_field_name
 
-    assert canonical_field_name("receipt_number", "COLLECTION_RECEIPT") == "document_number"
+    assert (
+        canonical_field_name("receipt_number", "COLLECTION_RECEIPT")
+        == "document_number"
+    )
     assert canonical_field_name("receipt_date", "COLLECTION_RECEIPT") == "document_date"
     assert canonical_field_name("amount", "COLLECTION_RECEIPT") == "total_amount"
     # TRANSPORT_TICKET keeps its own money field; SETTLEMENT rows keep `amount`.
@@ -463,7 +468,10 @@ def test_receipt_aliases_map_to_profile_vocabulary():
 async def test_receipt_variant_names_still_validate(tmp_path):
     """A receipt using printed labels validates to a CLEAR profile (TC25 LIVE)."""
     from invoice_referee.evidence.document_validity import validate_document
-    from invoice_referee.evidence.extraction import _pseudo_classification, _build_analysis
+    from invoice_referee.evidence.extraction import (
+        _pseudo_classification,
+        _build_analysis,
+    )
     from invoice_referee.evidence.ocr_quality import ConfidenceReview
 
     receipt_md = (
@@ -473,34 +481,66 @@ async def test_receipt_variant_names_still_validate(tmp_path):
     from invoice_referee.domain.documents import OcrSourceResult
 
     ocr = OcrSourceResult(
-        source_id="source:receipt", source_digest="e" * 64, provider="fake", model="m",
+        source_id="source:receipt",
+        source_digest="e" * 64,
+        provider="fake",
+        model="m",
         pages=(clear_ocr_page(receipt_md),),
     )
     classification = _pseudo_classification(
-        ocr, document_type="COLLECTION_RECEIPT", page_range=(1, 1))
+        ocr, document_type="COLLECTION_RECEIPT", page_range=(1, 1)
+    )
     payload = {
         "document_type": "COLLECTION_RECEIPT",
         "fields": [
-            {"field": "issuer_name", "state": "FOUND", "value": "CONG TY AN THINH",
-             "quote": "Đơn vị: CONG TY AN THINH", "page": 1},
-            {"field": "receipt_number", "state": "FOUND", "value": "PT-251026-016",
-             "quote": "Số phiếu: PT-251026-016", "page": 1},
-            {"field": "receipt_date", "state": "FOUND", "value": "2026-10-10",
-             "quote": "Ngày: 10/10/2026", "page": 1},
-            {"field": "amount", "state": "FOUND", "value": "700000",
-             "quote": "Số tiền: 700000", "page": 1},
-            {"field": "payer_name", "state": "FOUND", "value": "NGUYEN VAN A",
-             "quote": "Người nộp: NGUYEN VAN A", "page": 1},
+            {
+                "field": "issuer_name",
+                "state": "FOUND",
+                "value": "CONG TY AN THINH",
+                "quote": "Đơn vị: CONG TY AN THINH",
+                "page": 1,
+            },
+            {
+                "field": "receipt_number",
+                "state": "FOUND",
+                "value": "PT-251026-016",
+                "quote": "Số phiếu: PT-251026-016",
+                "page": 1,
+            },
+            {
+                "field": "receipt_date",
+                "state": "FOUND",
+                "value": "2026-10-10",
+                "quote": "Ngày: 10/10/2026",
+                "page": 1,
+            },
+            {
+                "field": "amount",
+                "state": "FOUND",
+                "value": "700000",
+                "quote": "Số tiền: 700000",
+                "page": 1,
+            },
+            {
+                "field": "payer_name",
+                "state": "FOUND",
+                "value": "NGUYEN VAN A",
+                "quote": "Người nộp: NGUYEN VAN A",
+                "page": 1,
+            },
         ],
         "line_items": [],
     }
-    analysis = _build_analysis(ocr, classification, payload=payload,
-                               document_type="COLLECTION_RECEIPT")
+    analysis = _build_analysis(
+        ocr, classification, payload=payload, document_type="COLLECTION_RECEIPT"
+    )
     names = {f.field for f in analysis.fields if f.state == "FOUND"}
     assert {"document_number", "document_date", "total_amount"} <= names
     validated = validate_document(
-        analysis, ocr,
-        ConfidenceReview(status="SKIPPED_NO_NUMERIC_CANDIDATES", block_assessments=()))
+        analysis,
+        ocr,
+        ConfidenceReview(status="SKIPPED_NO_NUMERIC_CANDIDATES", block_assessments=()),
+    )
     assert validated.profile_status == "CLEAR"
 
 
@@ -513,10 +553,14 @@ async def test_pure_amount_dispute_skips_resolver_call(tmp_path):
     calls = {"resolver": 0}
 
     class NoResolver(RoleFake):
-        async def complete_json(self, *, system: str, user: str, budget: RunBudget) -> dict:
+        async def complete_json(
+            self, *, system: str, user: str, budget: RunBudget
+        ) -> dict:
             if "promotions" in system:
                 calls["resolver"] += 1
-                raise AssertionError("resolver must be skipped for pure amount disputes")
+                raise AssertionError(
+                    "resolver must be skipped for pure amount disputes"
+                )
             return await super().complete_json(system=system, user=user, budget=budget)
 
     paper_md = (
@@ -531,13 +575,210 @@ async def test_pure_amount_dispute_skips_resolver_call(tmp_path):
     fake = NoResolver()
     # RoleFake evidence branch keys off source_id containing receipt/PT ref.
     report = await read_root_role_aware(
-        sources=tuple(sources), reader=_reader(texts), classifier=fake,
+        sources=tuple(sources),
+        reader=_reader(texts),
+        classifier=fake,
         artifacts=ArtifactStore(root=tmp_path / "artifacts"),
-        source_bytes={s.id: b"pdf" for s in sources}, budget=RunBudget(),
-        provider_mode="LIVE", root_id="root:t",
+        source_bytes={s.id: b"pdf" for s in sources},
+        budget=RunBudget(),
+        provider_mode="LIVE",
+        root_id="root:t",
     )
     assert calls["resolver"] == 0
     assert any(
         link.status == "SUGGEST_LINK" and link.method == "INVOICE_NUMBER_EXACT"
         for link in report.links
     )
+
+
+def _tc25_conflict_report():
+    """Paper row 900000 + receipt 700000, exact unique number (TC25 shape)."""
+    from invoice_referee.domain.common import EvidenceRef
+    from invoice_referee.domain.documents import (
+        DocumentAnalysis,
+        DocumentLine,
+        EvidenceLink,
+        FieldCandidate,
+    )
+    from invoice_referee.domain.evidence import ReadResult
+    from invoice_referee.reconciliation.settlement_draft import build_settlement_draft
+    from decimal import Decimal
+
+    sha = "a" * 64
+
+    def _ref(source_id, quote):
+        return EvidenceRef(
+            source_id=source_id, source_sha256=sha, page=1, exact_quote=quote
+        )
+
+    def _field(name, value, source_id, quote):
+        return FieldCandidate(
+            field=name, state="FOUND", value=value, refs=(_ref(source_id, quote),)
+        )
+
+    paper = DocumentAnalysis(
+        source_id="source:paper",
+        document_id="source:paper:1-1:SETTLEMENT_FORM",
+        document_type="SETTLEMENT_FORM",
+        roles=("SETTLEMENT_DECLARATION",),
+        page_range=(1, 1),
+        fields=(
+            _field(
+                "declared_name",
+                "NGUYEN VAN A",
+                "source:paper",
+                "Người đề nghị: NGUYEN VAN A",
+            ),
+            _field("printed_total", "4140000", "source:paper", "Tổng cộng: 4140000"),
+            _field("declared_advance", "5000000", "source:paper", "Tạm ứng: 5000000"),
+        ),
+        line_items=(
+            DocumentLine(
+                id="row:1",
+                fields=(
+                    _field(
+                        "description",
+                        "Di chuyển nội thành",
+                        "source:paper",
+                        "Di chuyển nội thành 900000 ref PT-251026-016",
+                    ),
+                    _field(
+                        "amount",
+                        "900000",
+                        "source:paper",
+                        "Di chuyển nội thành 900000 ref PT-251026-016",
+                    ),
+                    _field(
+                        "invoice_refs",
+                        ("PT-251026-016",),
+                        "source:paper",
+                        "Di chuyển nội thành 900000 ref PT-251026-016",
+                    ),
+                ),
+                refs=(
+                    _ref(
+                        "source:paper", "Di chuyển nội thành 900000 ref PT-251026-016"
+                    ),
+                ),
+            ),
+        ),
+        confidence_status="ASSESSED",
+        profile_status="CLEAR",
+    )
+    receipt = DocumentAnalysis(
+        source_id="source:receipt",
+        document_id="source:receipt:1-1:COLLECTION_RECEIPT",
+        document_type="COLLECTION_RECEIPT",
+        roles=("ORIGINAL_EXPENSE_EVIDENCE",),
+        page_range=(1, 1),
+        fields=(
+            _field(
+                "document_number",
+                "PT-251026-016",
+                "source:receipt",
+                "Số phiếu: PT-251026-016",
+            ),
+            _field("total_amount", "700000", "source:receipt", "Số tiền: 700000"),
+        ),
+        confidence_status="ASSESSED",
+        profile_status="CLEAR",
+    )
+    link = EvidenceLink(
+        item_id="ITEM-001",
+        source_id="source:receipt",
+        document_id=receipt.document_id,
+        status="SUGGEST_LINK",
+        method="INVOICE_NUMBER_EXACT",
+        score=Decimal("1"),
+        allocated_amount=None,
+        explanation="Phân bổ vượt giá trị chứng từ; cần xác nhận.",
+        refs=receipt.refs,
+    )
+    from invoice_referee.domain.evidence import SourceRef
+
+    sources = (
+        SourceRef(
+            id="source:paper",
+            digest="a" * 64,
+            tenant="t",
+            media="PDF",
+            storage_key="k1",
+            filename="report_hoan_ung.pdf",
+        ),
+        SourceRef(
+            id="source:receipt",
+            digest="b" * 64,
+            tenant="t",
+            media="PDF",
+            storage_key="k2",
+            filename="phieu_thu_di_chuyen.pdf",
+        ),
+    )
+    return build_settlement_draft(
+        ReadResult(documents=(paper, receipt), links=(link,)), sources=sources
+    )
+
+
+def test_draft_shows_cross_document_amount_conflict() -> None:
+    draft = _tc25_conflict_report()
+    findings = draft["reconciliation_findings"]
+    assert isinstance(findings, list) and len(findings) == 1
+    finding = findings[0]
+    assert finding["code"] == "row-amount-disputed"
+    assert finding["item_ids"] == ["ITEM-001"]
+    assert finding["paper_amount"] == 900000
+    assert finding["document_total"] == 700000
+    assert finding["difference"] == 200000
+    assert finding["blocking"] is True
+    quotes = [ref["exact_quote"] for ref in finding["refs"]]
+    assert any("900" in quote for quote in quotes)
+    assert any("700" in quote for quote in quotes)
+    row = next(
+        e for e in draft["expenses"] if e["description"] == "Di chuyển nội thành"
+    )
+    assert row["status"] == "DISPUTED"
+    assert row["suggested_invoice"] == "phieu_thu_di_chuyen.pdf"
+
+
+def test_draft_without_conflict_has_empty_reconciliation_findings() -> None:
+    from invoice_referee.domain.common import EvidenceRef
+    from invoice_referee.domain.documents import (
+        DocumentAnalysis,
+        DocumentLine,
+        FieldCandidate,
+    )
+    from invoice_referee.domain.evidence import ReadResult
+    from invoice_referee.reconciliation.settlement_draft import build_settlement_draft
+
+    sha = "a" * 64
+
+    def _ref(quote):
+        return EvidenceRef(source_id="s", source_sha256=sha, page=1, exact_quote=quote)
+
+    def _field(name, value, quote):
+        return FieldCandidate(
+            field=name, state="FOUND", value=value, refs=(_ref(quote),)
+        )
+
+    paper = DocumentAnalysis(
+        source_id="s",
+        document_id="s:1-1:SETTLEMENT_FORM",
+        document_type="SETTLEMENT_FORM",
+        roles=("SETTLEMENT_DECLARATION",),
+        page_range=(1, 1),
+        fields=(_field("printed_total", "100000", "Tổng: 100000"),),
+        line_items=(
+            DocumentLine(
+                id="row:1",
+                fields=(
+                    _field("description", "Vé", "Vé 100000"),
+                    _field("amount", "100000", "Vé 100000"),
+                ),
+            ),
+        ),
+        confidence_status="ASSESSED",
+        profile_status="CLEAR",
+    )
+    draft = build_settlement_draft(ReadResult(documents=(paper,)), sources=())
+    assert draft["reconciliation_findings"] == []
+    assert "arithmetic_findings" in draft

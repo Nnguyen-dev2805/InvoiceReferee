@@ -1,5 +1,21 @@
 # Implementation checkpoint
 
+## Draft hiển thị mâu thuẫn liên chứng từ — implemented, 17/10/2026
+
+`cross_document_conflicts` + DTO `RowAmountConflict` dùng chung cho
+projection/admission/draft; row DISPUTED_EVIDENCE, finding
+SET_PAPER_AMOUNT_DISPUTED, unmatched trừ associated; admission FACT từ
+conflicts (giữ wording); draft `reconciliation_findings` + `dispute` inline;
+UI khối đỏ tại dòng + nút xem 2 nguồn; submit giữ nguyên.
+
+Verification (0 provider call mới): unit/integration full trừ 6 pre-existing;
+frontend 47/2 + build; replay postfix artifacts → 1 FACT + draft DISPUTED
+900k/700k/200k + rebuild equality; browser post-submit DB copy 0 POST PASS;
+review-screen browser-thật NOT_RUN (cần quota LIVE).
+[Acceptance](reviews/2026-10-16-draft-cross-document-conflict-acceptance.md),
+[plan](../../superpowers/plans/2026-10-17-draft-cross-document-conflict.md).
+No commit/push/reset.
+
 ## TC25 association/dispute + latency — implemented, 17/10/2026
 
 Tách association khỏi allocation (SUGGEST exact-number không còn là

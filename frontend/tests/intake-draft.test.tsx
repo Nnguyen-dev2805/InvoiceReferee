@@ -260,3 +260,55 @@ describe("Intake draft (W5)", () => {
     });
   });
 });
+
+describe("Intake draft dispute (cross-document conflict)", () => {
+  it("shows the 900000/700000/200000 dispute at the row with both-side evidence buttons", async () => {
+    const dispute = {
+      code: "row-amount-disputed",
+      item_ids: ["ITEM-001"],
+      document_id: "source:receipt:1-1:COLLECTION_RECEIPT",
+      document_filename: "phieu_thu_di_chuyen.pdf",
+      paper_source_id: "source:paper",
+      document_source_id: "source:receipt",
+      status: "AMOUNT_DISPUTED",
+      paper_amount: 900000,
+      document_total: 700000,
+      difference: 200000,
+      basis: "Kê khai 900000 nhưng chứng từ chỉ chứng minh 700000 (lệch 200000); số tiền đang tranh chấp.",
+      question: "Xác nhận/sửa số tiền.",
+      refs: [],
+      blocking: true,
+    };
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/cases")) return new Response(JSON.stringify({ case_view: caseView(1, 0) }), { status: 200 });
+      if (url.endsWith("/sources")) return new Response(JSON.stringify({ case_view: caseView(2, 2) }), { status: 200 });
+      if (url.endsWith("/settlement/draft")) return new Response(JSON.stringify({
+        declared_name: "NGUYỄN MINH AN", destination: null, activity_name: null,
+        trip_start: null, trip_end: null, occurred_at: null,
+        declared_purpose: "Hoàn ứng chi phí công tác tỉnh",
+        incurred_total: 4140000, declared_advance: 5000000,
+        expenses: [{
+          description: "Di chuyển nội thành", invoice_no: "PT-251026-016", amount: 900000,
+          status: "DISPUTED", suggested_invoice: "phieu_thu_di_chuyen.pdf", dispute,
+        }],
+        warnings: [], invoices: [], reconciliation_findings: [dispute],
+      }), { status: 200 });
+      return new Response("{}", { status: 200 });
+    }));
+    render(<Intake session={SESSION} onCase={() => {}} />);
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText("Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "paper.pdf", { type: "application/pdf" }));
+    await user.upload(screen.getByLabelText("Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"), new File(["%PDF-1.4"], "evidence.pdf", { type: "application/pdf" }));
+    await user.click(screen.getByRole("button", { name: "Đọc chứng từ" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Xác nhận và nộp hồ sơ" })).toBeInTheDocument());
+    expect(screen.getByText(/số tiền đang tranh chấp/)).toBeInTheDocument();
+    expect(screen.getAllByText(/phieu_thu_di_chuyen\.pdf/).length).toBeGreaterThanOrEqual(2);
+    const body = document.body.textContent ?? "";
+    expect(body).toContain("900.000");
+    expect(body).toContain("700.000");
+    expect(body).toContain("200.000");
+    expect(screen.queryByText("✓")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Xem phieu_thu_di_chuyen/ }));
+  });
+});

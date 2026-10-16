@@ -138,6 +138,49 @@ def build_settlement_draft(
     suggested = _suggested_by_document(report)
     doc_by_id = {d.document_id: d for d in report.documents}
 
+    # Cross-document amount conflicts share one canonical source with the
+    # admission FACT (matching.cross_document_conflicts): the draft shows the
+    # same numbers/refs/status, without running finance or providers.
+    conflicts: tuple = ()
+    conflict_by_item: dict[str, object] = {}
+    if paper is not None:
+        from invoice_referee.evidence.matching import (
+            conflict_basis,
+            cross_document_conflicts,
+        )
+
+        conflicts = cross_document_conflicts(paper, report.documents)
+        for conflict in conflicts:
+            for item_id in conflict.item_ids:
+                conflict_by_item[item_id] = conflict
+    reconciliation_findings: list[dict[str, object]] = []
+    for conflict in conflicts:
+        basis, question = conflict_basis(
+            conflict.paper_amount, conflict.document_total, conflict.difference
+        )
+        document = doc_by_id.get(conflict.document_id)
+        reconciliation_findings.append(
+            {
+                "code": conflict.code,
+                "item_ids": list(conflict.item_ids),
+                "document_id": conflict.document_id,
+                "document_filename": names.get(document.source_id)
+                if document is not None
+                else None,
+                "status": "AMOUNT_DISPUTED",
+                "paper_amount": conflict.paper_amount,
+                "document_total": conflict.document_total,
+                "difference": conflict.difference,
+                "basis": basis,
+                "question": question,
+                "refs": [
+                    ref.model_dump(mode="json")
+                    for ref in (*conflict.row_refs, *conflict.doc_refs)
+                ],
+                "blocking": conflict.blocking,
+            }
+        )
+
     expenses: list[dict[str, object]] = []
     if paper is not None:
         for index, line in enumerate(paper.line_items, start=1):
@@ -216,6 +259,38 @@ def build_settlement_draft(
                         }
                     )
                     continue
+            conflict = conflict_by_item.get(f"ITEM-{index:03d}")
+            dispute: dict[str, object] | None = None
+            if conflict is not None and matched_filename is None:
+                dispute_basis, dispute_question = conflict_basis(
+                    conflict.paper_amount,
+                    conflict.document_total,
+                    conflict.difference,
+                )
+                dispute_document = doc_by_id.get(conflict.document_id)
+                dispute = {
+                    "code": conflict.code,
+                    "item_ids": list(conflict.item_ids),
+                    "document_id": conflict.document_id,
+                    "document_filename": names.get(dispute_document.source_id)
+                    if dispute_document is not None
+                    else None,
+                    "paper_source_id": paper.source_id,
+                    "document_source_id": dispute_document.source_id
+                    if dispute_document is not None
+                    else None,
+                    "status": "AMOUNT_DISPUTED",
+                    "paper_amount": conflict.paper_amount,
+                    "document_total": conflict.document_total,
+                    "difference": conflict.difference,
+                    "basis": dispute_basis,
+                    "question": dispute_question,
+                    "refs": [
+                        ref.model_dump(mode="json")
+                        for ref in (*conflict.row_refs, *conflict.doc_refs)
+                    ],
+                    "blocking": conflict.blocking,
+                }
             expenses.append(
                 {
                     "description": description,
@@ -238,13 +313,18 @@ def build_settlement_draft(
                         "CLEAR"
                         if matched_filename is not None
                         else (
-                            "SUGGESTED"
-                            if suggested_filename is not None
-                            else "UNMATCHED"
+                            "DISPUTED"
+                            if dispute is not None
+                            else (
+                                "SUGGESTED"
+                                if suggested_filename is not None
+                                else "UNMATCHED"
+                            )
                         )
                     ),
                     "matched_invoice": matched_filename,
                     "suggested_invoice": suggested_filename,
+                    "dispute": dispute,
                     "refs": _refs(line),
                 }
             )
@@ -334,6 +414,7 @@ def build_settlement_draft(
         "invoices": invoices,
         "warnings": warnings,
         "arithmetic_findings": arithmetic_findings,
+        "reconciliation_findings": reconciliation_findings,
         "field_states": field_states,
         "provider_mode": report.provider_mode,
         "data_origin": report.data_origin,

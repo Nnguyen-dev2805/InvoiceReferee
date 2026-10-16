@@ -930,88 +930,39 @@ def admit_evidence(
                 invoice_reference_counts.get(invoice_reference, 0) + 1
             )
 
-    # Allocation: the sum of the rows that share one source must not exceed that
-    # source's total (T4, TC22). A payment proof is not a second invoice, so it is
-    # not counted here (only original-expense types are matched above).
-    allocation_totals: dict[str, int] = {}
-    for entry in matched:
-        if entry.document is None:
-            continue
-        key = entry.document.document_id
-        allocation_totals[key] = allocation_totals.get(key, 0) + int(entry.amount)
-    # A source whose rows over-allocate it is in DISPUTE (TC08): the declared
-    # amount and the document amount disagree. The disputed cost must stay
-    # unresolved (never elevated to verified eligible money) until a correction
-    # resolves it. The FACT keeps both source numbers and their difference.
+    # Allocation disputes share one canonical source (17/10/2026):
+    # `cross_document_conflicts` over the paper rows and FOUND document facts.
+    # A source whose rows over-allocate it is in DISPUTE (T4, TC08, TC22): the
+    # declared amount and the document amount disagree. The disputed cost must
+    # stay unresolved (never elevated to verified eligible money) until a
+    # correction resolves it. The FACT keeps both source numbers, both sides'
+    # refs and their difference. A payment proof is not a second invoice.
+    from invoice_referee.evidence.matching import cross_document_conflicts
+
+    documents_by_id = {d.document_id: d for d in report.documents}
     disputed_documents: dict[str, tuple[int, int, int]] = {}
     disputed_entry_by_doc: dict[str, _MatchedExpense] = {}
-    for entry in matched:
-        if entry.document is None:
-            continue
-        doc_total = _as_decimal(_field(entry.document, "total_amount"))
-        if doc_total is None:
-            continue
-        allocated = allocation_totals[entry.document.document_id]
-        if allocated > int(doc_total):
-            disputed_documents[entry.document.document_id] = (
-                allocated,
-                int(doc_total),
-                allocated - int(doc_total),
-            )
-            disputed_entry_by_doc.setdefault(entry.document.document_id, entry)
-    # A rejected link must not erase the source's explicit over-allocation.
-    # Keep the paper assertion separately from the validated accepted mapping.
+    for conflict in (
+        cross_document_conflicts(paper, report.documents) if paper is not None else ()
+    ):
+        document = documents_by_id[conflict.document_id]
+        disputed_documents[conflict.document_id] = (
+            conflict.paper_amount,
+            conflict.document_total,
+            conflict.difference,
+        )
+        disputed_entry_by_doc.setdefault(
+            conflict.document_id,
+            _MatchedExpense(
+                Decimal(conflict.paper_amount),
+                _document_refs(document),
+                document,
+                "",
+                None,
+                conflict.row_refs,
+            ),
+        )
     if paper is not None:
-        from invoice_referee.evidence.matching import _invoice_ref_matches_number
-
-        originals = [
-            d for d in report.documents if d.document_type in _ORIGINAL_EXPENSE_TYPES
-        ]
-        declared_totals: dict[str, int] = {}
-        for row in paper.line_items:
-            description = str(_line_field(row, "description") or "")
-            if is_settlement_summary_row(description):
-                continue
-            row_amount = _as_decimal(_line_field(row, "amount"))
-            references = _line_field(row, "invoice_refs") or ()
-            if isinstance(references, str):
-                references = (references,)
-            candidates = [
-                d
-                for d in originals
-                if _field(d, "document_number") is not None
-                and any(
-                    _invoice_ref_matches_number(
-                        str(r), str(_field(d, "document_number"))
-                    )
-                    for r in references
-                )
-            ]
-            if len(candidates) == 1 and row_amount is not None:
-                document = candidates[0]
-                declared_totals[document.document_id] = declared_totals.get(
-                    document.document_id, 0
-                ) + int(row_amount)
-        for document in originals:
-            total = _as_decimal(_field(document, "total_amount"))
-            declared = declared_totals.get(document.document_id)
-            if total is not None and declared is not None and declared > int(total):
-                disputed_documents[document.document_id] = (
-                    declared,
-                    int(total),
-                    declared - int(total),
-                )
-                disputed_entry_by_doc.setdefault(
-                    document.document_id,
-                    _MatchedExpense(
-                        Decimal(declared),
-                        _document_refs(document),
-                        document,
-                        "",
-                        None,
-                        _row_refs(row, paper),
-                    ),
-                )
         if report.links:
             from invoice_referee.evidence.matching import project_evidence_matches
 
@@ -1036,6 +987,10 @@ def admit_evidence(
         entry = disputed_entry_by_doc[document_id]
         # Two-sided provenance (A3): the paper row's refs first (the declared
         # assertion), then the document's refs (the contradicting evidence).
+        # Wording is shared with the draft surface (conflict_basis).
+        from invoice_referee.evidence.matching import conflict_basis
+
+        basis, question = conflict_basis(allocated, doc_total, difference)
         doc_refs = _document_refs(entry.document) if entry.document is not None else ()
         two_sided = tuple(dict.fromkeys((*entry.paper_refs, *doc_refs)))
         issues.append(
@@ -1044,16 +999,9 @@ def admit_evidence(
                 kind="FACT",
                 field_or_rule=f"expense:allocation:{document_id}",
                 owner="employee",
-                basis=(
-                    f"Kê khai {allocated} nhưng chứng từ chỉ chứng minh {doc_total} "
-                    f"(lệch {difference}); số tiền đang tranh chấp."
-                ),
+                basis=basis,
                 refs=two_sided,
-                question=(
-                    f"Xác nhận/sửa số tiền: kê khai {allocated} nhưng chứng từ "
-                    f"{doc_total} (lệch {difference}); cung cấp chứng từ "
-                    "đúng hoặc điều chỉnh số kê khai."
-                ),
+                question=question,
             )
         )
     # An extra source the paper does not reference is a relevance FACT (TC24),

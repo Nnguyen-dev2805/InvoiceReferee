@@ -79,11 +79,15 @@ FIELD_STATES: tuple[str, ...] = (
     "AMBIGUOUS",
     "NOT_APPLICABLE",
 )
-FieldState = Literal["FOUND", "NOT_PRESENT", "UNREADABLE", "AMBIGUOUS", "NOT_APPLICABLE"]
+FieldState = Literal[
+    "FOUND", "NOT_PRESENT", "UNREADABLE", "AMBIGUOUS", "NOT_APPLICABLE"
+]
 
 LinkStatus = Literal["AUTO_LINK", "SUGGEST_LINK"]
 LinkMethod = Literal["INVOICE_NUMBER_EXACT", "AMOUNT_AND_CONTENT", "LLM_RESOLVED"]
-RowEvidenceStatus = Literal["ORIGINAL_EVIDENCE", "ALTERNATIVE_EVIDENCE", "NO_EVIDENCE"]
+RowEvidenceStatus = Literal[
+    "ORIGINAL_EVIDENCE", "ALTERNATIVE_EVIDENCE", "NO_EVIDENCE", "DISPUTED_EVIDENCE"
+]
 AlternativeEvidenceType = Literal[
     "PAYMENT_PROOF",
     "RECEIPT_OR_COLLECTION_NOTE",
@@ -332,12 +336,36 @@ class EvidenceMatchingResult(StrictModel):
     unmatched_source_ids: tuple[Id, ...] = ()
 
 
+class RowAmountConflict(StrictModel):
+    """A paper row whose uniquely-associated evidence disagrees on money.
+
+    Association (exact invoice number, unique document) is determined; only
+    the amount/allocation is disputed. Pure cross-document arithmetic from
+    FOUND facts: no finance, no policy, no model call. The draft and the
+    admission FACT share these values (same canonical result).
+    """
+
+    code: Literal["row-amount-disputed"] = "row-amount-disputed"
+    item_ids: tuple[Id, ...]
+    document_id: Id
+    paper_amount: int
+    document_total: int
+    difference: int
+    row_refs: tuple[EvidenceRef, ...] = ()
+    doc_refs: tuple[EvidenceRef, ...] = ()
+    blocking: bool = True
+
+
 # --- Confidence review (contracts §12.3) -----------------------------------
 
 ConfidenceImportance = Literal["CRITICAL", "NON_CRITICAL", "UNKNOWN"]
-QualityState = Literal["READABLE", "SEMANTICALLY_READABLE", "UNCERTAIN", "UNREADABLE", "UNKNOWN"]
+QualityState = Literal[
+    "READABLE", "SEMANTICALLY_READABLE", "UNCERTAIN", "UNREADABLE", "UNKNOWN"
+]
 ReviewAction = Literal["CONTINUE", "ASK_HUMAN", "DEFER_TO_POLICY"]
-ConfidenceReviewStatus = Literal["ASSESSED", "SKIPPED_NO_NUMERIC_CANDIDATES", "TECHNICAL_ERROR"]
+ConfidenceReviewStatus = Literal[
+    "ASSESSED", "SKIPPED_NO_NUMERIC_CANDIDATES", "TECHNICAL_ERROR"
+]
 
 
 class ConfidenceCandidate(StrictModel):

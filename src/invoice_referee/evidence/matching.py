@@ -25,6 +25,7 @@ from invoice_referee.domain.documents import (
     EvidenceMatchFinding,
     EvidenceMatchingResult,
     FieldCandidate,
+    RowAmountConflict,
 )
 from invoice_referee.reconciliation.document_arithmetic import is_settlement_summary_row
 
@@ -195,6 +196,150 @@ def _refs(document: DocumentAnalysis) -> tuple[EvidenceRef, ...]:
         *(r for row in document.line_items for f in row.fields for r in f.refs),
     ]
     return tuple(dict.fromkeys(refs))
+
+
+def associated_document_ids(
+    paper: DocumentAnalysis,
+    documents: tuple[DocumentAnalysis, ...],
+    links: tuple[EvidenceLink, ...],
+) -> set[str]:
+    """Documents a paper row references, accepted or not (A1).
+
+    Any link status counts, as does an explicit exact-number reference
+    independent of links. Associated documents are related evidence, never
+    "unreferenced" — even when their allocation is disputed.
+    """
+    matchable = tuple(d for d in documents if d.document_type != "UNKNOWN")
+    by_id = {d.document_id: d for d in matchable}
+    ids = {link.document_id for link in links if link.document_id in by_id}
+    for row in paper.line_items:
+        description = _line_description(row)
+        if is_settlement_summary_row(description):
+            continue
+        refs_value = _line_field(row, "invoice_refs") or ()
+        if isinstance(refs_value, str):
+            refs_value = (refs_value,)
+        for ref in refs_value:
+            for document in matchable:
+                number = document_field(document, "document_number")
+                if number is not None and _invoice_ref_matches_number(
+                    str(ref), str(number)
+                ):
+                    ids.add(document.document_id)
+    return ids
+
+
+def conflict_basis(
+    paper_amount: int, document_total: int, difference: int
+) -> tuple[str, str]:
+    """Shared basis/question for a row-amount dispute (draft + admission).
+
+    Same canonical numbers and wording on both surfaces: neither side's figure
+    is affirmed, and the question asks for correction, not confirmation.
+    """
+    basis = (
+        f"Kê khai {paper_amount} nhưng chứng từ chỉ chứng minh {document_total} "
+        f"(lệch {difference}); số tiền đang tranh chấp."
+    )
+    question = (
+        f"Xác nhận/sửa số tiền: kê khai {paper_amount} nhưng chứng từ "
+        f"{document_total} (lệch {difference}); cung cấp chứng từ "
+        "đúng hoặc điều chỉnh số kê khai."
+    )
+    return basis, question
+
+
+def cross_document_conflicts(
+    paper: DocumentAnalysis,
+    documents: tuple[DocumentAnalysis, ...],
+) -> tuple[RowAmountConflict, ...]:
+    """Amount conflicts between rows and their uniquely-associated evidence.
+
+    Pure cross-document arithmetic over FOUND facts (contracts §12.6): rows
+    sharing one source must not exceed its total (T4, TC08, TC22). A row whose
+    reference names exactly one document contributes its amount; documents are
+    aggregated once across their rows (no double counting). Missing,
+    unreadable or ambiguous amounts, unknown/duplicate-identity documents and
+    summary rows yield nothing — never a zero fill. Claiming less than the
+    source total is legitimate partial use. The draft and the admission FACT
+    share these values; neither runs finance to build them.
+    """
+    from invoice_referee.domain.documents import RowAmountConflict
+
+    matchable = tuple(
+        d
+        for d in documents
+        if d.document_type != "UNKNOWN" and d.document_id != paper.document_id
+    )
+    by_doc: dict[str, list[tuple[str, int, list]]] = {}
+    order: list[str] = []
+    for position, row in enumerate(paper.line_items, start=1):
+        description = _line_description(row)
+        if is_settlement_summary_row(description):
+            continue
+        amount = _as_decimal(_line_field(row, "amount"))
+        if amount is None:
+            continue
+        refs_value = _line_field(row, "invoice_refs") or ()
+        if isinstance(refs_value, str):
+            refs_value = (refs_value,)
+        candidates = [
+            document.document_id
+            for document in matchable
+            if (number := document_field(document, "document_number")) is not None
+            and any(
+                _invoice_ref_matches_number(str(ref), str(number)) for ref in refs_value
+            )
+        ]
+        if len(candidates) != 1:
+            continue
+        document_id = candidates[0]
+        field_refs = [
+            ref
+            for candidate in row.fields
+            for ref in (
+                *candidate.refs,
+                *(
+                    alt_ref
+                    for alternative in candidate.alternatives
+                    for alt_ref in alternative.refs
+                ),
+            )
+        ]
+        row_refs = list(dict.fromkeys([*field_refs, *row.refs]))
+        if document_id not in by_doc:
+            by_doc[document_id] = []
+            order.append(document_id)
+        by_doc[document_id].append((f"ITEM-{position:03d}", int(amount), row_refs))
+    by_id = {d.document_id: d for d in matchable}
+    conflicts: list[RowAmountConflict] = []
+    for document_id in order:
+        document = by_id[document_id]
+        total = _as_decimal(document_field(document, "total_amount"))
+        if total is None:
+            continue
+        rows = by_doc[document_id]
+        declared = sum(amount for _, amount, _ in rows)
+        # Only over-allocation disputes: claiming less than the source total
+        # is legitimate partial use (rows may share one invoice, T4).
+        if declared <= total + 1:
+            continue
+        difference = declared - total
+        row_refs: list = []
+        for _, _, refs in rows:
+            row_refs.extend(refs)
+        conflicts.append(
+            RowAmountConflict(
+                item_ids=tuple(item_id for item_id, _, _ in rows),
+                document_id=document_id,
+                paper_amount=int(declared),
+                document_total=int(total),
+                difference=int(declared - total),
+                row_refs=tuple(dict.fromkeys(row_refs)),
+                doc_refs=_refs(document),
+            )
+        )
+    return tuple(conflicts)
 
 
 def identity_determined(
@@ -399,6 +544,15 @@ def project_evidence_matches(
         d for d in documents if d.document_type not in {"UNKNOWN", "SETTLEMENT_FORM"}
     )
     by_id = {d.document_id: d for d in matchable}
+    conflicts = (
+        cross_document_conflicts(paper, documents)
+        if paper.document_type == "SETTLEMENT_FORM"
+        else ()
+    )
+    conflict_by_item: dict[str, RowAmountConflict] = {}
+    for conflict in conflicts:
+        for item_id in conflict.item_ids:
+            conflict_by_item[item_id] = conflict
     rows, findings, projected = [], [], []
     auto_linked: set[str] = set()
     allocated: dict[str, Decimal] = {}
@@ -538,6 +692,11 @@ def project_evidence_matches(
             evidence_status = "ALTERNATIVE_EVIDENCE"
         else:
             evidence_status = "NO_EVIDENCE"
+        conflict = conflict_by_item.get(item_id)
+        if conflict is not None and not auto_links:
+            # Association is determined but the amount is disputed: the row is
+            # neither unmatched nor accepted. Amount/allocation stays undecided.
+            evidence_status = "DISPUTED_EVIDENCE"
         alternative_type = "PAYMENT_PROOF" if has_alternative else None
 
         rows.append(
@@ -596,6 +755,19 @@ def project_evidence_matches(
                         refs=paper.refs,
                     )
                 )
+        elif conflict is not None:
+            findings.append(
+                EvidenceMatchFinding(
+                    code="SET_PAPER_AMOUNT_DISPUTED",
+                    status="UNRESOLVED",
+                    message=(
+                        f"Khoản '{description}' ghi {conflict.paper_amount} nhưng "
+                        f"chứng từ chỉ chứng minh {conflict.document_total} "
+                        f"(lệch {conflict.difference}); số tiền đang tranh chấp."
+                    ),
+                    refs=(*conflict.row_refs, *conflict.doc_refs),
+                )
+            )
         else:
             findings.append(
                 EvidenceMatchFinding(
@@ -606,9 +778,12 @@ def project_evidence_matches(
                 )
             )
 
+    associated = associated_document_ids(paper, documents, tuple(projected))
     unmatched = tuple(
         dict.fromkeys(
-            d.source_id for d in matchable if d.document_id not in auto_linked
+            d.source_id
+            for d in matchable
+            if d.document_id not in auto_linked and d.document_id not in associated
         )
     )
     if unmatched:
