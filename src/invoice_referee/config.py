@@ -20,14 +20,17 @@ LIVE_REQUIRED_SETTINGS: tuple[str, ...] = (
     "KIMI_SECRET",
     "KIMI_BASE_URL",
     "KIMI_MODEL",
+    "GROQ_API_KEY",
 )
 
 # Default LLM provider/model for local LIVE runs (16/10/2026 refinement).
-# Kimi-K3 is the default runtime; xKiro remains an explicit alternative.
+# Groq is the default runtime; Kimi and xKiro remain explicit alternatives.
 # The private endpoint URL is never hardcoded: KIMI_BASE_URL must come from
 # local ignored config. The model id itself is not a secret.
-DEFAULT_LLM_PROVIDER = "kimi"
+DEFAULT_LLM_PROVIDER = "groq"
 DEFAULT_KIMI_MODEL = "moonshotai/Kimi-K3"
+DEFAULT_GROQ_MODEL = "openai/gpt-oss-20b"
+DEFAULT_GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 # The single dataset source root (plan R2), resolved relative to the project,
 # not the cwd. Overridable for a temporary corpus.
@@ -50,6 +53,10 @@ class Settings(BaseSettings):
     kimi_base_url: str | None = None
     kimi_model: str | None = None
     kimi_reasoning_effort: str = "low"
+    groq_api_key: str | None = None
+    groq_base_url: str = DEFAULT_GROQ_BASE_URL
+    groq_model: str = DEFAULT_GROQ_MODEL
+    groq_reasoning_effort: str = "low"
     llm_provider: str = DEFAULT_LLM_PROVIDER
 
     # The evaluation dataset root (plan R2). One value for the whole app.
@@ -74,11 +81,13 @@ class Settings(BaseSettings):
 
         Refinement 16/10/2026: provider-aware. Mistral OCR is always required;
         only the selected LLM provider's credentials are required. Kimi is the
-        default; xKiro stays usable when ``llm_provider="xkiro"``.
+        alternative; Groq is the default; xKiro stays usable when ``llm_provider="xkiro"``.
         """
         provider = (self.llm_provider or DEFAULT_LLM_PROVIDER).strip().lower()
         names: list[str] = ["MISTRAL_API_KEY", "MISTRAL_OCR_MODEL"]
-        if provider == "xkiro":
+        if provider == "groq":
+            names += ["GROQ_API_KEY"]
+        elif provider == "xkiro":
             names += ["XKIRO_API_KEY", "XKIRO_BASE_URL", "INVOICE_REFEREE_LLM_MODEL"]
         else:
             names += ["KIMI_TOKEN", "KIMI_SECRET", "KIMI_BASE_URL"]

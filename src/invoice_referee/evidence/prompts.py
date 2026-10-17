@@ -195,6 +195,7 @@ def build_evidence_extraction_prompt(allowed_types: tuple[str, ...]) -> str:
 
 CLASSIFICATION_VERSION = "document-classification-v2"
 EXTRACTION_VERSION = "document-extraction-v3"
+LINE_NORMALIZATION_VERSION = "source-backed-flat-v1"
 CONFIDENCE_VERSION = "ocr-confidence-review-v2"
 MATCHING_VERSION = "evidence-suggestion-resolution-v2"
 # Role-aware pipeline version (16/10/2026): paper/evidence extraction without a
@@ -250,6 +251,7 @@ def evidence_reader_identity(
         "projection": "source-bounded-v2",
         "schema": "evidence-json-v2",
         "representation": "ocr-pages-block-words-v2",
+        "line_normalization": LINE_NORMALIZATION_VERSION,
         "activity_profile": activity_profile,
         "pipeline": LEGACY_READ_PIPELINE_VERSION,
         "ocr_provider": getattr(provider, "provider_name", None)
@@ -303,6 +305,7 @@ def role_aware_reader_identity(
         "projection": "source-bounded-v2",
         "schema": "evidence-json-v2",
         "representation": "ocr-pages-block-words-v2",
+        "line_normalization": LINE_NORMALIZATION_VERSION,
         "activity_profile": activity_profile,
         "ocr_provider": getattr(provider, "provider_name", None)
         or type(provider).__name__,

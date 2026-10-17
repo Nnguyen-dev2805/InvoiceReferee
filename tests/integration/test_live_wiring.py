@@ -205,17 +205,14 @@ def test_missing_llm_provider_is_reported_not_downgraded() -> None:
     from invoice_referee.runtime import build_llm_client
 
     # Isolate from any real .env credentials: blank every live-required setting.
-    # Default provider is kimi (16/10/2026): a blank config must name KIMI_*,
-    # never silently fall back to xKiro or STUB.
+    # Default provider is Groq: missing key must not fall back to Kimi/xKiro/STUB.
     settings = Settings(
-        kimi_token=None,
-        kimi_secret=None,
-        kimi_base_url=None,
+        groq_api_key=None,
         _env_file=None,  # type: ignore[call-arg]
     )
     with pytest.raises(ValueError) as exc:
         build_llm_client(settings)
-    assert "KIMI_TOKEN" in str(exc.value)
+    assert "GROQ_API_KEY" in str(exc.value)
 
 
 def test_build_workflow_live_wires_the_evidence_pipeline(tmp_path: Path) -> None:
@@ -227,10 +224,8 @@ def test_build_workflow_live_wires_the_evidence_pipeline(tmp_path: Path) -> None
     settings = Settings(
         mistral_api_key="m",
         mistral_ocr_model="mistral-ocr-1",
-        kimi_token="t",
-        kimi_secret="s",
-        kimi_base_url="https://kimi.test/v1",
-        kimi_model="moonshotai/Kimi-K3",
+        groq_api_key="fake",
+        groq_model="openai/gpt-oss-20b",
         _env_file=None,  # type: ignore[call-arg]
     )
     wf = build_workflow(
@@ -242,6 +237,7 @@ def test_build_workflow_live_wires_the_evidence_pipeline(tmp_path: Path) -> None
     )
     assert getattr(wf, "_evidence_reader", None) is not None
     assert getattr(wf, "_evidence_classifier", None) is not None
+    assert wf._evidence_classifier.provider_name == "groq"
     assert getattr(wf, "_transcriber", None) is None  # legacy path not used in LIVE
 
 

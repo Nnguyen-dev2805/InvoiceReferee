@@ -1,5 +1,15 @@
 # Implementation checkpoint
 
+## Groq default — selective integration, 17/10/2026
+
+Source-bound normalization, perHTTPattempt budget/trace, bounded429retry/timeout,
+truncation/refusal guards and cache version tested. User requested Groq default;
+local ignored.env configured with blankGROQ_API_KEY for entry. Kimi/xKiro remain
+explicit alternatives. No oldhard-cases policy/VAT merge.
+Focused111PASS; full1073PASS/6inheritedFAIL (1079total).
+User authorized commit. No LIVE/UI/provider calls/restart/push/deploy.
+[Acceptance](reviews/2026-10-17-groq-integration-acceptance.md).
+
 ## VAT source-bounded arithmetic + Demo25 context audit, 17/10/2026
 
 Printed independent VAT components supported; duplicate/unclear tax sources block.

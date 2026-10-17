@@ -222,14 +222,11 @@ def test_settings_report_missing_live_vars(monkeypatch: pytest.MonkeyPatch) -> N
 
     settings = Settings(_env_file=None)
     assert settings.mistral_api_key is None
-    # Provider-aware refinement (16/10/2026): default kimi requires Mistral +
-    # Kimi creds only; xKiro stays an explicit alternative.
+    # Provider-aware refinement (17/10/2026): Groq default; alternatives explicit.
     assert set(settings.missing_for_live()) == {
         "MISTRAL_API_KEY",
         "MISTRAL_OCR_MODEL",
-        "KIMI_TOKEN",
-        "KIMI_SECRET",
-        "KIMI_BASE_URL",
+        "GROQ_API_KEY",
     }
     xkiro = Settings(_env_file=None, llm_provider="xkiro")  # type: ignore[call-arg]
     assert set(xkiro.missing_for_live()) == {

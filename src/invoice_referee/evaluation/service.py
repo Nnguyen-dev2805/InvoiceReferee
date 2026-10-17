@@ -75,7 +75,17 @@ def code_version():
     return hashlib.sha256("".join(str(p.relative_to(PROJECT_ROOT))+digest(p) for p in sorted((PROJECT_ROOT/"src").rglob("*.py"))).encode()).hexdigest()
 
 def safe_config(settings):
-    return {key:getattr(settings,key,None)for key in ("llm_provider","kimi_model","kimi_reasoning_effort","mistral_ocr_model")}
+    return {
+        key: getattr(settings, key, None)
+        for key in (
+            "llm_provider",
+            "kimi_model",
+            "kimi_reasoning_effort",
+            "groq_model",
+            "groq_reasoning_effort",
+            "mistral_ocr_model",
+        )
+    }
 
 async def _run_single_case(case_dir,*,mode,case_work_dir,scorer,settings=None):
     packet=load_input(case_dir,stage_id="ban-dau")

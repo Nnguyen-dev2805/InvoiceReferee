@@ -15,17 +15,25 @@ _TRANSPORT_ERROR_TYPES: tuple[type, ...] = ()
 
 
 def _error_types() -> tuple[tuple[type, ...], tuple[type, ...]]:
-    """Schema vs transport errors across providers (xkiro + kimi, no fallback)."""
+    """Schema vs transport errors across providers (xkiro + kimi + groq, no fallback)."""
     global _SCHEMA_ERROR_TYPES, _TRANSPORT_ERROR_TYPES
     if not _SCHEMA_ERROR_TYPES:
         from invoice_referee.evidence.xkiro import XkiroSchemaError
 
+        types: list[type] = [XkiroSchemaError]
         try:
             from invoice_referee.evidence.kimi import KimiSchemaError
 
-            _SCHEMA_ERROR_TYPES = (XkiroSchemaError, KimiSchemaError)
+            types.append(KimiSchemaError)
         except Exception:
-            _SCHEMA_ERROR_TYPES = (XkiroSchemaError,)
+            pass
+        try:
+            from invoice_referee.evidence.groq import GroqSchemaError
+
+            types.append(GroqSchemaError)
+        except Exception:
+            pass
+        _SCHEMA_ERROR_TYPES = tuple(types)
     return _SCHEMA_ERROR_TYPES, _TRANSPORT_ERROR_TYPES
 
 

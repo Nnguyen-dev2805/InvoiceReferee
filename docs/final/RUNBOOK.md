@@ -222,3 +222,14 @@ free text does not waive it. Missing rights25m/20m stays blocked for higher auth
 
 Current main/production does not include this uncommitted worktree until an
 explicit integration step. Acceptance logs and all failures remain in the worktree.
+
+
+## Groq default runtime — 17/10/2026
+
+`LLM_PROVIDER=groq`, `GROQ_MODEL=openai/gpt-oss-20b`,
+`GROQ_REASONING_EFFORT=low`. Fill `GROQ_API_KEY` in ignored local `.env`.
+Groq base URL defaults to `https://api.groq.com/openai/v1`.
+Mistral OCR variables remain required. Missing Groq key fails LIVE readiness;
+no silent switch to Kimi/xKiro. Their credentials remain for explicit provider
+selection (`LLM_PROVIDER=kimi` or `xkiro`). Restart server after editing `.env`.
+Never commit actual `.env` or API keys. This selection is not a benchmark claim.

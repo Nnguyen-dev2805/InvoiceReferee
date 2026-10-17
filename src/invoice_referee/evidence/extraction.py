@@ -436,6 +436,31 @@ def _field_vocabulary(document_type: str) -> str:
     return ", ".join(profile.allowed_fields)
 
 
+def _normalize_line_fields(entry: dict) -> list[dict]:
+    """Normalize wrappers/field names without inventing evidence or state."""
+    if isinstance(entry.get("fields"), list):
+        if any(not isinstance(field, dict) for field in entry["fields"]):
+            raise XkiroSchemaError("line fields must be objects; do not drop malformed fields")
+        return entry["fields"]
+    normalized = []
+    for name, value in entry.items():
+        if name in ("id", "index", "line_id"):
+            continue
+        if not isinstance(value, dict) or "value" not in value:
+            raise XkiroSchemaError("flat line fields need structured value/state/quote/page; scalar values have no provenance")
+        field = dict(value)
+        field.setdefault("field", name)
+        # Page/state/quote must come from model payload and pass source validation;
+        # do not replace a missing quote with str(value) or invent a page here.
+        if field.get("state") == "FOUND" and (
+            not isinstance(field.get("quote"), str) or not field["quote"].strip()
+            or type(field.get("page")) is not int or field["page"] < 1
+        ):
+            raise XkiroSchemaError("flat FOUND field needs an explicit source quote and page")
+        normalized.append(field)
+    return normalized
+
+
 async def extract_document(
     ocr: OcrSourceResult,
     classification: DocumentClassification,
@@ -501,10 +526,6 @@ async def extract_document(
 
     lines: list[DocumentLine] = []
     for entry in raw_lines:
-        # Only a structured row ({fields: [...]}) is a line item. A raw OCR text
-        # string is not a row and must not be turned into a fabricated field.
-        # On a settlement form, preserve a blank marker so malformed row output
-        # stays unresolved instead of making the row-total check disappear.
         if not isinstance(entry, dict):
             if document_type == "SETTLEMENT_FORM":
                 lines.append(
@@ -513,8 +534,6 @@ async def extract_document(
                     )
                 )
             continue
-        # Code owns the line id; the model's id is discarded. Line fields get
-        # the same provenance validation as top-level fields (plan E5).
         line_fields = tuple(
             _validate_field(
                 f,
@@ -524,7 +543,7 @@ async def extract_document(
                 document_type=document_type,
                 allowed_pages=classification.page_range,
             )
-            for f in entry.get("fields", [])
+            for f in _normalize_line_fields(entry)
             if isinstance(f, dict)
         )
         index = len(lines) + 1
@@ -572,8 +591,8 @@ async def _call_with_one_repair(
 
         entries = list(payload["fields"])
         for row in lines:
-            if isinstance(row, dict) and isinstance(row.get("fields"), list):
-                entries.extend(row["fields"])
+            if isinstance(row, dict):
+                entries.extend(_normalize_line_fields(row))
         for index, entry in enumerate(entries):
             if not isinstance(entry, dict):
                 raise XkiroSchemaError(f"field[{index}] must be an object")
@@ -630,7 +649,7 @@ async def _call_with_one_repair(
                         f"field[{index}] needs at least two well-formed alternatives"
                     )
         for index, row in enumerate(lines):
-            if isinstance(row, dict) and not isinstance(row.get("fields", []), list):
+            if isinstance(row, dict) and "fields" in row and not isinstance(row["fields"], list):
                 raise XkiroSchemaError(f"line_items[{index}].fields must be an array")
         return payload
 
@@ -648,7 +667,10 @@ async def _call_with_one_repair(
     except Exception as error:
         from invoice_referee.evidence.kimi import KimiSchemaError as _KimiSchemaError
 
-        if isinstance(error, (XkiroSchemaError, _KimiSchemaError)):
+        from invoice_referee.evidence.groq import GroqSchemaError as _GroqSchemaError
+        schema_types = (XkiroSchemaError, _KimiSchemaError, _GroqSchemaError)
+
+        if isinstance(error, schema_types):
             return None
         raise
 
@@ -797,7 +819,7 @@ def _build_analysis(
                 document_type=document_type,
                 allowed_pages=classification.page_range,
             )
-            for f in entry.get("fields", [])
+            for f in _normalize_line_fields(entry)
             if isinstance(f, dict)
         )
         index = len(lines) + 1

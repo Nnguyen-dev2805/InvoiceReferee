@@ -22,13 +22,30 @@ from invoice_referee.workflow.service import CaseWorkflow
 def build_llm_client(settings: Settings):
     """Build the selected LLM client, or fail loudly (plan E4 Step 5 + 16/10 refinement).
 
-    ``llm_provider="kimi"`` (default) uses Kimi-K3 via the Hoangha endpoint shape;
+    ``llm_provider="kimi"`` (explicit alternative) uses Kimi-K3 via the Hoangha endpoint shape;
     ``llm_provider="xkiro"`` keeps the xKiro alternative. A Kimi failure is never
     silently retried as xKiro: selection happens once here, before any call.
     """
-    from invoice_referee.config import DEFAULT_KIMI_MODEL
+    from invoice_referee.config import DEFAULT_KIMI_MODEL, DEFAULT_LLM_PROVIDER
 
-    provider = (getattr(settings, "llm_provider", "kimi") or "kimi").strip().lower()
+    provider = (getattr(settings, "llm_provider", DEFAULT_LLM_PROVIDER) or DEFAULT_LLM_PROVIDER).strip().lower()
+    if provider == "groq":
+        from invoice_referee.config import DEFAULT_GROQ_BASE_URL, DEFAULT_GROQ_MODEL
+        from invoice_referee.evidence.groq import GroqClient
+
+        if not settings.groq_api_key:
+            raise ValueError("LLM provider not configured: missing GROQ_API_KEY")
+        effort = (getattr(settings, "groq_reasoning_effort", None) or "low").strip().lower()
+        if effort not in ("low", "medium", "high"):
+            raise ValueError(
+                f"invalid GROQ_REASONING_EFFORT: {effort!r} (expected 'low', 'medium' or 'high')"
+            )
+        return GroqClient(
+            api_key=settings.groq_api_key,
+            base_url=settings.groq_base_url or DEFAULT_GROQ_BASE_URL,
+            model=settings.groq_model or DEFAULT_GROQ_MODEL,
+            reasoning_effort=effort,
+        )
     if provider == "xkiro":
         from invoice_referee.evidence.xkiro import XkiroClient
 
@@ -48,7 +65,7 @@ def build_llm_client(settings: Settings):
         )
     if provider != "kimi":
         raise ValueError(
-            f"Unknown llm_provider: {provider!r} (expected 'kimi' or 'xkiro')"
+            f"Unknown llm_provider: {provider!r} (expected 'kimi', 'xkiro', or 'groq')"
         )
     from invoice_referee.evidence.kimi import KimiClient
 

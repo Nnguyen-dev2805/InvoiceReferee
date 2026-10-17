@@ -42,9 +42,7 @@ def test_missing_live_keys_are_reported_not_faked(monkeypatch) -> None:
     assert set(settings.missing_for_live()) == {
         "MISTRAL_API_KEY",
         "MISTRAL_OCR_MODEL",
-        "KIMI_TOKEN",
-        "KIMI_SECRET",
-        "KIMI_BASE_URL",
+        "GROQ_API_KEY",
     }
 
 

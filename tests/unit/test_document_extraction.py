@@ -926,3 +926,30 @@ async def test_genuinely_absent_field_as_not_present_is_accepted() -> None:
         f.field == "discount" and f.state == "NOT_PRESENT" and f.value is None
         for f in analysis.fields
     )
+
+
+
+async def test_flat_scalar_row_cannot_create_its_own_source_quote():
+    # 800000 exists in the advance, not the taxi row. Missing quotes stay unresolved.
+    llm=FakeLlm({"fields":[],"line_items":[{"description":"Taxi","amount":"800000"}]})
+    doc=await extract_document(_ocr("Taxi 300000\nTiền ứng 800000"),_classification(),llm=llm,budget=RunBudget())
+    assert not any(f.state=="FOUND" for line in doc.line_items for f in line.fields)
+
+
+async def test_flat_object_fields_preserve_real_quotes_and_source_page():
+    llm=FakeLlm({"fields":[],"line_items":[{
+        "description":{"state":"FOUND","value":"Taxi","quote":"Taxi 300000","page":1},
+        "line_amount":{"state":"FOUND","value":"300000","quote":"Taxi 300000","page":1}}]})
+    doc=await extract_document(_ocr("Taxi 300000\nTiền ứng 800000"),_classification(),llm=llm,budget=RunBudget())
+    amount=next(f for f in doc.line_items[0].fields if f.field=="line_amount")
+    assert amount.state=="FOUND" and amount.value=="300000"
+    assert amount.refs[0].exact_quote=="Taxi 300000" and amount.refs[0].page==1
+
+
+async def test_malformed_wrapped_row_fields_are_not_silently_dropped():
+    payload={"fields":[],"line_items":[{"fields":[
+        {"field":"description","state":"FOUND","value":"Taxi","quote":"Taxi","page":1},
+        "amount:800000"]}]}
+    llm=FakeLlm(payload)
+    doc=await extract_document(_ocr("Taxi 300000"),_classification(),llm=llm,budget=RunBudget())
+    assert doc.profile_status=="NEEDS_HUMAN"
