@@ -542,6 +542,8 @@ export async function decideIssues(
 }
 
 export interface ExceptionPreview {
+  basis_id?: string;
+  case_version?: number;
   issue_id: string;
   rule_id: string | null;
   expense_id: string | null;

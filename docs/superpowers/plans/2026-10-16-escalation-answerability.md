@@ -10,6 +10,25 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-16-escalation-answerability-design.md`.
 
+## Execution checkpoint — 17/10/2026
+
+- [x] Isolated managed worktree codex/escalation-answerability from96e6c4b0.
+- [x] Three typed routine regressions and missing payer/history counterexample.
+- [x] Server source-bound card + typed response/action preview.
+- [x] Authority persistence/compound amount/security/reload/restart/lifecycle;
+  review R1 expiry, R2 rebind, R3 epoch fixed with regression.
+- [x] FACT explicit declaration revision (original OCR/PDF immutable), scoped
+  reason supplement; ambiguous source changes remain blocked for genuine docs.
+- [x] DecisionCard UI, existing S6 ExceptionReview/OCR, component/build checks.
+- [x] Final offline browser7/7 + S6 18/18; full backend/frontend run, report saved.
+- [ ] Full backend GREEN:6baseline failures remain, not waived.
+- [ ] Real provider/compatible-recording and independent practitioner/rubric
+  acceptance. No20/20 claim. No commit/merge/deploy authorization inferred.
+
+Detailed original checklists below are the design task inventory, not a claim
+that every source-correction/UI/provider variant was executed. Current evidence
+and remaining limits are in acceptance, not the old dirty-main/base notes.
+
 ## Global Constraints
 
 - S=E−A−P+R;8/4/20triệu; B ngoài phạm vi. Không đổi model/policy/grant sản phẩm để làm test xanh.

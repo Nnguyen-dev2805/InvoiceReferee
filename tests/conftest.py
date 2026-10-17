@@ -329,6 +329,8 @@ class AppFixture:
 
     async def answer(self, root_id: str, answer, *, actor: str) -> CaseView:
         context = self.ctx(actor=actor, expected_case_version=self._version(root_id))
+        card=self.workflow.question_card(self.workflow.session(context.session_id),root_id,answer.issue_id)
+        answer=answer.model_copy(update={"basis_id":card.basis_id})
         result = await self.workflow.execute(context, AnswerIssue(root_id=root_id, answer=answer))
         return result.case_view
 

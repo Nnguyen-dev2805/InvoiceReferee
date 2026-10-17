@@ -315,7 +315,7 @@ def test_v9_database_migrates_the_additive_money_draft_table(tmp_path):
             row["name"]
             for row in cx.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         }
-    assert version == 11
+    assert version == 12
     assert "case_money_drafts" in tables
 
 

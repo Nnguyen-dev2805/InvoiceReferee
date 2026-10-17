@@ -35,6 +35,7 @@ from invoice_referee.domain.commands import (
     CommandResult,
     ConfirmCoverage,
     ConfirmMoneyHistory,
+    CorrectDeclaration,
     RecheckDossierHistory,
     Control,
     CreateDraft,
@@ -1285,6 +1286,7 @@ class CaseWorkflow:
             "REVISE_DECLARATION": self._revise_declaration,
             "SUBMIT": self._submit,
             "ANSWER_ISSUE": self._answer_issue,
+            "CORRECT_DECLARATION": self._correct_declaration,
             "DECIDE": self._decide,
             "REFUSE_EXCEPTION": self._refuse_exception,
             "RECORD_ACTUAL": self._record_actual,
@@ -3505,6 +3507,18 @@ class CaseWorkflow:
         ).fetchone()
         if issue is None:
             raise NotFoundError("Không tìm thấy việc cần xử lý này.")
+        if answer.value is None or not str(answer.value).strip() or not answer.reason.strip():
+            raise UnsupportedCommandError("Cần dữ kiện cụ thể và lý do xác nhận có trách nhiệm.")
+        if issue["kind"] != "FACT" or answer.answer_kind != "FACT":
+            raise UnsupportedCommandError("POLICY/AUTHORITY cần quyết định đúng quyền, không phải câu trả lời dữ kiện.")
+        if issue["status"] != "OPEN" or row["state"] == "STOPPED":
+            raise UnsupportedCommandError("Vấn đề không còn mở hoặc hồ sơ đã dừng.")
+        from invoice_referee.workflow.question_cards import build_card
+        card=build_card(self,cx,session,row,answer.issue_id)
+        if answer.basis_id != card.basis_id:
+            raise UnsupportedCommandError("Căn cứ câu trả lời đã thay đổi; tải lại thẻ.")
+        if card.response_kind != "FACT":
+            raise UnsupportedCommandError("Vấn đề này cần điều chỉnh khai báo/chứng từ hoặc đối chiếu, không nhận văn bản để bỏ qua.")
         # Only the issue's owner may answer it (contracts §5).
         if issue["owner"] not in (
             context.actor_id,
@@ -3522,7 +3536,13 @@ class CaseWorkflow:
         fact_key = str(issue["field_or_rule"])
         invoice_reference = _invoice_paid_reference(fact_key)
         confirmation_value: object = answer.value
-        confirmation_refs = answer.refs
+        from invoice_referee.domain.issues import BusinessIssue as _Issue
+        current_issue=_Issue.model_validate_json(issue["payload_json"])
+        confirmation_refs = answer.refs or current_issue.refs
+        for ref in confirmation_refs:
+            source=cx.execute("SELECT digest FROM case_sources WHERE root_id=? AND tenant=? AND source_id=?",(row["id"],session.tenant,ref.source_id)).fetchone()
+            if source is None or source["digest"]!=ref.source_sha256:
+                raise UnsupportedCommandError("Căn cứ câu trả lời không thuộc nguồn của hồ sơ.")
         invoice_issue_refs = ()
         if self._evidence_reader is not None and fact_key == "expense:payer":
             raise UnsupportedCommandError(
@@ -3683,7 +3703,25 @@ class CaseWorkflow:
                 raise UnsupportedCommandError(
                     "Câu trả lời chưa tạo được căn cứ cho hóa đơn này; kiểm tra số tiền, người trả và phạm vi."
                 )
+        still_open = cx.execute("SELECT 1 FROM case_issues WHERE root_id=? AND field_or_rule=? AND status='OPEN'",(row["id"],fact_key)).fetchone()
+        if still_open is not None:
+            raise UnsupportedCommandError("Câu trả lời chưa đủ để giải quyết dữ kiện. Vui lòng bổ sung hoặc điều chỉnh căn cứ đúng yêu cầu.")
         return CommandResult(case_view=view)
+
+    def _correct_declaration(self,cx,session,context,command):
+        from invoice_referee.workflow.declaration_corrections import persist_correction
+        row=self._require_root(cx,session,command.root_id)
+        persist_correction(self,cx,session,context,row,command)
+        self._assess_and_commit(cx,session,self._reload(cx,row),self._now_iso())
+        return CommandResult(case_view=self._case_view(cx,self._reload(cx,row)))
+
+    def question_card(self,session,root_id,issue_id):
+        from invoice_referee.workflow.question_cards import build_card
+        cx=self.db.connect()
+        try:
+            row=self._require_root(cx,session,root_id)
+            return build_card(self,cx,session,row,issue_id)
+        finally:cx.close()
 
     def _decide(
         self,
@@ -3693,54 +3731,11 @@ class CaseWorkflow:
         command: Decide,
     ) -> CommandResult:
         row = self._require_root(cx, session, command.root_id)
-        decision = command.decision
-        # A decision needs a real grant for its actions at this scope and within
-        # the grant's amount ceiling (contracts §5).
-        for action in decision.actions:
-            if not self._actor_has_grant(
-                cx,
-                session.tenant,
-                context.actor_id,
-                action,
-                decision.effect_scope,
-                decision.amount,
-                str(row["profile"]),
-            ):
-                raise UnsupportedCommandError(
-                    f"Không có quyền thực hiện {action} trong phạm vi này."
-                )
-        now = self._now_iso()
-        if not (decision.reason or "").strip():
-            raise UnsupportedCommandError("Quyết định cần có lý do.")
-        # S6 (18/10/2026): an accepted missing-evidence exception persists as a
-        # scoped decision row so reassessment keeps clearing the covered issues
-        # (the recomputed issue rows would otherwise resurrect them). Refusals
-        # go through REFUSE_EXCEPTION and persist nothing here.
-        if "EXCEPT_POLICY" in decision.actions:
-            if decision.amount is None:
-                raise UnsupportedCommandError(
-                    "Chấp nhận ngoại lệ cần số tiền hiệu lực."
-                )
-            self._persist_exception_decisions(cx, session, row, context, decision, now)
-        for issue_id in decision.issue_ids:
-            cx.execute(
-                "UPDATE case_issues SET status = 'RESOLVED', updated_at = ? WHERE id = ?",
-                (now, issue_id),
-            )
-        self._audit(
-            cx,
-            tenant=session.tenant,
-            root_id=str(row["id"]),
-            session_id=session.session_id,
-            actor=context.actor_id,
-            action="DECIDE",
-            detail=json.dumps(
-                {"actions": list(decision.actions), "reason": decision.reason},
-                ensure_ascii=False,
-            ),
-        )
-        self._assess_and_commit(cx, session, self._reload(cx, row), now)
-        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+        from invoice_referee.workflow.question_cards import persist_decision
+        persist_decision(self,cx,session,context,row,command.decision)
+        self._assess_and_commit(cx,session,self._reload(cx,row),self._now_iso())
+        return CommandResult(case_view=self._case_view(cx,self._reload(cx,row)))
+
 
     def _check_digital_submit(self, cx, session, row, declaration, now: str) -> None:
         """Re-validate a digital submit against attached sources + stored read."""
@@ -3813,6 +3808,7 @@ class CaseWorkflow:
                 now,
             ),
         )
+
 
     def _persist_exception_decisions(
         self, cx, session, row, context, decision, now: str
@@ -6069,48 +6065,22 @@ class CaseWorkflow:
         command: Override,
     ) -> CommandResult:
         row = self._require_root(cx, session, command.root_id)
-        decision = command.decision
-        # An override needs the exact grant for its actions and amount (§5, §10.3).
-        for action in decision.actions:
-            if not self._actor_has_grant(
-                cx,
-                session.tenant,
-                context.actor_id,
-                action,
-                decision.effect_scope,
-                decision.amount,
-                str(row["profile"]),
-            ):
-                raise UnsupportedCommandError(
-                    f"Không có quyền thực hiện {action} trong phạm vi này."
-                )
-        now = self._now_iso()
-        root_id = str(row["id"])
-        # A new scoped decision; the old decision is retained, facts and actual
-        # money are never rewritten.
-        for issue_id in decision.issue_ids:
-            cx.execute(
-                "UPDATE case_issues SET status = 'RESOLVED', updated_at = ? WHERE id = ?",
-                (now, issue_id),
-            )
-        self._audit(
-            cx,
-            tenant=session.tenant,
-            root_id=root_id,
-            session_id=session.session_id,
-            actor=context.actor_id,
-            action="OVERRIDE",
-            detail=json.dumps(
-                {
-                    "supersedes": command.supersedes_decision_id,
-                    "actions": list(decision.actions),
-                    "reason": decision.reason,
-                },
-                ensure_ascii=False,
-            ),
-        )
-        self._assess_and_commit(cx, session, self._reload(cx, row), now)
-        return CommandResult(case_view=self._case_view(cx, self._reload(cx, row)))
+        self._require_version(row,context.expected_case_version)
+        from invoice_referee.workflow.question_cards import build_card,persist_decision
+        from invoice_referee.reconciliation.authority import grants_for
+        if not command.decision.issue_ids:
+            raise UnsupportedCommandError("Cần chọn quyết định cần thay thế.")
+        card=build_card(self,cx,session,row,command.decision.issue_ids[0])
+        snapshot=self._build_assessment_input(cx,session,row,self._now_iso())
+        if not grants_for(snapshot,context.actor_id,"OVERRIDE",max((a.amount for a in card.actions),default=0)):
+            raise UnsupportedCommandError("Không có quyền thay thế quyết định trong phạm vi này.")
+        prior=cx.execute("SELECT id FROM case_authority_decisions WHERE tenant=? AND root_id=? AND id=?",(session.tenant,row["id"],command.supersedes_decision_id)).fetchone()
+        if prior is None:
+            raise UnsupportedCommandError("Quyết định tiền nhiệm không thuộc hồ sơ.")
+        persist_decision(self,cx,session,context,row,command.decision)
+        self._audit(cx,tenant=session.tenant,root_id=row["id"],session_id=session.session_id,actor=context.actor_id,action="OVERRIDE",detail=json.dumps({"supersedes":command.supersedes_decision_id,"reason":command.decision.reason}))
+        self._assess_and_commit(cx,session,self._reload(cx,row),self._now_iso())
+        return CommandResult(case_view=self._case_view(cx,self._reload(cx,row)))
 
     def exception_grant_preview(
         self, session: DemoSession, root_id: str, issue_id: str
@@ -6166,6 +6136,8 @@ class CaseWorkflow:
                 covered = bool(grants)
             return {
                 "issue_id": issue_id,
+                "basis_id": self.question_card(session,root_id,issue_id).basis_id,
+                "case_version": int(row["version"]),
                 "rule_id": rule_id,
                 "expense_id": expense_id,
                 "amount": amount,
@@ -6224,7 +6196,7 @@ class CaseWorkflow:
         amount: int,
     ) -> tuple[str, ...]:
         """The grant ids that authorize `action` at `scope` for `amount` (§2, §5)."""
-        now = datetime.now(UTC)
+        now = datetime.fromisoformat(self._now_iso())
         ids: list[str] = []
         for grant in cx.execute(
             "SELECT * FROM context_grants WHERE tenant = ? AND actor = ?",
@@ -6355,7 +6327,7 @@ class CaseWorkflow:
         authorizes this action. When `amount` is given it must not exceed the
         grant's `max_amount` (per action, inclusive). Contracts §5.
         """
-        now = datetime.now(UTC)
+        now = datetime.fromisoformat(self._now_iso())
         for grant in cx.execute(
             "SELECT * FROM context_grants WHERE tenant = ? AND actor = ?",
             (tenant, actor),
@@ -6776,11 +6748,15 @@ class CaseWorkflow:
             if report_row is None or not report_row["report_json"]:
                 return None
             report = ReadResult.model_validate_json(report_row["report_json"])
-            return build_evidence_assessment_input(
+            from invoice_referee.workflow.declaration_corrections import effective_report
+            report=effective_report(cx,row,report)
+            from invoice_referee.workflow.question_cards import with_authorizations
+            return with_authorizations(cx,row,build_evidence_assessment_input(
                 cx, tenant=session.tenant, root_id=root_id, report=report, as_of=as_of
-            )
+            ))
         transcription = self._transcription_for(cx, root_id)
-        return build_assessment_input(
+        from invoice_referee.workflow.question_cards import with_authorizations
+        return with_authorizations(cx,row,build_assessment_input(
             cx,
             tenant=session.tenant,
             root_id=root_id,
@@ -6789,7 +6765,7 @@ class CaseWorkflow:
             profile=str(row["profile"]),
             transcription=transcription,
             as_of=as_of,
-        )
+        ))
 
     def _commit_assessment(
         self,
@@ -6860,6 +6836,9 @@ class CaseWorkflow:
                 "OUTSTANDING" if state == "READY_TO_EXECUTE" else "BLOCKED"
             )
         elif result.issues:
+            # A previously issued order cannot remain actionable after its
+            # material evidence/authority was invalidated. Keep actuals intact.
+            cx.execute("UPDATE instructions SET status='SUSPENDED', execution_state=CASE WHEN execution_state IN ('OPEN','UNKNOWN') THEN 'UNKNOWN' ELSE execution_state END, updated_at=? WHERE root_id=? AND status IN ('ISSUED','PARTIAL')",(now,root_id))
             state = "WAITING"
             conclusion_status = "BLOCKED"
         elif (
@@ -6939,6 +6918,12 @@ class CaseWorkflow:
             cost_basis=result.cost_basis,
         )
 
+        if decision.action in ("RETAIN","REACTIVATE"):
+            current_refs=self._instruction_authority_refs(cx,session,row,effect)
+            old_refs=tuple(json.loads(active["authority_refs_json"] or "[]"))
+            if set(current_refs)!=set(old_refs):
+                cx.execute("UPDATE instructions SET authority_refs_json=?,updated_at=? WHERE id=?",(json.dumps(list(current_refs)),now,active["id"]))
+                self._audit(cx,tenant=session.tenant,root_id=root_id,session_id=session.session_id,actor=session.actor_id,action="REBIND_INSTRUCTION_AUTHORITY",detail=json.dumps({"instruction":active["id"],"previous":old_refs,"current":current_refs,"reason":"Same obligation reauthorized on current scoped decisions"}))
         if decision.action == "RETAIN":
             return decision.result_state
         if decision.action == "REACTIVATE":
@@ -6965,6 +6950,13 @@ class CaseWorkflow:
         self._issue_instruction(cx, session, row, result, now, active)
         return decision.result_state
 
+    def _instruction_authority_refs(self,cx,session,row,effect):
+        from invoice_referee.reconciliation.authority import grants_for
+        snapshot=self._build_assessment_input(cx,session,row,self._now_iso())
+        action="ISSUE_PAYMENT"if effect.direction=="PAY"else"ISSUE_COLLECTION"
+        systems=tuple(g.id for g in grants_for(snapshot,"system:referee",action,effect.amount))
+        return systems+tuple(effect.authority_refs)
+
     def _issue_instruction(
         self,
         cx: sqlite3.Connection,
@@ -6987,15 +6979,7 @@ class CaseWorkflow:
         # The authority that lets this order be issued (contracts §2): the
         # covering system grant(s) for the action at this scope/amount. Recorded
         # so the instruction is grounded, not merely asserted.
-        action = "ISSUE_PAYMENT" if effect.direction == "PAY" else "ISSUE_COLLECTION"
-        authority_refs = self._covering_grant_ids(
-            cx,
-            session.tenant,
-            "system:referee",
-            action,
-            str(row["activity"]),
-            effect.amount,
-        )
+        authority_refs=self._instruction_authority_refs(cx,session,row,effect)
         cx.execute(
             "INSERT INTO instructions (id, tenant, root_id, direction, amount, "
             "status, basis, cost_basis, authority_refs_json, supersedes_id, "
@@ -7569,7 +7553,9 @@ class CaseWorkflow:
                 assessment_ready = False
                 assessment_blocker = "EVIDENCE_ASSESSMENT_PENDING"
                 instructions = ()
+        from invoice_referee.workflow.declaration_corrections import saved_corrections
         return CaseView(
+            declaration_corrections=saved_corrections(cx,row["tenant"],row["id"]),
             id=row["id"],
             version=int(row["version"]),
             state=row["state"],

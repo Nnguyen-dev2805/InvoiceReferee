@@ -125,36 +125,22 @@ async def test_crash_after_commit_replays_same_result(app_fixture):
     assert second.case_view.version == first.case_view.version
 
 
-async def test_override_keeps_old_decision_and_actual(app_fixture):
-    v = await app_fixture.submit_packet("missing-history", mode="STUB")
-    issue = next(i for i in v.issues if i.kind == "FACT")
-    session = app_fixture.workflow.start_session(
-        tenant="tenant:demo", persona="approver", actor_id="employee:approver"
-    )
-    from invoice_referee.domain.case import CommandContext
-
-    ctx = CommandContext(
-        session_id=session.session_id,
-        actor_id="employee:approver",
-        command_id="cmd-override",
-        expected_case_version=app_fixture._version(v.id),
-    )
-    result = await app_fixture.workflow.execute(
-        ctx,
-        Override(
-            root_id=v.id,
-            supersedes_decision_id="decision:1",
-            decision=DecisionCommand(
-                issue_ids=(issue.id,),
-                basis_id="basis:override",
-                actions=("EXCEPT_POLICY",),
-                effect_scope="activity:travel-a",
-                reason="ngoại lệ có căn cứ",
-            ),
-        ),
-    )
-    # The override is a new decision; it does not erase money/facts.
-    assert result.case_view.state in ("WAITING", "READY_TO_EXECUTE", "SETTLED")
+async def test_override_keeps_old_decision_and_actual(app_fixture,monkeypatch):
+    from tests.escalation_shapes import scenario,actor_context
+    from tests.integration.test_escalation_decision_roundtrip import decision
+    from invoice_referee.domain.commands import Decide,Override
+    v=await scenario(app_fixture,monkeypatch)
+    ctx=actor_context(app_fixture,v);issue=next(i for i in v.issues if i.kind=="AUTHORITY")
+    card=app_fixture.workflow.question_card(app_fixture.workflow.session(ctx.session_id),v.id,issue.id)
+    await app_fixture.workflow.execute(ctx,Decide(root_id=v.id,decision=decision(card)))
+    prior=app_fixture.query_one("SELECT id FROM case_authority_decisions")["id"]
+    changed=await scenario(app_fixture,monkeypatch,cost=10000000,advance=8000000)
+    ctx=actor_context(app_fixture,changed);issue=next(i for i in changed.issues if i.kind=="AUTHORITY")
+    card=app_fixture.workflow.question_card(app_fixture.workflow.session(ctx.session_id),changed.id,issue.id)
+    result=await app_fixture.workflow.execute(ctx,Override(root_id=changed.id,supersedes_decision_id=prior,decision=decision(card)))
+    assert result.case_view.instructions[0].amount==2000000
+    assert result.case_view.actual_money.P.value==0
+    assert app_fixture.query_one("SELECT COUNT(*)AS n FROM case_authority_decisions")["n"]==2
 
 
 async def test_command_payload_conflict(app_fixture):

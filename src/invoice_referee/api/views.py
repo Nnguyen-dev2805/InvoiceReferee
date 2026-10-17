@@ -96,6 +96,12 @@ class AnswerRequest(ApiModel):
     reason: str
 
 
+class CorrectDeclarationRequest(ApiModel):
+    basis_id: str
+    correction_id: str
+    reason: str = Field(min_length=12,max_length=2000)
+
+
 class DecisionRequest(ApiModel):
     issue_ids: list[str]
     basis_id: str

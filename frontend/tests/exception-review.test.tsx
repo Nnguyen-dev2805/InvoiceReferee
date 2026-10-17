@@ -57,7 +57,7 @@ afterEach(() => vi.clearAllMocks());
 describe("ExceptionReview (accountant)", () => {
   it("shows amount, grants and both decisions when covered", async () => {
     vi.mocked(exceptionPreview).mockResolvedValue({
-      issue_id: issue.id, rule_id: "expense:missing_required_evidence",
+      issue_id: issue.id,basis_id:"card:s6",case_version:3, rule_id: "expense:missing_required_evidence",
       expense_id: "expense:2", amount: 1500000, covered: true,
       grants: [{ id: "g:except-sim", max_amount: 2000000, effective_from: "2026-10-01", effective_to: null }],
     });
@@ -80,7 +80,7 @@ describe("ExceptionReview (accountant)", () => {
 
   it("disables accept without covering grant but keeps refuse", async () => {
     vi.mocked(exceptionPreview).mockResolvedValue({
-      issue_id: issue.id, rule_id: "expense:missing_required_evidence",
+      issue_id: issue.id,basis_id:"card:s6",case_version:3, rule_id: "expense:missing_required_evidence",
       expense_id: "expense:2", amount: 1500000, covered: false, grants: [],
     });
     vi.mocked(refuseException).mockResolvedValue({ case_view: caseView(), job_id: null, duplicate_command: false });

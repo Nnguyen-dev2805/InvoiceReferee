@@ -37,6 +37,7 @@ from invoice_referee.domain.finance import (
 from invoice_referee.domain.issues import BusinessIssue, ProcessingProblem
 from invoice_referee.domain.policy import (
     BudgetDecision,
+    ActionAuthorization,
     CategoryPolicy,
     ExceptionDecision,
     Grant,
@@ -112,6 +113,7 @@ class AssessmentInput(StrictModel):
     category_policy: tuple[CategoryPolicy, ...] = ()
     exceptions: tuple[ExceptionDecision, ...] = ()
     previous_eligibility: EligibilityDecision | None = None
+    authorizations: tuple[ActionAuthorization, ...] = ()
     read_set: ReadSet
     as_of: UtcDatetime
     # Admission outputs (plan A0/A3): unresolved material conditions that must
@@ -136,6 +138,7 @@ class FinancialEffect(StrictModel):
     employee: Id
     activity: Id
     basis: str
+    authority_refs: tuple[Id, ...] = ()
 
 
 class AssessmentResult(StrictModel):
@@ -214,6 +217,7 @@ class Instruction(StrictModel):
 
 
 class CaseView(StrictModel):
+    declaration_corrections: tuple[dict, ...] = ()
     id: Id
     version: int
     state: CaseState

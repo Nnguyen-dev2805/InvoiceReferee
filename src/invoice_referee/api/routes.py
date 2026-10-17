@@ -23,6 +23,7 @@ from invoice_referee.domain.commands import (
     CommandResult,
     ConfirmCoverage,
     ConfirmMoneyHistory,
+    CorrectDeclaration,
     RecheckDossierHistory,
     Control,
     CreateDraft,
@@ -473,6 +474,12 @@ async def submit_case(
     )
 
 
+@router.get("/cases/{root_id}/issues/{issue_id}/card")
+async def get_question_card(request: Request,root_id: str,issue_id: str):
+    session=_require_session(request)
+    return _workflow(request).question_card(session,root_id,issue_id)
+
+
 @router.post("/cases/{root_id}/answers")
 async def answer_issue(
     request: Request, root_id: str, payload: views.AnswerRequest
@@ -495,13 +502,20 @@ async def answer_issue(
     )
 
 
+@router.post("/cases/{root_id}/issues/{issue_id}/corrections")
+async def correct_declaration(request: Request,root_id: str,issue_id: str,payload: views.CorrectDeclarationRequest):
+    session=_require_session(request)
+    context=_command_context(request,session,require_version=True)
+    return await _workflow(request).execute(context,CorrectDeclaration(root_id=root_id,issue_id=issue_id,basis_id=payload.basis_id,correction_id=payload.correction_id,reason=payload.reason))
+
+
 @router.post("/cases/{root_id}/decisions")
 async def decide_case(
     request: Request, root_id: str, payload: views.DecisionRequest
 ) -> CommandResult:
     session = _require_session(request)
     workflow = _workflow(request)
-    context = _command_context(request, session, require_version=False)
+    context = _command_context(request, session, require_version=True)
     return await workflow.execute(
         context,
         Decide(

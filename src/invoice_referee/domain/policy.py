@@ -84,3 +84,20 @@ class ExceptionDecision(StrictModel):
     effect_range: tuple[UtcDatetime, UtcDatetime | None]
     refs: tuple[EvidenceRef, ...] = ()
     reason: str
+
+
+class ActionAuthorization(StrictModel):
+    """A local human decision for one material basis, never a standing grant."""
+    id: Id
+    action: str
+    amount: Vnd
+    activity: Id
+    actor: Id
+    grant_ref: Id
+    issued_at: UtcDatetime | None = None
+    remaining_issued: Vnd | None = None
+    grant_fingerprint: str
+    basis: str
+    decided_at: UtcDatetime
+    reason: str
+    refs: tuple[EvidenceRef, ...] = ()

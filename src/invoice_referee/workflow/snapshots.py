@@ -370,8 +370,8 @@ def build_assessment_input(
         exceptions=(),
         previous_eligibility=None,
         read_set=ReadSet(
-            input_revision=1,
-            control_epoch=0,
+            input_revision=int(cx.execute("SELECT input_revision FROM cases WHERE id=?",(root_id,)).fetchone()[0]),
+            control_epoch=int(cx.execute("SELECT control_epoch FROM cases WHERE id=?",(root_id,)).fetchone()[0]),
             context_version=1,
             ledger_version=1,
             usage_version=1,

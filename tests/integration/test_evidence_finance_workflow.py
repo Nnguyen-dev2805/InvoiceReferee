@@ -21,7 +21,8 @@ TENANT = "tenant:uc03-pilot"
 EMPLOYEE = "employee:employee-a"
 ACTIVITY = "activity:uc03-f01"
 PILOT = Path(__file__).resolve().parents[2] / "data" / "test-kit" / "uc03-pilot" / "f01-cong-tac-thu-lai-tien-thua"
-SHA = "a" * 64
+import hashlib
+SHA = hashlib.sha256(b"pdf").hexdigest()
 
 
 def _ref(quote: str = "x") -> EvidenceRef:
@@ -159,6 +160,8 @@ async def _seed_case(wf: CaseWorkflow, *, state: str = "EVIDENCE_READY") -> str:
         AttachSources(root_id=root, uploads=(SourceUpload(filename="hd.pdf", media="PDF", digest=digest, storage_key=f"{TENANT}/{root}/hd.pdf"),)),
     )
     with wf.db.transaction() as cx:
+        # Match the literal report source locator to this uploaded input fixture.
+        cx.execute("UPDATE case_sources SET source_id='source:2' WHERE root_id=?",(root,))
         cx.execute("UPDATE cases SET state = ?, version = version + 1 WHERE id = ?", (state, root))
     return root
 
@@ -250,7 +253,7 @@ async def test_live_payer_answer_is_bound_to_invoice_amount_actor_and_activity(
             root_id=root,
             answer=Answer(
                 issue_id=issue.id,
-                basis_id=f"basis:{issue.id}",
+                basis_id=wf.question_card(session,root,issue.id).basis_id,
                 answer_kind="FACT",
                 value=3_240_000,
                 reason="Tôi trực tiếp thanh toán hóa đơn IR26101001.",
@@ -299,7 +302,7 @@ async def test_live_payer_answer_rejects_amount_above_invoice_total(tmp_path: Pa
             AnswerIssue(
                 root_id=root,
                 answer=Answer(
-                    issue_id=issue.id, basis_id=f"basis:{issue.id}", answer_kind="FACT",
+                    issue_id=issue.id, basis_id=wf.question_card(session,root,issue.id).basis_id, answer_kind="FACT",
                     value=3_240_001, reason="Xác nhận đã trả.",
                 ),
             ),
@@ -391,7 +394,7 @@ async def test_live_payer_answer_outside_q32_bounds_is_not_reported_as_success(
             AnswerIssue(
                 root_id=root,
                 answer=Answer(
-                    issue_id=issue.id, basis_id=f"basis:{issue.id}", answer_kind="FACT",
+                    issue_id=issue.id, basis_id=wf.question_card(session,root,issue.id).basis_id, answer_kind="FACT",
                     value=9_000_000, reason="Tôi trực tiếp thanh toán hóa đơn IR26101001.",
                 ),
             ),
@@ -424,7 +427,7 @@ async def test_live_payer_answer_rejects_a_different_employee(tmp_path: Path) ->
             AnswerIssue(
                 root_id=root,
                 answer=Answer(
-                    issue_id=issue.id, basis_id=f"basis:{issue.id}", answer_kind="FACT",
+                    issue_id=issue.id, basis_id=wf.question_card(session,root,issue.id).basis_id, answer_kind="FACT",
                     value=3_240_000, reason="Xác nhận đã trả.",
                 ),
             ),
@@ -486,7 +489,7 @@ async def test_live_unscoped_payer_answer_is_not_saved_as_success(tmp_path: Path
             AnswerIssue(
                 root_id=root,
                 answer=Answer(
-                    issue_id=issue.id, basis_id=f"basis:{issue.id}", answer_kind="FACT",
+                    issue_id=issue.id, basis_id=wf.question_card(session,root,issue.id).basis_id, answer_kind="FACT",
                     value=EMPLOYEE, reason="Tôi đã trả khoản này.",
                 ),
             ),

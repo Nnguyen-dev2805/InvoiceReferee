@@ -1,31 +1,13 @@
 import { useState } from "react";
 
-import { answerIssue, errorMessage } from "../api";
-import { formatVndHint } from "../format";
 import type { CaseView, IssueView } from "../types";
-import { ExceptionReview, OcrRegionView } from "./exception_review";
-
-const KIND_LABELS: Record<string, string> = {
-  FACT: "Dữ kiện thực tế",
-  POLICY: "Chính sách chi tiêu",
-  AUTHORITY: "Thẩm quyền phê duyệt",
-};
-
-function employeePaidInvoiceReference(fieldOrRule: string): string | null {
-  const prefix = "expense:";
-  const suffix = ":employee_paid";
-  if (!fieldOrRule.startsWith(prefix) || !fieldOrRule.endsWith(suffix)) return null;
-  const reference = fieldOrRule.slice(prefix.length, -suffix.length).trim();
-  return reference || null;
-}
+import { DecisionCard } from "./decision_card";
+import { ExceptionReview } from "./exception_review";
 
 export function formatVndInText(text: string): string {
-  return text.replace(/\b\d+\b/g, (match) => {
-    const num = parseInt(match, 10);
-    if (num >= 1900 && num <= 2099 && match.length === 4) return match;
-    if (num < 1000) return match;
-    return num.toLocaleString("vi-VN") + " đ";
-  });
+  // Only an explicitly labelled monetary token is formatted. Identifiers and
+  // calendar dates are source text, including leading zeroes.
+  return text.replace(/(?<![\w/-])(\d{4,})(?=\s*(?:VND|đồng|đ)(?:\b|$))/g, value => Number(value).toLocaleString("vi-VN"));
 }
 
 export function formatQuestionTitle(question: string, hasBasis: boolean): string {
@@ -178,340 +160,9 @@ export function parseSettlementReturn(basis: string | undefined): SettlementRetu
   return null;
 }
 
-/** One answerable question panel: known basis, the exact answer required, owner. */
-export function QuestionCard({
-  issue,
-  caseView,
-  onCase,
-  onSourceSelected,
-}: {
-  issue: IssueView;
-  caseView: CaseView;
-  onCase: (view: CaseView) => void;
-  onSourceSelected?: (sourceId: string) => void;
-}) {
-  const [value, setValue] = useState("");
-  const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const invoiceReference = employeePaidInvoiceReference(issue.field_or_rule);
-  const historyCoverageIssue = issue.field_or_rule === "ledger:coverage";
-  const lineTable = parseSettlementLineTotal(issue.basis);
-  const returnTable = parseSettlementReturn(issue.basis);
-
-  // Group refs by source and page
-  const groupedRefs = (issue.refs ?? []).reduce<
-    Record<string, { source_id: string; filename: string; page: number | null; quotes: string[] }>
-  >((acc, ref) => {
-    const filename =
-      caseView.sources.find((source) => source.id === ref.source_id)?.filename ??
-      ref.source_id;
-    const key = `${ref.source_id}::${ref.page ?? 1}`;
-    if (!acc[key]) {
-      acc[key] = {
-        source_id: ref.source_id,
-        filename,
-        page: ref.page ?? null,
-        quotes: [],
-      };
-    }
-    if (!acc[key].quotes.includes(ref.exact_quote)) {
-      acc[key].quotes.push(ref.exact_quote);
-    }
-    return acc;
-  }, {});
-
-  async function submit() {
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await answerIssue(
-        caseView.id,
-        {
-          issue_id: issue.id,
-          basis_id: `basis:${issue.id}`,
-          answer_kind: issue.kind,
-          value,
-          reason: reason || "Giải trình bổ sung cho hồ sơ",
-        },
-        caseView.version,
-      );
-      onCase(result.case_view);
-    } catch (cause) {
-      setError(errorMessage(cause));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div
-      className="space-y-4 text-xs max-w-2xl"
-      data-testid={`question-${issue.kind}`}
-    >
-      {/* 1. Câu hỏi & Diễn giải */}
-      <div className="space-y-1.5">
-        <h4 className="font-semibold text-slate-900 text-sm leading-relaxed">
-          {formatQuestionTitle(issue.question, Boolean(issue.basis))}
-        </h4>
-        {!lineTable && !returnTable && issue.basis && issue.basis !== issue.question && (
-          <p className="text-slate-600 text-xs leading-relaxed">
-            {formatVndInText(issue.basis)}
-          </p>
-        )}
-      </div>
-
-      {/* 2. Chứng từ liên quan */}
-      {Object.keys(groupedRefs).length > 0 && (
-        <div
-          aria-label="Trích dẫn nguồn cho căn cứ"
-          className="text-xs text-slate-600 flex items-baseline gap-2 flex-wrap pt-0.5"
-        >
-          <span className="text-slate-400 font-medium shrink-0">Chứng từ đối chiếu:</span>
-          {Object.entries(groupedRefs).map(([key, group]) => (
-            <span key={key} className="inline-flex items-baseline gap-1.5 flex-wrap">
-              {onSourceSelected ? (
-                <button
-                  type="button"
-                  onClick={() => onSourceSelected(group.source_id)}
-                  className="font-semibold text-sky-700 hover:text-sky-900 hover:underline cursor-pointer inline-flex items-center gap-1 text-left"
-                  title={`Xem chứng từ ${group.filename}`}
-                >
-                  <span>{group.filename}</span>
-                  <svg className="w-3 h-3 text-sky-500 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </button>
-              ) : (
-                <span className="font-semibold text-slate-800">{group.filename}</span>
-              )}
-              <span className="text-slate-500">· trang {group.page ?? "?"}</span>
-              {!lineTable && !returnTable && (
-                <>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-slate-400">Trích dẫn:</span>
-                  {group.quotes.map((quote, idx) => (
-                    <span
-                      key={idx}
-                      className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[11px] font-mono-nums"
-                    >
-                      {quote}
-                    </span>
-                  ))}
-                </>
-              )}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* 2b. Vùng OCR cần kiểm tra (chỉ khi ref mang bbox nguồn) */}
-      {(issue.refs ?? []).filter((ref) => ref.bbox !== null && ref.bbox !== undefined).length > 0 && (
-        <div className="space-y-2 pt-1">
-          <p className="text-slate-400 font-medium text-xs">Vùng OCR cần kiểm tra:</p>
-          {(issue.refs ?? [])
-            .filter((ref) => ref.bbox !== null && ref.bbox !== undefined)
-            .map((ref, idx) => (
-              <OcrRegionView
-                key={`${ref.source_id}:${ref.page}:${idx}`}
-                caseView={caseView}
-                reference={ref}
-                onSourceSelected={onSourceSelected}
-              />
-            ))}
-        </div>
-      )}
-
-      {/* 3. Bảng kê đối chiếu mini (Phương án A) */}
-      {lineTable && (
-        <div className="border border-slate-200 rounded overflow-hidden max-w-xl text-xs bg-white">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                <th className="py-2 px-3 font-semibold text-xs">Khoản mục trích xuất</th>
-                <th className="py-2 px-3 font-semibold text-xs text-right">Số tiền</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {lineTable.items.map((item, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/50">
-                  <td className="py-2 px-3 text-slate-800">• {item.description}</td>
-                  <td className="py-2 px-3 text-right font-mono-nums text-slate-900 font-medium">
-                    {item.amount}
-                  </td>
-                </tr>
-              ))}
-              <tr className="bg-slate-50/60 font-semibold border-t border-slate-200">
-                <td className="py-2 px-3 text-slate-700">Tổng cộng các dòng chi</td>
-                <td className="py-2 px-3 text-right font-mono-nums text-slate-900">
-                  {lineTable.calculatedTotal}
-                </td>
-              </tr>
-              <tr className="bg-slate-50/60 font-semibold">
-                <td className="py-2 px-3 text-slate-700">Tổng in trên giấy quyết toán</td>
-                <td className="py-2 px-3 text-right font-mono-nums text-slate-900">
-                  {lineTable.printedTotal}
-                </td>
-              </tr>
-              <tr className="bg-rose-50/80 font-semibold border-t border-rose-200 text-rose-900">
-                <td className="py-2 px-3 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
-                  <span>Chênh lệch chưa khớp</span>
-                </td>
-                <td className="py-2 px-3 text-right font-mono-nums text-rose-700 font-bold">
-                  {lineTable.diff.startsWith("+") || lineTable.diff.startsWith("-")
-                    ? lineTable.diff
-                    : `± ${lineTable.diff}`}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {returnTable && (
-        <div className="border border-slate-200 rounded overflow-hidden max-w-xl text-xs bg-white">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                <th className="py-2 px-3 font-semibold text-xs">Mục đối chiếu</th>
-                <th className="py-2 px-3 font-semibold text-xs text-right">Số tiền</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              <tr className="hover:bg-slate-50/50">
-                <td className="py-2 px-3 text-slate-800">• Tiền tạm ứng</td>
-                <td className="py-2 px-3 text-right font-mono-nums text-slate-900 font-medium">
-                  {returnTable.advance}
-                </td>
-              </tr>
-              <tr className="hover:bg-slate-50/50">
-                <td className="py-2 px-3 text-slate-800">• Tiền thực chi</td>
-                <td className="py-2 px-3 text-right font-mono-nums text-slate-900 font-medium">
-                  {returnTable.total}
-                </td>
-              </tr>
-              <tr className="bg-slate-50/60 font-semibold border-t border-slate-200">
-                <td className="py-2 px-3 text-slate-700">
-                  Số tiền {returnTable.isReturn ? "hoàn ứng" : "chi thêm"} theo phép tính
-                </td>
-                <td className="py-2 px-3 text-right font-mono-nums text-slate-900">
-                  {returnTable.expected}
-                </td>
-              </tr>
-              <tr className="bg-slate-50/60 font-semibold">
-                <td className="py-2 px-3 text-slate-700">
-                  Số tiền ghi trên giấy quyết toán
-                </td>
-                <td className="py-2 px-3 text-right font-mono-nums text-slate-900">
-                  {returnTable.printed}
-                </td>
-              </tr>
-              <tr className="bg-rose-50/80 font-semibold border-t border-rose-200 text-rose-900">
-                <td className="py-2 px-3 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
-                  <span>Chênh lệch chưa khớp</span>
-                </td>
-                <td className="py-2 px-3 text-right font-mono-nums text-rose-700 font-bold">
-                  {returnTable.diff.startsWith("+") || returnTable.diff.startsWith("-")
-                    ? returnTable.diff
-                    : `± ${returnTable.diff}`}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* 3. Form giải trình */}
-      {historyCoverageIssue ? (
-        <div className="pt-2 text-xs text-slate-600 space-y-1">
-          <p className="font-medium text-slate-800">
-            Không áp dụng giải trình bằng văn bản tự do cho mục này.
-          </p>
-          <p className="text-slate-500">
-            Vui lòng chuyển sang tab <strong className="text-slate-700 font-semibold">Sổ cái & Dòng tiền</strong> ở trên để thực hiện đối chiếu và xác nhận.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3 pt-3 border-t border-slate-200">
-          <div>
-            <label
-              htmlFor={`answer-${issue.id}`}
-              className="text-slate-900 block text-xs font-medium mb-1.5"
-            >
-              {invoiceReference
-                ? `Số tiền VND nhân viên trực tiếp thanh toán cho hóa đơn ${invoiceReference}`
-                : "Nội dung giải trình / xác nhận:"}
-            </label>
-            {invoiceReference ? (
-              <div className="space-y-1">
-                <input
-                  id={`answer-${issue.id}`}
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  step={1}
-                  value={value}
-                  onChange={(event) => setValue(event.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded text-xs px-3 py-2 text-slate-900 focus:outline-none focus:border-slate-800 transition-colors"
-                />
-                {formatVndHint(value) && (
-                  <p className="text-[11px] text-slate-500 font-mono tabular-nums">
-                    ≈ {formatVndHint(value)}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <textarea
-                id={`answer-${issue.id}`}
-                rows={3}
-                value={value}
-                onChange={(event) => setValue(event.target.value)}
-                className="w-full bg-white border border-slate-300 rounded text-xs p-2.5 text-slate-900 focus:outline-none focus:border-slate-800 resize-y transition-colors leading-relaxed"
-              />
-            )}
-          </div>
-
-          <div>
-            <label
-              htmlFor={`reason-${issue.id}`}
-              className="text-slate-600 block text-[11px] font-medium mb-1"
-            >
-              {invoiceReference
-                ? "Lý do / xác nhận cụ thể"
-                : "Căn cứ / Ghi chú đính kèm (tùy chọn):"}
-            </label>
-            <input
-              id={`reason-${issue.id}`}
-              type="text"
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              required={invoiceReference !== null}
-              className="w-full bg-white border border-slate-300 rounded text-xs px-3 py-1.5 text-slate-900 focus:outline-none focus:border-slate-800 transition-colors"
-            />
-          </div>
-
-          <div className="pt-1 flex items-center justify-end">
-            <button
-              type="button"
-              onClick={() => void submit()}
-              disabled={busy || value.trim() === "" || (invoiceReference !== null && reason.trim() === "")}
-              className="px-4 py-2 text-xs font-medium rounded transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed bg-slate-900 hover:bg-slate-800 text-white cursor-pointer"
-            >
-              {busy ? "Đang gửi…" : "Gửi giải trình"}
-            </button>
-          </div>
-
-          {error !== null && (
-            <p role="alert" className="error p-2.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-xs">
-              {error}
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  );
+/** Server metadata chooses the response path; role labels never grant actions. */
+export function QuestionCard(props: {issue: IssueView;caseView:CaseView;onCase:(view:CaseView)=>void;onSourceSelected?:(id:string)=>void;currentRole?:string}) {
+  return <DecisionCard {...props}/>;
 }
 
 export function Questions({
@@ -528,7 +179,7 @@ export function Questions({
   const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
   const [isOtherIssuesOpen, setIsOtherIssuesOpen] = useState(false);
 
-  if (caseView === null || caseView.issues.length === 0) return null;
+  if (caseView === null || (caseView.issues.length === 0 && !(caseView.declaration_corrections?.length))) return null;
 
   const myIssues = caseView.issues.filter((issue) =>
     roleMatchesOwner(currentRole, issue.owner, issue.kind),
@@ -540,6 +191,7 @@ export function Questions({
 
   return (
     <section aria-labelledby="questions-title" className="space-y-6 text-xs max-w-3xl">
+      {(caseView.declaration_corrections?.length??0)>0 && <section aria-label="Kê khai điều chỉnh đã lưu" className="rounded border border-slate-200 bg-slate-50 p-3 text-xs space-y-2"><h3 className="font-semibold">Kê khai điều chỉnh đã lưu</h3>{caseView.declaration_corrections?.map(entry=><div key={entry.id}><p>{entry.reason}</p><p className="text-slate-500">Người kê khai: {entry.actor} · {entry.observed_at}</p><p>Chứng từ gốc được giữ nguyên; đây là kê khai bổ sung của nhân viên.</p></div>)}</section>}
       {/* 1. Actionable Issues for Current Role */}
       {myIssues.length > 0 ? (
         <div className="space-y-3">
@@ -595,6 +247,7 @@ export function Questions({
                     caseView={caseView}
                     onCase={onCase}
                     onSourceSelected={onSourceSelected}
+                    currentRole={currentRole}
                   />
                 )}
               </div>

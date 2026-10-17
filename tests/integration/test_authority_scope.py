@@ -27,11 +27,12 @@ async def _approver_ctx(app_fixture, root_id: str) -> CommandContext:
     )
 
 
-async def test_decision_over_grant_amount_is_refused(app_fixture):
+async def test_decision_over_grant_amount_is_refused(app_fixture,monkeypatch):
     # The approver grant ceiling is 20m; a 25m decision must be refused even
     # though the actor holds an ISSUE_PAYMENT grant.
-    v = await app_fixture.submit_packet("missing-payer", mode="STUB")
-    issue = next(i for i in v.issues if i.kind == "FACT")
+    from tests.escalation_shapes import scenario
+    v = await scenario(app_fixture,monkeypatch,cost=25_000_000,advance=25_000_000)
+    issue = next(i for i in v.issues if i.kind == "AUTHORITY")
     ctx = await _approver_ctx(app_fixture, v.id)
     with pytest.raises(UnsupportedCommandError):
         await app_fixture.workflow.execute(
@@ -40,8 +41,8 @@ async def test_decision_over_grant_amount_is_refused(app_fixture):
                 root_id=v.id,
                 decision=DecisionCommand(
                     issue_ids=(issue.id,),
-                    basis_id="basis:big",
-                    actions=("ISSUE_PAYMENT",),
+                    basis_id=app_fixture.workflow.question_card(app_fixture.workflow.session(ctx.session_id),v.id,issue.id).basis_id,
+                    actions=("RECOGNIZE_COST",),
                     effect_scope="activity:travel-a",
                     amount=25_000_000,
                     reason="vượt hạn mức",
@@ -50,10 +51,11 @@ async def test_decision_over_grant_amount_is_refused(app_fixture):
         )
 
 
-async def test_decision_within_grant_amount_is_accepted(app_fixture):
+async def test_decision_within_grant_amount_is_accepted(app_fixture,monkeypatch):
     # 20m is exactly the ceiling and is accepted (inclusive).
-    v = await app_fixture.submit_packet("missing-payer", mode="STUB")
-    issue = next(i for i in v.issues if i.kind == "FACT")
+    from tests.escalation_shapes import scenario
+    v = await scenario(app_fixture,monkeypatch,cost=20_000_000,advance=20_000_000)
+    issue = next(i for i in v.issues if i.kind == "AUTHORITY")
     ctx = await _approver_ctx(app_fixture, v.id)
     result = await app_fixture.workflow.execute(
         ctx,
@@ -61,8 +63,8 @@ async def test_decision_within_grant_amount_is_accepted(app_fixture):
             root_id=v.id,
             decision=DecisionCommand(
                 issue_ids=(issue.id,),
-                basis_id="basis:ok",
-                actions=("ISSUE_PAYMENT",),
+                basis_id=app_fixture.workflow.question_card(app_fixture.workflow.session(ctx.session_id),v.id,issue.id).basis_id,
+                actions=("RECOGNIZE_COST",),
                 effect_scope="activity:travel-a",
                 amount=20_000_000,
                 reason="trong hạn mức",
