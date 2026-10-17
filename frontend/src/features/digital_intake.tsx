@@ -92,25 +92,6 @@ export function DigitalForm({
         />
       </div>
 
-      {settlementKind === "EMPLOYEE_REIMBURSEMENT" && (
-        <div className="space-y-1.5 rounded border border-slate-200 bg-slate-50 px-3 py-2.5">
-          <p className="text-xs font-semibold text-slate-900">
-            Khai không nhận tạm ứng
-          </p>
-          <p className="text-[11px] text-slate-500">
-            Khai báo này không tự biến sổ thành 0; hệ thống vẫn đối chiếu với
-            khoản ứng đã ghi nhận trong phạm vi.
-          </p>
-          <input
-            aria-label="Lý do không nhận tạm ứng"
-            value={noAdvanceReason}
-            onChange={(e) => setNoAdvanceReason(e.target.value)}
-            placeholder="Tự chi, không nhận tạm ứng…"
-            className="w-full text-xs border border-slate-300 rounded px-3 py-2 focus:outline-none focus:border-slate-900 bg-white"
-          />
-        </div>
-      )}
-
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-900">
@@ -288,7 +269,10 @@ export function toDigitalDeclarationInput(
       source_ids: [...l.attachedIds],
     })),
     no_advance_asserted: settlementKind === "EMPLOYEE_REIMBURSEMENT",
-    no_advance_reason: settlementKind === "EMPLOYEE_REIMBURSEMENT" ? noAdvanceReason || null : null,
+    no_advance_reason:
+      settlementKind === "EMPLOYEE_REIMBURSEMENT"
+        ? noAdvanceReason?.trim() || "Nhân viên tự chi, không nhận tạm ứng"
+        : null,
   };
 }
 
@@ -339,7 +323,5 @@ export function draftValidationError(
     if ((l.evidence_status === "ALTERNATIVE" || l.evidence_status === "NO_EVIDENCE") && !l.exception_reason.trim())
       return `Khoản ${i + 1}: cần lý do thiếu chứng từ gốc.`;
   }
-  if (settlementKind === "EMPLOYEE_REIMBURSEMENT" && !noAdvanceReason.trim())
-    return "Tự chi cần lý do không nhận tạm ứng.";
   return null;
 }

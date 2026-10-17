@@ -1960,7 +1960,8 @@ class CaseWorkflow:
                     activity_profile=str(root["profile"]),
                 )
                 if (
-                    report.reader_identity != current_identity
+                    self._evidence_reader is not None
+                    and report.reader_identity != current_identity
                     and saved["status"] != "CONFIRMED"
                 ):
                     # An explicit POST may refresh the read. GET/review still
@@ -2256,7 +2257,7 @@ class CaseWorkflow:
             self._require_version(root, expected_case_version)
             if (
                 saved is None or saved["status"] != "CONFIRMED"
-            ) and report.reader_identity != self._evidence_basis(
+            ) and self._evidence_reader is not None and report.reader_identity != self._evidence_basis(
                 cx, session.tenant, root_id
             )["reader_identity"]:
                 raise StaleCommandError(
@@ -3391,8 +3392,11 @@ class CaseWorkflow:
             declaration.settlement_type == "EMPLOYEE_REIMBURSEMENT"
             and declaration.no_advance_asserted
         ):
-            if not (declaration.no_advance_reason or "").strip():
-                raise UnsupportedCommandError("Khai không nhận tạm ứng cần có lý do.")
+            reason = (
+                declaration.no_advance_reason.strip()
+                if declaration.no_advance_reason and declaration.no_advance_reason.strip()
+                else "Nhân viên tự chi, không nhận tạm ứng"
+            )
             confirmation_id = f"confirmation:{hashlib.sha256((root_id + 'settlement:no_advance').encode()).hexdigest()[:16]}"
             cx.execute(
                 "INSERT OR REPLACE INTO case_confirmations (id, tenant, root_id, fact_key, "
@@ -3407,7 +3411,7 @@ class CaseWorkflow:
                     context.actor_id,
                     str(row["activity"]),
                     json.dumps([], ensure_ascii=False),
-                    declaration.no_advance_reason,
+                    reason,
                     now,
                 ),
             )

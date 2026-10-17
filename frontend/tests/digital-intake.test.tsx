@@ -34,10 +34,10 @@ describe("digital draft validation (client pre-check; server re-validates)", () 
     ).toMatch(/lý do thiếu/);
   });
 
-  it("requires the no-advance reason for self-expense", () => {
+  it("allows self-expense without requiring a no-advance reason", () => {
     expect(
       draftValidationError("EMPLOYEE_REIMBURSEMENT", "Sửa máy in", "", [line()]),
-    ).toMatch(/không nhận tạm ứng/);
+    ).toBeNull();
   });
 
   it("maps stable item ids and file source ids (never bare filenames)", () => {

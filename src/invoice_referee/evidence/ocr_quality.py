@@ -28,8 +28,8 @@ from invoice_referee.evidence.trace import RunBudget
 
 DEFAULT_WORD_REVIEW_THRESHOLD = 0.85
 
-# Exact accounting fields Hoangha treats as verification-requiring.
-EXACT_ACCOUNTING_VALUE_FIELDS = frozenset(
+# Exact money fields that require numeric VND score coverage.
+EXACT_MONEY_VALUE_FIELDS = frozenset(
     {
         "total_amount",
         "subtotal",
@@ -38,8 +38,27 @@ EXACT_ACCOUNTING_VALUE_FIELDS = frozenset(
         "unit_price",
         "amount",
         "printed_total",
+        "declared_advance",
+        "printed_return",
+        "printed_reimbursement",
     }
 )
+
+# Exact accounting fields Hoangha treats as verification-requiring.
+EXACT_ACCOUNTING_VALUE_FIELDS = frozenset(
+    {
+        *EXACT_MONEY_VALUE_FIELDS,
+        "seller_tax_code",
+        "buyer_tax_code",
+        "invoice_date",
+        "document_date",
+        "invoice_number",
+        "document_number",
+        "transaction_reference",
+        "transaction_status",
+    }
+)
+
 
 _DECORATIVE = re.compile(r"^[#|*_\-]+$")
 _MARKDOWN_LINK = re.compile(r"^\[[^]]+\]\([^)]+\)$")

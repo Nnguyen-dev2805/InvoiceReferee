@@ -559,3 +559,37 @@ def test_disputed_row_keeps_evidence_date_for_deadline() -> None:
         e for e in admitted.expense_facts if e.id in admitted.disputed_expense_ids
     )
     assert disputed.source_date is not None
+
+
+def test_admission_emits_issue_for_unverified_blurry_critical_field() -> None:
+    from invoice_referee.domain.documents import DocumentProfileIssue
+
+    paper = _paper()
+    blurry_invoice = _invoice().model_copy(
+        update={
+            "profile_status": "NEEDS_HUMAN",
+            "profile_findings": (
+                DocumentProfileIssue(
+                    code="CRITICAL_FIELD_UNVERIFIED",
+                    field="total_amount",
+                    status="UNRESOLVED",
+                    message="critical field lacks verified confidence",
+                    blocking=True,
+                ),
+            ),
+        }
+    )
+    report = _report((paper, blurry_invoice))
+    admitted = _admit(report)
+    quality_issues = [
+        issue
+        for issue in admitted.admission_issues
+        if issue.field_or_rule == f"evidence:quality:{blurry_invoice.document_id}:total_amount"
+    ]
+    assert len(quality_issues) == 1
+    issue = quality_issues[0]
+    assert issue.kind == "FACT"
+    assert issue.owner == "accountant"
+    assert "chưa đọc chắc chắn" in issue.basis
+    assert "tổng số tiền" in issue.basis or "total_amount" in issue.basis
+

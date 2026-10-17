@@ -162,26 +162,44 @@ def digital_to_paper(
         lines.append(DocumentLine(id=f"digital:{line.item_id}", fields=tuple(fields)))
 
     purpose_quote = declaration.declared_purpose
+    paper_fields: list[FieldCandidate] = [
+        FieldCandidate(
+            field="purpose",
+            state="FOUND",
+            value=declaration.declared_purpose,
+            refs=(_ref("header", purpose_quote),),
+        ),
+        FieldCandidate(
+            field="printed_total",
+            state="FOUND",
+            value=total,
+            refs=(_ref("header", purpose_quote),),
+        ),
+    ]
+    if declaration.settlement_type == "EMPLOYEE_REIMBURSEMENT":
+        paper_fields.extend(
+            [
+                FieldCandidate(
+                    field="settlement_type",
+                    state="FOUND",
+                    value="EMPLOYEE_REIMBURSEMENT",
+                    refs=(_ref("header", purpose_quote),),
+                ),
+                FieldCandidate(
+                    field="declared_advance",
+                    state="FOUND",
+                    value=0,
+                    refs=(_ref("header", purpose_quote),),
+                ),
+            ]
+        )
     return DocumentAnalysis(
         source_id=declaration_source,
         document_id=f"{declaration_source}:SETTLEMENT_FORM",
         document_type="SETTLEMENT_FORM",
         roles=("SETTLEMENT_DECLARATION",),
         page_range=(1, 1),
-        fields=(
-            FieldCandidate(
-                field="purpose",
-                state="FOUND",
-                value=declaration.declared_purpose,
-                refs=(_ref("header", purpose_quote),),
-            ),
-            FieldCandidate(
-                field="printed_total",
-                state="FOUND",
-                value=total,
-                refs=(_ref("header", purpose_quote),),
-            ),
-        ),
+        fields=tuple(paper_fields),
         line_items=tuple(lines),
         confidence_status="ASSESSED",
         profile_status="CLEAR",

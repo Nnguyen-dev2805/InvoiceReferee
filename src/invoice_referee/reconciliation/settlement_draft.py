@@ -430,7 +430,8 @@ def build_settlement_draft(
         warnings.append(
             "Không tìm thấy giấy quyết toán/đề nghị trong chứng từ đã tải lên."
         )
-    if declared_advance is None:
+    settlement_type = _found(paper, "settlement_type") if paper is not None else None
+    if settlement_type != "EMPLOYEE_REIMBURSEMENT" and declared_advance is None:
         warnings.append(
             "Chưa đọc được số tiền tạm ứng trên giấy; nhân viên vui lòng kiểm tra."
         )

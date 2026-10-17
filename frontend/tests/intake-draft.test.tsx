@@ -357,7 +357,6 @@ it("keeps self-expense type and no-advance declaration when submitting paper", a
  }));
  render(<Intake session={SESSION} onCase={()=>{}}/>);const user=userEvent.setup();
  await user.click(screen.getByText("Nhân viên tự chi"));
- await user.type(screen.getByLabelText("Lý do không nhận tạm ứng"),"Tự thanh toán trước, không nhận ứng");
  await user.upload(screen.getByLabelText("Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"),new File(["pdf"],"self.pdf",{type:"application/pdf"}));
  await user.upload(screen.getByLabelText("Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"),new File(["pdf"],"inv.pdf",{type:"application/pdf"}));
  await user.click(screen.getByRole("button",{name:"Đọc chứng từ"}));
@@ -392,7 +391,6 @@ it("allows submitting self-expense paper claim without choosing advance even whe
  }));
  render(<Intake session={SESSION} onCase={()=>{}}/>);const user=userEvent.setup();
  await user.click(screen.getByText("Nhân viên tự chi"));
- await user.type(screen.getByLabelText("Lý do không nhận tạm ứng"),"Tự thanh toán trước, không nhận ứng");
  await user.upload(screen.getByLabelText("Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"),new File(["pdf"],"self.pdf",{type:"application/pdf"}));
  await user.upload(screen.getByLabelText("Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"),new File(["pdf"],"inv.pdf",{type:"application/pdf"}));
  await user.click(screen.getByRole("button",{name:"Đọc chứng từ"}));

@@ -87,6 +87,33 @@ _ALTERNATIVE_EXPENSE_TYPES = frozenset(
     }
 )
 
+FIELD_LABELS: dict[str, str] = {
+    "issuer_name": "tên đơn vị phát hành/người bán",
+    "issuer_tax_code": "mã số thuế người bán",
+    "buyer_name": "tên người mua/đơn vị mua",
+    "buyer_tax_code": "mã số thuế người mua",
+    "document_number": "số chứng từ",
+    "template_number": "mẫu số hóa đơn",
+    "serial_number": "ký hiệu hóa đơn",
+    "document_date": "ngày chứng từ",
+    "total_amount": "tổng số tiền",
+    "line_items": "nội dung hàng hóa/dịch vụ",
+    "payer_name": "người chuyển tiền",
+    "payee_name": "người nhận tiền",
+    "transaction_reference": "mã giao dịch",
+    "transaction_status": "trạng thái giao dịch",
+    "confirmation_present": "xác nhận hoặc chữ ký trên chứng từ",
+    "purpose": "nội dung/mục đích hoàn ứng",
+    "lines": "bảng các khoản chi",
+    "advance_amount": "số tiền đã tạm ứng",
+    "declared_name": "tên người kê khai",
+    "printed_total": "tổng chi phí kê khai",
+    "subtotal": "tiền hàng chưa thuế",
+    "tax": "tiền thuế",
+    "line_amount": "thành tiền",
+}
+
+
 
 def _as_decimal(value: object) -> Decimal | None:
     """Parse a model/source money value to Decimal, VN formatting included.
@@ -1416,6 +1443,44 @@ def admit_evidence(
                     question=finding.question,
                 )
             )
+
+    for document in report.documents:
+        for finding in document.profile_findings:
+            if not finding.blocking:
+                continue
+            if finding.code == "CRITICAL_FIELD_UNVERIFIED":
+                field_label = FIELD_LABELS.get(finding.field, finding.field)
+                issues.append(
+                    BusinessIssue(
+                        id=f"issue:fact:quality:{document.document_id}:{finding.field}",
+                        kind="FACT",
+                        field_or_rule=f"evidence:quality:{document.document_id}:{finding.field}",
+                        owner="accountant",
+                        basis=(
+                            f"Hệ thống chưa đọc chắc chắn {field_label} trên chứng từ "
+                            f"'{document.document_id}' do chữ bị mờ, lem mực hoặc độ tin cậy OCR thấp."
+                        ),
+                        refs=document.refs,
+                        question=(
+                            f"Hệ thống chưa đọc chắc chắn {field_label} trên chứng từ; "
+                            "vui lòng kiểm tra bản gốc và xác nhận lại thông tin."
+                        ),
+                    )
+                )
+            elif finding.code == "REQUIRED_FIELD_MISSING":
+                field_label = FIELD_LABELS.get(finding.field, finding.field)
+                issues.append(
+                    BusinessIssue(
+                        id=f"issue:fact:missing_field:{document.document_id}:{finding.field}",
+                        kind="FACT",
+                        field_or_rule=f"evidence:missing_field:{document.document_id}:{finding.field}",
+                        owner="accountant",
+                        basis=f"Chứng từ '{document.document_id}' thiếu thông tin bắt buộc: {field_label}.",
+                        refs=document.refs,
+                        question=f"Vui lòng bổ sung hoặc xác nhận thông tin '{field_label}'.",
+                    )
+                )
+
 
     # A/P/R known only when coverage exists; used to bound the Q32 path.
     a_known = effective_coverage is not None

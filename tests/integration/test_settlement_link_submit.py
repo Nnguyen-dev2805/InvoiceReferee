@@ -373,3 +373,31 @@ async def test_employee_reimbursement_submits_without_advance_even_when_weak_can
     # Since catalog has 2 authorized activities (adv-1, adv-2) and none was confirmed,
     # it stays as an independent PROPOSED dossier:
     assert result.case_view.activity == "activity:proposed:draft1"
+
+
+async def test_employee_reimbursement_submits_without_no_advance_reason(
+    tmp_path: Path,
+) -> None:
+    wf = _workflow(tmp_path)
+    root = await _draft_root(wf)
+    _publish(wf, TENANT, root, _report(_found("purpose", "Tự chi công việc đột xuất")))
+
+    # Submitting an EMPLOYEE_REIMBURSEMENT without providing a no_advance_reason
+    # should NOT be rejected with "Khai không nhận tạm ứng cần có lý do."
+    result = await _submit(
+        wf,
+        TENANT,
+        root,
+        settlement_type="EMPLOYEE_REIMBURSEMENT",
+        no_advance_asserted=True,
+        no_advance_reason=None,
+    )
+    assert result.case_view.activity == "activity:proposed:draft1"
+    with wf.db.transaction() as cx:
+        conf = cx.execute(
+            "SELECT reason FROM case_confirmations WHERE root_id = ? AND fact_key = ?",
+            (root, "settlement:no_advance"),
+        ).fetchone()
+        assert conf is not None
+        assert conf["reason"] == "Nhân viên tự chi, không nhận tạm ứng"
+

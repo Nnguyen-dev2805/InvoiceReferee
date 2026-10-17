@@ -232,10 +232,6 @@ export function Intake({
   // through the OCR pipeline (no fabricated fallback). A failure keeps the
   // files and offers retry; it never shows a successful draft.
   async function handleReadDocuments() {
-    if (settlementKind === "EMPLOYEE_REIMBURSEMENT" && !noAdvanceReason.trim()) {
-      setError("Vui lòng nêu lý do không nhận tạm ứng cho hồ sơ tự chi.");
-      return;
-    }
     if (paperFiles.length !== 1) {
       setError("Vui lòng chọn đúng 1 tệp đơn quyết toán ở ô trên.");
       return;
@@ -444,14 +440,17 @@ export function Intake({
                   digitalPayload.settlementKind === "EMPLOYEE_REIMBURSEMENT",
                 no_advance_reason:
                   digitalPayload.settlementKind === "EMPLOYEE_REIMBURSEMENT"
-                    ? digitalPayload.noAdvanceReason || null
+                    ? digitalPayload.noAdvanceReason?.trim() || "Nhân viên tự chi, không nhận tạm ứng"
                     : null,
               }
             : {
                 settlement_type: settlementKind,
                 submission_source: "PAPER_SCAN" as const,
                 no_advance_asserted: settlementKind === "EMPLOYEE_REIMBURSEMENT",
-                no_advance_reason: settlementKind === "EMPLOYEE_REIMBURSEMENT" ? noAdvanceReason.trim() || null : null,
+                no_advance_reason:
+                  settlementKind === "EMPLOYEE_REIMBURSEMENT"
+                    ? noAdvanceReason.trim() || "Nhân viên tự chi, không nhận tạm ứng"
+                    : null,
               }),
         },
       );
@@ -464,6 +463,17 @@ export function Intake({
       setBusy(false);
     }
   }
+
+  const isReimbursement =
+    digitalPayload?.settlementKind === "EMPLOYEE_REIMBURSEMENT" ||
+    (!digitalPayload && settlementKind === "EMPLOYEE_REIMBURSEMENT");
+
+  const visibleWarnings = warnings.filter((warning) => {
+    if (isReimbursement && warning.includes("số tiền tạm ứng")) {
+      return false;
+    }
+    return !arithmeticFindings.some((finding) => finding.basis === warning);
+  });
 
   // Chênh lệch kê khai dự kiến: T - A (chỉ khi cả hai số đã biết). Đây KHÔNG
   // phải kết luận tài chính S — S chính thức chỉ có sau đối soát.
@@ -613,11 +623,6 @@ export function Intake({
                 />
               ) : (
               <>
-              {settlementKind === "EMPLOYEE_REIMBURSEMENT" && (
-                <label className="block space-y-1 text-xs">Lý do không nhận tạm ứng
-                  <textarea aria-label="Lý do không nhận tạm ứng" value={noAdvanceReason} onChange={e => setNoAdvanceReason(e.target.value)} className="w-full rounded border border-slate-300 p-2" />
-                </label>
-              )}
               {/* PHẦN 1: ĐƠN QUYẾT TOÁN */}
               <div className="space-y-2">
                 <div className="flex items-baseline justify-between">
@@ -935,17 +940,17 @@ export function Intake({
             </span>
             <span
               className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium border ${
-                warnings.length === 0
+                visibleWarnings.length === 0
                   ? "text-emerald-800 bg-emerald-50 border-emerald-200"
                   : "text-amber-800 bg-amber-50 border-amber-200"
               }`}
             >
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
-                  warnings.length === 0 ? "bg-emerald-500" : "bg-amber-500"
+                  visibleWarnings.length === 0 ? "bg-emerald-500" : "bg-amber-500"
                 }`}
               />
-              <span>{warnings.length === 0 ? "Đã trích xuất" : "Cần kiểm tra"}</span>
+              <span>{visibleWarnings.length === 0 ? "Đã trích xuất" : "Cần kiểm tra"}</span>
             </span>
           </div>
 
@@ -1056,9 +1061,9 @@ export function Intake({
             </section>
           )}
 
-          {warnings.filter((warning) => !arithmeticFindings.some((finding) => finding.basis === warning)).length > 0 && (
+          {visibleWarnings.length > 0 && (
             <div className="space-y-1">
-              {warnings.filter((warning) => !arithmeticFindings.some((finding) => finding.basis === warning)).map((w, i) => (
+              {visibleWarnings.map((w, i) => (
                 <div key={i} className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 flex items-center gap-1.5">
                   <span>⚠</span>
                   <span>{w}</span>
@@ -1270,71 +1275,86 @@ export function Intake({
                   </td>
                 </tr>
 
-                {/* Row 2: Ứng nhân viên kê khai */}
-                <tr>
-                  <td colSpan={2} className="py-2.5 px-0">
-                    <div className="flex items-center gap-2">
-                      <label htmlFor="draft-advance" className="font-medium text-slate-700 cursor-pointer">
-                        Ứng nhân viên kê khai:
-                      </label>
-                      {draft.declared_advance !== draft.original_advance && (
-                        <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
-                          Đã sửa
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-0 text-right">
-                    <div className="flex flex-col items-end">
-                      <div className="inline-flex items-center gap-1 justify-end">
-                        <input
-                          id="draft-advance"
-                          aria-label="Ứng nhân viên kê khai:"
-                          type="number"
-                          value={draft.declared_advance ?? ""}
-                          onChange={(e) =>
-                            setDraft((prev) => ({
-                              ...prev,
-                              declared_advance: e.target.value === "" ? null : Number(e.target.value),
-                            }))
-                          }
-                          className="w-32 text-right bg-transparent border-0 border-b border-slate-300 hover:border-slate-500 focus:border-slate-900 rounded-none py-0.5 px-0 font-mono tabular-nums font-semibold text-slate-900 focus:outline-none transition-colors"
-                        />
-                        <span className="text-slate-500 font-medium">đ</span>
-                      </div>
-                      {formatVndHint(draft.declared_advance) && (
-                        <span className="text-[10px] text-slate-500 font-mono tabular-nums pt-0.5">
-                          ≈ {formatVndHint(draft.declared_advance)}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                {isReimbursement ? (
+                  <tr className="border-t-2 border-slate-900/10 bg-slate-50/50">
+                    <td colSpan={2} className="py-3 px-0 font-semibold text-slate-900">
+                      Đề nghị hoàn chi (không tạm ứng):
+                    </td>
+                    <td className="py-3 px-0 text-right">
+                      <span className="text-sm font-bold font-mono tabular-nums text-emerald-700">
+                        {draft.incurred_total !== null ? formatVnd(draft.incurred_total) : "Chưa đọc được"}
+                      </span>
+                    </td>
+                  </tr>
+                ) : (
+                  <>
+                    {/* Row 2: Ứng nhân viên kê khai */}
+                    <tr>
+                      <td colSpan={2} className="py-2.5 px-0">
+                        <div className="flex items-center gap-2">
+                          <label htmlFor="draft-advance" className="font-medium text-slate-700 cursor-pointer">
+                            Ứng nhân viên kê khai:
+                          </label>
+                          {draft.declared_advance !== draft.original_advance && (
+                            <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                              Đã sửa
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-0 text-right">
+                        <div className="flex flex-col items-end">
+                          <div className="inline-flex items-center gap-1 justify-end">
+                            <input
+                              id="draft-advance"
+                              aria-label="Ứng nhân viên kê khai:"
+                              type="number"
+                              value={draft.declared_advance ?? ""}
+                              onChange={(e) =>
+                                setDraft((prev) => ({
+                                  ...prev,
+                                  declared_advance: e.target.value === "" ? null : Number(e.target.value),
+                                }))
+                              }
+                              className="w-32 text-right bg-transparent border-0 border-b border-slate-300 hover:border-slate-500 focus:border-slate-900 rounded-none py-0.5 px-0 font-mono tabular-nums font-semibold text-slate-900 focus:outline-none transition-colors"
+                            />
+                            <span className="text-slate-500 font-medium">đ</span>
+                          </div>
+                          {formatVndHint(draft.declared_advance) && (
+                            <span className="text-[10px] text-slate-500 font-mono tabular-nums pt-0.5">
+                              ≈ {formatVndHint(draft.declared_advance)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
 
-                {/* Row 3: Chênh lệch kê khai dự kiến */}
-                <tr className="border-t-2 border-slate-900/10">
-                  <td colSpan={2} className="py-3 px-0 font-semibold text-slate-900">
-                    Chênh lệch kê khai dự kiến:
-                  </td>
-                  <td className="py-3 px-0 text-right">
-                    {netDifference === null ? (
-                      <span className="text-slate-400 font-normal">Chưa xác định</span>
-                    ) : (
-                      <div className="flex items-baseline gap-1.5 justify-end">
-                        <span className="text-sm font-bold font-mono tabular-nums text-slate-950">
-                          {formatVnd(Math.abs(netDifference))}
-                        </span>
-                        <span className="text-[11px] text-slate-500 font-normal">
-                          {netDifference < 0
-                            ? "(Hoàn ứng)"
-                            : netDifference > 0
-                            ? "(Chi thêm)"
-                            : "(Cân bằng)"}
-                        </span>
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                    {/* Row 3: Chênh lệch kê khai dự kiến */}
+                    <tr className="border-t-2 border-slate-900/10">
+                      <td colSpan={2} className="py-3 px-0 font-semibold text-slate-900">
+                        Chênh lệch kê khai dự kiến:
+                      </td>
+                      <td className="py-3 px-0 text-right">
+                        {netDifference === null ? (
+                          <span className="text-slate-400 font-normal">Chưa xác định</span>
+                        ) : (
+                          <div className="flex items-baseline gap-1.5 justify-end">
+                            <span className="text-sm font-bold font-mono tabular-nums text-slate-950">
+                              {formatVnd(Math.abs(netDifference))}
+                            </span>
+                            <span className="text-[11px] text-slate-500 font-normal">
+                              {netDifference < 0
+                                ? "(Hoàn ứng)"
+                                : netDifference > 0
+                                ? "(Chi thêm)"
+                                : "(Cân bằng)"}
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  </>
+                )}
               </tfoot>
             </table>
           </div>

@@ -24,6 +24,9 @@ RETURN_PDF = b"%PDF-1.4\nSynthetic employee transfer receipt\n%%EOF\n"
 COMPANY = "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH"
 
 
+NOW = datetime.fromisoformat("2026-10-15T12:00:00+07:00")
+
+
 def _return_text(
     *,
     amount: str = "1.000.000 đồng",
@@ -132,6 +135,7 @@ async def _collect_case(
     reference="RET-TC01-001",
     activity="activity:travel-a",
 ):
+    app_fixture.workflow._clock = lambda: NOW
     view = await app_fixture.submit_packet(packet, mode="STUB", activity=activity)
     assert view.instructions[0].direction == "PAY"
     source = view.sources[0]
@@ -375,6 +379,7 @@ async def test_employee_return_upload_is_durable_but_does_not_record_R(
         app_fixture.workflow.db,
         uploads_dir=app_fixture.workflow.uploads_dir,
     )
+    restarted._clock = lambda: NOW
     restarted_session = restarted.start_session(
         tenant=TENANT, persona="employee", actor_id=EMPLOYEE
     )

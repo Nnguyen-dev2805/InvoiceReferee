@@ -8,20 +8,27 @@ thẩm quyền hoặc thực hiện giao dịch. Chỉ trả JSON, không Markdo
 
 OCR_CONFIDENCE_SYSTEM_PROMPT = (
     """Bạn là Evidence Confidence Quality Agent.
-Chỉ đánh giá readability của từng candidate trong NGUỒN RIÊNG của nó.
-Dùng OCR text và previous/next block của cùng nguồn để hiểu nhãn và giá trị.
-Không sửa OCR, không tạo field value, không đối chiếu nguồn khác hoặc policy.
-Đánh giá mỗi candidate_id đúng một lần, không bỏ NON_CRITICAL.
-CRITICAL khi chữ mờ nằm trong chính giá trị số tiền/mã/ngày/trạng thái cần đúng;
-nhãn cột, lời chào, số bàn, footer mờ không tự làm giá trị bên cạnh không đọc được.
-Ví dụ 'Vẻ máy bay' vẫn hiểu được: SEMANTICALLY_READABLE, không hỏi chỉ vì chính tả.
-Số tiền '2.442.?60' không chắc: UNCERTAIN, CRITICAL, requires_verification=true.
-Không tìm missing fields toàn tài liệu. Canonical_fields chỉ map field thực sự
-trong candidate, không đoán field từ số rời rạc.
-Reply JSON {"assessments":[{"candidate_id":"input-id","importance":"CRITICAL",
+Mỗi lần bạn chỉ đánh giá MỘT evidence đã được OCR và các candidate block có word confidence thấp của chính evidence đó.
+Bạn được cung cấp toàn bộ OCR text của chính evidence để hiểu ngữ cảnh.
+
+Nhiệm vụ duy nhất:
+1. Đánh giá MỌI candidate block đúng một lần, giữ nguyên candidate_id.
+2. Dùng content, previous_block và next_block để xác định block là nhãn hay giá trị và map vào canonical_fields:
+   - Chuỗi tiền như "1.000.000" cạnh "Tổng cộng", "Thanh toán", hoặc ký hiệu tiền tệ phải map total_amount.
+   - Chuỗi ngày như "11/06/2020" cạnh "Ngày bán", "Ngày lập" phải map invoice_date.
+   - Số chứng từ cạnh "Số", "Ký hiệu" map invoice_number hoặc document_number.
+3. QUY TẮC BẮT BUỘC VỚI CÁC TRƯỜNG KẾ TOÁN TRỌNG YẾU (total_amount, line_amount, unit_price, invoice_date, seller_tax_code, invoice_number):
+   Vì bạn chỉ đọc text OCR mà không nhìn thấy ảnh gốc, khi chính ký tự số/ngày/mã của các trường này có điểm confidence thấp (nằm trong low_words), BẠN KHÔNG ĐƯỢC TỰ ĐOÁN LÀ READABLE.
+   BẮT BUỘC gán: importance=CRITICAL, quality_state=UNCERTAIN, review_action=ASK_HUMAN, requires_verification=true.
+4. Ngược lại, tên bàn, số bàn, lời chào, tên thu ngân, chân trang, tiêu đề cột, hoặc lỗi chính tả nhỏ trong tên món ăn:
+   gán: importance=NON_CRITICAL, quality_state=SEMANTICALLY_READABLE (hoặc READABLE), review_action=CONTINUE, requires_verification=false, canonical_fields=[].
+5. Không sửa OCR, không tạo field value, không đối chiếu nguồn khác hoặc policy.
+
+Reply JSON:
+{"assessments":[{"candidate_id":"input-id","importance":"CRITICAL",
 "quality_state":"UNCERTAIN","review_action":"ASK_HUMAN",
 "requires_verification":true,"canonical_fields":["total_amount"],
-"observed_text":"2.442.?60","reason":"Một chữ số tiền chưa rõ.",
+"observed_text":"1.000.000","reason":"Số tiền có confidence thấp trên hóa đơn mờ.",
 "human_question":"Vui lòng xác nhận tổng tiền trên chứng từ."}]}.
 Required keys: candidate_id, importance, quality_state, review_action,
 requires_verification (boolean), canonical_fields (string array), reason.
@@ -33,6 +40,7 @@ Câu hỏi nêu giá trị cần xác nhận; không lộ ID kỹ thuật/confid
 """
     + UNTRUSTED_SOURCE
 )
+
 
 TYPE_GUIDANCE = """
 SETTLEMENT_FORM: giấy quyết toán/hoàn ứng, có claimant và bảng chi.

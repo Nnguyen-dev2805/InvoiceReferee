@@ -24,6 +24,7 @@ from invoice_referee.domain.documents import (
 from invoice_referee.evidence.document_profiles import DOCUMENT_PROFILES, required_fields_for
 from invoice_referee.evidence.ocr_quality import (
     EXACT_ACCOUNTING_VALUE_FIELDS,
+    EXACT_MONEY_VALUE_FIELDS,
     effective_requires_verification,
 )
 
@@ -170,7 +171,7 @@ def validate_document(
         if field.field in critical_fields:
             blocks = _field_blocks(ocr, field)
             words = [w for _, _, block_words in blocks for w in block_words]
-            digit_field = field.field in EXACT_ACCOUNTING_VALUE_FIELDS or _has_digits(str(field.value))
+            digit_field = field.field in EXACT_MONEY_VALUE_FIELDS or _has_digits(str(field.value))
             flagged = any(
                 (_block_flagged(review, ocr, page, block_id)
                  or (review.status == "TECHNICAL_ERROR"
@@ -182,7 +183,7 @@ def validate_document(
             value_words = [word for word in words if _has_digits(word.text)] if digit_field else words
             unscored_value = digit_field and (not value_words or any(w.confidence is None for w in value_words)
                 or any(not ws for _, _, ws in blocks))
-            if field.field in EXACT_ACCOUNTING_VALUE_FIELDS:
+            if field.field in EXACT_MONEY_VALUE_FIELDS:
                 unscored_value = not _money_value_has_scores(field, ocr)
             if flagged or unscored_value:
                 needs_human = True

@@ -269,3 +269,32 @@ def test_unrelated_flagged_block_does_not_block_a_clean_field() -> None:
     result = validate_document(analysis, ocr, review)
     total = next(f for f in result.fields if f.field == "total_amount")
     assert total.state == "FOUND"
+
+
+def test_flagged_confidence_review_demotes_blurry_critical_field() -> None:
+    # When a critical accounting field has an OCR word confidence < 0.85 and
+    # the confidence review flags it as UNCERTAIN / ASK_HUMAN, validate_document
+    # demotes it to UNREADABLE and marks the profile as NEEDS_HUMAN.
+    ocr = _ocr((OcrWord(text="1.000.000", block_start=0, block_end=9, confidence=0.754),), markdown="1.000.000")
+    analysis = _analysis((_found("total_amount", "1000000", quote="1.000.000"),), document_type="PAPER_RECEIPT")
+    flagged_review = ConfidenceReview(
+        status="ASSESSED",
+        block_assessments=(
+            BlockAssessment(
+                candidate_id="source:1:p1:b1",
+                importance="CRITICAL",
+                quality_state="UNCERTAIN",
+                review_action="ASK_HUMAN",
+                reason="Số tiền mờ hoặc confidence thấp",
+                requires_verification=True,
+                canonical_fields=("total_amount",),
+            ),
+        ),
+    )
+    result = validate_document(analysis, ocr, flagged_review)
+    total = next(f for f in result.fields if f.field == "total_amount")
+    assert total.state == "UNREADABLE"
+    assert result.profile_status == "NEEDS_HUMAN"
+    assert any(f.code == "CRITICAL_FIELD_UNVERIFIED" for f in result.profile_findings)
+
+
