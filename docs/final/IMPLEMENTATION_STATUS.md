@@ -1,5 +1,18 @@
 # Implementation checkpoint
 
+## VAT source-bounded arithmetic + Demo25 context audit, 17/10/2026
+
+Printed independent VAT components supported; duplicate/unclear tax sources block.
+No inferred discount allocation, no hard-cases keyword policy/dependency merge.
+Focused83PASS; context7PASS; final full1046PASS/6knownFAIL (1052total).
+All65PDF hash/text/amount/purpose checks complete; source dates10/10 unchanged.
+Shared/50scoped contexts, witnesses and generator synchronized through17/10.
+Next-day expiry guard retained; TC02/11 purpose collision and TC18 party mismatch
+remain documented, not forcedPASS. User authorized local commit; no LIVE/UI/
+provider calls/restart/push/deploy.
+[Demo25 audit](reviews/2026-10-17-demo25-context-pdf-audit.md).
+[Evidence and limits](reviews/2026-10-17-multirate-vat-hardening.md).
+
 ## Escalation cards — integrated locally, 17/10/2026
 
 Merged codex/escalation-answerability at2c59e441 (implementation42974fc1)

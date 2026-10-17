@@ -188,7 +188,7 @@
     "employee": "employee:employee-a",
     "activity": "activity:tc24",
     "start": "2026-10-01T00:00:00+07:00",
-    "as_of": "2026-10-16T12:00:00+07:00",
+    "as_of": "2026-10-17T23:59:59+07:00",
     "fund_ids": [
       "company:bank-demo"
     ],
@@ -220,11 +220,11 @@
       "record_key": "coverage:TC24",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc24",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc24: đúng một khoản ứng 3000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc24: đúng một khoản ứng 3000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     }
   ],
   "activities": [],
-  "financial_as_of": "2026-10-16T12:00:00+07:00",
+  "financial_as_of": "2026-10-17T23:59:59+07:00",
   "data_origin": "SIMULATED"
 }

@@ -511,7 +511,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc01",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -534,7 +534,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc02",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -557,7 +557,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc03",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -580,7 +580,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc04",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -603,7 +603,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc05",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -626,7 +626,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc06",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -649,7 +649,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc07",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -672,7 +672,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc08",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -695,7 +695,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc09",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -718,7 +718,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc10",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -741,7 +741,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc11",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -764,7 +764,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc12",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -787,7 +787,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc13",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -810,7 +810,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc14",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -833,7 +833,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc15",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -856,7 +856,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc16",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -879,7 +879,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc17",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -902,7 +902,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc18",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -925,7 +925,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc19",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -948,7 +948,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc20",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -971,7 +971,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc21",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -994,7 +994,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc22",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -1017,7 +1017,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc23",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -1040,7 +1040,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc24",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -1063,7 +1063,7 @@
       "employee": "employee:employee-a",
       "activity": "activity:tc25",
       "start": "2026-10-01T00:00:00+07:00",
-      "as_of": "2026-10-16T12:00:00+07:00",
+      "as_of": "2026-10-17T23:59:59+07:00",
       "fund_ids": [
         "company:bank-demo"
       ],
@@ -1095,8 +1095,8 @@
       "record_key": "coverage:TC01",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc01",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc01: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc01: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc02",
@@ -1109,8 +1109,8 @@
       "record_key": "coverage:TC02",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc02",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc02: đúng một khoản ứng 5000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc02: đúng một khoản ứng 5000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc03",
@@ -1123,8 +1123,8 @@
       "record_key": "coverage:TC03",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc03",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc03: đúng một khoản ứng 4320000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc03: đúng một khoản ứng 4320000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc04",
@@ -1137,8 +1137,8 @@
       "record_key": "coverage:TC04",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc04",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc04: đúng một khoản ứng 85000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc04: đúng một khoản ứng 85000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc05",
@@ -1151,8 +1151,8 @@
       "record_key": "coverage:TC05",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc05",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc05: đúng một khoản ứng 4500000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc05: đúng một khoản ứng 4500000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc06",
@@ -1165,8 +1165,8 @@
       "record_key": "coverage:TC06",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc06",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc06: đúng một khoản ứng 3800000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc06: đúng một khoản ứng 3800000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc07",
@@ -1179,8 +1179,8 @@
       "record_key": "coverage:TC07",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc07",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc07: đúng một khoản ứng 4800000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc07: đúng một khoản ứng 4800000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc08",
@@ -1193,8 +1193,8 @@
       "record_key": "coverage:TC08",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc08",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc08: đúng một khoản ứng 4200000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc08: đúng một khoản ứng 4200000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc09",
@@ -1207,8 +1207,8 @@
       "record_key": "coverage:TC09",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc09",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc09: đúng một khoản ứng 3600000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc09: đúng một khoản ứng 3600000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc10",
@@ -1221,8 +1221,8 @@
       "record_key": "coverage:TC10",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc10",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc10: đúng một khoản ứng 4600000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc10: đúng một khoản ứng 4600000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc11",
@@ -1235,8 +1235,8 @@
       "record_key": "coverage:TC11",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc11",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc11: đúng một khoản ứng 6000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc11: đúng một khoản ứng 6000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc12",
@@ -1249,8 +1249,8 @@
       "record_key": "coverage:TC12",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc12",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc12: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc12: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc13",
@@ -1263,8 +1263,8 @@
       "record_key": "coverage:TC13",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc13",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc13: đúng một khoản ứng 3000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc13: đúng một khoản ứng 3000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc14",
@@ -1277,8 +1277,8 @@
       "record_key": "coverage:TC14",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc14",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc14: đúng một khoản ứng 120000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc14: đúng một khoản ứng 120000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc15",
@@ -1291,8 +1291,8 @@
       "record_key": "coverage:TC15",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc15",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc15: đúng một khoản ứng 3000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc15: đúng một khoản ứng 3000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc16",
@@ -1305,8 +1305,8 @@
       "record_key": "coverage:TC16",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc16",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc16: đúng một khoản ứng 12000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc16: đúng một khoản ứng 12000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc17",
@@ -1319,8 +1319,8 @@
       "record_key": "coverage:TC17",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc17",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc17: đúng một khoản ứng 6000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc17: đúng một khoản ứng 6000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc18",
@@ -1333,8 +1333,8 @@
       "record_key": "coverage:TC18",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc18",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc18: đúng một khoản ứng 5000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc18: đúng một khoản ứng 5000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc19",
@@ -1347,8 +1347,8 @@
       "record_key": "coverage:TC19",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc19",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc19: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc19: đúng một khoản ứng 4000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc20",
@@ -1361,8 +1361,8 @@
       "record_key": "coverage:TC20",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc20",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc20: đúng một khoản ứng 2000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc20: đúng một khoản ứng 2000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc21",
@@ -1375,8 +1375,8 @@
       "record_key": "coverage:TC21",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc21",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc21: đúng một khoản ứng 15000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc21: đúng một khoản ứng 15000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc22",
@@ -1389,8 +1389,8 @@
       "record_key": "coverage:TC22",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc22",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc22: đúng một khoản ứng 9000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc22: đúng một khoản ứng 9000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc23",
@@ -1403,8 +1403,8 @@
       "record_key": "coverage:TC23",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc23",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc23: đúng một khoản ứng 9000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc23: đúng một khoản ứng 9000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc24",
@@ -1417,8 +1417,8 @@
       "record_key": "coverage:TC24",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc24",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc24: đúng một khoản ứng 3000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc24: đúng một khoản ứng 3000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     },
     {
       "record_key": "advance:tc25",
@@ -1431,8 +1431,8 @@
       "record_key": "coverage:TC25",
       "actor": "employee:accountant-demo",
       "scope": "activity:tc25",
-      "observed_at": "2026-10-16T12:00:00+07:00",
-      "quote": "Sổ hồ sơ giả lập activity:tc25: đúng một khoản ứng 5000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-16T12:00:00+07:00."
+      "observed_at": "2026-10-17T23:59:59+07:00",
+      "quote": "Sổ hồ sơ giả lập activity:tc25: đúng một khoản ứng 5000000 VND; đầu kỳ0; chưa chi bổ sung, chưa hoàn, chưa đảo và chưa có khoản chưa phân bổ đến 2026-10-17T23:59:59+07:00."
     }
   ],
   "activities": [
@@ -1837,6 +1837,6 @@
       }
     }
   ],
-  "financial_as_of": "2026-10-16T12:00:00+07:00",
+  "financial_as_of": "2026-10-17T23:59:59+07:00",
   "data_origin": "SIMULATED"
 }

@@ -17,7 +17,7 @@ from invoice_referee.domain.organization import OrganizationContext
 
 ROOT = Path(__file__).resolve().parents[1]
 DEMO = ROOT / "data/demo"
-AS_OF = "2026-10-16T12:00:00+07:00"
+AS_OF = "2026-10-17T23:59:59+07:00"
 START = "2026-10-01T00:00:00+07:00"
 END = "2026-12-31T23:59:59+07:00"
 COMPANY = "CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ AN THỊNH"

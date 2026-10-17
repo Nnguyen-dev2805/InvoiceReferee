@@ -55,7 +55,7 @@ Chi tiết quy định: [Implementation contracts](../../docs/final/IMPLEMENTATI
 - `company-context.json`: **dùng chung một app cho 25 case, đã có sẵn 25 khoản ứng thực nhận giả lập** và lịch sử tách theo từng công việc; không cần kế toán upload biên nhận ứng. Không có transcription mẫu.
 - `cases/<tên-folder-case>/context.json`: có đúng khoản ứng thực nhận giả lập theo README, P=R=0 theo sổ fixture; dùng kiểm đối soát từ PDF.
 - `cases/<tên-folder-case>/context-ui.json`: chưa ghi khoản ứng; dùng khi muốn kế toán upload biên nhận ứng và xác nhận trên UI.
-- [manifest.json](manifest.json): đường dẫn context riêng, hash PDF, mốc chạy **16/10/2026 12:00 +07:00**. Context chung chạy cả25 trong một DB; context riêng phục vụ test cô lập. TC12 cần hồ sơ trước đã sử dụng hóa đơn để kiểm trùng thực sự.
+- [manifest.json](manifest.json): đường dẫn context riêng, hash PDF, mốc chạy **17/10/2026 23:59:59 +07:00**. Context chung chạy cả25 trong một DB; context riêng phục vụ test cô lập. TC12 cần hồ sơ trước đã sử dụng hóa đơn để kiểm trùng thực sự.
 - `tc01-company-context.json` và hai context trong `tc01-chung-tu-ung/` giữ tương thích cho TC01; chọn chuyển khoản **hoặc** tiền mặt, không cộng cả hai.
 - Context chỉ chuẩn bị đầu vào; không tự sửa mismatch, cấp ngoại lệ hay tạo bằng chứng hoàn/chi. MST chuẩn đã lưu nhưng chưa bổ sung gate so MST tổ chức trong lượt này. Không bịa ngày chuyến đi còn thiếu trên giấy.
 
@@ -64,9 +64,11 @@ Chạy chung cả25 case, đã có ứng (DB demo riêng với DB đang dùng):
 ```bash
 rtk proxy uv run python scripts/dev.py --mode live --port 8012 \
   --context data/demo/company-context.json \
-  --demo-as-of 2026-10-16T12:00:00+07:00 \
+  --demo-as-of 2026-10-17T12:00:00+07:00 \
   --db .runtime/uc03-all/app.sqlite --uploads .runtime/uc03-all/uploads
 ```
+
+Mốc coverage mô phỏng bao phủ đến hết ngày17/10; không thay ngày giao dịch trên PDF (10/10). Đây là phạm vi sổ giả lập cho demo, không phải xác nhận dữ liệu ngân hàng thực tế. Chạy sau ngày17/10 cần chuẩn bị lại context.
 
 Sinh lại context: `rtk proxy uv run python scripts/sinh_context_uc03.py`.
 Đổi context không tự xóa hồ sơ/hoạt động đã lưu trong DB cũ. Fixture bảy hoạt động cũ chỉ còn ở `tests/fixtures/legacy-company-context.json` phục vụ hồi quy.

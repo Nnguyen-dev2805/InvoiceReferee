@@ -1,7 +1,7 @@
 {
   "schema_version": "uc03-contexts/v1",
   "data_origin": "SIMULATED",
-  "assessment_at": "2026-10-16T12:00:00+07:00",
+  "assessment_at": "2026-10-17T23:59:59+07:00",
   "company_tax_id": "0319999996",
   "cases": [
     {

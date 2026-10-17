@@ -12,7 +12,8 @@ from invoice_referee.workflow.service import CaseWorkflow
 
 ROOT = Path(__file__).resolve().parents[2]
 DEMO = ROOT / "data/demo"
-AS_OF = datetime.fromisoformat("2026-10-16T12:00:00+07:00")
+AS_OF = datetime.fromisoformat("2026-10-17T12:00:00+07:00")
+HORIZON = datetime.fromisoformat("2026-10-17T23:59:59+07:00")
 ADVANCES = [4_000_000,5_000_000,4_320_000,85_000_000,4_500_000,
             3_800_000,4_800_000,4_200_000,3_600_000,4_600_000,
             6_000_000,4_000_000,3_000_000,120_000_000,3_000_000,
@@ -51,7 +52,7 @@ def test_shared_app_has_all25_advances_with_independent_history_after_restart(tm
             assert len(events)==1 and events[0].amount==amount
             assert events[0].scope==activity and events[0].payee=="employee:employee-a"
             assert history is not None and history.scope==activity
-            assert history.opening_balance.value==0 and history.as_of==AS_OF
+            assert history.opening_balance.value==0 and history.as_of==HORIZON
             assert len(ctx.coverages)==1
             assert {g["scope"] for g in ctx.grants}=={"tenant:demo"}
         assert load_context(cx,"tenant:demo","activity:unrelated",AS_OF) is None
@@ -74,7 +75,7 @@ def test_each_case_has_scoped_advance_and_a_separate_unrecorded_ui_start(tmp_pat
         assert event["verification_state"]=="CONFIRMED"
         assert event["kind"]=="ADVANCE_RECEIVED"
         assert ctx.coverage["activity"]==activity
-        assert ctx.financial_as_of==AS_OF.isoformat()
+        assert ctx.financial_as_of==HORIZON.isoformat()
         assert not ui.ledger and ui.coverage is None
         assert ui.activity==ctx.activity
         assert "expected" not in ctx.model_dump_json() and "transcription" not in ctx.model_dump_json()
@@ -139,3 +140,24 @@ def test_context_generator_is_repeatable_and_does_not_write_into_other_folders(t
     with pytest.raises(ValueError,match="symlink"):
         generate(link)
     assert (unmanaged/"keep.txt").read_text()=="keep"
+
+
+def test_all25_contexts_cover_oct17_but_do_not_claim_oct18():
+    from invoice_referee.domain.case import CaseScope
+    from invoice_referee.reconciliation.admission import coverage_is_valid
+    manifest = _manifest()
+    assert manifest["assessment_at"] == HORIZON.isoformat()
+    for entry in manifest["cases"]:
+        ctx = OrganizationContext.model_validate_json((DEMO/entry["context"]).read_bytes())
+        ui = OrganizationContext.model_validate_json((DEMO/entry["context_ui"]).read_bytes())
+        assert ctx.financial_as_of == ui.financial_as_of == HORIZON.isoformat()
+        history = context_coverage(ctx, digest="a"*64)
+        scope = CaseScope(tenant=ctx.tenant, employee="employee:employee-a",
+                          activity=ctx.activity["activity_id"], profile=ctx.profile)
+        assert coverage_is_valid(history, scope=scope, as_of=AS_OF)
+        assert coverage_is_valid(history, scope=scope, as_of=HORIZON)
+        assert not coverage_is_valid(history, scope=scope,
+            as_of=datetime.fromisoformat("2026-10-18T00:00:00+07:00"))
+        for grant in ctx.grants:
+            assert datetime.fromisoformat(grant["effective_from"]) <= AS_OF
+            assert datetime.fromisoformat(grant["effective_to"]) >= HORIZON
