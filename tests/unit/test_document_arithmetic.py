@@ -283,3 +283,84 @@ def test_receipt_without_vat_fields_is_not_forced_to_reconcile() -> None:
 
 def test_paper_without_both_advance_and_total_is_not_checked() -> None:
     assert check_document_arithmetic(_paper(printed_total="3240000", printed_return="700000")) == ()
+
+
+# VAT components are independent source evidence, never a fit to printed total.
+def _multi_tax_invoice(*taxes, total="15300000", discount="1000000"):
+    return _invoice().model_copy(update={"fields": (
+        _found("subtotal", "15000000"), _found("discount", discount),
+        *taxes, _found("total_amount", total),
+    )})
+
+
+def test_distinct_printed_vat_components_are_added_once():
+    doc = _multi_tax_invoice(
+        _found("tax", "900000", quote="VAT 10%: 900000"),
+        _found("tax", "400000", quote="VAT 8%: 400000"),
+    )
+    assert check_document_arithmetic(doc) == ()
+
+
+def test_negative_printed_discount_is_a_deduction():
+    doc = _multi_tax_invoice(_found("tax", "1300000"), discount="-1000000")
+    assert check_document_arithmetic(doc) == ()
+
+
+def test_repeated_same_tax_source_cannot_balance_an_incorrect_total():
+    tax = _found("tax", "80000", quote="VAT: 80000")
+    doc = _invoice().model_copy(update={"fields": (
+        _found("subtotal", "1000000"), tax, tax,
+        _found("total_amount", "1160000"),
+    )})
+    assert check_document_arithmetic(doc), "Repeated source must not become two taxes"
+
+
+def test_equal_tax_amounts_from_distinct_sources_are_not_deduplicated_by_value():
+    doc = _invoice().model_copy(update={"fields": (
+        _found("subtotal", "2000000"),
+        _found("tax", "80000", quote="VAT group A: 80000"),
+        _found("tax", "80000", quote="VAT group B: 80000"),
+        _found("total_amount", "2160000"),
+    )})
+    assert check_document_arithmetic(doc) == ()
+
+
+def test_unread_tax_component_is_not_hidden_by_another_readable_component():
+    for taxes in (
+        (_state("tax", "UNREADABLE"), _found("tax", "1300000")),
+        (_found("tax", "1300000"), _state("tax", "UNREADABLE")),
+    ):
+        assert "invoice-components-unread" in _codes(check_document_arithmetic(_multi_tax_invoice(*taxes)))
+
+
+def test_no_discount_allocation_is_inferred_from_the_printed_total():
+    lines = tuple(DocumentLine(id=str(i), fields=(
+        _found("line_amount", amount), _found("tax_rate", rate),
+    )) for i, amount, rate in [(1,"10000000","10%"),(2,"5000000","8%")])
+    for total in ("15300000", "15320000"):
+        doc = _multi_tax_invoice(_state("tax", "UNREADABLE"), total=total).model_copy(update={"line_items": lines})
+        assert "invoice-components-unread" in _codes(check_document_arithmetic(doc))
+
+
+def test_printed_total_tax_and_its_breakdown_are_not_both_added():
+    # One total plus its components must be clarified, not blindly summed.
+    doc = _multi_tax_invoice(
+        _found("tax", "900000", quote="VAT 10%: 900000"),
+        _found("tax", "400000", quote="VAT 8%: 400000"),
+        _found("tax", "1300000", quote="Total VAT: 1300000"),
+        total="16600000",
+    )
+    assert check_document_arithmetic(doc)
+
+
+def test_same_tax_region_with_different_quotes_is_not_two_components():
+    first = _found("tax", "80000", quote="VAT 80000")
+    second = _found("tax", "80000", quote="80000")
+    box = (10.0, 10.0, 50.0, 30.0)
+    first = first.model_copy(update={"refs": (first.refs[0].model_copy(update={"bbox": box}),)})
+    second = second.model_copy(update={"refs": (second.refs[0].model_copy(update={"bbox": box}),)})
+    doc = _invoice().model_copy(update={"fields": (
+        _found("subtotal", "1000000"), first, second,
+        _found("total_amount", "1160000"),
+    )})
+    assert check_document_arithmetic(doc)

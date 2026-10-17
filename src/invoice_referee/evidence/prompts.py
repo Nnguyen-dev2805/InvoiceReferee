@@ -61,6 +61,7 @@ Không ghi đính kèm không có nghĩa được miễn chứng từ.
 """,
     "E_INVOICE": """
 Giữ subtotal, tax, discount, service_charge, total_amount và amount_words nếu có.
+Nếu có tổng tiền thuế in sẵn, chỉ lấy tổng đó làm tax; không lấy đồng thời tổng và các thành phần. Nếu không có tổng thuế, mỗi khoản tiền thuế độc lập là một field tax riêng với quote/page/vùng nguồn phân biệt. Không lặp cùng dòng thuế. Thuế suất không phải tiền thuế; không tự tính thuế hoặc phân bổ chiết khấu để khớp tổng.
 buyer_person_name là cá nhân người mua, buyer_name là tổ chức; không đánh đồng payer.
 Row fields: description, quantity, unit_price, line_amount; mỗi giá trị có quote riêng.
 Không thay dòng bằng tổng hóa đơn; không tự tính phần thiếu. Thuế suất không là tiền thuế.
@@ -186,6 +187,7 @@ def build_evidence_extraction_prompt(allowed_types: tuple[str, ...]) -> str:
         "supporting documents never become original expense. "
         "Dates YYYY-MM-DD; preserve source date in quote; no invented year/time/offset. "
         "Each line_items entry has fields:[same field objects]; no plain text OCR lines.\n"
+        + "E_INVOICE: ưu tiên tax là tổng tiền thuế in sẵn; không lấy đồng thời tổng và thành phần. Nếu không in tổng thuế, mỗi khoản tiền thuế độc lập là một field tax có quote/page/vùng nguồn riêng; không lặp cùng dòng. Không biến thuế suất thành tiền thuế, không tự tính thuế hoặc phân bổ chiết khấu để khớp tổng.\n"
         + TYPE_GUIDANCE
         + UNTRUSTED_SOURCE
     )

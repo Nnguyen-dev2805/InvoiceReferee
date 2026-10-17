@@ -312,3 +312,43 @@ async def test_tc06_commit_ends_waiting_with_no_instruction(tmp_path: Path) -> N
     assert view.state == "WAITING"
     assert not view.instructions
     assert any(i.kind == "FACT" and "arithmetic" in i.field_or_rule for i in view.issues)
+
+
+def _vat_case(*taxes):
+    paper = _tc06_paper().model_copy(update={"fields": tuple(
+        f.model_copy(update={"value": "760000"}) if f.field == "printed_return" else f
+        for f in _tc06_paper().fields
+    )})
+    invoice = _tc06_invoice().model_copy(update={"fields": tuple(
+        f for f in _tc06_invoice().fields if f.field != "tax"
+    ) + taxes})
+    return _report(paper, invoice)
+
+
+def _vat_field(value, quote):
+    return FieldCandidate(field="tax", state="FOUND", value=value, refs=(
+        EvidenceRef(source_id="s2", source_sha256=SHA, page=1, exact_quote=quote),
+    ))
+
+
+async def test_repeated_tax_source_blocks_workflow_without_rewriting_evidence(tmp_path):
+    tax = _vat_field("240000", "VAT:240000")
+    report = _vat_case(tax, tax)
+    wf, root = await _seed_workflow(tmp_path, report)
+    with wf.db.connect() as cx:
+        row = cx.execute("SELECT * FROM cases WHERE id=?", (root,)).fetchone()
+        view = wf._case_view(cx, row)
+        raw = json.loads(cx.execute("SELECT report_json FROM case_evidence_reports WHERE root_id=?", (root,)).fetchone()[0])
+        assert raw == json.loads(report.model_dump_json())
+        assert cx.execute("SELECT COUNT(*) FROM money_events").fetchone()[0] == 0
+    assert view.state == "WAITING" and not view.instructions
+    issue = next(i for i in view.issues if i.field_or_rule == "expense:arithmetic:components")
+    assert issue.kind == "FACT" and tax.refs[0] in issue.refs
+
+
+def test_distinct_tax_components_keep_routine_collection_and_both_refs():
+    taxes = (_vat_field("200000", "VAT A:200000"), _vat_field("40000", "VAT B:40000"))
+    result = Reconciler().assess(_admit(_vat_case(*taxes), advance=4000000))
+    assert not result.issues
+    assert result.allowed_effect.direction == "COLLECT"
+    assert result.allowed_effect.amount == 760000

@@ -278,52 +278,73 @@ def _check_settlement_line_total(document: DocumentAnalysis) -> list[ArithmeticF
     )]
 
 
+def _invoice_refs(document: DocumentAnalysis) -> tuple[EvidenceRef, ...]:
+    return _unique_refs([
+        ref for field in document.fields
+        if field.field in ("subtotal", "tax", "discount", "service_charge", "total_amount")
+        for ref in _candidate_refs(field)
+    ])
+
+
 def _check_invoice(document: DocumentAnalysis) -> list[ArithmeticFinding]:
-    """The invoice's subtotal + tax (+ service − discount) = total relationship."""
+    """Check printed components; never infer tax/allocation from the total."""
     subtotal = _found(document, "subtotal")
     total = _found(document, "total_amount")
     if subtotal is None or total is None:
         return []
-    # A material component that was read as unreadable/ambiguous cannot be treated
-    # as zero: the total is unverifiable, so the document is not silently eligible.
-    unread = [
-        name for name in _MATERIAL_INVOICE_COMPONENTS
-        if _state(document, name) in ("UNREADABLE", "AMBIGUOUS")
-    ]
+    components = [f for f in document.fields if f.field in _MATERIAL_INVOICE_COMPONENTS]
+    unread = sorted({f.field for f in components if f.state in ("UNREADABLE", "AMBIGUOUS")
+                     or (f.state == "FOUND" and parse_vnd(f.value) is None)})
     if unread:
         return [ArithmeticFinding(
             code="invoice-components-unread",
             field_or_rule="expense:arithmetic:components",
-            basis=(
-                "Không đọc được thành phần bắt buộc để kiểm tổng hóa đơn ("
-                + ", ".join(unread) + "); không mặc định bằng 0."
-            ),
-            question=(
-                "Bổ sung/đọc lại " + ", ".join(unread)
-                + " để đối chiếu tổng hóa đơn (không coi phần chưa đọc là 0)."
-            ),
-            refs=_refs(document, "subtotal", "total_amount"),
+            basis="Không đọc được thành phần bắt buộc để kiểm tổng hóa đơn ("
+                  + ", ".join(unread) + "); không mặc định bằng 0.",
+            question="Bổ sung/đọc lại " + ", ".join(unread)
+                     + " để đối chiếu tổng hóa đơn (không coi phần chưa đọc là 0).",
+            refs=_invoice_refs(document),
         )]
-    expected = subtotal
-    for name in _MATERIAL_INVOICE_COMPONENTS:
+    taxes = [f for f in components if f.field == "tax" and f.state == "FOUND"]
+    # A repeated quote/location is not a second economic tax component. A printed
+    # total plus its breakdown is also not an additive set. Keep both in source;
+    # ask for clarification rather than choosing the set that fits printed total.
+    seen: set[tuple] = set()
+    overlapping = False
+    for tax in taxes:
+        locations = {
+            (ref.source_id, ref.source_sha256, ref.page,
+             ("bbox", ref.bbox) if ref.bbox is not None else
+             ("record", ref.record_key) if ref.record_key is not None else
+             ("quote", " ".join(ref.exact_quote.split())))
+            for ref in tax.refs
+        }
+        overlapping |= bool(seen.intersection(locations))
+        seen.update(locations)
+    has_total_label = any(
+        re.search(r"(?:tong(?: cong)? (?:tien )?thue|total (?:vat|tax)|(?:vat|tax) total)", _row_label(ref.exact_quote))
+        for tax in taxes for ref in tax.refs
+    )
+    if overlapping or (len(taxes) > 1 and has_total_label):
+        return [ArithmeticFinding(
+            code="invoice-tax-sources-overlap",
+            field_or_rule="expense:arithmetic:components",
+            basis="Các giá trị thuế có nguồn trùng hoặc gồm cả tổng thuế và thành phần; chưa xác định bộ khoản thuế độc lập để cộng.",
+            question="Đối chiếu tổng tiền thuế in trên hóa đơn hoặc cung cấp từng khoản tiền thuế có căn cứ phân biệt; không cộng lại cùng nguồn.",
+            refs=_invoice_refs(document),
+        )]
+    expected = subtotal + sum(parse_vnd(t.value) for t in taxes)
+    for name in ("service_charge", "discount"):
         value = _found(document, name)
-        if value is None:
-            continue  # NOT_PRESENT / not applicable: not forced to reconcile
-        expected += -value if name == "discount" else value
+        if value is not None:
+            expected += -abs(value) if name == "discount" else value
     if expected != total:
         diff = abs(total - expected)
-        findings: list[ArithmeticFinding] = [ArithmeticFinding(
+        return [ArithmeticFinding(
             code="invoice-total",
             field_or_rule="expense:arithmetic:total",
-            basis=(
-                f"Tiền hàng {_vnd(subtotal)} cộng thuế/phí ra {_vnd(expected)} nhưng tổng "
-                f"hóa đơn in {_vnd(total)} (lệch {_vnd(diff)})."
-            ),
-            question=(
-                f"Đối chiếu/cung cấp hóa đơn hợp lệ: tiền hàng + thuế/phí = {_vnd(expected)} "
-                f"nhưng tổng in {_vnd(total)} (lệch {_vnd(diff)})."
-            ),
-            refs=_refs(document, "subtotal", "tax", "service_charge", "discount", "total_amount"),
+            basis=f"Tiền hàng {_vnd(subtotal)} cộng thuế/phí ra {_vnd(expected)} nhưng tổng hóa đơn in {_vnd(total)} (lệch {_vnd(diff)}).",
+            question=f"Đối chiếu/cung cấp hóa đơn hợp lệ: tiền hàng + thuế/phí = {_vnd(expected)} nhưng tổng in {_vnd(total)} (lệch {_vnd(diff)}).",
+            refs=_invoice_refs(document),
         )]
-        return findings
     return []
