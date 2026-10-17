@@ -106,3 +106,29 @@ def test_paper_self_expense_declaration_retains_intake_choice_and_assertion():
     assert saved["confirmed"]["settlement_type"]=="EMPLOYEE_REIMBURSEMENT"
     assert saved["confirmed"]["submission_source"]=="PAPER_SCAN"
     assert saved["confirmed"]["no_advance_reason"]=="Tự thanh toán trước"
+
+
+def test_adapter_allows_attached_sources_without_read_document_number() -> None:
+    from invoice_referee.reconciliation.digital_intake import digital_to_paper
+
+    declaration = Declaration(
+        declared_purpose="Thuê cloud server",
+        settlement_type="EMPLOYEE_REIMBURSEMENT",
+        submission_source="DIGITAL_FORM",
+        digital_lines=(_line(source_ids=("source:unreadable",)),),
+        no_advance_asserted=True,
+        no_advance_reason="Tự chi",
+    )
+    paper = digital_to_paper(
+        declaration,
+        root_id="root:1",
+        attached_source_ids={"source:unreadable"},
+        evidence_numbers={},
+    )
+    assert paper.document_type == "SETTLEMENT_FORM"
+    assert len(paper.line_items) == 1
+    row = paper.line_items[0]
+    fields = {f.field: f for f in row.fields}
+    assert fields["amount"].value == 1_500_000
+    assert "invoice_refs" not in fields
+

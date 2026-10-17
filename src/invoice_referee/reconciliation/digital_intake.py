@@ -88,10 +88,13 @@ def digital_to_paper(
     declaration: Declaration,
     *,
     root_id: str,
-    evidence_numbers: dict[str, str],
+    evidence_numbers: dict[str, str] | None = None,
+    attached_source_ids: set[str] | frozenset[str] | None = None,
 ) -> DocumentAnalysis:
     """Build the synthetic settlement paper from a validated declaration."""
-    validate_digital_declaration(declaration, attached_source_ids=set(evidence_numbers))
+    if attached_source_ids is None:
+        attached_source_ids = set(evidence_numbers.keys()) if evidence_numbers is not None else set()
+    validate_digital_declaration(declaration, attached_source_ids=attached_source_ids)
     digest = canonical_digest(declaration)
     declaration_source = f"declaration:{root_id}"
 
@@ -106,16 +109,13 @@ def digital_to_paper(
 
     lines: list[DocumentLine] = []
     total = 0
+    ev_numbers = evidence_numbers or {}
     for line in declaration.digital_lines:
         numbers = []
         for source_id in line.source_ids:
-            number = evidence_numbers.get(source_id)
-            if number is None:
-                raise ValueError(
-                    f"line {line.item_id} maps source {source_id} "
-                    "with no read document number"
-                )
-            numbers.append(number)
+            number = ev_numbers.get(source_id)
+            if number:
+                numbers.append(number)
         total += int(line.amount)
         quote = line.description
         fields = [
@@ -319,7 +319,12 @@ async def read_digital_report(
         check_document_arithmetic(analysis)
         documents.append(analysis)
     numbers = _evidence_numbers(documents)
-    paper = digital_to_paper(declaration, root_id=root_id, evidence_numbers=numbers)
+    paper = digital_to_paper(
+        declaration,
+        root_id=root_id,
+        evidence_numbers=numbers,
+        attached_source_ids={s.id for s in sources},
+    )
     with step("match", metadata={"trace_stage": "matching"}):
         matching = match_paper_evidence(paper, tuple(documents))
     origin = {"LIVE": "LIVE_READ", "RECORDED_REPLAY": "RECORDED_REPLAY"}.get(

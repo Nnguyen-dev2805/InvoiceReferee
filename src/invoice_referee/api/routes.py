@@ -849,7 +849,10 @@ async def read_digital_draft(request: Request, root_id: str) -> dict[str, object
     """Read attached evidence + the saved web declaration into a shared draft."""
     session = _require_session(request)
     workflow = _workflow(request)
-    return await workflow.read_digital_draft(session, root_id)
+    try:
+        return await workflow.read_digital_draft(session, root_id)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.post("/cases/{root_id}/decisions/refuse")
