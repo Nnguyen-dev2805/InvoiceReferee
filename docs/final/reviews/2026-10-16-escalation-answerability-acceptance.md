@@ -152,3 +152,19 @@ User explicitly requested merge. Branch fresh full suite:1034PASS/6FAIL
 the same six failure names (premerge-comparison.json in main runtime evidence).
 The additional accountant-correction test is now included in this full run.
 No baseline failures waived. Local merge authorized; no push/deploy authorization.
+
+## Authorized local merge result — 17/10/2026
+
+Implementation42974fc1 merged into main07ed4a77 at2c59e441. Git auto-merged
+routes.py cleanly; retained newer digital-intake handling and dataset files.
+Merged full1041tests:1035PASS/6FAIL. Exact six failure names match fresh main
+baseline1000PASS/6FAIL; no newly failing names. Frontend73PASS/2SKIP; buildPASS.
+Post-merge fresh isolated browser7/7PASS: authority/compound/over-limit/correction/
+collect/pay/balance. All7 owned test servers stopped after cwd/command checks.
+S6 full-suite API regressions pass; previous18/18 browser evidence is pre-merge,
+not claimed rerun. No provider calls, push, deployment or user-DB migration.
+
+Evidence in main `.runtime/escalation-merge-20261017/`: main-baseline.xml,
+merged.xml, merged-comparison.json, frontend.log, build.log, browser.log;
+PNG/API payloads `.runtime/escalation-answerability/browser-output-merged/`.
+Original worktree and runtime evidence retained for traceability.

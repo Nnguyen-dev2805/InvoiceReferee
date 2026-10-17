@@ -21,6 +21,7 @@
   reason supplement; ambiguous source changes remain blocked for genuine docs.
 - [x] DecisionCard UI, existing S6 ExceptionReview/OCR, component/build checks.
 - [x] Final offline browser7/7 + S6 18/18; full backend/frontend run, report saved.
+- [x] Authorized local merge at2c59e441; merged1035PASS/6baselineFAIL, frontend73/2, fresh browser7/7.
 - [ ] Full backend GREEN:6baseline failures remain, not waived.
 - [ ] Real provider/compatible-recording and independent practitioner/rubric
   acceptance. No20/20 claim. No commit/merge/deploy authorization inferred.
