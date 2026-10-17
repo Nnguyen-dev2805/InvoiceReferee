@@ -217,12 +217,22 @@ def _publish(wf: CaseWorkflow, tenant: str, root: str, report: ReadResult) -> No
 
 
 async def _submit(
-    wf: CaseWorkflow, tenant: str, root: str, *, confirmed: str | None = None
+    wf: CaseWorkflow,
+    tenant: str,
+    root: str,
+    *,
+    confirmed: str | None = None,
+    **dec_kwargs,
 ):
     session = wf.start_session(tenant=tenant, persona="employee", actor_id=EMPLOYEE)
     version = int(
         wf._query_one("SELECT version FROM cases WHERE id = ?", (root,))["version"]
     )
+    payload = {
+        "declared_purpose": "Quyết toán tạm ứng",
+        "confirmed_activity_id": confirmed,
+    }
+    payload.update(dec_kwargs)
     return await wf.execute(
         CommandContext(
             session_id=session.session_id,
@@ -232,9 +242,7 @@ async def _submit(
         ),
         Submit(
             root_id=root,
-            declaration=Declaration(
-                declared_purpose="Quyết toán tạm ứng", confirmed_activity_id=confirmed
-            ),
+            declaration=Declaration(**payload),
         ),
     )
 
@@ -342,3 +350,26 @@ async def test_unlinked_dossier_creates_no_budget_or_grant(tmp_path: Path) -> No
             (TENANT, "activity:proposed:draft1"),
         ).fetchone()
         assert int(grants["n"]) == 0
+ 
+ 
+async def test_employee_reimbursement_submits_without_advance_even_when_weak_candidates_exist(
+    tmp_path: Path,
+) -> None:
+    wf = _workflow(tmp_path)
+    root = await _draft_root(wf)
+    # The paper's purpose matches catalog activities, which produces NEEDS_CONFIRMATION
+    _publish(wf, TENANT, root, _report(_found("purpose", "Tạm ứng công tác")))
+
+    # An employee submitting an EMPLOYEE_REIMBURSEMENT asserts no advance.
+    # It must NOT be forced to confirm an advance!
+    result = await _submit(
+        wf,
+        TENANT,
+        root,
+        settlement_type="EMPLOYEE_REIMBURSEMENT",
+        no_advance_asserted=True,
+        no_advance_reason="Tự thanh toán không nhận tạm ứng",
+    )
+    # Since catalog has 2 authorized activities (adv-1, adv-2) and none was confirmed,
+    # it stays as an independent PROPOSED dossier:
+    assert result.case_view.activity == "activity:proposed:draft1"

@@ -345,7 +345,7 @@ describe("Intake draft alternative evidence (TC18)", () => {
 });
 
 it("keeps self-expense type and no-advance declaration when submitting paper", async () => {
- localStorage.clear();
+ window.localStorage?.clear?.();
  let submitted:Record<string,unknown>|null=null;
  vi.stubGlobal("fetch",vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
   const url=String(input);
@@ -364,5 +364,41 @@ it("keeps self-expense type and no-advance declaration when submitting paper", a
  await user.click(await screen.findByRole("button",{name:"Xác nhận và nộp hồ sơ"}));
  await waitFor(()=>expect(submitted).not.toBeNull());
  expect(submitted).toMatchObject({settlement_type:"EMPLOYEE_REIMBURSEMENT",submission_source:"PAPER_SCAN",no_advance_asserted:true});
- localStorage.clear();
+ window.localStorage?.clear?.();
 });
+
+it("allows submitting self-expense paper claim without choosing advance even when link needs confirmation", async () => {
+ window.localStorage?.clear?.();
+ let submitted:Record<string,unknown>|null=null;
+ vi.stubGlobal("fetch",vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
+  const url=String(input);
+  if(url.endsWith("/api/cases"))return new Response(JSON.stringify({case_view:caseView(1,0)}));
+  if(url.endsWith("/sources"))return new Response(JSON.stringify({case_view:caseView(2,2)}));
+  if(url.endsWith("/settlement/draft"))return new Response(JSON.stringify({
+    declared_name:"NGUYỄN MINH AN",
+    declared_purpose:"Sửa máy in",
+    incurred_total:1000000,
+    declared_advance:0,
+    expenses:[],
+    warnings:[],
+    invoices:[],
+    link: {
+      status: "NEEDS_CONFIRMATION",
+      candidates: [{ activity_id: "activity:adv-1", name: "Tạm ứng 1", amount: 1000000 }]
+    }
+  }));
+  if(url.endsWith("/submit")){submitted=JSON.parse(String(init?.body));return new Response(JSON.stringify({case_view:caseView(3,2,"WAITING")}));}
+  return new Response("{}");
+ }));
+ render(<Intake session={SESSION} onCase={()=>{}}/>);const user=userEvent.setup();
+ await user.click(screen.getByText("Nhân viên tự chi"));
+ await user.type(screen.getByLabelText("Lý do không nhận tạm ứng"),"Tự thanh toán trước, không nhận ứng");
+ await user.upload(screen.getByLabelText("Đơn quyết toán (PDF/DOC/DOCX/PNG/JPEG)"),new File(["pdf"],"self.pdf",{type:"application/pdf"}));
+ await user.upload(screen.getByLabelText("Hóa đơn chứng từ kèm theo (PDF/DOC/DOCX/PNG/JPEG)"),new File(["pdf"],"inv.pdf",{type:"application/pdf"}));
+ await user.click(screen.getByRole("button",{name:"Đọc chứng từ"}));
+ await user.click(await screen.findByRole("button",{name:"Xác nhận và nộp hồ sơ"}));
+ await waitFor(()=>expect(submitted).not.toBeNull());
+ expect(submitted).toMatchObject({settlement_type:"EMPLOYEE_REIMBURSEMENT",submission_source:"PAPER_SCAN",no_advance_asserted:true});
+ window.localStorage?.clear?.();
+});
+

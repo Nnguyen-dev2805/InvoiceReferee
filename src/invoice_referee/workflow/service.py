@@ -3234,13 +3234,17 @@ class CaseWorkflow:
                 self._rebind_case_activity(cx, session, row, root_id, entry)
                 return self._reload(cx, row)
             if link.status == "NEEDS_CONFIRMATION":
-                names = ", ".join(
-                    f"{c.name} ({c.activity_id})" for c in link.candidates
-                )
-                raise UnsupportedCommandError(
-                    "Hồ sơ này quyết toán cho khoản tạm ứng nào? "
-                    f"Ứng viên: {names}. Nhân viên xác nhận một hồ sơ trong phạm vi."
-                )
+                if (
+                    getattr(declaration, "settlement_type", "ADVANCE_SETTLEMENT")
+                    != "EMPLOYEE_REIMBURSEMENT"
+                ):
+                    names = ", ".join(
+                        f"{c.name} ({c.activity_id})" for c in link.candidates
+                    )
+                    raise UnsupportedCommandError(
+                        "Hồ sơ này quyết toán cho khoản tạm ứng nào? "
+                        f"Ứng viên: {names}. Nhân viên xác nhận một hồ sơ trong phạm vi."
+                    )
             if link.status == "CONFLICT":
                 raise UnsupportedCommandError(
                     "Các căn cứ mạnh trỏ tới các hồ sơ khác nhau; giữ mâu thuẫn "
@@ -3252,7 +3256,13 @@ class CaseWorkflow:
         # backend binds the dossier there (server-owned, single-candidate
         # decision, never an employee-picked standing code). Otherwise the
         # draft stays PROPOSED as before.
-        if (link is None or (link is not None and link.status == "NOT_FOUND")) and (
+        if (
+            link is None
+            or (
+                link is not None
+                and link.status in ("NOT_FOUND", "NEEDS_CONFIRMATION")
+            )
+        ) and (
             getattr(declaration, "settlement_type", "ADVANCE_SETTLEMENT")
             == "EMPLOYEE_REIMBURSEMENT"
         ):

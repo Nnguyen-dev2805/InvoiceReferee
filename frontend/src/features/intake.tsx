@@ -404,7 +404,10 @@ export function Intake({
       );
       return;
     }
-    if (link?.status === "NEEDS_CONFIRMATION" && !confirmedActivityId) {
+    const isReimbursement =
+      digitalPayload?.settlementKind === "EMPLOYEE_REIMBURSEMENT" ||
+      (!digitalPayload && settlementKind === "EMPLOYEE_REIMBURSEMENT");
+    if (!isReimbursement && link?.status === "NEEDS_CONFIRMATION" && !confirmedActivityId) {
       setError("Vui lòng chọn khoản tạm ứng mà hồ sơ này quyết toán.");
       return;
     }
@@ -1068,12 +1071,39 @@ export function Intake({
           {link?.status === "NEEDS_CONFIRMATION" && (
             <div className="py-2 border-b border-amber-200 bg-amber-50/50 px-3 py-2.5 rounded text-xs space-y-2">
               <p className="font-semibold text-amber-900">
-                Hồ sơ này quyết toán cho khoản tạm ứng nào?
+                {(digitalPayload?.settlementKind ?? settlementKind) === "EMPLOYEE_REIMBURSEMENT"
+                  ? "Hồ sơ tự chi này có gắn với hoạt động / đề án nào không?"
+                  : "Hồ sơ này quyết toán cho khoản tạm ứng nào?"}
               </p>
               <p className="text-[11px] text-amber-800">
-                Chứng từ chỉ tương đồng một số trường dữ liệu. Vui lòng chọn khoản tạm ứng phù hợp trong danh sách:
+                {(digitalPayload?.settlementKind ?? settlementKind) === "EMPLOYEE_REIMBURSEMENT"
+                  ? "Hệ thống gợi ý các hoạt động có liên quan. Bạn có thể chọn một hoạt động hoặc để trống nếu là hồ sơ độc lập:"
+                  : "Chứng từ chỉ tương đồng một số trường dữ liệu. Vui lòng chọn khoản tạm ứng phù hợp trong danh sách:"}
               </p>
-              <div role="radiogroup" aria-label="Khoản tạm ứng cần quyết toán" className="space-y-1">
+              <div
+                role="radiogroup"
+                aria-label={
+                  (digitalPayload?.settlementKind ?? settlementKind) === "EMPLOYEE_REIMBURSEMENT"
+                    ? "Hoạt động gắn với hồ sơ tự chi"
+                    : "Khoản tạm ứng cần quyết toán"
+                }
+                className="space-y-1"
+              >
+                {(digitalPayload?.settlementKind ?? settlementKind) === "EMPLOYEE_REIMBURSEMENT" && (
+                  <label className="flex items-start gap-2 text-xs py-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="link-confirm"
+                      value=""
+                      checked={!confirmedActivityId}
+                      onChange={() => setConfirmedActivityId("")}
+                      className="mt-0.5"
+                    />
+                    <span className="font-medium text-slate-700">
+                      Hồ sơ độc lập (không gắn hoạt động nào)
+                    </span>
+                  </label>
+                )}
                 {link.candidates.map((c) => (
                   <label key={c.activity_id} className="flex items-start gap-2 text-xs py-1 cursor-pointer">
                     <input
