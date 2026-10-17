@@ -165,6 +165,7 @@ export interface EmployeeReturnDraftView {
 }
 
 export interface CaseView {
+  declaration_corrections?: Array<{id:string;actor:string;reason:string;observed_at:string;changes:Array<{field:string;row_id?:string;before:number;after:number}>}>;
   id: string;
   version: number;
   state: CaseState;

@@ -171,6 +171,15 @@ class AnswerIssue(StrictModel):
     answer: Answer
 
 
+class CorrectDeclaration(StrictModel):
+    kind: Literal["CORRECT_DECLARATION"] = "CORRECT_DECLARATION"
+    root_id: Id
+    issue_id: Id
+    basis_id: Id
+    correction_id: str
+    reason: str = Field(min_length=12,max_length=2000)
+
+
 class Decide(StrictModel):
     kind: Literal["DECIDE"] = "DECIDE"
     root_id: Id
@@ -254,6 +263,7 @@ CaseCommand = Annotated[
         ReviseDeclaration,
         Submit,
         AnswerIssue,
+        CorrectDeclaration,
         Decide,
         RefuseException,
         RecordActual,

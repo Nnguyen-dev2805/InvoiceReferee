@@ -27,6 +27,10 @@ from tests.s6_seeding import (
 from tests.tc18_shapes import _acceptance, _invoice, _paper, _transfer
 
 
+def version(wf,root):
+    with wf.db.connect() as cx:return cx.execute("SELECT version FROM cases WHERE id=?",(root,)).fetchone()[0]
+
+
 async def test_accept_persists_and_clears_on_reassess(tmp_path: Path) -> None:
     wf = _workflow(tmp_path)
     root, _ = await _seed(wf, consistent=True)
@@ -41,13 +45,13 @@ async def test_accept_persists_and_clears_on_reassess(tmp_path: Path) -> None:
             session_id=acct.session_id,
             actor_id=ACCOUNTANT,
             command_id="cmd:d1",
-            expected_case_version=0,
+            expected_case_version=version(wf,root),
         ),
         Decide(
             root_id=root,
             decision=DecisionCommand(
                 issue_ids=(issue["id"],),
-                basis_id="b:1",
+                basis_id=wf.question_card(acct,root,issue["id"]).basis_id,
                 actions=("EXCEPT_POLICY",),
                 effect_scope=ACTIVITY,
                 amount=1_500_000,
@@ -84,7 +88,7 @@ async def test_refuse_keeps_issue_open(tmp_path: Path) -> None:
             session_id=acct.session_id,
             actor_id=ACCOUNTANT,
             command_id="cmd:r1",
-            expected_case_version=0,
+            expected_case_version=version(wf,root),
         ),
         RefuseException(
             root_id=root,
@@ -117,13 +121,13 @@ async def test_accept_without_grant_is_blocked(tmp_path: Path) -> None:
                 session_id=acct.session_id,
                 actor_id=ACCOUNTANT,
                 command_id="cmd:d1",
-                expected_case_version=0,
+                expected_case_version=version(wf,root),
             ),
             Decide(
                 root_id=root,
                 decision=DecisionCommand(
                     issue_ids=(issue["id"],),
-                    basis_id="b:1",
+                    basis_id=wf.question_card(acct,root,issue["id"]).basis_id,
                     actions=("EXCEPT_POLICY",),
                     effect_scope=ACTIVITY,
                     amount=1_500_000,
@@ -151,13 +155,13 @@ async def test_accept_over_grant_ceiling_is_blocked(tmp_path: Path) -> None:
                 session_id=acct.session_id,
                 actor_id=ACCOUNTANT,
                 command_id="cmd:d1",
-                expected_case_version=0,
+                expected_case_version=version(wf,root),
             ),
             Decide(
                 root_id=root,
                 decision=DecisionCommand(
                     issue_ids=(issue["id"],),
-                    basis_id="b:1",
+                    basis_id=wf.question_card(acct,root,issue["id"]).basis_id,
                     actions=("EXCEPT_POLICY",),
                     effect_scope=ACTIVITY,
                     amount=1_500_000,

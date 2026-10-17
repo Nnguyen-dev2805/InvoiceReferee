@@ -17,6 +17,7 @@ from invoice_referee.domain.common import EvidenceRef
 from invoice_referee.domain.finance import Projection
 from invoice_referee.domain.issues import BusinessIssue
 from invoice_referee.domain.policy import Grant
+from invoice_referee.reconciliation.authority import approved
 
 RECOGNIZE_LIMIT = 8_000_000
 ISSUE_LIMIT = 4_000_000
@@ -228,9 +229,9 @@ def evaluate_policy(
     # E recognition limit: the system self-recognizes up to 8m.
     if projection.E.state == "KNOWN":
         e_value = int(projection.E.value or 0)
-        if e_value > RECOGNIZE_LIMIT and not _grant_covers(
+        if e_value > RECOGNIZE_LIMIT and not (_grant_covers(
             input, "RECOGNIZE_COST", e_value, actor=SYSTEM_ACTOR
-        ):
+        ) or approved(input,"RECOGNIZE_COST",e_value)):
             authorizations.append("RECOGNIZE_COST")
             issues.append(
                 _issue(
@@ -239,7 +240,7 @@ def evaluate_policy(
                     "RECOGNIZE_COST",
                     "approver",
                     f"Chi phí đủ điều kiện {e_value} vượt mức tự công nhận {RECOGNIZE_LIMIT}.",
-                    "Cấp quyết định công nhận chi phí trong phạm vi được giao.",
+                    f"Bạn có chấp thuận công nhận {e_value} VND chi phí cho hồ sơ này không? Mức tự công nhận là {RECOGNIZE_LIMIT} VND; quyết định này chưa ghi nhận tiền đã chi.",
                     _evidence_refs(
                         input, fields=("paid_employee", "incurred"), expense=True
                     ),
@@ -252,15 +253,16 @@ def evaluate_policy(
         if s_value != 0:
             action = "ISSUE_PAYMENT" if s_value > 0 else "ISSUE_COLLECTION"
             amount = abs(s_value)
-            if amount <= ISSUE_LIMIT and _grant_covers(
+            if (amount <= ISSUE_LIMIT and _grant_covers(
                 input, action, amount, actor=SYSTEM_ACTOR
-            ):
+            )) or approved(input,action,amount):
                 allowed_effect = FinancialEffect(
                     direction="PAY" if s_value > 0 else "COLLECT",
                     amount=amount,
                     employee=input.scope.employee,
                     activity=activity,
                     basis=f"S={s_value}",
+                    authority_refs=tuple(d.id for d in (approved(input,"RECOGNIZE_COST",int(projection.E.value or 0)),approved(input,action,amount)) if d is not None),
                 )
             else:
                 authorizations.append(action)
@@ -271,7 +273,7 @@ def evaluate_policy(
                         action,
                         "approver",
                         f"Cần phát hành {action} {amount} vượt quyền tự xử lý {ISSUE_LIMIT}.",
-                        "Cấp quyết định phát hành yêu cầu chi/thu trong phạm vi.",
+                        f"Bạn có chấp thuận phát hành yêu cầu {'chi' if s_value>0 else 'thu'} {amount} VND cho hồ sơ này không? Mức tự phát hành là {ISSUE_LIMIT} VND; chưa có giao dịch tiền được ghi nhận.",
                         _evidence_refs(
                             input, fields=("incurred", "paid_employee"), expense=True
                         ),

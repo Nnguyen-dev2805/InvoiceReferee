@@ -428,3 +428,16 @@ CREATE TABLE IF NOT EXISTS context_transcriptions (
     transcription_json TEXT NOT NULL,
     PRIMARY KEY (tenant, activity_id)
 );
+
+
+CREATE TABLE IF NOT EXISTS case_authority_decisions (
+ id TEXT PRIMARY KEY, tenant TEXT NOT NULL, root_id TEXT NOT NULL,
+ action TEXT NOT NULL, payload_json TEXT NOT NULL, decided_at TEXT NOT NULL,
+ FOREIGN KEY(root_id) REFERENCES cases(id)
+);
+
+CREATE TABLE IF NOT EXISTS case_declaration_corrections (
+ id TEXT PRIMARY KEY, tenant TEXT NOT NULL, root_id TEXT NOT NULL,
+ source_basis TEXT NOT NULL, payload_json TEXT NOT NULL, observed_at TEXT NOT NULL,
+ FOREIGN KEY(root_id) REFERENCES cases(id)
+);

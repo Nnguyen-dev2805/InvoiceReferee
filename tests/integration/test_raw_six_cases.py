@@ -148,7 +148,7 @@ async def test_d04_answer_closes_the_fact_then_escalates(raw_workflow, legacy_co
     answered = await workflow.execute(
         ctx("cmd:answer", view.version),
         AnswerIssue(root_id=root, answer=Answer(
-            issue_id=payer_issue.id, basis_id="basis:payer", answer_kind="FACT",
+            issue_id=payer_issue.id, basis_id=workflow.question_card(session,root,payer_issue.id).basis_id, answer_kind="FACT",
             value="employee:employee-a", reason="Tôi đã trả khoản này.",
         )),
     )

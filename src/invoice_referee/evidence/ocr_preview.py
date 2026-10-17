@@ -16,7 +16,7 @@ BOX_COLOR = (194, 45, 35, 255)
 BOX_FILL = (194, 45, 35, 44)
 
 _FONT_CANDIDATES = (
-    Path(__file__).resolve().parents[2] / "assets" / "fonts" / "NotoSans-Regular.ttf",
+    Path(__file__).resolve().parents[3] / "assets" / "fonts" / "NotoSans-Regular.ttf",
     Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
 )
 
@@ -45,16 +45,12 @@ def _load_page(path: Path, page_index: int, media: str | None = None) -> Image.I
     if not is_pdf and media is not None:
         is_pdf = str(media).upper() == "PDF"
     if is_pdf:
-        import pymupdf
-
-        with pymupdf.open(path) as document:
-            if page_index >= document.page_count:
-                raise ValueError("Trang OCR không tồn tại trong PDF.")
-            pixmap = document[page_index].get_pixmap(
-                matrix=pymupdf.Matrix(2, 2),
-                alpha=False,
-            )
-            return Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples)
+        import io
+        from invoice_referee.evidence.pdf import render_page_png,page_count
+        if page_index>=page_count(path):
+            raise ValueError("Trang OCR không tồn tại trong PDF.")
+        with Image.open(io.BytesIO(render_page_png(path,page_index+1))) as rendered:
+            return rendered.convert("RGB")
     with Image.open(path) as source:
         try:
             source.seek(page_index)

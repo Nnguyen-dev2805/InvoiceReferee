@@ -108,7 +108,7 @@ export function ExceptionReview({
     return () => {
       cancelled = true;
     };
-  }, [caseView.id, issue.id]);
+  }, [caseView.id, caseView.version, issue.id]);
 
   const openFacts = caseView.issues.filter(
     (i) =>
@@ -119,7 +119,7 @@ export function ExceptionReview({
   );
 
   async function accept() {
-    if (!preview || preview.amount === null) return;
+    if (!preview || preview.amount === null || !preview.basis_id) return;
     if (!reason.trim()) {
       setError("Chấp nhận ngoại lệ cần có lý do.");
       return;
@@ -131,7 +131,7 @@ export function ExceptionReview({
         caseView.id,
         {
           issue_ids: [issue.id],
-          basis_id: `basis:${issue.id}`,
+          basis_id: preview.basis_id,
           actions: ["EXCEPT_POLICY"],
           effect_scope: caseView.activity ?? "",
           amount: preview.amount,
@@ -261,7 +261,7 @@ export function ExceptionReview({
         <button
           type="button"
           onClick={() => void accept()}
-          disabled={busy || preview === null || !preview.covered}
+          disabled={busy || preview === null || !preview.covered || !preview.basis_id || openFacts.length>0}
           title={preview !== null && !preview.covered ? "Thiếu quyền hoặc vượt hạn mức" : undefined}
           className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white font-medium text-xs px-4 py-2 rounded cursor-pointer"
         >

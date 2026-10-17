@@ -282,7 +282,7 @@ def test_activity_acceptance_signal_migration_preserves_v8_schema(
         source_columns = {
             str(row["name"]) for row in cx.execute("PRAGMA table_info(case_sources)")
         }
-    assert version == 11
+    assert version == 12
     assert "link_signals_json" in columns
     assert "upload_role" in source_columns
     with db.connect() as cx:

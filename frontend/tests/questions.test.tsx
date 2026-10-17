@@ -1,14 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { answerIssue } from "../src/api";
+import {getQuestionCard,submitCard} from "../src/features/question_card_api";
 import { Questions } from "../src/features/questions";
 import type { CaseView } from "../src/types";
 
-vi.mock("../src/api", () => ({
-  answerIssue: vi.fn(),
-  errorMessage: (cause: unknown) => String(cause),
-}));
+vi.mock("../src/features/question_card_api",()=>({getQuestionCard:vi.fn(),submitCard:vi.fn()}));
+
 
 const issue = {
   id: "issue:fact:payer:invoice-1",
@@ -38,11 +36,15 @@ const caseView: CaseView = {
   payment_basis: [],
 };
 
+function metadata(selected=issue,response_kind="FACT") {
+ return {issue_id:selected.id,case_version:4,basis_id:"card:server",kind:selected.kind,scope:"activity:a",title:selected.question,response_kind,known_facts:[selected.basis],excerpt_refs:(selected as any).refs??[],required_answer:selected.question,effects:"Không ghi tiền",owner:selected.owner,actions:[],corrections:[]} as any;
+}
 afterEach(() => vi.clearAllMocks());
 
 describe("invoice-scoped employee-paid answer", () => {
   it("collects an exact VND amount and a responsible reason without a payer dropdown", async () => {
-    vi.mocked(answerIssue).mockResolvedValue({
+    vi.mocked(getQuestionCard).mockResolvedValue(metadata());
+    vi.mocked(submitCard).mockResolvedValue({
       case_view: caseView,
       job_id: null,
       duplicate_command: false,
@@ -51,16 +53,16 @@ describe("invoice-scoped employee-paid answer", () => {
 
     render(<Questions caseView={caseView} onCase={onCase} currentRole="employee" />);
 
-    expect(screen.getByText(/Bạn trực tiếp thanh toán bao nhiêu/)).toBeInTheDocument();
+    expect(await screen.findByText(/Bạn trực tiếp thanh toán bao nhiêu/)).toBeInTheDocument();
     expect(screen.queryByText(/ngân sách hoạt động|vượt ngân sách/i)).not.toBeInTheDocument();
 
     const amount = screen.getByLabelText(
-      "Số tiền VND nhân viên trực tiếp thanh toán cho hóa đơn IR26101001",
+      "Dữ kiện bổ sung",
     );
     expect(amount).toHaveAttribute("type", "number");
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
 
-    const submit = screen.getByRole("button", { name: "Gửi giải trình" });
+    const submit = screen.getByRole("button", { name: "Gửi dữ kiện bổ sung" });
     expect(submit).toBeDisabled();
     fireEvent.change(amount, { target: { value: "3240000" } });
     fireEvent.change(screen.getByLabelText("Lý do / xác nhận cụ thể"), {
@@ -70,20 +72,12 @@ describe("invoice-scoped employee-paid answer", () => {
     fireEvent.click(submit);
 
     await waitFor(() => {
-      expect(answerIssue).toHaveBeenCalledWith(
-        "case:1",
-        expect.objectContaining({
-          issue_id: issue.id,
-          value: "3240000",
-          reason: "Tôi trực tiếp thanh toán hóa đơn IR26101001.",
-        }),
-        4,
-      );
+      expect(submitCard).toHaveBeenCalledWith("case:1",expect.objectContaining({basis_id:"card:server"}),"Tôi trực tiếp thanh toán hóa đơn IR26101001.","3240000",undefined);
     });
     expect(onCase).toHaveBeenCalledWith(caseView);
   });
 
-  it("routes history coverage to the structured accountant form instead of free text", () => {
+  it("routes history coverage to the structured accountant form instead of free text", async () => {
     const coverageIssue = {
       id: "issue:fact:history",
       kind: "FACT" as const,
@@ -94,16 +88,17 @@ describe("invoice-scoped employee-paid answer", () => {
       question: "Xác minh coverage lịch sử (scope/thời gian/loại dòng tiền).",
     };
     const view = { ...caseView, issues: [coverageIssue] };
+    vi.mocked(getQuestionCard).mockResolvedValue(metadata(coverageIssue,"HISTORY"));
     render(<Questions caseView={view} onCase={() => {}} currentRole="accountant" />);
 
-    expect(screen.getByText(/Không áp dụng giải trình bằng văn bản tự do/)).toBeInTheDocument();
-    expect(screen.getByText(/Sổ cái & Dòng tiền/)).toBeInTheDocument();
+    expect(await screen.findByText(/Chuyển sang tab Sổ cái/)).toBeInTheDocument();
+
     expect(screen.queryByRole("link", { name: "Tới xác nhận lịch sử tiền" })).toBeNull();
     expect(screen.queryByLabelText("Nội dung giải trình / xác nhận:")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Gửi giải trình" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Gửi dữ kiện bổ sung" })).toBeNull();
   });
 
-  it("shows the exact source quotations attached to a blocking arithmetic FACT", () => {
+  it("shows the exact source quotations attached to a blocking arithmetic FACT", async () => {
     const rowTotalIssue = {
       ...issue,
       id: "issue:fact:arithmetic:row-total",
@@ -124,9 +119,10 @@ describe("invoice-scoped employee-paid answer", () => {
       issues: [rowTotalIssue],
     };
 
+    vi.mocked(getQuestionCard).mockResolvedValue(metadata(rowTotalIssue,"REPLACE_SOURCE"));
     render(<Questions caseView={view} onCase={() => {}} currentRole="employee" />);
 
-    expect(screen.getByLabelText("Trích dẫn nguồn cho căn cứ")).toHaveTextContent(/report_hoan_ung\.pdf.*trang 1/);
+    expect(await screen.findByLabelText("Trích dẫn nguồn cho căn cứ")).toHaveTextContent(/report_hoan_ung\.pdf.*trang 1/);
     expect(screen.getByText("Tiếp khách 2.000.000 đ")).toBeInTheDocument();
   });
 });

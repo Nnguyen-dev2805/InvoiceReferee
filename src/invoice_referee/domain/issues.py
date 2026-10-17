@@ -37,10 +37,42 @@ class ProcessingProblem(StrictModel):
     next_action: str
 
 
+class QuestionAction(StrictModel):
+    issue_id: Id
+    action: str
+    label: str
+    scope: Id
+    amount: Vnd
+    limit: Vnd | None = None
+    authorized: bool = False
+    unavailable_reason: str | None = None
+
+
+class DeclaredChange(StrictModel):
+    field: str
+    row_id: str | None = None
+    before: int
+    after: int
+
+
+class DeclarationCorrectionOption(StrictModel):
+    id: str
+    label: str
+    changes: tuple[DeclaredChange, ...]
+
+
 class QuestionCard(StrictModel):
     """Everything one owner needs to answer this issue in one response."""
 
     issue_id: Id
+    case_version: int = 0
+    basis_id: str = ""
+    kind: IssueKind = "FACT"
+    scope: str = ""
+    title: str = ""
+    response_kind: Literal["FACT", "DECISION", "CORRECT_DECLARATION", "REPLACE_SOURCE", "HISTORY"] = "FACT"
+    actions: tuple[QuestionAction, ...] = ()
+    corrections: tuple[DeclarationCorrectionOption, ...] = ()
     known_facts: tuple[str, ...] = ()
     excerpt_refs: tuple[EvidenceRef, ...] = ()
     required_answer: str

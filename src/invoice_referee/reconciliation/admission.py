@@ -1462,6 +1462,12 @@ def admit_evidence(
     for index, entry in enumerate(matched, start=1):
         amount, refs = entry.amount, entry.refs
         expense_id = f"expense:{index}"
+        if entry.no_evidence_reason is None:
+            source_keys={(r.source_id,r.source_sha256) for r in entry.paper_refs}
+            declaration=next((c for c in reversed(confirmations) if c.fact_key==f"{expense_id}:exception_reason" and c.actor==scope.employee and c.scope==scope.activity and str(c.value).strip() and c.refs and all((r.source_id,r.source_sha256) in source_keys for r in c.refs)),None)
+            if declaration is not None:
+                # A new responsible declaration, never inferred from note/OCR.
+                entry=entry._replace(no_evidence_reason=str(declaration.value))
         # A cost whose source over-allocates is in dispute (TC08): its amount is
         # not a verified fact and must not become eligible/employee-paid money.
         disputed = (

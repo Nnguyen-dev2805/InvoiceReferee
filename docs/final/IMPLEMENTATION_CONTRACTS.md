@@ -1000,3 +1000,42 @@ giữ và E0 pin; profile/critical-field matrix pin tại Hoangha revision `1ee3
   phải money. Giá trị có chữ (số chứng từ) bind theo skeleton alphanumeric hoặc theo
   run số dài nhất của chính nó, nên số serial-prefix (`IR26E00000101`) khớp đúng phần
   của nó và số sai bị từ chối.
+
+
+## 13. Source-bound question cards and accountable responses (17/10/2026)
+
+QuestionCard GET `/cases/{root}/issues/{issue}/card` is read-only and source-built:
+case_version, opaque basis_id, kind/scope/owner, known_facts, excerpt_refs,
+response_kind, per-action preview (action/amount/limit/authorized/reason), optional
+explicit declaration correction. Preview never grants authority. POST checks the
+current version/basis/scope/issue set/actor/role/grants and Stop in one transaction.
+
+Authority decisions persist per root/action/material cost or obligation basis in
+`case_authority_decisions` (schema12), with actor, exact live grant fingerprint,
+amount, source refs, time and reason. They are not system grants. Each action is
+amount-bounded separately: E9/A1 requires recognition9 and issuance8; a single
+client amount1 cannot authorize either. Missing one action/right is atomic refusal.
+Unrelated FACT/POLICY remains blocking. Reload/reassess/restart consume only a
+still-valid decision; changed source/cost/grant/profile/epoch invalidates it.
+Instruction-bound confirmed receipts fulfill an obligation, do not change E or
+ask for cost recognition again. Invalidated gates suspend an old actionable order.
+
+FACT uses a typed owner answer and real basis; POLICY/AUTHORITY cannot pass through
+answers. Unsupported text that leaves the same fact unresolved is refused rather
+than falsely reported as success. Q32 retains invoice/employee/amount/source bounds.
+Alternative-evidence reason may be a new scoped employee declaration; it is not
+inferred from source note and does not clear party/service/payment FACTs.
+
+CorrectDeclaration records an immutable employee-authored revision, original
+source fingerprint, before/after fields, actor/reason/digest/time. Original PDF and
+stored raw OCR report are unchanged. Only code-proposed narrow return/reimburse or
+unique expense-amount adjustments can be accepted; no invoice/source fact is
+rewritten, no actual A/P/R is created. Current matching/admission/policy use that
+explicit declaration overlay while the original source basis remains unchanged.
+Changing material sources invalidates old corrections. Unsupported/ambiguous
+changes require a new original document; a generic “agree” cannot waive them.
+
+UI keeps codes and dates verbatim, renders quotes/context inline, decisions call
+`decisions`, corrections call `corrections`, facts call `answers`, history goes to
+the existing money workflow. TC18 ExceptionReview/OCR and Verify semantics remain.
+Engineering rehearsal is not practitioner evidence or an independent20/20 score.

@@ -1,5 +1,17 @@
 # Implementation checkpoint
 
+## Escalation cards and response loop — worktree implementation, 17/10/2026
+
+Uncommitted branch codex/escalation-answerability, base96e6c4b0 (S6+Verify already
+integrated). Main/deployment unchanged. Server-built cards, typed FACT/decision/
+declaration revision, per-action authority persistence, current grant/basis/epoch
+checks and immutable original evidence. S6 exception/OCR retained; no providers.
+Premerge full1034pass/6inheritedfail; frontend73pass/2skip/build; browser7/7 and S6 18/18.
+Independent review found3 lifecycle issues, fixed RED→GREEN; no reapproval claim.
+No real-recording/LIVE/practitioner/20-point-score acceptance. No commit/merge.
+[Acceptance](reviews/2026-10-16-escalation-answerability-acceptance.md).
+
+
 ## Verify/scorer hardened and integrated — 17/10/2026
 
 Merged `codex/verify-scorer` into main at06e03767 (implementation a0afeb7b),

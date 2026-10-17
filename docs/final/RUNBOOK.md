@@ -198,3 +198,27 @@ BROWSER_BASE_URL=http://127.0.0.1:65135 rtk proxy node frontend/s6-flow-c.mjs   
   never calls a live provider. Human question quality remains NOT_REVIEWED.
 - Combined merge evidence `.runtime/verify-fix-merge-20261017/`; six known backend
   failures remain, so do not report full-regression green or model-quality success.
+
+
+## 9. Escalation response rehearsal (worktree only, offline)
+
+Use the uncommitted codex/escalation-answerability managed worktree, not the
+running main DB. `rtk proxy uv run --frozen --python 3.12 python scripts/seed_escalation_browser.py`
+creates isolated synthetic input DBs under .runtime/escalation-answerability/browser.
+Run private source/card-only servers from the accompanying accepted browser evidence
+wrapper (`serve_browser.py <name> <port>`); the wrapper is test-only and blocks
+outbound network. Frontend must be built using pinned Node24. Run
+`rtk proxy node frontend/escalation-browser.mjs` against ports65201–65207.
+Names: authority,compound,over,fact,collect,pay,balanced. Each fresh DB gets one
+mutation run; preserve artifacts/stop owned servers before reseeding. Read-only
+reload tests may use the existing run. S6 compatibility uses original s6-flow-a2
+on separate65208 DB and fake transport; it does not call real providers.
+
+Decision users review amount/action/right/source on the card, enter reason and
+approve. FACT arithmetic users review an explicit before/after claim revision,
+check responsibility and enter reason; original PDF is retained. It never means
+money was paid. Unsupported source replacement needs corrected original docs;
+free text does not waive it. Missing rights25m/20m stays blocked for higher authority.
+
+Current main/production does not include this uncommitted worktree until an
+explicit integration step. Acceptance logs and all failures remain in the worktree.
